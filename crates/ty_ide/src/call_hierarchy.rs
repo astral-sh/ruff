@@ -244,8 +244,43 @@ pub fn call_hierarchy_incoming_calls(
         _ => PropertyAccessorRole::NotProperty,
     };
 
+    // Pre-compute the set of attribute names that *could* resolve to one of
+    // `target_definitions`: the needle itself plus every distinct name carried
+    // by the resolved definitions. Used as a cheap text-level prefilter at
+    // attribute-leaf call sites (`obj.X` / `obj.X()` / `@obj.X`) — attribute
+    // names are invariant under import aliasing, so a leaf whose `attr` is
+    // outside this set cannot possibly resolve to the target. Bare-name leaves
+    // (`X()`) can still route through aliases / rebindings and are deliberately
+    // excluded from this filter so the existing alias support is preserved
+    // (see `incoming_via_import_alias` and the comment on `CallSitesFinder`).
+    //
+    // The filter is disabled (left empty) when any candidate name is a
+    // dunder method, because dunders are implicitly invoked through arbitrary
+    // attribute syntax: `obj.fbank(...)` triggers `fbank.__call__`, and
+    // `mod.MyClass(...)` triggers `MyClass.__init__`. In both cases the
+    // textual leaf is the receiver name, not the dunder.
+    let mut candidate_attribute_names: Vec<String> = Vec::new();
+    candidate_attribute_names.push(needle.to_string());
+    for resolved in &target_definitions {
+        if let Some(def) = resolved.definition()
+            && let Some(name) = def.name(db)
+            && !candidate_attribute_names.iter().any(|n| n == &name)
+        {
+            candidate_attribute_names.push(name);
+        }
+    }
+    if candidate_attribute_names.iter().any(|name| is_dunder(name)) {
+        candidate_attribute_names.clear();
+    }
+
     // Collect raw `(caller_file, call_site_range, enclosing_scope)` triples.
-    let mut raw = call_sites_for_file(db, file, &target_definitions, target_role);
+    let mut raw = call_sites_for_file(
+        db,
+        file,
+        &target_definitions,
+        target_role,
+        &candidate_attribute_names,
+    );
 
     if is_externally_visible {
         let result = std::sync::Mutex::new(Vec::<RawCallSite>::new());
@@ -255,6 +290,7 @@ pub fn call_hierarchy_incoming_calls(
             let target_definitions = &target_definitions;
             let files = &files;
             let result = &result;
+            let candidate_attribute_names = &candidate_attribute_names;
             // The byte-level text prefilter still pays off as a coarse gate:
             // files that don't contain the target name (or an import of it)
             // textually are skipped before any AST work. Files that route the
@@ -273,8 +309,13 @@ pub fn call_hierarchy_incoming_calls(
                         if !contains_identifier(&source, needle) {
                             return;
                         }
-                        let sites =
-                            call_sites_for_file(db, other_file, target_definitions, target_role);
+                        let sites = call_sites_for_file(
+                            db,
+                            other_file,
+                            target_definitions,
+                            target_role,
+                            candidate_attribute_names,
+                        );
                         result.lock().unwrap().extend(sites);
                     });
                 }
@@ -470,6 +511,7 @@ fn call_sites_for_file(
     file: File,
     target_definitions: &Definitions<'_>,
     target_role: PropertyAccessorRole,
+    candidate_attribute_names: &[String],
 ) -> Vec<RawCallSite> {
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
@@ -482,6 +524,7 @@ fn call_sites_for_file(
         tokens: module.tokens(),
         target_definitions,
         target_role,
+        candidate_attribute_names,
         sites: &mut sites,
         ancestors: Vec::new(),
     };
@@ -501,6 +544,14 @@ struct CallSitesFinder<'a, 'db> {
     /// Without this, querying a setter would also match reads (via the
     /// getter co-definition).
     target_role: PropertyAccessorRole,
+    /// Names that an attribute leaf could textually match before any
+    /// semantic resolution. `obj.X` cannot resolve to a definition with a
+    /// different name (attribute names are invariant under import aliasing),
+    /// so leaves whose identifier is outside this set are skipped without a
+    /// semantic query. Bare-name leaves are deliberately *not* gated by this
+    /// (they may route through aliases / rebindings) and always go through
+    /// the semantic check.
+    candidate_attribute_names: &'a [String],
     sites: &'a mut Vec<RawCallSite>,
     ancestors: Vec<AnyNodeRef<'a>>,
 }
@@ -516,14 +567,18 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
             // where `bar` is a local rebinding/alias of the target resolves
             // semantically without needing the alias name in the text needle.
             AnyNodeRef::ExprCall(call) => {
-                if let Some(leaf) = callee_leaf(&call.func) {
+                if let Some(leaf) = callee_leaf(&call.func)
+                    && self.leaf_could_match(leaf)
+                {
                     self.check_call_site(leaf);
                 }
             }
             AnyNodeRef::Decorator(decorator) => {
                 // `@foo` without parens is a runtime call; `@foo()` is handled
                 // by the `ExprCall` arm above.
-                if let Some(leaf) = callee_leaf(&decorator.expression) {
+                if let Some(leaf) = callee_leaf(&decorator.expression)
+                    && self.leaf_could_match(leaf)
+                {
                     self.check_call_site(leaf);
                 }
             }
@@ -541,7 +596,9 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
             // either, and the `incoming_non_call_reference_filtered_out`
             // test depends on the bare-name filter staying in place.
             AnyNodeRef::ExprAttribute(attribute) => {
-                if !attribute_is_callee_of_parent(&self.ancestors, attribute) {
+                if !attribute_is_callee_of_parent(&self.ancestors, attribute)
+                    && self.attribute_name_could_match(attribute.attr.as_str())
+                {
                     self.check_attribute_reference(attribute);
                 }
             }
@@ -558,6 +615,27 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
 }
 
 impl<'a> CallSitesFinder<'a, '_> {
+    /// Text-level prefilter for call-site leaves. Attribute leaves whose name
+    /// is outside `candidate_attribute_names` cannot resolve to the target;
+    /// bare-name leaves always go through the semantic check because they can
+    /// route through aliases.
+    fn leaf_could_match(&self, leaf: CalleeLeaf<'_>) -> bool {
+        match leaf {
+            CalleeLeaf::Name(_) => true,
+            CalleeLeaf::AttrIdentifier { identifier, .. } => {
+                self.attribute_name_could_match(identifier.as_str())
+            }
+        }
+    }
+
+    fn attribute_name_could_match(&self, name: &str) -> bool {
+        // An empty candidate set means the prefilter is disabled (the target
+        // includes a dunder method, which can be implicitly invoked through
+        // any receiver name).
+        self.candidate_attribute_names.is_empty()
+            || self.candidate_attribute_names.iter().any(|n| n == name)
+    }
+
     fn check_call_site(&mut self, leaf: CalleeLeaf<'a>) {
         let Some((goto_target, call_site_range)) =
             resolve_callee(self.model, self.tokens, &self.ancestors, leaf)
@@ -668,6 +746,14 @@ impl<'a> CallSitesFinder<'a, '_> {
             call_site_range,
         });
     }
+}
+
+/// `__call__`, `__init__`, etc. — names that Python invokes implicitly through
+/// arbitrary receivers, so a textual attribute-name match against the target
+/// would be unsound: `obj.fbank(...)` triggers `fbank.__call__` even though
+/// the textual attribute is `fbank`, not `__call__`.
+fn is_dunder(name: &str) -> bool {
+    name.len() >= 4 && name.starts_with("__") && name.ends_with("__")
 }
 
 /// Returns `true` when `attribute` is the immediate callee of an enclosing
