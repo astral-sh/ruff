@@ -7,7 +7,10 @@ use crate::place::place_from_declarations;
 use crate::types::infer::nearest_enclosing_function;
 use crate::{
     TypeQualifiers,
-    types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
+    types::{
+        Type, attribute_write::assignment_attribute_members, diagnostic::INVALID_ASSIGNMENT,
+        infer::TypeInferenceBuilder,
+    },
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
@@ -315,7 +318,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) {
         let Some((meta_attr, fallback_attr)) =
-            self.assignment_attribute_members(object_ty, attribute)
+            assignment_attribute_members(self.db(), object_ty, attribute)
         else {
             return;
         };
@@ -344,7 +347,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let Some((meta_attr, fallback_attr)) =
-            self.assignment_attribute_members(object_ty, attribute)
+            assignment_attribute_members(self.db(), object_ty, attribute)
         else {
             return false;
         };
