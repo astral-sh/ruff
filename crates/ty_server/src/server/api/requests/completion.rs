@@ -84,7 +84,13 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     })
                 });
 
-                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let name = match comp.insert_text_format {
+                    CompletionInsertTextFormat::PlainText => {
+                        comp.insert.as_deref().unwrap_or(&comp.name)
+                    }
+                    CompletionInsertTextFormat::Snippet => &comp.name,
+                }
+                .to_string();
                 let import_suffix = comp
                     .module_name
                     .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
