@@ -119,8 +119,6 @@ func(
       {
         "label": "Class",
         "kind": 7,
-        "detail": "type[Class]",
-        "sortText": "0",
         "insertText": "Class($0)",
         "insertTextFormat": 2
       }
@@ -133,8 +131,6 @@ func(
       {
         "label": "function",
         "kind": 3,
-        "detail": "def function() -> None",
-        "sortText": "0",
         "insertText": "function($0)",
         "insertTextFormat": 2
       }
@@ -147,8 +143,6 @@ func(
       {
         "label": "method",
         "kind": 2,
-        "detail": "def method(self) -> None",
-        "sortText": "0",
         "insertText": "method($0)",
         "insertTextFormat": 2
       }
@@ -160,9 +154,7 @@ func(
     [
       {
         "label": "function",
-        "kind": 3,
-        "detail": "def function() -> None",
-        "sortText": "0"
+        "kind": 3
       }
     ]
     "#);
@@ -198,9 +190,7 @@ func
     [
       {
         "label": "function",
-        "kind": 3,
-        "detail": "def function() -> None",
-        "sortText": "0"
+        "kind": 3
       }
     ]
     "#);
@@ -216,6 +206,10 @@ fn callable_completions(
     let mut completions = server.completion_request(&server.file_uri(file), position);
     completions
         .retain(|completion| matches!(completion.label.as_str(), "Class" | "function" | "method"));
+    for completion in &mut completions {
+        completion.detail = None;
+        completion.sort_text = None;
+    }
     completions
 }
 
