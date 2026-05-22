@@ -77,18 +77,55 @@ note: This is an unsafe fix and may change runtime behavior
 
 SIM109 [*] Use `a in ("foo", "bar")` instead of multiple equality comparisons
   --> SIM109.py:34:4
-   ...
+   |
+33 | # SIM109 (string literals)
+34 | if a == "foo" or a == "bar":
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+35 |     d
+   |
+help: Replace with `a in ("foo", "bar")`
+31 |     d
+32 |
+33 | # SIM109 (string literals)
+   - if a == "foo" or a == "bar":
 34 + if a in ("foo", "bar"):
+35 |     d
+36 |
+37 | # SIM109 (integer literals)
 note: This is an unsafe fix and may change runtime behavior
 
 SIM109 [*] Use `a in (1, 2)` instead of multiple equality comparisons
   --> SIM109.py:38:4
-   ...
+   |
+37 | # SIM109 (integer literals)
+38 | if a == 1 or a == 2:
+   |    ^^^^^^^^^^^^^^^^
+39 |     d
+   |
+help: Replace with `a in (1, 2)`
+35 |     d
+36 |
+37 | # SIM109 (integer literals)
+   - if a == 1 or a == 2:
 38 + if a in (1, 2):
+39 |     d
+40 |
+41 | # SIM109 (mixed: variable and literal)
 note: This is an unsafe fix and may change runtime behavior
 
 SIM109 [*] Use `a in (b, "baz")` instead of multiple equality comparisons
   --> SIM109.py:42:4
-   ...
+   |
+41 | # SIM109 (mixed: variable and literal)
+42 | if a == b or a == "baz":
+   |    ^^^^^^^^^^^^^^^^^^^^
+43 |     d
+   |
+help: Replace with `a in (b, "baz")`
+39 |     d
+40 |
+41 | # SIM109 (mixed: variable and literal)
+   - if a == b or a == "baz":
 42 + if a in (b, "baz"):
+43 |     d
 note: This is an unsafe fix and may change runtime behavior
