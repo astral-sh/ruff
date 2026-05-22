@@ -708,7 +708,7 @@ static_assert(is_assignable_to(FooSubclassOfAny, HasX))
 class FooWithY(Foo):
     y: int
 
-assert is_subtype_of(FooWithY, HasXY)
+assert is_subtype_of(FooWithY, HasXY)  # ty: ignore[redundant-assert]
 static_assert(is_assignable_to(FooWithY, HasXY))
 
 class Bar:

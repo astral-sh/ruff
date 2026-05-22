@@ -82,7 +82,7 @@ def two(x: int | None, y: int | None):
 ## Assertions with `test` predicates that are statically known to always be `True`
 
 ```py
-assert True, (x := 1)
+assert True, (x := 1)  # error: [redundant-assert] "Assert condition is always true"
 
 # error: [unresolved-reference]
 reveal_type(x)  # revealed: Unknown

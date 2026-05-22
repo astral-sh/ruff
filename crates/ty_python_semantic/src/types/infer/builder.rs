@@ -6,7 +6,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -51,16 +51,16 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
-    report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
-    report_invalid_type_checking_constant,
+    REDUNDANT_ASSERT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_bad_dunder_set_call,
+    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_class_match_pattern, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
+    report_invalid_key_on_typed_dict, report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -4771,11 +4771,88 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
-        if let Err(err) = test_ty.try_bool(self.db()) {
-            err.report_diagnostic(&self.context, &**test);
+        if Self::is_explicit_falsy_assert(test) {
+            self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+            return;
+        }
+
+        if Self::is_sys_version_info_or_platform_assert(test) {
+            self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+            return;
+        }
+
+        if self.is_runtime_check_assert(test) {
+            self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+            return;
+        }
+
+        match test_ty.try_bool(self.db()) {
+            Ok(Truthiness::AlwaysTrue) => {
+                if let Some(builder) = self.context.report_lint(&REDUNDANT_ASSERT, &**test) {
+                    builder.into_diagnostic("Assert condition is always true");
+                }
+            }
+            Ok(Truthiness::AlwaysFalse) => {
+                if let Some(builder) = self.context.report_lint(&REDUNDANT_ASSERT, &**test) {
+                    builder.into_diagnostic("Assert condition is always false");
+                }
+            }
+            Ok(Truthiness::Ambiguous) => {}
+            Err(err) => err.report_diagnostic(&self.context, &**test),
         }
 
         self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+    }
+
+    fn is_explicit_falsy_assert(expr: &ast::Expr) -> bool {
+        match expr {
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => !value,
+            ast::Expr::NoneLiteral(_) => true,
+            ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+            ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+                ast::Number::Int(int) => *int == 0,
+                ast::Number::Float(float) => *float == 0.0,
+                ast::Number::Complex { real, imag } => *real == 0.0 && *imag == 0.0,
+            },
+            ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+            | ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Set(ast::ExprSet { elts, .. }) => elts.is_empty(),
+            ast::Expr::Dict(ast::ExprDict { items, .. }) => items.is_empty(),
+            _ => false,
+        }
+    }
+
+    fn is_sys_version_info_or_platform_assert(expr: &ast::Expr) -> bool {
+        any_over_expr(expr, |expr| {
+            let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
+                return false;
+            };
+
+            matches!(attr.as_str(), "version_info" | "platform")
+                && matches!(value.as_ref(), ast::Expr::Name(ast::ExprName { id, .. }) if id == "sys")
+        })
+    }
+
+    fn is_runtime_check_assert(&self, expr: &ast::Expr) -> bool {
+        any_over_expr(expr, |expr| {
+            let ast::Expr::Call(call) = expr else {
+                return false;
+            };
+
+            matches!(
+                self.expression_type(&call.func),
+                Type::FunctionLiteral(function)
+                    if matches!(
+                        function.known(self.db()),
+                        Some(
+                            KnownFunction::IsInstance
+                                | KnownFunction::IsSubclass
+                                | KnownFunction::HasAttr
+                        )
+                    )
+            )
+        })
     }
 
     fn infer_raise_statement(&mut self, raise: &ast::StmtRaise) {

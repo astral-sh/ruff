@@ -152,6 +152,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
+    registry.register_lint(&REDUNDANT_ASSERT);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&REDUNDANT_FINAL_CLASSVAR);
     registry.register_lint(&UNRESOLVED_GLOBAL);
@@ -2931,6 +2932,28 @@ declare_lint! {
         summary: "Invalid attribute access",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects `assert` statements with conditions that are statically known
+    /// to always evaluate to `True` or always evaluate to `False`.
+    ///
+    /// ## Why is this bad?
+    /// An assertion that always passes is redundant and may indicate stale
+    /// defensive code. An assertion that always fails is equivalent to an
+    /// unconditional `AssertionError`.
+    ///
+    /// ## Example
+    /// ```python
+    /// def f(x: str):
+    ///     assert x is not None
+    /// ```
+    pub(crate) static REDUNDANT_ASSERT = {
+        summary: "detects redundant assert statements",
+        status: LintStatus::preview("0.0.36"),
+        default_level: Level::Ignore,
     }
 }
 
