@@ -1694,6 +1694,20 @@ static_assert(is_subtype_of(XSubProto, HasXProperty))
 static_assert(is_assignable_to(XSubProto, HasXProperty))
 ```
 
+A `Final` attribute on a protocol is also read-only:
+
+```py
+class HasFinalX(Protocol):
+    x: Final[int] = 42
+
+static_assert(is_subtype_of(XFinal, HasFinalX))
+static_assert(is_assignable_to(XFinal, HasFinalX))
+static_assert(is_subtype_of(XReadProperty, HasFinalX))
+static_assert(is_assignable_to(XReadProperty, HasFinalX))
+static_assert(is_subtype_of(HasXProperty, HasFinalX))
+static_assert(is_assignable_to(HasXProperty, HasFinalX))
+```
+
 A read/write property on a protocol, where the getter returns the same type that the setter takes,
 is equivalent to a normal mutable attribute on a protocol.
 
@@ -1746,6 +1760,8 @@ class HasMutableXAttr(Protocol):
     x: int
 
 static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))
+static_assert(not is_subtype_of(HasFinalX, HasMutableXAttr))
+static_assert(not is_assignable_to(HasFinalX, HasMutableXAttr))
 
 static_assert(is_subtype_of(HasMutableXAttr, HasXProperty))
 static_assert(is_assignable_to(HasMutableXAttr, HasXProperty))
@@ -1893,6 +1909,31 @@ class HasSetAttrWithUnsuitableInput:
 
 static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
+```
+
+## Variance of generic protocols with `Final` members
+
+A `Final` attribute is readable but not writable, so it constrains an inferred type parameter
+covariantly:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, Protocol, cast
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+
+class MyInt(int): ...
+
+class GenericFinalX[T](Protocol):
+    x: Final[T] = cast(T, None)
+
+static_assert(is_subtype_of(GenericFinalX[MyInt], GenericFinalX[int]))
+static_assert(is_assignable_to(GenericFinalX[MyInt], GenericFinalX[int]))
+static_assert(not is_subtype_of(GenericFinalX[int], GenericFinalX[MyInt]))
+static_assert(not is_assignable_to(GenericFinalX[int], GenericFinalX[MyInt]))
 ```
 
 ## Subtyping of protocols with method members

@@ -1283,7 +1283,7 @@ c.x = (1, b"")  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `tuple[Literal[1], Literal[b""]]` is not assignable to attribute `x` on type `tuple[int, str]`
+error[invalid-assignment]: Object of type `tuple[Literal[1], Literal[b""]]` is not assignable to attribute `x` of type `tuple[int, str]`
  --> src/mdtest_snippet.py:5:1
   |
 5 | c.x = (1, b"")  # snapshot

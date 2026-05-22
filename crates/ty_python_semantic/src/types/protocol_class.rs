@@ -426,6 +426,11 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
                             .map(|set_type| set_type.variance_of(db, typevar).flip()),
                     )
                     .collect(),
+                ProtocolMemberKind::Other(ty)
+                    if member.qualifiers.contains(TypeQualifiers::FINAL) =>
+                {
+                    ty.variance_of(db, typevar)
+                }
                 ProtocolMemberKind::Other(ty) => [
                     ty.variance_of(db, typevar),
                     ty.variance_of(db, typevar).flip(),
@@ -893,7 +898,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 };
                 let read_result = self.check_type_pair(db, attribute_type, *member_type);
 
-                if member.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                if member.qualifiers.contains(TypeQualifiers::FINAL) {
+                    read_result
+                } else if member.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
                     let Place::Defined(DefinedPlace {
                         ty: meta_attribute_type,
                         definedness: Definedness::AlwaysDefined,
@@ -959,19 +966,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (
                             ProtocolMemberKind::Property(source_property),
                             ProtocolMemberKind::Other(target_type),
-                        ) => property_get_type(db, source_property)
-                            .when_some_and(db, self.constraints, |source_get_type| {
-                                self.check_type_pair(db, source_get_type, target_type)
-                            })
-                            .and(db, self.constraints, || {
-                                property_set_type(db, source_property).when_some_and(
-                                    db,
-                                    self.constraints,
-                                    |source_set_type| {
-                                        self.check_type_pair(db, target_type, source_set_type)
-                                    },
-                                )
-                            }),
+                        ) => {
+                            let read_result = property_get_type(db, source_property).when_some_and(
+                                db,
+                                self.constraints,
+                                |source_get_type| {
+                                    self.check_type_pair(db, source_get_type, target_type)
+                                },
+                            );
+                            if target_member.qualifiers.contains(TypeQualifiers::FINAL) {
+                                read_result
+                            } else {
+                                read_result.and(db, self.constraints, || {
+                                    property_set_type(db, source_property).when_some_and(
+                                        db,
+                                        self.constraints,
+                                        |source_set_type| {
+                                            self.check_type_pair(db, target_type, source_set_type)
+                                        },
+                                    )
+                                })
+                            }
+                        }
 
                         // A `@property` member can never be a subtype of a method member, as it is not necessarily
                         // accessible on the meta-type, whereas a method member must be.
@@ -1008,11 +1024,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (
                             ProtocolMemberKind::Other(source_type),
                             ProtocolMemberKind::Other(target_type),
-                        ) => self.check_type_pair(db, source_type, target_type).and(
-                            db,
-                            self.constraints,
-                            || self.check_type_pair(db, target_type, source_type),
-                        ),
+                        ) => {
+                            let read_result = self.check_type_pair(db, source_type, target_type);
+                            if target_member.qualifiers.contains(TypeQualifiers::FINAL) {
+                                read_result
+                            } else if source_member.qualifiers.contains(TypeQualifiers::FINAL) {
+                                self.never()
+                            } else {
+                                read_result.and(db, self.constraints, || {
+                                    self.check_type_pair(db, target_type, source_type)
+                                })
+                            }
+                        }
 
                         (
                             ProtocolMemberKind::Property(_)

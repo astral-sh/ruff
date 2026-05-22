@@ -45,9 +45,9 @@ body, we do not allow these assignments, preventing users from accidentally over
 descriptor, which is what would happen at runtime:
 
 ```py
-# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` on type `Ten`"
+# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` of type `Ten`"
 C.ten = 10
-# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` on type `Ten`"
+# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
 C.ten = 11
 ```
 
@@ -165,7 +165,7 @@ class C:
 
         # However, for non-data descriptors, instance attributes do take precedence.
         # So it is possible to override them.
-        # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `non_data_descriptor` on type `NonDataDescriptor`"
+        # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `non_data_descriptor` of type `NonDataDescriptor`"
         self.non_data_descriptor = 1
 
 c = C()
@@ -180,7 +180,7 @@ reveal_type(C.non_data_descriptor)  # revealed: Literal["non-data"]
 
 # Assignments through class objects are still checked against the declared
 # descriptor type.
-# error: [invalid-assignment] "Object of type `Literal["something else"]` is not assignable to attribute `data_descriptor` on type `DataDescriptor`"
+# error: [invalid-assignment] "Object of type `Literal["something else"]` is not assignable to attribute `data_descriptor` of type `DataDescriptor`"
 C.data_descriptor = "something else"
 ```
 
@@ -221,7 +221,7 @@ def f1(flag: bool):
     reveal_type(C1().attr)  # revealed: Literal["data"] | bytes
 
     # Assigning to the attribute also causes no `possibly-unbound` diagnostic:
-    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` on type `bytes`"
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` of type `bytes`"
     C1().attr = 1
 ```
 
@@ -231,7 +231,7 @@ descriptor here:
 ```py
 class C2:
     def f(self):
-        # error: [invalid-assignment] "Object of type `Literal[b"normal"]` is not assignable to attribute `attr` on type `NonDataDescriptor`"
+        # error: [invalid-assignment] "Object of type `Literal[b"normal"]` is not assignable to attribute `attr` of type `NonDataDescriptor`"
         self.attr = b"normal"
     attr = NonDataDescriptor()
 
@@ -239,7 +239,7 @@ reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 
 # Reads still fall back to the instance attribute in this case, but assignments
 # are checked against the declared class attribute type.
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` on type `NonDataDescriptor`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` of type `NonDataDescriptor`"
 C2().attr = 1
 ```
 
@@ -263,7 +263,7 @@ reveal_type(C().ten)  # revealed: Ten
 C().ten = Ten()
 
 # The instance attribute is declared as `Ten`, so this is an
-# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` on type `Ten`"
+# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` of type `Ten`"
 C().ten = 10
 ```
 
@@ -330,7 +330,7 @@ overwrite the data descriptor, but the attribute is declared as `DataDescriptor`
 so we do not allow this:
 
 ```py
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `class_data_descriptor` on type `DataDescriptor`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `class_data_descriptor` of type `DataDescriptor`"
 C1.class_data_descriptor = 1
 ```
 
@@ -422,7 +422,7 @@ def _(flag: bool):
     # wrong, but they could be subsumed under a higher-level diagnostic.
 
     # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>` with custom `__set__` method"
-    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` on type `Literal["value on class"]`"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
     # error: [possibly-missing-attribute]
@@ -857,7 +857,7 @@ class Descriptor:
 class C:
     descriptor = Descriptor()
 
-# error: [invalid-assignment] "Object of type `Literal["something else"]` is not assignable to attribute `descriptor` on type `Descriptor`"
+# error: [invalid-assignment] "Object of type `Literal["something else"]` is not assignable to attribute `descriptor` of type `Descriptor`"
 C.descriptor = "something else"
 reveal_type(C.descriptor)  # revealed: int
 ```
