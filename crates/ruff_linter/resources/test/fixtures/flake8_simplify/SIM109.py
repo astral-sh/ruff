@@ -29,3 +29,15 @@ if (
     or a == c
 ):
     d
+
+# SIM109 (string literals)
+if a == "foo" or a == "bar":
+    d
+
+# SIM109 (integer literals)
+if a == 1 or a == 2:
+    d
+
+# SIM109 (mixed: variable and literal)
+if a == b or a == "baz":
+    d
