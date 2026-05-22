@@ -15,7 +15,7 @@ use crate::{
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type, binding_type,
+        StaticClassLiteral, Type, TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -48,6 +48,7 @@ use crate::{
         overrides,
         tuple::Tuple,
         typevar::TypeVarInstance,
+        variance::VarianceInferable,
         visitor::find_over_type,
     },
 };
@@ -221,6 +222,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
     let expanded_base_entries =
         expanded_class_base_entries(db, class.known(db), class_node, class_definition);
+    let check_explicit_base_variance = context.is_lint_enabled(&INVALID_GENERIC_CLASS);
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
         let base_class = entry.ty();
@@ -311,7 +313,30 @@ pub(crate) fn check_static_class_definitions<'db>(
                 continue;
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
-            Type::GenericAlias(class) => ClassType::Generic(class),
+            Type::GenericAlias(base_alias) => {
+                if check_explicit_base_variance
+                    && let Some(node) = source_node
+                    && let Some(generic_context) = class.generic_context(db)
+                    && let Some(typevar) = generic_context.variables(db).find(|typevar| {
+                        let Some(declared_variance) = typevar.typevar(db).explicit_variance(db)
+                        else {
+                            return false;
+                        };
+                        declared_variance != TypeVarVariance::Invariant
+                            && declared_variance.join(base_alias.variance_of(db, *typevar))
+                                != declared_variance
+                    })
+                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Variance of type variable `{}` is incompatible with base class `{}`",
+                        typevar.typevar(db).name(db),
+                        base_alias.origin(db).name(db),
+                    ));
+                }
+
+                ClassType::Generic(base_alias)
+            }
             _ => continue,
         };
 
