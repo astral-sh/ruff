@@ -452,11 +452,7 @@ impl<'db> CompletionBuilder<'db> {
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
-        let (insert, insert_text_format) = if ctx.insert_call_parentheses
-            && matches!(
-                kind,
-                Some(CompletionKind::Function | CompletionKind::Method | CompletionKind::Class)
-            ) {
+        let (insert, insert_text_format) = if ctx.should_complete_function_parentheses(kind) {
             let insert = self.insert.take().unwrap_or_else(|| self.name.clone());
             (
                 Some(Name::new(format!("{insert}($0)"))),
@@ -594,7 +590,9 @@ pub enum CompletionInsertTextFormat {
     /// Plain text to insert as-is.
     #[default]
     PlainText,
-    /// Snippet text with tab stops or placeholders.
+    /// [Snippet syntax] text.
+    ///
+    /// [Snippet syntax]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#snippet_syntax
     Snippet,
 }
 
@@ -696,8 +694,8 @@ impl<'m> Context<'m> {
                     is_raising_exception: exception_ty.is_some(),
                     existing_class_bases,
                     valid_keywords: self.cursor.valid_keywords(),
-                    insert_call_parentheses: settings.complete_function_parentheses
-                        && !self.cursor.next_token_is_open_parenthesis(),
+                    complete_function_parentheses: settings.complete_function_parentheses
+                        && !self.cursor.suppress_function_parentheses(),
                 }
             }
         }
@@ -847,12 +845,51 @@ impl<'m> ContextCursor<'m> {
             .map(|token| token.string_quote_style())
     }
 
+    fn suppress_function_parentheses(&self) -> bool {
+        self.next_token_is_open_parenthesis()
+            || self.is_in_decorator_name()
+            || self.is_in_type_expression()
+    }
+
     fn next_token_is_open_parenthesis(&self) -> bool {
         self.parsed
             .tokens()
             .at_offset(self.offset)
             .last()
             .is_some_and(|token| token.kind() == TokenKind::Lpar)
+    }
+
+    fn is_in_decorator_name(&self) -> bool {
+        self.covering_node
+            .ancestors()
+            // We bail if we're specifying arguments as we don't want
+            // to suppress suggestions there.
+            .take_while(|node| {
+                !matches!(node, ast::AnyNodeRef::Arguments(_)) && !node.is_statement()
+            })
+            .any(|node| matches!(node, ast::AnyNodeRef::Decorator(_)))
+    }
+
+    fn is_in_type_expression(&self) -> bool {
+        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
+
+        self.covering_node.ancestors().any(|node| match node {
+            ast::AnyNodeRef::StmtAnnAssign(stmt) => contains(&stmt.annotation),
+            ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
+            ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
+            ast::AnyNodeRef::Parameter(param) => param.annotation.as_deref().is_some_and(contains),
+            ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
+                type_param.bound.as_deref().is_some_and(contains)
+                    || type_param.default.as_deref().is_some_and(contains)
+            }
+            ast::AnyNodeRef::TypeParamTypeVarTuple(type_param) => {
+                type_param.default.as_deref().is_some_and(contains)
+            }
+            ast::AnyNodeRef::TypeParamParamSpec(type_param) => {
+                type_param.default.as_deref().is_some_and(contains)
+            }
+            _ => false,
+        })
     }
 
     /// Returns true when the tokens indicate that the definition of a new
@@ -992,18 +1029,7 @@ impl<'m> ContextCursor<'m> {
     /// Returns None if no context-based exclusions can
     /// be identified. Meaning that all keywords are valid.
     fn valid_keywords(&self) -> Option<FxHashSet<&'static str>> {
-        // Check if the cursor is within the naming
-        // part of a decorator node.
-        if self
-            .covering_node
-            .ancestors()
-            // We bail if we're specifying arguments as we don't
-            // want to suppress suggestions there.
-            .take_while(|node| {
-                !matches!(node, ast::AnyNodeRef::Arguments(_)) && !node.is_statement()
-            })
-            .any(|node| matches!(node, ast::AnyNodeRef::Decorator(_)))
-        {
+        if self.is_in_decorator_name() {
             return Some(FxHashSet::from_iter(["lambda"]));
         }
         self.covering_node.ancestors().find_map(|node| {
@@ -1205,7 +1231,7 @@ struct CollectionContext<'db> {
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
     /// Whether callable completions should insert call parentheses.
-    insert_call_parentheses: bool,
+    complete_function_parentheses: bool,
 }
 
 impl<'db> CollectionContext<'db> {
@@ -1253,6 +1279,15 @@ impl<'db> CollectionContext<'db> {
             }
         }
         false
+    }
+
+    fn should_complete_function_parentheses(&self, kind: Option<CompletionKind>) -> bool {
+        self.complete_function_parentheses
+            && matches!(
+                kind,
+                Some(CompletionKind::Function | CompletionKind::Method | CompletionKind::Class)
+            )
+            && !(kind == Some(CompletionKind::Class) && self.is_in_class_def())
     }
 }
 
@@ -9305,6 +9340,125 @@ def foo():
     }
 
     #[test]
+    fn complete_function_parentheses() {
+        let builder = completion_test_builder(
+            "\
+def callable():
+    pass
+
+call<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"callable($0)",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_existing_parenthesis() {
+        let builder = completion_test_builder(
+            "\
+def callable():
+    pass
+
+call<CURSOR>(
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"callable",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_from_import() {
+        let builder = completion_test_builder("from sys import get<CURSOR>");
+        assert_snapshot!(
+            builder
+                .complete_function_parentheses()
+                .filter(|completion| {
+                    completion.name == "getsizeof"
+                        && completion.kind == Some(CompletionKind::Function)
+                })
+                .build()
+                .snapshot(),
+            @"getsizeof",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_type_expression() {
+        let builder = completion_test_builder(
+            "\
+class CallableType: ...
+
+value: Call<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"CallableType",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_decorator_name() {
+        let builder = completion_test_builder(
+            "\
+def decorator(func): ...
+
+@decor<CURSOR>
+def decorated(): ...
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"decorator",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_class_base() {
+        let builder = completion_test_builder(
+            "\
+class Base: ...
+
+class Derived(Ba<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"Base",
+        );
+    }
+
+    #[test]
     fn nested_scopes_with_return() {
         let builder = completion_test_builder(
             "\
@@ -9735,6 +9889,11 @@ raise <CURSOR>
         /// being tested.
         fn skip_auto_import(mut self) -> CompletionTestBuilder {
             self.settings.auto_import = false;
+            self
+        }
+
+        fn complete_function_parentheses(mut self) -> CompletionTestBuilder {
+            self.settings.complete_function_parentheses = true;
             self
         }
 
