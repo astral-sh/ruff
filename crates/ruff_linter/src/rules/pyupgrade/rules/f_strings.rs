@@ -4,13 +4,14 @@ use anyhow::{Context, Result};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -36,6 +37,18 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```python
 /// f"{foo}"
 /// ```
+///
+/// ## Fix safety
+/// The fix is marked as unsafe whenever conversion may change runtime behavior:
+///
+/// - A walrus binding referenced only by the dropped argument
+///   (`"{1}".format(x := 1, x)` → `f"{x}"` raises `NameError`).
+/// - An unreferenced argument with side effects, including calls and arithmetic
+///   operations that may raise (`"a".format(foo())`, `"1".format(1 / 0)`).
+/// - A format-time accessor (`{[k]}`, `{.attr}`) combined with a side-effecting
+///   argument elsewhere, because `str.format` evaluates all arguments before any
+///   formatting while f-strings interleave the two
+///   (`"{[x]} {}".format(d, len(d))` on a `defaultdict`).
 ///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
@@ -65,6 +78,11 @@ struct FormatSummaryValues<'a> {
     args: Vec<&'a Expr>,
     kwargs: FxHashMap<&'a str, &'a Expr>,
     auto_index: usize,
+    /// Reference counts, used to detect dropped arguments.
+    args_used: Vec<u32>,
+    kwargs_used: FxHashMap<&'a str, u32>,
+    /// `true` if any field uses a post-argument accessor like `{x.y}` or `{x[k]}`.
+    field_has_accessors: bool,
 }
 
 impl<'a> FormatSummaryValues<'a> {
@@ -99,10 +117,16 @@ impl<'a> FormatSummaryValues<'a> {
             return None;
         }
 
+        let args_used = vec![0; extracted_args.len()];
+        let kwargs_used = extracted_kwargs.keys().map(|k| (*k, 0u32)).collect();
+
         Some(Self {
             args: extracted_args,
             kwargs: extracted_kwargs,
             auto_index: 0,
+            args_used,
+            kwargs_used,
+            field_has_accessors: false,
         })
     }
 
@@ -114,13 +138,33 @@ impl<'a> FormatSummaryValues<'a> {
     }
 
     /// Return the positional argument at the given index.
-    fn arg_positional(&self, index: usize) -> Option<&Expr> {
-        self.args.get(index).copied()
+    fn arg_positional(&mut self, index: usize) -> Option<&Expr> {
+        let arg = self.args.get(index).copied()?;
+        if let Some(count) = self.args_used.get_mut(index) {
+            *count = count.saturating_add(1);
+        }
+        Some(arg)
     }
 
     /// Return the keyword argument with the given name.
-    fn arg_keyword(&self, key: &str) -> Option<&Expr> {
-        self.kwargs.get(key).copied()
+    fn arg_keyword(&mut self, key: &str) -> Option<&Expr> {
+        let arg = self.kwargs.get(key).copied()?;
+        if let Some(count) = self.kwargs_used.get_mut(key) {
+            *count = count.saturating_add(1);
+        }
+        Some(arg)
+    }
+
+    fn unreferenced_args(&self) -> impl Iterator<Item = &'a Expr> + '_ {
+        let positional = self
+            .args
+            .iter()
+            .zip(&self.args_used)
+            .filter_map(|(arg, count)| (*count == 0).then_some(*arg));
+        let keyword = self.kwargs.iter().filter_map(|(key, value)| {
+            (self.kwargs_used.get(key).copied().unwrap_or(0) == 0).then_some(*value)
+        });
+        positional.chain(keyword)
     }
 }
 
@@ -139,6 +183,11 @@ enum FormatContext {
 
 /// Returns `true` if the expression should be parenthesized when used in an f-string.
 fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
+    // A leading `{` would be read as an escaped brace; a top-level colon (lambda)
+    // would be read as the format-spec separator.
+    if text.starts_with('{') || matches!(expr, Expr::Lambda(_)) {
+        return true;
+    }
     match (context, expr) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
@@ -148,7 +197,6 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             | Expr::BoolOp(_)
             | Expr::Compare(_)
             | Expr::If(_)
-            | Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
@@ -303,6 +351,27 @@ impl FStringConversion {
 
                     let field = FieldName::parse(&field_name)?;
 
+                    // Python rejects `"{+0}"` with `KeyError`; `usize::from_str` accepts `+`.
+                    if matches!(field.field_type, FieldType::Index(_))
+                        && field_name.starts_with(['+', '-'])
+                    {
+                        return Err(anyhow::anyhow!("signed field-name index"));
+                    }
+
+                    // `"{. a}"` resolves via `getattr(x, " a")`, but `f"{x. a}"` reads `x.a`.
+                    for part in &field.parts {
+                        if let FieldNamePart::Attribute(name) = part
+                            && !is_identifier(name)
+                        {
+                            return Err(anyhow::anyhow!("non-identifier attribute name"));
+                        }
+                    }
+
+                    // Set the flag before borrowing `summary` mutably for the arg lookup.
+                    if !field.parts.is_empty() {
+                        summary.field_has_accessors = true;
+                    }
+
                     // Map from field type to specifier.
                     let specifier = match field.field_type {
                         FieldType::Auto => IndexOrKeyword::Index(summary.arg_auto()),
@@ -327,10 +396,8 @@ impl FStringConversion {
                     // string, we can't convert the format string to an f-string. For example,
                     // converting `"{x} {x}".format(x=foo())` would result in `f"{foo()} {foo()}"`,
                     // which would call `foo()` twice.
-                    if !seen.insert(specifier) {
-                        if any_over_expr(arg, &Expr::is_call_expr) {
-                            return Ok(Self::SideEffects);
-                        }
+                    if !seen.insert(specifier) && any_over_expr(arg, &Expr::is_call_expr) {
+                        return Ok(Self::SideEffects);
                     }
 
                     converted.push_str(&formatted_expr(
@@ -360,6 +427,12 @@ impl FStringConversion {
                                     "\"" => '\'',
                                     _ => unreachable!("invalid trailing quote"),
                                 };
+                                // E.g. `"{[']}"` with inner `'` would produce invalid output.
+                                if index.contains(quote) {
+                                    return Err(anyhow::anyhow!(
+                                        "string index conflicts with available quote"
+                                    ));
+                                }
                                 converted.push('[');
                                 converted.push(quote);
                                 converted.push_str(&index);
@@ -370,6 +443,12 @@ impl FStringConversion {
                     }
 
                     if let Some(conversion_spec) = conversion_spec {
+                        // Anything other than `s`/`r`/`a` raises `ValueError` at runtime.
+                        if !matches!(conversion_spec, 's' | 'r' | 'a') {
+                            return Err(anyhow::anyhow!(
+                                "unknown conversion specifier {conversion_spec:?}"
+                            ));
+                        }
                         converted.push('!');
                         converted.push(conversion_spec);
                     }
@@ -461,6 +540,8 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
 
     let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
+    // Drop orphan whitespace after a leading empty-literal (`"" "{x}".format(x)`).
+    let mut emitted_real_content = false;
     for (range, conversion) in patches {
         let fstring = match conversion {
             FStringConversion::Convert(fstring) => Some(fstring),
@@ -473,12 +554,15 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
             FStringConversion::SideEffects => unreachable!(),
         };
         if let Some(fstring) = fstring {
-            contents.push_str(
-                checker
-                    .locator()
-                    .slice(TextRange::new(prev_end, range.start())),
-            );
+            if emitted_real_content || prev_end == call.start() {
+                contents.push_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(prev_end, range.start())),
+                );
+            }
             contents.push_str(&fstring);
+            emitted_real_content = true;
         }
         prev_end = range.end();
     }
@@ -525,17 +609,41 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     let has_comments = checker.comment_ranges().intersects(call.arguments.range());
 
     if !has_comments {
-        if contents.is_empty() {
+        let is_builtin = |id: &str| checker.semantic().has_builtin_binding(id);
+
+        // Downgrade to unsafe when behavior may change. Refer: https://github.com/astral-sh/ruff/issues/15874
+        let walrus_dropped = summary
+            .unreferenced_args()
+            .any(|arg| matches!(arg, Expr::Named(_)));
+        // `BinOp`/`UnaryOp` on literals are statically `Absent` but can raise (e.g., `1 / 0`).
+        let dropped_side_effect = summary.unreferenced_args().any(|arg| {
+            contains_effect(arg, is_builtin)
+                || any_over_expr(arg, &|e: &Expr| {
+                    matches!(e, Expr::BinOp(_) | Expr::UnaryOp(_))
+                })
+        });
+        let total_references =
+            summary.args_used.iter().sum::<u32>() + summary.kwargs_used.values().sum::<u32>();
+        let accessor_eval_order = summary.field_has_accessors
+            && total_references > 1
+            && summary
+                .args
+                .iter()
+                .chain(summary.kwargs.values())
+                .any(|arg| contains_effect(arg, is_builtin));
+
+        let edit = if contents.is_empty() {
             // Ex) `''.format(self.project)`
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker.locator().slice(literal).to_string(),
-                call.range(),
-            )));
+            Edit::range_replacement(checker.locator().slice(literal).to_string(), call.range())
         } else {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                contents,
-                call.range(),
-            )));
-        }
+            Edit::range_replacement(contents, call.range())
+        };
+
+        let fix = if walrus_dropped || dropped_side_effect || accessor_eval_order {
+            Fix::unsafe_edit(edit)
+        } else {
+            Fix::safe_edit(edit)
+        };
+        diagnostic.set_fix(fix);
     }
 }

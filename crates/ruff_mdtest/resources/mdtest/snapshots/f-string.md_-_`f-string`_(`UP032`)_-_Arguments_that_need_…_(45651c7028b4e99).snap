@@ -1,0 +1,48 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: f-string.md - `f-string` (`UP032`) - Arguments that need parentheses
+mdtest path: crates/ruff_linter/../ruff_linter/resources/mdtest/pyupgrade/f-string.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | "{}".format(lambda: 1)  # error: [f-string]
+2 | "{}".format({} | {})  # error: [f-string]
+```
+
+# Diagnostics
+
+```
+error[UP032]: Use f-string instead of `format` call
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | "{}".format(lambda: 1)  # error: [f-string]
+  | ^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Convert to f-string
+  - "{}".format(lambda: 1)  # error: [f-string]
+1 + f"{(lambda: 1)}"  # error: [f-string]
+2 | "{}".format({} | {})  # error: [f-string]
+
+```
+
+```
+error[UP032]: Use f-string instead of `format` call
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | "{}".format({} | {})  # error: [f-string]
+  | ^^^^^^^^^^^^^^^^^^^^
+  |
+help: Convert to f-string
+1 | "{}".format(lambda: 1)  # error: [f-string]
+  - "{}".format({} | {})  # error: [f-string]
+2 + f"{({} | {})}"  # error: [f-string]
+
+```
