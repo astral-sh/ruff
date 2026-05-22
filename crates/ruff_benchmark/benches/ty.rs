@@ -1015,6 +1015,105 @@ fn benchmark_repeated_match_narrowed_loads(criterion: &mut Criterion) {
     });
 }
 
+/// Benchmark for declaration reachability through a long chain of class-pattern arms.
+///
+/// This is modeled after event rendering code that assigns the rendered output in each arm of a
+/// large `match` over a union of event classes.
+fn class_match_assignment_reachability_code(
+    num_classes: usize,
+    num_match_branches: usize,
+    wrapped_singleton_alternative: Option<&str>,
+) -> String {
+    let mut code = String::new();
+
+    for i in 0..num_classes {
+        writeln!(&mut code, "class Event{i}:\n    value: int\n").ok();
+    }
+    if wrapped_singleton_alternative.is_some() {
+        code.push_str("class OtherEvent:\n    value: int\n\n");
+    }
+
+    code.push_str("Event = ");
+    for i in 0..num_classes {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Event{i}").ok();
+    }
+    code.push_str("\n\n");
+
+    code.push_str("def render(event: Event) -> int:\n    match event:\n");
+    for i in 0..num_match_branches {
+        let pattern = if let Some(alternative) = wrapped_singleton_alternative {
+            format!("(Event{i}() | OtherEvent() | {alternative}) as matched")
+        } else {
+            format!("Event{i}()")
+        };
+        writeln!(
+            &mut code,
+            "        case {pattern}:\n            data = event.value"
+        )
+        .ok();
+    }
+    code.push_str("        case _:\n            data = event.value\n    return data\n\n");
+
+    code
+}
+
+fn benchmark_class_match_assignment_reachability(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 48;
+    const NUM_MATCH_BRANCHES: usize = 47;
+
+    setup_rayon();
+
+    let code = class_match_assignment_reachability_code(NUM_CLASSES, NUM_MATCH_BRANCHES, None);
+    criterion.bench_function("ty_micro[class_match_assignment_reachability]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::LargeInput,
+        );
+    });
+
+    let as_or_none_alternative_code =
+        class_match_assignment_reachability_code(NUM_CLASSES, NUM_MATCH_BRANCHES, Some("None"));
+    criterion.bench_function(
+        "ty_micro[class_as_or_none_alternative_match_assignment_reachability]",
+        |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&as_or_none_alternative_code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::LargeInput,
+            );
+        },
+    );
+
+    let as_or_false_alternative_code =
+        class_match_assignment_reachability_code(NUM_CLASSES, NUM_MATCH_BRANCHES, Some("False"));
+    criterion.bench_function(
+        "ty_micro[class_as_or_false_alternative_match_assignment_reachability]",
+        |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&as_or_false_alternative_code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::LargeInput,
+            );
+        },
+    );
+}
+
 /// Benchmark for narrowing through a long `isinstance` elif chain.
 ///
 /// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
@@ -1470,6 +1569,7 @@ fn datetype(criterion: &mut Criterion) {
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
+    benchmark_class_match_assignment_reachability,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
