@@ -2569,6 +2569,52 @@ def ab(a: str): ...
     }
 
     #[test]
+    fn hover_reexported_stub_definition_implementation_docstring() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from a import bar
+
+ba<CURSOR>r
+",
+            )
+            .source("a/__init__.pyi", "def bar() -> None: ...\n")
+            .source("a/__init__.py", "from .b import bar as bar\n")
+            .source(
+                "a/b.py",
+                r#"
+def bar() -> None:
+    """Implementation docstring"""
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.hover(), @"
+        def bar() -> None
+        ---------------------------------------------
+        Implementation docstring
+
+        ---------------------------------------------
+        ```python
+        def bar() -> None
+        ```
+        ---
+        Implementation docstring
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:1
+          |
+        4 | bar
+          | ^^-
+          | | |
+          | | Cursor offset
+          | source
+          |
+        ");
+    }
+
+    #[test]
     fn hover_overload_type_disambiguated2() {
         let test = CursorTest::builder()
             .source(
