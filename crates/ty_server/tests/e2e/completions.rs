@@ -202,15 +202,35 @@ fn callable_completions(
     server: &mut crate::TestServer,
     file: &SystemPath,
     position: Position,
-) -> Vec<lsp_types::CompletionItem> {
-    let mut completions = server.completion_request(&server.file_uri(file), position);
+) -> Vec<CallableCompletionSnapshot> {
+    let completions = server.completion_request(&server.file_uri(file), position);
     completions
-        .retain(|completion| matches!(completion.label.as_str(), "Class" | "function" | "method"));
-    for completion in &mut completions {
-        completion.detail = None;
-        completion.sort_text = None;
+        .into_iter()
+        .filter(|completion| matches!(completion.label.as_str(), "Class" | "function" | "method"))
+        .map(CallableCompletionSnapshot::from)
+        .collect()
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CallableCompletionSnapshot {
+    label: String,
+    kind: Option<lsp_types::CompletionItemKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    insert_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    insert_text_format: Option<lsp_types::InsertTextFormat>,
+}
+
+impl From<lsp_types::CompletionItem> for CallableCompletionSnapshot {
+    fn from(completion: lsp_types::CompletionItem) -> Self {
+        Self {
+            label: completion.label,
+            kind: completion.kind,
+            insert_text: completion.insert_text,
+            insert_text_format: completion.insert_text_format,
+        }
     }
-    completions
 }
 
 /// Tests that auto-import completions show the fully

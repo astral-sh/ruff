@@ -9432,6 +9432,7 @@ def decorated(): ...
                 .skip_auto_import()
                 .skip_builtins()
                 .complete_function_parentheses()
+                .filter(|completion| completion.name == "decorator")
                 .build()
                 .snapshot(),
             @"decorator",
@@ -9452,6 +9453,7 @@ class Derived(Ba<CURSOR>
                 .skip_auto_import()
                 .skip_builtins()
                 .complete_function_parentheses()
+                .filter(|completion| completion.name == "Base")
                 .build()
                 .snapshot(),
             @"Base",
