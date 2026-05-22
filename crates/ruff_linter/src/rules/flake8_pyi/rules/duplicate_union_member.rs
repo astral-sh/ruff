@@ -26,6 +26,14 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// destabilizing equality semantics for any other rule that uses
 /// [`ComparableExpr`].
 ///
+/// Trade-off: source-text keying is strict about insignificant whitespace.
+/// Two members like `Annotated[int, t"{x}"]` and `Annotated[int,  t"{x}"]`
+/// (extra space) source-text-key differently and so are not detected as
+/// duplicates, even though `ComparableExpr` would have considered them equal.
+/// Stub files almost never carry that kind of duplication and the cost of a
+/// false negative here (a missed cleanup suggestion) is much smaller than the
+/// cost of the false positive / unsafe autofix that motivated this change.
+///
 /// See: <https://github.com/astral-sh/ruff/issues/25164>
 #[derive(PartialEq, Eq, Hash)]
 enum DedupKey<'a> {
@@ -107,7 +115,10 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
         };
 
         // Key by source text for t-string-bearing members; see `DedupKey`.
-        let has_tstring = contains_tstring(virtual_expr);
+        // T-strings are syntactically invalid before Python 3.14, so on
+        // older targets we can skip the tree walk entirely.
+        let has_tstring = checker.target_version() >= PythonVersion::PY314
+            && contains_tstring(virtual_expr);
         let key = if has_tstring {
             tstring_present = true;
             DedupKey::SourceText(checker.locator().slice(virtual_expr.range()))
