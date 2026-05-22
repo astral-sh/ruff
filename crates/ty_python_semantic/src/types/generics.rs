@@ -30,7 +30,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
     infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
@@ -1807,7 +1807,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'db>,
     pending: ConstraintSet<'db, 'c>,
-    types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
 
@@ -1861,7 +1861,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     fn solve_pending_with(
-        &self,
+        &mut self,
         generic_context: GenericContext<'db>,
         choose: &mut impl FnMut(
             BoundTypeVarInstance<'db>,
@@ -1927,7 +1927,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 continue;
             }
 
-            if let Some(mapped_ty) = self.types.get(identity).copied()
+            if let Some(mapped_ty) = self
+                .types
+                .get_mut(identity)
+                .map(|accumulator| accumulator.get_or_build(self.db))
                 && (mapped_ty.is_never()
                     || (mapped_ty == Type::object()
                         && variable.variance(self.db).is_contravariant()))
@@ -2034,7 +2037,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     fn solve_hash_map_with(
-        &self,
+        &mut self,
         generic_context: GenericContext<'db>,
         choose: &mut impl FnMut(
             BoundTypeVarInstance<'db>,
@@ -2045,7 +2048,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .variables_inner(self.db)
             .iter()
             .filter_map(|(identity, variable)| {
-                let mapped_ty = self.types.get(identity).copied();
+                let mapped_ty = self
+                    .types
+                    .get_mut(identity)
+                    .map(|accumulator| accumulator.get_or_build(self.db));
                 let chosen = match mapped_ty {
                     Some(mapped_ty) => {
                         choose(*variable, Some((mapped_ty, mapped_ty))).unwrap_or(mapped_ty)
@@ -2075,10 +2081,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     return;
                 }
 
-                *entry.get_mut() = UnionType::from_two_elements(self.db, *entry.get(), ty);
+                entry.get_mut().add(self.db, ty);
             }
             Entry::Vacant(entry) => {
-                entry.insert(ty);
+                entry.insert(UnionAccumulator::new(ty));
             }
         }
     }
@@ -2106,13 +2112,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     pub(crate) fn inferred_type_is_assignable_to(
-        &self,
+        &mut self,
         bound_typevar: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) -> bool {
         self.types
-            .get(&bound_typevar)
-            .is_some_and(|inferred_ty| inferred_ty.is_assignable_to(self.db, ty))
+            .get_mut(&bound_typevar)
+            .is_some_and(|inferred_ty| {
+                inferred_ty
+                    .get_or_build(self.db)
+                    .is_assignable_to(self.db, ty)
+            })
     }
 
     /// Add a type mapping for a bound typevar using the given variance to determine how the

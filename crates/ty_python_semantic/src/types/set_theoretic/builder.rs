@@ -474,6 +474,22 @@ impl<'db> UnionAccumulator<'db> {
         }
     }
 
+    pub(crate) fn get_or_build(&mut self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => *ty,
+            UnionAccumulator::Two(first, second) => {
+                let ty = UnionType::from_two_elements(db, *first, *second);
+                *self = UnionAccumulator::One(ty);
+                ty
+            }
+            UnionAccumulator::Deferred(_) => {
+                let ty = std::mem::replace(self, UnionAccumulator::new(Type::Never)).into_type(db);
+                *self = UnionAccumulator::new(ty);
+                ty
+            }
+        }
+    }
+
     pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             UnionAccumulator::One(ty) => ty,
