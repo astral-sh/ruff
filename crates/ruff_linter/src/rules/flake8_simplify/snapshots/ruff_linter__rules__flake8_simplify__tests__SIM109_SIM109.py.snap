@@ -74,3 +74,21 @@ help: Replace with `a in (b, c)`
 16 |
 17 | # OK
 note: This is an unsafe fix and may change runtime behavior
+
+SIM109 [*] Use `a in ("foo", "bar")` instead of multiple equality comparisons
+  --> SIM109.py:34:4
+   ...
+34 + if a in ("foo", "bar"):
+note: This is an unsafe fix and may change runtime behavior
+
+SIM109 [*] Use `a in (1, 2)` instead of multiple equality comparisons
+  --> SIM109.py:38:4
+   ...
+38 + if a in (1, 2):
+note: This is an unsafe fix and may change runtime behavior
+
+SIM109 [*] Use `a in (b, "baz")` instead of multiple equality comparisons
+  --> SIM109.py:42:4
+   ...
+42 + if a in (b, "baz"):
+note: This is an unsafe fix and may change runtime behavior
