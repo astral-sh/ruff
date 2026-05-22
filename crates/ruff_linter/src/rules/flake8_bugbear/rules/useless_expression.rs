@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_b018_tuple_detection_enabled;
 
 use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 
@@ -50,6 +51,16 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 /// with errors.ExceptionRaisedContext():
 ///     _ = obj.attribute
 /// ```
+///
+/// ## Preview
+/// When [preview] is enabled, bare tuple expression statements are also flagged,
+/// since the wrapping tuple is discarded and almost always indicates a stray
+/// trailing comma. For example:
+/// ```python
+/// foo(),
+/// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.100")]
 pub(crate) struct UselessExpression {
@@ -65,6 +76,10 @@ impl Violation for UselessExpression {
             }
             Kind::Attribute => {
                 "Found useless attribute access. Either assign it to a variable or remove it."
+                    .to_string()
+            }
+            Kind::Tuple => {
+                "Found useless tuple expression (a stray trailing comma may have created an unintended tuple). Either remove the comma, assign it to a variable, or remove it entirely."
                     .to_string()
             }
         }
@@ -99,14 +114,10 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
     // A tuple expression statement constructs a tuple that is immediately discarded.
     // Even if the elements have side effects (e.g. `foo(),`), the tuple wrapper itself
     // is useless and almost always indicates a stray trailing comma. Flag it ahead of
-    // the side-effect check below so those cases are not silently allowed.
-    if value.is_tuple_expr() {
-        checker.report_diagnostic(
-            UselessExpression {
-                kind: Kind::Expression,
-            },
-            value.range(),
-        );
+    // the side-effect check below so those cases are not silently allowed. Gated on
+    // preview because this is a significant expansion to a stable rule.
+    if value.is_tuple_expr() && is_b018_tuple_detection_enabled(checker.settings()) {
+        checker.report_diagnostic(UselessExpression { kind: Kind::Tuple }, value.range());
         return;
     }
 
@@ -137,4 +148,5 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
 enum Kind {
     Expression,
     Attribute,
+    Tuple,
 }
