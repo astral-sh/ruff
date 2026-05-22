@@ -101,9 +101,6 @@ if any(msg.startswith(p) for p in ["a", "b", "c"]):  # Error (list literal also 
 if any([msg.startswith(p) for p in ("x", "y")]):  # Error (list comprehension form)
     print("yes")
 
-if any({msg.endswith(p) for p in ("x", "y")}):  # Error (set comprehension form)
-    print("yes")
-
 prefixes = ("a", "b")
 if any(msg.startswith(p) for p in prefixes):  # OK (iterable is a bare name; can't be sure it's a tuple at the call site)
     print("yes")

@@ -45,6 +45,12 @@ use crate::{Edit, Fix};
 /// the rule will suggest `msg.startswith((x, y))`, which will error at
 /// runtime.
 ///
+/// For the `any(s.startswith(p) for p in (...))` form, the fix is also unsafe
+/// because elements of the iterable are evaluated eagerly when assembled into
+/// the tuple — if the iterable contains side-effecting expressions, those
+/// side effects originally executed lazily as `any` short-circuited; after
+/// the fix they all run before `startswith` is called.
+///
 /// ## References
 /// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
 /// - [Python documentation: `str.endswith`](https://docs.python.org/3/library/stdtypes.html#str.endswith)

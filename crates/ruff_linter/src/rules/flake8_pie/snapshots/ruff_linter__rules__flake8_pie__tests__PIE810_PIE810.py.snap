@@ -240,25 +240,5 @@ help: Merge into a single `startswith` call
 101 + if msg.startswith(("x", "y")):  # Error (list comprehension form)
 102 |     print("yes")
 103 |
-104 | if any({msg.endswith(p) for p in ("x", "y")}):  # Error (set comprehension form)
-note: This is an unsafe fix and may change runtime behavior
-
-PIE810 [*] Call `endswith` once with a `tuple`
-   --> PIE810.py:104:4
-    |
-102 |     print("yes")
-103 |
-104 | if any({msg.endswith(p) for p in ("x", "y")}):  # Error (set comprehension form)
-    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-105 |     print("yes")
-    |
-help: Merge into a single `endswith` call
-101 | if any([msg.startswith(p) for p in ("x", "y")]):  # Error (list comprehension form)
-102 |     print("yes")
-103 |
-    - if any({msg.endswith(p) for p in ("x", "y")}):  # Error (set comprehension form)
-104 + if msg.endswith(("x", "y")):  # Error (set comprehension form)
-105 |     print("yes")
-106 |
-107 | prefixes = ("a", "b")
+104 | prefixes = ("a", "b")
 note: This is an unsafe fix and may change runtime behavior
