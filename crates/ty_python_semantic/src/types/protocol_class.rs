@@ -902,8 +902,26 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match &member.kind {
-            // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => self.never(),
+            // TODO: implement disjointness for property members as well as attribute/method members.
+            ProtocolMemberKind::Property(_) => self.never(),
+            ProtocolMemberKind::Method(method) => {
+                let Some(method_return_type) = non_never_callable_return_type(db, *method) else {
+                    return self.never();
+                };
+
+                ty.try_upcast_to_callable_with_policy(db, UpcastPolicy::Sound)
+                    .when_some_and(db, self.constraints, |callables| {
+                        callables.iter().when_all(db, self.constraints, |callable| {
+                            non_never_callable_return_type(db, *callable).when_some_and(
+                                db,
+                                self.constraints,
+                                |return_type| {
+                                    self.check_type_pair(db, method_return_type, return_type)
+                                },
+                            )
+                        })
+                    })
+            }
             ProtocolMemberKind::Other(other_type) => self.check_type_pair(db, ty, *other_type),
         }
     }
@@ -1102,6 +1120,21 @@ fn protocol_bind_self<'db>(
         CallableTypeKind::Regular,
         callable.provenance(db),
     )
+}
+
+/// Return the possible output type of a callable unless any overload returns `Never`.
+///
+/// Return-type disjointness is a pragmatic approximation for method members: a callable returning
+/// `Never` could satisfy otherwise-incompatible signatures, so it must not establish disjointness.
+fn non_never_callable_return_type<'db>(
+    db: &'db dyn Db,
+    callable: CallableType<'db>,
+) -> Option<Type<'db>> {
+    callable
+        .signatures(db)
+        .iter()
+        .all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
+        .then(|| callable.signatures(db).overload_return_type_or_unknown(db))
 }
 
 /// Protocol compatibility can only succeed if every required member is present.
