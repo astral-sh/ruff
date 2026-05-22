@@ -5721,68 +5721,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
-        let mut ty = if let Some(type_form) = self.infer_implicit_type_form(expression, tcx) {
-            type_form
-        } else {
-            match expression {
-                ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
-                    range: _,
-                    node_index: _,
-                }) => Type::none(self.db()),
-                ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
-                ast::Expr::BooleanLiteral(literal) => {
-                    self.infer_boolean_literal_expression(literal)
-                }
-                ast::Expr::StringLiteral(literal) => {
-                    self.infer_string_literal_expression(literal, tcx)
-                }
-                ast::Expr::BytesLiteral(bytes_literal) => {
-                    self.infer_bytes_literal_expression(bytes_literal)
-                }
-                ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
-                ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
-                ast::Expr::EllipsisLiteral(literal) => {
-                    self.infer_ellipsis_literal_expression(literal)
-                }
-                ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple, tcx),
-                ast::Expr::List(list) => self.infer_list_expression(list, tcx),
-                ast::Expr::Set(set) => self.infer_set_expression(set, tcx),
-                ast::Expr::Dict(dict) => self.infer_dict_expression(dict, tcx),
-                ast::Expr::Generator(generator) => self.infer_generator_expression(generator, tcx),
-                ast::Expr::ListComp(listcomp) => {
-                    self.infer_list_comprehension_expression(listcomp, tcx)
-                }
-                ast::Expr::DictComp(dictcomp) => {
-                    self.infer_dict_comprehension_expression(dictcomp, tcx)
-                }
-                ast::Expr::SetComp(setcomp) => {
-                    self.infer_set_comprehension_expression(setcomp, tcx)
-                }
-                ast::Expr::Name(name) => self.infer_name_expression(name),
-                ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
-                ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
-                ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
-                ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
-                ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
-                ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
-                ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
-                ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
-                ast::Expr::Lambda(lambda_expression) => {
-                    self.infer_lambda_expression(lambda_expression, tcx)
-                }
-                ast::Expr::Call(call_expression) => {
-                    self.infer_call_expression(call_expression, tcx)
-                }
-                ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
-                ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
-                ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
-                ast::Expr::Await(await_expression) => {
-                    self.infer_await_expression(await_expression, tcx)
-                }
-                ast::Expr::Named(named) => self.infer_named_expression(named),
-                ast::Expr::IpyEscapeCommand(_) => {
-                    todo_type!("Ipy escape command support")
-                }
+        let mut ty = match expression {
+            expr if let Some(type_form) = self.infer_implicit_type_form(expr, tcx) => type_form,
+            ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
+                range: _,
+                node_index: _,
+            }) => Type::none(self.db()),
+            ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
+            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
+            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal, tcx),
+            ast::Expr::BytesLiteral(bytes_literal) => {
+                self.infer_bytes_literal_expression(bytes_literal)
+            }
+            ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
+            ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
+            ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
+            ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple, tcx),
+            ast::Expr::List(list) => self.infer_list_expression(list, tcx),
+            ast::Expr::Set(set) => self.infer_set_expression(set, tcx),
+            ast::Expr::Dict(dict) => self.infer_dict_expression(dict, tcx),
+            ast::Expr::Generator(generator) => self.infer_generator_expression(generator, tcx),
+            ast::Expr::ListComp(listcomp) => {
+                self.infer_list_comprehension_expression(listcomp, tcx)
+            }
+            ast::Expr::DictComp(dictcomp) => {
+                self.infer_dict_comprehension_expression(dictcomp, tcx)
+            }
+            ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
+            ast::Expr::Name(name) => self.infer_name_expression(name),
+            ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
+            ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
+            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
+            ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
+            ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
+            ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
+            ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
+            ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
+            ast::Expr::Lambda(lambda_expression) => {
+                self.infer_lambda_expression(lambda_expression, tcx)
+            }
+            ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
+            ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
+            ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
+            ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
+            ast::Expr::Await(await_expression) => {
+                self.infer_await_expression(await_expression, tcx)
+            }
+            ast::Expr::Named(named) => self.infer_named_expression(named),
+            ast::Expr::IpyEscapeCommand(_) => {
+                todo_type!("Ipy escape command support")
             }
         };
 

@@ -99,3 +99,44 @@ def get_type() -> type[int]:
 compatible: TypeForm[int | str] = get_type()
 incompatible: TypeForm[str] = get_type()  # error: [invalid-assignment]
 ```
+
+## Generic specialization
+
+```py
+from typing import assert_type
+from typing_extensions import TypeForm
+
+def construct[T](form: TypeForm[T]) -> T:
+    raise NotImplementedError
+
+assert_type(construct(int), int)
+assert_type(construct(list[int]), list[int])
+assert_type(construct(int | str), int | str)
+
+def use_runtime_type(form: type[int]) -> None:
+    assert_type(construct(form), int)
+
+type Alias[T] = TypeForm[T]
+
+def construct_alias[T](form: Alias[T]) -> T:
+    raise NotImplementedError
+
+assert_type(construct_alias(int), int)
+```
+
+## Narrowing to a runtime class
+
+```py
+from typing import assert_type
+from typing_extensions import TypeForm
+
+def as_type[T](form: TypeForm[T]) -> type[T] | None:
+    if isinstance(form, type):
+        assert_type(form, type[T])
+        return form
+    return None
+
+class A: ...
+
+assert_type(as_type(A), type[A] | None)
+```
