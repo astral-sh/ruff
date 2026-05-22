@@ -3,10 +3,7 @@ use std::{path::Path, sync::LazyLock};
 use regex::Regex;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::format_module_source;
-use ruff_python_trivia::{
-    is_python_whitespace,
-    textwrap::{dedent, indent},
-};
+use ruff_python_trivia::textwrap::{dedent, indent};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
@@ -61,7 +58,14 @@ fn is_closing_code_fence(line: &str, opening_fence: &str) -> bool {
         .take_while(|&&byte| byte == fence_byte)
         .count();
 
-    fence_len >= opening_fence.len() && line[fence_len..].chars().all(is_python_whitespace)
+    fence_len >= opening_fence.len()
+        && line[fence_len..]
+            .chars()
+            .all(is_markdown_closing_fence_trailing_whitespace)
+}
+
+const fn is_markdown_closing_fence_trailing_whitespace(ch: char) -> bool {
+    matches!(ch, ' ' | '\t')
 }
 
 pub fn format_code_blocks(
@@ -391,6 +395,15 @@ print( 'world' )
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
             @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_invalid_closing_fence_form_feed() {
+        let code = "```py\nprint( 'hello' )\n```\x0C\nprint( 'world' )\n```\n";
+        assert_eq!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            MarkdownResult::Unchanged
+        );
     }
 
     #[test]
