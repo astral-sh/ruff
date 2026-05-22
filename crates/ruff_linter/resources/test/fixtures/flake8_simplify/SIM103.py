@@ -159,3 +159,26 @@ def f():
     if a != 10:
         return False
     return True
+
+
+# https://github.com/astral-sh/ruff/issues/15323
+# `and`/`or` chains of bool-returning operands should not be wrapped in `bool(...)`.
+def f():
+    if a == 0 and b == 0:
+        return True
+    else:
+        return False
+
+
+def f():
+    if a == 0 or b == 0:
+        return True
+    else:
+        return False
+
+
+def f():
+    if not a:
+        return True
+    else:
+        return False

@@ -268,9 +268,9 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 })),
             }
-        } else if if_test.is_compare_expr() {
-            // If the condition is a comparison, we can replace it with the condition, since we
-            // know it's a boolean.
+        } else if returns_bool(if_test) {
+            // If the condition is already known to evaluate to a bool, we can replace it with
+            // the condition directly.
             Some(if_test.clone())
         } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
@@ -338,6 +338,22 @@ enum Bool {
 impl From<bool> for Bool {
     fn from(value: bool) -> Self {
         if value { Bool::True } else { Bool::False }
+    }
+}
+
+/// Return true when `expr` is guaranteed to evaluate to a `bool` at runtime,
+/// so the autofix can drop the surrounding `bool(...)` wrapper. This covers
+/// comparisons, `not` expressions, boolean literals, and `and`/`or` chains
+/// whose operands are themselves bool-returning.
+fn returns_bool(expr: &Expr) -> bool {
+    match expr {
+        Expr::Compare(_) | Expr::BooleanLiteral(_) => true,
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            ..
+        }) => true,
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().all(returns_bool),
+        _ => false,
     }
 }
 

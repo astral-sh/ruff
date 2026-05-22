@@ -380,4 +380,77 @@ help: Replace with `return a == 10`
     -         return False
     -     return True
 159 +     return a == 10
+160 |
+161 |
+162 | # https://github.com/astral-sh/ruff/issues/15323
+note: This is an unsafe fix and may change runtime behavior
+
+SIM103 [*] Return the condition `a == 0 and b == 0` directly
+   --> SIM103.py:167:5
+    |
+165 |   # `and`/`or` chains of bool-returning operands should not be wrapped in `bool(...)`.
+166 |   def f():
+167 | /     if a == 0 and b == 0:
+168 | |         return True
+169 | |     else:
+170 | |         return False
+    | |____________________^
+    |
+help: Replace with `return a == 0 and b == 0`
+164 | # https://github.com/astral-sh/ruff/issues/15323
+165 | # `and`/`or` chains of bool-returning operands should not be wrapped in `bool(...)`.
+166 | def f():
+    -     if a == 0 and b == 0:
+    -         return True
+    -     else:
+    -         return False
+167 +     return a == 0 and b == 0
+168 |
+169 |
+170 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+SIM103 [*] Return the condition `a == 0 or b == 0` directly
+   --> SIM103.py:174:5
+    |
+173 |   def f():
+174 | /     if a == 0 or b == 0:
+175 | |         return True
+176 | |     else:
+177 | |         return False
+    | |____________________^
+    |
+help: Replace with `return a == 0 or b == 0`
+171 |
+172 |
+173 | def f():
+    -     if a == 0 or b == 0:
+    -         return True
+    -     else:
+    -         return False
+174 +     return a == 0 or b == 0
+175 |
+176 |
+177 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+SIM103 [*] Return the condition `not a` directly
+   --> SIM103.py:181:5
+    |
+180 |   def f():
+181 | /     if not a:
+182 | |         return True
+183 | |     else:
+184 | |         return False
+    | |____________________^
+    |
+help: Replace with `return not a`
+178 |
+179 |
+180 | def f():
+    -     if not a:
+    -         return True
+    -     else:
+    -         return False
+181 +     return not a
 note: This is an unsafe fix and may change runtime behavior
