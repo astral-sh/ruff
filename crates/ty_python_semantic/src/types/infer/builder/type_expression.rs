@@ -33,16 +33,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ty = self.infer_type_expression_without_store(expression);
-        self.store_expression_type(expression, ty);
-        ty
-    }
-
-    /// Infer a value as a type expression without replacing its expression type.
-    pub(super) fn infer_type_expression_without_store(
-        &mut self,
-        expression: &ast::Expr,
-    ) -> Type<'db> {
         let previous_deferred_state = self.deferred_state;
         let was_in_type_expression = self
             .inference_flags()
@@ -81,6 +71,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             InferenceFlags::IN_TYPE_EXPRESSION,
             previously_in_type_expression,
         );
+        self.store_expression_type(expression, ty);
         ty
     }
 

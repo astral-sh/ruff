@@ -1341,27 +1341,33 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
 
         // A runtime class value of `TypeForm[T]` has type `type[T]`.
-        if new_positive == KnownClass::Type.to_instance(db)
-            && let Some((index, narrowed)) =
-                self.positive
-                    .iter()
-                    .enumerate()
-                    .find_map(|(index, positive)| match positive {
-                        Type::TypeForm(typeform) => {
-                            SubclassOfType::try_from_instance(db, typeform.type_argument(db))
-                                .map(|narrowed| (index, narrowed))
-                        }
-                        _ => None,
-                    })
-        {
-            self.positive.swap_remove_index(index);
-            new_positive = narrowed;
-        } else if let Type::TypeForm(typeform) = new_positive
-            && let Some(narrowed) =
-                SubclassOfType::try_from_instance(db, typeform.type_argument(db))
-            && self.positive.swap_remove(&KnownClass::Type.to_instance(db))
-        {
-            new_positive = narrowed;
+        match new_positive {
+            Type::TypeForm(typeform) => {
+                if let Some(narrowed) =
+                    SubclassOfType::try_from_instance(db, typeform.type_argument(db))
+                    && self.positive.swap_remove(&KnownClass::Type.to_instance(db))
+                {
+                    new_positive = narrowed;
+                }
+            }
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                if let Some((index, narrowed)) =
+                    self.positive
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, positive)| match positive {
+                            Type::TypeForm(typeform) => {
+                                SubclassOfType::try_from_instance(db, typeform.type_argument(db))
+                                    .map(|narrowed| (index, narrowed))
+                            }
+                            _ => None,
+                        })
+                {
+                    self.positive.swap_remove_index(index);
+                    new_positive = narrowed;
+                }
+            }
+            _ => {}
         }
 
         match new_positive {

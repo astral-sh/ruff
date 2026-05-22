@@ -5690,7 +5690,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         Some(TypeFormType::from_type_expression(
             self.db(),
-            self.infer_type_expression_without_store(expression),
+            self.infer_type_expression_no_store(expression),
         ))
     }
 
