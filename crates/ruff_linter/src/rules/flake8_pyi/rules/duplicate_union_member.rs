@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{AtomicNodeIndex, Expr, ExprBinOp, ExprNoneLiteral, Operator, PythonVersion};
 use ruff_python_semantic::analyze::typing::traverse_union_and_optional;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -10,6 +11,31 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use super::generate_union_fix;
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+
+/// Key for deduplicating union members.
+///
+/// For most expressions, two members are duplicates when their [`ComparableExpr`]
+/// representations are equal — that is, when they have the same AST shape.
+///
+/// T-strings break this assumption: they expose the source text of each
+/// interpolation at runtime via `string.templatelib.Interpolation.expression`,
+/// so `t"{00}"` and `t"{000}"` are observably distinct programs even though
+/// `ComparableExpr` normalizes both to the same `NumberLiteral(0)` node. For
+/// union members that contain any t-string, we therefore key on the raw source
+/// text instead, which preserves source-level distinctness without
+/// destabilizing equality semantics for any other rule that uses
+/// [`ComparableExpr`].
+///
+/// See: <https://github.com/astral-sh/ruff/issues/25164>
+#[derive(PartialEq, Eq, Hash)]
+enum DedupKey<'a> {
+    Shape(ComparableExpr<'a>),
+    SourceText(&'a str),
+}
+
+fn contains_tstring(expr: &Expr) -> bool {
+    any_over_expr(expr, &|e: &Expr| matches!(e, Expr::TString(_)))
+}
 
 /// ## What it does
 /// Checks for duplicate union members.
@@ -59,12 +85,13 @@ impl Violation for DuplicateUnionMember {
 
 /// PYI016
 pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
-    let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
+    let mut seen_nodes: HashSet<DedupKey<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
     let mut diagnostics = Vec::new();
 
     let mut union_type = UnionKind::TypingUnion;
     let mut optional_present = false;
+    let mut tstring_present = false;
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut check_for_duplicate_members = |expr: &'a Expr, parent: &'a Expr| {
         if matches!(parent, Expr::BinOp(_)) {
@@ -79,14 +106,31 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
             expr
         };
 
+        // Key by source text for t-string-bearing members; see `DedupKey`.
+        let has_tstring = contains_tstring(virtual_expr);
+        let key = if has_tstring {
+            tstring_present = true;
+            DedupKey::SourceText(checker.locator().slice(virtual_expr.range()))
+        } else {
+            DedupKey::Shape(virtual_expr.into())
+        };
+
         // If we've already seen this union member, raise a violation.
-        if seen_nodes.insert(virtual_expr.into()) {
+        if seen_nodes.insert(key) {
             unique_nodes.push(virtual_expr);
         } else {
+            // Use the source text for the duplicate name label when the
+            // member contains a t-string, because the generator may
+            // normalize interpolation source text (e.g. `t"{0x0=}"` ->
+            // `t"{0=}"`) and that normalized label would mislead the
+            // reader about what their source actually says.
+            let duplicate_name = if has_tstring {
+                checker.locator().slice(virtual_expr.range()).to_string()
+            } else {
+                checker.generator().expr(virtual_expr)
+            };
             diagnostics.push(checker.report_diagnostic(
-                DuplicateUnionMember {
-                    duplicate_name: checker.generator().expr(virtual_expr),
-                },
+                DuplicateUnionMember { duplicate_name },
                 // Use the real expression's range for diagnostics.
                 expr.range(),
             ));
@@ -104,6 +148,15 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     // e.g. `isinstance(None, Union[None, None])`, if reduced to `isinstance(None, None)`, causes
     // `TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union` to throw.
     if unique_nodes.iter().all(|expr| expr.is_none_literal_expr()) && !optional_present {
+        return;
+    }
+
+    // Do not offer an autofix when any union member contains a t-string: the
+    // ast generator may normalize source-level distinctions inside the
+    // interpolation (e.g. rewriting `t"{0x0=}"` as `t"{0=}"`), which would
+    // silently change the program's runtime output. The diagnostic still
+    // surfaces; the user can resolve it by hand. See #25164.
+    if tstring_present {
         return;
     }
 
