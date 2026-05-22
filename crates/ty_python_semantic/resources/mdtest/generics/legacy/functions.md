@@ -979,7 +979,7 @@ reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal[
 ## Inferring bounded typevars through iterable protocols
 
 ```py
-from typing import Iterable, TypeVar
+from typing import Iterable, Iterator, NamedTuple, TypeVar
 
 S = TypeVar("S", bound=str | bytes)
 T = TypeVar("T", bound=str | bytes)
@@ -990,6 +990,17 @@ def collect(items: Iterable[T]) -> list[T]:
 def test(items: list[S]) -> None:
     reveal_type(collect(items))  # revealed: list[S@test]
     bad: list[str] | list[bytes] = collect(items)  # error: [invalid-assignment]
+
+class Diff(NamedTuple):
+    removed: set[str]
+    added: set[str]
+    source_sha: str
+
+    def __iter__(self) -> Iterator[str]:
+        yield ""
+
+def named_tuple_with_custom_iterator(diff: Diff) -> None:
+    reveal_type(list(diff))  # revealed: list[str]
 ```
 
 ## Inferring typevars in intersections (formal type position)
