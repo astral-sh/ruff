@@ -1136,8 +1136,8 @@ jobs:
       fail-fast: false
       matrix:
         benchmark:
-          - "check_file|micro|anyio"
-          - "attrs|hydra|datetype"
+          - "check_file|micro"
+          - "anyio|attrs|hydra|datetype"
         mode:
           - simulation
           - memory
@@ -1232,10 +1232,10 @@ jobs:
     strategy:
       matrix:
         benchmark:
-          - colour_science
-          - "pandas|tanjun|altair"
-          - "static_frame|sympy"
-          - "pydantic|multithreaded|freqtrade"
+          - sympy
+          - "pandas|tanjun"
+          - "colour_science|static_frame"
+          - "pydantic|freqtrade|multithreaded|altair"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
