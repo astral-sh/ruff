@@ -805,6 +805,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryRangeStart) {
                 flake8_pie::rules::unnecessary_range_start(checker, call);
             }
+            if checker.is_rule_enabled(Rule::MultipleStartsEndsWith) {
+                flake8_pie::rules::multiple_starts_ends_with_any(checker, call);
+            }
             if checker.is_rule_enabled(Rule::ExecBuiltin) {
                 flake8_bandit::rules::exec_used(checker, func);
             }
