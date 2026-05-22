@@ -639,3 +639,29 @@ x = 5
 # `x = 5` shadows `x = 4`, which is eager, but the lazy bindings are still visible.
 reveal_type(x)  # revealed: Literal[1, 2, 5]
 ```
+
+## Nested class scopes should be applied in execution order
+
+```py
+x = 1
+
+class C:
+    global x
+    x = 2
+    class D:
+        global x
+        x = 3
+
+reveal_type(x)  # revealed: Literal[3]
+
+class C:
+    global x
+    class D:
+        global x
+        x = 3
+
+    x = 2
+
+# TODO: `x = 2` should shadow `x = 3`.
+reveal_type(x)  # revealed: Literal[3]
+```

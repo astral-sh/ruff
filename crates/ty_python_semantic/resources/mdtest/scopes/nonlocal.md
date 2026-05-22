@@ -704,3 +704,29 @@ def f():
     # `x = 5` shadows `x = 4`, which is eager, but the lazy bindings are still visible.
     reveal_type(x)  # revealed: Literal[1, 2, 5]
 ```
+
+## Nested class scopes should be applied in execution order
+
+```py
+def f():
+    x = 1
+    class C:
+        nonlocal x
+        x = 2
+        class D:
+            nonlocal x
+            x = 3
+
+    reveal_type(x)  # revealed: Literal[3]
+
+    class C:
+        nonlocal x
+        class D:
+            nonlocal x
+            x = 3
+
+        x = 2
+
+    # TODO: `x = 2` should shadow `x = 3`.
+    reveal_type(x)  # revealed: Literal[3]
+```
