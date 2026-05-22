@@ -27,11 +27,12 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
-    DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
-    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
-    ImportFromSubmoduleDefinitionNodeRef, LambdaParameterDefinitionNodeRef,
-    LoopHeaderDefinitionNodeRef, LoopStmtRef, MatchPatternDefinitionNodeRef,
-    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, DictKeyAssignmentPathSegmentNodeRef,
+    ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
+    ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
+    LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
+    MatchPatternDefinitionNodeRef, ParameterDefinitionNodeRef, StarImportDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::member::MemberExprBuilder;
@@ -1151,9 +1152,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn add_definition(
         &mut self,
         place: ScopedPlaceId,
-        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>> + std::fmt::Debug + Copy,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
     ) -> Definition<'db> {
-        let (definition, num_definitions) = self.push_additional_definition(place, definition_node);
+        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+        let (definition, num_definitions) =
+            self.push_additional_definition(place, definition_node.clone());
         debug_assert_eq!(
             num_definitions, 1,
             "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
@@ -1198,7 +1201,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
 
         // Note `definition_node` is guaranteed to be a child of `self.module`
-        let kind = definition_node.into_owned(self.module);
+        let kind = definition_node.clone().into_owned(self.module);
         let is_loop_header = kind.is_loop_header();
 
         let category = kind.category(self.source_type.is_stub(), self.module);
@@ -1286,7 +1289,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
-            self.add_dict_key_assignment_definitions_impl(&target, dict.into(), assignment);
+            self.add_dict_key_assignment_definitions_impl(
+                &target,
+                dict.into(),
+                assignment,
+                &mut smallvec::SmallVec::new(),
+            );
         }
     }
 
@@ -1295,6 +1303,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         target: &MemberExprBuilder,
         expr: ast::ExprRef<'ast>,
         assignment: Definition<'db>,
+        path: &mut smallvec::SmallVec<[DictKeyAssignmentPathSegmentNodeRef<'ast>; 4]>,
     ) {
         let ruff_python_ast::ExprRef::Dict(dict) = expr else {
             let items = match expr {
@@ -1311,6 +1320,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .take_while(|e| !e.is_starred_expr())
                 .enumerate()
             {
+                let Ok(path_index) = i64::try_from(i) else {
+                    return;
+                };
                 if let Some(target) = MemberExprBuilder::visit_subscript_expr(
                     target.clone(),
                     &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -1319,7 +1331,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         node_index: AtomicNodeIndex::NONE,
                     }),
                 ) {
-                    self.add_dict_key_assignment_definitions_impl(&target, item.into(), assignment);
+                    path.push(DictKeyAssignmentPathSegmentNodeRef::Index(path_index));
+                    self.add_dict_key_assignment_definitions_impl(
+                        &target,
+                        item.into(),
+                        assignment,
+                        path,
+                    );
+                    path.pop();
                 }
             }
             return;
@@ -1344,6 +1363,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         key,
                         assignment,
                         value: &item.value,
+                        path: (!path.is_empty()).then(|| path.clone().into_boxed_slice()),
                     },
                 );
 
@@ -1351,11 +1371,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 //
                 // Note that we must do this _after_ adding the outer place in order to track
                 // sub-member places correctly.
+                path.push(DictKeyAssignmentPathSegmentNodeRef::Key(key));
                 self.add_dict_key_assignment_definitions_impl(
                     &member_expr,
                     (&item.value).into(),
                     assignment,
+                    path,
                 );
+                path.pop();
             }
         }
     }

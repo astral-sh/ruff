@@ -247,7 +247,7 @@ impl<'db> DefinitionState<'db> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Import(ImportDefinitionNodeRef<'ast>),
     ImportFrom(ImportFromDefinitionNodeRef<'ast>),
@@ -449,10 +449,17 @@ pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub(crate) enum DictKeyAssignmentPathSegmentNodeRef<'ast> {
+    Key(&'ast ast::Expr),
+    Index(i64),
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
     pub(crate) key: &'ast ast::Expr,
     pub(crate) value: &'ast ast::Expr,
     pub(crate) assignment: Definition<'db>,
+    pub(crate) path: Option<Box<[DictKeyAssignmentPathSegmentNodeRef<'ast>]>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -633,10 +640,23 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 key,
                 value,
                 assignment,
+                path,
             }) => DefinitionKind::DictKeyAssignment(DictKeyAssignmentKind {
                 key: AstNodeRef::new(parsed, key),
                 value: AstNodeRef::new(parsed, value),
                 assignment,
+                path: path.map(|path| {
+                    path.into_iter()
+                        .map(|segment| match segment {
+                            DictKeyAssignmentPathSegmentNodeRef::Key(key) => {
+                                DictKeyAssignmentPathSegment::Key(AstNodeRef::new(parsed, key))
+                            }
+                            DictKeyAssignmentPathSegmentNodeRef::Index(index) => {
+                                DictKeyAssignmentPathSegment::Index(index)
+                            }
+                        })
+                        .collect()
+                }),
             }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
                 unpack,
@@ -1368,6 +1388,19 @@ pub struct DictKeyAssignmentKind<'db> {
     pub(crate) key: AstNodeRef<ast::Expr>,
     pub(crate) value: AstNodeRef<ast::Expr>,
     pub(crate) assignment: Definition<'db>,
+    path: Option<Box<[DictKeyAssignmentPathSegment]>>,
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+enum DictKeyAssignmentPathSegment {
+    Key(AstNodeRef<ast::Expr>),
+    Index(i64),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum DictKeyAssignmentPathSegmentRef<'ast> {
+    Key(&'ast ast::Expr),
+    Index(i64),
 }
 
 impl<'db> DictKeyAssignmentKind<'db> {
@@ -1381,6 +1414,23 @@ impl<'db> DictKeyAssignmentKind<'db> {
 
     pub fn assignment(&self) -> Definition<'db> {
         self.assignment
+    }
+
+    pub fn path<'ast>(
+        &'ast self,
+        module: &'ast ParsedModuleRef,
+    ) -> impl Iterator<Item = DictKeyAssignmentPathSegmentRef<'ast>> + 'ast {
+        self.path
+            .iter()
+            .flatten()
+            .map(move |segment| match segment {
+                DictKeyAssignmentPathSegment::Key(key) => {
+                    DictKeyAssignmentPathSegmentRef::Key(key.node(module))
+                }
+                DictKeyAssignmentPathSegment::Index(index) => {
+                    DictKeyAssignmentPathSegmentRef::Index(*index)
+                }
+            })
     }
 }
 

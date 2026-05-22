@@ -223,6 +223,28 @@ def _(x: dict[str, object]):
     # error: [invalid-argument-type]
     f1(**x["inner"])
 
+def _(x: dict[str, dict[str, float | str]]):
+    # A rejected dictionary assignment does not establish known key types.
+    # error: [invalid-assignment]
+    x["kwargs"] = {"nested": {"a": 1}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+    # error: [invalid-argument-type]
+    f1(**x["kwargs"])
+
+def accepts_value(**kwargs: object): ...
+def _(x: dict[str, dict[str, float | str]]):
+    # error: [invalid-assignment]
+    x = {"kwargs": {"nested": {"a": object()}}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+    # error: [invalid-argument-type]
+    accepts_value(**x["kwargs"]["nested"])
+
+def _(x: list[dict[str, float | str]]):
+    # error: [invalid-assignment]
+    x = [{"nested": {"a": object()}}]
+    # error: [invalid-argument-type]
+    accepts_value(**x[0]["nested"])
+
 class Y:
     inner: dict[str, object]
 
