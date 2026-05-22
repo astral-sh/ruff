@@ -84,3 +84,12 @@ class FakeEnum12(enum.Enum):
     A = enum.auto(), 0
     B = enum.auto(), 1
     C = enum.auto(), 0
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/25164
+# T-strings as enum values are distinct Template objects at runtime;
+# include a small fixture so a future regression that re-collapses them in
+# the comparable layer would surface here.
+class FakeEnum13TString(enum.Enum):
+    A = t"{x}"
+    B = t"{x}"  # OK

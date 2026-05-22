@@ -157,3 +157,13 @@ elif True:
     print(1)
 else:
     print(2)
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/25164
+# SIM114 collapses if/elif arms whose bodies compare equal. Two t-strings
+# with identical source spelling are no longer comparable-equal, so the
+# arms below are not collapsed.
+if cond_a:
+    take(t"{x}")
+elif cond_b:
+    take(t"{x}")  # OK (distinct t-string instances)
