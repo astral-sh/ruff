@@ -332,6 +332,8 @@ F523 [*] `.format` call has unused arguments at position(s): 1
 44 | # even though the used argument has a side effect
 45 | "Hello, {0}".format(print(1), "Pikachu")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+46 |
+47 | # https://github.com/astral-sh/ruff/issues/15557
    |
 help: Remove extra positional arguments at position(s): 1
 42 |
@@ -339,3 +341,97 @@ help: Remove extra positional arguments at position(s): 1
 44 | # even though the used argument has a side effect
    - "Hello, {0}".format(print(1), "Pikachu")
 45 + "Hello, {0}".format(print(1), )
+46 |
+47 | # https://github.com/astral-sh/ruff/issues/15557
+48 | # When dropping every argument leaves a string with only `{{`/`}}` escapes, the
+
+F523 [*] `.format` call has unused arguments at position(s): 0
+  --> F523.py:52:1
+   |
+50 | # When the string still has replacement fields, the empty `.format()` call is
+51 | # kept so the `KeyError` (or other failure) at runtime is preserved.
+52 | "{{".format("!")
+   | ^^^^^^^^^^^^^^^^
+53 | "{x}".format("!")
+54 | "{{}}".format("!")
+   |
+help: Remove extra positional arguments at position(s): 0
+49 | # `.format(...)` call is removed and the escapes are reduced to single braces.
+50 | # When the string still has replacement fields, the empty `.format()` call is
+51 | # kept so the `KeyError` (or other failure) at runtime is preserved.
+   - "{{".format("!")
+52 + "{"
+53 | "{x}".format("!")
+54 | "{{}}".format("!")
+55 | "{{0}}".format("!")
+
+F523 [*] `.format` call has unused arguments at position(s): 0
+  --> F523.py:53:1
+   |
+51 | # kept so the `KeyError` (or other failure) at runtime is preserved.
+52 | "{{".format("!")
+53 | "{x}".format("!")
+   | ^^^^^^^^^^^^^^^^^
+54 | "{{}}".format("!")
+55 | "{{0}}".format("!")
+   |
+help: Remove extra positional arguments at position(s): 0
+50 | # When the string still has replacement fields, the empty `.format()` call is
+51 | # kept so the `KeyError` (or other failure) at runtime is preserved.
+52 | "{{".format("!")
+   - "{x}".format("!")
+53 + "{x}".format()
+54 | "{{}}".format("!")
+55 | "{{0}}".format("!")
+56 | "{x}".format("!", x=1)
+
+F523 [*] `.format` call has unused arguments at position(s): 0
+  --> F523.py:54:1
+   |
+52 | "{{".format("!")
+53 | "{x}".format("!")
+54 | "{{}}".format("!")
+   | ^^^^^^^^^^^^^^^^^^
+55 | "{{0}}".format("!")
+56 | "{x}".format("!", x=1)
+   |
+help: Remove extra positional arguments at position(s): 0
+51 | # kept so the `KeyError` (or other failure) at runtime is preserved.
+52 | "{{".format("!")
+53 | "{x}".format("!")
+   - "{{}}".format("!")
+54 + "{}"
+55 | "{{0}}".format("!")
+56 | "{x}".format("!", x=1)
+
+F523 [*] `.format` call has unused arguments at position(s): 0
+  --> F523.py:55:1
+   |
+53 | "{x}".format("!")
+54 | "{{}}".format("!")
+55 | "{{0}}".format("!")
+   | ^^^^^^^^^^^^^^^^^^^
+56 | "{x}".format("!", x=1)
+   |
+help: Remove extra positional arguments at position(s): 0
+52 | "{{".format("!")
+53 | "{x}".format("!")
+54 | "{{}}".format("!")
+   - "{{0}}".format("!")
+55 + "{0}"
+56 | "{x}".format("!", x=1)
+
+F523 [*] `.format` call has unused arguments at position(s): 0
+  --> F523.py:56:1
+   |
+54 | "{{}}".format("!")
+55 | "{{0}}".format("!")
+56 | "{x}".format("!", x=1)
+   | ^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove extra positional arguments at position(s): 0
+53 | "{x}".format("!")
+54 | "{{}}".format("!")
+55 | "{{0}}".format("!")
+   - "{x}".format("!", x=1)
+56 + "{x}".format(x=1)

@@ -43,3 +43,14 @@
 # The fix here is safe because the unused argument has no side effect,
 # even though the used argument has a side effect
 "Hello, {0}".format(print(1), "Pikachu")
+
+# https://github.com/astral-sh/ruff/issues/15557
+# When dropping every argument leaves a string with only `{{`/`}}` escapes, the
+# `.format(...)` call is removed and the escapes are reduced to single braces.
+# When the string still has replacement fields, the empty `.format()` call is
+# kept so the `KeyError` (or other failure) at runtime is preserved.
+"{{".format("!")
+"{x}".format("!")
+"{{}}".format("!")
+"{{0}}".format("!")
+"{x}".format("!", x=1)
