@@ -119,6 +119,7 @@ pub(super) fn validate_attribute_write<'db, V: AttributeWriteVisitor<'db>>(
 
         Type::Intersection(intersection) => {
             let mut result = visitor.constant(false);
+            // TODO: Handle negative intersection elements.
             for element in intersection.positive(db) {
                 let element_result =
                     validate_attribute_write(db, *element, attribute, visitor, false);
@@ -239,6 +240,9 @@ fn validate_instance_attribute_write<'db, V: AttributeWriteVisitor<'db>>(
     emit_diagnostics: bool,
 ) -> V::Output {
     let value_ty = visitor.infer_value(TypeContext::default(), emit_diagnostics);
+    // Infer `__setattr__` once upfront: a terminal implementation blocks every
+    // write, and an ordinary implementation is the fallback for unknown members.
+    // TODO: Infer `value_ty` with `__setattr__`'s type context when it is used.
     let setattr_result = object_ty.try_call_dunder_with_policy(
         db,
         "__setattr__",
@@ -432,6 +436,8 @@ fn validate_class_attribute_write<'db, V: AttributeWriteVisitor<'db>>(
                 },
             ) = fallback_attr
             {
+                // With no metaclass member, this is the primary target and must
+                // perform the loud contextual inference for a real assignment.
                 check_class_fallback_write(
                     db,
                     object_ty,
@@ -569,6 +575,10 @@ fn check_class_fallback_write<'db, V: AttributeWriteVisitor<'db>>(
     visitor.and(db, final_result, write_result)
 }
 
+/// Return the accepted type for writes to an explicitly declared attribute.
+///
+/// A dataclass field with a converter accepts the converter's input type, not
+/// the field's post-conversion type.
 fn effective_write_type<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
@@ -602,7 +612,7 @@ fn property_setter_returns_never<'db>(
     })
 }
 
-fn assignment_attribute_members<'db>(
+pub(super) fn assignment_attribute_members<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
     attribute: &str,

@@ -39,7 +39,8 @@ use crate::place::{
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{
-    AttributeWriteDiagnostic, AttributeWriteVisitor, validate_attribute_write,
+    AttributeWriteDiagnostic, AttributeWriteVisitor, assignment_attribute_members,
+    validate_attribute_write,
 };
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -2487,8 +2488,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ..
                         }),
                     ..
-                }) = self
-                    .assignment_attribute_members(object_ty, attribute)
+                }) = assignment_attribute_members(db, object_ty, attribute)
                     .map(|(meta_attr, _)| meta_attr)
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
@@ -2541,64 +2541,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
         }
-    }
-
-    fn assignment_attribute_members(
-        &self,
-        object_ty: Type<'db>,
-        attribute: &str,
-    ) -> Option<(PlaceAndQualifiers<'db>, Option<PlaceAndQualifiers<'db>>)> {
-        let db = self.db();
-        let meta_attr = object_ty.class_member(db, attribute.into());
-        let needs_fallback = matches!(
-            meta_attr.place,
-            Place::Defined(DefinedPlace {
-                definedness: Definedness::PossiblyUndefined,
-                ..
-            }) | Place::Undefined
-        );
-        let fallback_attr = if needs_fallback {
-            Some(match object_ty {
-                Type::NominalInstance(..)
-                | Type::ProtocolInstance(_)
-                | Type::LiteralValue(..)
-                | Type::SpecialForm(..)
-                | Type::KnownInstance(..)
-                | Type::PropertyInstance(..)
-                | Type::FunctionLiteral(..)
-                | Type::Callable(..)
-                | Type::BoundMethod(_)
-                | Type::KnownBoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::EnumComplement(_)
-                | Type::TypeVar(..)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                    object_ty.find_name_in_mro(db, attribute).expect(
-                        "called on Type::ClassLiteral, Type::GenericAlias, or Type::SubclassOf",
-                    )
-                }
-                Type::Union(..)
-                | Type::Intersection(..)
-                | Type::TypeAlias(..)
-                | Type::Dynamic(..)
-                | Type::Divergent(_)
-                | Type::Never
-                | Type::ModuleLiteral(..)
-                | Type::BoundSuper(..) => return None,
-            })
-        } else {
-            None
-        };
-
-        Some((meta_attr, fallback_attr))
     }
 
     #[expect(clippy::type_complexity)]
