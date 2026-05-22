@@ -476,10 +476,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
     let [comparator] = &**comparators else {
         return None;
     };
-    if !comparator.is_name_expr() {
-        return None;
-    }
-    Some((id, comparator))
+    Some((id, comparator))             // ← literals now pass through
 }
 
 /// SIM109
