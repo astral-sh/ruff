@@ -89,10 +89,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Check if the target attribute expression (e.g. `self.x`) is an instance attribute
     /// assignment, i.e. the object is the implicit `self`/`cls` receiver.
     ///
-    /// This delegates to the `is_instance_attribute` flag computed during semantic indexing,
-    /// which checks that the object expression refers to the first parameter of the
-    /// enclosing method and has not been shadowed in intermediate scopes.
-    fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
+    /// The `is_instance_attribute` flag computed during semantic indexing checks that the object
+    /// expression refers to the first parameter of the enclosing method and has not been shadowed
+    /// in intermediate scopes. We additionally check that the enclosing function has an implicit
+    /// receiver, since static methods still have a first parameter.
+    pub(super) fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
+        if !self
+            .current_function_type()
+            .is_some_and(|function| function.has_implicit_receiver(self.db()))
+        {
+            return false;
+        }
+
         let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
             return false;
         };

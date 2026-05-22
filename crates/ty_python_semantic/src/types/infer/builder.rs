@@ -1557,6 +1557,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|node_ref| node_ref.node(self.module()))
     }
 
+    fn current_function_type(&self) -> Option<FunctionType<'db>> {
+        let function = self.current_function_definition()?;
+        let definition = self.index.expect_single_definition(function);
+        infer_definition_types(self.db(), definition).function_type(definition)
+    }
+
     fn function_decorator_types<'a>(
         &'a self,
         function: &'a ast::StmtFunctionDef,
@@ -4098,6 +4104,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
+            }
+
+            let is_receiver_attribute = target
+                .as_attribute_expr()
+                .is_some_and(|target| self.is_instance_attribute_assignment(target));
+
+            if !is_receiver_attribute {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
+                {
+                    builder
+                        .into_diagnostic("Annotations are not allowed on this assignment target");
+                }
+
+                if let Some(value) = value {
+                    self.infer_target(target, value, &|builder, tcx| {
+                        builder.infer_maybe_standalone_expression(value, tcx)
+                    });
+                } else {
+                    self.infer_expression(target, TypeContext::default());
+                }
+                return;
             }
 
             let value_ty = value.as_ref().map(|value| {
@@ -8930,9 +8959,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let first_parameter_name = first_parameter.name();
 
-        let function_definition = self.index.expect_single_definition(current_function);
-        let Type::FunctionLiteral(function_type) = binding_type(self.db(), function_definition)
-        else {
+        let Some(function_type) = self.current_function_type() else {
             return;
         };
 

@@ -79,13 +79,18 @@ error[invalid-attribute-access]: Cannot assign to instance attribute `attr` from
 
 ## Invalid annotated assignment to attribute
 
-Annotated assignments to attributes on `self` should be validated against their annotation.
+Annotated assignments to attributes on method receivers should be validated against their
+annotation.
 
 ```py
 class C:
     def __init__(self):
         self.attr: str = None  # snapshot: invalid-assignment
         self.attr2: int = 1  # fine
+
+    @classmethod
+    def initialize(cls):
+        cls.class_attr: int = 1  # fine
 ```
 
 ```snapshot
@@ -97,6 +102,43 @@ error[invalid-assignment]: Object of type `None` is not assignable to `str`
   |                    |
   |                    Declared type
   |
+```
+
+Annotations on other attribute targets are ignored, and the assignment is checked against the
+attribute already declared on the object's type.
+
+```py
+class C:
+    declared: int
+
+instance = C()
+
+# error: [invalid-type-form]
+# error: [invalid-assignment]
+instance.declared: str = "wrong"
+
+# error: [invalid-type-form]
+# error: [unresolved-attribute]
+instance.missing: str = "wrong"
+
+class Other:
+    declared: int
+
+class Static:
+    @staticmethod
+    def assign(other: Other):
+        # error: [invalid-type-form]
+        # error: [invalid-assignment]
+        other.declared: str = "wrong"
+
+class WithNew:
+    declared: int
+
+    def __new__(cls):
+        # error: [invalid-type-form]
+        # error: [invalid-assignment]
+        cls.declared: str = "wrong"
+        return super().__new__(cls)
 ```
 
 ## `ClassVar`s
