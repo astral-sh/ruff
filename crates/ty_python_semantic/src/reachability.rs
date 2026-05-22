@@ -545,12 +545,14 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Type<'db> {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
-        ProjectedNarrowingContext {
+        let mut context = ProjectedNarrowingContext {
             db,
             base_ty,
             graph: &projector.graph,
-        }
-        .narrow(projected_root, None)
+            joins: projector.graph.joins(projected_root),
+            join_cache: FxHashMap::default(),
+        };
+        context.narrow(projected_root, None)
     }
 
     /// Analyze the statically known reachability for a given constraint.
@@ -615,6 +617,10 @@ impl ProjectedNarrowingNodeId {
     const ALWAYS_TRUE: Self = Self(usize::MAX);
     /// Terminal node for paths that are statically unreachable.
     const ALWAYS_FALSE: Self = Self(usize::MAX - 1);
+
+    fn is_terminal(self) -> bool {
+        self == Self::ALWAYS_TRUE || self == Self::ALWAYS_FALSE
+    }
 }
 
 /// Interior node in a projected narrowing graph.
@@ -661,6 +667,35 @@ impl ProjectedNarrowingGraph<'_> {
         self.nodes.push(node);
         self.node_cache.insert(node, id);
         id
+    }
+
+    /// Returns the projected nodes that join multiple incoming paths.
+    ///
+    /// Projection interns equivalent subgraphs into a DAG. Caching each join lets narrowing
+    /// evaluate a shared suffix once and apply each incoming prefix constraint afterward.
+    fn joins(&self, root: ProjectedNarrowingNodeId) -> Vec<bool> {
+        let mut referenced = vec![false; self.nodes.len()];
+        let mut joins = vec![false; self.nodes.len()];
+        let mut visited = vec![false; self.nodes.len()];
+        let mut pending = vec![root];
+
+        while let Some(id) = pending.pop() {
+            if id.is_terminal() || std::mem::replace(&mut visited[id.0], true) {
+                continue;
+            }
+
+            let node = self.node(id);
+            for next in [node.if_true, node.if_false] {
+                if !next.is_terminal() {
+                    if std::mem::replace(&mut referenced[next.0], true) {
+                        joins[next.0] = true;
+                    }
+                    pending.push(next);
+                }
+            }
+        }
+
+        joins
     }
 
     /// Constructs the canonical disjunction of two projected subgraphs.
@@ -833,11 +868,46 @@ struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
+    /// Marks join boundaries in the projected DAG.
+    joins: Vec<bool>,
+    /// Caches each join's narrowed suffix type from its boundary.
+    join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
+    fn is_join(&self, id: ProjectedNarrowingNodeId) -> bool {
+        !id.is_terminal() && self.joins[id.0]
+    }
+
+    /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
+    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
+        if let Some(cached) = self.join_cache.get(&id) {
+            return *cached;
+        }
+
+        let result = self.narrow_uncached(id, None);
+        self.join_cache.insert(id, result);
+        result
+    }
+
     /// Recursively evaluates a projected path while accumulating narrowing constraints.
     fn narrow(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+        accumulated: Option<NarrowingConstraint<'db>>,
+    ) -> Type<'db> {
+        if self.is_join(id) {
+            // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
+            // then apply the incoming prefix constraint to its narrowed type.
+            let suffix_ty = self.narrow_join(id);
+            return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
+        }
+
+        self.narrow_uncached(id, accumulated)
+    }
+
+    /// Recursively evaluates an unshared projected path while accumulating narrowing constraints.
+    fn narrow_uncached(
         &mut self,
         id: ProjectedNarrowingNodeId,
         accumulated: Option<NarrowingConstraint<'db>>,
