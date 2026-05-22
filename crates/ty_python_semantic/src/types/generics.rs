@@ -1938,7 +1938,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         // Sequent-map transitivity can add relationships between inferable typevars to path
         // bounds. Those relationships are important while solving, but should not become recursive
-        // specialization outputs when concrete bounds are available.
+        // specialization outputs when concrete bounds are available. (This is tested in "Generic
+        // callable chains" in the call/function.md mdtest.)
         //
         // TODO: This is a solution-level projection. A more principled version would live in the
         // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
