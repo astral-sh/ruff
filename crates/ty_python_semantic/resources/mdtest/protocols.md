@@ -1847,6 +1847,25 @@ class XAsymmetricProperty:
 
 static_assert(is_subtype_of(XAsymmetricProperty, HasAsymmetricXProperty))
 static_assert(is_assignable_to(XAsymmetricProperty, HasAsymmetricXProperty))
+
+from typing import Any
+
+class ObjectReadAnyWriteProperty:
+    @property
+    def x(self) -> object:
+        return object()
+
+    @x.setter
+    def x(self, value: Any) -> None: ...
+
+class HasObjectReadIntWriteProperty(Protocol):
+    @property
+    def x(self) -> object: ...
+    @x.setter
+    def x(self, value: int) -> None: ...
+
+static_assert(not is_subtype_of(ObjectReadAnyWriteProperty, HasObjectReadIntWriteProperty))
+static_assert(is_assignable_to(ObjectReadAnyWriteProperty, HasObjectReadIntWriteProperty))
 ```
 
 A custom descriptor attribute on the nominal class will also suffice:
@@ -1879,6 +1898,16 @@ class TerminalPropertySetter:
     def x(self, value: int) -> Never:
         raise RuntimeError
 
+class TerminalDescriptor:
+    def __get__(self, instance, owner) -> int:
+        return 1
+
+    def __set__(self, instance, value: int) -> Never:
+        raise RuntimeError
+
+class HasTerminalDescriptor:
+    x: TerminalDescriptor = TerminalDescriptor()
+
 class NeverAttribute:
     x: Never
 
@@ -1890,6 +1919,8 @@ class HasNeverAttribute(Protocol):
 
 static_assert(not is_subtype_of(TerminalPropertySetter, HasMutableXProperty))
 static_assert(not is_assignable_to(TerminalPropertySetter, HasMutableXProperty))
+static_assert(not is_subtype_of(HasTerminalDescriptor, HasMutableXProperty))
+static_assert(not is_assignable_to(HasTerminalDescriptor, HasMutableXProperty))
 static_assert(is_subtype_of(NeverAttribute, HasNeverAttribute))
 static_assert(is_assignable_to(NeverAttribute, HasNeverAttribute))
 

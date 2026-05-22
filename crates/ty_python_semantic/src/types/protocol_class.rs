@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, attribute_write_requirement,
-    instance_attribute_write_member_requirement, property_setter_returns_never,
+    descriptor_setter_returns_never, instance_attribute_write_member_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::callable::CallableTypeKind;
@@ -889,8 +889,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 setter_ty,
                 ..
             } => {
-                if property_setter_returns_never(db, *descriptor_ty, object_ty, value_ty) {
+                if descriptor_setter_returns_never(
+                    db,
+                    *descriptor_ty,
+                    *setter_ty,
+                    object_ty,
+                    value_ty,
+                ) {
                     return self.never();
+                }
+                if let Some(property) = descriptor_ty.as_property_instance()
+                    && let Some(set_type) = property_set_type(db, property)
+                {
+                    return self.check_type_pair(db, value_ty, set_type);
                 }
                 ConstraintSet::from_bool(
                     self.constraints,

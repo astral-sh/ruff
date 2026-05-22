@@ -346,20 +346,35 @@ fn effective_write_type<'db>(
     }
 }
 
-pub(super) fn property_setter_returns_never<'db>(
+pub(super) fn descriptor_setter_returns_never<'db>(
     db: &'db dyn Db,
-    property_ty: Type<'db>,
+    descriptor_ty: Type<'db>,
+    setter_ty: Type<'db>,
     object_ty: Type<'db>,
     value_ty: Type<'db>,
 ) -> bool {
-    property_ty.as_property_instance().is_some_and(|property| {
-        property.setter(db).is_some_and(|setter| {
-            match setter.try_call(db, &CallArguments::positional([object_ty, value_ty])) {
-                Ok(result) => result.return_type(db).is_never(),
-                Err(error) => error.return_type(db).is_never(),
-            }
-        })
-    })
+    // `Never` permits arbitrary operations only because there can be no runtime
+    // value to write through; it is not a terminal concrete descriptor.
+    let setter_returns_never = !descriptor_ty.is_never()
+        && match setter_ty.try_call(
+            db,
+            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
+        ) {
+            Ok(result) => result.return_type(db).is_never(),
+            Err(error) => error.return_type(db).is_never(),
+        };
+
+    setter_returns_never
+        || descriptor_ty
+            .as_property_instance()
+            .is_some_and(|property| {
+                property.setter(db).is_some_and(|setter| {
+                    match setter.try_call(db, &CallArguments::positional([object_ty, value_ty])) {
+                        Ok(result) => result.return_type(db).is_never(),
+                        Err(error) => error.return_type(db).is_never(),
+                    }
+                })
+            })
 }
 
 pub(super) fn assignment_attribute_members<'db>(

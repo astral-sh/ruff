@@ -41,8 +41,8 @@ use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, assignment_attribute_members,
-    attribute_write_requirement, instance_attribute_write_member_requirement,
-    property_setter_returns_never,
+    attribute_write_requirement, descriptor_setter_returns_never,
+    instance_attribute_write_member_requirement,
 };
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -9843,7 +9843,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     db,
                     &CallArguments::positional([*descriptor_ty, object_ty, value_ty]),
                 );
-                if property_setter_returns_never(db, *descriptor_ty, object_ty, value_ty) {
+                if descriptor_setter_returns_never(
+                    db,
+                    *descriptor_ty,
+                    *setter_ty,
+                    object_ty,
+                    value_ty,
+                ) {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
                     }
