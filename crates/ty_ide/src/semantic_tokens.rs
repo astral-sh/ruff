@@ -570,6 +570,21 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
     }
 
+    fn classify_function_definition(&self, func: &ast::StmtFunctionDef) -> SemanticTokenType {
+        if !self.in_class_scope {
+            return SemanticTokenType::Function;
+        }
+
+        if matches!(
+            func.inferred_type(self.model),
+            Some(Type::PropertyInstance(_))
+        ) {
+            SemanticTokenType::Property
+        } else {
+            SemanticTokenType::Method
+        }
+    }
+
     fn add_dotted_name_tokens(&mut self, name: &ast::Identifier, token_type: SemanticTokenType) {
         let name_str = name.id.as_str();
         let name_start = name.start();
@@ -688,11 +703,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Function name
                 self.add_token(
                     func.name.range(),
-                    if self.in_class_scope {
-                        SemanticTokenType::Method
-                    } else {
-                        SemanticTokenType::Function
-                    },
+                    self.classify_function_definition(func),
                     if func.is_async {
                         SemanticTokenModifier::DEFINITION | SemanticTokenModifier::ASYNC
                     } else {
@@ -2084,7 +2095,7 @@ t = MyClass.prop          # prop should be property on the class itself
         "self" @ 108..112: SelfParameter [definition]
         "\"hello\"" @ 130..137: String
         "property" @ 144..152: Decorator
-        "prop" @ 161..165: Method [definition]
+        "prop" @ 161..165: Property [definition]
         "self" @ 166..170: SelfParameter [definition]
         "self" @ 188..192: SelfParameter
         "CONSTANT" @ 193..201: Variable [readonly]
@@ -2134,7 +2145,7 @@ x = Foo.prop
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "Foo" @ 7..10: Class [definition]
         "property" @ 17..25: Decorator
-        "prop" @ 34..38: Method [definition]
+        "prop" @ 34..38: Property [definition]
         "self" @ 39..43: SelfParameter [definition]
         "int" @ 48..51: Class
         "4" @ 68..69: Number
@@ -2179,19 +2190,19 @@ b = cfg.read_write
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "Config" @ 7..13: Class [definition]
         "property" @ 20..28: Decorator
-        "read_only" @ 37..46: Method [definition]
+        "read_only" @ 37..46: Property [definition]
         "self" @ 47..51: SelfParameter [definition]
         "str" @ 56..59: Class
         "'value'" @ 76..83: String
         "property" @ 90..98: Decorator
-        "read_write" @ 107..117: Method [definition]
+        "read_write" @ 107..117: Property [definition]
         "self" @ 118..122: SelfParameter [definition]
         "int" @ 127..130: Class
         "self" @ 147..151: SelfParameter
         "_x" @ 152..154: Variable
         "read_write" @ 161..171: Method
         "setter" @ 172..178: Method
-        "read_write" @ 187..197: Method [definition]
+        "read_write" @ 187..197: Property [definition]
         "self" @ 198..202: SelfParameter [definition]
         "value" @ 204..209: Parameter [definition]
         "int" @ 211..214: Class
@@ -2232,7 +2243,7 @@ def f(obj: WithProperty | WithAttribute):
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "WithProperty" @ 7..19: Class [definition]
         "property" @ 26..34: Decorator
-        "value" @ 43..48: Method [definition]
+        "value" @ 43..48: Property [definition]
         "self" @ 49..53: SelfParameter [definition]
         "int" @ 58..61: Class
         "1" @ 78..79: Number
@@ -2280,20 +2291,20 @@ x = obj.value
         "random" @ 20..26: Method
         "ReadOnly" @ 34..42: Class [definition]
         "property" @ 49..57: Decorator
-        "value" @ 66..71: Method [definition]
+        "value" @ 66..71: Property [definition]
         "self" @ 72..76: SelfParameter [definition]
         "int" @ 81..84: Class
         "1" @ 101..102: Number
         "ReadWrite" @ 110..119: Class [definition]
         "property" @ 126..134: Decorator
-        "value" @ 143..148: Method [definition]
+        "value" @ 143..148: Property [definition]
         "self" @ 149..153: SelfParameter [definition]
         "int" @ 158..161: Class
         "self" @ 178..182: SelfParameter
         "_value" @ 183..189: Variable
         "value" @ 196..201: Method
         "setter" @ 202..208: Method
-        "value" @ 217..222: Method [definition]
+        "value" @ 217..222: Property [definition]
         "self" @ 223..227: SelfParameter [definition]
         "new_value" @ 229..238: Parameter [definition]
         "int" @ 240..243: Class
@@ -2390,7 +2401,7 @@ x = foobar_cls.prop                              # prop should be property
         "self" @ 73..77: SelfParameter [definition]
         "\"hello\"" @ 95..102: String
         "property" @ 109..117: Decorator
-        "prop" @ 126..130: Method [definition]
+        "prop" @ 126..130: Property [definition]
         "self" @ 131..135: SelfParameter [definition]
         "str" @ 140..143: Class
         "\"hello\"" @ 160..167: String
@@ -2405,7 +2416,7 @@ x = foobar_cls.prop                              # prop should be property
         "int" @ 235..238: Class
         "42" @ 255..257: Number
         "property" @ 264..272: Decorator
-        "prop" @ 281..285: Method [definition]
+        "prop" @ 281..285: Property [definition]
         "self" @ 286..290: SelfParameter [definition]
         "int" @ 295..298: Class
         "self" @ 315..319: SelfParameter
@@ -2485,7 +2496,7 @@ q = Baz.prop        # prop should be property on the class as well
         "int" @ 155..158: Class
         "42" @ 179..181: Number
         "property" @ 192..200: Decorator
-        "prop" @ 213..217: Method [definition]
+        "prop" @ 213..217: Property [definition]
         "self" @ 218..222: SelfParameter [definition]
         "int" @ 227..230: Class
         "42" @ 251..253: Number
@@ -2496,7 +2507,7 @@ q = Baz.prop        # prop should be property on the class as well
         "str" @ 320..323: Class
         "\"hello\"" @ 344..351: String
         "property" @ 362..370: Decorator
-        "prop" @ 383..387: Method [definition]
+        "prop" @ 383..387: Property [definition]
         "self" @ 388..392: SelfParameter [definition]
         "str" @ 397..400: Class
         "\"hello\"" @ 421..428: String
@@ -2567,7 +2578,7 @@ q = Baz.prop
         "int" @ 107..110: Class
         "42" @ 131..133: Number
         "property" @ 144..152: Decorator
-        "prop" @ 165..169: Method [definition]
+        "prop" @ 165..169: Property [definition]
         "self" @ 170..174: SelfParameter [definition]
         "int" @ 179..182: Class
         "42" @ 203..205: Number
@@ -2575,7 +2586,7 @@ q = Baz.prop
         "self" @ 237..241: SelfParameter [definition]
         "\"hello\"" @ 263..270: String
         "property" @ 281..289: Decorator
-        "method" @ 302..308: Method [definition]
+        "method" @ 302..308: Property [definition]
         "self" @ 309..313: SelfParameter [definition]
         "str" @ 318..321: Class
         "\"hello\"" @ 342..349: String
