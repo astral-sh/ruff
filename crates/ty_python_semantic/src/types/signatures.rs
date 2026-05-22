@@ -979,6 +979,12 @@ impl<'db> Signature<'db> {
             return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
         }
 
+        // Inferred receiver annotations describe the method owner, rather than constraining which
+        // overload is exposed for a bound receiver. Only explicit receiver annotations can prune.
+        if first_parameter.inferred_annotation {
+            return smallvec_inline![self.bind_self(db, Some(typing_self_type))];
+        }
+
         let mut expected_self_ty = first_parameter.annotated_type();
         let accepts_any_or_exact_self =
             |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
@@ -1009,10 +1015,15 @@ impl<'db> Signature<'db> {
             }
         }
 
+        let is_compatible_receiver = |expected_self_ty| {
+            let constraints = ConstraintSetBuilder::new();
+            self_type
+                .when_constraint_set_assignable_to(db, expected_self_ty, &constraints)
+                .is_always_satisfied(db)
+        };
         let inferable_typevars = self.inferable_typevars(db);
         if inferable_typevars == InferableTypeVars::None || !expected_self_ty.has_typevar(db) {
-            let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
-            if when.query(|_, when| when.is_always_satisfied(db)) {
+            if is_compatible_receiver(expected_self_ty) {
                 smallvec_inline![self.bind_self(db, Some(typing_self_type))]
             } else {
                 SmallVec::new()
@@ -1030,20 +1041,17 @@ impl<'db> Signature<'db> {
                 // `self_type`.
                 let specialized_expected_self_ty =
                     expected_self_ty.apply_specialization(db, specialization);
-                let when = self_type
-                    .when_constraint_set_assignable_to_owned(db, specialized_expected_self_ty);
-                when.query(|_, when| when.is_always_satisfied(db)).then(|| {
+                is_compatible_receiver(specialized_expected_self_ty).then(|| {
                     self.apply_specialization(db, specialization)
                         .bind_self(db, Some(typing_self_type))
                 })
             };
 
             if matches!(expected_self_ty, Type::ProtocolInstance(_)) {
-                let when = self_type.when_constraint_set_assignable_to_owned(db, expected_self_ty);
                 let specializations = builder
-                    .specializations_from_owned_constraint_set(
+                    .specializations_from_assignability(
                         expected_self_ty,
-                        when,
+                        self_type,
                         generic_context,
                     )
                     .unwrap_or_default();

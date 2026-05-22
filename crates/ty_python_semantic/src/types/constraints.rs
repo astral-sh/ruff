@@ -2823,6 +2823,32 @@ impl<'db> Type<'db> {
 
         assignable_solutions_impl(db, self, target, inferable)
     }
+
+    /// Computes and caches the default exact solutions for a constraint-set assignability query.
+    pub(crate) fn assignable_default_solutions_with_inferable(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> &'db Solutions<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _, _, _| Solutions::Unsatisfiable,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn assignable_default_solutions_impl<'db>(
+            db: &'db dyn Db,
+            source: Type<'db>,
+            target: Type<'db>,
+            inferable: InferableTypeVars<'db>,
+        ) -> Solutions<'db> {
+            source
+                .assignable_solutions_with_inferable(db, target, inferable)
+                .solve(db, &ConstraintSetBuilder::new())
+        }
+
+        assignable_default_solutions_impl(db, self, target, inferable)
+    }
 }
 
 /// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
@@ -4032,7 +4058,7 @@ impl InteriorNode {
 }
 
 /// The result of solving a constraint set for per-typevar specializations.
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum Solutions<'db> {
     Unsatisfiable,
     Unconstrained,
@@ -4041,7 +4067,7 @@ pub(crate) enum Solutions<'db> {
 
 pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct TypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) solution: Type<'db>,

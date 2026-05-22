@@ -11,8 +11,7 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    Solutions,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -1926,7 +1925,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
         };
-        for solution in &solutions {
+        for solution in solutions {
             for binding in solution {
                 let variance = formal.variance_of(self.db, binding.bound_typevar);
                 self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);
@@ -1935,27 +1934,47 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
-    fn add_type_mappings_from_owned_constraint_set(
+    fn add_type_mappings_from_assignability(
         &mut self,
         formal: Type<'db>,
-        set: &'db OwnedConstraintSet<'db>,
+        actual: Type<'db>,
         f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
-        let set = self.constraints.load(self.db, set);
-        self.add_type_mappings_from_constraint_set(formal, set, f)
+        let solutions = match actual.assignable_default_solutions_with_inferable(
+            self.db,
+            formal,
+            self.inferable,
+        ) {
+            Solutions::Unsatisfiable => return Err(()),
+            Solutions::Unconstrained => return Ok(()),
+            Solutions::Constrained(solutions) => solutions,
+        };
+        let mut f = f;
+        for solution in solutions {
+            for binding in solution {
+                let variance = formal.variance_of(self.db, binding.bound_typevar);
+                self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);
+            }
+        }
+        Ok(())
     }
 
-    pub(crate) fn specializations_from_owned_constraint_set(
+    pub(crate) fn specializations_from_assignability(
         &self,
         formal: Type<'db>,
-        set: &'db OwnedConstraintSet<'db>,
+        actual: Type<'db>,
         generic_context: GenericContext<'db>,
     ) -> Result<Vec<Specialization<'db>>, ()> {
-        let set = self.constraints.load(self.db, set);
-        let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions = match set.solutions(self.db, self.constraints) {
+        let solutions = match actual.assignable_default_solutions_with_inferable(
+            self.db,
+            formal,
+            self.inferable,
+        ) {
             Solutions::Unsatisfiable => return Err(()),
-            Solutions::Unconstrained => vec![Vec::new()],
+            Solutions::Unconstrained => {
+                let mut builder = Self::new(self.db, self.constraints, self.inferable);
+                return Ok(vec![builder.build_with(generic_context, |_, _| None)]);
+            }
             Solutions::Constrained(solutions) => solutions,
         };
         let mut specializations = Vec::new();
@@ -2539,15 +2558,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
                         // (replacing the logic below).
-                        let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                         // For protocol inference via constraint sets, we currently treat
                         // unsatisfiable results as "no inference" instead of an immediate
                         // specialization error. This matches the previous behavior (where
                         // unsatisfied comparisons simply produced no type mappings), and avoids
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
-                        let _ =
-                            self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
+                        let _ = self.add_type_mappings_from_assignability(formal, actual, &mut f);
                         return Ok(());
                     }
 
@@ -2574,11 +2591,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 if !self.references_inferable_typevar(formal) {
                     return Ok(());
                 }
-                let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
-                let _ = self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
+                let _ = self.add_type_mappings_from_assignability(formal, actual, &mut f);
                 return Ok(());
             }
 
