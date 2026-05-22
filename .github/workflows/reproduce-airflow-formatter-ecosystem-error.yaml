@@ -1,0 +1,44 @@
+name: Reproduce Airflow formatter ecosystem error
+
+permissions: {}
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/reproduce-airflow-formatter-ecosystem-error.yaml"
+  workflow_dispatch:
+
+jobs:
+  reproduce:
+    name: "ruff format --preview on apache/airflow"
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
+    env:
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
+      - name: "Build Ruff"
+        run: cargo build --bin ruff
+
+      - name: "Checkout apache/airflow"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: apache/airflow
+          ref: main
+          path: checkouts/airflow
+          persist-credentials: false
+
+      - name: "Report Airflow revision"
+        run: git -C checkouts/airflow rev-parse HEAD
+
+      - name: "Run `ruff format --preview`"
+        working-directory: checkouts/airflow
+        run: '"$GITHUB_WORKSPACE/target/debug/ruff" format --preview .'
