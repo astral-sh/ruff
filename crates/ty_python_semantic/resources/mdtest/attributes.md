@@ -555,6 +555,8 @@ reveal_type(C().declared_and_bound)  # revealed: str | None
 class C:
     def __init__(self) -> None:
         this = self
+        # error: [invalid-type-form]
+        # error: [unresolved-attribute]
         this.declared_and_bound: str | None = "a"
 
 # This would ideally be `str | None`, but mypy/pyright don't support this either,
@@ -2597,6 +2599,8 @@ reveal_type(C().x)  # revealed: int
 class C:
     def __init__(self) -> None:
         def set_attribute(value: str):
+            # error: [invalid-type-form]
+            # error: [unresolved-attribute]
             self.x: str = value
         set_attribute("a")
 

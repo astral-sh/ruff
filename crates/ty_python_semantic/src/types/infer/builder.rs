@@ -4106,25 +4106,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // Disallow annotations on non-receiver targets while preserving assignment checks for
+            // the non-name targets that are valid Python syntax.
             let is_receiver_attribute = target
                 .as_attribute_expr()
                 .is_some_and(|target| self.is_instance_attribute_assignment(target));
-
             if !is_receiver_attribute {
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
-                {
-                    builder
-                        .into_diagnostic("Annotations are not allowed on this assignment target");
-                }
+                match target.as_ref() {
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                        // For syntactically valid non-name targets, reject the annotation and
+                        // validate any accompanying assignment.
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
+                        {
+                            builder.into_diagnostic(
+                                "Annotations are not allowed on this assignment target",
+                            );
+                        }
 
-                if let Some(value) = value {
-                    self.infer_target(target, value, &|builder, tcx| {
-                        builder.infer_maybe_standalone_expression(value, tcx)
-                    });
-                } else {
-                    self.infer_expression(target, TypeContext::default());
+                        if let Some(value) = value {
+                            self.infer_target(target, value, &|builder, tcx| {
+                                builder.infer_maybe_standalone_expression(value, tcx)
+                            });
+                        } else {
+                            self.infer_expression(target, TypeContext::default());
+                        }
+                    }
+                    _ => {
+                        // For parser-recovered invalid targets, the syntax diagnostic is
+                        // sufficient.
+                        if let Some(value) = value {
+                            self.infer_maybe_standalone_expression(value, TypeContext::default());
+                        }
+                        self.infer_expression(target, TypeContext::default());
+                    }
                 }
                 return;
             }
