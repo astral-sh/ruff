@@ -407,7 +407,7 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
     if file
         .path(db)
         .as_system_path()
-        .is_none_or(|path| !db.project().is_file_included(db, path))
+        .is_none_or(|path| !db.project().is_file_included(db, path).is_included())
     {
         // Eagerly clear ASTs of third party files.
         parsed.clear();
