@@ -10,7 +10,7 @@ on:
 
 jobs:
   reproduce:
-    name: "ruff format --preview on apache/airflow"
+    name: "formatter ecosystem comparison"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
     env:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
@@ -37,52 +37,21 @@ jobs:
       - name: "Install ruff-ecosystem"
         run: uv pip install ./python/ruff-ecosystem
 
-      - name: "Checkout apache/airflow"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: apache/airflow
-          ref: main
-          path: checkouts/airflow
-          persist-credentials: false
-
-      - name: "Report Airflow revision"
-        run: git -C checkouts/airflow rev-parse HEAD
-
-      - name: "Run Airflow formatter ecosystem comparison"
-        env:
-          RUFF_BIN: ${{ github.workspace }}/target/debug/ruff
-        working-directory: checkouts/airflow
+      - name: "Run `ruff format` stable ecosystem check"
         run: |
-          git config user.email "ecosystem@astral.sh"
-          git config user.name "Ecosystem Bot"
+          set -eo pipefail
+          ruff-ecosystem format ./target/debug/ruff ./target/debug/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
 
-          python - <<'PY'
-          import asyncio
-          import os
-          from pathlib import Path
+      - name: "Report cached Airflow revision"
+        run: git -C './checkouts/apache:airflow' rev-parse HEAD
 
-          from ruff_ecosystem.defaults import DEFAULT_TARGETS
-          from ruff_ecosystem.format import FormatComparison, compare_format
-          from ruff_ecosystem.projects import ClonedRepository
+      - name: "Run `ruff format` preview ecosystem check"
+        run: |
+          set -eo pipefail
+          ruff-ecosystem format ./target/debug/ruff ./target/debug/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
 
-
-          async def run() -> None:
-              target = next(
-                  target
-                  for target in DEFAULT_TARGETS
-                  if target.repo.fullname == "apache/airflow"
-              ).with_preview_enabled()
-              repository = await ClonedRepository.from_path(Path("."), target.repo)
-              ruff = Path(os.environ["RUFF_BIN"])
-              await compare_format(
-                  ruff,
-                  ruff,
-                  target.format_options,
-                  target.config_overrides,
-                  repository,
-                  FormatComparison.ruff_and_ruff,
-              )
-
-
-          asyncio.run(run())
-          PY
+      - name: "Fail on ecosystem errors"
+        run: |
+          if grep -q "project error" ecosystem-result-format-stable ecosystem-result-format-preview; then
+            exit 1
+          fi
