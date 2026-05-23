@@ -1053,23 +1053,23 @@ impl<'src> Lexer<'src> {
                     .take_while(|&&c| c == b'\\')
                     .count();
 
+                let quote_or_newline = self.cursor.rest().as_bytes()[index];
+
                 // Skip up to the current character.
                 self.cursor.skip_bytes(index);
 
-                // Lookahead because we want to bump only if it's a quote or being escaped.
-                let quote_or_newline = self.cursor.first();
-
                 // If the character is escaped, continue scanning.
                 if num_backslashes % 2 == 1 {
-                    self.cursor.bump();
-                    if quote_or_newline == '\r' {
-                        self.cursor.eat_char('\n');
-                    }
+                    let continuation_len = 1 + usize::from(
+                        quote_or_newline == b'\r'
+                            && self.cursor.rest().as_bytes().get(1) == Some(&b'\n'),
+                    );
+                    self.cursor.skip_bytes(continuation_len);
                     continue;
                 }
 
                 match quote_or_newline {
-                    '\r' | '\n' => {
+                    b'\r' | b'\n' => {
                         self.current_flags |= TokenFlags::UNCLOSED_STRING;
                         self.push_error(LexicalError::new(
                             LexicalErrorType::UnclosedStringError,
@@ -1077,12 +1077,12 @@ impl<'src> Lexer<'src> {
                         ));
                         break self.offset();
                     }
-                    ch if ch == quote => {
+                    ch if ch == quote_byte => {
                         let value_end = self.offset();
-                        self.cursor.bump();
+                        self.cursor.skip_bytes(1);
                         break value_end;
                     }
-                    _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
+                    _ => unreachable!("memchr3 returned an index that is not a quote or a newline"),
                 }
             }
         };
