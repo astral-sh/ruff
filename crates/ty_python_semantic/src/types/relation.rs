@@ -986,6 +986,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
 
+            // Annotation unions retain type aliases so recursive aliases can be represented.
+            // Normalize direct alias elements together before checking the union so reductions
+            // that depend on multiple elements, such as all members of an enum, are visible.
+            (_, Type::Union(union))
+                if union
+                    .elements(db)
+                    .iter()
+                    .any(|element| matches!(element, Type::TypeAlias(_))) =>
+            {
+                self.with_recursion_guard(source, target, || {
+                    self.check_type_pair(
+                        db,
+                        source,
+                        UnionType::from_elements(db, union.elements(db).iter().copied()),
+                    )
+                })
+            }
+
             (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
                 self.check_type_pair(db, complement.remaining_literal_union(db), target)
             }
