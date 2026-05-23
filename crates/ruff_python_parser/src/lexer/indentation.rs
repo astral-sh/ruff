@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use static_assertions::assert_eq_size;
 use std::cmp::Ordering;
 use std::fmt::Debug;
@@ -126,17 +127,17 @@ impl Indentations {
     }
 
     pub(crate) fn checkpoint(&self) -> IndentationsCheckpoint {
-        IndentationsCheckpoint(self.stack.clone())
+        IndentationsCheckpoint(SmallVec::from_slice(&self.stack))
     }
 
-    pub(crate) fn rewind(&mut self, mut checkpoint: IndentationsCheckpoint) {
+    pub(crate) fn rewind(&mut self, checkpoint: IndentationsCheckpoint) {
         self.stack.clear();
-        self.stack.append(&mut checkpoint.0);
+        self.stack.extend(checkpoint.0);
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct IndentationsCheckpoint(Vec<Indentation>);
+#[derive(Debug)]
+pub(crate) struct IndentationsCheckpoint(SmallVec<[Indentation; 4]>);
 
 assert_eq_size!(Indentation, u64);
 

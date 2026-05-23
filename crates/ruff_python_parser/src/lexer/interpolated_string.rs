@@ -1,11 +1,12 @@
 use ruff_python_ast::StringFlags;
+use smallvec::SmallVec;
 
 use crate::string::InterpolatedStringKind;
 
 use super::TokenFlags;
 
 /// The context representing the current f-string or t-string that the lexer is in.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct InterpolatedStringContext {
     flags: TokenFlags,
 
@@ -145,14 +146,14 @@ impl InterpolatedStrings {
     }
 
     pub(crate) fn checkpoint(&self) -> InterpolatedStringsCheckpoint {
-        InterpolatedStringsCheckpoint(self.stack.clone())
+        InterpolatedStringsCheckpoint(SmallVec::from_slice(&self.stack))
     }
 
-    pub(crate) fn rewind(&mut self, mut checkpoint: InterpolatedStringsCheckpoint) {
+    pub(crate) fn rewind(&mut self, checkpoint: InterpolatedStringsCheckpoint) {
         self.stack.clear();
-        self.stack.append(&mut checkpoint.0);
+        self.stack.extend(checkpoint.0);
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct InterpolatedStringsCheckpoint(Vec<InterpolatedStringContext>);
+#[derive(Debug)]
+pub(crate) struct InterpolatedStringsCheckpoint(SmallVec<[InterpolatedStringContext; 1]>);
