@@ -483,10 +483,10 @@ impl<'src> Parser<'src> {
             _ => {}
         }
 
-        let lhs = self.parse_atom();
+        let lhs = self.parse_atom(context);
 
         ParsedExpr {
-            expr: self.parse_postfix_expression(lhs.expr, start),
+            expr: self.parse_postfix_expression(lhs.expr, start, context),
             is_parenthesized: lhs.is_parenthesized,
         }
     }
@@ -532,8 +532,8 @@ impl<'src> Parser<'src> {
     /// field will be [`ExprContext::Invalid`].
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
-    pub(super) fn parse_name(&mut self) -> ast::ExprName {
-        let identifier = self.parse_identifier();
+    pub(super) fn parse_name(&mut self, context: ExpressionContext) -> ast::ExprName {
+        let identifier = self.parse_identifier_with_context(context);
 
         let ctx = if identifier.is_valid() {
             ExprContext::Load
@@ -566,6 +566,10 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
     pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
+        self.parse_identifier_with_context(ExpressionContext::default())
+    }
+
+    fn parse_identifier_with_context(&mut self, context: ExpressionContext) -> ast::Identifier {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
@@ -587,6 +591,21 @@ impl<'src> Parser<'src> {
                 range,
                 node_index: AtomicNodeIndex::NONE,
             };
+        }
+
+        // test_err incomplete_attribute_before_for_in_delimiter
+        // [item. for item in xs]
+        // [item. async for item in xs]
+        // {item. for item in xs}
+        // (item. for item in xs)
+        // [item for item. in xs]
+        // for item. in xs: ...
+        if (context.is_for_excluded())
+            && (self.at(TokenKind::For)
+                || (self.at(TokenKind::Async) && self.peek() == TokenKind::For))
+            || (context.is_in_excluded() && self.at(TokenKind::In))
+        {
+            return self.parse_missing_identifier();
         }
 
         if self.current_token_kind().is_keyword() {
@@ -627,7 +646,7 @@ impl<'src> Parser<'src> {
     /// Parses an atom.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
-    fn parse_atom(&mut self) -> ParsedExpr {
+    fn parse_atom(&mut self, context: ExpressionContext) -> ParsedExpr {
         let start = self.node_start();
 
         let lhs = match self.current_token_kind() {
@@ -692,7 +711,7 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 })
             }
-            TokenKind::Name => Expr::Name(self.parse_name()),
+            TokenKind::Name => Expr::Name(self.parse_name(context)),
             TokenKind::IpyEscapeCommand => {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
@@ -707,7 +726,7 @@ impl<'src> Parser<'src> {
 
             kind => {
                 if kind.is_keyword() {
-                    Expr::Name(self.parse_name())
+                    Expr::Name(self.parse_name(context))
                 } else {
                     self.add_error(
                         ParseErrorType::ExpectedExpression,
@@ -732,7 +751,12 @@ impl<'src> Parser<'src> {
     /// expression, `[` for a subscript expression, or `.` for an attribute expression.
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
-    pub(super) fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
+    pub(super) fn parse_postfix_expression(
+        &mut self,
+        mut lhs: Expr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => {
@@ -749,7 +773,9 @@ impl<'src> Parser<'src> {
                     }
                     Expr::Subscript(self.parse_subscript_expression(lhs, start))
                 }
-                TokenKind::Dot => Expr::Attribute(self.parse_attribute_expression(lhs, start)),
+                TokenKind::Dot => {
+                    Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
+                }
                 _ => break lhs,
             };
         }
@@ -1183,10 +1209,11 @@ impl<'src> Parser<'src> {
         &mut self,
         value: Expr,
         start: TextSize,
+        context: ExpressionContext,
     ) -> ast::ExprAttribute {
         self.bump(TokenKind::Dot);
 
-        let attr = self.parse_identifier();
+        let attr = self.parse_identifier_with_context(context);
 
         ast::ExprAttribute {
             value: Box::new(value),
@@ -2113,8 +2140,9 @@ impl<'src> Parser<'src> {
         }
 
         // Parse the first element with a more general rule and limit it later.
-        let first_element =
-            self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+        let first_element = self.parse_named_expression_or_higher(
+            ExpressionContext::starred_bitwise_or().with_for_excluded(),
+        );
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
@@ -2250,8 +2278,9 @@ impl<'src> Parser<'src> {
         // For dictionary expressions, the key uses the `expression` rule while for
         // set expressions, the element uses the `star_expression` rule. So, use the
         // one that is more general and limit it later.
-        let key_or_element =
-            self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+        let key_or_element = self.parse_named_expression_or_higher(
+            ExpressionContext::starred_bitwise_or().with_for_excluded(),
+        );
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
@@ -2367,8 +2396,9 @@ impl<'src> Parser<'src> {
 
         // Use the more general rule of the three to parse the first element
         // and limit it later.
-        let mut parsed_expr =
-            self.parse_named_expression_or_higher(ExpressionContext::yield_or_starred_bitwise_or());
+        let mut parsed_expr = self.parse_named_expression_or_higher(
+            ExpressionContext::yield_or_starred_bitwise_or().with_for_excluded(),
+        );
 
         match self.current_token_kind() {
             TokenKind::Comma => {
@@ -3214,6 +3244,10 @@ bitflags! {
         /// parsing of a yield expression as it will be parsed nevertheless. But, if it is not
         /// allowed, an error is reported.
         const ALLOW_YIELD_EXPRESSION = 1 << 3;
+
+        /// This flag is set when the `for` keyword, or `async` starting `async for`, should be
+        /// excluded from an expression.
+        const EXCLUDE_FOR = 1 << 4;
     }
 }
 
@@ -3266,6 +3300,11 @@ impl ExpressionContext {
         ExpressionContext(self.0 | ExpressionContextFlags::EXCLUDE_IN)
     }
 
+    /// Returns a new [`ExpressionContext`] which excludes `for` from an expression.
+    fn with_for_excluded(self) -> Self {
+        ExpressionContext(self.0 | ExpressionContextFlags::EXCLUDE_FOR)
+    }
+
     /// Returns `true` if the `in` keyword should be excluded from a comparison expression.
     const fn is_in_excluded(self) -> bool {
         self.0.contains(ExpressionContextFlags::EXCLUDE_IN)
@@ -3281,6 +3320,11 @@ impl ExpressionContext {
     const fn is_yield_expression_allowed(self) -> bool {
         self.0
             .contains(ExpressionContextFlags::ALLOW_YIELD_EXPRESSION)
+    }
+
+    /// Returns `true` if `for` should be excluded from the expression.
+    const fn is_for_excluded(self) -> bool {
+        self.0.contains(ExpressionContextFlags::EXCLUDE_FOR)
     }
 
     /// Returns the [`StarredExpressionPrecedence`] for the context, regardless of whether starred

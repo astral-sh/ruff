@@ -525,7 +525,7 @@ impl Parser<'_> {
                         //     case case.bar: ...
                         //     case type.bar: ...
                         //     case match.case.type.bar.type.case.match: ...
-                        let id = Expr::Name(self.parse_name());
+                        let id = Expr::Name(self.parse_name(ExpressionContext::default()));
 
                         let attribute = self.parse_attr_expr_for_match_pattern(id, start);
 
@@ -638,7 +638,11 @@ impl Parser<'_> {
     /// Parses an attribute expression until the current token is not a `.`.
     fn parse_attr_expr_for_match_pattern(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
         while self.current_token_kind() == TokenKind::Dot {
-            lhs = Expr::Attribute(self.parse_attribute_expression(lhs, start));
+            lhs = Expr::Attribute(self.parse_attribute_expression(
+                lhs,
+                start,
+                ExpressionContext::default(),
+            ));
         }
 
         lhs
