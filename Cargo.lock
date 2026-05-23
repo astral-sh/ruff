@@ -4609,6 +4609,7 @@ dependencies = [
  "crossbeam",
  "get-size2",
  "globset",
+ "ignore",
  "insta",
  "notify",
  "ordermap",
