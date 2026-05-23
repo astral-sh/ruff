@@ -609,7 +609,7 @@ impl<'src> Lexer<'src> {
             }
             ',' => TokenKind::Comma,
             '.' => {
-                if self.cursor.first().is_ascii_digit() {
+                if matches!(self.cursor.rest().as_bytes().first(), Some(b'0'..=b'9')) {
                     self.lex_decimal_number('.')
                 } else if self.cursor.eat_char2('.', '.') {
                     TokenKind::Ellipsis
