@@ -111,6 +111,25 @@ impl<'src> Cursor<'src> {
     }
 
     pub(super) fn eat_char2(&mut self, c1: char, c2: char) -> bool {
+        let bytes = self.chars.as_str().as_bytes();
+        if let Some(&first) = bytes.first()
+            && first.is_ascii()
+        {
+            if char::from(first) != c1 {
+                return false;
+            }
+            let Some(&second) = bytes.get(1) else {
+                return false;
+            };
+            if second.is_ascii() {
+                if char::from(second) != c2 {
+                    return false;
+                }
+                self.skip_bytes(2);
+                return true;
+            }
+        }
+
         let mut chars = self.chars.clone();
         if chars.next() == Some(c1) && chars.next() == Some(c2) {
             self.bump();
