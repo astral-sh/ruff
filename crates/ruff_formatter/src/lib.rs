@@ -1,3 +1,4 @@
+// Trigger the standard formatter ecosystem CI job for #25331.
 //! Infrastructure for code formatting
 //!
 //! This module defines [`FormatElement`], an IR to format code documents and provides a means to print
