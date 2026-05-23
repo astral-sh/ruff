@@ -395,10 +395,10 @@ impl<'src> Parser<'src> {
     fn bump_name(&mut self) -> Name {
         let range = self.current_token_range();
         let text = self.src_text(range);
-        let name = if self.tokens.current_flags().is_non_ascii_name() {
-            text.nfkc().collect::<Name>()
-        } else {
+        let name = if !self.tokens.current_flags().is_non_ascii_name() {
             Name::new(text)
+        } else {
+            normalize_name(text)
         };
         self.bump(TokenKind::Name);
         name
@@ -894,6 +894,11 @@ fn strip_underscores(text: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(text)
     }
+}
+
+#[cold]
+fn normalize_name(text: &str) -> Name {
+    text.nfkc().collect::<Name>()
 }
 
 struct ParserCheckpoint {
