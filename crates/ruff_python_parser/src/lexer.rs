@@ -369,6 +369,10 @@ impl<'src> Lexer<'src> {
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
+        // Fast path: consume a run of spaces and tabs directly from the byte slice,
+        // avoiding the per-character `Chars` clone+decode in the loop below.
+        self.cursor.skip_ascii_whitespace();
+
         loop {
             match self.cursor.first() {
                 ' ' => {

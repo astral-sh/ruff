@@ -144,6 +144,25 @@ impl<'src> Cursor<'src> {
         }
     }
 
+    /// Advances past a leading run of ASCII spaces and tabs using a raw byte scan.
+    ///
+    /// This avoids the per-character `Chars` clone and UTF-8 decode cost of the
+    /// general `eat_while` loop for the common case of space/tab-separated tokens.
+    #[inline]
+    pub(super) fn skip_ascii_whitespace(&mut self) {
+        let bytes = self.chars.as_str().as_bytes();
+
+        let n = bytes
+            .iter()
+            .take_while(|&&b| b == b' ' || b == b'\t')
+            .count();
+
+        if n > 0 {
+            // SAFETY: all skipped bytes are ASCII (single-byte UTF-8 code points).
+            self.chars = self.chars.as_str()[n..].chars();
+        }
+    }
+
     /// Eats symbols while predicate returns true or until the end of file is reached.
     #[inline]
     pub(super) fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
