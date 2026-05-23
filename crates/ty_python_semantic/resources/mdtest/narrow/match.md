@@ -89,6 +89,25 @@ def exhaustive_pattern_with_guard(x: A, flag: bool) -> None:
             reveal_type(x)  # revealed: A
 ```
 
+## Class pattern after collectively exhaustive singleton patterns
+
+```py
+class A: ...
+
+def _(x: bool | A):
+    match x:
+        case True:
+            y = 1
+        case False:
+            y = 2
+        case A():
+            y = 3
+        case _:
+            y = 4
+
+    reveal_type(y)  # revealed: Literal[1, 2, 3]
+```
+
 ## Class patterns with generic classes
 
 ```toml

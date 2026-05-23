@@ -538,8 +538,9 @@ fn prove_ambiguous_nominal_class_union_pattern_predicate<'db>(
         }
 
         let types = supported_exact_pattern_types(db, previous_predicate.kind(db))?;
-        previous_types.push(UnionType::from_elements(db, types));
+        previous_types.extend(types);
     }
+    let previous_ty = UnionType::from_elements(db, previous_types.iter().copied());
 
     // Discard any alternative that was already completely handled by an earlier arm. If all
     // alternatives were handled, this case can be statically unreachable; leave that result to
@@ -547,11 +548,7 @@ fn prove_ambiguous_nominal_class_union_pattern_predicate<'db>(
     let remaining_current_types = current_types
         .iter()
         .copied()
-        .filter(|current_ty| {
-            !previous_types
-                .iter()
-                .any(|previous_ty| current_ty.is_subtype_of(db, *previous_ty))
-        })
+        .filter(|current_ty| !current_ty.is_subtype_of(db, previous_ty))
         .collect::<Vec<_>>();
     if remaining_current_types.is_empty() {
         return None;
@@ -560,10 +557,7 @@ fn prove_ambiguous_nominal_class_union_pattern_predicate<'db>(
     let mut can_match = false;
     let mut can_fall_through = false;
     for subject_element in subject_union.elements(db) {
-        if previous_types
-            .iter()
-            .any(|previous_ty| subject_element.is_subtype_of(db, *previous_ty))
-        {
+        if subject_element.is_subtype_of(db, previous_ty) {
             continue;
         }
 
