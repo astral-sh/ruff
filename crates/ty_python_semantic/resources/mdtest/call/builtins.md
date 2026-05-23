@@ -248,3 +248,18 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           Did you mean `NotImplementedError`?
   |
 ```
+
+## `map` with generic callbacks
+
+```py
+from typing import cast
+from ty_extensions import Unknown
+import re
+
+s = cast(Unknown | str, "")
+"".join(map(re.escape, s))
+
+xs = cast(Unknown | list[str], ["a"])
+tokens: list[Unknown | str] = []
+tokens.extend(map(re.escape, xs))
+```
