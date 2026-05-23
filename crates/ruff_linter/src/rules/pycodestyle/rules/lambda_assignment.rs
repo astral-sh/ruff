@@ -8,6 +8,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
+use thin_vec::ThinVec;
 
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -208,7 +209,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<ast::ParameterList>();
+                .collect::<ThinVec<_>>();
             let new_args = parameters
                 .args
                 .iter()
@@ -222,7 +223,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<ast::ParameterList>();
+                .collect::<ThinVec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
                 name: Identifier::new(name.to_string(), TextRange::default()),
@@ -232,7 +233,7 @@ fn function(
                     ..parameters
                 }),
                 body: ast::Suite::from([body]),
-                decorator_list: ast::DecoratorList::new(),
+                decorator_list: ThinVec::new(),
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
@@ -248,7 +249,7 @@ fn function(
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters),
         body: ast::Suite::from([body]),
-        decorator_list: ast::DecoratorList::new(),
+        decorator_list: ThinVec::new(),
         returns: None,
         type_params: None,
         range: TextRange::default(),

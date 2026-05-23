@@ -8955,7 +8955,7 @@ impl AnyNodeRef<'_> {
 pub struct ModModule {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: crate::Suite,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
@@ -8977,12 +8977,12 @@ pub struct StmtFunctionDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
-    pub decorator_list: crate::DecoratorList,
+    pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
     pub type_params: Option<Box<crate::TypeParams>>,
     pub parameters: Box<crate::Parameters>,
     pub returns: Option<Box<Expr>>,
-    pub body: crate::Suite,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
@@ -8991,11 +8991,11 @@ pub struct StmtFunctionDef {
 pub struct StmtClassDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub decorator_list: crate::DecoratorList,
+    pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
     pub type_params: Option<Box<crate::TypeParams>>,
     pub arguments: Option<Box<crate::Arguments>>,
-    pub body: crate::Suite,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
@@ -9072,8 +9072,8 @@ pub struct StmtFor {
     pub is_async: bool,
     pub target: Box<Expr>,
     pub iter: Box<Expr>,
-    pub body: crate::Suite,
-    pub orelse: crate::Suite,
+    pub body: thin_vec::ThinVec<Stmt>,
+    pub orelse: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
@@ -9084,8 +9084,8 @@ pub struct StmtWhile {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
-    pub body: crate::Suite,
-    pub orelse: crate::Suite,
+    pub body: thin_vec::ThinVec<Stmt>,
+    pub orelse: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
@@ -9095,7 +9095,7 @@ pub struct StmtIf {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
-    pub body: crate::Suite,
+    pub body: thin_vec::ThinVec<Stmt>,
     pub elif_else_clauses: Vec<crate::ElifElseClause>,
 }
 
@@ -9110,7 +9110,7 @@ pub struct StmtWith {
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub items: Vec<crate::WithItem>,
-    pub body: crate::Suite,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
@@ -9140,10 +9140,10 @@ pub struct StmtRaise {
 pub struct StmtTry {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: crate::Suite,
+    pub body: thin_vec::ThinVec<Stmt>,
     pub handlers: Vec<ExceptHandler>,
-    pub orelse: crate::Suite,
-    pub finalbody: crate::Suite,
+    pub orelse: thin_vec::ThinVec<Stmt>,
+    pub finalbody: thin_vec::ThinVec<Stmt>,
     pub is_star: bool,
 }
 
@@ -9663,7 +9663,7 @@ pub struct PatternMatchSingleton {
 pub struct PatternMatchSequence {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub patterns: crate::PatternList,
+    pub patterns: Vec<Pattern>,
 }
 
 /// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
@@ -9672,8 +9672,8 @@ pub struct PatternMatchSequence {
 pub struct PatternMatchMapping {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub keys: crate::PatternKeyList,
-    pub patterns: crate::PatternList,
+    pub keys: thin_vec::ThinVec<Expr>,
+    pub patterns: thin_vec::ThinVec<Pattern>,
     pub rest: Option<crate::Identifier>,
 }
 
@@ -9712,7 +9712,7 @@ pub struct PatternMatchAs {
 pub struct PatternMatchOr {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub patterns: crate::PatternList,
+    pub patterns: Vec<Pattern>,
 }
 
 /// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)

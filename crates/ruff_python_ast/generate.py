@@ -987,14 +987,11 @@ def write_node(out: list[str], ast: Ast) -> None:
                     rust_ty = f"Box<{rust_ty}>"
 
                 if ty.seq:
-                    if ty.name == "Stmt":
-                        rust_ty = "crate::Suite"
-                    elif ty.name == "Decorator":
-                        rust_ty = "crate::DecoratorList"
-                    elif ty.name == "Pattern":
-                        rust_ty = "crate::PatternList"
-                    elif name == "PatternMatchMapping" and field.name == "keys":
-                        rust_ty = "crate::PatternKeyList"
+                    if ty.name in {"Stmt", "Decorator"} or (
+                        name == "PatternMatchMapping"
+                        and field.name in {"keys", "patterns"}
+                    ):
+                        rust_ty = f"thin_vec::ThinVec<{rust_ty}>"
                     else:
                         rust_ty = f"Vec<{rust_ty}>"
                 elif ty.optional:

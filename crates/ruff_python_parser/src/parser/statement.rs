@@ -8,6 +8,7 @@ use ruff_python_ast::{
     PythonVersion, Stmt, Suite, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use thin_vec::ThinVec;
 
 use crate::error::StarTupleKind;
 use crate::parser::expression::{EXPR_SET, ParsedExpr};
@@ -118,11 +119,9 @@ impl<'src> Parser<'src> {
             TokenKind::For => Stmt::For(self.parse_for_statement(start)),
             TokenKind::While => Stmt::While(self.parse_while_statement()),
             TokenKind::Def => {
-                Stmt::FunctionDef(self.parse_function_definition(ast::DecoratorList::new(), start))
+                Stmt::FunctionDef(self.parse_function_definition(ThinVec::new(), start))
             }
-            TokenKind::Class => {
-                Stmt::ClassDef(self.parse_class_definition(ast::DecoratorList::new(), start))
-            }
+            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(ThinVec::new(), start)),
             TokenKind::Try => Stmt::Try(self.parse_try_statement()),
             TokenKind::With => Stmt::With(self.parse_with_statement(start)),
             TokenKind::At => self.parse_decorators(),
@@ -1970,7 +1969,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
         &mut self,
-        decorator_list: ast::DecoratorList,
+        decorator_list: ThinVec<ast::Decorator>,
         start: TextSize,
     ) -> ast::StmtFunctionDef {
         self.bump(TokenKind::Def);
@@ -2098,7 +2097,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
-        decorator_list: ast::DecoratorList,
+        decorator_list: ThinVec<ast::Decorator>,
         start: TextSize,
     ) -> ast::StmtClassDef {
         self.bump(TokenKind::Class);
@@ -2804,7 +2803,7 @@ impl<'src> Parser<'src> {
             // async def foo(): ...
             TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: true,
-                ..self.parse_function_definition(ast::DecoratorList::new(), async_start)
+                ..self.parse_function_definition(ThinVec::new(), async_start)
             }),
 
             // test_ok async_with_statement
@@ -2863,7 +2862,7 @@ impl<'src> Parser<'src> {
     fn parse_decorators(&mut self) -> Stmt {
         let start = self.node_start();
 
-        let mut decorators = ast::DecoratorList::new();
+        let mut decorators = ThinVec::new();
         let mut progress = ParserProgress::default();
 
         // test_err decorator_missing_expression

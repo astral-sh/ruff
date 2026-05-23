@@ -8,6 +8,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
+use thin_vec::ThinVec;
 
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -186,7 +187,7 @@ fn create_class_def_stmt(
         })),
         body,
         type_params: None,
-        decorator_list: ast::DecoratorList::new(),
+        decorator_list: ThinVec::new(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }

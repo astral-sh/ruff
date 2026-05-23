@@ -2930,7 +2930,7 @@ pub enum IrrefutablePatternKind {
 pub struct PatternArguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub patterns: PatternList,
+    pub patterns: ThinVec<Pattern>,
     pub keywords: Vec<PatternKeyword>,
 }
 
@@ -3097,10 +3097,10 @@ impl Ranged for AnyParameterRef<'_> {
 pub struct Parameters {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub posonlyargs: ParameterList,
-    pub args: ParameterList,
+    pub posonlyargs: ThinVec<ParameterWithDefault>,
+    pub args: ThinVec<ParameterWithDefault>,
     pub vararg: Option<Box<Parameter>>,
-    pub kwonlyargs: ParameterList,
+    pub kwonlyargs: ThinVec<ParameterWithDefault>,
     pub kwarg: Option<Box<Parameter>>,
 }
 
@@ -3690,18 +3690,6 @@ impl<'a> IntoIterator for &'a TypeParams {
 ///
 /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
 pub type Suite = ThinVec<Stmt>;
-
-/// Decorators attached to a function or class definition.
-pub type DecoratorList = ThinVec<Decorator>;
-
-/// Non-variadic parameters grouped by parameter kind.
-pub type ParameterList = ThinVec<ParameterWithDefault>;
-
-/// Child patterns in sequence, mapping, class, and or-pattern nodes.
-pub type PatternList = ThinVec<Pattern>;
-
-/// Keys in a mapping-pattern node.
-pub type PatternKeyList = ThinVec<Expr>;
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
