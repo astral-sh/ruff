@@ -659,18 +659,31 @@ impl<'src> Lexer<'src> {
 
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
-        // Detect potential string like rb'' b'' f'' t'' u'' r''
-        let quote = match (first, self.cursor.first()) {
-            (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then(|| {
-                self.cursor.bump();
-                quote
-            }),
-            (_, second) if is_quote(self.cursor.second()) => {
-                self.try_double_char_prefix([first, second]).then(|| {
-                    self.cursor.bump();
-                    // SAFETY: Safe because of the `is_quote` check in this match arm's guard
-                    self.cursor.bump().unwrap()
-                })
+        // String prefixes and quote delimiters are ASCII, so avoid decoding identifier text just
+        // to determine whether this identifier begins a string.
+        let quote = match first {
+            'b' | 'B' | 'f' | 'F' | 'r' | 'R' | 't' | 'T' | 'u' | 'U' => {
+                let (next, after_next) = {
+                    let bytes = self.cursor.rest().as_bytes();
+                    (bytes.first().copied(), bytes.get(1).copied())
+                };
+
+                match (next, after_next) {
+                    (Some(quote @ (b'\'' | b'"')), _) => {
+                        self.try_single_char_prefix(first).then(|| {
+                            self.cursor.bump();
+                            char::from(quote)
+                        })
+                    }
+                    (Some(second), Some(quote @ (b'\'' | b'"')))
+                        if self.try_double_char_prefix([first, char::from(second)]) =>
+                    {
+                        self.cursor.bump();
+                        self.cursor.bump();
+                        Some(char::from(quote))
+                    }
+                    _ => None,
+                }
             }
             _ => None,
         };
@@ -1826,10 +1839,6 @@ impl Radix {
     }
 }
 
-const fn is_quote(c: char) -> bool {
-    matches!(c, '\'' | '"')
-}
-
 const fn is_ascii_identifier_start(c: char) -> bool {
     matches!(c, 'a'..='z' | 'A'..='Z' | '_')
 }
@@ -2427,6 +2436,10 @@ if first:
     fn test_nfkc_normalization() {
         let source1 = "𝒞 = 500";
         let source2 = "C = 500";
+        assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
+
+        let source1 = "r𝒞 = 500";
+        let source2 = "rC = 500";
         assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
     }
 
