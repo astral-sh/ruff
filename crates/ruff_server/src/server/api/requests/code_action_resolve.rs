@@ -21,10 +21,16 @@ impl super::RequestHandler for CodeActionResolve {
 }
 
 impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> Cow<'_, types::Url> {
-        let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
-            .expect("code actions should have a URI in their data fields");
-        Cow::Owned(uri)
+    fn document_url(params: &types::CodeAction) -> crate::server::Result<Cow<'_, types::Url>> {
+        let data = params
+            .data
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("Code action is missing its document URI"))
+            .with_failure_code(ErrorCode::InvalidParams)?;
+        let uri: lsp_types::Url = serde_json::from_value(data)
+            .map_err(|err| anyhow::anyhow!("Code action has an invalid document URI: {err}"))
+            .with_failure_code(ErrorCode::InvalidParams)?;
+        Ok(Cow::Owned(uri))
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

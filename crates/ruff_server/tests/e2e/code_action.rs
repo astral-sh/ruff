@@ -1,7 +1,9 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
+use lsp_server::ErrorCode;
+use lsp_types::{CodeAction, CodeActionKind, request::CodeActionResolveRequest};
 
-use crate::TestServerBuilder;
+use crate::{AwaitResponseError, TestServerBuilder};
 
 #[test]
 fn no_code_actions_for_markdown() -> Result<()> {
@@ -65,6 +67,32 @@ fn code_actions_for_python() -> Result<()> {
     ]
     "#
     );
+
+    Ok(())
+}
+
+#[test]
+fn invalid_code_action_resolve_data_returns_invalid_params() -> Result<()> {
+    let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
+
+    let request_id = server.send_request::<CodeActionResolveRequest>(CodeAction {
+        title: "Ruff: Fix all auto-fixable problems".to_string(),
+        kind: Some(CodeActionKind::from("source.fixAll.ruff")),
+        ..Default::default()
+    });
+
+    let error = match server.try_await_response::<CodeActionResolveRequest>(&request_id, None) {
+        Err(AwaitResponseError::RequestFailed(error)) => error,
+        result => panic!("Expected an InvalidParams error response, got {result:?}"),
+    };
+
+    assert_eq!(error.code, ErrorCode::InvalidParams as i32);
+    assert_json_snapshot!(error, @r#"
+    {
+      "code": -32602,
+      "message": "Code action is missing its document URI"
+    }
+    "#);
 
     Ok(())
 }

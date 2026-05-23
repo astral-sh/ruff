@@ -26,15 +26,17 @@ use self::traits::{NotificationHandler, RequestHandler};
 
 use super::{Result, schedule::BackgroundSchedule};
 
-/// Defines the `document_url` method for implementers of [`Notification`] and [`Request`], given
-/// the request or notification parameter type.
+/// Defines the `document_url` method for implementers of [`Request`], given the request parameter
+/// type.
 ///
 /// This would only work if the parameter type has a `text_document` field with a `uri` field
 /// that is of type [`lsp_types::Url`].
 macro_rules! define_document_url {
     ($params:ident: &$p:ty) => {
-        fn document_url($params: &$p) -> std::borrow::Cow<'_, lsp_types::Url> {
-            std::borrow::Cow::Borrowed(&$params.text_document.uri)
+        fn document_url(
+            $params: &$p,
+        ) -> crate::server::Result<std::borrow::Cow<'_, lsp_types::Url>> {
+            Ok(std::borrow::Cow::Borrowed(&$params.text_document.uri))
         }
     };
 }
@@ -167,6 +169,14 @@ where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     let (id, params) = cast_request::<R>(req)?;
+    let url = match R::document_url(&params) {
+        Ok(url) => url.into_owned(),
+        Err(error) => {
+            let result: Result<<<R as RequestHandler>::RequestType as Request>::Result> =
+                Err(error);
+            return Ok(Task::immediate(id, result));
+        }
+    };
 
     Ok(Task::background(schedule, move |session: &Session| {
         let cancellation_token = session
@@ -175,9 +185,7 @@ where
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
 
-        let url = R::document_url(&params).into_owned();
-
-        let Some(snapshot) = session.take_snapshot(R::document_url(&params).into_owned()) else {
+        let Some(snapshot) = session.take_snapshot(url.clone()) else {
             tracing::warn!("Ignoring request because snapshot for path `{url:?}` doesn't exist.");
             return Box::new(|_| {});
         };

@@ -62,7 +62,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     /// [`define_document_url`]: super::define_document_url
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> std::borrow::Cow<'_, lsp_types::Url>;
+    ) -> crate::server::Result<std::borrow::Cow<'_, lsp_types::Url>>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
