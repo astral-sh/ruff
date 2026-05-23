@@ -3,7 +3,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{self as ast, helpers::is_dunder, name::Name};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::definition::{DefinitionKind, DefinitionState};
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_core::semantic_index;
@@ -54,20 +54,26 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             }
 
+            let Some((range, display_name)) = import_target(kind, &parsed) else {
+                continue;
+            };
+
             let multipart_import_name = unaliased_multipart_import_name(kind, &parsed);
             let multipart_import_is_used =
                 multipart_import_name.is_some_and(|name| match scope.node() {
                     NodeWithScopeKind::Module => {
-                        multipart_import_is_used_in_body(parsed.suite(), name)
+                        multipart_import_is_used_in_body(parsed.suite(), name, range)
                     }
-                    NodeWithScopeKind::Class(class) => {
-                        multipart_import_is_used_in_class_body(&class.node(&parsed).body, name)
-                    }
+                    NodeWithScopeKind::Class(class) => multipart_import_is_used_in_class_body(
+                        &class.node(&parsed).body,
+                        name,
+                        range,
+                    ),
                     NodeWithScopeKind::Function(function) => {
-                        multipart_import_is_used_in_body(&function.node(&parsed).body, name)
+                        multipart_import_is_used_in_body(&function.node(&parsed).body, name, range)
                     }
                     NodeWithScopeKind::Lambda(lambda) => {
-                        let mut visitor = MultipartImportUseVisitor::new(name);
+                        let mut visitor = MultipartImportUseVisitor::new(name, range);
                         visitor.visit_expr(&lambda.node(&parsed).body);
                         visitor.used
                     }
@@ -76,10 +82,6 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
             if multipart_import_is_used || (multipart_import_name.is_none() && is_used) {
                 continue;
             }
-
-            let Some((range, display_name)) = import_target(kind, &parsed) else {
-                continue;
-            };
 
             if is_intentionally_unused_name(&display_name) {
                 continue;
@@ -178,21 +180,39 @@ fn expr_matches_dotted_import_prefix(
 
 struct MultipartImportUseVisitor<'a> {
     imported_name: &'a str,
+    imported_root: &'a str,
+    import_range: TextRange,
     used: bool,
+    shadowed: bool,
 }
 
 impl<'a> MultipartImportUseVisitor<'a> {
-    const fn new(imported_name: &'a str) -> Self {
+    fn new(imported_name: &'a str, import_range: TextRange) -> Self {
         Self {
             imported_name,
+            imported_root: imported_name.split('.').next().unwrap_or(imported_name),
+            import_range,
             used: false,
+            shadowed: false,
         }
     }
 }
 
 impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
     fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        if self.used {
+        if self.used || self.shadowed {
+            return;
+        }
+
+        if expr.range().end() <= self.import_range.end() {
+            return;
+        }
+
+        if let ast::Expr::Name(name) = expr
+            && matches!(name.ctx, ast::ExprContext::Store)
+            && name.id == self.imported_root
+        {
+            self.shadowed = true;
             return;
         }
 
@@ -208,13 +228,17 @@ impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
     }
 }
 
-fn multipart_import_is_used_in_body(body: &[ast::Stmt], imported_name: &str) -> bool {
-    let mut visitor = MultipartImportUseVisitor::new(imported_name);
+fn multipart_import_is_used_in_body(
+    body: &[ast::Stmt],
+    imported_name: &str,
+    import_range: TextRange,
+) -> bool {
+    let mut visitor = MultipartImportUseVisitor::new(imported_name, import_range);
 
     for stmt in body {
         visitor.visit_stmt(stmt);
 
-        if visitor.used {
+        if visitor.used || visitor.shadowed {
             break;
         }
     }
@@ -222,8 +246,12 @@ fn multipart_import_is_used_in_body(body: &[ast::Stmt], imported_name: &str) -> 
     visitor.used
 }
 
-fn multipart_import_is_used_in_class_body(body: &[ast::Stmt], imported_name: &str) -> bool {
-    let mut visitor = MultipartImportUseVisitor::new(imported_name);
+fn multipart_import_is_used_in_class_body(
+    body: &[ast::Stmt],
+    imported_name: &str,
+    import_range: TextRange,
+) -> bool {
+    let mut visitor = MultipartImportUseVisitor::new(imported_name, import_range);
 
     for stmt in body {
         if matches!(stmt, ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_)) {
@@ -232,7 +260,7 @@ fn multipart_import_is_used_in_class_body(body: &[ast::Stmt], imported_name: &st
 
         visitor.visit_stmt(stmt);
 
-        if visitor.used {
+        if visitor.used || visitor.shadowed {
             break;
         }
     }
@@ -502,6 +530,41 @@ mod tests {
         )?;
 
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_multipart_import_used_only_before_import() -> anyhow::Result<()> {
+        let entries = UnusedImportTest::new().entries(
+            r#"
+            print(os.path)
+
+            import os.path
+            "#,
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("os.path".to_string(), "os.path".to_string())]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reports_multipart_import_shadowed_before_use() -> anyhow::Result<()> {
+        let entries = UnusedImportTest::new().entries(
+            r#"
+            import os.path
+
+            os = None
+            print(os.path)
+            "#,
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("os.path".to_string(), "os.path".to_string())]
+        );
         Ok(())
     }
 
