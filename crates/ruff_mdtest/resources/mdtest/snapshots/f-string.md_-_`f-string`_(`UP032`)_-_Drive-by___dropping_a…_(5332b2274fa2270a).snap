@@ -4,7 +4,7 @@ expression: snapshot
 ---
 
 ---
-mdtest name: f-string.md - `f-string` (`UP032`) - Drive-by: a dropped leading empty literal leaves no orphan whitespace
+mdtest name: f-string.md - `f-string` (`UP032`) - Drive-by: dropping a leading empty literal leaves no orphan whitespace
 mdtest path: crates/ruff_linter/../ruff_linter/resources/mdtest/pyupgrade/f-string.md
 ---
 

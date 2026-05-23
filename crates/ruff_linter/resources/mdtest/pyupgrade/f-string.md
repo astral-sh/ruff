@@ -84,6 +84,8 @@ An unknown conversion specifier (`str.format` raises `ValueError`):
 
 ## Drive-by: dropping a leading empty literal leaves no orphan whitespace
 
+<!-- snapshot-diagnostics -->
+
 ```py
 "" "{}".format(x)  # error: [f-string]
 "a" "" "{}".format(x)  # error: [f-string]
