@@ -50,6 +50,10 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             }
 
+            if is_module_scope && kind.is_reexported() {
+                continue;
+            }
+
             let multipart_import_name = unaliased_multipart_import_name(kind, &parsed);
             let multipart_import_is_used =
                 multipart_import_name.is_some_and(|name| match scope.node() {
@@ -106,12 +110,12 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
 
 /// Returns `true` for concrete import aliases that can produce unused-import hints.
 ///
-/// Star imports have no precise target, and explicit reexports are intentional public API.
+/// Star imports have no precise target.
 fn should_report_import(kind: &DefinitionKind<'_>) -> bool {
     matches!(
         kind,
         DefinitionKind::Import(_) | DefinitionKind::ImportFrom(_)
-    ) && !kind.is_reexported()
+    )
 }
 
 fn is_intentionally_unused_name(name: &Name) -> bool {
@@ -706,6 +710,20 @@ mod tests {
         )?;
 
         assert_eq!(names, vec!["os"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_function_scope_reexport_shaped_unused_imports() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            def f():
+                import sys as sys
+                from pathlib import Path as Path
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["Path", "sys"]);
         Ok(())
     }
 
