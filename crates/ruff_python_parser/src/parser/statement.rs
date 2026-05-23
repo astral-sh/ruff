@@ -1037,7 +1037,7 @@ impl<'src> Parser<'src> {
             type_range,
         );
 
-        let mut name = Expr::Name(self.parse_name());
+        let mut name = Expr::Name(self.parse_name(ExpressionContext::default()));
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
 
         let type_params = self.try_parse_type_params();

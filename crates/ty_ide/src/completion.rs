@@ -3515,6 +3515,42 @@ def frob(): ...
     }
 
     #[test]
+    fn list_comprehension_member() {
+        completion_test_builder(
+            "\
+items: list[str] = []
+[item.<CURSOR> for item in items]
+",
+        )
+        .build()
+        .contains("upper");
+    }
+
+    #[test]
+    fn set_comprehension_member() {
+        completion_test_builder(
+            "\
+items: list[str] = []
+{item.<CURSOR> for item in items}
+",
+        )
+        .build()
+        .contains("upper");
+    }
+
+    #[test]
+    fn generator_expression_member() {
+        completion_test_builder(
+            "\
+items: list[str] = []
+(item.<CURSOR> for item in items)
+",
+        )
+        .build()
+        .contains("upper");
+    }
+
+    #[test]
     fn lambda_prefix1() {
         let builder = completion_test_builder(
             "\
