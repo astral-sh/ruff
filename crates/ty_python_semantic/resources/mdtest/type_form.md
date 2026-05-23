@@ -30,7 +30,7 @@ Implicit type-form evaluation should not reinterpret ordinary expressions whose 
 
 ```py
 from typing import Any, Literal, Never
-from typing_extensions import TypeForm
+from typing_extensions import TypeForm, TypeIs
 
 def get_form() -> TypeForm[str]:
     return str
@@ -48,6 +48,26 @@ def use_existing(holder: Holder, values: list[TypeForm[str]]) -> None:
 def incompatible_existing(value: TypeForm[int], runtime_type: type[int]) -> None:
     invalid_form: TypeForm[str] = value  # error: [invalid-assignment]
     invalid_runtime_type: TypeForm[str] = runtime_type  # error: [invalid-assignment]
+
+def accepts_type_form(value: TypeForm[Any]) -> None:
+    pass
+
+def accept_bare_runtime_type(runtime_type: type) -> None:
+    bare: TypeForm[Any] = runtime_type
+    accepts_type_form(runtime_type)
+
+def reject_broad_runtime_type(runtime_type: type[object], bare: type) -> None:
+    preserved: TypeForm[object] = runtime_type
+    explicit: TypeForm[str] = runtime_type  # error: [invalid-assignment]
+    implicit: TypeForm[str] = bare  # error: [invalid-assignment]
+
+def is_bare_runtime_type(value: TypeForm[Any]) -> TypeIs[type]:
+    return isinstance(value, type)
+
+def reject_broad_runtime_type_narrowing(
+    value: TypeForm[str],
+) -> TypeIs[type]:  # error: [invalid-type-guard-definition]
+    return isinstance(value, type)
 
 def accept_gradual(value: Any) -> None:
     dynamic: TypeForm[str] = value

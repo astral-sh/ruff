@@ -2051,10 +2051,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else {
                     std::slice::from_ref(arguments_slice)
                 };
-                let num_arguments = arguments.len();
-                let type_argument = if num_arguments == 1 {
-                    self.infer_type_expression(&arguments[0])
+                let type_argument = if let [argument] = arguments {
+                    self.infer_type_expression(argument)
                 } else {
+                    let num_arguments = arguments.len();
+
                     if !self.in_string_annotation() {
                         for argument in arguments {
                             self.infer_expression(argument, TypeContext::default());
@@ -2067,6 +2068,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         num_arguments,
                         1,
                     );
+
                     Type::unknown()
                 };
                 if arguments_slice.is_tuple_expr() {

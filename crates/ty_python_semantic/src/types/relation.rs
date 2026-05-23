@@ -1021,6 +1021,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target_typeform.type_argument(db),
                 ),
 
+            (Type::NominalInstance(source_instance), Type::TypeForm(target_typeform))
+                if source_instance.has_known_class(db, KnownClass::Type) =>
+            {
+                self.check_type_pair(db, Type::object(), target_typeform.type_argument(db))
+            }
+
             (Type::ClassLiteral(source_class), Type::TypeForm(target_typeform)) => self
                 .check_type_pair(
                     db,

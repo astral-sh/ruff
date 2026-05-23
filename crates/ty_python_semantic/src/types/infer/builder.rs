@@ -5655,15 +5655,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         types.expression_type(expression)
     }
 
-    /// Try implicit `TypeForm` evaluation when ordinary value inference cannot
-    /// preserve a type-form value or satisfy another arm of a union context.
-    fn infer_implicit_type_form(
+    /// In a `TypeForm` context, keep the ordinary value interpretation if it is
+    /// already acceptable.
+    ///
+    /// For example, `value` in `x: TypeForm[str] = value` might already have type
+    /// `TypeForm[str]`, and `1` in `x: TypeForm[str] | int = 1` satisfies the
+    /// ordinary `int` arm. In those cases, use ordinary expression inference.
+    /// Otherwise, reinterpret the expression as a type expression, as in
+    /// `x: TypeForm[int | str] = int | str`, and wrap it in `TypeForm[...]`.
+    fn infer_type_form_contextual_expression(
         &mut self,
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let target = tcx.annotation?;
-        let non_type_form_target = match target.resolve_type_alias(self.db()) {
+        let non_type_form_fallback = match target.resolve_type_alias(self.db()) {
             Type::TypeForm(_) => None,
             Type::Union(union)
                 if union.elements(self.db()).iter().any(|element| {
@@ -5677,12 +5683,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => return None,
         };
 
+        // Suppress contextual `TypeForm` evaluation only if ordinary inference already
+        // produces a type-form value or satisfies the non-`TypeForm` arm of the union.
         let value_ty = self
             .speculate()
             .infer_expression(expression, TypeContext::default());
         if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
             || self.contains_type_form_value(value_ty)
-            || non_type_form_target
+            || non_type_form_fallback
                 .is_some_and(|alternative| value_ty.is_assignable_to(self.db(), alternative))
         {
             return None;
@@ -5697,6 +5705,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn contains_type_form_value(&self, ty: Type<'db>) -> bool {
         match ty.resolve_type_alias(self.db()) {
             Type::TypeForm(_) | Type::SubclassOf(_) => true,
+            Type::NominalInstance(instance)
+                if instance.has_known_class(self.db(), KnownClass::Type) =>
+            {
+                true
+            }
             Type::Union(union) => union
                 .elements(self.db())
                 .iter()
@@ -5721,7 +5734,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
-        if let Some(ty) = self.infer_implicit_type_form(expression, tcx) {
+        if let Some(ty) = self.infer_type_form_contextual_expression(expression, tcx) {
             self.store_expression_type(expression, ty);
 
             if let Some(expression_cache) = &self.expression_cache {
