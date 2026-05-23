@@ -9,163 +9,175 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..53,
-        body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 0..24,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 4..7,
+        body: Suite {
+            range: 0..53,
+            node_index: NodeIndex(None),
+            statements: [
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 7..19,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 8..9,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        range: 0..24,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 4..7,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 7..19,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
                                     range: 8..9,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("a"),
+                                    parameter: Parameter {
                                         range: 8..9,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("a"),
+                                            range: 8..9,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                        ],
-                        vararg: None,
-                        kwonlyargs: [
-                            ParameterWithDefault {
-                                range: 17..18,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                            ],
+                            vararg: None,
+                            kwonlyargs: [
+                                ParameterWithDefault {
                                     range: 17..18,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("b"),
+                                    parameter: Parameter {
                                         range: 17..18,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("b"),
+                                            range: 17..18,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                        ],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 21..24,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                            ],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 21..24,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 21..24,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 21..24,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 25..52,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 29..32,
-                        node_index: NodeIndex(None),
+                            ],
+                        },
                     },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 32..47,
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 33..34,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        range: 25..52,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 29..32,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 32..47,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
                                     range: 33..34,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("a"),
+                                    parameter: Parameter {
                                         range: 33..34,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("a"),
+                                            range: 33..34,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                        ],
-                        vararg: None,
-                        kwonlyargs: [
-                            ParameterWithDefault {
-                                range: 39..40,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                            ],
+                            vararg: None,
+                            kwonlyargs: [
+                                ParameterWithDefault {
                                     range: 39..40,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("b"),
+                                    parameter: Parameter {
                                         range: 39..40,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("b"),
+                                            range: 39..40,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                            ParameterWithDefault {
-                                range: 42..43,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                                ParameterWithDefault {
                                     range: 42..43,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("c"),
+                                    parameter: Parameter {
                                         range: 42..43,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("c"),
+                                            range: 42..43,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                        ],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 49..52,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                            ],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 49..52,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 49..52,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 49..52,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

@@ -67,6 +67,10 @@ impl<'ast, I> SourceOrderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_, I
 where
     I: Iterator<Item = SuppressionComment> + 'ast,
 {
+    fn visit_suite(&mut self, suite: &'ast Suite) {
+        self.visit_body(suite);
+    }
+
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         let node_range = node.range();
 

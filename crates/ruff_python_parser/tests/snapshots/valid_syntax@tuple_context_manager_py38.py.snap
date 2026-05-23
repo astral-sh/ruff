@@ -9,79 +9,87 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..85,
-        body: [
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 43..84,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 48..79,
-                            node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    node_index: NodeIndex(None),
-                                    range: 48..72,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 52..55,
-                                                id: Name("foo"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 59..62,
-                                                id: Name("bar"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 66..69,
-                                                id: Name("baz"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
+        body: Suite {
+            range: 0..85,
+            node_index: NodeIndex(None),
+            statements: [
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 43..84,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 48..79,
+                                node_index: NodeIndex(None),
+                                context_expr: Tuple(
+                                    ExprTuple {
                                         node_index: NodeIndex(None),
-                                        range: 76..79,
-                                        id: Name("tup"),
-                                        ctx: Store,
+                                        range: 48..72,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 52..55,
+                                                    id: Name("foo"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 59..62,
+                                                    id: Name("bar"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 66..69,
+                                                    id: Name("baz"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
                                     },
                                 ),
-                            ),
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 81..84,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 81..84,
-                                    },
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 76..79,
+                                            id: Name("tup"),
+                                            ctx: Store,
+                                        },
+                                    ),
                                 ),
                             },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                        ],
+                        body: Suite {
+                            range: 81..84,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 81..84,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 81..84,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

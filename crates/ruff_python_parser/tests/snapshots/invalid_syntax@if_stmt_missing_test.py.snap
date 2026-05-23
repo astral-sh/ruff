@@ -9,37 +9,45 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..9,
-        body: [
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 0..8,
-                    test: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 2..2,
-                            id: Name(""),
-                            ctx: Invalid,
-                        },
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
+        body: Suite {
+            range: 0..9,
+            node_index: NodeIndex(None),
+            statements: [
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 0..8,
+                        test: Name(
+                            ExprName {
                                 node_index: NodeIndex(None),
-                                range: 5..8,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 5..8,
-                                    },
-                                ),
+                                range: 2..2,
+                                id: Name(""),
+                                ctx: Invalid,
                             },
                         ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-        ],
+                        body: Suite {
+                            range: 5..8,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 5..8,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 5..8,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

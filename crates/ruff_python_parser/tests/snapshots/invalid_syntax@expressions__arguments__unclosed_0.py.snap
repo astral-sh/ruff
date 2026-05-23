@@ -9,66 +9,74 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..26,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..5,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 0..5,
-                            func: Name(
-                                ExprName {
+        body: Suite {
+            range: 0..26,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..5,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 0..5,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 0..4,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 4..5,
                                     node_index: NodeIndex(None),
-                                    range: 0..4,
-                                    id: Name("call"),
-                                    ctx: Load,
+                                    args: [],
+                                    keywords: [],
                                 },
-                            ),
-                            arguments: Arguments {
-                                range: 4..5,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 7..26,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 11..14,
-                        node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 14..16,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 22..26,
                             },
                         ),
-                    ],
-                },
-            ),
-        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 7..26,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 11..14,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 14..16,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 17..26,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 22..26,
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

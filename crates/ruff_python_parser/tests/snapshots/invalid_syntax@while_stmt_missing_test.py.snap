@@ -9,79 +9,99 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..30,
-        body: [
-            While(
-                StmtWhile {
-                    node_index: NodeIndex(None),
-                    range: 0..11,
-                    test: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 5..5,
-                            id: Name(""),
-                            ctx: Invalid,
-                        },
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
+        body: Suite {
+            range: 0..30,
+            node_index: NodeIndex(None),
+            statements: [
+                While(
+                    StmtWhile {
+                        node_index: NodeIndex(None),
+                        range: 0..11,
+                        test: Name(
+                            ExprName {
                                 node_index: NodeIndex(None),
-                                range: 8..11,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 8..11,
-                                    },
-                                ),
+                                range: 5..5,
+                                id: Name(""),
+                                ctx: Invalid,
                             },
                         ),
-                    ],
-                    orelse: [],
-                },
-            ),
-            While(
-                StmtWhile {
-                    node_index: NodeIndex(None),
-                    range: 12..29,
-                    test: Name(
-                        ExprName {
+                        body: Suite {
+                            range: 8..11,
                             node_index: NodeIndex(None),
-                            range: 17..17,
-                            id: Name(""),
-                            ctx: Invalid,
-                        },
-                    ),
-                    body: [
-                        Assign(
-                            StmtAssign {
-                                node_index: NodeIndex(None),
-                                range: 24..29,
-                                targets: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 24..25,
-                                            id: Name("a"),
-                                            ctx: Store,
-                                        },
-                                    ),
-                                ],
-                                value: NumberLiteral(
-                                    ExprNumberLiteral {
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
-                                        range: 28..29,
-                                        value: Int(
-                                            1,
+                                        range: 8..11,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 8..11,
+                                            },
                                         ),
                                     },
                                 ),
+                            ],
+                        },
+                        orelse: Suite {
+                            range: 11..11,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                While(
+                    StmtWhile {
+                        node_index: NodeIndex(None),
+                        range: 12..29,
+                        test: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 17..17,
+                                id: Name(""),
+                                ctx: Invalid,
                             },
                         ),
-                    ],
-                    orelse: [],
-                },
-            ),
-        ],
+                        body: Suite {
+                            range: 19..29,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Assign(
+                                    StmtAssign {
+                                        node_index: NodeIndex(None),
+                                        range: 24..29,
+                                        targets: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 24..25,
+                                                    id: Name("a"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                        ],
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 28..29,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        orelse: Suite {
+                            range: 29..29,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

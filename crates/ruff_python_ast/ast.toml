@@ -67,7 +67,7 @@ doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
 [Mod.nodes.ModModule]
 doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
-fields = [{ name = "body", type = "Stmt*" }]
+fields = [{ name = "body", type = "Suite" }]
 
 [Mod.nodes.ModExpression]
 doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
@@ -90,7 +90,7 @@ fields = [
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "parameters", type = "Box<crate::Parameters>" },
   { name = "returns", type = "Expr?", is_annotation = true },
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "Suite" },
 ]
 
 [Stmt.nodes.StmtClassDef]
@@ -100,7 +100,7 @@ fields = [
   { name = "name", type = "Identifier" },
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "arguments", type = "Box<crate::Arguments>?" },
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "Suite" },
 ]
 
 [Stmt.nodes.StmtReturn]
@@ -152,8 +152,8 @@ fields = [
   { name = "is_async", type = "bool" },
   { name = "target", type = "Expr" },
   { name = "iter", type = "Expr" },
-  { name = "body", type = "Stmt*" },
-  { name = "orelse", type = "Stmt*" },
+  { name = "body", type = "Suite" },
+  { name = "orelse", type = "Suite" },
 ]
 
 [Stmt.nodes.StmtWhile]
@@ -161,8 +161,8 @@ doc = """See also [While](https://docs.python.org/3/library/ast.html#ast.While)
 and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile)."""
 fields = [
   { name = "test", type = "Expr" },
-  { name = "body", type = "Stmt*" },
-  { name = "orelse", type = "Stmt*" },
+  { name = "body", type = "Suite" },
+  { name = "orelse", type = "Suite" },
 ]
 
 [Stmt.nodes.StmtIf]
@@ -170,7 +170,7 @@ doc = "See also [If](https://docs.python.org/3/library/ast.html#ast.If)"
 fields = [
 
   { name = "test", type = "Expr" },
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "Suite" },
   { name = "elif_else_clauses", type = "ElifElseClause*" },
 ]
 
@@ -182,7 +182,7 @@ This type differs from the original Python AST, as it collapses the synchronous 
 fields = [
   { name = "is_async", type = "bool" },
   { name = "items", type = "WithItem*" },
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "Suite" },
 ]
 
 [Stmt.nodes.StmtMatch]
@@ -200,10 +200,10 @@ fields = [{ name = "exc", type = "Expr?" }, { name = "cause", type = "Expr?" }]
 doc = """See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
 and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)"""
 fields = [
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "Suite" },
   { name = "handlers", type = "ExceptHandler*" },
-  { name = "orelse", type = "Stmt*" },
-  { name = "finalbody", type = "Stmt*" },
+  { name = "orelse", type = "Suite" },
+  { name = "finalbody", type = "Suite" },
   { name = "is_star", type = "bool" },
 ]
 
@@ -632,6 +632,7 @@ fields = [
 ]
 
 [ungrouped.nodes]
+Suite = {}
 InterpolatedStringFormatSpec = {}
 PatternArguments = {}
 PatternKeyword = {}

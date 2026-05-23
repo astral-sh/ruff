@@ -3,8 +3,9 @@ source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
 expression: trace
 ---
 - ModModule
-  - StmtExpr
-    - ExprBytesLiteral
-      - BytesLiteral
-      - BytesLiteral
-      - BytesLiteral
+  - Suite
+    - StmtExpr
+      - ExprBytesLiteral
+        - BytesLiteral
+        - BytesLiteral
+        - BytesLiteral

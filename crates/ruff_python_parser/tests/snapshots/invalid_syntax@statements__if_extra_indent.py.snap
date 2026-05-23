@@ -9,90 +9,98 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..153,
-        body: [
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 103..134,
-                    test: BooleanLiteral(
-                        ExprBooleanLiteral {
-                            node_index: NodeIndex(None),
-                            range: 106..110,
-                            value: true,
-                        },
-                    ),
-                    body: [
-                        Pass(
-                            StmtPass {
+        body: Suite {
+            range: 0..153,
+            node_index: NodeIndex(None),
+            statements: [
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 103..134,
+                        test: BooleanLiteral(
+                            ExprBooleanLiteral {
                                 node_index: NodeIndex(None),
-                                range: 116..120,
+                                range: 106..110,
+                                value: true,
                             },
                         ),
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 129..134,
-                                value: BinOp(
-                                    ExprBinOp {
+                        body: Suite {
+                            range: 111..134,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 116..120,
+                                    },
+                                ),
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 129..134,
-                                        left: Name(
-                                            ExprName {
+                                        value: BinOp(
+                                            ExprBinOp {
                                                 node_index: NodeIndex(None),
-                                                range: 129..130,
-                                                id: Name("a"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        op: Add,
-                                        right: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 133..134,
-                                                id: Name("b"),
-                                                ctx: Load,
+                                                range: 129..134,
+                                                left: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 129..130,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                op: Add,
+                                                right: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 133..134,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
                                             },
                                         ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            Pass(
-                StmtPass {
-                    node_index: NodeIndex(None),
-                    range: 140..144,
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 146..152,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 146..147,
-                                id: Name("a"),
-                                ctx: Store,
-                            },
-                        ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 150..152,
-                            value: Int(
-                                10,
-                            ),
+                            ],
                         },
-                    ),
-                },
-            ),
-        ],
+                        elif_else_clauses: [],
+                    },
+                ),
+                Pass(
+                    StmtPass {
+                        node_index: NodeIndex(None),
+                        range: 140..144,
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 146..152,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 146..147,
+                                    id: Name("a"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                node_index: NodeIndex(None),
+                                range: 150..152,
+                                value: Int(
+                                    10,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

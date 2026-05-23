@@ -40,6 +40,7 @@ types_requiring_crate_prefix = {
     "Alias",
     "Singleton",
     "PatternArguments",
+    "Suite",
 }
 
 
@@ -53,6 +54,7 @@ class VisitorInfo:
 # Only visitors that are different from the default `visit_*` method are included.
 # These visitors either have a different name or accept a sequence of items.
 type_to_visitor_function: dict[str, VisitorInfo] = {
+    "Suite": VisitorInfo("visit_suite"),
     "TypeParams": VisitorInfo("visit_type_params", True),
     "Parameters": VisitorInfo("visit_parameters", True),
     "Stmt": VisitorInfo("visit_body", True),

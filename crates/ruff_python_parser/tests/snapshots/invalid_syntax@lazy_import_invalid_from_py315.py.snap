@@ -9,115 +9,123 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..146,
-        body: [
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 44..65,
-                    module: Some(
-                        Identifier {
-                            id: Name("os"),
-                            range: 54..56,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 64..65,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("*"),
-                                range: 64..65,
-                                node_index: NodeIndex(None),
-                            },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: true,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 66..105,
-                    module: Some(
-                        Identifier {
-                            id: Name("__future__"),
-                            range: 76..86,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 94..105,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("annotations"),
-                                range: 94..105,
-                                node_index: NodeIndex(None),
-                            },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: true,
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 107..145,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("func"),
-                        range: 111..115,
+        body: Suite {
+            range: 0..146,
+            node_index: NodeIndex(None),
+            statements: [
+                ImportFrom(
+                    StmtImportFrom {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 115..117,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        ImportFrom(
-                            StmtImportFrom {
+                        range: 44..65,
+                        module: Some(
+                            Identifier {
+                                id: Name("os"),
+                                range: 54..56,
                                 node_index: NodeIndex(None),
-                                range: 123..145,
-                                module: Some(
-                                    Identifier {
-                                        id: Name("sys"),
-                                        range: 133..136,
-                                        node_index: NodeIndex(None),
-                                    },
-                                ),
-                                names: [
-                                    Alias {
-                                        range: 144..145,
-                                        node_index: NodeIndex(None),
-                                        name: Identifier {
-                                            id: Name("*"),
-                                            range: 144..145,
-                                            node_index: NodeIndex(None),
-                                        },
-                                        asname: None,
-                                    },
-                                ],
-                                level: 0,
-                                is_lazy: true,
                             },
                         ),
-                    ],
-                },
-            ),
-        ],
+                        names: [
+                            Alias {
+                                range: 64..65,
+                                node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("*"),
+                                    range: 64..65,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: 0,
+                        is_lazy: true,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 66..105,
+                        module: Some(
+                            Identifier {
+                                id: Name("__future__"),
+                                range: 76..86,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 94..105,
+                                node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("annotations"),
+                                    range: 94..105,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: 0,
+                        is_lazy: true,
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 107..145,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("func"),
+                            range: 111..115,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 115..117,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 118..145,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                ImportFrom(
+                                    StmtImportFrom {
+                                        node_index: NodeIndex(None),
+                                        range: 123..145,
+                                        module: Some(
+                                            Identifier {
+                                                id: Name("sys"),
+                                                range: 133..136,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        names: [
+                                            Alias {
+                                                range: 144..145,
+                                                node_index: NodeIndex(None),
+                                                name: Identifier {
+                                                    id: Name("*"),
+                                                    range: 144..145,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                asname: None,
+                                            },
+                                        ],
+                                        level: 0,
+                                        is_lazy: true,
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

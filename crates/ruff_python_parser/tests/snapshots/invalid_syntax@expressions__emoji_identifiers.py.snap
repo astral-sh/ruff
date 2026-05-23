@@ -9,77 +9,81 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..64,
-        body: [
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 0..5,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 0..1,
-                                id: Name("a"),
-                                ctx: Store,
-                            },
-                        ),
-                    ],
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 5..5,
-                            id: Name(""),
-                            ctx: Invalid,
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 32..37,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 32..33,
-                                id: Name("a"),
-                                ctx: Store,
-                            },
-                        ),
-                    ],
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 37..37,
-                            id: Name(""),
-                            ctx: Invalid,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 42..43,
-                    value: UnaryOp(
-                        ExprUnaryOp {
-                            node_index: NodeIndex(None),
-                            range: 42..43,
-                            op: UAdd,
-                            operand: Name(
+        body: Suite {
+            range: 0..64,
+            node_index: NodeIndex(None),
+            statements: [
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 0..5,
+                        targets: [
+                            Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
-                                    range: 43..43,
-                                    id: Name(""),
-                                    ctx: Invalid,
+                                    range: 0..1,
+                                    id: Name("a"),
+                                    ctx: Store,
                                 },
                             ),
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ],
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 5..5,
+                                id: Name(""),
+                                ctx: Invalid,
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 32..37,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 32..33,
+                                    id: Name("a"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 37..37,
+                                id: Name(""),
+                                ctx: Invalid,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 42..43,
+                        value: UnaryOp(
+                            ExprUnaryOp {
+                                node_index: NodeIndex(None),
+                                range: 42..43,
+                                op: UAdd,
+                                operand: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 43..43,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

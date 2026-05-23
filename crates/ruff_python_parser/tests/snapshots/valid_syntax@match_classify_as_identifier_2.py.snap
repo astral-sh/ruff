@@ -9,358 +9,362 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..149,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..5,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 0..5,
-                            id: Name("match"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 6..18,
-                    value: Compare(
-                        ExprCompare {
-                            node_index: NodeIndex(None),
-                            range: 6..18,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 6..11,
-                                    id: Name("match"),
-                                    ctx: Load,
-                                },
-                            ),
-                            ops: [
-                                NotEq,
-                            ],
-                            comparators: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 15..18,
-                                        id: Name("foo"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 19..31,
-                    value: Tuple(
-                        ExprTuple {
-                            node_index: NodeIndex(None),
-                            range: 19..31,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 20..23,
-                                        id: Name("foo"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 25..30,
-                                        id: Name("match"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                            ctx: Load,
-                            parenthesized: true,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 32..44,
-                    value: List(
-                        ExprList {
-                            node_index: NodeIndex(None),
-                            range: 32..44,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 33..36,
-                                        id: Name("foo"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 38..43,
-                                        id: Name("match"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 45..57,
-                    value: Set(
-                        ExprSet {
-                            node_index: NodeIndex(None),
-                            range: 45..57,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 46..49,
-                                        id: Name("foo"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 51..56,
-                                        id: Name("match"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 58..63,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 58..63,
-                            id: Name("match"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    node_index: NodeIndex(None),
-                    range: 65..75,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 65..70,
-                            id: Name("match"),
-                            ctx: Store,
-                        },
-                    ),
-                    annotation: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 72..75,
-                            id: Name("int"),
-                            ctx: Load,
-                        },
-                    ),
-                    value: None,
-                    simple: true,
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 76..82,
-                    value: Tuple(
-                        ExprTuple {
-                            node_index: NodeIndex(None),
-                            range: 76..82,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 76..81,
-                                        id: Name("match"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                            ctx: Load,
-                            parenthesized: false,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 83..92,
-                    value: Attribute(
-                        ExprAttribute {
-                            node_index: NodeIndex(None),
-                            range: 83..92,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 83..88,
-                                    id: Name("match"),
-                                    ctx: Load,
-                                },
-                            ),
-                            attr: Identifier {
-                                id: Name("foo"),
-                                range: 89..92,
+        body: Suite {
+            range: 0..149,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..5,
+                        value: Name(
+                            ExprName {
                                 node_index: NodeIndex(None),
+                                range: 0..5,
+                                id: Name("match"),
+                                ctx: Load,
                             },
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 93..104,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 93..104,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 93..98,
-                                    id: Name("match"),
-                                    ctx: Load,
-                                },
-                            ),
-                            op: Div,
-                            right: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 101..104,
-                                    id: Name("foo"),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 105..117,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 105..117,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 105..110,
-                                    id: Name("match"),
-                                    ctx: Load,
-                                },
-                            ),
-                            op: LShift,
-                            right: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 114..117,
-                                    id: Name("foo"),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 118..131,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 118..131,
-                            op: And,
-                            values: [
-                                Name(
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 6..18,
+                        value: Compare(
+                            ExprCompare {
+                                node_index: NodeIndex(None),
+                                range: 6..18,
+                                left: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 118..123,
+                                        range: 6..11,
                                         id: Name("match"),
                                         ctx: Load,
                                     },
                                 ),
-                                Name(
+                                ops: [
+                                    NotEq,
+                                ],
+                                comparators: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 15..18,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 19..31,
+                        value: Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 19..31,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 20..23,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 25..30,
+                                            id: Name("match"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 32..44,
+                        value: List(
+                            ExprList {
+                                node_index: NodeIndex(None),
+                                range: 32..44,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 33..36,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 38..43,
+                                            id: Name("match"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 45..57,
+                        value: Set(
+                            ExprSet {
+                                node_index: NodeIndex(None),
+                                range: 45..57,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 46..49,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 51..56,
+                                            id: Name("match"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 58..63,
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 58..63,
+                                id: Name("match"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        node_index: NodeIndex(None),
+                        range: 65..75,
+                        target: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 65..70,
+                                id: Name("match"),
+                                ctx: Store,
+                            },
+                        ),
+                        annotation: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 72..75,
+                                id: Name("int"),
+                                ctx: Load,
+                            },
+                        ),
+                        value: None,
+                        simple: true,
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 76..82,
+                        value: Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 76..82,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 76..81,
+                                            id: Name("match"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 83..92,
+                        value: Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 83..92,
+                                value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 128..131,
-                                        id: Name("foo"),
+                                        range: 83..88,
+                                        id: Name("match"),
                                         ctx: Load,
                                     },
                                 ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 132..148,
-                    value: Compare(
-                        ExprCompare {
-                            node_index: NodeIndex(None),
-                            range: 132..148,
-                            left: Name(
-                                ExprName {
+                                attr: Identifier {
+                                    id: Name("foo"),
+                                    range: 89..92,
                                     node_index: NodeIndex(None),
-                                    range: 132..137,
-                                    id: Name("match"),
-                                    ctx: Load,
                                 },
-                            ),
-                            ops: [
-                                IsNot,
-                            ],
-                            comparators: [
-                                Name(
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 93..104,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 93..104,
+                                left: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 145..148,
+                                        range: 93..98,
+                                        id: Name("match"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Div,
+                                right: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 101..104,
                                         id: Name("foo"),
                                         ctx: Load,
                                     },
                                 ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-        ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 105..117,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 105..117,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 105..110,
+                                        id: Name("match"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: LShift,
+                                right: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 114..117,
+                                        id: Name("foo"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 118..131,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 118..131,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 118..123,
+                                            id: Name("match"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 128..131,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 132..148,
+                        value: Compare(
+                            ExprCompare {
+                                node_index: NodeIndex(None),
+                                range: 132..148,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 132..137,
+                                        id: Name("match"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                ops: [
+                                    IsNot,
+                                ],
+                                comparators: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 145..148,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

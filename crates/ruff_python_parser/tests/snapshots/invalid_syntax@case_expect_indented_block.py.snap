@@ -9,79 +9,91 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..43,
-        body: [
-            Match(
-                StmtMatch {
-                    node_index: NodeIndex(None),
-                    range: 0..42,
-                    subject: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 6..13,
-                            id: Name("subject"),
-                            ctx: Load,
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 19..26,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
-                                    node_index: NodeIndex(None),
-                                    range: 24..25,
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 24..25,
-                                            value: Int(
-                                                1,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [],
-                        },
-                        MatchCase {
-                            range: 31..42,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
-                                    node_index: NodeIndex(None),
-                                    range: 36..37,
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 36..37,
-                                            value: Int(
-                                                2,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
+        body: Suite {
+            range: 0..43,
+            node_index: NodeIndex(None),
+            statements: [
+                Match(
+                    StmtMatch {
+                        node_index: NodeIndex(None),
+                        range: 0..42,
+                        subject: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 6..13,
+                                id: Name("subject"),
+                                ctx: Load,
+                            },
+                        ),
+                        cases: [
+                            MatchCase {
+                                range: 19..26,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
                                         node_index: NodeIndex(None),
-                                        range: 39..42,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
+                                        range: 24..25,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 39..42,
+                                                range: 24..25,
+                                                value: Int(
+                                                    1,
+                                                ),
                                             },
                                         ),
                                     },
                                 ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-        ],
+                                guard: None,
+                                body: Suite {
+                                    range: 26..26,
+                                    node_index: NodeIndex(None),
+                                    statements: [],
+                                },
+                            },
+                            MatchCase {
+                                range: 31..42,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
+                                        node_index: NodeIndex(None),
+                                        range: 36..37,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 36..37,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 39..42,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Expr(
+                                            StmtExpr {
+                                                node_index: NodeIndex(None),
+                                                range: 39..42,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 39..42,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

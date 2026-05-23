@@ -9,23 +9,27 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..7,
-        body: [
-            Assert(
-                StmtAssert {
-                    node_index: NodeIndex(None),
-                    range: 0..6,
-                    test: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 6..6,
-                            id: Name(""),
-                            ctx: Invalid,
-                        },
-                    ),
-                    msg: None,
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..7,
+            node_index: NodeIndex(None),
+            statements: [
+                Assert(
+                    StmtAssert {
+                        node_index: NodeIndex(None),
+                        range: 0..6,
+                        test: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 6..6,
+                                id: Name(""),
+                                ctx: Invalid,
+                            },
+                        ),
+                        msg: None,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

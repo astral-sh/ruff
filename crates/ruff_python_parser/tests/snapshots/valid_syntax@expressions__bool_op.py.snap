@@ -9,451 +9,455 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..142,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..7,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 0..7,
-                            op: And,
-                            values: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 0..1,
-                                        id: Name("a"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 6..7,
-                                        id: Name("b"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 8..21,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 8..21,
-                            op: And,
-                            values: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 8..9,
-                                        id: Name("a"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 14..15,
-                                        id: Name("b"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 20..21,
-                                        id: Name("c"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 22..28,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 22..28,
-                            op: Or,
-                            values: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 22..23,
-                                        id: Name("a"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 27..28,
-                                        id: Name("b"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 29..40,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 29..40,
-                            op: Or,
-                            values: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 29..30,
-                                        id: Name("a"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 34..35,
-                                        id: Name("b"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 39..40,
-                                        id: Name("c"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 41..53,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 41..53,
-                            op: Or,
-                            values: [
-                                BoolOp(
-                                    ExprBoolOp {
-                                        node_index: NodeIndex(None),
-                                        range: 41..48,
-                                        op: And,
-                                        values: [
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 41..42,
-                                                    id: Name("a"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 47..48,
-                                                    id: Name("b"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 52..53,
-                                        id: Name("c"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 54..88,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 54..88,
-                            op: Or,
-                            values: [
-                                BoolOp(
-                                    ExprBoolOp {
-                                        node_index: NodeIndex(None),
-                                        range: 54..67,
-                                        op: And,
-                                        values: [
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 54..55,
-                                                    id: Name("a"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 60..61,
-                                                    id: Name("b"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 66..67,
-                                                    id: Name("c"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 71..72,
-                                        id: Name("d"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                BoolOp(
-                                    ExprBoolOp {
-                                        node_index: NodeIndex(None),
-                                        range: 76..83,
-                                        op: And,
-                                        values: [
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 76..77,
-                                                    id: Name("e"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 82..83,
-                                                    id: Name("f"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 87..88,
-                                        id: Name("g"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 89..105,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 89..105,
-                            op: Or,
-                            values: [
-                                BoolOp(
-                                    ExprBoolOp {
-                                        node_index: NodeIndex(None),
-                                        range: 89..100,
-                                        op: And,
-                                        values: [
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 89..90,
-                                                    id: Name("a"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            UnaryOp(
-                                                ExprUnaryOp {
-                                                    node_index: NodeIndex(None),
-                                                    range: 95..100,
-                                                    op: Not,
-                                                    operand: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 99..100,
-                                                            id: Name("b"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 104..105,
-                                        id: Name("c"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 106..124,
-                    value: Yield(
-                        ExprYield {
-                            node_index: NodeIndex(None),
-                            range: 106..124,
-                            value: Some(
-                                BoolOp(
-                                    ExprBoolOp {
-                                        node_index: NodeIndex(None),
-                                        range: 112..124,
-                                        op: Or,
-                                        values: [
-                                            BoolOp(
-                                                ExprBoolOp {
-                                                    node_index: NodeIndex(None),
-                                                    range: 112..119,
-                                                    op: And,
-                                                    values: [
-                                                        Name(
+        body: Suite {
+            range: 0..142,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..7,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 0..7,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 0..1,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 6..7,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 8..21,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 8..21,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 8..9,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 14..15,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 20..21,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 22..28,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 22..28,
+                                op: Or,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 22..23,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 27..28,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 29..40,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 29..40,
+                                op: Or,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 29..30,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 34..35,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 39..40,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 41..53,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 41..53,
+                                op: Or,
+                                values: [
+                                    BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 41..48,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 41..42,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 47..48,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 52..53,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 54..88,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 54..88,
+                                op: Or,
+                                values: [
+                                    BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 54..67,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 54..55,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 60..61,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 66..67,
+                                                        id: Name("c"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 71..72,
+                                            id: Name("d"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 76..83,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 76..77,
+                                                        id: Name("e"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 82..83,
+                                                        id: Name("f"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 87..88,
+                                            id: Name("g"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 89..105,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 89..105,
+                                op: Or,
+                                values: [
+                                    BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 89..100,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 89..90,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                UnaryOp(
+                                                    ExprUnaryOp {
+                                                        node_index: NodeIndex(None),
+                                                        range: 95..100,
+                                                        op: Not,
+                                                        operand: Name(
                                                             ExprName {
                                                                 node_index: NodeIndex(None),
-                                                                range: 112..113,
-                                                                id: Name("a"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 118..119,
+                                                                range: 99..100,
                                                                 id: Name("b"),
                                                                 ctx: Load,
                                                             },
                                                         ),
-                                                    ],
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 123..124,
-                                                    id: Name("c"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                    },
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 104..105,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 106..124,
+                        value: Yield(
+                            ExprYield {
+                                node_index: NodeIndex(None),
+                                range: 106..124,
+                                value: Some(
+                                    BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 112..124,
+                                            op: Or,
+                                            values: [
+                                                BoolOp(
+                                                    ExprBoolOp {
+                                                        node_index: NodeIndex(None),
+                                                        range: 112..119,
+                                                        op: And,
+                                                        values: [
+                                                            Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 112..113,
+                                                                    id: Name("a"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 118..119,
+                                                                    id: Name("b"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 123..124,
+                                                        id: Name("c"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
                                 ),
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 125..141,
-                    value: BoolOp(
-                        ExprBoolOp {
-                            node_index: NodeIndex(None),
-                            range: 125..141,
-                            op: Or,
-                            values: [
-                                BoolOp(
-                                    ExprBoolOp {
-                                        node_index: NodeIndex(None),
-                                        range: 125..136,
-                                        op: And,
-                                        values: [
-                                            UnaryOp(
-                                                ExprUnaryOp {
-                                                    node_index: NodeIndex(None),
-                                                    range: 125..130,
-                                                    op: Not,
-                                                    operand: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 129..130,
-                                                            id: Name("a"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 135..136,
-                                                    id: Name("b"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 140..141,
-                                        id: Name("c"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-        ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 125..141,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                node_index: NodeIndex(None),
+                                range: 125..141,
+                                op: Or,
+                                values: [
+                                    BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 125..136,
+                                            op: And,
+                                            values: [
+                                                UnaryOp(
+                                                    ExprUnaryOp {
+                                                        node_index: NodeIndex(None),
+                                                        range: 125..130,
+                                                        op: Not,
+                                                        operand: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 129..130,
+                                                                id: Name("a"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 135..136,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 140..141,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

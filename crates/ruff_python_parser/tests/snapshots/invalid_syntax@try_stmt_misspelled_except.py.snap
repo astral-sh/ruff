@@ -9,177 +9,209 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..165,
-        body: [
-            Try(
-                StmtTry {
-                    node_index: NodeIndex(None),
-                    range: 0..13,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 9..13,
-                            },
-                        ),
-                    ],
-                    handlers: [],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: false,
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    node_index: NodeIndex(None),
-                    range: 14..20,
-                    target: Name(
-                        ExprName {
+        body: Suite {
+            range: 0..165,
+            node_index: NodeIndex(None),
+            statements: [
+                Try(
+                    StmtTry {
+                        node_index: NodeIndex(None),
+                        range: 0..13,
+                        body: Suite {
+                            range: 4..13,
                             node_index: NodeIndex(None),
-                            range: 14..19,
-                            id: Name("exept"),
-                            ctx: Store,
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 9..13,
+                                    },
+                                ),
+                            ],
                         },
-                    ),
-                    annotation: Name(
-                        ExprName {
+                        handlers: [],
+                        orelse: Suite {
+                            range: 13..13,
                             node_index: NodeIndex(None),
-                            range: 20..20,
-                            id: Name(""),
-                            ctx: Invalid,
+                            statements: [],
                         },
-                    ),
-                    value: None,
-                    simple: true,
-                },
-            ),
-            Pass(
-                StmtPass {
-                    node_index: NodeIndex(None),
-                    range: 54..58,
-                },
-            ),
-            Pass(
-                StmtPass {
-                    node_index: NodeIndex(None),
-                    range: 72..76,
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 77..82,
-                    targets: [
-                        Name(
+                        finalbody: Suite {
+                            range: 13..13,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        is_star: false,
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        node_index: NodeIndex(None),
+                        range: 14..20,
+                        target: Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 77..78,
-                                id: Name("a"),
+                                range: 14..19,
+                                id: Name("exept"),
                                 ctx: Store,
                             },
                         ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 81..82,
-                            value: Int(
-                                1,
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Try(
-                StmtTry {
-                    node_index: NodeIndex(None),
-                    range: 83..113,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 92..96,
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 97..113,
-                                node_index: NodeIndex(None),
-                                type_: None,
-                                name: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 109..113,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: false,
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    node_index: NodeIndex(None),
-                    range: 114..120,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 114..119,
-                            id: Name("exept"),
-                            ctx: Store,
-                        },
-                    ),
-                    annotation: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 120..120,
-                            id: Name(""),
-                            ctx: Invalid,
-                        },
-                    ),
-                    value: None,
-                    simple: true,
-                },
-            ),
-            Pass(
-                StmtPass {
-                    node_index: NodeIndex(None),
-                    range: 154..158,
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 159..164,
-                    targets: [
-                        Name(
+                        annotation: Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 159..160,
-                                id: Name("b"),
+                                range: 20..20,
+                                id: Name(""),
+                                ctx: Invalid,
+                            },
+                        ),
+                        value: None,
+                        simple: true,
+                    },
+                ),
+                Pass(
+                    StmtPass {
+                        node_index: NodeIndex(None),
+                        range: 54..58,
+                    },
+                ),
+                Pass(
+                    StmtPass {
+                        node_index: NodeIndex(None),
+                        range: 72..76,
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 77..82,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 77..78,
+                                    id: Name("a"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                node_index: NodeIndex(None),
+                                range: 81..82,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Try(
+                    StmtTry {
+                        node_index: NodeIndex(None),
+                        range: 83..113,
+                        body: Suite {
+                            range: 87..96,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 92..96,
+                                    },
+                                ),
+                            ],
+                        },
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 97..113,
+                                    node_index: NodeIndex(None),
+                                    type_: None,
+                                    name: None,
+                                    body: Suite {
+                                        range: 104..113,
+                                        node_index: NodeIndex(None),
+                                        statements: [
+                                            Pass(
+                                                StmtPass {
+                                                    node_index: NodeIndex(None),
+                                                    range: 109..113,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                },
+                            ),
+                        ],
+                        orelse: Suite {
+                            range: 113..113,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        finalbody: Suite {
+                            range: 113..113,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        is_star: false,
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        node_index: NodeIndex(None),
+                        range: 114..120,
+                        target: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 114..119,
+                                id: Name("exept"),
                                 ctx: Store,
                             },
                         ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 163..164,
-                            value: Int(
-                                1,
+                        annotation: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 120..120,
+                                id: Name(""),
+                                ctx: Invalid,
+                            },
+                        ),
+                        value: None,
+                        simple: true,
+                    },
+                ),
+                Pass(
+                    StmtPass {
+                        node_index: NodeIndex(None),
+                        range: 154..158,
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 159..164,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 159..160,
+                                    id: Name("b"),
+                                    ctx: Store,
+                                },
                             ),
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ],
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                node_index: NodeIndex(None),
+                                range: 163..164,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

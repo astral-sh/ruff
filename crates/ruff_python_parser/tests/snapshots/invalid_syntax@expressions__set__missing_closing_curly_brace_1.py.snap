@@ -9,45 +9,49 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..136,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 128..136,
-                    value: Set(
-                        ExprSet {
-                            node_index: NodeIndex(None),
-                            range: 128..136,
-                            elts: [
-                                BinOp(
-                                    ExprBinOp {
-                                        node_index: NodeIndex(None),
-                                        range: 131..136,
-                                        left: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 131..132,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        op: Add,
-                                        right: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 135..136,
-                                                id: Name("y"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..136,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 128..136,
+                        value: Set(
+                            ExprSet {
+                                node_index: NodeIndex(None),
+                                range: 128..136,
+                                elts: [
+                                    BinOp(
+                                        ExprBinOp {
+                                            node_index: NodeIndex(None),
+                                            range: 131..136,
+                                            left: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 131..132,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 135..136,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

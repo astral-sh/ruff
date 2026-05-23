@@ -256,6 +256,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
     match node {
         AnyNodeRef::ModModule(_)
         | AnyNodeRef::ModExpression(_)
+        | AnyNodeRef::Suite(_)
         | AnyNodeRef::StmtFunctionDef(_)
         | AnyNodeRef::StmtClassDef(_)
         | AnyNodeRef::StmtReturn(_)

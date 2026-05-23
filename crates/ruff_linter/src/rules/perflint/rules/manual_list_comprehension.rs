@@ -103,7 +103,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     };
 
-    let (stmt, if_test) = match &*for_stmt.body {
+    let (stmt, if_test) = match for_stmt.body.as_slice() {
         // ```python
         // for x in y:
         //     if z:

@@ -182,7 +182,7 @@ fn create_class_def_stmt(
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
-        body,
+        body: body.into(),
         type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),

@@ -9,94 +9,98 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..41,
-        body: [
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 25..32,
-                    targets: [
-                        Compare(
-                            ExprCompare {
-                                node_index: NodeIndex(None),
-                                range: 25..29,
-                                left: Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 25..26,
-                                        id: Name("x"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                ops: [
-                                    Eq,
-                                ],
-                                comparators: [
-                                    Name(
+        body: Suite {
+            range: 0..41,
+            node_index: NodeIndex(None),
+            statements: [
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 25..32,
+                        targets: [
+                            Compare(
+                                ExprCompare {
+                                    node_index: NodeIndex(None),
+                                    range: 25..29,
+                                    left: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 29..29,
-                                            id: Name(""),
-                                            ctx: Invalid,
+                                            range: 25..26,
+                                            id: Name("x"),
+                                            ctx: Load,
                                         },
                                     ),
-                                ],
+                                    ops: [
+                                        Eq,
+                                    ],
+                                    comparators: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 29..29,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 31..32,
+                                id: Name("y"),
+                                ctx: Load,
                             },
                         ),
-                    ],
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 31..32,
-                            id: Name("y"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 33..40,
-                    targets: [
-                        Compare(
-                            ExprCompare {
-                                node_index: NodeIndex(None),
-                                range: 33..37,
-                                left: Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 33..34,
-                                        id: Name("x"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                ops: [
-                                    NotEq,
-                                ],
-                                comparators: [
-                                    Name(
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 33..40,
+                        targets: [
+                            Compare(
+                                ExprCompare {
+                                    node_index: NodeIndex(None),
+                                    range: 33..37,
+                                    left: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 37..37,
-                                            id: Name(""),
-                                            ctx: Invalid,
+                                            range: 33..34,
+                                            id: Name("x"),
+                                            ctx: Load,
                                         },
                                     ),
-                                ],
+                                    ops: [
+                                        NotEq,
+                                    ],
+                                    comparators: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 37..37,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 39..40,
+                                id: Name("y"),
+                                ctx: Load,
                             },
                         ),
-                    ],
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 39..40,
-                            id: Name("y"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

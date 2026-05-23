@@ -9,95 +9,103 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..73,
-        body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 45..72,
-                    is_async: false,
-                    decorator_list: [
-                        Decorator {
-                            range: 45..57,
-                            node_index: NodeIndex(None),
-                            expression: Call(
-                                ExprCall {
-                                    node_index: NodeIndex(None),
-                                    range: 46..57,
-                                    func: Attribute(
-                                        ExprAttribute {
-                                            node_index: NodeIndex(None),
-                                            range: 46..55,
-                                            value: Call(
-                                                ExprCall {
-                                                    node_index: NodeIndex(None),
-                                                    range: 46..51,
-                                                    func: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 46..49,
-                                                            id: Name("foo"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    arguments: Arguments {
-                                                        range: 49..51,
-                                                        node_index: NodeIndex(None),
-                                                        args: [],
-                                                        keywords: [],
-                                                    },
-                                                },
-                                            ),
-                                            attr: Identifier {
-                                                id: Name("bar"),
-                                                range: 52..55,
-                                                node_index: NodeIndex(None),
-                                            },
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: Arguments {
-                                        range: 55..57,
-                                        node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
-                                    },
-                                },
-                            ),
-                        },
-                    ],
-                    name: Identifier {
-                        id: Name("baz"),
-                        range: 62..65,
+        body: Suite {
+            range: 0..73,
+            node_index: NodeIndex(None),
+            statements: [
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 65..67,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
+                        range: 45..72,
+                        is_async: false,
+                        decorator_list: [
+                            Decorator {
+                                range: 45..57,
                                 node_index: NodeIndex(None),
-                                range: 69..72,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                expression: Call(
+                                    ExprCall {
                                         node_index: NodeIndex(None),
-                                        range: 69..72,
+                                        range: 46..57,
+                                        func: Attribute(
+                                            ExprAttribute {
+                                                node_index: NodeIndex(None),
+                                                range: 46..55,
+                                                value: Call(
+                                                    ExprCall {
+                                                        node_index: NodeIndex(None),
+                                                        range: 46..51,
+                                                        func: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 46..49,
+                                                                id: Name("foo"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        arguments: Arguments {
+                                                            range: 49..51,
+                                                            node_index: NodeIndex(None),
+                                                            args: [],
+                                                            keywords: [],
+                                                        },
+                                                    },
+                                                ),
+                                                attr: Identifier {
+                                                    id: Name("bar"),
+                                                    range: 52..55,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 55..57,
+                                            node_index: NodeIndex(None),
+                                            args: [],
+                                            keywords: [],
+                                        },
                                     },
                                 ),
                             },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                        ],
+                        name: Identifier {
+                            id: Name("baz"),
+                            range: 62..65,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 65..67,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 69..72,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 69..72,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 69..72,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

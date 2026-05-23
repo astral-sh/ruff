@@ -9,333 +9,337 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..122,
-        body: [
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 0..5,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 4..5,
-                                id: Name("x"),
-                                ctx: Del,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 6..13,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 11..12,
-                                id: Name("x"),
-                                ctx: Del,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 14..23,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 18..19,
-                                id: Name("a"),
-                                ctx: Del,
-                            },
-                        ),
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 21..22,
-                                id: Name("b"),
-                                ctx: Del,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 24..40,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 28..29,
-                                id: Name("a"),
-                                ctx: Del,
-                            },
-                        ),
-                        Tuple(
-                            ExprTuple {
-                                node_index: NodeIndex(None),
-                                range: 31..37,
-                                elts: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 32..33,
-                                            id: Name("b"),
-                                            ctx: Del,
-                                        },
-                                    ),
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 35..36,
-                                            id: Name("c"),
-                                            ctx: Del,
-                                        },
-                                    ),
-                                ],
-                                ctx: Del,
-                                parenthesized: true,
-                            },
-                        ),
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 39..40,
-                                id: Name("d"),
-                                ctx: Del,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 41..51,
-                    targets: [
-                        List(
-                            ExprList {
-                                node_index: NodeIndex(None),
-                                range: 45..51,
-                                elts: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 46..47,
-                                            id: Name("a"),
-                                            ctx: Del,
-                                        },
-                                    ),
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 49..50,
-                                            id: Name("b"),
-                                            ctx: Del,
-                                        },
-                                    ),
-                                ],
-                                ctx: Del,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 52..70,
-                    targets: [
-                        List(
-                            ExprList {
-                                node_index: NodeIndex(None),
-                                range: 56..70,
-                                elts: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 57..58,
-                                            id: Name("a"),
-                                            ctx: Del,
-                                        },
-                                    ),
-                                    List(
-                                        ExprList {
-                                            node_index: NodeIndex(None),
-                                            range: 60..66,
-                                            elts: [
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 61..62,
-                                                        id: Name("b"),
-                                                        ctx: Del,
-                                                    },
-                                                ),
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 64..65,
-                                                        id: Name("c"),
-                                                        ctx: Del,
-                                                    },
-                                                ),
-                                            ],
-                                            ctx: Del,
-                                        },
-                                    ),
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 68..69,
-                                            id: Name("d"),
-                                            ctx: Del,
-                                        },
-                                    ),
-                                ],
-                                ctx: Del,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 71..78,
-                    targets: [
-                        Attribute(
-                            ExprAttribute {
-                                node_index: NodeIndex(None),
-                                range: 75..78,
-                                value: Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 75..76,
-                                        id: Name("x"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                attr: Identifier {
-                                    id: Name("y"),
-                                    range: 77..78,
+        body: Suite {
+            range: 0..122,
+            node_index: NodeIndex(None),
+            statements: [
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 0..5,
+                        targets: [
+                            Name(
+                                ExprName {
                                     node_index: NodeIndex(None),
+                                    range: 4..5,
+                                    id: Name("x"),
+                                    ctx: Del,
                                 },
-                                ctx: Del,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 79..87,
-                    targets: [
-                        Subscript(
-                            ExprSubscript {
-                                node_index: NodeIndex(None),
-                                range: 83..87,
-                                value: Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 83..84,
-                                        id: Name("x"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                slice: Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 85..86,
-                                        id: Name("y"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                ctx: Del,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            Delete(
-                StmtDelete {
-                    node_index: NodeIndex(None),
-                    range: 88..121,
-                    targets: [
-                        Tuple(
-                            ExprTuple {
-                                node_index: NodeIndex(None),
-                                range: 92..121,
-                                elts: [
-                                    Name(
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 6..13,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 11..12,
+                                    id: Name("x"),
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 14..23,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 18..19,
+                                    id: Name("a"),
+                                    ctx: Del,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 21..22,
+                                    id: Name("b"),
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 24..40,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 28..29,
+                                    id: Name("a"),
+                                    ctx: Del,
+                                },
+                            ),
+                            Tuple(
+                                ExprTuple {
+                                    node_index: NodeIndex(None),
+                                    range: 31..37,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 32..33,
+                                                id: Name("b"),
+                                                ctx: Del,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 35..36,
+                                                id: Name("c"),
+                                                ctx: Del,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Del,
+                                    parenthesized: true,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 39..40,
+                                    id: Name("d"),
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 41..51,
+                        targets: [
+                            List(
+                                ExprList {
+                                    node_index: NodeIndex(None),
+                                    range: 45..51,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 46..47,
+                                                id: Name("a"),
+                                                ctx: Del,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 49..50,
+                                                id: Name("b"),
+                                                ctx: Del,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 52..70,
+                        targets: [
+                            List(
+                                ExprList {
+                                    node_index: NodeIndex(None),
+                                    range: 56..70,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 57..58,
+                                                id: Name("a"),
+                                                ctx: Del,
+                                            },
+                                        ),
+                                        List(
+                                            ExprList {
+                                                node_index: NodeIndex(None),
+                                                range: 60..66,
+                                                elts: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 61..62,
+                                                            id: Name("b"),
+                                                            ctx: Del,
+                                                        },
+                                                    ),
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 64..65,
+                                                            id: Name("c"),
+                                                            ctx: Del,
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Del,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 68..69,
+                                                id: Name("d"),
+                                                ctx: Del,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 71..78,
+                        targets: [
+                            Attribute(
+                                ExprAttribute {
+                                    node_index: NodeIndex(None),
+                                    range: 75..78,
+                                    value: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 98..99,
+                                            range: 75..76,
                                             id: Name("x"),
-                                            ctx: Del,
+                                            ctx: Load,
                                         },
                                     ),
-                                    Attribute(
-                                        ExprAttribute {
+                                    attr: Identifier {
+                                        id: Name("y"),
+                                        range: 77..78,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 79..87,
+                        targets: [
+                            Subscript(
+                                ExprSubscript {
+                                    node_index: NodeIndex(None),
+                                    range: 83..87,
+                                    value: Name(
+                                        ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 105..108,
-                                            value: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 105..106,
-                                                    id: Name("x"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            attr: Identifier {
-                                                id: Name("y"),
-                                                range: 107..108,
+                                            range: 83..84,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    slice: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 85..86,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        node_index: NodeIndex(None),
+                        range: 88..121,
+                        targets: [
+                            Tuple(
+                                ExprTuple {
+                                    node_index: NodeIndex(None),
+                                    range: 92..121,
+                                    elts: [
+                                        Name(
+                                            ExprName {
                                                 node_index: NodeIndex(None),
+                                                range: 98..99,
+                                                id: Name("x"),
+                                                ctx: Del,
                                             },
-                                            ctx: Del,
-                                        },
-                                    ),
-                                    Subscript(
-                                        ExprSubscript {
-                                            node_index: NodeIndex(None),
-                                            range: 114..118,
-                                            value: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 114..115,
-                                                    id: Name("x"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            slice: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 116..117,
+                                        ),
+                                        Attribute(
+                                            ExprAttribute {
+                                                node_index: NodeIndex(None),
+                                                range: 105..108,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 105..106,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                attr: Identifier {
                                                     id: Name("y"),
-                                                    ctx: Load,
+                                                    range: 107..108,
+                                                    node_index: NodeIndex(None),
                                                 },
-                                            ),
-                                            ctx: Del,
-                                        },
-                                    ),
-                                ],
-                                ctx: Del,
-                                parenthesized: true,
-                            },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                                                ctx: Del,
+                                            },
+                                        ),
+                                        Subscript(
+                                            ExprSubscript {
+                                                node_index: NodeIndex(None),
+                                                range: 114..118,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 114..115,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                slice: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 116..117,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Del,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Del,
+                                    parenthesized: true,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

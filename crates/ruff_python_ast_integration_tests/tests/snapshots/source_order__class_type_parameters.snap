@@ -3,17 +3,19 @@ source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
 expression: trace
 ---
 - ModModule
-  - StmtClassDef
-    - Identifier
-    - TypeParams
-      - TypeParamTypeVar
-        - Identifier
-        - ExprName
-      - TypeParamTypeVar
-        - Identifier
-      - TypeParamTypeVarTuple
-        - Identifier
-      - TypeParamParamSpec
-        - Identifier
-    - StmtExpr
-      - ExprEllipsisLiteral
+  - Suite
+    - StmtClassDef
+      - Identifier
+      - TypeParams
+        - TypeParamTypeVar
+          - Identifier
+          - ExprName
+        - TypeParamTypeVar
+          - Identifier
+        - TypeParamTypeVarTuple
+          - Identifier
+        - TypeParamParamSpec
+          - Identifier
+      - Suite
+        - StmtExpr
+          - ExprEllipsisLiteral

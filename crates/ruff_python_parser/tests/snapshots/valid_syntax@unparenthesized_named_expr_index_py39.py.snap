@@ -9,52 +9,56 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..53,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 43..52,
-                    value: Subscript(
-                        ExprSubscript {
-                            node_index: NodeIndex(None),
-                            range: 43..52,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 43..46,
-                                    id: Name("lst"),
-                                    ctx: Load,
-                                },
-                            ),
-                            slice: Named(
-                                ExprNamed {
-                                    node_index: NodeIndex(None),
-                                    range: 47..51,
-                                    target: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 47..48,
-                                            id: Name("x"),
-                                            ctx: Store,
-                                        },
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 50..51,
-                                            value: Int(
-                                                1,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..53,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 43..52,
+                        value: Subscript(
+                            ExprSubscript {
+                                node_index: NodeIndex(None),
+                                range: 43..52,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 43..46,
+                                        id: Name("lst"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Named(
+                                    ExprNamed {
+                                        node_index: NodeIndex(None),
+                                        range: 47..51,
+                                        target: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 47..48,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 50..51,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

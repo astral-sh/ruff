@@ -189,6 +189,10 @@ impl<'a, 'ast> FindEnclosingNode<'a, 'ast> {
 
 impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+        if matches!(node, AnyNodeRef::Suite(_)) {
+            return TraversalSignal::Traverse;
+        }
+
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;
         }
@@ -367,6 +371,10 @@ struct NarrowRange<'a> {
 
 impl SourceOrderVisitor<'_> for NarrowRange<'_> {
     fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
+        if matches!(node, AnyNodeRef::Suite(_)) {
+            return TraversalSignal::Traverse;
+        }
+
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;
         }
@@ -673,6 +681,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             AnyNodeRef::ElifElseClause(node) => node.format().fmt(f),
 
             AnyNodeRef::ExprBoolOp(_)
+            | AnyNodeRef::Suite(_)
             | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)

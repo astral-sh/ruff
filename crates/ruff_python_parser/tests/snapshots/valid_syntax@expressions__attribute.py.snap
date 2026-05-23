@@ -9,260 +9,264 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..90,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..10,
-                    value: Attribute(
-                        ExprAttribute {
-                            node_index: NodeIndex(None),
-                            range: 0..10,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 0..5,
-                                    id: Name("value"),
-                                    ctx: Load,
-                                },
-                            ),
-                            attr: Identifier {
-                                id: Name("attr"),
-                                range: 6..10,
+        body: Suite {
+            range: 0..90,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..10,
+                        value: Attribute(
+                            ExprAttribute {
                                 node_index: NodeIndex(None),
-                            },
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 11..23,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 11..23,
-                            func: Attribute(
-                                ExprAttribute {
-                                    node_index: NodeIndex(None),
-                                    range: 11..21,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 11..16,
-                                            id: Name("value"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    attr: Identifier {
-                                        id: Name("attr"),
-                                        range: 17..21,
+                                range: 0..10,
+                                value: Name(
+                                    ExprName {
                                         node_index: NodeIndex(None),
+                                        range: 0..5,
+                                        id: Name("value"),
+                                        ctx: Load,
                                     },
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 21..23,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 24..36,
-                    value: Attribute(
-                        ExprAttribute {
-                            node_index: NodeIndex(None),
-                            range: 24..36,
-                            value: Call(
-                                ExprCall {
+                                ),
+                                attr: Identifier {
+                                    id: Name("attr"),
+                                    range: 6..10,
                                     node_index: NodeIndex(None),
-                                    range: 24..31,
-                                    func: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 24..29,
-                                            id: Name("value"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: Arguments {
-                                        range: 29..31,
+                                },
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 11..23,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 11..23,
+                                func: Attribute(
+                                    ExprAttribute {
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
-                                    },
-                                },
-                            ),
-                            attr: Identifier {
-                                id: Name("attr"),
-                                range: 32..36,
-                                node_index: NodeIndex(None),
-                            },
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 37..55,
-                    value: Attribute(
-                        ExprAttribute {
-                            node_index: NodeIndex(None),
-                            range: 37..55,
-                            value: Call(
-                                ExprCall {
-                                    node_index: NodeIndex(None),
-                                    range: 37..51,
-                                    func: Attribute(
-                                        ExprAttribute {
+                                        range: 11..21,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 11..16,
+                                                id: Name("value"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        attr: Identifier {
+                                            id: Name("attr"),
+                                            range: 17..21,
                                             node_index: NodeIndex(None),
-                                            range: 37..49,
-                                            value: Call(
-                                                ExprCall {
-                                                    node_index: NodeIndex(None),
-                                                    range: 37..44,
-                                                    func: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 37..42,
-                                                            id: Name("value"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    arguments: Arguments {
-                                                        range: 42..44,
+                                        },
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 21..23,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 24..36,
+                        value: Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 24..36,
+                                value: Call(
+                                    ExprCall {
+                                        node_index: NodeIndex(None),
+                                        range: 24..31,
+                                        func: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 24..29,
+                                                id: Name("value"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 29..31,
+                                            node_index: NodeIndex(None),
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("attr"),
+                                    range: 32..36,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 37..55,
+                        value: Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 37..55,
+                                value: Call(
+                                    ExprCall {
+                                        node_index: NodeIndex(None),
+                                        range: 37..51,
+                                        func: Attribute(
+                                            ExprAttribute {
+                                                node_index: NodeIndex(None),
+                                                range: 37..49,
+                                                value: Call(
+                                                    ExprCall {
                                                         node_index: NodeIndex(None),
-                                                        args: [],
-                                                        keywords: [],
+                                                        range: 37..44,
+                                                        func: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 37..42,
+                                                                id: Name("value"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        arguments: Arguments {
+                                                            range: 42..44,
+                                                            node_index: NodeIndex(None),
+                                                            args: [],
+                                                            keywords: [],
+                                                        },
                                                     },
-                                                },
-                                            ),
-                                            attr: Identifier {
-                                                id: Name("attr"),
-                                                range: 45..49,
-                                                node_index: NodeIndex(None),
-                                            },
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: Arguments {
-                                        range: 49..51,
-                                        node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
-                                    },
-                                },
-                            ),
-                            attr: Identifier {
-                                id: Name("foo"),
-                                range: 52..55,
-                                node_index: NodeIndex(None),
-                            },
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 56..70,
-                    value: Attribute(
-                        ExprAttribute {
-                            node_index: NodeIndex(None),
-                            range: 56..70,
-                            value: Attribute(
-                                ExprAttribute {
-                                    node_index: NodeIndex(None),
-                                    range: 56..66,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 56..61,
-                                            id: Name("value"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    attr: Identifier {
-                                        id: Name("attr"),
-                                        range: 62..66,
-                                        node_index: NodeIndex(None),
-                                    },
-                                    ctx: Load,
-                                },
-                            ),
-                            attr: Identifier {
-                                id: Name("foo"),
-                                range: 67..70,
-                                node_index: NodeIndex(None),
-                            },
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 71..89,
-                    value: Attribute(
-                        ExprAttribute {
-                            node_index: NodeIndex(None),
-                            range: 71..89,
-                            value: Call(
-                                ExprCall {
-                                    node_index: NodeIndex(None),
-                                    range: 71..85,
-                                    func: Attribute(
-                                        ExprAttribute {
-                                            node_index: NodeIndex(None),
-                                            range: 71..83,
-                                            value: Name(
-                                                ExprName {
+                                                ),
+                                                attr: Identifier {
+                                                    id: Name("attr"),
+                                                    range: 45..49,
                                                     node_index: NodeIndex(None),
-                                                    range: 72..77,
-                                                    id: Name("value"),
-                                                    ctx: Load,
                                                 },
-                                            ),
-                                            attr: Identifier {
-                                                id: Name("attr"),
-                                                range: 79..83,
-                                                node_index: NodeIndex(None),
+                                                ctx: Load,
                                             },
-                                            ctx: Load,
+                                        ),
+                                        arguments: Arguments {
+                                            range: 49..51,
+                                            node_index: NodeIndex(None),
+                                            args: [],
+                                            keywords: [],
                                         },
-                                    ),
-                                    arguments: Arguments {
-                                        range: 83..85,
-                                        node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
                                     },
+                                ),
+                                attr: Identifier {
+                                    id: Name("foo"),
+                                    range: 52..55,
+                                    node_index: NodeIndex(None),
                                 },
-                            ),
-                            attr: Identifier {
-                                id: Name("foo"),
-                                range: 86..89,
-                                node_index: NodeIndex(None),
+                                ctx: Load,
                             },
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 56..70,
+                        value: Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 56..70,
+                                value: Attribute(
+                                    ExprAttribute {
+                                        node_index: NodeIndex(None),
+                                        range: 56..66,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 56..61,
+                                                id: Name("value"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        attr: Identifier {
+                                            id: Name("attr"),
+                                            range: 62..66,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("foo"),
+                                    range: 67..70,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 71..89,
+                        value: Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 71..89,
+                                value: Call(
+                                    ExprCall {
+                                        node_index: NodeIndex(None),
+                                        range: 71..85,
+                                        func: Attribute(
+                                            ExprAttribute {
+                                                node_index: NodeIndex(None),
+                                                range: 71..83,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 72..77,
+                                                        id: Name("value"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                attr: Identifier {
+                                                    id: Name("attr"),
+                                                    range: 79..83,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 83..85,
+                                            node_index: NodeIndex(None),
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("foo"),
+                                    range: 86..89,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

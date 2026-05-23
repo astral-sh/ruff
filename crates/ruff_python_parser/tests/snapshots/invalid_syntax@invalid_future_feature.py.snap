@@ -9,109 +9,113 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..151,
-        body: [
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 0..38,
-                    module: Some(
-                        Identifier {
-                            id: Name("__future__"),
-                            range: 5..15,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 23..38,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("invalid_feature"),
+        body: Suite {
+            range: 0..151,
+            node_index: NodeIndex(None),
+            statements: [
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 0..38,
+                        module: Some(
+                            Identifier {
+                                id: Name("__future__"),
+                                range: 5..15,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 23..38,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("invalid_feature"),
+                                    range: 23..38,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 39..90,
-                    module: Some(
-                        Identifier {
-                            id: Name("__future__"),
-                            range: 44..54,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 62..73,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("annotations"),
+                        ],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 39..90,
+                        module: Some(
+                            Identifier {
+                                id: Name("__future__"),
+                                range: 44..54,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 62..73,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("annotations"),
+                                    range: 62..73,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 75..90,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("invalid_feature"),
+                            Alias {
                                 range: 75..90,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("invalid_feature"),
+                                    range: 75..90,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 91..150,
-                    module: Some(
-                        Identifier {
-                            id: Name("__future__"),
-                            range: 96..106,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 114..131,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("invalid_feature_1"),
+                        ],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 91..150,
+                        module: Some(
+                            Identifier {
+                                id: Name("__future__"),
+                                range: 96..106,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 114..131,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("invalid_feature_1"),
+                                    range: 114..131,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 133..150,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("invalid_feature_2"),
+                            Alias {
                                 range: 133..150,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("invalid_feature_2"),
+                                    range: 133..150,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-        ],
+                        ],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

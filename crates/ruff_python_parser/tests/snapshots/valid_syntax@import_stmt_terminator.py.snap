@@ -9,127 +9,131 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..42,
-        body: [
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 0..11,
-                    names: [
-                        Alias {
-                            range: 7..8,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a"),
+        body: Suite {
+            range: 0..42,
+            node_index: NodeIndex(None),
+            statements: [
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 0..11,
+                        names: [
+                            Alias {
                                 range: 7..8,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 7..8,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 10..11,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("b"),
+                            Alias {
                                 range: 10..11,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("b"),
+                                    range: 10..11,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 13..24,
-                    names: [
-                        Alias {
-                            range: 20..21,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("c"),
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 13..24,
+                        names: [
+                            Alias {
                                 range: 20..21,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("c"),
+                                    range: 20..21,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 23..24,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("d"),
+                            Alias {
                                 range: 23..24,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("d"),
+                                    range: 23..24,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 25..36,
-                    names: [
-                        Alias {
-                            range: 32..33,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a"),
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 25..36,
+                        names: [
+                            Alias {
                                 range: 32..33,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 32..33,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 35..36,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("b"),
+                            Alias {
                                 range: 35..36,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("b"),
+                                    range: 35..36,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 37..41,
-                    value: Tuple(
-                        ExprTuple {
-                            node_index: NodeIndex(None),
-                            range: 37..41,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 37..38,
-                                        id: Name("c"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 40..41,
-                                        id: Name("d"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                            ctx: Load,
-                            parenthesized: false,
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 37..41,
+                        value: Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 37..41,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 37..38,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 40..41,
+                                            id: Name("d"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

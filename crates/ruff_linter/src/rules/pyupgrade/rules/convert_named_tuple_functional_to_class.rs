@@ -239,7 +239,7 @@ fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> 
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
-        body,
+        body: body.into(),
         type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),

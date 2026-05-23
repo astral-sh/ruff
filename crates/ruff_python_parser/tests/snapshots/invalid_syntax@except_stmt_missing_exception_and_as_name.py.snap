@@ -9,43 +9,63 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..34,
-        body: [
-            Try(
-                StmtTry {
-                    node_index: NodeIndex(None),
-                    range: 0..33,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 9..13,
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 14..33,
-                                node_index: NodeIndex(None),
-                                type_: None,
-                                name: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 29..33,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: false,
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..34,
+            node_index: NodeIndex(None),
+            statements: [
+                Try(
+                    StmtTry {
+                        node_index: NodeIndex(None),
+                        range: 0..33,
+                        body: Suite {
+                            range: 4..13,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 9..13,
+                                    },
+                                ),
+                            ],
+                        },
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 14..33,
+                                    node_index: NodeIndex(None),
+                                    type_: None,
+                                    name: None,
+                                    body: Suite {
+                                        range: 24..33,
+                                        node_index: NodeIndex(None),
+                                        statements: [
+                                            Pass(
+                                                StmtPass {
+                                                    node_index: NodeIndex(None),
+                                                    range: 29..33,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                },
+                            ),
+                        ],
+                        orelse: Suite {
+                            range: 33..33,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        finalbody: Suite {
+                            range: 33..33,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        is_star: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

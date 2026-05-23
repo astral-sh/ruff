@@ -9,134 +9,146 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..57,
-        body: [
-            Match(
-                StmtMatch {
-                    node_index: NodeIndex(None),
-                    range: 0..56,
-                    subject: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 6..13,
-                            id: Name("subject"),
-                            ctx: Load,
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 19..35,
-                            node_index: NodeIndex(None),
-                            pattern: MatchSequence(
-                                PatternMatchSequence {
-                                    node_index: NodeIndex(None),
-                                    range: 24..30,
-                                    patterns: [
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 25..26,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("a"),
-                                                        range: 25..26,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 28..29,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("b"),
-                                                        range: 28..29,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
+        body: Suite {
+            range: 0..57,
+            node_index: NodeIndex(None),
+            statements: [
+                Match(
+                    StmtMatch {
+                        node_index: NodeIndex(None),
+                        range: 0..56,
+                        subject: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 6..13,
+                                id: Name("subject"),
+                                ctx: Load,
+                            },
+                        ),
+                        cases: [
+                            MatchCase {
+                                range: 19..35,
+                                node_index: NodeIndex(None),
+                                pattern: MatchSequence(
+                                    PatternMatchSequence {
                                         node_index: NodeIndex(None),
-                                        range: 32..35,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
+                                        range: 24..30,
+                                        patterns: [
+                                            MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 25..26,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("a"),
+                                                            range: 25..26,
+                                                            node_index: NodeIndex(None),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 28..29,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("b"),
+                                                            range: 28..29,
+                                                            node_index: NodeIndex(None),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 32..35,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Expr(
+                                            StmtExpr {
                                                 node_index: NodeIndex(None),
                                                 range: 32..35,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 40..56,
-                            node_index: NodeIndex(None),
-                            pattern: MatchSequence(
-                                PatternMatchSequence {
-                                    node_index: NodeIndex(None),
-                                    range: 45..51,
-                                    patterns: [
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 46..47,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("a"),
-                                                        range: 46..47,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
                                                         node_index: NodeIndex(None),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 49..50,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("b"),
-                                                        range: 49..50,
-                                                        node_index: NodeIndex(None),
+                                                        range: 32..35,
                                                     },
                                                 ),
                                             },
                                         ),
                                     ],
                                 },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
+                            },
+                            MatchCase {
+                                range: 40..56,
+                                node_index: NodeIndex(None),
+                                pattern: MatchSequence(
+                                    PatternMatchSequence {
                                         node_index: NodeIndex(None),
-                                        range: 53..56,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 53..56,
-                                            },
-                                        ),
+                                        range: 45..51,
+                                        patterns: [
+                                            MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 46..47,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("a"),
+                                                            range: 46..47,
+                                                            node_index: NodeIndex(None),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 49..50,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("b"),
+                                                            range: 49..50,
+                                                            node_index: NodeIndex(None),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-        ],
+                                guard: None,
+                                body: Suite {
+                                    range: 53..56,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Expr(
+                                            StmtExpr {
+                                                node_index: NodeIndex(None),
+                                                range: 53..56,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 53..56,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

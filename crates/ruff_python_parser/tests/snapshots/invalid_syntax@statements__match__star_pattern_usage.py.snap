@@ -9,463 +9,337 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..408,
-        body: [
-            Match(
-                StmtMatch {
-                    node_index: NodeIndex(None),
-                    range: 57..407,
-                    subject: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 63..70,
-                            id: Name("subject"),
-                            ctx: Load,
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 76..97,
-                            node_index: NodeIndex(None),
-                            pattern: MatchStar(
-                                PatternMatchStar {
-                                    node_index: NodeIndex(None),
-                                    range: 81..83,
-                                    name: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
+        body: Suite {
+            range: 0..408,
+            node_index: NodeIndex(None),
+            statements: [
+                Match(
+                    StmtMatch {
+                        node_index: NodeIndex(None),
+                        range: 57..407,
+                        subject: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 63..70,
+                                id: Name("subject"),
+                                ctx: Load,
+                            },
+                        ),
+                        cases: [
+                            MatchCase {
+                                range: 76..97,
+                                node_index: NodeIndex(None),
+                                pattern: MatchStar(
+                                    PatternMatchStar {
                                         node_index: NodeIndex(None),
-                                        range: 93..97,
+                                        range: 81..83,
+                                        name: None,
                                     },
                                 ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 102..128,
-                            node_index: NodeIndex(None),
-                            pattern: MatchAs(
-                                PatternMatchAs {
+                                guard: None,
+                                body: Suite {
+                                    range: 84..97,
                                     node_index: NodeIndex(None),
-                                    range: 107..114,
-                                    pattern: Some(
-                                        MatchStar(
-                                            PatternMatchStar {
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
                                                 node_index: NodeIndex(None),
-                                                range: 107..109,
-                                                name: None,
-                                            },
-                                        ),
-                                    ),
-                                    name: Some(
-                                        Identifier {
-                                            id: Name("x"),
-                                            range: 113..114,
-                                            node_index: NodeIndex(None),
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 124..128,
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 133..156,
-                            node_index: NodeIndex(None),
-                            pattern: MatchStar(
-                                PatternMatchStar {
-                                    node_index: NodeIndex(None),
-                                    range: 138..142,
-                                    name: Some(
-                                        Identifier {
-                                            id: Name("foo"),
-                                            range: 139..142,
-                                            node_index: NodeIndex(None),
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 152..156,
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 161..188,
-                            node_index: NodeIndex(None),
-                            pattern: MatchOr(
-                                PatternMatchOr {
-                                    node_index: NodeIndex(None),
-                                    range: 166..174,
-                                    patterns: [
-                                        MatchStar(
-                                            PatternMatchStar {
-                                                node_index: NodeIndex(None),
-                                                range: 166..170,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("foo"),
-                                                        range: 167..170,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 173..174,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 173..174,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
+                                                range: 93..97,
                                             },
                                         ),
                                     ],
                                 },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
+                            },
+                            MatchCase {
+                                range: 102..128,
+                                node_index: NodeIndex(None),
+                                pattern: MatchAs(
+                                    PatternMatchAs {
                                         node_index: NodeIndex(None),
-                                        range: 184..188,
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 193..220,
-                            node_index: NodeIndex(None),
-                            pattern: MatchOr(
-                                PatternMatchOr {
-                                    node_index: NodeIndex(None),
-                                    range: 198..206,
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
+                                        range: 107..114,
+                                        pattern: Some(
+                                            MatchStar(
+                                                PatternMatchStar {
+                                                    node_index: NodeIndex(None),
+                                                    range: 107..109,
+                                                    name: None,
+                                                },
+                                            ),
+                                        ),
+                                        name: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 113..114,
                                                 node_index: NodeIndex(None),
-                                                range: 198..199,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 198..199,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
                                             },
                                         ),
-                                        MatchStar(
-                                            PatternMatchStar {
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 115..128,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
                                                 node_index: NodeIndex(None),
-                                                range: 202..206,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("foo"),
-                                                        range: 203..206,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                ),
+                                                range: 124..128,
                                             },
                                         ),
                                     ],
                                 },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
+                            },
+                            MatchCase {
+                                range: 133..156,
+                                node_index: NodeIndex(None),
+                                pattern: MatchStar(
+                                    PatternMatchStar {
                                         node_index: NodeIndex(None),
-                                        range: 216..220,
+                                        range: 138..142,
+                                        name: Some(
+                                            Identifier {
+                                                id: Name("foo"),
+                                                range: 139..142,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
                                     },
                                 ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 225..251,
-                            node_index: NodeIndex(None),
-                            pattern: MatchClass(
-                                PatternMatchClass {
+                                guard: None,
+                                body: Suite {
+                                    range: 143..156,
                                     node_index: NodeIndex(None),
-                                    range: 230..237,
-                                    cls: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 230..233,
-                                            id: Name("Foo"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: PatternArguments {
-                                        range: 233..237,
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 152..156,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 161..188,
+                                node_index: NodeIndex(None),
+                                pattern: MatchOr(
+                                    PatternMatchOr {
                                         node_index: NodeIndex(None),
+                                        range: 166..174,
                                         patterns: [
                                             MatchStar(
                                                 PatternMatchStar {
                                                     node_index: NodeIndex(None),
-                                                    range: 234..236,
-                                                    name: None,
-                                                },
-                                            ),
-                                        ],
-                                        keywords: [],
-                                    },
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 247..251,
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 256..284,
-                            node_index: NodeIndex(None),
-                            pattern: MatchClass(
-                                PatternMatchClass {
-                                    node_index: NodeIndex(None),
-                                    range: 261..270,
-                                    cls: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 261..264,
-                                            id: Name("Foo"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: PatternArguments {
-                                        range: 264..270,
-                                        node_index: NodeIndex(None),
-                                        patterns: [],
-                                        keywords: [
-                                            PatternKeyword {
-                                                range: 265..269,
-                                                node_index: NodeIndex(None),
-                                                attr: Identifier {
-                                                    id: Name("x"),
-                                                    range: 265..266,
-                                                    node_index: NodeIndex(None),
-                                                },
-                                                pattern: MatchStar(
-                                                    PatternMatchStar {
-                                                        node_index: NodeIndex(None),
-                                                        range: 267..269,
-                                                        name: None,
-                                                    },
-                                                ),
-                                            },
-                                        ],
-                                    },
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 280..284,
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 289..312,
-                            node_index: NodeIndex(None),
-                            pattern: MatchMapping(
-                                PatternMatchMapping {
-                                    node_index: NodeIndex(None),
-                                    range: 294..298,
-                                    keys: [
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 295..297,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 296..297,
-                                                        id: Name("_"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 297..297,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 297..297,
-                                                        id: Name(""),
-                                                        ctx: Invalid,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 308..312,
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 317..343,
-                            node_index: NodeIndex(None),
-                            pattern: MatchMapping(
-                                PatternMatchMapping {
-                                    node_index: NodeIndex(None),
-                                    range: 322..329,
-                                    keys: [
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 323..325,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 324..325,
-                                                        id: Name("_"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 327..328,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 327..328,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 339..343,
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 348..377,
-                            node_index: NodeIndex(None),
-                            pattern: MatchMapping(
-                                PatternMatchMapping {
-                                    node_index: NodeIndex(None),
-                                    range: 353..363,
-                                    keys: [
-                                        NoneLiteral(
-                                            ExprNoneLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 354..358,
-                                            },
-                                        ),
-                                    ],
-                                    patterns: [
-                                        MatchStar(
-                                            PatternMatchStar {
-                                                node_index: NodeIndex(None),
-                                                range: 360..362,
-                                                name: None,
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 373..377,
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 382..407,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
-                                    node_index: NodeIndex(None),
-                                    range: 387..393,
-                                    value: BinOp(
-                                        ExprBinOp {
-                                            node_index: NodeIndex(None),
-                                            range: 387..393,
-                                            left: NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 387..388,
-                                                    value: Int(
-                                                        1,
+                                                    range: 166..170,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("foo"),
+                                                            range: 167..170,
+                                                            node_index: NodeIndex(None),
+                                                        },
                                                     ),
                                                 },
                                             ),
-                                            op: Add,
-                                            right: Starred(
+                                            MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 173..174,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 173..174,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 175..188,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 184..188,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 193..220,
+                                node_index: NodeIndex(None),
+                                pattern: MatchOr(
+                                    PatternMatchOr {
+                                        node_index: NodeIndex(None),
+                                        range: 198..206,
+                                        patterns: [
+                                            MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 198..199,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 198..199,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            MatchStar(
+                                                PatternMatchStar {
+                                                    node_index: NodeIndex(None),
+                                                    range: 202..206,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("foo"),
+                                                            range: 203..206,
+                                                            node_index: NodeIndex(None),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 207..220,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 216..220,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 225..251,
+                                node_index: NodeIndex(None),
+                                pattern: MatchClass(
+                                    PatternMatchClass {
+                                        node_index: NodeIndex(None),
+                                        range: 230..237,
+                                        cls: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 230..233,
+                                                id: Name("Foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: PatternArguments {
+                                            range: 233..237,
+                                            node_index: NodeIndex(None),
+                                            patterns: [
+                                                MatchStar(
+                                                    PatternMatchStar {
+                                                        node_index: NodeIndex(None),
+                                                        range: 234..236,
+                                                        name: None,
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 238..251,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 247..251,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 256..284,
+                                node_index: NodeIndex(None),
+                                pattern: MatchClass(
+                                    PatternMatchClass {
+                                        node_index: NodeIndex(None),
+                                        range: 261..270,
+                                        cls: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 261..264,
+                                                id: Name("Foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: PatternArguments {
+                                            range: 264..270,
+                                            node_index: NodeIndex(None),
+                                            patterns: [],
+                                            keywords: [
+                                                PatternKeyword {
+                                                    range: 265..269,
+                                                    node_index: NodeIndex(None),
+                                                    attr: Identifier {
+                                                        id: Name("x"),
+                                                        range: 265..266,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    pattern: MatchStar(
+                                                        PatternMatchStar {
+                                                            node_index: NodeIndex(None),
+                                                            range: 267..269,
+                                                            name: None,
+                                                        },
+                                                    ),
+                                                },
+                                            ],
+                                        },
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 271..284,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 280..284,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 289..312,
+                                node_index: NodeIndex(None),
+                                pattern: MatchMapping(
+                                    PatternMatchMapping {
+                                        node_index: NodeIndex(None),
+                                        range: 294..298,
+                                        keys: [
+                                            Starred(
                                                 ExprStarred {
                                                     node_index: NodeIndex(None),
-                                                    range: 391..393,
+                                                    range: 295..297,
                                                     value: Name(
                                                         ExprName {
                                                             node_index: NodeIndex(None),
-                                                            range: 392..393,
+                                                            range: 296..297,
                                                             id: Name("_"),
                                                             ctx: Store,
                                                         },
@@ -473,24 +347,198 @@ Module(
                                                     ctx: Store,
                                                 },
                                             ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 403..407,
+                                        ],
+                                        patterns: [
+                                            MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 297..297,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 297..297,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        rest: None,
                                     },
                                 ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-        ],
+                                guard: None,
+                                body: Suite {
+                                    range: 299..312,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 308..312,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 317..343,
+                                node_index: NodeIndex(None),
+                                pattern: MatchMapping(
+                                    PatternMatchMapping {
+                                        node_index: NodeIndex(None),
+                                        range: 322..329,
+                                        keys: [
+                                            Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 323..325,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 324..325,
+                                                            id: Name("_"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                        ],
+                                        patterns: [
+                                            MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 327..328,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 327..328,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        rest: None,
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 330..343,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 339..343,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 348..377,
+                                node_index: NodeIndex(None),
+                                pattern: MatchMapping(
+                                    PatternMatchMapping {
+                                        node_index: NodeIndex(None),
+                                        range: 353..363,
+                                        keys: [
+                                            NoneLiteral(
+                                                ExprNoneLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 354..358,
+                                                },
+                                            ),
+                                        ],
+                                        patterns: [
+                                            MatchStar(
+                                                PatternMatchStar {
+                                                    node_index: NodeIndex(None),
+                                                    range: 360..362,
+                                                    name: None,
+                                                },
+                                            ),
+                                        ],
+                                        rest: None,
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 364..377,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 373..377,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 382..407,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
+                                        node_index: NodeIndex(None),
+                                        range: 387..393,
+                                        value: BinOp(
+                                            ExprBinOp {
+                                                node_index: NodeIndex(None),
+                                                range: 387..393,
+                                                left: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 387..388,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                                op: Add,
+                                                right: Starred(
+                                                    ExprStarred {
+                                                        node_index: NodeIndex(None),
+                                                        range: 391..393,
+                                                        value: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 392..393,
+                                                                id: Name("_"),
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 394..407,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 403..407,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

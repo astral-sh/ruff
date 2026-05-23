@@ -9,204 +9,208 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..85,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..31,
-                    value: FString(
-                        ExprFString {
-                            node_index: NodeIndex(None),
-                            range: 6..31,
-                            value: FStringValue {
-                                inner: Concatenated(
-                                    [
-                                        Literal(
-                                            StringLiteral {
-                                                range: 6..13,
-                                                node_index: NodeIndex(None),
-                                                value: "hello",
-                                                flags: StringLiteralFlags {
-                                                    quote_style: Single,
-                                                    prefix: Empty,
-                                                    triple_quoted: false,
-                                                    unclosed: false,
+        body: Suite {
+            range: 0..85,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..31,
+                        value: FString(
+                            ExprFString {
+                                node_index: NodeIndex(None),
+                                range: 6..31,
+                                value: FStringValue {
+                                    inner: Concatenated(
+                                        [
+                                            Literal(
+                                                StringLiteral {
+                                                    range: 6..13,
+                                                    node_index: NodeIndex(None),
+                                                    value: "hello",
+                                                    flags: StringLiteralFlags {
+                                                        quote_style: Single,
+                                                        prefix: Empty,
+                                                        triple_quoted: false,
+                                                        unclosed: false,
+                                                    },
                                                 },
-                                            },
-                                        ),
-                                        FString(
-                                            FString {
-                                                range: 18..31,
-                                                node_index: NodeIndex(None),
-                                                elements: [
-                                                    Literal(
-                                                        InterpolatedStringLiteralElement {
-                                                            range: 20..26,
-                                                            node_index: NodeIndex(None),
-                                                            value: "world ",
-                                                        },
-                                                    ),
-                                                    Interpolation(
-                                                        InterpolatedElement {
-                                                            range: 26..29,
-                                                            node_index: NodeIndex(None),
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 27..28,
-                                                                    id: Name("x"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Single,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                    unclosed: true,
+                                            ),
+                                            FString(
+                                                FString {
+                                                    range: 18..31,
+                                                    node_index: NodeIndex(None),
+                                                    elements: [
+                                                        Literal(
+                                                            InterpolatedStringLiteralElement {
+                                                                range: 20..26,
+                                                                node_index: NodeIndex(None),
+                                                                value: "world ",
+                                                            },
+                                                        ),
+                                                        Interpolation(
+                                                            InterpolatedElement {
+                                                                range: 26..29,
+                                                                node_index: NodeIndex(None),
+                                                                expression: Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 27..28,
+                                                                        id: Name("x"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                debug_text: None,
+                                                                conversion: None,
+                                                                format_spec: None,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    flags: FStringFlags {
+                                                        quote_style: Single,
+                                                        prefix: Regular,
+                                                        triple_quoted: false,
+                                                        unclosed: true,
+                                                    },
                                                 },
-                                            },
+                                            ),
+                                        ],
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 32..37,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 32..37,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 32..33,
+                                        value: Int(
+                                            1,
                                         ),
-                                    ],
+                                    },
+                                ),
+                                op: Add,
+                                right: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 36..37,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
                                 ),
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 32..37,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 32..37,
-                            left: NumberLiteral(
-                                ExprNumberLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 32..33,
-                                    value: Int(
-                                        1,
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 38..78,
+                        value: FString(
+                            ExprFString {
+                                node_index: NodeIndex(None),
+                                range: 44..76,
+                                value: FStringValue {
+                                    inner: Concatenated(
+                                        [
+                                            Literal(
+                                                StringLiteral {
+                                                    range: 44..51,
+                                                    node_index: NodeIndex(None),
+                                                    value: "first",
+                                                    flags: StringLiteralFlags {
+                                                        quote_style: Single,
+                                                        prefix: Empty,
+                                                        triple_quoted: false,
+                                                        unclosed: false,
+                                                    },
+                                                },
+                                            ),
+                                            Literal(
+                                                StringLiteral {
+                                                    range: 56..63,
+                                                    node_index: NodeIndex(None),
+                                                    value: "second",
+                                                    flags: StringLiteralFlags {
+                                                        quote_style: Single,
+                                                        prefix: Empty,
+                                                        triple_quoted: false,
+                                                        unclosed: true,
+                                                    },
+                                                },
+                                            ),
+                                            FString(
+                                                FString {
+                                                    range: 68..76,
+                                                    node_index: NodeIndex(None),
+                                                    elements: [
+                                                        Literal(
+                                                            InterpolatedStringLiteralElement {
+                                                                range: 70..75,
+                                                                node_index: NodeIndex(None),
+                                                                value: "third",
+                                                            },
+                                                        ),
+                                                    ],
+                                                    flags: FStringFlags {
+                                                        quote_style: Single,
+                                                        prefix: Regular,
+                                                        triple_quoted: false,
+                                                        unclosed: false,
+                                                    },
+                                                },
+                                            ),
+                                        ],
                                     ),
                                 },
-                            ),
-                            op: Add,
-                            right: NumberLiteral(
-                                ExprNumberLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 36..37,
-                                    value: Int(
-                                        1,
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 38..78,
-                    value: FString(
-                        ExprFString {
-                            node_index: NodeIndex(None),
-                            range: 44..76,
-                            value: FStringValue {
-                                inner: Concatenated(
-                                    [
-                                        Literal(
-                                            StringLiteral {
-                                                range: 44..51,
-                                                node_index: NodeIndex(None),
-                                                value: "first",
-                                                flags: StringLiteralFlags {
-                                                    quote_style: Single,
-                                                    prefix: Empty,
-                                                    triple_quoted: false,
-                                                    unclosed: false,
-                                                },
-                                            },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 79..84,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 79..84,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 79..80,
+                                        value: Int(
+                                            2,
                                         ),
-                                        Literal(
-                                            StringLiteral {
-                                                range: 56..63,
-                                                node_index: NodeIndex(None),
-                                                value: "second",
-                                                flags: StringLiteralFlags {
-                                                    quote_style: Single,
-                                                    prefix: Empty,
-                                                    triple_quoted: false,
-                                                    unclosed: true,
-                                                },
-                                            },
+                                    },
+                                ),
+                                op: Add,
+                                right: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 83..84,
+                                        value: Int(
+                                            2,
                                         ),
-                                        FString(
-                                            FString {
-                                                range: 68..76,
-                                                node_index: NodeIndex(None),
-                                                elements: [
-                                                    Literal(
-                                                        InterpolatedStringLiteralElement {
-                                                            range: 70..75,
-                                                            node_index: NodeIndex(None),
-                                                            value: "third",
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Single,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                    unclosed: false,
-                                                },
-                                            },
-                                        ),
-                                    ],
+                                    },
                                 ),
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 79..84,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 79..84,
-                            left: NumberLiteral(
-                                ExprNumberLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 79..80,
-                                    value: Int(
-                                        2,
-                                    ),
-                                },
-                            ),
-                            op: Add,
-                            right: NumberLiteral(
-                                ExprNumberLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 83..84,
-                                    value: Int(
-                                        2,
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

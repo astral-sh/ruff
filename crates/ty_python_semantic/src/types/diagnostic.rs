@@ -4956,7 +4956,7 @@ pub(super) fn abstract_method_span<'db>(
         return implementation.spans(db).decorators_and_header;
     }
 
-    if let [single_stmt] = &*node.body
+    if let [single_stmt] = node.body.as_slice()
         && source_text.line_start(single_stmt.start()) == source_text.line_start(single_stmt.end())
     {
         Span::from(file).with_range(node.range())

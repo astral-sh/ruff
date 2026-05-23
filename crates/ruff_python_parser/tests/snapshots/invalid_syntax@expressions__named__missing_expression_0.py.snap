@@ -9,22 +9,26 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..75,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 71..72,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 71..72,
-                            id: Name("x"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..75,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 71..72,
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 71..72,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

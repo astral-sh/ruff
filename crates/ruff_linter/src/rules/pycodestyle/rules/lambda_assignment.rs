@@ -231,7 +231,7 @@ fn function(
                     args: new_args,
                     ..parameters
                 }),
-                body: vec![body],
+                body: vec![body].into(),
                 decorator_list: vec![],
                 returns: Some(Box::new(return_type)),
                 type_params: None,
@@ -247,7 +247,7 @@ fn function(
         is_async: false,
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters),
-        body: vec![body],
+        body: vec![body].into(),
         decorator_list: vec![],
         returns: None,
         type_params: None,

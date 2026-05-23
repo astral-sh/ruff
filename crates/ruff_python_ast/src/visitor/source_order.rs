@@ -2,7 +2,7 @@ use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
     ExceptHandler, Expr, FString, InterpolatedStringElement, Keyword, MatchCase, Mod, Operator,
     Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword,
-    Singleton, Stmt, StringLiteral, TString, TypeParam, TypeParams, UnaryOp, WithItem,
+    Singleton, Stmt, StringLiteral, Suite, TString, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, Identifier};
 
@@ -147,6 +147,11 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
+    fn visit_suite(&mut self, suite: &'a Suite) {
+        walk_suite(self, suite);
+    }
+
+    #[inline]
     fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
     }
@@ -207,6 +212,18 @@ where
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
+}
+
+pub fn walk_suite<'a, V>(visitor: &mut V, suite: &'a Suite)
+where
+    V: SourceOrderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(suite);
+    if visitor.enter_node(node).is_traverse() {
+        suite.visit_source_order(visitor);
+    }
+
+    visitor.leave_node(node);
 }
 
 pub fn walk_stmt<'a, V>(visitor: &mut V, stmt: &'a Stmt)

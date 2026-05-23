@@ -9,785 +9,740 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..950,
-        body: [
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 163..188,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 168..182,
-                            node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    node_index: NodeIndex(None),
-                                    range: 168..182,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 169..174,
-                                                id: Name("item1"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 176..181,
-                                                id: Name("item2"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
+        body: Suite {
+            range: 0..950,
+            node_index: NodeIndex(None),
+            statements: [
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 163..188,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 168..182,
                                 node_index: NodeIndex(None),
-                                range: 185..188,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                context_expr: Tuple(
+                                    ExprTuple {
                                         node_index: NodeIndex(None),
-                                        range: 185..188,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 189..219,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 194..208,
-                            node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    node_index: NodeIndex(None),
-                                    range: 194..208,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 195..200,
-                                                id: Name("item1"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 202..207,
-                                                id: Name("item2"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 213..214,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 213..214,
-                                    id: Name("f"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 216..219,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 216..219,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 220..252,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 225..239,
-                            node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    node_index: NodeIndex(None),
-                                    range: 225..239,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 226..231,
-                                                id: Name("item1"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 233..238,
-                                                id: Name("item2"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 241..246,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 241..246,
-                                    id: Name("item3"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 249..252,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 249..252,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 253..270,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 258..265,
-                            node_index: NodeIndex(None),
-                            context_expr: Starred(
-                                ExprStarred {
-                                    node_index: NodeIndex(None),
-                                    range: 259..264,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 260..264,
-                                            id: Name("item"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 267..270,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 267..270,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 271..293,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 276..288,
-                            node_index: NodeIndex(None),
-                            context_expr: Starred(
-                                ExprStarred {
-                                    node_index: NodeIndex(None),
-                                    range: 277..282,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 278..282,
-                                            id: Name("item"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 287..288,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 290..293,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 290..293,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 294..321,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 300..315,
-                            node_index: NodeIndex(None),
-                            context_expr: Named(
-                                ExprNamed {
-                                    node_index: NodeIndex(None),
-                                    range: 300..310,
-                                    target: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 300..304,
-                                            id: Name("item"),
-                                            ctx: Store,
-                                        },
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 308..310,
-                                            value: Int(
-                                                10,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 314..315,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 318..321,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 318..321,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 322..357,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 328..333,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 328..333,
-                                    id: Name("item1"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 335..351,
-                            node_index: NodeIndex(None),
-                            context_expr: Named(
-                                ExprNamed {
-                                    node_index: NodeIndex(None),
-                                    range: 335..346,
-                                    target: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 335..340,
-                                            id: Name("item2"),
-                                            ctx: Store,
-                                        },
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 344..346,
-                                            value: Int(
-                                                10,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 350..351,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 354..357,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 354..357,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 358..396,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 363..384,
-                            node_index: NodeIndex(None),
-                            context_expr: Generator(
-                                ExprGenerator {
-                                    node_index: NodeIndex(None),
-                                    range: 363..384,
-                                    elt: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 364..365,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    generators: [
-                                        Comprehension {
-                                            range: 366..384,
-                                            node_index: NodeIndex(None),
-                                            target: Name(
+                                        range: 168..182,
+                                        elts: [
+                                            Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 370..371,
-                                                    id: Name("x"),
-                                                    ctx: Store,
+                                                    range: 169..174,
+                                                    id: Name("item1"),
+                                                    ctx: Load,
                                                 },
                                             ),
-                                            iter: Call(
-                                                ExprCall {
+                                            Name(
+                                                ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 375..384,
-                                                    func: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 375..380,
-                                                            id: Name("range"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    arguments: Arguments {
-                                                        range: 380..384,
-                                                        node_index: NodeIndex(None),
-                                                        args: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 381..383,
-                                                                    value: Int(
-                                                                        10,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        ],
-                                                        keywords: [],
-                                                    },
+                                                    range: 176..181,
+                                                    id: Name("item2"),
+                                                    ctx: Load,
                                                 },
                                             ),
-                                            ifs: [],
-                                            is_async: false,
-                                        },
-                                    ],
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 386..390,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 386..390,
-                                    id: Name("item"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 393..396,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 393..396,
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
                                     },
                                 ),
+                                optional_vars: None,
                             },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 397..410,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 402..410,
+                        ],
+                        body: Suite {
+                            range: 185..188,
                             node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    node_index: NodeIndex(None),
-                                    range: 402..410,
-                                    elts: [
-                                        Name(
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 185..188,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 185..188,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 189..219,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 194..208,
+                                node_index: NodeIndex(None),
+                                context_expr: Tuple(
+                                    ExprTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 194..208,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 195..200,
+                                                    id: Name("item1"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 202..207,
+                                                    id: Name("item2"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 213..214,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 213..214,
+                                        id: Name("f"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 216..219,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 216..219,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 216..219,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 220..252,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 225..239,
+                                node_index: NodeIndex(None),
+                                context_expr: Tuple(
+                                    ExprTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 225..239,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 226..231,
+                                                    id: Name("item1"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 233..238,
+                                                    id: Name("item2"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 241..246,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 241..246,
+                                        id: Name("item3"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 249..252,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 249..252,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 249..252,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 253..270,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 258..265,
+                                node_index: NodeIndex(None),
+                                context_expr: Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 259..264,
+                                        value: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 403..407,
+                                                range: 260..264,
                                                 id: Name("item"),
                                                 ctx: Load,
                                             },
                                         ),
-                                        Name(
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 267..270,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 267..270,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 267..270,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 271..293,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 276..288,
+                                node_index: NodeIndex(None),
+                                context_expr: Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 277..282,
+                                        value: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 409..410,
+                                                range: 278..282,
+                                                id: Name("item"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 287..288,
+                                            id: Name("f"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 290..293,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 290..293,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 290..293,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 294..321,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 300..315,
+                                node_index: NodeIndex(None),
+                                context_expr: Named(
+                                    ExprNamed {
+                                        node_index: NodeIndex(None),
+                                        range: 300..310,
+                                        target: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 300..304,
+                                                id: Name("item"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 308..310,
+                                                value: Int(
+                                                    10,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 314..315,
+                                            id: Name("f"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 318..321,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 318..321,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 318..321,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 322..357,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 328..333,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 328..333,
+                                        id: Name("item1"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 335..351,
+                                node_index: NodeIndex(None),
+                                context_expr: Named(
+                                    ExprNamed {
+                                        node_index: NodeIndex(None),
+                                        range: 335..346,
+                                        target: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 335..340,
+                                                id: Name("item2"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 344..346,
+                                                value: Int(
+                                                    10,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 350..351,
+                                            id: Name("f"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 354..357,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 354..357,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 354..357,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 358..396,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 363..384,
+                                node_index: NodeIndex(None),
+                                context_expr: Generator(
+                                    ExprGenerator {
+                                        node_index: NodeIndex(None),
+                                        range: 363..384,
+                                        elt: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 364..365,
                                                 id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [],
-                },
-            ),
-            For(
-                StmtFor {
-                    node_index: NodeIndex(None),
-                    range: 411..429,
-                    is_async: false,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 415..416,
-                            id: Name("x"),
-                            ctx: Store,
-                        },
-                    ),
-                    iter: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 420..429,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 420..425,
-                                    id: Name("range"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 425..429,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 426..428,
-                                            value: Int(
-                                                10,
-                                            ),
-                                        },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                    body: [],
-                    orelse: [],
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 432..435,
-                    value: EllipsisLiteral(
-                        ExprEllipsisLiteral {
-                            node_index: NodeIndex(None),
-                            range: 432..435,
-                        },
-                    ),
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 496..515,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 502..509,
-                            node_index: NodeIndex(None),
-                            context_expr: Starred(
-                                ExprStarred {
-                                    node_index: NodeIndex(None),
-                                    range: 503..508,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 504..508,
-                                            id: Name("item"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 512..515,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 512..515,
+                                        generators: [
+                                            Comprehension {
+                                                range: 366..384,
+                                                node_index: NodeIndex(None),
+                                                target: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 370..371,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                iter: Call(
+                                                    ExprCall {
+                                                        node_index: NodeIndex(None),
+                                                        range: 375..384,
+                                                        func: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 375..380,
+                                                                id: Name("range"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        arguments: Arguments {
+                                                            range: 380..384,
+                                                            node_index: NodeIndex(None),
+                                                            args: [
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 381..383,
+                                                                        value: Int(
+                                                                            10,
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            keywords: [],
+                                                        },
+                                                    },
+                                                ),
+                                                ifs: [],
+                                                is_async: false,
+                                            },
+                                        ],
+                                        parenthesized: true,
                                     },
                                 ),
+                                optional_vars: None,
                             },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 517..551,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 522..539,
+                            WithItem {
+                                range: 386..390,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 386..390,
+                                        id: Name("item"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 393..396,
                             node_index: NodeIndex(None),
-                            context_expr: Generator(
-                                ExprGenerator {
-                                    node_index: NodeIndex(None),
-                                    range: 522..539,
-                                    elt: Starred(
-                                        ExprStarred {
-                                            node_index: NodeIndex(None),
-                                            range: 523..525,
-                                            value: Name(
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 393..396,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 393..396,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 397..410,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 402..410,
+                                node_index: NodeIndex(None),
+                                context_expr: Tuple(
+                                    ExprTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 402..410,
+                                        elts: [
+                                            Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 524..525,
+                                                    range: 403..407,
+                                                    id: Name("item"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 409..410,
                                                     id: Name("x"),
                                                     ctx: Load,
                                                 },
                                             ),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    generators: [
-                                        Comprehension {
-                                            range: 526..539,
-                                            node_index: NodeIndex(None),
-                                            target: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 530..531,
-                                                    id: Name("x"),
-                                                    ctx: Store,
-                                                },
-                                            ),
-                                            iter: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 535..539,
-                                                    id: Name("iter"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            ifs: [],
-                                            is_async: false,
-                                        },
-                                    ],
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 541..545,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 541..545,
-                                    id: Name("item"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 548..551,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 548..551,
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
                                     },
                                 ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 410..410,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                For(
+                    StmtFor {
+                        node_index: NodeIndex(None),
+                        range: 411..429,
+                        is_async: false,
+                        target: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 415..416,
+                                id: Name("x"),
+                                ctx: Store,
                             },
                         ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 552..567,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 557..567,
-                            node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
+                        iter: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 420..429,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 420..425,
+                                        id: Name("range"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 425..429,
                                     node_index: NodeIndex(None),
-                                    range: 557..567,
-                                    elts: [
-                                        Name(
+                                    args: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 426..428,
+                                                value: Int(
+                                                    10,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        body: Suite {
+                            range: 429..429,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        orelse: Suite {
+                            range: 429..429,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 432..435,
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                node_index: NodeIndex(None),
+                                range: 432..435,
+                            },
+                        ),
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 496..515,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 502..509,
+                                node_index: NodeIndex(None),
+                                context_expr: Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 503..508,
+                                        value: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 558..563,
-                                                id: Name("item1"),
+                                                range: 504..508,
+                                                id: Name("item"),
                                                 ctx: Load,
                                             },
                                         ),
-                                        Starred(
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 512..515,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 512..515,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 512..515,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 517..551,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 522..539,
+                                node_index: NodeIndex(None),
+                                context_expr: Generator(
+                                    ExprGenerator {
+                                        node_index: NodeIndex(None),
+                                        range: 522..539,
+                                        elt: Starred(
                                             ExprStarred {
                                                 node_index: NodeIndex(None),
-                                                range: 565..567,
+                                                range: 523..525,
                                                 value: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),
-                                                        range: 566..567,
+                                                        range: 524..525,
                                                         id: Name("x"),
                                                         ctx: Load,
                                                     },
@@ -795,773 +750,930 @@ Module(
                                                 ctx: Load,
                                             },
                                         ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [],
-                },
-            ),
-            For(
-                StmtFor {
-                    node_index: NodeIndex(None),
-                    range: 568..588,
-                    is_async: false,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 572..573,
-                            id: Name("x"),
-                            ctx: Store,
-                        },
-                    ),
-                    iter: Tuple(
-                        ExprTuple {
-                            node_index: NodeIndex(None),
-                            range: 577..588,
-                            elts: [
-                                Name(
+                                        generators: [
+                                            Comprehension {
+                                                range: 526..539,
+                                                node_index: NodeIndex(None),
+                                                target: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 530..531,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                iter: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 535..539,
+                                                        id: Name("iter"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ifs: [],
+                                                is_async: false,
+                                            },
+                                        ],
+                                        parenthesized: true,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 541..545,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 577..581,
-                                        id: Name("iter"),
+                                        range: 541..545,
+                                        id: Name("item"),
                                         ctx: Load,
                                     },
                                 ),
-                                Name(
-                                    ExprName {
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 548..551,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
-                                        range: 583..588,
-                                        id: Name("item2"),
-                                        ctx: Load,
+                                        range: 548..551,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 548..551,
+                                            },
+                                        ),
                                     },
                                 ),
                             ],
-                            ctx: Load,
-                            parenthesized: false,
                         },
-                    ),
-                    body: [],
-                    orelse: [],
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 591..594,
-                    value: EllipsisLiteral(
-                        ExprEllipsisLiteral {
-                            node_index: NodeIndex(None),
-                            range: 591..594,
-                        },
-                    ),
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 595..617,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 601..607,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 601..602,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 552..567,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 557..567,
+                                node_index: NodeIndex(None),
+                                context_expr: Tuple(
+                                    ExprTuple {
                                         node_index: NodeIndex(None),
-                                        range: 606..607,
-                                        id: Name("f"),
-                                        ctx: Store,
+                                        range: 557..567,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 558..563,
+                                                    id: Name("item1"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 565..567,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 566..567,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
                                     },
                                 ),
-                            ),
-                        },
-                        WithItem {
-                            range: 609..611,
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 567..567,
                             node_index: NodeIndex(None),
-                            context_expr: Starred(
-                                ExprStarred {
-                                    node_index: NodeIndex(None),
-                                    range: 609..611,
-                                    value: Name(
+                            statements: [],
+                        },
+                    },
+                ),
+                For(
+                    StmtFor {
+                        node_index: NodeIndex(None),
+                        range: 568..588,
+                        is_async: false,
+                        target: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 572..573,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 577..588,
+                                elts: [
+                                    Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 610..611,
-                                            id: Name("y"),
+                                            range: 577..581,
+                                            id: Name("iter"),
                                             ctx: Load,
                                         },
                                     ),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 614..617,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 614..617,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 618..640,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 624..626,
-                            node_index: NodeIndex(None),
-                            context_expr: Starred(
-                                ExprStarred {
-                                    node_index: NodeIndex(None),
-                                    range: 624..626,
-                                    value: Name(
+                                    Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 625..626,
-                                            id: Name("x"),
+                                            range: 583..588,
+                                            id: Name("item2"),
                                             ctx: Load,
                                         },
                                     ),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 628..634,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 628..629,
-                                    id: Name("y"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 633..634,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 637..640,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 637..640,
-                                    },
-                                ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
                             },
                         ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 641..663,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 646..658,
+                        body: Suite {
+                            range: 588..588,
                             node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    node_index: NodeIndex(None),
-                                    range: 646..658,
-                                    elts: [
-                                        Name(
+                            statements: [],
+                        },
+                        orelse: Suite {
+                            range: 588..588,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 591..594,
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                node_index: NodeIndex(None),
+                                range: 591..594,
+                            },
+                        ),
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 595..617,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 601..607,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 601..602,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 606..607,
+                                            id: Name("f"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                            WithItem {
+                                range: 609..611,
+                                node_index: NodeIndex(None),
+                                context_expr: Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 609..611,
+                                        value: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 647..648,
+                                                range: 610..611,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 614..617,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 614..617,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 614..617,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 618..640,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 624..626,
+                                node_index: NodeIndex(None),
+                                context_expr: Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 624..626,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 625..626,
                                                 id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
-                                        Yield(
-                                            ExprYield {
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 628..634,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 628..629,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 633..634,
+                                            id: Name("f"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 637..640,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 637..640,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 650..657,
-                                                value: Some(
-                                                    Name(
+                                                range: 637..640,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 641..663,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 646..658,
+                                node_index: NodeIndex(None),
+                                context_expr: Tuple(
+                                    ExprTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 646..658,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 647..648,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Yield(
+                                                ExprYield {
+                                                    node_index: NodeIndex(None),
+                                                    range: 650..657,
+                                                    value: Some(
+                                                        Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 656..657,
+                                                                id: Name("y"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 660..663,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 660..663,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 660..663,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 664..689,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 669..684,
+                                node_index: NodeIndex(None),
+                                context_expr: Tuple(
+                                    ExprTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 669..684,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 670..671,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Yield(
+                                                ExprYield {
+                                                    node_index: NodeIndex(None),
+                                                    range: 673..683,
+                                                    value: Some(
+                                                        Tuple(
+                                                            ExprTuple {
+                                                                node_index: NodeIndex(None),
+                                                                range: 679..683,
+                                                                elts: [
+                                                                    Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 679..680,
+                                                                            id: Name("y"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 682..683,
+                                                                            id: Name("z"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                ctx: Load,
+                                                                parenthesized: false,
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 686..689,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 686..689,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 686..689,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 690..717,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 695..712,
+                                node_index: NodeIndex(None),
+                                context_expr: Tuple(
+                                    ExprTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 695..712,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 696..697,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            YieldFrom(
+                                                ExprYieldFrom {
+                                                    node_index: NodeIndex(None),
+                                                    range: 699..711,
+                                                    value: Name(
                                                         ExprName {
                                                             node_index: NodeIndex(None),
-                                                            range: 656..657,
+                                                            range: 710..711,
                                                             id: Name("y"),
                                                             ctx: Load,
                                                         },
                                                     ),
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 660..663,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 660..663,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
                                     },
                                 ),
+                                optional_vars: None,
                             },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 664..689,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 669..684,
+                        ],
+                        body: Suite {
+                            range: 714..717,
                             node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    node_index: NodeIndex(None),
-                                    range: 669..684,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 670..671,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Yield(
-                                            ExprYield {
-                                                node_index: NodeIndex(None),
-                                                range: 673..683,
-                                                value: Some(
-                                                    Tuple(
-                                                        ExprTuple {
-                                                            node_index: NodeIndex(None),
-                                                            range: 679..683,
-                                                            elts: [
-                                                                Name(
-                                                                    ExprName {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 679..680,
-                                                                        id: Name("y"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                                Name(
-                                                                    ExprName {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 682..683,
-                                                                        id: Name("z"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            ctx: Load,
-                                                            parenthesized: false,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 686..689,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 686..689,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 690..717,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 695..712,
-                            node_index: NodeIndex(None),
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    node_index: NodeIndex(None),
-                                    range: 695..712,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 696..697,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        YieldFrom(
-                                            ExprYieldFrom {
-                                                node_index: NodeIndex(None),
-                                                range: 699..711,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 710..711,
-                                                        id: Name("y"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 714..717,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 714..717,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 714..717,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 718..734,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 724..730,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 724..725,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 729..730,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
+                            ],
                         },
-                        WithItem {
-                            range: 732..733,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 732..733,
-                                    id: Name("y"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [],
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    node_index: NodeIndex(None),
-                    range: 738..744,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 738..739,
-                            id: Name("f"),
-                            ctx: Store,
-                        },
-                    ),
-                    annotation: EllipsisLiteral(
-                        ExprEllipsisLiteral {
-                            node_index: NodeIndex(None),
-                            range: 741..744,
-                        },
-                    ),
-                    value: None,
-                    simple: true,
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 745..777,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 750..771,
-                            node_index: NodeIndex(None),
-                            context_expr: Generator(
-                                ExprGenerator {
-                                    node_index: NodeIndex(None),
-                                    range: 750..766,
-                                    elt: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 751..752,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    generators: [
-                                        Comprehension {
-                                            range: 753..766,
-                                            node_index: NodeIndex(None),
-                                            target: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 757..758,
-                                                    id: Name("x"),
-                                                    ctx: Store,
-                                                },
-                                            ),
-                                            iter: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 762..766,
-                                                    id: Name("iter"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            ifs: [],
-                                            is_async: false,
-                                        },
-                                    ],
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 770..771,
-                                        id: Name("y"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 718..734,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 724..730,
                                 node_index: NodeIndex(None),
-                                range: 774..777,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 774..777,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 837..854,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 843..853,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 844..848,
-                                    id: Name("item"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
+                                context_expr: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 852..853,
-                                        id: Name("f"),
-                                        ctx: Store,
+                                        range: 724..725,
+                                        id: Name("x"),
+                                        ctx: Load,
                                     },
                                 ),
-                            ),
-                        },
-                    ],
-                    body: [],
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 857..860,
-                    value: EllipsisLiteral(
-                        ExprEllipsisLiteral {
-                            node_index: NodeIndex(None),
-                            range: 857..860,
-                        },
-                    ),
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 862..878,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 868..877,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 868..872,
-                                    id: Name("item"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 876..877,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                    ],
-                    body: [],
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    node_index: NodeIndex(None),
-                    range: 880..886,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 880..881,
-                            id: Name("x"),
-                            ctx: Store,
-                        },
-                    ),
-                    annotation: EllipsisLiteral(
-                        ExprEllipsisLiteral {
-                            node_index: NodeIndex(None),
-                            range: 883..886,
-                        },
-                    ),
-                    value: None,
-                    simple: true,
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 887..904,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 893..903,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 893..897,
-                                    id: Name("item"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 901..903,
-                                        id: Name("f1"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                    ],
-                    body: [],
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    node_index: NodeIndex(None),
-                    range: 908..915,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 908..910,
-                            id: Name("f2"),
-                            ctx: Store,
-                        },
-                    ),
-                    annotation: EllipsisLiteral(
-                        ExprEllipsisLiteral {
-                            node_index: NodeIndex(None),
-                            range: 912..915,
-                        },
-                    ),
-                    value: None,
-                    simple: true,
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 916..950,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 922..932,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 922..927,
-                                    id: Name("item1"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 931..932,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                        WithItem {
-                            range: 934..944,
-                            node_index: NodeIndex(None),
-                            context_expr: Named(
-                                ExprNamed {
-                                    node_index: NodeIndex(None),
-                                    range: 934..944,
-                                    target: Name(
+                                optional_vars: Some(
+                                    Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 934..939,
-                                            id: Name("item2"),
+                                            range: 729..730,
+                                            id: Name("f"),
                                             ctx: Store,
                                         },
                                     ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 943..944,
-                                            value: Int(
-                                                0,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 947..950,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 947..950,
-                                    },
                                 ),
                             },
+                            WithItem {
+                                range: 732..733,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 732..733,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 734..734,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        node_index: NodeIndex(None),
+                        range: 738..744,
+                        target: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 738..739,
+                                id: Name("f"),
+                                ctx: Store,
+                            },
                         ),
-                    ],
-                },
-            ),
-        ],
+                        annotation: EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                node_index: NodeIndex(None),
+                                range: 741..744,
+                            },
+                        ),
+                        value: None,
+                        simple: true,
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 745..777,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 750..771,
+                                node_index: NodeIndex(None),
+                                context_expr: Generator(
+                                    ExprGenerator {
+                                        node_index: NodeIndex(None),
+                                        range: 750..766,
+                                        elt: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 751..752,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        generators: [
+                                            Comprehension {
+                                                range: 753..766,
+                                                node_index: NodeIndex(None),
+                                                target: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 757..758,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                iter: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 762..766,
+                                                        id: Name("iter"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ifs: [],
+                                                is_async: false,
+                                            },
+                                        ],
+                                        parenthesized: true,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 770..771,
+                                            id: Name("y"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 774..777,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 774..777,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 774..777,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 837..854,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 843..853,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 844..848,
+                                        id: Name("item"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 852..853,
+                                            id: Name("f"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 854..854,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 857..860,
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                node_index: NodeIndex(None),
+                                range: 857..860,
+                            },
+                        ),
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 862..878,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 868..877,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 868..872,
+                                        id: Name("item"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 876..877,
+                                            id: Name("f"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 878..878,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        node_index: NodeIndex(None),
+                        range: 880..886,
+                        target: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 880..881,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                        annotation: EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                node_index: NodeIndex(None),
+                                range: 883..886,
+                            },
+                        ),
+                        value: None,
+                        simple: true,
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 887..904,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 893..903,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 893..897,
+                                        id: Name("item"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 901..903,
+                                            id: Name("f1"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 904..904,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        node_index: NodeIndex(None),
+                        range: 908..915,
+                        target: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 908..910,
+                                id: Name("f2"),
+                                ctx: Store,
+                            },
+                        ),
+                        annotation: EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                node_index: NodeIndex(None),
+                                range: 912..915,
+                            },
+                        ),
+                        value: None,
+                        simple: true,
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 916..950,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 922..932,
+                                node_index: NodeIndex(None),
+                                context_expr: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 922..927,
+                                        id: Name("item1"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 931..932,
+                                            id: Name("f"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                            WithItem {
+                                range: 934..944,
+                                node_index: NodeIndex(None),
+                                context_expr: Named(
+                                    ExprNamed {
+                                        node_index: NodeIndex(None),
+                                        range: 934..944,
+                                        target: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 934..939,
+                                                id: Name("item2"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 943..944,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 947..950,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 947..950,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 947..950,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

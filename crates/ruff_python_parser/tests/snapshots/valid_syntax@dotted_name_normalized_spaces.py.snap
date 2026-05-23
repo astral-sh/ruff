@@ -9,46 +9,50 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..32,
-        body: [
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 0..12,
-                    names: [
-                        Alias {
-                            range: 7..12,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a.b.c"),
+        body: Suite {
+            range: 0..32,
+            node_index: NodeIndex(None),
+            statements: [
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 0..12,
+                        names: [
+                            Alias {
                                 range: 7..12,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a.b.c"),
+                                    range: 7..12,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 13..31,
-                    names: [
-                        Alias {
-                            range: 20..31,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a.b.c"),
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 13..31,
+                        names: [
+                            Alias {
                                 range: 20..31,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a.b.c"),
+                                    range: 20..31,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-        ],
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

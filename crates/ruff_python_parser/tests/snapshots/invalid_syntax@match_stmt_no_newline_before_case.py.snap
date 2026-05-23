@@ -9,51 +9,59 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..23,
-        body: [
-            Match(
-                StmtMatch {
-                    node_index: NodeIndex(None),
-                    range: 0..22,
-                    subject: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 6..9,
-                            id: Name("foo"),
-                            ctx: Load,
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 11..22,
-                            node_index: NodeIndex(None),
-                            pattern: MatchAs(
-                                PatternMatchAs {
-                                    node_index: NodeIndex(None),
-                                    range: 16..17,
-                                    pattern: None,
-                                    name: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
+        body: Suite {
+            range: 0..23,
+            node_index: NodeIndex(None),
+            statements: [
+                Match(
+                    StmtMatch {
+                        node_index: NodeIndex(None),
+                        range: 0..22,
+                        subject: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 6..9,
+                                id: Name("foo"),
+                                ctx: Load,
+                            },
+                        ),
+                        cases: [
+                            MatchCase {
+                                range: 11..22,
+                                node_index: NodeIndex(None),
+                                pattern: MatchAs(
+                                    PatternMatchAs {
                                         node_index: NodeIndex(None),
-                                        range: 19..22,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 19..22,
-                                            },
-                                        ),
+                                        range: 16..17,
+                                        pattern: None,
+                                        name: None,
                                     },
                                 ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-        ],
+                                guard: None,
+                                body: Suite {
+                                    range: 19..22,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Expr(
+                                            StmtExpr {
+                                                node_index: NodeIndex(None),
+                                                range: 19..22,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 19..22,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

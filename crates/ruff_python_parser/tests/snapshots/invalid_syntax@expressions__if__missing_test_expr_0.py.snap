@@ -9,76 +9,84 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..76,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 51..55,
-                    value: If(
-                        ExprIf {
-                            node_index: NodeIndex(None),
-                            range: 51..55,
-                            test: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 55..55,
-                                    id: Name(""),
-                                    ctx: Invalid,
-                                },
-                            ),
-                            body: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 51..52,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            orelse: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 55..55,
-                                    id: Name(""),
-                                    ctx: Invalid,
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 57..76,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 61..64,
+        body: Suite {
+            range: 0..76,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 64..66,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Pass(
-                            StmtPass {
+                        range: 51..55,
+                        value: If(
+                            ExprIf {
                                 node_index: NodeIndex(None),
-                                range: 72..76,
+                                range: 51..55,
+                                test: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 55..55,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 51..52,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                orelse: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 55..55,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
                             },
                         ),
-                    ],
-                },
-            ),
-        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 57..76,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 61..64,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 64..66,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 67..76,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 72..76,
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

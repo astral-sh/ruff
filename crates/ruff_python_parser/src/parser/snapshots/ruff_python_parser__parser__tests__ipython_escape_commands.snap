@@ -6,498 +6,514 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..953,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 21..42,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 27..40,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 27..28,
-                                    id: Name("a"),
-                                    ctx: Load,
-                                },
-                            ),
-                            op: Mod,
-                            right: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 39..40,
-                                    id: Name("b"),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 66..73,
-                    kind: Help2,
-                    value: "a.foo",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 74..80,
-                    kind: Help,
-                    value: "a.foo",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 81..88,
-                    kind: Help,
-                    value: "a.foo",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 89..100,
-                    kind: Help2,
-                    value: "a.foo()",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 115..128,
-                    kind: Magic,
-                    value: "timeit a = b",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 129..147,
-                    kind: Magic,
-                    value: "timeit foo(b) % 3",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 148..176,
-                    kind: Magic,
-                    value: "alias showPath pwd && ls -a",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 177..205,
-                    kind: Magic,
-                    value: "timeit a =  foo(b); b = 2",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 206..226,
-                    kind: Magic,
-                    value: "matplotlib --inline",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 227..253,
-                    kind: Magic,
-                    value: "matplotlib     --inline",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 277..309,
-                    kind: Shell,
-                    value: "pwd && ls -a | sed 's/^/\\    /'",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 310..347,
-                    kind: Shell,
-                    value: "pwd   && ls -a | sed 's/^/\\\\    /'",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 348..393,
-                    kind: ShCap,
-                    value: "cd /Users/foo/Library/Application\\ Support/",
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 566..626,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 570..573,
+        body: Suite {
+            range: 0..953,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 573..575,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Return(
-                            StmtReturn {
+                        range: 21..42,
+                        value: BinOp(
+                            ExprBinOp {
                                 node_index: NodeIndex(None),
-                                range: 581..626,
-                                value: Some(
-                                    Compare(
-                                        ExprCompare {
-                                            node_index: NodeIndex(None),
-                                            range: 598..620,
-                                            left: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 598..599,
-                                                    id: Name("a"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            ops: [
-                                                NotEq,
-                                            ],
-                                            comparators: [
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 619..620,
-                                                        id: Name("b"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
+                                range: 27..40,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 27..28,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Mod,
+                                right: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 39..40,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
                                 ),
                             },
                         ),
-                    ],
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 656..664,
-                    kind: Paren,
-                    value: "foo 1 2",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 665..673,
-                    kind: Quote2,
-                    value: "foo 1 2",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 674..682,
-                    kind: Quote,
-                    value: "foo 1 2",
-                },
-            ),
-            For(
-                StmtFor {
-                    node_index: NodeIndex(None),
-                    range: 711..737,
-                    is_async: false,
-                    target: Name(
-                        ExprName {
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 66..73,
+                        kind: Help2,
+                        value: "a.foo",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 74..80,
+                        kind: Help,
+                        value: "a.foo",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 81..88,
+                        kind: Help,
+                        value: "a.foo",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 89..100,
+                        kind: Help2,
+                        value: "a.foo()",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 115..128,
+                        kind: Magic,
+                        value: "timeit a = b",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 129..147,
+                        kind: Magic,
+                        value: "timeit foo(b) % 3",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 148..176,
+                        kind: Magic,
+                        value: "alias showPath pwd && ls -a",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 177..205,
+                        kind: Magic,
+                        value: "timeit a =  foo(b); b = 2",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 206..226,
+                        kind: Magic,
+                        value: "matplotlib --inline",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 227..253,
+                        kind: Magic,
+                        value: "matplotlib     --inline",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 277..309,
+                        kind: Shell,
+                        value: "pwd && ls -a | sed 's/^/\\    /'",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 310..347,
+                        kind: Shell,
+                        value: "pwd   && ls -a | sed 's/^/\\\\    /'",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 348..393,
+                        kind: ShCap,
+                        value: "cd /Users/foo/Library/Application\\ Support/",
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 566..626,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 570..573,
                             node_index: NodeIndex(None),
-                            range: 715..716,
-                            id: Name("a"),
-                            ctx: Store,
                         },
-                    ),
-                    iter: Call(
-                        ExprCall {
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 573..575,
                             node_index: NodeIndex(None),
-                            range: 720..728,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 720..725,
-                                    id: Name("range"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 725..728,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 726..727,
-                                            value: Int(
-                                                5,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 576..626,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Return(
+                                    StmtReturn {
+                                        node_index: NodeIndex(None),
+                                        range: 581..626,
+                                        value: Some(
+                                            Compare(
+                                                ExprCompare {
+                                                    node_index: NodeIndex(None),
+                                                    range: 598..620,
+                                                    left: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 598..599,
+                                                            id: Name("a"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ops: [
+                                                        NotEq,
+                                                    ],
+                                                    comparators: [
+                                                        Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 619..620,
+                                                                id: Name("b"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
                                             ),
-                                        },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
+                                        ),
+                                    },
+                                ),
+                            ],
                         },
-                    ),
-                    body: [
-                        IpyEscapeCommand(
-                            StmtIpyEscapeCommand {
-                                node_index: NodeIndex(None),
-                                range: 734..737,
-                                kind: Shell,
-                                value: "ls",
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 739..748,
-                    targets: [
-                        Name(
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 656..664,
+                        kind: Paren,
+                        value: "foo 1 2",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 665..673,
+                        kind: Quote2,
+                        value: "foo 1 2",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 674..682,
+                        kind: Quote,
+                        value: "foo 1 2",
+                    },
+                ),
+                For(
+                    StmtFor {
+                        node_index: NodeIndex(None),
+                        range: 711..737,
+                        is_async: false,
+                        target: Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 739..741,
-                                id: Name("p1"),
+                                range: 715..716,
+                                id: Name("a"),
                                 ctx: Store,
                             },
                         ),
-                    ],
-                    value: IpyEscapeCommand(
-                        ExprIpyEscapeCommand {
+                        iter: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 720..728,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 720..725,
+                                        id: Name("range"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 725..728,
+                                    node_index: NodeIndex(None),
+                                    args: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 726..727,
+                                                value: Int(
+                                                    5,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        body: Suite {
+                            range: 729..737,
                             node_index: NodeIndex(None),
-                            range: 744..748,
-                            kind: Shell,
-                            value: "pwd",
+                            statements: [
+                                IpyEscapeCommand(
+                                    StmtIpyEscapeCommand {
+                                        node_index: NodeIndex(None),
+                                        range: 734..737,
+                                        kind: Shell,
+                                        value: "ls",
+                                    },
+                                ),
+                            ],
                         },
-                    ),
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    node_index: NodeIndex(None),
-                    range: 749..763,
-                    target: Name(
-                        ExprName {
+                        orelse: Suite {
+                            range: 737..737,
                             node_index: NodeIndex(None),
-                            range: 749..751,
-                            id: Name("p2"),
-                            ctx: Store,
+                            statements: [],
                         },
-                    ),
-                    annotation: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 753..756,
-                            id: Name("str"),
-                            ctx: Load,
-                        },
-                    ),
-                    value: Some(
-                        IpyEscapeCommand(
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 739..748,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 739..741,
+                                    id: Name("p1"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: IpyEscapeCommand(
                             ExprIpyEscapeCommand {
                                 node_index: NodeIndex(None),
-                                range: 759..763,
+                                range: 744..748,
                                 kind: Shell,
                                 value: "pwd",
                             },
                         ),
-                    ),
-                    simple: true,
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 764..784,
-                    targets: [
-                        Name(
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        node_index: NodeIndex(None),
+                        range: 749..763,
+                        target: Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 764..767,
-                                id: Name("foo"),
+                                range: 749..751,
+                                id: Name("p2"),
                                 ctx: Store,
                             },
                         ),
-                    ],
-                    value: IpyEscapeCommand(
-                        ExprIpyEscapeCommand {
-                            node_index: NodeIndex(None),
-                            range: 770..784,
-                            kind: Magic,
-                            value: "foo     bar",
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 785..796,
-                    targets: [
-                        Name(
+                        annotation: Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 785..788,
-                                id: Name("bar"),
-                                ctx: Store,
+                                range: 753..756,
+                                id: Name("str"),
+                                ctx: Load,
                             },
                         ),
-                    ],
-                    value: IpyEscapeCommand(
-                        ExprIpyEscapeCommand {
-                            node_index: NodeIndex(None),
-                            range: 791..796,
-                            kind: Magic,
-                            value: "foo?",
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 797..808,
-                    targets: [
-                        Name(
-                            ExprName {
+                        value: Some(
+                            IpyEscapeCommand(
+                                ExprIpyEscapeCommand {
+                                    node_index: NodeIndex(None),
+                                    range: 759..763,
+                                    kind: Shell,
+                                    value: "pwd",
+                                },
+                            ),
+                        ),
+                        simple: true,
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 764..784,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 764..767,
+                                    id: Name("foo"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: IpyEscapeCommand(
+                            ExprIpyEscapeCommand {
                                 node_index: NodeIndex(None),
-                                range: 797..800,
-                                id: Name("baz"),
-                                ctx: Store,
+                                range: 770..784,
+                                kind: Magic,
+                                value: "foo     bar",
                             },
                         ),
-                    ],
-                    value: IpyEscapeCommand(
-                        ExprIpyEscapeCommand {
-                            node_index: NodeIndex(None),
-                            range: 803..808,
-                            kind: Shell,
-                            value: "pwd?",
-                        },
-                    ),
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 810..815,
-                    kind: Magic,
-                    value: " foo",
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 816..837,
-                    targets: [
-                        Name(
-                            ExprName {
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 785..796,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 785..788,
+                                    id: Name("bar"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: IpyEscapeCommand(
+                            ExprIpyEscapeCommand {
                                 node_index: NodeIndex(None),
-                                range: 816..819,
-                                id: Name("foo"),
-                                ctx: Store,
+                                range: 791..796,
+                                kind: Magic,
+                                value: "foo?",
                             },
                         ),
-                    ],
-                    value: IpyEscapeCommand(
-                        ExprIpyEscapeCommand {
-                            node_index: NodeIndex(None),
-                            range: 822..837,
-                            kind: Magic,
-                            value: "foo  # comment",
-                        },
-                    ),
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 862..866,
-                    kind: Help,
-                    value: "foo",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 867..876,
-                    kind: Help2,
-                    value: "foo.bar",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 877..889,
-                    kind: Help,
-                    value: "foo.bar.baz",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 890..898,
-                    kind: Help2,
-                    value: "foo[0]",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 899..909,
-                    kind: Help,
-                    value: "foo[0][1]",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 910..929,
-                    kind: Help2,
-                    value: "foo.bar[0].baz[1]",
-                },
-            ),
-            IpyEscapeCommand(
-                StmtIpyEscapeCommand {
-                    node_index: NodeIndex(None),
-                    range: 930..953,
-                    kind: Help2,
-                    value: "foo.bar[0].baz[2].egg",
-                },
-            ),
-        ],
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 797..808,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 797..800,
+                                    id: Name("baz"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: IpyEscapeCommand(
+                            ExprIpyEscapeCommand {
+                                node_index: NodeIndex(None),
+                                range: 803..808,
+                                kind: Shell,
+                                value: "pwd?",
+                            },
+                        ),
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 810..815,
+                        kind: Magic,
+                        value: " foo",
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 816..837,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 816..819,
+                                    id: Name("foo"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: IpyEscapeCommand(
+                            ExprIpyEscapeCommand {
+                                node_index: NodeIndex(None),
+                                range: 822..837,
+                                kind: Magic,
+                                value: "foo  # comment",
+                            },
+                        ),
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 862..866,
+                        kind: Help,
+                        value: "foo",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 867..876,
+                        kind: Help2,
+                        value: "foo.bar",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 877..889,
+                        kind: Help,
+                        value: "foo.bar.baz",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 890..898,
+                        kind: Help2,
+                        value: "foo[0]",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 899..909,
+                        kind: Help,
+                        value: "foo[0][1]",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 910..929,
+                        kind: Help2,
+                        value: "foo.bar[0].baz[1]",
+                    },
+                ),
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        node_index: NodeIndex(None),
+                        range: 930..953,
+                        kind: Help2,
+                        value: "foo.bar[0].baz[2].egg",
+                    },
+                ),
+            ],
+        },
     },
 )

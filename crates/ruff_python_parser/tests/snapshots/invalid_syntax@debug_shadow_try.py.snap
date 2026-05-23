@@ -9,70 +9,90 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..44,
-        body: [
-            Try(
-                StmtTry {
-                    node_index: NodeIndex(None),
-                    range: 0..43,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 5..8,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+        body: Suite {
+            range: 0..44,
+            node_index: NodeIndex(None),
+            statements: [
+                Try(
+                    StmtTry {
+                        node_index: NodeIndex(None),
+                        range: 0..43,
+                        body: Suite {
+                            range: 5..8,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 5..8,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 5..8,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 9..43,
-                                node_index: NodeIndex(None),
-                                type_: Some(
-                                    Name(
-                                        ExprName {
+                            ],
+                        },
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 9..43,
+                                    node_index: NodeIndex(None),
+                                    type_: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 16..25,
+                                                id: Name("Exception"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("__debug__"),
+                                            range: 29..38,
                                             node_index: NodeIndex(None),
-                                            range: 16..25,
-                                            id: Name("Exception"),
-                                            ctx: Load,
                                         },
                                     ),
-                                ),
-                                name: Some(
-                                    Identifier {
-                                        id: Name("__debug__"),
-                                        range: 29..38,
+                                    body: Suite {
+                                        range: 40..43,
                                         node_index: NodeIndex(None),
-                                    },
-                                ),
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            node_index: NodeIndex(None),
-                                            range: 40..43,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
+                                        statements: [
+                                            Expr(
+                                                StmtExpr {
                                                     node_index: NodeIndex(None),
                                                     range: 40..43,
+                                                    value: EllipsisLiteral(
+                                                        ExprEllipsisLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 40..43,
+                                                        },
+                                                    ),
                                                 },
                                             ),
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: false,
-                },
-            ),
-        ],
+                                        ],
+                                    },
+                                },
+                            ),
+                        ],
+                        orelse: Suite {
+                            range: 43..43,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        finalbody: Suite {
+                            range: 43..43,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        is_star: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

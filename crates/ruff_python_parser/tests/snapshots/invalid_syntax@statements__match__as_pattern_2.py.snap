@@ -9,99 +9,107 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..190,
-        body: [
-            Match(
-                StmtMatch {
-                    node_index: NodeIndex(None),
-                    range: 0..176,
-                    subject: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 6..13,
-                            id: Name("subject"),
-                            ctx: Load,
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 159..176,
-                            node_index: NodeIndex(None),
-                            pattern: MatchAs(
-                                PatternMatchAs {
-                                    node_index: NodeIndex(None),
-                                    range: 164..170,
-                                    pattern: Some(
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 164..165,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("x"),
-                                                        range: 164..165,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ),
-                                    name: Some(
-                                        Identifier {
-                                            id: Name("y"),
-                                            range: 169..170,
-                                            node_index: NodeIndex(None),
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                AnnAssign(
-                                    StmtAnnAssign {
+        body: Suite {
+            range: 0..190,
+            node_index: NodeIndex(None),
+            statements: [
+                Match(
+                    StmtMatch {
+                        node_index: NodeIndex(None),
+                        range: 0..176,
+                        subject: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 6..13,
+                                id: Name("subject"),
+                                ctx: Load,
+                            },
+                        ),
+                        cases: [
+                            MatchCase {
+                                range: 159..176,
+                                node_index: NodeIndex(None),
+                                pattern: MatchAs(
+                                    PatternMatchAs {
                                         node_index: NodeIndex(None),
-                                        range: 171..176,
-                                        target: UnaryOp(
-                                            ExprUnaryOp {
-                                                node_index: NodeIndex(None),
-                                                range: 171..175,
-                                                op: UAdd,
-                                                operand: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 173..175,
-                                                        value: Complex {
-                                                            real: 0.0,
-                                                            imag: 1.0,
+                                        range: 164..170,
+                                        pattern: Some(
+                                            MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 164..165,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("x"),
+                                                            range: 164..165,
+                                                            node_index: NodeIndex(None),
                                                         },
-                                                    },
-                                                ),
-                                            },
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                        annotation: Name(
-                                            ExprName {
+                                        name: Some(
+                                            Identifier {
+                                                id: Name("y"),
+                                                range: 169..170,
                                                 node_index: NodeIndex(None),
-                                                range: 176..176,
-                                                id: Name(""),
-                                                ctx: Invalid,
                                             },
                                         ),
-                                        value: None,
-                                        simple: false,
                                     },
                                 ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-            Pass(
-                StmtPass {
-                    node_index: NodeIndex(None),
-                    range: 185..189,
-                },
-            ),
-        ],
+                                guard: None,
+                                body: Suite {
+                                    range: 171..176,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        AnnAssign(
+                                            StmtAnnAssign {
+                                                node_index: NodeIndex(None),
+                                                range: 171..176,
+                                                target: UnaryOp(
+                                                    ExprUnaryOp {
+                                                        node_index: NodeIndex(None),
+                                                        range: 171..175,
+                                                        op: UAdd,
+                                                        operand: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 173..175,
+                                                                value: Complex {
+                                                                    real: 0.0,
+                                                                    imag: 1.0,
+                                                                },
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                annotation: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 176..176,
+                                                        id: Name(""),
+                                                        ctx: Invalid,
+                                                    },
+                                                ),
+                                                value: None,
+                                                simple: false,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+                Pass(
+                    StmtPass {
+                        node_index: NodeIndex(None),
+                        range: 185..189,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

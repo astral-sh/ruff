@@ -9,264 +9,284 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..131,
-        body: [
-            Match(
-                StmtMatch {
-                    node_index: NodeIndex(None),
-                    range: 0..130,
-                    subject: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 6..9,
-                            id: Name("foo"),
-                            ctx: Load,
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 15..34,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
-                                    node_index: NodeIndex(None),
-                                    range: 20..29,
-                                    value: Attribute(
-                                        ExprAttribute {
-                                            node_index: NodeIndex(None),
-                                            range: 20..29,
-                                            value: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 20..25,
-                                                    id: Name("match"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            attr: Identifier {
-                                                id: Name("bar"),
-                                                range: 26..29,
-                                                node_index: NodeIndex(None),
-                                            },
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
+        body: Suite {
+            range: 0..131,
+            node_index: NodeIndex(None),
+            statements: [
+                Match(
+                    StmtMatch {
+                        node_index: NodeIndex(None),
+                        range: 0..130,
+                        subject: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 6..9,
+                                id: Name("foo"),
+                                ctx: Load,
+                            },
+                        ),
+                        cases: [
+                            MatchCase {
+                                range: 15..34,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
                                         node_index: NodeIndex(None),
-                                        range: 31..34,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
+                                        range: 20..29,
+                                        value: Attribute(
+                                            ExprAttribute {
+                                                node_index: NodeIndex(None),
+                                                range: 20..29,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 20..25,
+                                                        id: Name("match"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                attr: Identifier {
+                                                    id: Name("bar"),
+                                                    range: 26..29,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                guard: None,
+                                body: Suite {
+                                    range: 31..34,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Expr(
+                                            StmtExpr {
                                                 node_index: NodeIndex(None),
                                                 range: 31..34,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 31..34,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 39..57,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
+                                        node_index: NodeIndex(None),
+                                        range: 44..52,
+                                        value: Attribute(
+                                            ExprAttribute {
+                                                node_index: NodeIndex(None),
+                                                range: 44..52,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 44..48,
+                                                        id: Name("case"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                attr: Identifier {
+                                                    id: Name("bar"),
+                                                    range: 49..52,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                ctx: Load,
                                             },
                                         ),
                                     },
                                 ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 39..57,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
+                                guard: None,
+                                body: Suite {
+                                    range: 54..57,
                                     node_index: NodeIndex(None),
-                                    range: 44..52,
-                                    value: Attribute(
-                                        ExprAttribute {
-                                            node_index: NodeIndex(None),
-                                            range: 44..52,
-                                            value: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 44..48,
-                                                    id: Name("case"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            attr: Identifier {
-                                                id: Name("bar"),
-                                                range: 49..52,
-                                                node_index: NodeIndex(None),
-                                            },
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 54..57,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
+                                    statements: [
+                                        Expr(
+                                            StmtExpr {
                                                 node_index: NodeIndex(None),
                                                 range: 54..57,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 54..57,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 62..80,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
+                                        node_index: NodeIndex(None),
+                                        range: 67..75,
+                                        value: Attribute(
+                                            ExprAttribute {
+                                                node_index: NodeIndex(None),
+                                                range: 67..75,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 67..71,
+                                                        id: Name("type"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                attr: Identifier {
+                                                    id: Name("bar"),
+                                                    range: 72..75,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                ctx: Load,
                                             },
                                         ),
                                     },
                                 ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 62..80,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
+                                guard: None,
+                                body: Suite {
+                                    range: 77..80,
                                     node_index: NodeIndex(None),
-                                    range: 67..75,
-                                    value: Attribute(
-                                        ExprAttribute {
-                                            node_index: NodeIndex(None),
-                                            range: 67..75,
-                                            value: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 67..71,
-                                                    id: Name("type"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            attr: Identifier {
-                                                id: Name("bar"),
-                                                range: 72..75,
-                                                node_index: NodeIndex(None),
-                                            },
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 77..80,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
+                                    statements: [
+                                        Expr(
+                                            StmtExpr {
                                                 node_index: NodeIndex(None),
                                                 range: 77..80,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 77..80,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                            MatchCase {
+                                range: 85..130,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
+                                        node_index: NodeIndex(None),
+                                        range: 90..125,
+                                        value: Attribute(
+                                            ExprAttribute {
+                                                node_index: NodeIndex(None),
+                                                range: 90..125,
+                                                value: Attribute(
+                                                    ExprAttribute {
+                                                        node_index: NodeIndex(None),
+                                                        range: 90..119,
+                                                        value: Attribute(
+                                                            ExprAttribute {
+                                                                node_index: NodeIndex(None),
+                                                                range: 90..114,
+                                                                value: Attribute(
+                                                                    ExprAttribute {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 90..109,
+                                                                        value: Attribute(
+                                                                            ExprAttribute {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 90..105,
+                                                                                value: Attribute(
+                                                                                    ExprAttribute {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 90..100,
+                                                                                        value: Name(
+                                                                                            ExprName {
+                                                                                                node_index: NodeIndex(None),
+                                                                                                range: 90..95,
+                                                                                                id: Name("match"),
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                        attr: Identifier {
+                                                                                            id: Name("case"),
+                                                                                            range: 96..100,
+                                                                                            node_index: NodeIndex(None),
+                                                                                        },
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                                attr: Identifier {
+                                                                                    id: Name("type"),
+                                                                                    range: 101..105,
+                                                                                    node_index: NodeIndex(None),
+                                                                                },
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        attr: Identifier {
+                                                                            id: Name("bar"),
+                                                                            range: 106..109,
+                                                                            node_index: NodeIndex(None),
+                                                                        },
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                attr: Identifier {
+                                                                    id: Name("type"),
+                                                                    range: 110..114,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        attr: Identifier {
+                                                            id: Name("case"),
+                                                            range: 115..119,
+                                                            node_index: NodeIndex(None),
+                                                        },
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                attr: Identifier {
+                                                    id: Name("match"),
+                                                    range: 120..125,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                ctx: Load,
                                             },
                                         ),
                                     },
                                 ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 85..130,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
+                                guard: None,
+                                body: Suite {
+                                    range: 127..130,
                                     node_index: NodeIndex(None),
-                                    range: 90..125,
-                                    value: Attribute(
-                                        ExprAttribute {
-                                            node_index: NodeIndex(None),
-                                            range: 90..125,
-                                            value: Attribute(
-                                                ExprAttribute {
-                                                    node_index: NodeIndex(None),
-                                                    range: 90..119,
-                                                    value: Attribute(
-                                                        ExprAttribute {
-                                                            node_index: NodeIndex(None),
-                                                            range: 90..114,
-                                                            value: Attribute(
-                                                                ExprAttribute {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 90..109,
-                                                                    value: Attribute(
-                                                                        ExprAttribute {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 90..105,
-                                                                            value: Attribute(
-                                                                                ExprAttribute {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 90..100,
-                                                                                    value: Name(
-                                                                                        ExprName {
-                                                                                            node_index: NodeIndex(None),
-                                                                                            range: 90..95,
-                                                                                            id: Name("match"),
-                                                                                            ctx: Load,
-                                                                                        },
-                                                                                    ),
-                                                                                    attr: Identifier {
-                                                                                        id: Name("case"),
-                                                                                        range: 96..100,
-                                                                                        node_index: NodeIndex(None),
-                                                                                    },
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                            attr: Identifier {
-                                                                                id: Name("type"),
-                                                                                range: 101..105,
-                                                                                node_index: NodeIndex(None),
-                                                                            },
-                                                                            ctx: Load,
-                                                                        },
-                                                                    ),
-                                                                    attr: Identifier {
-                                                                        id: Name("bar"),
-                                                                        range: 106..109,
-                                                                        node_index: NodeIndex(None),
-                                                                    },
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            attr: Identifier {
-                                                                id: Name("type"),
-                                                                range: 110..114,
-                                                                node_index: NodeIndex(None),
-                                                            },
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    attr: Identifier {
-                                                        id: Name("case"),
-                                                        range: 115..119,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            attr: Identifier {
-                                                id: Name("match"),
-                                                range: 120..125,
-                                                node_index: NodeIndex(None),
-                                            },
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 127..130,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
+                                    statements: [
+                                        Expr(
+                                            StmtExpr {
                                                 node_index: NodeIndex(None),
                                                 range: 127..130,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 127..130,
+                                                    },
+                                                ),
                                             },
                                         ),
-                                    },
-                                ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-        ],
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

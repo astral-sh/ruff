@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
+use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::UnsupportedSyntaxError;
@@ -181,16 +181,21 @@ impl<'src> Parser<'src> {
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
     fn parse_module(&mut self) -> ModModule {
-        let body = self.parse_list_into_vec(
+        let statements = self.parse_list_into_vec(
             RecoveryContextKind::ModuleStatements,
             Parser::parse_statement,
         );
 
         self.bump(TokenKind::EndOfFile);
 
+        let range = TextRange::new(self.start_offset, self.current_token_range().end());
         ModModule {
-            body,
-            range: TextRange::new(self.start_offset, self.current_token_range().end()),
+            body: Suite {
+                statements,
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            },
+            range,
             node_index: AtomicNodeIndex::NONE,
         }
     }

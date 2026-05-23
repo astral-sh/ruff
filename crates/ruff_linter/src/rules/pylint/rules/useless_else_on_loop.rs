@@ -3,7 +3,7 @@ use anyhow::Result;
 use ast::whitespace::indentation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier;
-use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
@@ -64,7 +64,7 @@ impl Violation for UselessElseOnLoop {
 }
 
 /// PLW0120
-pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
+pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt], orelse: &Suite) {
     if orelse.is_empty() || loop_exits_early(body) {
         return;
     }
@@ -128,7 +128,7 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
 /// Generate a [`Fix`] to remove the `else` clause from the given statement.
 fn remove_else(
     stmt: &Stmt,
-    orelse: &[Stmt],
+    orelse: &Suite,
     else_range: TextRange,
     locator: &Locator,
     indexer: &Indexer,
@@ -137,10 +137,6 @@ fn remove_else(
     let Some(start) = orelse.first() else {
         return Err(anyhow::anyhow!("Empty `else` clause"));
     };
-    let Some(end) = orelse.last() else {
-        return Err(anyhow::anyhow!("Empty `else` clause"));
-    };
-
     let start_indentation = indentation(locator.contents(), start);
     if start_indentation.is_none() {
         // Inline `else` block (e.g., `else: x = 1`).
@@ -158,7 +154,7 @@ fn remove_else(
         let indented = adjust_indentation(
             TextRange::new(
                 locator.full_line_end(else_range.start()),
-                locator.full_line_end(end.end()),
+                locator.full_line_end(orelse.end()),
             ),
             desired_indentation,
             locator,
@@ -170,7 +166,7 @@ fn remove_else(
         Ok(Fix::safe_edit(Edit::replacement(
             indented,
             locator.line_start(else_range.start()),
-            locator.full_line_end(end.end()),
+            locator.full_line_end(orelse.end()),
         )))
     }
 }

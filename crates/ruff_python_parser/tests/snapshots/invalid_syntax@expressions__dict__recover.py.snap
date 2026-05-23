@@ -9,463 +9,467 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..346,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 88..91,
-                    value: Set(
-                        ExprSet {
-                            node_index: NodeIndex(None),
-                            range: 88..91,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 89..89,
-                                        id: Name(""),
-                                        ctx: Invalid,
+        body: Suite {
+            range: 0..346,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 88..91,
+                        value: Set(
+                            ExprSet {
+                                node_index: NodeIndex(None),
+                                range: 88..91,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 89..89,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 93..105,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 93..105,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 94..95,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 97..98,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
                                     },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 93..105,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 93..105,
-                            items: [
-                                DictItem {
-                                    key: Some(
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 94..95,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 97..98,
-                                            value: Int(
-                                                2,
+                                    DictItem {
+                                        key: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 100..101,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
                                             ),
-                                        },
-                                    ),
-                                },
-                                DictItem {
-                                    key: Some(
-                                        NumberLiteral(
+                                        ),
+                                        value: NumberLiteral(
                                             ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 100..101,
+                                                range: 103..104,
                                                 value: Int(
-                                                    3,
+                                                    4,
                                                 ),
                                             },
                                         ),
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 103..104,
-                                            value: Int(
-                                                4,
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 107..115,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 107..115,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 108..109,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
                                             ),
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 107..115,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 107..115,
-                            items: [
-                                DictItem {
-                                    key: Some(
-                                        NumberLiteral(
+                                        ),
+                                        value: NumberLiteral(
                                             ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 108..109,
+                                                range: 111..112,
                                                 value: Int(
-                                                    1,
+                                                    2,
                                                 ),
                                             },
                                         ),
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 111..112,
-                                            value: Int(
-                                                2,
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 133..144,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 133..144,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 134..135,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
                                             ),
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 133..144,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 133..144,
-                            items: [
-                                DictItem {
-                                    key: Some(
-                                        NumberLiteral(
+                                        ),
+                                        value: NumberLiteral(
                                             ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 134..135,
+                                                range: 137..138,
                                                 value: Int(
-                                                    1,
+                                                    2,
                                                 ),
                                             },
                                         ),
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 137..138,
-                                            value: Int(
-                                                2,
+                                    },
+                                    DictItem {
+                                        key: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 139..140,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
                                             ),
-                                        },
-                                    ),
-                                },
-                                DictItem {
-                                    key: Some(
-                                        NumberLiteral(
+                                        ),
+                                        value: NumberLiteral(
                                             ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 139..140,
+                                                range: 142..143,
                                                 value: Int(
-                                                    3,
+                                                    4,
                                                 ),
                                             },
                                         ),
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 142..143,
-                                            value: Int(
-                                                4,
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 157..162,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 157..162,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 158..159,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
                                             ),
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 157..162,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 157..162,
-                            items: [
-                                DictItem {
-                                    key: Some(
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 158..159,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
                                         ),
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 160..160,
-                                            id: Name(""),
-                                            ctx: Invalid,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 201..205,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 201..205,
-                            items: [
-                                DictItem {
-                                    key: None,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 204..204,
-                                            id: Name(""),
-                                            ctx: Invalid,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 206..222,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 206..222,
-                            items: [
-                                DictItem {
-                                    key: Some(
-                                        Name(
+                                        value: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 207..208,
-                                                id: Name("x"),
-                                                ctx: Load,
+                                                range: 160..160,
+                                                id: Name(""),
+                                                ctx: Invalid,
                                             },
                                         ),
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 210..211,
-                                            id: Name("y"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                DictItem {
-                                    key: None,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 215..215,
-                                            id: Name(""),
-                                            ctx: Invalid,
-                                        },
-                                    ),
-                                },
-                                DictItem {
-                                    key: Some(
-                                        Name(
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 201..205,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 201..205,
+                                items: [
+                                    DictItem {
+                                        key: None,
+                                        value: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 217..218,
-                                                id: Name("a"),
-                                                ctx: Load,
+                                                range: 204..204,
+                                                id: Name(""),
+                                                ctx: Invalid,
                                             },
                                         ),
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 220..221,
-                                            id: Name("b"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 310..330,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 310..330,
-                            items: [
-                                DictItem {
-                                    key: Some(
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 311..313,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 312..313,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 315..316,
-                                            id: Name("y"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                DictItem {
-                                    key: Some(
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 318..319,
-                                                id: Name("z"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 321..322,
-                                            id: Name("a"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                DictItem {
-                                    key: Some(
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 324..326,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 325..326,
-                                                        id: Name("b"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 328..329,
-                                            id: Name("c"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 331..345,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 331..345,
-                            items: [
-                                DictItem {
-                                    key: Some(
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 332..333,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ),
-                                    value: Starred(
-                                        ExprStarred {
-                                            node_index: NodeIndex(None),
-                                            range: 335..337,
-                                            value: Name(
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 206..222,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 206..222,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 336..337,
-                                                    id: Name("y"),
+                                                    range: 207..208,
+                                                    id: Name("x"),
                                                     ctx: Load,
                                                 },
                                             ),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                DictItem {
-                                    key: Some(
-                                        Name(
+                                        ),
+                                        value: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 339..340,
-                                                id: Name("z"),
+                                                range: 210..211,
+                                                id: Name("y"),
                                                 ctx: Load,
                                             },
                                         ),
-                                    ),
-                                    value: Starred(
-                                        ExprStarred {
-                                            node_index: NodeIndex(None),
-                                            range: 342..344,
-                                            value: Name(
+                                    },
+                                    DictItem {
+                                        key: None,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 215..215,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                    },
+                                    DictItem {
+                                        key: Some(
+                                            Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 343..344,
+                                                    range: 217..218,
                                                     id: Name("a"),
                                                     ctx: Load,
                                                 },
                                             ),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-        ],
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 220..221,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 310..330,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 310..330,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 311..313,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 312..313,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 315..316,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                    DictItem {
+                                        key: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 318..319,
+                                                    id: Name("z"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 321..322,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                    DictItem {
+                                        key: Some(
+                                            Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 324..326,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 325..326,
+                                                            id: Name("b"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 328..329,
+                                                id: Name("c"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 331..345,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 331..345,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 332..333,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        value: Starred(
+                                            ExprStarred {
+                                                node_index: NodeIndex(None),
+                                                range: 335..337,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 336..337,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                    DictItem {
+                                        key: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 339..340,
+                                                    id: Name("z"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        value: Starred(
+                                            ExprStarred {
+                                                node_index: NodeIndex(None),
+                                                range: 342..344,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 343..344,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

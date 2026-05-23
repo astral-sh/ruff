@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
-    PythonVersion, Stmt, WithItem,
+    PythonVersion, Stmt, Suite, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -1577,14 +1577,23 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite {
+                range: self.missing_node_range(),
+                ..Suite::default()
+            }
         };
 
         let (finalbody, has_finally) = if self.eat(TokenKind::Finally) {
             self.expect(TokenKind::Colon);
             (self.parse_body(Clause::Finally), true)
         } else {
-            (vec![], false)
+            (
+                Suite {
+                    range: self.missing_node_range(),
+                    ..Suite::default()
+                },
+                false,
+            )
         };
 
         if !has_except && !has_finally {
@@ -1890,7 +1899,10 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite {
+                range: self.missing_node_range(),
+                ..Suite::default()
+            }
         };
 
         ast::StmtFor {
@@ -1940,7 +1952,10 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite {
+                range: self.missing_node_range(),
+                ..Suite::default()
+            }
         };
 
         ast::StmtWhile {
@@ -3025,7 +3040,10 @@ impl<'src> Parser<'src> {
                         ..ast::Parameters::default()
                     }),
                     returns: None,
-                    body: vec![],
+                    body: Suite {
+                        range: self.missing_node_range(),
+                        ..Suite::default()
+                    },
                 }
                 .into()
             }
@@ -3036,45 +3054,54 @@ impl<'src> Parser<'src> {
     ///
     /// This could either be a single statement that's on the same line as the
     /// clause header or an indented block.
-    fn parse_body(&mut self, parent_clause: Clause) -> Vec<Stmt> {
+    fn parse_body(&mut self, parent_clause: Clause) -> Suite {
         // Note: The test cases in this method chooses a clause at random to test
         // the error logic.
 
+        let start = self.current_token_range().start();
         let newline_range = self.current_token_range();
-        if self.eat(TokenKind::Newline) {
+        let body = if self.eat(TokenKind::Newline) {
             if self.at(TokenKind::Indent) {
-                return self.parse_block();
+                self.parse_block()
+            } else {
+                // test_err clause_expect_indented_block
+                // # Here, the error is highlighted at the `pass` token
+                // if True:
+                // pass
+                // # The parser is at the end of the program, so let's highlight
+                // # at the newline token after `:`
+                // if True:
+                self.add_error(
+                    ParseErrorType::OtherError(format!(
+                        "Expected an indented block after {parent_clause}"
+                    )),
+                    if self.current_token_range().is_empty() {
+                        newline_range
+                    } else {
+                        self.current_token_range()
+                    },
+                );
+                Vec::new()
             }
-            // test_err clause_expect_indented_block
-            // # Here, the error is highlighted at the `pass` token
-            // if True:
-            // pass
-            // # The parser is at the end of the program, so let's highlight
-            // # at the newline token after `:`
-            // if True:
-            self.add_error(
-                ParseErrorType::OtherError(format!(
-                    "Expected an indented block after {parent_clause}"
-                )),
-                if self.current_token_range().is_empty() {
-                    newline_range
-                } else {
-                    self.current_token_range()
-                },
-            );
         } else {
             if self.at_simple_stmt() {
-                return self.parse_simple_statements();
+                self.parse_simple_statements()
+            } else {
+                // test_err clause_expect_single_statement
+                // if True: if True: pass
+                self.add_error(
+                    ParseErrorType::OtherError("Expected a simple statement".to_string()),
+                    self.current_token_range(),
+                );
+                Vec::new()
             }
-            // test_err clause_expect_single_statement
-            // if True: if True: pass
-            self.add_error(
-                ParseErrorType::OtherError("Expected a simple statement".to_string()),
-                self.current_token_range(),
-            );
-        }
+        };
 
-        Vec::new()
+        Suite {
+            statements: body,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        }
     }
 
     /// Parses a block of statements.

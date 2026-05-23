@@ -9,27 +9,31 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..12,
-        body: [
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 0..11,
-                    names: [
-                        Alias {
-                            range: 7..11,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("x"),
-                                range: 7..8,
+        body: Suite {
+            range: 0..12,
+            node_index: NodeIndex(None),
+            statements: [
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 0..11,
+                        names: [
+                            Alias {
+                                range: 7..11,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("x"),
+                                    range: 7..8,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-        ],
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

@@ -9,157 +9,169 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..112,
-        body: [
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 43..80,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 48..75,
-                            node_index: NodeIndex(None),
-                            context_expr: Call(
-                                ExprCall {
-                                    node_index: NodeIndex(None),
-                                    range: 52..67,
-                                    func: Name(
-                                        ExprName {
+        body: Suite {
+            range: 0..112,
+            node_index: NodeIndex(None),
+            statements: [
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 43..80,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 48..75,
+                                node_index: NodeIndex(None),
+                                context_expr: Call(
+                                    ExprCall {
+                                        node_index: NodeIndex(None),
+                                        range: 52..67,
+                                        func: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 52..56,
+                                                id: Name("open"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 56..67,
                                             node_index: NodeIndex(None),
-                                            range: 52..56,
-                                            id: Name("open"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: Arguments {
-                                        range: 56..67,
-                                        node_index: NodeIndex(None),
-                                        args: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 57..66,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 57..66,
-                                                                node_index: NodeIndex(None),
-                                                                value: "foo.txt",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Single,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
-                                                                    unclosed: false,
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 57..66,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 57..66,
+                                                                    node_index: NodeIndex(None),
+                                                                    value: "foo.txt",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Single,
+                                                                        prefix: Empty,
+                                                                        triple_quoted: false,
+                                                                        unclosed: false,
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
+                                                            ),
+                                                        },
                                                     },
-                                                },
-                                            ),
-                                        ],
-                                        keywords: [],
-                                    },
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 72..75,
-                                        id: Name("foo"),
-                                        ctx: Store,
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
                                     },
                                 ),
-                            ),
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 77..80,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 72..75,
+                                            id: Name("foo"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: Suite {
+                            range: 77..80,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 77..80,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 77..80,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 81..111,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 90..105,
-                            node_index: NodeIndex(None),
-                            context_expr: Call(
-                                ExprCall {
-                                    node_index: NodeIndex(None),
-                                    range: 90..105,
-                                    func: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 90..94,
-                                            id: Name("open"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: Arguments {
-                                        range: 94..105,
-                                        node_index: NodeIndex(None),
-                                        args: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 95..104,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 95..104,
-                                                                node_index: NodeIndex(None),
-                                                                value: "foo.txt",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Single,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
-                                                                    unclosed: false,
-                                                                },
-                                                            },
-                                                        ),
-                                                    },
-                                                },
-                                            ),
-                                        ],
-                                        keywords: [],
-                                    },
-                                },
-                            ),
-                            optional_vars: None,
+                            ],
                         },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
+                    },
+                ),
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 81..111,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 90..105,
                                 node_index: NodeIndex(None),
-                                range: 108..111,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                context_expr: Call(
+                                    ExprCall {
+                                        node_index: NodeIndex(None),
+                                        range: 90..105,
+                                        func: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 90..94,
+                                                id: Name("open"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 94..105,
+                                            node_index: NodeIndex(None),
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 95..104,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 95..104,
+                                                                    node_index: NodeIndex(None),
+                                                                    value: "foo.txt",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Single,
+                                                                        prefix: Empty,
+                                                                        triple_quoted: false,
+                                                                        unclosed: false,
+                                                                    },
+                                                                },
+                                                            ),
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: Suite {
+                            range: 108..111,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 108..111,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 108..111,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

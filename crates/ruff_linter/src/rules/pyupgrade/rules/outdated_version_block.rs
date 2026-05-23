@@ -311,13 +311,13 @@ fn fix_always_false_branch(
                 body, test: None, ..
             }) => {
                 let start = body.first()?;
-                let end = body.last()?;
+                let end = body.end();
                 if indentation(checker.source(), start).is_none() {
                     // Inline `else` block (e.g., `else: x = 1`).
                     Some(Fix::unsafe_edit(Edit::range_replacement(
                         checker
                             .locator()
-                            .slice(TextRange::new(start.start(), end.end()))
+                            .slice(TextRange::new(start.start(), end))
                             .to_string(),
                         stmt_if.range(),
                     )))
@@ -325,10 +325,7 @@ fn fix_always_false_branch(
                     indentation(checker.source(), stmt_if)
                         .and_then(|indentation| {
                             adjust_indentation(
-                                TextRange::new(
-                                    checker.locator().line_start(start.start()),
-                                    end.end(),
-                                ),
+                                TextRange::new(checker.locator().line_start(start.start()), end),
                                 indentation,
                                 checker.locator(),
                                 checker.indexer(),
@@ -389,13 +386,13 @@ fn fix_always_true_branch(
             // If the first statement is an `if`, use the body of this statement, and ignore
             // the rest.
             let start = branch.body.first()?;
-            let end = branch.body.last()?;
+            let end = branch.body.end();
             if indentation(checker.source(), start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
                 Some(Fix::unsafe_edit(Edit::range_replacement(
                     checker
                         .locator()
-                        .slice(TextRange::new(start.start(), end.end()))
+                        .slice(TextRange::new(start.start(), end))
                         .to_string(),
                     stmt_if.range,
                 )))
@@ -403,7 +400,7 @@ fn fix_always_true_branch(
                 indentation(checker.source(), &stmt_if)
                     .and_then(|indentation| {
                         adjust_indentation(
-                            TextRange::new(checker.locator().line_start(start.start()), end.end()),
+                            TextRange::new(checker.locator().line_start(start.start()), end),
                             indentation,
                             checker.locator(),
                             checker.indexer(),
@@ -423,10 +420,12 @@ fn fix_always_true_branch(
         BranchKind::Elif => {
             // Replace the `elif` with an `else`, preserve the body of the elif, and remove
             // the rest.
-            let end = branch.body.last()?;
+            if branch.body.is_empty() {
+                return None;
+            }
             let text = checker
                 .locator()
-                .slice(TextRange::new(branch.test.end(), end.end()));
+                .slice(TextRange::new(branch.test.end(), branch.body.end()));
             Some(Fix::unsafe_edit(Edit::range_replacement(
                 format!("else{text}"),
                 TextRange::new(branch.start(), stmt_if.end()),

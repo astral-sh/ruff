@@ -9,217 +9,221 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..119,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 80..92,
-                    value: Subscript(
-                        ExprSubscript {
-                            node_index: NodeIndex(None),
-                            range: 80..92,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 80..83,
-                                    id: Name("lst"),
-                                    ctx: Load,
-                                },
-                            ),
-                            slice: Slice(
-                                ExprSlice {
-                                    node_index: NodeIndex(None),
-                                    range: 84..91,
-                                    lower: Some(
-                                        Named(
-                                            ExprNamed {
-                                                node_index: NodeIndex(None),
-                                                range: 84..88,
-                                                target: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 84..85,
-                                                        id: Name("x"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 87..88,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
+        body: Suite {
+            range: 0..119,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 80..92,
+                        value: Subscript(
+                            ExprSubscript {
+                                node_index: NodeIndex(None),
+                                range: 80..92,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 80..83,
+                                        id: Name("lst"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Slice(
+                                    ExprSlice {
+                                        node_index: NodeIndex(None),
+                                        range: 84..91,
+                                        lower: Some(
+                                            Named(
+                                                ExprNamed {
+                                                    node_index: NodeIndex(None),
+                                                    range: 84..88,
+                                                    target: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 84..85,
+                                                            id: Name("x"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 87..88,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                    upper: Some(
-                                        UnaryOp(
-                                            ExprUnaryOp {
-                                                node_index: NodeIndex(None),
-                                                range: 89..91,
-                                                op: USub,
-                                                operand: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 90..91,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
+                                        upper: Some(
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    node_index: NodeIndex(None),
+                                                    range: 89..91,
+                                                    op: USub,
+                                                    operand: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 90..91,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                    step: None,
-                                },
-                            ),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 93..100,
-                    value: Subscript(
-                        ExprSubscript {
-                            node_index: NodeIndex(None),
-                            range: 93..100,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 93..96,
-                                    id: Name("lst"),
-                                    ctx: Load,
-                                },
-                            ),
-                            slice: Slice(
-                                ExprSlice {
-                                    node_index: NodeIndex(None),
-                                    range: 97..100,
-                                    lower: Some(
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 97..98,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
+                                        step: None,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 93..100,
+                        value: Subscript(
+                            ExprSubscript {
+                                node_index: NodeIndex(None),
+                                range: 93..100,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 93..96,
+                                        id: Name("lst"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Slice(
+                                    ExprSlice {
+                                        node_index: NodeIndex(None),
+                                        range: 97..100,
+                                        lower: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 97..98,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                    upper: Some(
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 99..100,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
+                                        upper: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 99..100,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                    step: None,
-                                },
-                            ),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 102..103,
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 102..103,
-                            value: Int(
-                                1,
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 105..114,
-                    value: Subscript(
-                        ExprSubscript {
-                            node_index: NodeIndex(None),
-                            range: 105..114,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 105..108,
-                                    id: Name("lst"),
-                                    ctx: Load,
-                                },
-                            ),
-                            slice: Slice(
-                                ExprSlice {
-                                    node_index: NodeIndex(None),
-                                    range: 109..114,
-                                    lower: Some(
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 109..110,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
+                                        step: None,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 102..103,
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                node_index: NodeIndex(None),
+                                range: 102..103,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 105..114,
+                        value: Subscript(
+                            ExprSubscript {
+                                node_index: NodeIndex(None),
+                                range: 105..114,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 105..108,
+                                        id: Name("lst"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Slice(
+                                    ExprSlice {
+                                        node_index: NodeIndex(None),
+                                        range: 109..114,
+                                        lower: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 109..110,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                    upper: Some(
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 111..112,
-                                                value: Int(
-                                                    3,
-                                                ),
-                                            },
+                                        upper: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 111..112,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                    step: Some(
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 113..114,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
+                                        step: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 113..114,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                },
-                            ),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 116..117,
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 116..117,
-                            value: Int(
-                                1,
-                            ),
-                        },
-                    ),
-                },
-            ),
-        ],
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 116..117,
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                node_index: NodeIndex(None),
+                                range: 116..117,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

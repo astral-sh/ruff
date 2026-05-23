@@ -19,7 +19,7 @@ impl ast::ElifElseClause {
         if let Some(test) = test {
             visitor.visit_expr(test);
         }
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
     }
 }
 
@@ -230,7 +230,7 @@ impl ast::ExceptHandlerExceptHandler {
             visitor.visit_identifier(name);
         }
 
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
     }
 }
 
@@ -463,7 +463,16 @@ impl ast::MatchCase {
         if let Some(expr) = guard {
             visitor.visit_expr(expr);
         }
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
+    }
+}
+
+impl ast::Suite {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        visitor.visit_body(self);
     }
 }
 

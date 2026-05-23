@@ -9,138 +9,142 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..42,
-        body: [
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 0..12,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 0..1,
-                                id: Name("a"),
-                                ctx: Store,
-                            },
-                        ),
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 4..8,
-                                id: Name("pass"),
-                                ctx: Store,
-                            },
-                        ),
-                    ],
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 11..12,
-                            id: Name("c"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 13..18,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 13..18,
-                            left: Name(
+        body: Suite {
+            range: 0..42,
+            node_index: NodeIndex(None),
+            statements: [
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 0..12,
+                        targets: [
+                            Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
-                                    range: 13..14,
+                                    range: 0..1,
                                     id: Name("a"),
-                                    ctx: Load,
+                                    ctx: Store,
                                 },
                             ),
-                            op: Add,
-                            right: Name(
+                            Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
-                                    range: 17..18,
-                                    id: Name("b"),
-                                    ctx: Load,
+                                    range: 4..8,
+                                    id: Name("pass"),
+                                    ctx: Store,
                                 },
                             ),
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 19..35,
-                    targets: [
-                        Name(
+                        ],
+                        value: Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 19..20,
-                                id: Name("a"),
-                                ctx: Store,
+                                range: 11..12,
+                                id: Name("c"),
+                                ctx: Load,
                             },
                         ),
-                        Name(
-                            ExprName {
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 13..18,
+                        value: BinOp(
+                            ExprBinOp {
                                 node_index: NodeIndex(None),
-                                range: 23..24,
-                                id: Name("b"),
-                                ctx: Store,
+                                range: 13..18,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 13..14,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Add,
+                                right: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 17..18,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
                             },
                         ),
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 27..31,
-                                id: Name("pass"),
-                                ctx: Store,
-                            },
-                        ),
-                    ],
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 34..35,
-                            id: Name("c"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 36..41,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 36..41,
-                            left: Name(
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 19..35,
+                        targets: [
+                            Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
-                                    range: 36..37,
+                                    range: 19..20,
                                     id: Name("a"),
-                                    ctx: Load,
+                                    ctx: Store,
                                 },
                             ),
-                            op: Add,
-                            right: Name(
+                            Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
-                                    range: 40..41,
+                                    range: 23..24,
                                     id: Name("b"),
-                                    ctx: Load,
+                                    ctx: Store,
                                 },
                             ),
-                        },
-                    ),
-                },
-            ),
-        ],
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 27..31,
+                                    id: Name("pass"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 34..35,
+                                id: Name("c"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 36..41,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 36..41,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 36..37,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Add,
+                                right: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 40..41,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

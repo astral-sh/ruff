@@ -3,7 +3,7 @@ use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::{AnyNodeRef, Identifier};
-use ruff_python_ast::{Mod, Stmt};
+use ruff_python_ast::{Mod, Stmt, Suite};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
@@ -165,6 +165,10 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 }
             }
         }
+    }
+
+    fn visit_suite(&mut self, suite: &'ast Suite) {
+        self.visit_body(suite);
     }
 
     fn visit_identifier(&mut self, _identifier: &'ast Identifier) {

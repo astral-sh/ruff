@@ -9,116 +9,132 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..48,
-        body: [
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 0..10,
-                    test: Starred(
-                        ExprStarred {
-                            node_index: NodeIndex(None),
-                            range: 3..5,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 4..5,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            ctx: Load,
-                        },
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
+        body: Suite {
+            range: 0..48,
+            node_index: NodeIndex(None),
+            statements: [
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 0..10,
+                        test: Starred(
+                            ExprStarred {
                                 node_index: NodeIndex(None),
-                                range: 7..10,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 7..10,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 11..26,
-                    test: Yield(
-                        ExprYield {
-                            node_index: NodeIndex(None),
-                            range: 14..21,
-                            value: Some(
-                                Name(
+                                range: 3..5,
+                                value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 20..21,
+                                        range: 4..5,
                                         id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
-                            ),
+                                ctx: Load,
+                            },
+                        ),
+                        body: Suite {
+                            range: 7..10,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 7..10,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 7..10,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
                         },
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 11..26,
+                        test: Yield(
+                            ExprYield {
                                 node_index: NodeIndex(None),
-                                range: 23..26,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                range: 14..21,
+                                value: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 20..21,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                        body: Suite {
+                            range: 23..26,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 23..26,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 23..26,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 27..47,
+                        test: YieldFrom(
+                            ExprYieldFrom {
+                                node_index: NodeIndex(None),
+                                range: 30..42,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 41..42,
+                                        id: Name("x"),
+                                        ctx: Load,
                                     },
                                 ),
                             },
                         ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 27..47,
-                    test: YieldFrom(
-                        ExprYieldFrom {
+                        body: Suite {
+                            range: 44..47,
                             node_index: NodeIndex(None),
-                            range: 30..42,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 41..42,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 44..47,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 44..47,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 44..47,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-        ],
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

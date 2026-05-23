@@ -1,4 +1,5 @@
 use ruff_python_ast::Stmt;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
@@ -8,6 +9,40 @@ fn test_modes() {
 
     assert!(parse(source, ParseOptions::from(Mode::Expression)).is_ok());
     assert!(parse(source, ParseOptions::from(Mode::Module)).is_ok());
+}
+
+#[test]
+fn test_suite_ranges() {
+    let source = "if test:\n    first()\nelse: second()\n";
+    let parsed = parse_module(source).unwrap();
+    let suite = parsed.suite();
+
+    assert_eq!(
+        suite.range(),
+        TextRange::new(TextSize::new(0), TextSize::new(36))
+    );
+
+    let Stmt::If(if_stmt) = &suite[0] else {
+        panic!("expected an if statement");
+    };
+    assert_eq!(
+        if_stmt.body.range(),
+        TextRange::new(TextSize::new(8), TextSize::new(20))
+    );
+    assert_eq!(
+        if_stmt.elif_else_clauses[0].body.range(),
+        TextRange::new(TextSize::new(27), TextSize::new(35))
+    );
+
+    let parsed = parse_module("for x in y:\n    pass\n").unwrap();
+    let Stmt::For(for_stmt) = &parsed.suite()[0] else {
+        panic!("expected a for statement");
+    };
+    assert_eq!(
+        for_stmt.body.range(),
+        TextRange::new(TextSize::new(11), TextSize::new(20))
+    );
+    assert_eq!(for_stmt.orelse.range(), TextRange::empty(TextSize::new(20)));
 }
 
 #[test]

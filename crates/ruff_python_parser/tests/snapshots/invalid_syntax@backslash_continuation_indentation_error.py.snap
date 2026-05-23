@@ -9,54 +9,62 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..29,
-        body: [
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 0..28,
-                    test: BooleanLiteral(
-                        ExprBooleanLiteral {
-                            node_index: NodeIndex(None),
-                            range: 3..7,
-                            value: true,
-                        },
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
+        body: Suite {
+            range: 0..29,
+            node_index: NodeIndex(None),
+            statements: [
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 0..28,
+                        test: BooleanLiteral(
+                            ExprBooleanLiteral {
                                 node_index: NodeIndex(None),
-                                range: 13..14,
-                                value: NumberLiteral(
-                                    ExprNumberLiteral {
+                                range: 3..7,
+                                value: true,
+                            },
+                        ),
+                        body: Suite {
+                            range: 8..28,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 13..14,
-                                        value: Int(
-                                            1,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 13..14,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
                                         ),
                                     },
                                 ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 27..28,
-                                value: NumberLiteral(
-                                    ExprNumberLiteral {
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 27..28,
-                                        value: Int(
-                                            2,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 27..28,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
                                         ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-        ],
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

@@ -9,50 +9,54 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..10,
-        body: [
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 0..9,
-                    targets: [
-                        Starred(
-                            ExprStarred {
+        body: Suite {
+            range: 0..10,
+            node_index: NodeIndex(None),
+            statements: [
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 0..9,
+                        targets: [
+                            Starred(
+                                ExprStarred {
+                                    node_index: NodeIndex(None),
+                                    range: 0..2,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 1..2,
+                                            id: Name("a"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: Tuple(
+                            ExprTuple {
                                 node_index: NodeIndex(None),
-                                range: 0..2,
-                                value: Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 1..2,
-                                        id: Name("a"),
-                                        ctx: Store,
-                                    },
-                                ),
-                                ctx: Store,
+                                range: 5..9,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 6..7,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
                             },
                         ),
-                    ],
-                    value: Tuple(
-                        ExprTuple {
-                            node_index: NodeIndex(None),
-                            range: 5..9,
-                            elts: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 6..7,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                            ],
-                            ctx: Load,
-                            parenthesized: true,
-                        },
-                    ),
-                },
-            ),
-        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

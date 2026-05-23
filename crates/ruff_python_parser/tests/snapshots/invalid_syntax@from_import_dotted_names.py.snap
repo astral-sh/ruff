@@ -9,159 +9,163 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..67,
-        body: [
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 0..16,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 5..6,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 14..15,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a"),
+        body: Suite {
+            range: 0..67,
+            node_index: NodeIndex(None),
+            statements: [
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 0..16,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 5..6,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 14..15,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 14..15,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 17..34,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 22..23,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 31..32,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a"),
+                        ],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 17..34,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 22..23,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 31..32,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 31..32,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 33..34,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("b"),
+                            Alias {
                                 range: 33..34,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("b"),
+                                    range: 33..34,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 35..66,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 40..41,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 49..50,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a"),
+                        ],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 35..66,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 40..41,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 49..50,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 49..50,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 52..53,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("b"),
+                            Alias {
                                 range: 52..53,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("b"),
+                                    range: 52..53,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 54..55,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("c"),
+                            Alias {
                                 range: 54..55,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("c"),
+                                    range: 54..55,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 57..58,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("d"),
+                            Alias {
                                 range: 57..58,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("d"),
+                                    range: 57..58,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 60..61,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("e"),
+                            Alias {
                                 range: 60..61,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("e"),
+                                    range: 60..61,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 62..63,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("f"),
+                            Alias {
                                 range: 62..63,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("f"),
+                                    range: 62..63,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 65..66,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("g"),
+                            Alias {
                                 range: 65..66,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("g"),
+                                    range: 65..66,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-        ],
+                        ],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

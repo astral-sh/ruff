@@ -9,195 +9,199 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..112,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 77..83,
-                    value: FString(
-                        ExprFString {
-                            node_index: NodeIndex(None),
-                            range: 77..83,
-                            value: FStringValue {
-                                inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 77..83,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 79..82,
-                                                        node_index: NodeIndex(None),
-                                                        expression: Starred(
-                                                            ExprStarred {
-                                                                node_index: NodeIndex(None),
-                                                                range: 80..81,
-                                                                value: Name(
-                                                                    ExprName {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 81..81,
-                                                                        id: Name(""),
-                                                                        ctx: Invalid,
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                                unclosed: false,
+        body: Suite {
+            range: 0..112,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 77..83,
+                        value: FString(
+                            ExprFString {
+                                node_index: NodeIndex(None),
+                                range: 77..83,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 77..83,
+                                                node_index: NodeIndex(None),
+                                                elements: [
+                                                    Interpolation(
+                                                        InterpolatedElement {
+                                                            range: 79..82,
+                                                            node_index: NodeIndex(None),
+                                                            expression: Starred(
+                                                                ExprStarred {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 80..81,
+                                                                    value: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 81..81,
+                                                                            id: Name(""),
+                                                                            ctx: Invalid,
+                                                                        },
+                                                                    ),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
                                             },
-                                        },
+                                        ),
                                     ),
-                                ),
+                                },
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 84..97,
-                    value: FString(
-                        ExprFString {
-                            node_index: NodeIndex(None),
-                            range: 84..97,
-                            value: FStringValue {
-                                inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 84..97,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 86..96,
-                                                        node_index: NodeIndex(None),
-                                                        expression: Starred(
-                                                            ExprStarred {
-                                                                node_index: NodeIndex(None),
-                                                                range: 87..95,
-                                                                value: BoolOp(
-                                                                    ExprBoolOp {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 88..95,
-                                                                        op: And,
-                                                                        values: [
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 88..89,
-                                                                                    id: Name("x"),
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 94..95,
-                                                                                    id: Name("y"),
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                        ],
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                                unclosed: false,
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 84..97,
+                        value: FString(
+                            ExprFString {
+                                node_index: NodeIndex(None),
+                                range: 84..97,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 84..97,
+                                                node_index: NodeIndex(None),
+                                                elements: [
+                                                    Interpolation(
+                                                        InterpolatedElement {
+                                                            range: 86..96,
+                                                            node_index: NodeIndex(None),
+                                                            expression: Starred(
+                                                                ExprStarred {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 87..95,
+                                                                    value: BoolOp(
+                                                                        ExprBoolOp {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 88..95,
+                                                                            op: And,
+                                                                            values: [
+                                                                                Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 88..89,
+                                                                                        id: Name("x"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                                Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 94..95,
+                                                                                        id: Name("y"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                        },
+                                                                    ),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
                                             },
-                                        },
+                                        ),
                                     ),
-                                ),
+                                },
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 98..111,
-                    value: FString(
-                        ExprFString {
-                            node_index: NodeIndex(None),
-                            range: 98..111,
-                            value: FStringValue {
-                                inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 98..111,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 100..110,
-                                                        node_index: NodeIndex(None),
-                                                        expression: Starred(
-                                                            ExprStarred {
-                                                                node_index: NodeIndex(None),
-                                                                range: 101..109,
-                                                                value: Yield(
-                                                                    ExprYield {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 102..109,
-                                                                        value: Some(
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 108..109,
-                                                                                    id: Name("x"),
-                                                                                    ctx: Load,
-                                                                                },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 98..111,
+                        value: FString(
+                            ExprFString {
+                                node_index: NodeIndex(None),
+                                range: 98..111,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 98..111,
+                                                node_index: NodeIndex(None),
+                                                elements: [
+                                                    Interpolation(
+                                                        InterpolatedElement {
+                                                            range: 100..110,
+                                                            node_index: NodeIndex(None),
+                                                            expression: Starred(
+                                                                ExprStarred {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 101..109,
+                                                                    value: Yield(
+                                                                        ExprYield {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 102..109,
+                                                                            value: Some(
+                                                                                Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 108..109,
+                                                                                        id: Name("x"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
                                                                             ),
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                                unclosed: false,
+                                                                        },
+                                                                    ),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
                                             },
-                                        },
+                                        ),
                                     ),
-                                ),
+                                },
                             },
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

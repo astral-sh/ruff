@@ -9,220 +9,240 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..144,
-        body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 0..34,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("f1"),
-                        range: 4..6,
+        body: Suite {
+            range: 0..144,
+            node_index: NodeIndex(None),
+            statements: [
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 6..8,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        ImportFrom(
-                            StmtImportFrom {
-                                node_index: NodeIndex(None),
-                                range: 14..34,
-                                module: Some(
-                                    Identifier {
-                                        id: Name("module"),
-                                        range: 19..25,
+                        range: 0..34,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("f1"),
+                            range: 4..6,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 6..8,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 9..34,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                ImportFrom(
+                                    StmtImportFrom {
                                         node_index: NodeIndex(None),
+                                        range: 14..34,
+                                        module: Some(
+                                            Identifier {
+                                                id: Name("module"),
+                                                range: 19..25,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        names: [
+                                            Alias {
+                                                range: 33..34,
+                                                node_index: NodeIndex(None),
+                                                name: Identifier {
+                                                    id: Name("*"),
+                                                    range: 33..34,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                asname: None,
+                                            },
+                                        ],
+                                        level: 0,
+                                        is_lazy: false,
                                     },
                                 ),
-                                names: [
-                                    Alias {
-                                        range: 33..34,
-                                        node_index: NodeIndex(None),
-                                        name: Identifier {
-                                            id: Name("*"),
-                                            range: 33..34,
-                                            node_index: NodeIndex(None),
-                                        },
-                                        asname: None,
-                                    },
-                                ],
-                                level: 0,
-                                is_lazy: false,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            ClassDef(
-                StmtClassDef {
-                    node_index: NodeIndex(None),
-                    range: 35..68,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("C"),
-                        range: 41..42,
-                        node_index: NodeIndex(None),
+                            ],
+                        },
                     },
-                    type_params: None,
-                    arguments: None,
-                    body: [
-                        ImportFrom(
-                            StmtImportFrom {
-                                node_index: NodeIndex(None),
-                                range: 48..68,
-                                module: Some(
-                                    Identifier {
-                                        id: Name("module"),
-                                        range: 53..59,
+                ),
+                ClassDef(
+                    StmtClassDef {
+                        node_index: NodeIndex(None),
+                        range: 35..68,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("C"),
+                            range: 41..42,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        arguments: None,
+                        body: Suite {
+                            range: 43..68,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                ImportFrom(
+                                    StmtImportFrom {
                                         node_index: NodeIndex(None),
+                                        range: 48..68,
+                                        module: Some(
+                                            Identifier {
+                                                id: Name("module"),
+                                                range: 53..59,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        names: [
+                                            Alias {
+                                                range: 67..68,
+                                                node_index: NodeIndex(None),
+                                                name: Identifier {
+                                                    id: Name("*"),
+                                                    range: 67..68,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                asname: None,
+                                            },
+                                        ],
+                                        level: 0,
+                                        is_lazy: false,
                                     },
                                 ),
-                                names: [
-                                    Alias {
-                                        range: 67..68,
-                                        node_index: NodeIndex(None),
-                                        name: Identifier {
-                                            id: Name("*"),
-                                            range: 67..68,
-                                            node_index: NodeIndex(None),
-                                        },
-                                        asname: None,
-                                    },
-                                ],
-                                level: 0,
-                                is_lazy: false,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 69..105,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("f2"),
-                        range: 73..75,
-                        node_index: NodeIndex(None),
+                            ],
+                        },
                     },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 75..77,
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        ImportFrom(
-                            StmtImportFrom {
-                                node_index: NodeIndex(None),
-                                range: 83..105,
-                                module: Some(
-                                    Identifier {
-                                        id: Name("module"),
-                                        range: 90..96,
+                        range: 69..105,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("f2"),
+                            range: 73..75,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 75..77,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 78..105,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                ImportFrom(
+                                    StmtImportFrom {
                                         node_index: NodeIndex(None),
+                                        range: 83..105,
+                                        module: Some(
+                                            Identifier {
+                                                id: Name("module"),
+                                                range: 90..96,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        names: [
+                                            Alias {
+                                                range: 104..105,
+                                                node_index: NodeIndex(None),
+                                                name: Identifier {
+                                                    id: Name("*"),
+                                                    range: 104..105,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                asname: None,
+                                            },
+                                        ],
+                                        level: 2,
+                                        is_lazy: false,
                                     },
                                 ),
-                                names: [
-                                    Alias {
-                                        range: 104..105,
-                                        node_index: NodeIndex(None),
-                                        name: Identifier {
-                                            id: Name("*"),
-                                            range: 104..105,
-                                            node_index: NodeIndex(None),
-                                        },
-                                        asname: None,
-                                    },
-                                ],
-                                level: 2,
-                                is_lazy: false,
-                            },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 106..143,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("f3"),
-                        range: 110..112,
-                        node_index: NodeIndex(None),
+                            ],
+                        },
                     },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 112..114,
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        ImportFrom(
-                            StmtImportFrom {
-                                node_index: NodeIndex(None),
-                                range: 120..143,
-                                module: Some(
-                                    Identifier {
-                                        id: Name("module"),
-                                        range: 125..131,
+                        range: 106..143,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("f3"),
+                            range: 110..112,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 112..114,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 115..143,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                ImportFrom(
+                                    StmtImportFrom {
                                         node_index: NodeIndex(None),
+                                        range: 120..143,
+                                        module: Some(
+                                            Identifier {
+                                                id: Name("module"),
+                                                range: 125..131,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        names: [
+                                            Alias {
+                                                range: 139..140,
+                                                node_index: NodeIndex(None),
+                                                name: Identifier {
+                                                    id: Name("*"),
+                                                    range: 139..140,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                asname: None,
+                                            },
+                                            Alias {
+                                                range: 142..143,
+                                                node_index: NodeIndex(None),
+                                                name: Identifier {
+                                                    id: Name("*"),
+                                                    range: 142..143,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                                asname: None,
+                                            },
+                                        ],
+                                        level: 0,
+                                        is_lazy: false,
                                     },
                                 ),
-                                names: [
-                                    Alias {
-                                        range: 139..140,
-                                        node_index: NodeIndex(None),
-                                        name: Identifier {
-                                            id: Name("*"),
-                                            range: 139..140,
-                                            node_index: NodeIndex(None),
-                                        },
-                                        asname: None,
-                                    },
-                                    Alias {
-                                        range: 142..143,
-                                        node_index: NodeIndex(None),
-                                        name: Identifier {
-                                            id: Name("*"),
-                                            range: 142..143,
-                                            node_index: NodeIndex(None),
-                                        },
-                                        asname: None,
-                                    },
-                                ],
-                                level: 0,
-                                is_lazy: false,
-                            },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

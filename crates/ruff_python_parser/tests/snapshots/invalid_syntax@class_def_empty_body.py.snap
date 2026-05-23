@@ -9,70 +9,82 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..31,
-        body: [
-            ClassDef(
-                StmtClassDef {
-                    node_index: NodeIndex(None),
-                    range: 0..10,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("Foo"),
-                        range: 6..9,
+        body: Suite {
+            range: 0..31,
+            node_index: NodeIndex(None),
+            statements: [
+                ClassDef(
+                    StmtClassDef {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    arguments: None,
-                    body: [],
-                },
-            ),
-            ClassDef(
-                StmtClassDef {
-                    node_index: NodeIndex(None),
-                    range: 11..23,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("Foo"),
-                        range: 17..20,
-                        node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    arguments: Some(
-                        Arguments {
-                            range: 20..22,
+                        range: 0..10,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("Foo"),
+                            range: 6..9,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
                         },
-                    ),
-                    body: [],
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 24..30,
-                    targets: [
-                        Name(
-                            ExprName {
+                        type_params: None,
+                        arguments: None,
+                        body: Suite {
+                            range: 10..10,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                ClassDef(
+                    StmtClassDef {
+                        node_index: NodeIndex(None),
+                        range: 11..23,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("Foo"),
+                            range: 17..20,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        arguments: Some(
+                            Arguments {
+                                range: 20..22,
                                 node_index: NodeIndex(None),
-                                range: 24..25,
-                                id: Name("x"),
-                                ctx: Store,
+                                args: [],
+                                keywords: [],
                             },
                         ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
+                        body: Suite {
+                            range: 23..23,
                             node_index: NodeIndex(None),
-                            range: 28..30,
-                            value: Int(
-                                42,
-                            ),
+                            statements: [],
                         },
-                    ),
-                },
-            ),
-        ],
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 24..30,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 24..25,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                node_index: NodeIndex(None),
+                                range: 28..30,
+                                value: Int(
+                                    42,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

@@ -2,38 +2,42 @@
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
 ---
-[
-    Expr(
-        StmtExpr {
-            node_index: NodeIndex(None),
-            range: 0..14,
-            value: BytesLiteral(
-                ExprBytesLiteral {
-                    node_index: NodeIndex(None),
-                    range: 0..14,
-                    value: BytesLiteralValue {
-                        inner: Single(
-                            BytesLiteral {
-                                range: 0..14,
-                                node_index: NodeIndex(None),
-                                value: [
-                                    35,
-                                    97,
-                                    4,
-                                    83,
-                                    52,
-                                ],
-                                flags: BytesLiteralFlags {
-                                    quote_style: Single,
-                                    prefix: Regular,
-                                    triple_quoted: false,
-                                    unclosed: false,
+Suite {
+    range: 0..14,
+    node_index: NodeIndex(None),
+    statements: [
+        Expr(
+            StmtExpr {
+                node_index: NodeIndex(None),
+                range: 0..14,
+                value: BytesLiteral(
+                    ExprBytesLiteral {
+                        node_index: NodeIndex(None),
+                        range: 0..14,
+                        value: BytesLiteralValue {
+                            inner: Single(
+                                BytesLiteral {
+                                    range: 0..14,
+                                    node_index: NodeIndex(None),
+                                    value: [
+                                        35,
+                                        97,
+                                        4,
+                                        83,
+                                        52,
+                                    ],
+                                    flags: BytesLiteralFlags {
+                                        quote_style: Single,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                        unclosed: false,
+                                    },
                                 },
-                            },
-                        ),
+                            ),
+                        },
                     },
-                },
-            ),
-        },
-    ),
-]
+                ),
+            },
+        ),
+    ],
+}

@@ -9,39 +9,43 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..19,
-        body: [
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 0..4,
-                    module: None,
-                    names: [],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 5..18,
-                    module: None,
-                    names: [
-                        Alias {
-                            range: 17..18,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("x"),
+        body: Suite {
+            range: 0..19,
+            node_index: NodeIndex(None),
+            statements: [
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 0..4,
+                        module: None,
+                        names: [],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 5..18,
+                        module: None,
+                        names: [
+                            Alias {
                                 range: 17..18,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("x"),
+                                    range: 17..18,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-        ],
+                        ],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

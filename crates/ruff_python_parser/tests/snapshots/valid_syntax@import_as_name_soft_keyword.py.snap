@@ -9,108 +9,112 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..77,
-        body: [
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 0..19,
-                    names: [
-                        Alias {
-                            range: 7..19,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("foo"),
-                                range: 7..10,
+        body: Suite {
+            range: 0..77,
+            node_index: NodeIndex(None),
+            statements: [
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 0..19,
+                        names: [
+                            Alias {
+                                range: 7..19,
                                 node_index: NodeIndex(None),
-                            },
-                            asname: Some(
-                                Identifier {
-                                    id: Name("match"),
-                                    range: 14..19,
+                                name: Identifier {
+                                    id: Name("foo"),
+                                    range: 7..10,
                                     node_index: NodeIndex(None),
                                 },
-                            ),
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 20..38,
-                    names: [
-                        Alias {
-                            range: 27..38,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("bar"),
-                                range: 27..30,
-                                node_index: NodeIndex(None),
+                                asname: Some(
+                                    Identifier {
+                                        id: Name("match"),
+                                        range: 14..19,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
                             },
-                            asname: Some(
-                                Identifier {
-                                    id: Name("case"),
-                                    range: 34..38,
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 20..38,
+                        names: [
+                            Alias {
+                                range: 27..38,
+                                node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 27..30,
                                     node_index: NodeIndex(None),
                                 },
-                            ),
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 39..57,
-                    names: [
-                        Alias {
-                            range: 46..57,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("baz"),
-                                range: 46..49,
-                                node_index: NodeIndex(None),
+                                asname: Some(
+                                    Identifier {
+                                        id: Name("case"),
+                                        range: 34..38,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
                             },
-                            asname: Some(
-                                Identifier {
-                                    id: Name("type"),
-                                    range: 53..57,
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 39..57,
+                        names: [
+                            Alias {
+                                range: 46..57,
+                                node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("baz"),
+                                    range: 46..49,
                                     node_index: NodeIndex(None),
                                 },
-                            ),
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 58..76,
-                    names: [
-                        Alias {
-                            range: 65..76,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("qux"),
-                                range: 65..68,
-                                node_index: NodeIndex(None),
+                                asname: Some(
+                                    Identifier {
+                                        id: Name("type"),
+                                        range: 53..57,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
                             },
-                            asname: Some(
-                                Identifier {
-                                    id: Name("lazy"),
-                                    range: 72..76,
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 58..76,
+                        names: [
+                            Alias {
+                                range: 65..76,
+                                node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("qux"),
+                                    range: 65..68,
                                     node_index: NodeIndex(None),
                                 },
-                            ),
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-        ],
+                                asname: Some(
+                                    Identifier {
+                                        id: Name("lazy"),
+                                        range: 72..76,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
+                            },
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

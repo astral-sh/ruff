@@ -9,107 +9,111 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..28,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..15,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 0..15,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 0..1,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            op: Add,
-                            right: Lambda(
-                                ExprLambda {
-                                    node_index: NodeIndex(None),
-                                    range: 4..15,
-                                    parameters: Some(
-                                        Parameters {
-                                            range: 11..12,
-                                            node_index: NodeIndex(None),
-                                            posonlyargs: [],
-                                            args: [
-                                                ParameterWithDefault {
-                                                    range: 11..12,
-                                                    node_index: NodeIndex(None),
-                                                    parameter: Parameter {
+        body: Suite {
+            range: 0..28,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..15,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 0..15,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 0..1,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Add,
+                                right: Lambda(
+                                    ExprLambda {
+                                        node_index: NodeIndex(None),
+                                        range: 4..15,
+                                        parameters: Some(
+                                            Parameters {
+                                                range: 11..12,
+                                                node_index: NodeIndex(None),
+                                                posonlyargs: [],
+                                                args: [
+                                                    ParameterWithDefault {
                                                         range: 11..12,
                                                         node_index: NodeIndex(None),
-                                                        name: Identifier {
-                                                            id: Name("y"),
+                                                        parameter: Parameter {
                                                             range: 11..12,
                                                             node_index: NodeIndex(None),
+                                                            name: Identifier {
+                                                                id: Name("y"),
+                                                                range: 11..12,
+                                                                node_index: NodeIndex(None),
+                                                            },
+                                                            annotation: None,
                                                         },
-                                                        annotation: None,
+                                                        default: None,
                                                     },
-                                                    default: None,
-                                                },
-                                            ],
-                                            vararg: None,
-                                            kwonlyargs: [],
-                                            kwarg: None,
-                                        },
-                                    ),
-                                    body: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 14..15,
-                                            id: Name("y"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 17..28,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 17..28,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 17..18,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            op: Sub,
-                            right: Yield(
-                                ExprYield {
-                                    node_index: NodeIndex(None),
-                                    range: 21..28,
-                                    value: Some(
-                                        Name(
+                                                ],
+                                                vararg: None,
+                                                kwonlyargs: [],
+                                                kwarg: None,
+                                            },
+                                        ),
+                                        body: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 27..28,
+                                                range: 14..15,
                                                 id: Name("y"),
                                                 ctx: Load,
                                             },
                                         ),
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-        ],
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 17..28,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 17..28,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 17..18,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Sub,
+                                right: Yield(
+                                    ExprYield {
+                                        node_index: NodeIndex(None),
+                                        range: 21..28,
+                                        value: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 27..28,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

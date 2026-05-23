@@ -9,93 +9,97 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..61,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 44..60,
-                    value: TString(
-                        ExprTString {
-                            node_index: NodeIndex(None),
-                            range: 44..60,
-                            value: TStringValue {
-                                inner: Single(
-                                    TString {
-                                        range: 44..60,
-                                        node_index: NodeIndex(None),
-                                        elements: [
-                                            Interpolation(
-                                                InterpolatedElement {
-                                                    range: 46..56,
-                                                    node_index: NodeIndex(None),
-                                                    expression: Lambda(
-                                                        ExprLambda {
-                                                            node_index: NodeIndex(None),
-                                                            range: 47..56,
-                                                            parameters: Some(
-                                                                Parameters {
-                                                                    range: 54..55,
-                                                                    node_index: NodeIndex(None),
-                                                                    posonlyargs: [],
-                                                                    args: [
-                                                                        ParameterWithDefault {
-                                                                            range: 54..55,
-                                                                            node_index: NodeIndex(None),
-                                                                            parameter: Parameter {
+        body: Suite {
+            range: 0..61,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 44..60,
+                        value: TString(
+                            ExprTString {
+                                node_index: NodeIndex(None),
+                                range: 44..60,
+                                value: TStringValue {
+                                    inner: Single(
+                                        TString {
+                                            range: 44..60,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 46..56,
+                                                        node_index: NodeIndex(None),
+                                                        expression: Lambda(
+                                                            ExprLambda {
+                                                                node_index: NodeIndex(None),
+                                                                range: 47..56,
+                                                                parameters: Some(
+                                                                    Parameters {
+                                                                        range: 54..55,
+                                                                        node_index: NodeIndex(None),
+                                                                        posonlyargs: [],
+                                                                        args: [
+                                                                            ParameterWithDefault {
                                                                                 range: 54..55,
                                                                                 node_index: NodeIndex(None),
-                                                                                name: Identifier {
-                                                                                    id: Name("x"),
+                                                                                parameter: Parameter {
                                                                                     range: 54..55,
                                                                                     node_index: NodeIndex(None),
+                                                                                    name: Identifier {
+                                                                                        id: Name("x"),
+                                                                                        range: 54..55,
+                                                                                        node_index: NodeIndex(None),
+                                                                                    },
+                                                                                    annotation: None,
                                                                                 },
-                                                                                annotation: None,
+                                                                                default: None,
                                                                             },
-                                                                            default: None,
-                                                                        },
-                                                                    ],
-                                                                    vararg: None,
-                                                                    kwonlyargs: [],
-                                                                    kwarg: None,
-                                                                },
-                                                            ),
-                                                            body: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 56..56,
-                                                                    id: Name(""),
-                                                                    ctx: Invalid,
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                    debug_text: None,
-                                                    conversion: None,
-                                                    format_spec: None,
-                                                },
-                                            ),
-                                            Literal(
-                                                InterpolatedStringLiteralElement {
-                                                    range: 56..58,
-                                                    node_index: NodeIndex(None),
-                                                    value: " x",
-                                                },
-                                            ),
-                                        ],
-                                        flags: TStringFlags {
-                                            quote_style: Double,
-                                            prefix: Regular,
-                                            triple_quoted: false,
-                                            unclosed: false,
+                                                                        ],
+                                                                        vararg: None,
+                                                                        kwonlyargs: [],
+                                                                        kwarg: None,
+                                                                    },
+                                                                ),
+                                                                body: Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 56..56,
+                                                                        id: Name(""),
+                                                                        ctx: Invalid,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    InterpolatedStringLiteralElement {
+                                                        range: 56..58,
+                                                        node_index: NodeIndex(None),
+                                                        value: " x",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
+                                            },
                                         },
-                                    },
-                                ),
+                                    ),
+                                },
                             },
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

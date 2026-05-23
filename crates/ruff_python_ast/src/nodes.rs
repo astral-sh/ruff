@@ -51,7 +51,7 @@ pub struct ElifElseClause {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
     pub test: Option<Expr>,
-    pub body: Vec<Stmt>,
+    pub body: Suite,
 }
 
 impl Expr {
@@ -2781,7 +2781,7 @@ pub struct ExceptHandlerExceptHandler {
     pub node_index: AtomicNodeIndex,
     pub type_: Option<Box<Expr>>,
     pub name: Option<Identifier>,
-    pub body: Vec<Stmt>,
+    pub body: Suite,
 }
 
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
@@ -2842,7 +2842,7 @@ pub struct MatchCase {
     pub node_index: AtomicNodeIndex,
     pub pattern: Pattern,
     pub guard: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub body: Suite,
 }
 
 impl Pattern {
@@ -3685,10 +3685,90 @@ impl<'a> IntoIterator for &'a TypeParams {
     }
 }
 
-/// A suite represents a [Vec] of [Stmt].
+/// An AST node that represents the statements in a compound statement body.
 ///
 /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
-pub type Suite = Vec<Stmt>;
+#[derive(Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct Suite {
+    pub range: TextRange,
+    pub node_index: AtomicNodeIndex,
+    pub statements: Vec<Stmt>,
+}
+
+impl Suite {
+    pub fn as_slice(&self) -> &[Stmt] {
+        self.statements.as_slice()
+    }
+}
+
+impl Deref for Suite {
+    type Target = Vec<Stmt>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.statements
+    }
+}
+
+impl DerefMut for Suite {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.statements
+    }
+}
+
+impl AsRef<[Stmt]> for Suite {
+    fn as_ref(&self) -> &[Stmt] {
+        self.as_slice()
+    }
+}
+
+impl From<Vec<Stmt>> for Suite {
+    fn from(statements: Vec<Stmt>) -> Self {
+        let range = match (statements.first(), statements.last()) {
+            (Some(first), Some(last)) => TextRange::new(first.start(), last.end()),
+            _ => TextRange::default(),
+        };
+
+        Self {
+            range,
+            node_index: AtomicNodeIndex::NONE,
+            statements,
+        }
+    }
+}
+
+impl FromIterator<Stmt> for Suite {
+    fn from_iter<T: IntoIterator<Item = Stmt>>(iter: T) -> Self {
+        Vec::from_iter(iter).into()
+    }
+}
+
+impl<'a> IntoIterator for &'a Suite {
+    type Item = &'a Stmt;
+    type IntoIter = Iter<'a, Stmt>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.statements.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Suite {
+    type Item = &'a mut Stmt;
+    type IntoIter = IterMut<'a, Stmt>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.statements.iter_mut()
+    }
+}
+
+impl IntoIterator for Suite {
+    type Item = Stmt;
+    type IntoIter = std::vec::IntoIter<Stmt>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.statements.into_iter()
+    }
+}
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
@@ -3881,17 +3961,18 @@ impl From<bool> for Singleton {
 
 #[cfg(test)]
 mod tests {
-    use crate::Mod;
     use crate::generated::*;
+    use crate::{Mod, Suite};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Stmt>(), 128);
-        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 128);
-        assert_eq!(std::mem::size_of::<StmtClassDef>(), 120);
-        assert_eq!(std::mem::size_of::<StmtTry>(), 112);
-        assert_eq!(std::mem::size_of::<Mod>(), 40);
+        assert_eq!(std::mem::size_of::<Suite>(), 40);
+        assert_eq!(std::mem::size_of::<Stmt>(), 160);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 144);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 136);
+        assert_eq!(std::mem::size_of::<StmtTry>(), 160);
+        assert_eq!(std::mem::size_of::<Mod>(), 56);
         assert_eq!(std::mem::size_of::<Pattern>(), 104);
         assert_eq!(std::mem::size_of::<Expr>(), 80);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);

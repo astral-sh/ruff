@@ -9,93 +9,105 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..31,
-        body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 0..11,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name(""),
-                        range: 3..3,
+        body: Suite {
+            range: 0..31,
+            node_index: NodeIndex(None),
+            statements: [
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 4..6,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 8..11,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                        range: 0..11,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name(""),
+                            range: 3..3,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 4..6,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 8..11,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 8..11,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 8..11,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 12..30,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name(""),
-                        range: 15..15,
-                        node_index: NodeIndex(None),
+                            ],
+                        },
                     },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 16..18,
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: Some(
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 22..25,
-                                id: Name("int"),
-                                ctx: Load,
-                            },
+                        range: 12..30,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name(""),
+                            range: 15..15,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 16..18,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: Some(
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 22..25,
+                                    id: Name("int"),
+                                    ctx: Load,
+                                },
+                            ),
                         ),
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 27..30,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                        body: Suite {
+                            range: 27..30,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 27..30,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 27..30,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

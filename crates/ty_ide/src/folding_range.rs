@@ -6,7 +6,7 @@ use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_body, walk_node,
 };
 use ruff_python_ast::{
-    AnyNodeRef, ExprAttribute, ExprCall, ExprGenerator, ExprRef, ExprSubscript, Stmt,
+    AnyNodeRef, ExprAttribute, ExprCall, ExprGenerator, ExprRef, ExprSubscript, Stmt, Suite,
 };
 use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
 use ruff_source_file::{LineRanges, UniversalNewlines};
@@ -485,6 +485,14 @@ impl<'a> FoldingRangeVisitor<'a> {
         self.add_distinct_block_ranges(parent, full_range, body_range);
     }
 
+    /// Adds folding ranges for a statement suite.
+    fn add_suite_ranges(&mut self, parent: AnyNodeRef<'a>, suite: &Suite) {
+        let (block_start, _) = self.block_range_starts(parent);
+        let full_range = self.full_suite_range(block_start, suite);
+        let body_range = self.suite_body_range(suite);
+        self.add_distinct_block_ranges(parent, full_range, body_range);
+    }
+
     /// Adds the full range if present, and also adds the body range if both present and distinct
     /// from the full range.
     fn add_distinct_block_ranges(
@@ -516,6 +524,18 @@ impl<'a> FoldingRangeVisitor<'a> {
         Some(TextRange::new(start, end))
     }
 
+    /// Returns a folding range for a full block backed by a statement suite.
+    fn full_suite_range(&self, block_start: TextSize, suite: &Suite) -> Option<TextRange> {
+        if suite.is_empty() {
+            return None;
+        }
+
+        let start = self.source.line_end(block_start);
+        let end = suite.end();
+
+        (start < end).then(|| TextRange::new(start, end))
+    }
+
     /// Returns a folding range for just the body of a block.
     fn block_body_range<T: Ranged>(
         &self,
@@ -533,6 +553,17 @@ impl<'a> FoldingRangeVisitor<'a> {
         )?;
 
         Some(TextRange::new(block_fold_start, last_block_statement.end()))
+    }
+
+    /// Returns a folding range for a suite whose body starts on a separate line.
+    fn suite_body_range(&self, suite: &Suite) -> Option<TextRange> {
+        if suite.is_empty() {
+            return None;
+        }
+
+        let first_token = self.tokens.in_range(suite.range()).iter().next()?;
+        (first_token.kind() == TokenKind::Newline && first_token.start() == suite.start())
+            .then(|| suite.range())
     }
 
     /// Returns the range inside a delimiter pair that bounds the given range.
@@ -557,28 +588,27 @@ impl<'a> FoldingRangeVisitor<'a> {
         Some(TextRange::new(opening_token.end(), closing_token.start()))
     }
 
-    /// Searches for a given keyword and, if present, adds folds for the block it defines.
-    fn add_block_ranges_after_keyword<T: Ranged>(
+    /// Searches for a keyword introducing a statement suite and adds its folds.
+    fn add_suite_ranges_after_keyword(
         &mut self,
         parent: AnyNodeRef<'a>,
         keyword: TokenKind,
         previous_block_end: TextSize,
-        block: &[T],
+        suite: &Suite,
     ) {
-        let Some(first_body_statement) = block.first() else {
+        if suite.is_empty() {
             return;
-        };
-        let Some(keyword_start) = self.find_token_start(
-            keyword,
-            TextRange::new(previous_block_end, first_body_statement.start()),
-        ) else {
+        }
+        let Some(keyword_start) =
+            self.find_token_start(keyword, TextRange::new(previous_block_end, suite.start()))
+        else {
             return;
         };
 
         self.add_distinct_block_ranges(
             parent,
-            self.full_block_range(keyword_start, block),
-            self.block_body_range(keyword_start, block),
+            self.full_suite_range(keyword_start, suite),
+            self.suite_body_range(suite),
         );
     }
 }
@@ -595,7 +625,7 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
             }
             // Compound statements that create folding regions
             AnyNodeRef::StmtFunctionDef(func) => {
-                self.add_block_ranges(node, &func.body);
+                self.add_suite_ranges(node, &func.body);
                 // Note that this may be duplicative with folding
                 // ranges added for string literals. But I don't think
                 // the LSP protocol specifies that this is a problem.
@@ -606,7 +636,7 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                 self.add_docstring_range(&func.body);
             }
             AnyNodeRef::StmtClassDef(class) => {
-                self.add_block_ranges(node, &class.body);
+                self.add_suite_ranges(node, &class.body);
                 // See comment above for class docstrings about this
                 // being duplicative with adding folding ranges for
                 // string literals.
@@ -614,51 +644,51 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
             }
             AnyNodeRef::StmtIf(if_stmt) => {
                 // Fold each branch individually rather than the entire if block.
-                self.add_block_ranges(node, &if_stmt.body);
+                self.add_suite_ranges(node, &if_stmt.body);
             }
             AnyNodeRef::ElifElseClause(clause) => {
                 // Each elif/else clause has its own range.
-                self.add_block_ranges(node, &clause.body);
+                self.add_suite_ranges(node, &clause.body);
             }
             AnyNodeRef::StmtFor(for_stmt) => {
                 // Fold the for body separately from the else block.
-                self.add_block_ranges(node, &for_stmt.body);
-                if let Some(body_last) = for_stmt.body.last() {
-                    self.add_block_ranges_after_keyword(
+                self.add_suite_ranges(node, &for_stmt.body);
+                if !for_stmt.body.is_empty() {
+                    self.add_suite_ranges_after_keyword(
                         node,
                         TokenKind::Else,
-                        body_last.end(),
+                        for_stmt.body.end(),
                         &for_stmt.orelse,
                     );
                 }
             }
             AnyNodeRef::StmtWhile(while_stmt) => {
                 // Fold the while body separately from the else block.
-                self.add_block_ranges(node, &while_stmt.body);
-                if let Some(body_last) = while_stmt.body.last() {
-                    self.add_block_ranges_after_keyword(
+                self.add_suite_ranges(node, &while_stmt.body);
+                if !while_stmt.body.is_empty() {
+                    self.add_suite_ranges_after_keyword(
                         node,
                         TokenKind::Else,
-                        body_last.end(),
+                        while_stmt.body.end(),
                         &while_stmt.orelse,
                     );
                 }
             }
             AnyNodeRef::StmtWith(with_stmt) => {
-                self.add_block_ranges(node, &with_stmt.body);
+                self.add_suite_ranges(node, &with_stmt.body);
             }
             AnyNodeRef::StmtTry(try_stmt) => {
                 // Fold the try body separately from handlers, else, and finally.
-                self.add_block_ranges(node, &try_stmt.body);
+                self.add_suite_ranges(node, &try_stmt.body);
                 // Exception handlers are folded via ExceptHandlerExceptHandler.
                 // Fold the else block if present.
                 if let Some(previous_block_end) = try_stmt
                     .handlers
                     .last()
                     .map(Ranged::end)
-                    .or_else(|| try_stmt.body.last().map(Ranged::end))
+                    .or_else(|| (!try_stmt.body.is_empty()).then(|| try_stmt.body.end()))
                 {
-                    self.add_block_ranges_after_keyword(
+                    self.add_suite_ranges_after_keyword(
                         node,
                         TokenKind::Else,
                         previous_block_end,
@@ -666,14 +696,12 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                     );
                 }
                 // Fold the finally block if present.
-                if let Some(previous_block_end) = try_stmt
-                    .orelse
-                    .last()
-                    .map(Ranged::end)
+                if let Some(previous_block_end) = (!try_stmt.orelse.is_empty())
+                    .then(|| try_stmt.orelse.end())
                     .or_else(|| try_stmt.handlers.last().map(Ranged::end))
-                    .or_else(|| try_stmt.body.last().map(Ranged::end))
+                    .or_else(|| (!try_stmt.body.is_empty()).then(|| try_stmt.body.end()))
                 {
-                    self.add_block_ranges_after_keyword(
+                    self.add_suite_ranges_after_keyword(
                         node,
                         TokenKind::Finally,
                         previous_block_end,
@@ -687,12 +715,12 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
 
             // Match cases within match statements
             AnyNodeRef::MatchCase(case) => {
-                self.add_block_ranges(node, &case.body);
+                self.add_suite_ranges(node, &case.body);
             }
 
             // Exception handlers
             AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                self.add_block_ranges(node, &handler.body);
+                self.add_suite_ranges(node, &handler.body);
             }
 
             // Multiline expressions

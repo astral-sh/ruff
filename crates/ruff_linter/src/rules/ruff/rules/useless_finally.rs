@@ -86,12 +86,15 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
     let source = checker.source();
     let tokens = checker.tokens();
 
-    // `is_stub_body` guarantees at least one statement in finalbody
-    let last_finalbody_stmt = finalbody.last().unwrap();
+    // `is_stub_body` guarantees at least one statement in finalbody.
+    let Some(last_finalbody_stmt) = finalbody.last() else {
+        return;
+    };
+    let finalbody_end = finalbody.end();
     let (preceding_end, preceding_stmt) = preceding_clause_info(try_stmt);
 
     let Some(finally_start) = tokens
-        .in_range(TextRange::new(preceding_end, last_finalbody_stmt.end()))
+        .in_range(TextRange::new(preceding_end, finalbody_end))
         .iter()
         .find(|token| token.kind() == TokenKind::Finally)
         .map(Ranged::start)
@@ -99,7 +102,7 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
         return;
     };
 
-    let finally_range = TextRange::new(finally_start, last_finalbody_stmt.end());
+    let finally_range = TextRange::new(finally_start, finalbody_end);
 
     let has_comments = finally_contains_comments(
         preceding_stmt,
@@ -119,9 +122,7 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
 
     if is_bare_try_finally {
         // bare `try/finally: pass` — unwrap the try body
-        let (Some(first_body_stmt), Some(last_body_stmt)) =
-            (try_stmt.body.first(), try_stmt.body.last())
-        else {
+        let Some(first_body_stmt) = try_stmt.body.first() else {
             return;
         };
 
@@ -130,7 +131,7 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
         let Ok(adjusted) = crate::fix::edits::adjust_indentation(
             TextRange::new(
                 source.line_start(first_body_stmt.start()),
-                source.full_line_end(last_body_stmt.end()),
+                source.full_line_end(try_stmt.body.end()),
             ),
             try_indentation,
             checker.locator(),
@@ -141,14 +142,14 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
         };
 
         let try_line_start = source.line_start(try_stmt.start());
-        let finally_full_end = source.full_line_end(last_finalbody_stmt.end());
+        let finally_full_end = source.full_line_end(finalbody_end);
         let edit =
             Edit::range_replacement(adjusted, TextRange::new(try_line_start, finally_full_end));
         diagnostic.set_fix(Fix::safe_edit(edit));
     } else {
         // `try/except/finally: pass` — remove the finally clause
         let finally_line_start = source.line_start(finally_start);
-        let finally_full_end = source.full_line_end(last_finalbody_stmt.end());
+        let finally_full_end = source.full_line_end(finalbody_end);
         let edit = Edit::range_deletion(TextRange::new(finally_line_start, finally_full_end));
         diagnostic.set_fix(Fix::safe_edit(edit));
     }

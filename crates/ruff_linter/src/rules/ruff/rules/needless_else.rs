@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::comment_indentation_after;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Stmt, StmtExpr, StmtFor, StmtIf, StmtTry, StmtWhile};
+use ruff_python_ast::{Stmt, StmtExpr, StmtFor, StmtIf, StmtTry, StmtWhile, Suite};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -50,7 +50,9 @@ pub(crate) fn needless_else(checker: &Checker, stmt: AnyNodeWithOrElse) {
     let source = checker.source();
     let tokens = checker.tokens();
 
-    let else_body = stmt.else_body();
+    let Some(else_body) = stmt.else_body() else {
+        return;
+    };
 
     if !body_is_no_op(else_body) {
         return;
@@ -109,7 +111,7 @@ fn else_contains_comments(
         return false;
     };
 
-    let Some(else_last_stmt) = stmt.else_body().last() else {
+    let Some(else_last_stmt) = stmt.else_body().and_then(|body| body.last()) else {
         return false;
     };
 
@@ -215,17 +217,18 @@ impl<'a> AnyNodeWithOrElse<'a> {
         match self {
             Self::For(_) | Self::While(_) | Self::Try(_) => {
                 let before_else = self.body_before_else();
-
-                let else_body = self.else_body();
-                let end = else_body.last()?.end();
+                let else_body = self.else_body()?;
+                if before_else.is_empty() || else_body.is_empty() {
+                    return None;
+                }
 
                 let start = tokens
-                    .in_range(TextRange::new(before_else.last()?.end(), end))
+                    .in_range(TextRange::new(before_else.end(), else_body.end()))
                     .iter()
                     .find(|token| token.kind() == TokenKind::Else)?
                     .start();
 
-                Some(TextRange::new(start, end))
+                Some(TextRange::new(start, else_body.end()))
             }
 
             Self::If(StmtIf {
@@ -238,7 +241,7 @@ impl<'a> AnyNodeWithOrElse<'a> {
     }
 
     /// Returns the suite before the else block.
-    fn body_before_else(self) -> &'a [Stmt] {
+    fn body_before_else(self) -> &'a Suite {
         match self {
             Self::Try(StmtTry { body, handlers, .. }) => handlers
                 .last()
@@ -256,26 +259,24 @@ impl<'a> AnyNodeWithOrElse<'a> {
                 .iter()
                 .rev()
                 .find(|clause| clause.test.is_some())
-                .map(|clause| &*clause.body)
+                .map(|clause| &clause.body)
                 .unwrap_or(body),
         }
     }
 
     /// Returns the `else` suite.
-    /// Defaults to an empty suite if the statement has no `else` block.
-    fn else_body(self) -> &'a [Stmt] {
+    fn else_body(self) -> Option<&'a Suite> {
         match self {
             Self::While(StmtWhile { orelse, .. })
             | Self::For(StmtFor { orelse, .. })
-            | Self::Try(StmtTry { orelse, .. }) => orelse,
+            | Self::Try(StmtTry { orelse, .. }) => Some(orelse),
 
             Self::If(StmtIf {
                 elif_else_clauses, ..
             }) => elif_else_clauses
                 .last()
                 .filter(|clause| clause.test.is_none())
-                .map(|clause| &*clause.body)
-                .unwrap_or_default(),
+                .map(|clause| &clause.body),
         }
     }
 }

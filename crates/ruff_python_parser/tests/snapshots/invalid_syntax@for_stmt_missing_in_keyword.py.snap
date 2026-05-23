@@ -9,84 +9,104 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..24,
-        body: [
-            For(
-                StmtFor {
-                    node_index: NodeIndex(None),
-                    range: 0..12,
-                    is_async: false,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 4..5,
-                            id: Name("a"),
-                            ctx: Store,
-                        },
-                    ),
-                    iter: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 6..7,
-                            id: Name("b"),
-                            ctx: Load,
-                        },
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
+        body: Suite {
+            range: 0..24,
+            node_index: NodeIndex(None),
+            statements: [
+                For(
+                    StmtFor {
+                        node_index: NodeIndex(None),
+                        range: 0..12,
+                        is_async: false,
+                        target: Name(
+                            ExprName {
                                 node_index: NodeIndex(None),
-                                range: 9..12,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                range: 4..5,
+                                id: Name("a"),
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 6..7,
+                                id: Name("b"),
+                                ctx: Load,
+                            },
+                        ),
+                        body: Suite {
+                            range: 9..12,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 9..12,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 9..12,
+                                            },
+                                        ),
                                     },
                                 ),
+                            ],
+                        },
+                        orelse: Suite {
+                            range: 12..12,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+                For(
+                    StmtFor {
+                        node_index: NodeIndex(None),
+                        range: 13..23,
+                        is_async: false,
+                        target: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 17..18,
+                                id: Name("a"),
+                                ctx: Store,
                             },
                         ),
-                    ],
-                    orelse: [],
-                },
-            ),
-            For(
-                StmtFor {
-                    node_index: NodeIndex(None),
-                    range: 13..23,
-                    is_async: false,
-                    target: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 17..18,
-                            id: Name("a"),
-                            ctx: Store,
-                        },
-                    ),
-                    iter: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 18..18,
-                            id: Name(""),
-                            ctx: Invalid,
-                        },
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
+                        iter: Name(
+                            ExprName {
                                 node_index: NodeIndex(None),
-                                range: 20..23,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                range: 18..18,
+                                id: Name(""),
+                                ctx: Invalid,
+                            },
+                        ),
+                        body: Suite {
+                            range: 20..23,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 20..23,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 20..23,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                },
-            ),
-        ],
+                            ],
+                        },
+                        orelse: Suite {
+                            range: 23..23,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

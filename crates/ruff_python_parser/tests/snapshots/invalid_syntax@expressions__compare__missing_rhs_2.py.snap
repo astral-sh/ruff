@@ -9,72 +9,76 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..15,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..8,
-                    value: Compare(
-                        ExprCompare {
-                            node_index: NodeIndex(None),
-                            range: 0..8,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 0..1,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            ops: [
-                                IsNot,
-                            ],
-                            comparators: [
-                                Name(
+        body: Suite {
+            range: 0..15,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..8,
+                        value: Compare(
+                            ExprCompare {
+                                node_index: NodeIndex(None),
+                                range: 0..8,
+                                left: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 8..8,
-                                        id: Name(""),
-                                        ctx: Invalid,
+                                        range: 0..1,
+                                        id: Name("x"),
+                                        ctx: Load,
                                     },
                                 ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 10..15,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 10..15,
-                            left: NumberLiteral(
-                                ExprNumberLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 10..11,
-                                    value: Int(
-                                        1,
+                                ops: [
+                                    IsNot,
+                                ],
+                                comparators: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 8..8,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
                                     ),
-                                },
-                            ),
-                            op: Add,
-                            right: NumberLiteral(
-                                ExprNumberLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 14..15,
-                                    value: Int(
-                                        2,
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-        ],
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 10..15,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 10..15,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 10..11,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                op: Add,
+                                right: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 14..15,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

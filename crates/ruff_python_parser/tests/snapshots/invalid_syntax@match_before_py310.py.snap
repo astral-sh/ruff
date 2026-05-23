@@ -9,53 +9,61 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..79,
-        body: [
-            Match(
-                StmtMatch {
-                    node_index: NodeIndex(None),
-                    range: 45..78,
-                    subject: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 51..52,
-                            value: Int(
-                                2,
-                            ),
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 58..78,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
-                                    node_index: NodeIndex(None),
-                                    range: 63..64,
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 63..64,
-                                            value: Int(
-                                                1,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
+        body: Suite {
+            range: 0..79,
+            node_index: NodeIndex(None),
+            statements: [
+                Match(
+                    StmtMatch {
+                        node_index: NodeIndex(None),
+                        range: 45..78,
+                        subject: NumberLiteral(
+                            ExprNumberLiteral {
+                                node_index: NodeIndex(None),
+                                range: 51..52,
+                                value: Int(
+                                    2,
+                                ),
+                            },
+                        ),
+                        cases: [
+                            MatchCase {
+                                range: 58..78,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
                                         node_index: NodeIndex(None),
-                                        range: 74..78,
+                                        range: 63..64,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 63..64,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
                                     },
                                 ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-        ],
+                                guard: None,
+                                body: Suite {
+                                    range: 65..78,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 74..78,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

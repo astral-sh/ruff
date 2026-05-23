@@ -2,39 +2,43 @@
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
 ---
-[
-    Expr(
-        StmtExpr {
-            node_index: NodeIndex(None),
-            range: 0..8,
-            value: BytesLiteral(
-                ExprBytesLiteral {
-                    node_index: NodeIndex(None),
-                    range: 0..8,
-                    value: BytesLiteralValue {
-                        inner: Single(
-                            BytesLiteral {
-                                range: 0..8,
-                                node_index: NodeIndex(None),
-                                value: [
-                                    92,
-                                    120,
-                                    49,
-                                    122,
-                                ],
-                                flags: BytesLiteralFlags {
-                                    quote_style: Single,
-                                    prefix: Raw {
-                                        uppercase_r: false,
+Suite {
+    range: 0..8,
+    node_index: NodeIndex(None),
+    statements: [
+        Expr(
+            StmtExpr {
+                node_index: NodeIndex(None),
+                range: 0..8,
+                value: BytesLiteral(
+                    ExprBytesLiteral {
+                        node_index: NodeIndex(None),
+                        range: 0..8,
+                        value: BytesLiteralValue {
+                            inner: Single(
+                                BytesLiteral {
+                                    range: 0..8,
+                                    node_index: NodeIndex(None),
+                                    value: [
+                                        92,
+                                        120,
+                                        49,
+                                        122,
+                                    ],
+                                    flags: BytesLiteralFlags {
+                                        quote_style: Single,
+                                        prefix: Raw {
+                                            uppercase_r: false,
+                                        },
+                                        triple_quoted: false,
+                                        unclosed: false,
                                     },
-                                    triple_quoted: false,
-                                    unclosed: false,
                                 },
-                            },
-                        ),
+                            ),
+                        },
                     },
-                },
-            ),
-        },
-    ),
-]
+                ),
+            },
+        ),
+    ],
+}

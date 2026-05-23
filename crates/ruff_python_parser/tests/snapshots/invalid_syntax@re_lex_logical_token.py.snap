@@ -9,774 +9,850 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..979,
-        body: [
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 48..59,
-                    test: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 51..59,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 51..55,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 55..59,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 56..59,
-                                            id: Name("foo"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                    body: [],
-                    elif_else_clauses: [],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 60..79,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("bar"),
-                        range: 64..67,
+        body: Suite {
+            range: 0..979,
+            node_index: NodeIndex(None),
+            statements: [
+                If(
+                    StmtIf {
                         node_index: NodeIndex(None),
+                        range: 48..59,
+                        test: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 51..59,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 51..55,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 55..59,
+                                    node_index: NodeIndex(None),
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 56..59,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        body: Suite {
+                            range: 59..59,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        elif_else_clauses: [],
                     },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 67..69,
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        range: 60..79,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("bar"),
+                            range: 64..67,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 67..69,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 70..79,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 75..79,
+                                    },
+                                ),
+                            ],
+                        },
                     },
-                    returns: None,
-                    body: [
-                        Pass(
-                            StmtPass {
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 113..152,
+                        test: Call(
+                            ExprCall {
                                 node_index: NodeIndex(None),
-                                range: 75..79,
+                                range: 116..124,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 116..120,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 120..124,
+                                    node_index: NodeIndex(None),
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 121..124,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
                             },
                         ),
-                    ],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 113..152,
-                    test: Call(
-                        ExprCall {
+                        body: Suite {
+                            range: 124..152,
                             node_index: NodeIndex(None),
-                            range: 116..124,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 116..120,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 120..124,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
+                            statements: [
+                                FunctionDef(
+                                    StmtFunctionDef {
+                                        node_index: NodeIndex(None),
+                                        range: 129..152,
+                                        is_async: false,
+                                        decorator_list: [],
+                                        name: Identifier {
+                                            id: Name("bar"),
+                                            range: 133..136,
                                             node_index: NodeIndex(None),
-                                            range: 121..124,
-                                            id: Name("foo"),
-                                            ctx: Load,
                                         },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                    body: [
-                        FunctionDef(
-                            StmtFunctionDef {
-                                node_index: NodeIndex(None),
-                                range: 129..152,
-                                is_async: false,
-                                decorator_list: [],
-                                name: Identifier {
-                                    id: Name("bar"),
-                                    range: 133..136,
-                                    node_index: NodeIndex(None),
-                                },
-                                type_params: None,
-                                parameters: Parameters {
-                                    range: 136..138,
-                                    node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
-                                },
-                                returns: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
+                                        type_params: None,
+                                        parameters: Parameters {
+                                            range: 136..138,
                                             node_index: NodeIndex(None),
-                                            range: 148..152,
+                                            posonlyargs: [],
+                                            args: [],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
                                         },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 228..269,
-                    test: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 231..239,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 231..235,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 235..239,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
+                                        returns: None,
+                                        body: Suite {
+                                            range: 139..152,
                                             node_index: NodeIndex(None),
-                                            range: 236..239,
-                                            id: Name("foo"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                    body: [
-                        FunctionDef(
-                            StmtFunctionDef {
-                                node_index: NodeIndex(None),
-                                range: 246..269,
-                                is_async: false,
-                                decorator_list: [],
-                                name: Identifier {
-                                    id: Name("bar"),
-                                    range: 250..253,
-                                    node_index: NodeIndex(None),
-                                },
-                                type_params: None,
-                                parameters: Parameters {
-                                    range: 253..255,
-                                    node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
-                                },
-                                returns: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 265..269,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 344..392,
-                    test: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 347..355,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 347..351,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 351..355,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 352..355,
-                                            id: Name("foo"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                    body: [
-                        FunctionDef(
-                            StmtFunctionDef {
-                                node_index: NodeIndex(None),
-                                range: 369..392,
-                                is_async: false,
-                                decorator_list: [],
-                                name: Identifier {
-                                    id: Name("bar"),
-                                    range: 373..376,
-                                    node_index: NodeIndex(None),
-                                },
-                                type_params: None,
-                                parameters: Parameters {
-                                    range: 376..378,
-                                    node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
-                                },
-                                returns: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 388..392,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 453..499,
-                    test: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 456..471,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 456..460,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 460..471,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 461..464,
-                                            id: Name("foo"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    List(
-                                        ExprList {
-                                            node_index: NodeIndex(None),
-                                            range: 466..471,
-                                            elts: [
-                                                Name(
-                                                    ExprName {
+                                            statements: [
+                                                Pass(
+                                                    StmtPass {
                                                         node_index: NodeIndex(None),
-                                                        range: 467..468,
-                                                        id: Name("a"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 470..471,
-                                                        id: Name("b"),
-                                                        ctx: Load,
+                                                        range: 148..152,
                                                     },
                                                 ),
                                             ],
-                                            ctx: Load,
                                         },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
+                                    },
+                                ),
+                            ],
                         },
-                    ),
-                    body: [
-                        FunctionDef(
-                            StmtFunctionDef {
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 228..269,
+                        test: Call(
+                            ExprCall {
                                 node_index: NodeIndex(None),
-                                range: 476..499,
-                                is_async: false,
-                                decorator_list: [],
-                                name: Identifier {
-                                    id: Name("bar"),
-                                    range: 480..483,
+                                range: 231..239,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 231..235,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 235..239,
                                     node_index: NodeIndex(None),
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 236..239,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
                                 },
-                                type_params: None,
-                                parameters: Parameters {
-                                    range: 483..485,
-                                    node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
-                                },
-                                returns: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 495..499,
-                                        },
-                                    ),
-                                ],
                             },
                         ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 564..611,
-                    test: Call(
-                        ExprCall {
+                        body: Suite {
+                            range: 239..269,
                             node_index: NodeIndex(None),
-                            range: 567..583,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 567..571,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 571..583,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
+                            statements: [
+                                FunctionDef(
+                                    StmtFunctionDef {
+                                        node_index: NodeIndex(None),
+                                        range: 246..269,
+                                        is_async: false,
+                                        decorator_list: [],
+                                        name: Identifier {
+                                            id: Name("bar"),
+                                            range: 250..253,
                                             node_index: NodeIndex(None),
-                                            range: 572..575,
-                                            id: Name("foo"),
-                                            ctx: Load,
                                         },
-                                    ),
-                                    List(
-                                        ExprList {
+                                        type_params: None,
+                                        parameters: Parameters {
+                                            range: 253..255,
                                             node_index: NodeIndex(None),
-                                            range: 577..582,
-                                            elts: [
-                                                Name(
-                                                    ExprName {
+                                            posonlyargs: [],
+                                            args: [],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                        returns: None,
+                                        body: Suite {
+                                            range: 256..269,
+                                            node_index: NodeIndex(None),
+                                            statements: [
+                                                Pass(
+                                                    StmtPass {
                                                         node_index: NodeIndex(None),
-                                                        range: 578..579,
-                                                        id: Name("a"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 581..582,
-                                                        id: Name("b"),
-                                                        ctx: Load,
+                                                        range: 265..269,
                                                     },
                                                 ),
                                             ],
-                                            ctx: Load,
                                         },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
+                                    },
+                                ),
+                            ],
                         },
-                    ),
-                    body: [
-                        FunctionDef(
-                            StmtFunctionDef {
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 344..392,
+                        test: Call(
+                            ExprCall {
                                 node_index: NodeIndex(None),
-                                range: 588..611,
-                                is_async: false,
-                                decorator_list: [],
-                                name: Identifier {
-                                    id: Name("bar"),
-                                    range: 592..595,
+                                range: 347..355,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 347..351,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 351..355,
                                     node_index: NodeIndex(None),
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 352..355,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
                                 },
-                                type_params: None,
-                                parameters: Parameters {
-                                    range: 595..597,
-                                    node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
-                                },
-                                returns: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 607..611,
-                                        },
-                                    ),
-                                ],
                             },
                         ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 772..824,
-                    test: Call(
-                        ExprCall {
+                        body: Suite {
+                            range: 355..392,
                             node_index: NodeIndex(None),
-                            range: 775..796,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 775..779,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 779..796,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
+                            statements: [
+                                FunctionDef(
+                                    StmtFunctionDef {
+                                        node_index: NodeIndex(None),
+                                        range: 369..392,
+                                        is_async: false,
+                                        decorator_list: [],
+                                        name: Identifier {
+                                            id: Name("bar"),
+                                            range: 373..376,
                                             node_index: NodeIndex(None),
-                                            range: 780..783,
-                                            id: Name("foo"),
-                                            ctx: Load,
                                         },
-                                    ),
-                                    List(
-                                        ExprList {
+                                        type_params: None,
+                                        parameters: Parameters {
+                                            range: 376..378,
                                             node_index: NodeIndex(None),
-                                            range: 785..794,
-                                            elts: [
-                                                Name(
-                                                    ExprName {
+                                            posonlyargs: [],
+                                            args: [],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                        returns: None,
+                                        body: Suite {
+                                            range: 379..392,
+                                            node_index: NodeIndex(None),
+                                            statements: [
+                                                Pass(
+                                                    StmtPass {
                                                         node_index: NodeIndex(None),
-                                                        range: 786..787,
-                                                        id: Name("a"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 793..794,
-                                                        id: Name("b"),
-                                                        ctx: Load,
+                                                        range: 388..392,
                                                     },
                                                 ),
                                             ],
-                                            ctx: Load,
                                         },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
+                                    },
+                                ),
+                            ],
                         },
-                    ),
-                    body: [
-                        FunctionDef(
-                            StmtFunctionDef {
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 453..499,
+                        test: Call(
+                            ExprCall {
                                 node_index: NodeIndex(None),
-                                range: 801..824,
-                                is_async: false,
-                                decorator_list: [],
-                                name: Identifier {
-                                    id: Name("bar"),
-                                    range: 805..808,
+                                range: 456..471,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 456..460,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 460..471,
                                     node_index: NodeIndex(None),
-                                },
-                                type_params: None,
-                                parameters: Parameters {
-                                    range: 808..810,
-                                    node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
-                                },
-                                returns: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 820..824,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 887..933,
-                    test: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 890..905,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 890..894,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 894..905,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    FString(
-                                        ExprFString {
-                                            node_index: NodeIndex(None),
-                                            range: 895..905,
-                                            value: FStringValue {
-                                                inner: Single(
-                                                    FString(
-                                                        FString {
-                                                            range: 895..905,
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 461..464,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        List(
+                                            ExprList {
+                                                node_index: NodeIndex(None),
+                                                range: 466..471,
+                                                elts: [
+                                                    Name(
+                                                        ExprName {
                                                             node_index: NodeIndex(None),
-                                                            elements: [
-                                                                Literal(
-                                                                    InterpolatedStringLiteralElement {
-                                                                        range: 897..903,
-                                                                        node_index: NodeIndex(None),
-                                                                        value: "hello ",
-                                                                    },
-                                                                ),
-                                                                Interpolation(
-                                                                    InterpolatedElement {
-                                                                        range: 903..905,
-                                                                        node_index: NodeIndex(None),
-                                                                        expression: Name(
-                                                                            ExprName {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 904..905,
-                                                                                id: Name("x"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
-                                                                        debug_text: None,
-                                                                        conversion: None,
-                                                                        format_spec: None,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            flags: FStringFlags {
-                                                                quote_style: Double,
-                                                                prefix: Regular,
-                                                                triple_quoted: false,
-                                                                unclosed: true,
-                                                            },
+                                                            range: 467..468,
+                                                            id: Name("a"),
+                                                            ctx: Load,
                                                         },
                                                     ),
-                                                ),
-                                            },
-                                        },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                    body: [
-                        FunctionDef(
-                            StmtFunctionDef {
-                                node_index: NodeIndex(None),
-                                range: 910..933,
-                                is_async: false,
-                                decorator_list: [],
-                                name: Identifier {
-                                    id: Name("bar"),
-                                    range: 914..917,
-                                    node_index: NodeIndex(None),
-                                },
-                                type_params: None,
-                                parameters: Parameters {
-                                    range: 917..919,
-                                    node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
-                                },
-                                returns: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 929..933,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 936..956,
-                    test: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 939..956,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 939..943,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 943..956,
-                                node_index: NodeIndex(None),
-                                args: [
-                                    FString(
-                                        ExprFString {
-                                            node_index: NodeIndex(None),
-                                            range: 944..951,
-                                            value: FStringValue {
-                                                inner: Single(
-                                                    FString(
-                                                        FString {
-                                                            range: 944..951,
+                                                    Name(
+                                                        ExprName {
                                                             node_index: NodeIndex(None),
-                                                            elements: [
-                                                                Literal(
-                                                                    InterpolatedStringLiteralElement {
-                                                                        range: 946..951,
-                                                                        node_index: NodeIndex(None),
-                                                                        value: "hello",
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            flags: FStringFlags {
-                                                                quote_style: Double,
-                                                                prefix: Regular,
-                                                                triple_quoted: false,
-                                                                unclosed: true,
-                                                            },
+                                                            range: 470..471,
+                                                            id: Name("b"),
+                                                            ctx: Load,
                                                         },
                                                     ),
-                                                ),
+                                                ],
+                                                ctx: Load,
                                             },
-                                        },
-                                    ),
-                                ],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                    body: [],
-                    elif_else_clauses: [],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 956..979,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("bar"),
-                        range: 960..963,
-                        node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 963..965,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 975..979,
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
                             },
                         ),
-                    ],
-                },
-            ),
-        ],
+                        body: Suite {
+                            range: 471..499,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                FunctionDef(
+                                    StmtFunctionDef {
+                                        node_index: NodeIndex(None),
+                                        range: 476..499,
+                                        is_async: false,
+                                        decorator_list: [],
+                                        name: Identifier {
+                                            id: Name("bar"),
+                                            range: 480..483,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        type_params: None,
+                                        parameters: Parameters {
+                                            range: 483..485,
+                                            node_index: NodeIndex(None),
+                                            posonlyargs: [],
+                                            args: [],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                        returns: None,
+                                        body: Suite {
+                                            range: 486..499,
+                                            node_index: NodeIndex(None),
+                                            statements: [
+                                                Pass(
+                                                    StmtPass {
+                                                        node_index: NodeIndex(None),
+                                                        range: 495..499,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    },
+                                ),
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 564..611,
+                        test: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 567..583,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 567..571,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 571..583,
+                                    node_index: NodeIndex(None),
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 572..575,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        List(
+                                            ExprList {
+                                                node_index: NodeIndex(None),
+                                                range: 577..582,
+                                                elts: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 578..579,
+                                                            id: Name("a"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 581..582,
+                                                            id: Name("b"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        body: Suite {
+                            range: 583..611,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                FunctionDef(
+                                    StmtFunctionDef {
+                                        node_index: NodeIndex(None),
+                                        range: 588..611,
+                                        is_async: false,
+                                        decorator_list: [],
+                                        name: Identifier {
+                                            id: Name("bar"),
+                                            range: 592..595,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        type_params: None,
+                                        parameters: Parameters {
+                                            range: 595..597,
+                                            node_index: NodeIndex(None),
+                                            posonlyargs: [],
+                                            args: [],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                        returns: None,
+                                        body: Suite {
+                                            range: 598..611,
+                                            node_index: NodeIndex(None),
+                                            statements: [
+                                                Pass(
+                                                    StmtPass {
+                                                        node_index: NodeIndex(None),
+                                                        range: 607..611,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    },
+                                ),
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 772..824,
+                        test: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 775..796,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 775..779,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 779..796,
+                                    node_index: NodeIndex(None),
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 780..783,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        List(
+                                            ExprList {
+                                                node_index: NodeIndex(None),
+                                                range: 785..794,
+                                                elts: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 786..787,
+                                                            id: Name("a"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 793..794,
+                                                            id: Name("b"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        body: Suite {
+                            range: 796..824,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                FunctionDef(
+                                    StmtFunctionDef {
+                                        node_index: NodeIndex(None),
+                                        range: 801..824,
+                                        is_async: false,
+                                        decorator_list: [],
+                                        name: Identifier {
+                                            id: Name("bar"),
+                                            range: 805..808,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        type_params: None,
+                                        parameters: Parameters {
+                                            range: 808..810,
+                                            node_index: NodeIndex(None),
+                                            posonlyargs: [],
+                                            args: [],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                        returns: None,
+                                        body: Suite {
+                                            range: 811..824,
+                                            node_index: NodeIndex(None),
+                                            statements: [
+                                                Pass(
+                                                    StmtPass {
+                                                        node_index: NodeIndex(None),
+                                                        range: 820..824,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    },
+                                ),
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 887..933,
+                        test: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 890..905,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 890..894,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 894..905,
+                                    node_index: NodeIndex(None),
+                                    args: [
+                                        FString(
+                                            ExprFString {
+                                                node_index: NodeIndex(None),
+                                                range: 895..905,
+                                                value: FStringValue {
+                                                    inner: Single(
+                                                        FString(
+                                                            FString {
+                                                                range: 895..905,
+                                                                node_index: NodeIndex(None),
+                                                                elements: [
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 897..903,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "hello ",
+                                                                        },
+                                                                    ),
+                                                                    Interpolation(
+                                                                        InterpolatedElement {
+                                                                            range: 903..905,
+                                                                            node_index: NodeIndex(None),
+                                                                            expression: Name(
+                                                                                ExprName {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 904..905,
+                                                                                    id: Name("x"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            debug_text: None,
+                                                                            conversion: None,
+                                                                            format_spec: None,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                flags: FStringFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Regular,
+                                                                    triple_quoted: false,
+                                                                    unclosed: true,
+                                                                },
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        body: Suite {
+                            range: 905..933,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                FunctionDef(
+                                    StmtFunctionDef {
+                                        node_index: NodeIndex(None),
+                                        range: 910..933,
+                                        is_async: false,
+                                        decorator_list: [],
+                                        name: Identifier {
+                                            id: Name("bar"),
+                                            range: 914..917,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        type_params: None,
+                                        parameters: Parameters {
+                                            range: 917..919,
+                                            node_index: NodeIndex(None),
+                                            posonlyargs: [],
+                                            args: [],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                        returns: None,
+                                        body: Suite {
+                                            range: 920..933,
+                                            node_index: NodeIndex(None),
+                                            statements: [
+                                                Pass(
+                                                    StmtPass {
+                                                        node_index: NodeIndex(None),
+                                                        range: 929..933,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    },
+                                ),
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 936..956,
+                        test: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 939..956,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 939..943,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 943..956,
+                                    node_index: NodeIndex(None),
+                                    args: [
+                                        FString(
+                                            ExprFString {
+                                                node_index: NodeIndex(None),
+                                                range: 944..951,
+                                                value: FStringValue {
+                                                    inner: Single(
+                                                        FString(
+                                                            FString {
+                                                                range: 944..951,
+                                                                node_index: NodeIndex(None),
+                                                                elements: [
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 946..951,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "hello",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                flags: FStringFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Regular,
+                                                                    triple_quoted: false,
+                                                                    unclosed: true,
+                                                                },
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        body: Suite {
+                            range: 956..956,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 956..979,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("bar"),
+                            range: 960..963,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 963..965,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 966..979,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 975..979,
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

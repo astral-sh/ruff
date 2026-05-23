@@ -9,85 +9,139 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..126,
-        body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 44..125,
-                    is_async: true,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("test"),
-                        range: 54..58,
+        body: Suite {
+            range: 0..126,
+            node_index: NodeIndex(None),
+            statements: [
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 58..60,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Return(
-                            StmtReturn {
-                                node_index: NodeIndex(None),
-                                range: 62..125,
-                                value: Some(
-                                    ListComp(
-                                        ExprListComp {
-                                            node_index: NodeIndex(None),
-                                            range: 69..125,
-                                            elt: ListComp(
+                        range: 44..125,
+                        is_async: true,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("test"),
+                            range: 54..58,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 58..60,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 62..125,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Return(
+                                    StmtReturn {
+                                        node_index: NodeIndex(None),
+                                        range: 62..125,
+                                        value: Some(
+                                            ListComp(
                                                 ExprListComp {
                                                     node_index: NodeIndex(None),
-                                                    range: 70..100,
-                                                    elt: Name(
-                                                        ExprName {
+                                                    range: 69..125,
+                                                    elt: ListComp(
+                                                        ExprListComp {
                                                             node_index: NodeIndex(None),
-                                                            range: 71..72,
-                                                            id: Name("x"),
-                                                            ctx: Load,
+                                                            range: 70..100,
+                                                            elt: Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 71..72,
+                                                                    id: Name("x"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            generators: [
+                                                                Comprehension {
+                                                                    range: 73..99,
+                                                                    node_index: NodeIndex(None),
+                                                                    target: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 83..84,
+                                                                            id: Name("x"),
+                                                                            ctx: Store,
+                                                                        },
+                                                                    ),
+                                                                    iter: Call(
+                                                                        ExprCall {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 88..99,
+                                                                            func: Name(
+                                                                                ExprName {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 88..96,
+                                                                                    id: Name("elements"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            arguments: Arguments {
+                                                                                range: 96..99,
+                                                                                node_index: NodeIndex(None),
+                                                                                args: [
+                                                                                    Name(
+                                                                                        ExprName {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 97..98,
+                                                                                            id: Name("n"),
+                                                                                            ctx: Load,
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                keywords: [],
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                    ifs: [],
+                                                                    is_async: true,
+                                                                },
+                                                            ],
                                                         },
                                                     ),
                                                     generators: [
                                                         Comprehension {
-                                                            range: 73..99,
+                                                            range: 101..124,
                                                             node_index: NodeIndex(None),
                                                             target: Name(
                                                                 ExprName {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 83..84,
-                                                                    id: Name("x"),
+                                                                    range: 111..112,
+                                                                    id: Name("n"),
                                                                     ctx: Store,
                                                                 },
                                                             ),
                                                             iter: Call(
                                                                 ExprCall {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 88..99,
+                                                                    range: 116..124,
                                                                     func: Name(
                                                                         ExprName {
                                                                             node_index: NodeIndex(None),
-                                                                            range: 88..96,
-                                                                            id: Name("elements"),
+                                                                            range: 116..121,
+                                                                            id: Name("range"),
                                                                             ctx: Load,
                                                                         },
                                                                     ),
                                                                     arguments: Arguments {
-                                                                        range: 96..99,
+                                                                        range: 121..124,
                                                                         node_index: NodeIndex(None),
                                                                         args: [
-                                                                            Name(
-                                                                                ExprName {
+                                                                            NumberLiteral(
+                                                                                ExprNumberLiteral {
                                                                                     node_index: NodeIndex(None),
-                                                                                    range: 97..98,
-                                                                                    id: Name("n"),
-                                                                                    ctx: Load,
+                                                                                    range: 122..123,
+                                                                                    value: Int(
+                                                                                        3,
+                                                                                    ),
                                                                                 },
                                                                             ),
                                                                         ],
@@ -101,61 +155,15 @@ Module(
                                                     ],
                                                 },
                                             ),
-                                            generators: [
-                                                Comprehension {
-                                                    range: 101..124,
-                                                    node_index: NodeIndex(None),
-                                                    target: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 111..112,
-                                                            id: Name("n"),
-                                                            ctx: Store,
-                                                        },
-                                                    ),
-                                                    iter: Call(
-                                                        ExprCall {
-                                                            node_index: NodeIndex(None),
-                                                            range: 116..124,
-                                                            func: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 116..121,
-                                                                    id: Name("range"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            arguments: Arguments {
-                                                                range: 121..124,
-                                                                node_index: NodeIndex(None),
-                                                                args: [
-                                                                    NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 122..123,
-                                                                            value: Int(
-                                                                                3,
-                                                                            ),
-                                                                        },
-                                                                    ),
-                                                                ],
-                                                                keywords: [],
-                                                            },
-                                                        },
-                                                    ),
-                                                    ifs: [],
-                                                    is_async: true,
-                                                },
-                                            ],
-                                        },
-                                    ),
+                                        ),
+                                    },
                                 ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

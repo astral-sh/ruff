@@ -9,68 +9,76 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..210,
-        body: [
-            Match(
-                StmtMatch {
-                    node_index: NodeIndex(None),
-                    range: 0..209,
-                    subject: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 6..13,
-                            id: Name("subject"),
-                            ctx: Load,
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 140..209,
-                            node_index: NodeIndex(None),
-                            pattern: MatchValue(
-                                PatternMatchValue {
-                                    node_index: NodeIndex(None),
-                                    range: 145..158,
-                                    value: BinOp(
-                                        ExprBinOp {
-                                            node_index: NodeIndex(None),
-                                            range: 145..158,
-                                            left: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 146..152,
-                                                    id: Name(""),
-                                                    ctx: Invalid,
-                                                },
-                                            ),
-                                            op: Add,
-                                            right: NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 156..158,
-                                                    value: Complex {
-                                                        real: 0.0,
-                                                        imag: 1.0,
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Pass(
-                                    StmtPass {
+        body: Suite {
+            range: 0..210,
+            node_index: NodeIndex(None),
+            statements: [
+                Match(
+                    StmtMatch {
+                        node_index: NodeIndex(None),
+                        range: 0..209,
+                        subject: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 6..13,
+                                id: Name("subject"),
+                                ctx: Load,
+                            },
+                        ),
+                        cases: [
+                            MatchCase {
+                                range: 140..209,
+                                node_index: NodeIndex(None),
+                                pattern: MatchValue(
+                                    PatternMatchValue {
                                         node_index: NodeIndex(None),
-                                        range: 205..209,
+                                        range: 145..158,
+                                        value: BinOp(
+                                            ExprBinOp {
+                                                node_index: NodeIndex(None),
+                                                range: 145..158,
+                                                left: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 146..152,
+                                                        id: Name(""),
+                                                        ctx: Invalid,
+                                                    },
+                                                ),
+                                                op: Add,
+                                                right: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 156..158,
+                                                        value: Complex {
+                                                            real: 0.0,
+                                                            imag: 1.0,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        ),
                                     },
                                 ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-        ],
+                                guard: None,
+                                body: Suite {
+                                    range: 159..209,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 205..209,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

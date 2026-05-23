@@ -9,173 +9,177 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..88,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 43..57,
-                    value: Set(
-                        ExprSet {
-                            node_index: NodeIndex(None),
-                            range: 43..57,
-                            elts: [
-                                Named(
-                                    ExprNamed {
-                                        node_index: NodeIndex(None),
-                                        range: 44..50,
-                                        target: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 44..45,
-                                                id: Name("x"),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 49..50,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 52..53,
-                                        value: Int(
-                                            2,
-                                        ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 55..56,
-                                        value: Int(
-                                            3,
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 58..72,
-                    value: Set(
-                        ExprSet {
-                            node_index: NodeIndex(None),
-                            range: 58..72,
-                            elts: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 59..60,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                                Named(
-                                    ExprNamed {
-                                        node_index: NodeIndex(None),
-                                        range: 62..68,
-                                        target: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 62..63,
-                                                id: Name("x"),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 67..68,
-                                                value: Int(
-                                                    2,
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 70..71,
-                                        value: Int(
-                                            3,
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 73..87,
-                    value: Set(
-                        ExprSet {
-                            node_index: NodeIndex(None),
-                            range: 73..87,
-                            elts: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 74..75,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 77..78,
-                                        value: Int(
-                                            2,
-                                        ),
-                                    },
-                                ),
-                                Named(
-                                    ExprNamed {
-                                        node_index: NodeIndex(None),
-                                        range: 80..86,
-                                        target: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 80..81,
-                                                id: Name("x"),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 85..86,
-                                                value: Int(
-                                                    3,
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..88,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 43..57,
+                        value: Set(
+                            ExprSet {
+                                node_index: NodeIndex(None),
+                                range: 43..57,
+                                elts: [
+                                    Named(
+                                        ExprNamed {
+                                            node_index: NodeIndex(None),
+                                            range: 44..50,
+                                            target: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 44..45,
+                                                    id: Name("x"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 49..50,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 52..53,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 55..56,
+                                            value: Int(
+                                                3,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 58..72,
+                        value: Set(
+                            ExprSet {
+                                node_index: NodeIndex(None),
+                                range: 58..72,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 59..60,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    Named(
+                                        ExprNamed {
+                                            node_index: NodeIndex(None),
+                                            range: 62..68,
+                                            target: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 62..63,
+                                                    id: Name("x"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 67..68,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 70..71,
+                                            value: Int(
+                                                3,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 73..87,
+                        value: Set(
+                            ExprSet {
+                                node_index: NodeIndex(None),
+                                range: 73..87,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 74..75,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 77..78,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                    Named(
+                                        ExprNamed {
+                                            node_index: NodeIndex(None),
+                                            range: 80..86,
+                                            target: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 80..81,
+                                                    id: Name("x"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 85..86,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

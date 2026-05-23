@@ -4008,6 +4008,12 @@ impl ruff_text_size::Ranged for crate::TypeParamParamSpec {
     }
 }
 
+impl ruff_text_size::Ranged for crate::Suite {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
 impl ruff_text_size::Ranged for crate::InterpolatedStringFormatSpec {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -4567,6 +4573,12 @@ impl crate::HasNodeIndex for crate::TypeParamTypeVarTuple {
 }
 
 impl crate::HasNodeIndex for crate::TypeParamParamSpec {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
+        &self.node_index
+    }
+}
+
+impl crate::HasNodeIndex for crate::Suite {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
@@ -5909,6 +5921,7 @@ pub enum AnyNodeRef<'a> {
     TypeParamTypeVar(&'a crate::TypeParamTypeVar),
     TypeParamTypeVarTuple(&'a crate::TypeParamTypeVarTuple),
     TypeParamParamSpec(&'a crate::TypeParamParamSpec),
+    Suite(&'a crate::Suite),
     InterpolatedStringFormatSpec(&'a crate::InterpolatedStringFormatSpec),
     PatternArguments(&'a crate::PatternArguments),
     PatternKeyword(&'a crate::PatternKeyword),
@@ -6768,6 +6781,12 @@ impl<'a> From<&'a crate::TypeParamParamSpec> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a crate::Suite> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Suite) -> AnyNodeRef<'a> {
+        AnyNodeRef::Suite(node)
+    }
+}
+
 impl<'a> From<&'a crate::InterpolatedStringFormatSpec> for AnyNodeRef<'a> {
     fn from(node: &'a crate::InterpolatedStringFormatSpec) -> AnyNodeRef<'a> {
         AnyNodeRef::InterpolatedStringFormatSpec(node)
@@ -6965,6 +6984,7 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(node) => node.range(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.range(),
             AnyNodeRef::TypeParamParamSpec(node) => node.range(),
+            AnyNodeRef::Suite(node) => node.range(),
             AnyNodeRef::InterpolatedStringFormatSpec(node) => node.range(),
             AnyNodeRef::PatternArguments(node) => node.range(),
             AnyNodeRef::PatternKeyword(node) => node.range(),
@@ -7066,6 +7086,7 @@ impl crate::HasNodeIndex for AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(node) => node.node_index(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.node_index(),
             AnyNodeRef::TypeParamParamSpec(node) => node.node_index(),
+            AnyNodeRef::Suite(node) => node.node_index(),
             AnyNodeRef::InterpolatedStringFormatSpec(node) => node.node_index(),
             AnyNodeRef::PatternArguments(node) => node.node_index(),
             AnyNodeRef::PatternKeyword(node) => node.node_index(),
@@ -7169,6 +7190,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamParamSpec(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::Suite(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::InterpolatedStringFormatSpec(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::PatternArguments(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::PatternKeyword(node) => std::ptr::NonNull::from(*node).cast(),
@@ -7274,6 +7296,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::TypeParamTypeVar(node) => node.visit_source_order(visitor),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.visit_source_order(visitor),
             AnyNodeRef::TypeParamParamSpec(node) => node.visit_source_order(visitor),
+            AnyNodeRef::Suite(node) => node.visit_source_order(visitor),
             AnyNodeRef::InterpolatedStringFormatSpec(node) => node.visit_source_order(visitor),
             AnyNodeRef::PatternArguments(node) => node.visit_source_order(visitor),
             AnyNodeRef::PatternKeyword(node) => node.visit_source_order(visitor),
@@ -7442,6 +7465,7 @@ pub enum AnyRootNodeRef<'a> {
     InterpolatedStringElement(&'a InterpolatedStringElement),
     Pattern(&'a Pattern),
     TypeParam(&'a TypeParam),
+    Suite(&'a crate::Suite),
     InterpolatedStringFormatSpec(&'a crate::InterpolatedStringFormatSpec),
     PatternArguments(&'a crate::PatternArguments),
     PatternKeyword(&'a crate::PatternKeyword),
@@ -8322,6 +8346,22 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParamParamSpec {
     }
 }
 
+impl<'a> From<&'a crate::Suite> for AnyRootNodeRef<'a> {
+    fn from(node: &'a crate::Suite) -> AnyRootNodeRef<'a> {
+        AnyRootNodeRef::Suite(node)
+    }
+}
+
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Suite {
+    type Error = ();
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Suite, ()> {
+        match node {
+            AnyRootNodeRef::Suite(node) => Ok(node),
+            _ => Err(()),
+        }
+    }
+}
+
 impl<'a> From<&'a crate::InterpolatedStringFormatSpec> for AnyRootNodeRef<'a> {
     fn from(node: &'a crate::InterpolatedStringFormatSpec) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::InterpolatedStringFormatSpec(node)
@@ -8652,6 +8692,7 @@ impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
             AnyRootNodeRef::InterpolatedStringElement(node) => node.range(),
             AnyRootNodeRef::Pattern(node) => node.range(),
             AnyRootNodeRef::TypeParam(node) => node.range(),
+            AnyRootNodeRef::Suite(node) => node.range(),
             AnyRootNodeRef::InterpolatedStringFormatSpec(node) => node.range(),
             AnyRootNodeRef::PatternArguments(node) => node.range(),
             AnyRootNodeRef::PatternKeyword(node) => node.range(),
@@ -8686,6 +8727,7 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
             AnyRootNodeRef::InterpolatedStringElement(node) => node.node_index(),
             AnyRootNodeRef::Pattern(node) => node.node_index(),
             AnyRootNodeRef::TypeParam(node) => node.node_index(),
+            AnyRootNodeRef::Suite(node) => node.node_index(),
             AnyRootNodeRef::InterpolatedStringFormatSpec(node) => node.node_index(),
             AnyRootNodeRef::PatternArguments(node) => node.node_index(),
             AnyRootNodeRef::PatternKeyword(node) => node.node_index(),
@@ -8724,6 +8766,7 @@ impl<'a> AnyRootNodeRef<'a> {
             AnyRootNodeRef::InterpolatedStringElement(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Pattern(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::TypeParam(node) => node.visit_source_order(visitor),
+            AnyRootNodeRef::Suite(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::InterpolatedStringFormatSpec(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::PatternArguments(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::PatternKeyword(node) => node.visit_source_order(visitor),
@@ -8824,6 +8867,7 @@ pub enum NodeKind {
     TypeParamTypeVar,
     TypeParamTypeVarTuple,
     TypeParamParamSpec,
+    Suite,
     InterpolatedStringFormatSpec,
     PatternArguments,
     PatternKeyword,
@@ -8925,6 +8969,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
             AnyNodeRef::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
             AnyNodeRef::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
+            AnyNodeRef::Suite(_) => NodeKind::Suite,
             AnyNodeRef::InterpolatedStringFormatSpec(_) => NodeKind::InterpolatedStringFormatSpec,
             AnyNodeRef::PatternArguments(_) => NodeKind::PatternArguments,
             AnyNodeRef::PatternKeyword(_) => NodeKind::PatternKeyword,
@@ -8955,7 +9000,7 @@ impl AnyNodeRef<'_> {
 pub struct ModModule {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: Vec<Stmt>,
+    pub body: crate::Suite,
 }
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
@@ -8982,7 +9027,7 @@ pub struct StmtFunctionDef {
     pub type_params: Option<Box<crate::TypeParams>>,
     pub parameters: Box<crate::Parameters>,
     pub returns: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub body: crate::Suite,
 }
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
@@ -8995,7 +9040,7 @@ pub struct StmtClassDef {
     pub name: crate::Identifier,
     pub type_params: Option<Box<crate::TypeParams>>,
     pub arguments: Option<Box<crate::Arguments>>,
-    pub body: Vec<Stmt>,
+    pub body: crate::Suite,
 }
 
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
@@ -9072,8 +9117,8 @@ pub struct StmtFor {
     pub is_async: bool,
     pub target: Box<Expr>,
     pub iter: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub body: crate::Suite,
+    pub orelse: crate::Suite,
 }
 
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
@@ -9084,8 +9129,8 @@ pub struct StmtWhile {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub body: crate::Suite,
+    pub orelse: crate::Suite,
 }
 
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
@@ -9095,7 +9140,7 @@ pub struct StmtIf {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
-    pub body: Vec<Stmt>,
+    pub body: crate::Suite,
     pub elif_else_clauses: Vec<crate::ElifElseClause>,
 }
 
@@ -9110,7 +9155,7 @@ pub struct StmtWith {
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub items: Vec<crate::WithItem>,
-    pub body: Vec<Stmt>,
+    pub body: crate::Suite,
 }
 
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
@@ -9140,10 +9185,10 @@ pub struct StmtRaise {
 pub struct StmtTry {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: Vec<Stmt>,
+    pub body: crate::Suite,
     pub handlers: Vec<ExceptHandler>,
-    pub orelse: Vec<Stmt>,
-    pub finalbody: Vec<Stmt>,
+    pub orelse: crate::Suite,
+    pub finalbody: crate::Suite,
     pub is_star: bool,
 }
 
@@ -9756,7 +9801,7 @@ impl ModModule {
             range: _,
             node_index: _,
         } = self;
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
     }
 }
 
@@ -9806,7 +9851,7 @@ impl StmtFunctionDef {
             visitor.visit_annotation(returns);
         }
 
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
     }
 }
 
@@ -9838,7 +9883,7 @@ impl StmtClassDef {
             visitor.visit_arguments(arguments);
         }
 
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
     }
 }
 
@@ -9973,8 +10018,8 @@ impl StmtFor {
         } = self;
         visitor.visit_expr(target);
         visitor.visit_expr(iter);
-        visitor.visit_body(body);
-        visitor.visit_body(orelse);
+        visitor.visit_suite(body);
+        visitor.visit_suite(orelse);
     }
 }
 
@@ -9991,8 +10036,8 @@ impl StmtWhile {
             node_index: _,
         } = self;
         visitor.visit_expr(test);
-        visitor.visit_body(body);
-        visitor.visit_body(orelse);
+        visitor.visit_suite(body);
+        visitor.visit_suite(orelse);
     }
 }
 
@@ -10009,7 +10054,7 @@ impl StmtIf {
             node_index: _,
         } = self;
         visitor.visit_expr(test);
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
 
         for elm in elif_else_clauses {
             visitor.visit_elif_else_clause(elm);
@@ -10033,7 +10078,7 @@ impl StmtWith {
         for elm in items {
             visitor.visit_with_item(elm);
         }
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
     }
 }
 
@@ -10092,13 +10137,13 @@ impl StmtTry {
             range: _,
             node_index: _,
         } = self;
-        visitor.visit_body(body);
+        visitor.visit_suite(body);
 
         for elm in handlers {
             visitor.visit_except_handler(elm);
         }
-        visitor.visit_body(orelse);
-        visitor.visit_body(finalbody);
+        visitor.visit_suite(orelse);
+        visitor.visit_suite(finalbody);
     }
 }
 

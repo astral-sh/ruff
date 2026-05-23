@@ -9,44 +9,48 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..10,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..9,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 0..9,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 0..4,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 4..9,
+        body: Suite {
+            range: 0..10,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..9,
+                        value: Call(
+                            ExprCall {
                                 node_index: NodeIndex(None),
-                                args: [
-                                    NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 7..8,
-                                            value: Int(
-                                                1,
-                                            ),
-                                        },
-                                    ),
-                                ],
-                                keywords: [],
+                                range: 0..9,
+                                func: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 0..4,
+                                        id: Name("call"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 4..9,
+                                    node_index: NodeIndex(None),
+                                    args: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 7..8,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
                             },
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

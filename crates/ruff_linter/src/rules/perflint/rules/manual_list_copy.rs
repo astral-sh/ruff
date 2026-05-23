@@ -55,7 +55,7 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
         return;
     };
 
-    let [stmt] = &*for_stmt.body else {
+    let [stmt] = for_stmt.body.as_slice() else {
         return;
     };
 

@@ -9,56 +9,60 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..48,
-        body: [
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 0..13,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 5..6,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 14..30,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 19..20,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 31..47,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 36..37,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [],
-                    level: 0,
-                    is_lazy: false,
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..48,
+            node_index: NodeIndex(None),
+            statements: [
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 0..13,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 5..6,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 14..30,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 19..20,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 31..47,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 36..37,
+                                node_index: NodeIndex(None),
+                            },
+                        ),
+                        names: [],
+                        level: 0,
+                        is_lazy: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

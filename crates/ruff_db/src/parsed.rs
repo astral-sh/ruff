@@ -441,6 +441,12 @@ mod indexed {
         }
 
         #[inline]
+        fn visit_suite(&mut self, suite: &'a Suite) {
+            self.visit_node(suite);
+            walk_suite(self, suite);
+        }
+
+        #[inline]
         fn visit_f_string(&mut self, f_string: &'a FString) {
             self.visit_node(f_string);
             walk_f_string(self, f_string);

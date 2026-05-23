@@ -9,81 +9,89 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..68,
-        body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 45..67,
-                    is_async: false,
-                    decorator_list: [
-                        Decorator {
-                            range: 45..52,
-                            node_index: NodeIndex(None),
-                            expression: Dict(
-                                ExprDict {
-                                    node_index: NodeIndex(None),
-                                    range: 46..52,
-                                    items: [
-                                        DictItem {
-                                            key: Some(
-                                                NumberLiteral(
+        body: Suite {
+            range: 0..68,
+            node_index: NodeIndex(None),
+            statements: [
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 45..67,
+                        is_async: false,
+                        decorator_list: [
+                            Decorator {
+                                range: 45..52,
+                                node_index: NodeIndex(None),
+                                expression: Dict(
+                                    ExprDict {
+                                        node_index: NodeIndex(None),
+                                        range: 46..52,
+                                        items: [
+                                            DictItem {
+                                                key: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 47..48,
+                                                            value: Int(
+                                                                3,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
-                                                        range: 47..48,
+                                                        range: 50..51,
                                                         value: Int(
                                                             3,
                                                         ),
                                                     },
                                                 ),
-                                            ),
-                                            value: NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 50..51,
-                                                    value: Int(
-                                                        3,
-                                                    ),
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                },
-                            ),
-                        },
-                    ],
-                    name: Identifier {
-                        id: Name("bar"),
-                        range: 57..60,
-                        node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 60..62,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 64..67,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 64..67,
+                                            },
+                                        ],
                                     },
                                 ),
                             },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                        ],
+                        name: Identifier {
+                            id: Name("bar"),
+                            range: 57..60,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 60..62,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 64..67,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 64..67,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 64..67,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

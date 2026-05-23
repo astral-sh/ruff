@@ -9,72 +9,76 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..25,
-        body: [
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 0..11,
-                    names: [
-                        Alias {
-                            range: 7..11,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a..b"),
+        body: Suite {
+            range: 0..25,
+            node_index: NodeIndex(None),
+            statements: [
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 0..11,
+                        names: [
+                            Alias {
                                 range: 7..11,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a..b"),
+                                    range: 7..11,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 12..20,
-                    names: [
-                        Alias {
-                            range: 19..20,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("a"),
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 12..20,
+                        names: [
+                            Alias {
                                 range: 19..20,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 19..20,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: false,
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 20..23,
-                    value: EllipsisLiteral(
-                        ExprEllipsisLiteral {
-                            node_index: NodeIndex(None),
-                            range: 20..23,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 23..24,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 23..24,
-                            id: Name("b"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ],
+                        is_lazy: false,
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 20..23,
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                node_index: NodeIndex(None),
+                                range: 20..23,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 23..24,
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 23..24,
+                                id: Name("b"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

@@ -9,135 +9,190 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..58,
-        body: [
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 0..5,
-                    targets: [
-                        NumberLiteral(
-                            ExprNumberLiteral {
-                                node_index: NodeIndex(None),
-                                range: 0..1,
-                                value: Int(
-                                    1,
-                                ),
-                            },
-                        ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 4..5,
-                            value: Int(
-                                1,
+        body: Suite {
+            range: 0..58,
+            node_index: NodeIndex(None),
+            statements: [
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 0..5,
+                        targets: [
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 0..1,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
                             ),
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 6..15,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 6..7,
-                                id: Name("x"),
-                                ctx: Store,
-                            },
-                        ),
-                        NumberLiteral(
+                        ],
+                        value: NumberLiteral(
                             ExprNumberLiteral {
                                 node_index: NodeIndex(None),
-                                range: 10..11,
+                                range: 4..5,
                                 value: Int(
                                     1,
                                 ),
                             },
                         ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 14..15,
-                            value: Int(
-                                2,
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 6..15,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 6..7,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
                             ),
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 16..33,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 16..17,
-                                id: Name("x"),
-                                ctx: Store,
-                            },
-                        ),
-                        NumberLiteral(
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 10..11,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        ],
+                        value: NumberLiteral(
                             ExprNumberLiteral {
                                 node_index: NodeIndex(None),
-                                range: 20..21,
-                                value: Int(
-                                    1,
-                                ),
-                            },
-                        ),
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 24..25,
-                                id: Name("y"),
-                                ctx: Store,
-                            },
-                        ),
-                        NumberLiteral(
-                            ExprNumberLiteral {
-                                node_index: NodeIndex(None),
-                                range: 28..29,
+                                range: 14..15,
                                 value: Int(
                                     2,
                                 ),
                             },
                         ),
-                    ],
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 32..33,
-                            id: Name("z"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 34..57,
-                    targets: [
-                        List(
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 16..33,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 16..17,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 20..21,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 24..25,
+                                    id: Name("y"),
+                                    ctx: Store,
+                                },
+                            ),
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 28..29,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        ],
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 32..33,
+                                id: Name("z"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 34..57,
+                        targets: [
+                            List(
+                                ExprList {
+                                    node_index: NodeIndex(None),
+                                    range: 34..44,
+                                    elts: [
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 35..38,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 35..38,
+                                                            node_index: NodeIndex(None),
+                                                            value: "a",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 40..43,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 40..43,
+                                                            node_index: NodeIndex(None),
+                                                            value: "b",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: List(
                             ExprList {
                                 node_index: NodeIndex(None),
-                                range: 34..44,
+                                range: 47..57,
                                 elts: [
                                     StringLiteral(
                                         ExprStringLiteral {
                                             node_index: NodeIndex(None),
-                                            range: 35..38,
+                                            range: 48..51,
                                             value: StringLiteralValue {
                                                 inner: Single(
                                                     StringLiteral {
-                                                        range: 35..38,
+                                                        range: 48..51,
                                                         node_index: NodeIndex(None),
                                                         value: "a",
                                                         flags: StringLiteralFlags {
@@ -154,11 +209,11 @@ Module(
                                     StringLiteral(
                                         ExprStringLiteral {
                                             node_index: NodeIndex(None),
-                                            range: 40..43,
+                                            range: 53..56,
                                             value: StringLiteralValue {
                                                 inner: Single(
                                                     StringLiteral {
-                                                        range: 40..43,
+                                                        range: 53..56,
                                                         node_index: NodeIndex(None),
                                                         value: "b",
                                                         flags: StringLiteralFlags {
@@ -173,64 +228,13 @@ Module(
                                         },
                                     ),
                                 ],
-                                ctx: Store,
+                                ctx: Load,
                             },
                         ),
-                    ],
-                    value: List(
-                        ExprList {
-                            node_index: NodeIndex(None),
-                            range: 47..57,
-                            elts: [
-                                StringLiteral(
-                                    ExprStringLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 48..51,
-                                        value: StringLiteralValue {
-                                            inner: Single(
-                                                StringLiteral {
-                                                    range: 48..51,
-                                                    node_index: NodeIndex(None),
-                                                    value: "a",
-                                                    flags: StringLiteralFlags {
-                                                        quote_style: Double,
-                                                        prefix: Empty,
-                                                        triple_quoted: false,
-                                                        unclosed: false,
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                    },
-                                ),
-                                StringLiteral(
-                                    ExprStringLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 53..56,
-                                        value: StringLiteralValue {
-                                            inner: Single(
-                                                StringLiteral {
-                                                    range: 53..56,
-                                                    node_index: NodeIndex(None),
-                                                    value: "b",
-                                                    flags: StringLiteralFlags {
-                                                        quote_style: Double,
-                                                        prefix: Empty,
-                                                        triple_quoted: false,
-                                                        unclosed: false,
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                    },
-                                ),
-                            ],
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

@@ -9,64 +9,84 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..77,
-        body: [
-            Try(
-                StmtTry {
-                    node_index: NodeIndex(None),
-                    range: 44..76,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 49..52,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+        body: Suite {
+            range: 0..77,
+            node_index: NodeIndex(None),
+            statements: [
+                Try(
+                    StmtTry {
+                        node_index: NodeIndex(None),
+                        range: 44..76,
+                        body: Suite {
+                            range: 49..52,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 49..52,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 49..52,
+                                            },
+                                        ),
                                     },
                                 ),
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 53..76,
-                                node_index: NodeIndex(None),
-                                type_: Some(
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 61..71,
-                                            id: Name("ValueError"),
-                                            ctx: Load,
-                                        },
+                            ],
+                        },
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 53..76,
+                                    node_index: NodeIndex(None),
+                                    type_: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 61..71,
+                                                id: Name("ValueError"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ),
-                                name: None,
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            node_index: NodeIndex(None),
-                                            range: 73..76,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
+                                    name: None,
+                                    body: Suite {
+                                        range: 73..76,
+                                        node_index: NodeIndex(None),
+                                        statements: [
+                                            Expr(
+                                                StmtExpr {
                                                     node_index: NodeIndex(None),
                                                     range: 73..76,
+                                                    value: EllipsisLiteral(
+                                                        ExprEllipsisLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 73..76,
+                                                        },
+                                                    ),
                                                 },
                                             ),
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: true,
-                },
-            ),
-        ],
+                                        ],
+                                    },
+                                },
+                            ),
+                        ],
+                        orelse: Suite {
+                            range: 76..76,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        finalbody: Suite {
+                            range: 76..76,
+                            node_index: NodeIndex(None),
+                            statements: [],
+                        },
+                        is_star: true,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

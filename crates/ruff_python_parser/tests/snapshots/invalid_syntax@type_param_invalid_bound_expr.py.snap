@@ -9,250 +9,254 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..103,
-        body: [
-            TypeAlias(
-                StmtTypeAlias {
-                    node_index: NodeIndex(None),
-                    range: 0..21,
-                    name: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 5..6,
-                            id: Name("X"),
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: Some(
-                        TypeParams {
-                            range: 6..15,
-                            node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 7..14,
-                                        name: Identifier {
-                                            id: Name("T"),
-                                            range: 7..8,
+        body: Suite {
+            range: 0..103,
+            node_index: NodeIndex(None),
+            statements: [
+                TypeAlias(
+                    StmtTypeAlias {
+                        node_index: NodeIndex(None),
+                        range: 0..21,
+                        name: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 5..6,
+                                id: Name("X"),
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 6..15,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
                                             node_index: NodeIndex(None),
-                                        },
-                                        bound: Some(
-                                            Starred(
-                                                ExprStarred {
-                                                    node_index: NodeIndex(None),
-                                                    range: 10..14,
-                                                    value: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 11..14,
-                                                            id: Name("int"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ),
-                                        default: None,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 18..21,
-                            id: Name("int"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    node_index: NodeIndex(None),
-                    range: 22..46,
-                    name: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 27..28,
-                            id: Name("X"),
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: Some(
-                        TypeParams {
-                            range: 28..40,
-                            node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 29..39,
-                                        name: Identifier {
-                                            id: Name("T"),
-                                            range: 29..30,
-                                            node_index: NodeIndex(None),
-                                        },
-                                        bound: Some(
-                                            Yield(
-                                                ExprYield {
-                                                    node_index: NodeIndex(None),
-                                                    range: 32..39,
-                                                    value: Some(
-                                                        Name(
+                                            range: 7..14,
+                                            name: Identifier {
+                                                id: Name("T"),
+                                                range: 7..8,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            bound: Some(
+                                                Starred(
+                                                    ExprStarred {
+                                                        node_index: NodeIndex(None),
+                                                        range: 10..14,
+                                                        value: Name(
                                                             ExprName {
                                                                 node_index: NodeIndex(None),
-                                                                range: 38..39,
+                                                                range: 11..14,
+                                                                id: Name("int"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 18..21,
+                                id: Name("int"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                TypeAlias(
+                    StmtTypeAlias {
+                        node_index: NodeIndex(None),
+                        range: 22..46,
+                        name: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 27..28,
+                                id: Name("X"),
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 28..40,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
+                                            range: 29..39,
+                                            name: Identifier {
+                                                id: Name("T"),
+                                                range: 29..30,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            bound: Some(
+                                                Yield(
+                                                    ExprYield {
+                                                        node_index: NodeIndex(None),
+                                                        range: 32..39,
+                                                        value: Some(
+                                                            Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 38..39,
+                                                                    id: Name("x"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 43..46,
+                                id: Name("int"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                TypeAlias(
+                    StmtTypeAlias {
+                        node_index: NodeIndex(None),
+                        range: 47..76,
+                        name: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 52..53,
+                                id: Name("X"),
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 53..70,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
+                                            range: 54..69,
+                                            name: Identifier {
+                                                id: Name("T"),
+                                                range: 54..55,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            bound: Some(
+                                                YieldFrom(
+                                                    ExprYieldFrom {
+                                                        node_index: NodeIndex(None),
+                                                        range: 57..69,
+                                                        value: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 68..69,
                                                                 id: Name("x"),
                                                                 ctx: Load,
                                                             },
                                                         ),
-                                                    ),
-                                                },
+                                                    },
+                                                ),
                                             ),
-                                        ),
-                                        default: None,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 43..46,
-                            id: Name("int"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    node_index: NodeIndex(None),
-                    range: 47..76,
-                    name: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 52..53,
-                            id: Name("X"),
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: Some(
-                        TypeParams {
-                            range: 53..70,
-                            node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 54..69,
-                                        name: Identifier {
-                                            id: Name("T"),
-                                            range: 54..55,
-                                            node_index: NodeIndex(None),
+                                            default: None,
                                         },
-                                        bound: Some(
-                                            YieldFrom(
-                                                ExprYieldFrom {
-                                                    node_index: NodeIndex(None),
-                                                    range: 57..69,
-                                                    value: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 68..69,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                        ),
-                                        default: None,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 73..76,
-                            id: Name("int"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    node_index: NodeIndex(None),
-                    range: 77..102,
-                    name: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 82..83,
-                            id: Name("X"),
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: Some(
-                        TypeParams {
-                            range: 83..96,
-                            node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 84..88,
-                                        name: Identifier {
-                                            id: Name("T"),
-                                            range: 84..85,
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 73..76,
+                                id: Name("int"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                TypeAlias(
+                    StmtTypeAlias {
+                        node_index: NodeIndex(None),
+                        range: 77..102,
+                        name: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 82..83,
+                                id: Name("X"),
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 83..96,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
                                             node_index: NodeIndex(None),
-                                        },
-                                        bound: Some(
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 87..88,
-                                                    id: Name("x"),
-                                                    ctx: Load,
-                                                },
+                                            range: 84..88,
+                                            name: Identifier {
+                                                id: Name("T"),
+                                                range: 84..85,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            bound: Some(
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 87..88,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
                                             ),
-                                        ),
-                                        default: None,
-                                    },
-                                ),
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 92..95,
-                                        name: Identifier {
-                                            id: Name("int"),
+                                            default: None,
+                                        },
+                                    ),
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
                                             range: 92..95,
-                                            node_index: NodeIndex(None),
+                                            name: Identifier {
+                                                id: Name("int"),
+                                                range: 92..95,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            bound: None,
+                                            default: None,
                                         },
-                                        bound: None,
-                                        default: None,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 99..102,
-                            id: Name("int"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-        ],
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 99..102,
+                                id: Name("int"),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

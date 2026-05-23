@@ -9,216 +9,236 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..70,
-        body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 0..15,
-                    is_async: false,
-                    decorator_list: [
-                        Decorator {
-                            range: 0..1,
-                            node_index: NodeIndex(None),
-                            expression: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 1..1,
-                                    id: Name(""),
-                                    ctx: Invalid,
-                                },
-                            ),
-                        },
-                    ],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 5..8,
+        body: Suite {
+            range: 0..70,
+            node_index: NodeIndex(None),
+            statements: [
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 8..10,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
+                        range: 0..15,
+                        is_async: false,
+                        decorator_list: [
+                            Decorator {
+                                range: 0..1,
                                 node_index: NodeIndex(None),
-                                range: 12..15,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                expression: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 1..1,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            },
+                        ],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 5..8,
+                            node_index: NodeIndex(None),
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 8..10,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 12..15,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 12..15,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 12..15,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 16..32,
+                        is_async: false,
+                        decorator_list: [
+                            Decorator {
+                                range: 16..17,
+                                node_index: NodeIndex(None),
+                                expression: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 17..17,
+                                        id: Name(""),
+                                        ctx: Invalid,
                                     },
                                 ),
                             },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 16..32,
-                    is_async: false,
-                    decorator_list: [
-                        Decorator {
-                            range: 16..17,
+                        ],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 22..25,
                             node_index: NodeIndex(None),
-                            expression: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 17..17,
-                                    id: Name(""),
-                                    ctx: Invalid,
-                                },
-                            ),
                         },
-                    ],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 22..25,
-                        node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 25..27,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 29..32,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 25..27,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 29..32,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 29..32,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 29..32,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 33..50,
+                        is_async: false,
+                        decorator_list: [
+                            Decorator {
+                                range: 33..35,
+                                node_index: NodeIndex(None),
+                                expression: BinOp(
+                                    ExprBinOp {
+                                        node_index: NodeIndex(None),
+                                        range: 34..35,
+                                        left: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 34..34,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                        op: MatMult,
+                                        right: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 35..35,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
                                     },
                                 ),
                             },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 33..50,
-                    is_async: false,
-                    decorator_list: [
-                        Decorator {
-                            range: 33..35,
+                        ],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 40..43,
                             node_index: NodeIndex(None),
-                            expression: BinOp(
-                                ExprBinOp {
-                                    node_index: NodeIndex(None),
-                                    range: 34..35,
-                                    left: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 34..34,
-                                            id: Name(""),
-                                            ctx: Invalid,
-                                        },
-                                    ),
-                                    op: MatMult,
-                                    right: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 35..35,
-                                            id: Name(""),
-                                            ctx: Invalid,
-                                        },
-                                    ),
-                                },
-                            ),
                         },
-                    ],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 40..43,
-                        node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 43..45,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 47..50,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 43..45,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 47..50,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
                                         node_index: NodeIndex(None),
                                         range: 47..50,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 47..50,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                ClassDef(
+                    StmtClassDef {
+                        node_index: NodeIndex(None),
+                        range: 51..69,
+                        decorator_list: [
+                            Decorator {
+                                range: 51..56,
+                                node_index: NodeIndex(None),
+                                expression: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 52..56,
+                                        id: Name("test"),
+                                        ctx: Load,
                                     },
                                 ),
                             },
-                        ),
-                    ],
-                },
-            ),
-            ClassDef(
-                StmtClassDef {
-                    node_index: NodeIndex(None),
-                    range: 51..69,
-                    decorator_list: [
-                        Decorator {
-                            range: 51..56,
+                            Decorator {
+                                range: 57..58,
+                                node_index: NodeIndex(None),
+                                expression: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 58..58,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            },
+                        ],
+                        name: Identifier {
+                            id: Name("Test"),
+                            range: 65..69,
                             node_index: NodeIndex(None),
-                            expression: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 52..56,
-                                    id: Name("test"),
-                                    ctx: Load,
-                                },
-                            ),
                         },
-                        Decorator {
-                            range: 57..58,
+                        type_params: None,
+                        arguments: None,
+                        body: Suite {
+                            range: 69..69,
                             node_index: NodeIndex(None),
-                            expression: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 58..58,
-                                    id: Name(""),
-                                    ctx: Invalid,
-                                },
-                            ),
+                            statements: [],
                         },
-                    ],
-                    name: Identifier {
-                        id: Name("Test"),
-                        range: 65..69,
-                        node_index: NodeIndex(None),
                     },
-                    type_params: None,
-                    arguments: None,
-                    body: [],
-                },
-            ),
-        ],
+                ),
+            ],
+        },
     },
 )
 ```

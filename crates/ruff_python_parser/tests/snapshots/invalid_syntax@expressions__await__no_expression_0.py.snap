@@ -9,57 +9,61 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..73,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 61..66,
-                    value: Await(
-                        ExprAwait {
-                            node_index: NodeIndex(None),
-                            range: 61..66,
-                            value: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 66..66,
-                                    id: Name(""),
-                                    ctx: Invalid,
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 68..73,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 68..73,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 68..69,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            op: Add,
-                            right: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 72..73,
-                                    id: Name("y"),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..73,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 61..66,
+                        value: Await(
+                            ExprAwait {
+                                node_index: NodeIndex(None),
+                                range: 61..66,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 66..66,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 68..73,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 68..73,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 68..69,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Add,
+                                right: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 72..73,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

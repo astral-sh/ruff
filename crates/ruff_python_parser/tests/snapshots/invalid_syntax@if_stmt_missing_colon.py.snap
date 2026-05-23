@@ -9,72 +9,84 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..25,
-        body: [
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 0..4,
-                    test: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 3..4,
-                            id: Name("x"),
-                            ctx: Load,
-                        },
-                    ),
-                    body: [],
-                    elif_else_clauses: [],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 5..18,
-                    test: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 8..9,
-                            id: Name("x"),
-                            ctx: Load,
-                        },
-                    ),
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 14..18,
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 19..24,
-                    targets: [
-                        Name(
+        body: Suite {
+            range: 0..25,
+            node_index: NodeIndex(None),
+            statements: [
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 0..4,
+                        test: Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 19..20,
-                                id: Name("a"),
-                                ctx: Store,
+                                range: 3..4,
+                                id: Name("x"),
+                                ctx: Load,
                             },
                         ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
+                        body: Suite {
+                            range: 4..4,
                             node_index: NodeIndex(None),
-                            range: 23..24,
-                            value: Int(
-                                1,
-                            ),
+                            statements: [],
                         },
-                    ),
-                },
-            ),
-        ],
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 5..18,
+                        test: Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 8..9,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                        body: Suite {
+                            range: 9..18,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 14..18,
+                                    },
+                                ),
+                            ],
+                        },
+                        elif_else_clauses: [],
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 19..24,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 19..20,
+                                    id: Name("a"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                node_index: NodeIndex(None),
+                                range: 23..24,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

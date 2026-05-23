@@ -301,16 +301,17 @@ impl<'a> ClauseHeader<'a> {
                 source,
             ),
             ClauseHeader::TryFinally(header) => {
-                let last_statement = header
-                    .orelse
-                    .last()
-                    .map(AnyNodeRef::from)
-                    .or_else(|| header.handlers.last().map(AnyNodeRef::from))
-                    .or_else(|| header.body.last().map(AnyNodeRef::from))
-                    .unwrap();
+                let preceding_clause_end = if !header.orelse.is_empty() {
+                    header.orelse.end()
+                } else {
+                    header
+                        .handlers
+                        .last()
+                        .map_or_else(|| header.body.end(), Ranged::end)
+                };
 
                 find_keyword(
-                    StartPosition::LastStatement(last_statement.end()),
+                    StartPosition::LastStatement(preceding_clause_end),
                     SimpleTokenKind::Finally,
                     source,
                 )
@@ -349,22 +350,20 @@ impl<'a> ClauseHeader<'a> {
             }
             ClauseHeader::OrElse(header) => match header {
                 ElseClause::Try(try_stmt) => {
-                    let last_statement = try_stmt
+                    let preceding_clause_end = try_stmt
                         .handlers
                         .last()
-                        .map(AnyNodeRef::from)
-                        .or_else(|| try_stmt.body.last().map(AnyNodeRef::from))
-                        .unwrap();
+                        .map_or_else(|| try_stmt.body.end(), Ranged::end);
 
                     find_keyword(
-                        StartPosition::LastStatement(last_statement.end()),
+                        StartPosition::LastStatement(preceding_clause_end),
                         SimpleTokenKind::Else,
                         source,
                     )
                 }
                 ElseClause::For(StmtFor { body, .. })
                 | ElseClause::While(StmtWhile { body, .. }) => find_keyword(
-                    StartPosition::LastStatement(body.last().unwrap().end()),
+                    StartPosition::LastStatement(body.end()),
                     SimpleTokenKind::Else,
                     source,
                 ),

@@ -9,50 +9,54 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..30,
-        body: [
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 0..13,
-                    module: None,
-                    names: [
-                        Alias {
-                            range: 12..13,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("x"),
+        body: Suite {
+            range: 0..30,
+            node_index: NodeIndex(None),
+            statements: [
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 0..13,
+                        module: None,
+                        names: [
+                            Alias {
                                 range: 12..13,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("x"),
+                                    range: 12..13,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 1,
-                    is_lazy: false,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 14..29,
-                    module: None,
-                    names: [
-                        Alias {
-                            range: 28..29,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("x"),
+                        ],
+                        level: 1,
+                        is_lazy: false,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 14..29,
+                        module: None,
+                        names: [
+                            Alias {
                                 range: 28..29,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("x"),
+                                    range: 28..29,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 3,
-                    is_lazy: false,
-                },
-            ),
-        ],
+                        ],
+                        level: 3,
+                        is_lazy: false,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

@@ -9,153 +9,161 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..47,
-        body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 0..39,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 4..7,
+        body: Suite {
+            range: 0..47,
+            node_index: NodeIndex(None),
+            statements: [
+                FunctionDef(
+                    StmtFunctionDef {
                         node_index: NodeIndex(None),
-                    },
-                    type_params: Some(
-                        TypeParams {
-                            range: 7..15,
+                        range: 0..39,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 4..7,
                             node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 8..10,
-                                        name: Identifier {
-                                            id: Name("T1"),
+                        },
+                        type_params: Some(
+                            TypeParams {
+                                range: 7..15,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
                                             range: 8..10,
-                                            node_index: NodeIndex(None),
+                                            name: Identifier {
+                                                id: Name("T1"),
+                                                range: 8..10,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            bound: None,
+                                            default: None,
                                         },
-                                        bound: None,
-                                        default: None,
-                                    },
-                                ),
-                                TypeVarTuple(
-                                    TypeParamTypeVarTuple {
+                                    ),
+                                    TypeVarTuple(
+                                        TypeParamTypeVarTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 12..15,
+                                            name: Identifier {
+                                                id: Name("T2"),
+                                                range: 13..15,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        parameters: Parameters {
+                            range: 15..21,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 16..17,
+                                    node_index: NodeIndex(None),
+                                    parameter: Parameter {
+                                        range: 16..17,
                                         node_index: NodeIndex(None),
-                                        range: 12..15,
                                         name: Identifier {
-                                            id: Name("T2"),
-                                            range: 13..15,
+                                            id: Name("a"),
+                                            range: 16..17,
                                             node_index: NodeIndex(None),
                                         },
-                                        default: None,
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                                ParameterWithDefault {
+                                    range: 19..20,
+                                    node_index: NodeIndex(None),
+                                    parameter: Parameter {
+                                        range: 19..20,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("b"),
+                                            range: 19..20,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 22..39,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Return(
+                                    StmtReturn {
+                                        node_index: NodeIndex(None),
+                                        range: 27..39,
+                                        value: Some(
+                                            BinOp(
+                                                ExprBinOp {
+                                                    node_index: NodeIndex(None),
+                                                    range: 34..39,
+                                                    left: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 34..35,
+                                                            id: Name("a"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    op: Add,
+                                                    right: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 38..39,
+                                                            id: Name("b"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
                                     },
                                 ),
                             ],
                         },
-                    ),
-                    parameters: Parameters {
-                        range: 15..21,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 16..17,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
-                                    range: 16..17,
-                                    node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("a"),
-                                        range: 16..17,
-                                        node_index: NodeIndex(None),
-                                    },
-                                    annotation: None,
-                                },
-                                default: None,
-                            },
-                            ParameterWithDefault {
-                                range: 19..20,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
-                                    range: 19..20,
-                                    node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("b"),
-                                        range: 19..20,
-                                        node_index: NodeIndex(None),
-                                    },
-                                    annotation: None,
-                                },
-                                default: None,
-                            },
-                        ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
-                    returns: None,
-                    body: [
-                        Return(
-                            StmtReturn {
+                ),
+                Assign(
+                    StmtAssign {
+                        node_index: NodeIndex(None),
+                        range: 40..46,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 40..41,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
                                 node_index: NodeIndex(None),
-                                range: 27..39,
-                                value: Some(
-                                    BinOp(
-                                        ExprBinOp {
-                                            node_index: NodeIndex(None),
-                                            range: 34..39,
-                                            left: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 34..35,
-                                                    id: Name("a"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            op: Add,
-                                            right: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 38..39,
-                                                    id: Name("b"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    ),
+                                range: 44..46,
+                                value: Int(
+                                    10,
                                 ),
                             },
                         ),
-                    ],
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    node_index: NodeIndex(None),
-                    range: 40..46,
-                    targets: [
-                        Name(
-                            ExprName {
-                                node_index: NodeIndex(None),
-                                range: 40..41,
-                                id: Name("x"),
-                                ctx: Store,
-                            },
-                        ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            node_index: NodeIndex(None),
-                            range: 44..46,
-                            value: Int(
-                                10,
-                            ),
-                        },
-                    ),
-                },
-            ),
-        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

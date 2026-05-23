@@ -122,11 +122,7 @@ pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
         return None;
     }
 
-    IdentifierTokenizer::starts_at(
-        body.last().expect("Expected body to be non-empty").end(),
-        source,
-    )
-    .next()
+    IdentifierTokenizer::starts_at(body.end(), source).next()
 }
 
 /// Return `true` if the given character starts a valid Python identifier.

@@ -9,29 +9,37 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..110,
-        body: [
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 90..97,
-                    test: BooleanLiteral(
-                        ExprBooleanLiteral {
+        body: Suite {
+            range: 0..110,
+            node_index: NodeIndex(None),
+            statements: [
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 90..97,
+                        test: BooleanLiteral(
+                            ExprBooleanLiteral {
+                                node_index: NodeIndex(None),
+                                range: 93..97,
+                                value: true,
+                            },
+                        ),
+                        body: Suite {
+                            range: 97..97,
                             node_index: NodeIndex(None),
-                            range: 93..97,
-                            value: true,
+                            statements: [],
                         },
-                    ),
-                    body: [],
-                    elif_else_clauses: [],
-                },
-            ),
-            Pass(
-                StmtPass {
-                    node_index: NodeIndex(None),
-                    range: 105..109,
-                },
-            ),
-        ],
+                        elif_else_clauses: [],
+                    },
+                ),
+                Pass(
+                    StmtPass {
+                        node_index: NodeIndex(None),
+                        range: 105..109,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

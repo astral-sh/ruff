@@ -9,91 +9,107 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..56,
-        body: [
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 0..55,
-                    test: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 3..4,
-                            id: Name("x"),
-                            ctx: Load,
-                        },
-                    ),
-                    body: [
-                        Pass(
-                            StmtPass {
+        body: Suite {
+            range: 0..56,
+            node_index: NodeIndex(None),
+            statements: [
+                If(
+                    StmtIf {
+                        node_index: NodeIndex(None),
+                        range: 0..55,
+                        test: Name(
+                            ExprName {
                                 node_index: NodeIndex(None),
-                                range: 10..14,
+                                range: 3..4,
+                                id: Name("x"),
+                                ctx: Load,
                             },
                         ),
-                    ],
-                    elif_else_clauses: [
-                        ElifElseClause {
-                            range: 15..32,
+                        body: Suite {
+                            range: 5..14,
                             node_index: NodeIndex(None),
-                            test: Some(
-                                Starred(
-                                    ExprStarred {
-                                        node_index: NodeIndex(None),
-                                        range: 20..22,
-                                        value: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 21..22,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        ctx: Load,
-                                    },
-                                ),
-                            ),
-                            body: [
+                            statements: [
                                 Pass(
                                     StmtPass {
                                         node_index: NodeIndex(None),
-                                        range: 28..32,
+                                        range: 10..14,
                                     },
                                 ),
                             ],
                         },
-                        ElifElseClause {
-                            range: 33..55,
-                            node_index: NodeIndex(None),
-                            test: Some(
-                                Yield(
-                                    ExprYield {
-                                        node_index: NodeIndex(None),
-                                        range: 38..45,
-                                        value: Some(
-                                            Name(
+                        elif_else_clauses: [
+                            ElifElseClause {
+                                range: 15..32,
+                                node_index: NodeIndex(None),
+                                test: Some(
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 20..22,
+                                            value: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 44..45,
+                                                    range: 21..22,
                                                     id: Name("x"),
                                                     ctx: Load,
                                                 },
                                             ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                body: Suite {
+                                    range: 23..32,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 28..32,
+                                            },
                                         ),
-                                    },
+                                    ],
+                                },
+                            },
+                            ElifElseClause {
+                                range: 33..55,
+                                node_index: NodeIndex(None),
+                                test: Some(
+                                    Yield(
+                                        ExprYield {
+                                            node_index: NodeIndex(None),
+                                            range: 38..45,
+                                            value: Some(
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 44..45,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
                                 ),
-                            ),
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 51..55,
-                                    },
-                                ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-        ],
+                                body: Suite {
+                                    range: 46..55,
+                                    node_index: NodeIndex(None),
+                                    statements: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 51..55,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

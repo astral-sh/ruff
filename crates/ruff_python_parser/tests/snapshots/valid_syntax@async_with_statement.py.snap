@@ -9,44 +9,52 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..21,
-        body: [
-            With(
-                StmtWith {
-                    node_index: NodeIndex(None),
-                    range: 0..20,
-                    is_async: true,
-                    items: [
-                        WithItem {
-                            range: 11..15,
-                            node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 11..15,
-                                    id: Name("item"),
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
+        body: Suite {
+            range: 0..21,
+            node_index: NodeIndex(None),
+            statements: [
+                With(
+                    StmtWith {
+                        node_index: NodeIndex(None),
+                        range: 0..20,
+                        is_async: true,
+                        items: [
+                            WithItem {
+                                range: 11..15,
                                 node_index: NodeIndex(None),
-                                range: 17..20,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
+                                context_expr: Name(
+                                    ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 17..20,
+                                        range: 11..15,
+                                        id: Name("item"),
+                                        ctx: Load,
                                     },
                                 ),
+                                optional_vars: None,
                             },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                        ],
+                        body: Suite {
+                            range: 17..20,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 17..20,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 17..20,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

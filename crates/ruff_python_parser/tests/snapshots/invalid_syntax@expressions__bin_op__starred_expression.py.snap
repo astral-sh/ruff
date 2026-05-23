@@ -9,80 +9,84 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..14,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..6,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 0..6,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 0..1,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            op: Add,
-                            right: Starred(
-                                ExprStarred {
-                                    node_index: NodeIndex(None),
-                                    range: 4..6,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 5..6,
-                                            id: Name("y"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 7..14,
-                    value: BinOp(
-                        ExprBinOp {
-                            node_index: NodeIndex(None),
-                            range: 7..14,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 7..8,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                            op: Pow,
-                            right: Starred(
-                                ExprStarred {
-                                    node_index: NodeIndex(None),
-                                    range: 12..14,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 13..14,
-                                            id: Name("y"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-        ],
+        body: Suite {
+            range: 0..14,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..6,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 0..6,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 0..1,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Add,
+                                right: Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 4..6,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 5..6,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 7..14,
+                        value: BinOp(
+                            ExprBinOp {
+                                node_index: NodeIndex(None),
+                                range: 7..14,
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 7..8,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Pow,
+                                right: Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 12..14,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 13..14,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

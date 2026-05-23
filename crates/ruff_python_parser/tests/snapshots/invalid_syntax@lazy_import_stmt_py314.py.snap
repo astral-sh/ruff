@@ -9,54 +9,58 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..85,
-        body: [
-            Import(
-                StmtImport {
-                    node_index: NodeIndex(None),
-                    range: 44..59,
-                    names: [
-                        Alias {
-                            range: 56..59,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("foo"),
+        body: Suite {
+            range: 0..85,
+            node_index: NodeIndex(None),
+            statements: [
+                Import(
+                    StmtImport {
+                        node_index: NodeIndex(None),
+                        range: 44..59,
+                        names: [
+                            Alias {
                                 range: 56..59,
                                 node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("foo"),
+                                    range: 56..59,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    is_lazy: true,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    node_index: NodeIndex(None),
-                    range: 60..84,
-                    module: Some(
-                        Identifier {
-                            id: Name("bar"),
-                            range: 70..73,
-                            node_index: NodeIndex(None),
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 81..84,
-                            node_index: NodeIndex(None),
-                            name: Identifier {
-                                id: Name("baz"),
-                                range: 81..84,
+                        ],
+                        is_lazy: true,
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        node_index: NodeIndex(None),
+                        range: 60..84,
+                        module: Some(
+                            Identifier {
+                                id: Name("bar"),
+                                range: 70..73,
                                 node_index: NodeIndex(None),
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                    is_lazy: true,
-                },
-            ),
-        ],
+                        ),
+                        names: [
+                            Alias {
+                                range: 81..84,
+                                node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("baz"),
+                                    range: 81..84,
+                                    node_index: NodeIndex(None),
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: 0,
+                        is_lazy: true,
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

@@ -9,74 +9,78 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..24,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..24,
-                    value: Dict(
-                        ExprDict {
-                            node_index: NodeIndex(None),
-                            range: 0..24,
-                            items: [
-                                DictItem {
-                                    key: Some(
-                                        Name(
+        body: Suite {
+            range: 0..24,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..24,
+                        value: Dict(
+                            ExprDict {
+                                node_index: NodeIndex(None),
+                                range: 0..24,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 1..2,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        value: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 1..2,
-                                                id: Name("x"),
+                                                range: 5..8,
+                                                id: Name("def"),
                                                 ctx: Load,
                                             },
                                         ),
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 5..8,
-                                            id: Name("def"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                DictItem {
-                                    key: Some(
-                                        Call(
-                                            ExprCall {
-                                                node_index: NodeIndex(None),
-                                                range: 9..14,
-                                                func: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 9..12,
-                                                        id: Name("foo"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                arguments: Arguments {
-                                                    range: 12..14,
+                                    },
+                                    DictItem {
+                                        key: Some(
+                                            Call(
+                                                ExprCall {
                                                     node_index: NodeIndex(None),
-                                                    args: [],
-                                                    keywords: [],
+                                                    range: 9..14,
+                                                    func: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 9..12,
+                                                            id: Name("foo"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 12..14,
+                                                        node_index: NodeIndex(None),
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
                                                 },
+                                            ),
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 20..24,
+                                                id: Name("pass"),
+                                                ctx: Load,
                                             },
                                         ),
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 20..24,
-                                            id: Name("pass"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-        ],
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

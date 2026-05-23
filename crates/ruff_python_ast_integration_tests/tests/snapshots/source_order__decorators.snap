@@ -3,14 +3,17 @@ source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
 expression: trace
 ---
 - ModModule
-  - StmtFunctionDef
-    - Decorator
-      - ExprName
-    - Identifier
-    - Parameters
-    - StmtPass
-  - StmtClassDef
-    - Decorator
-      - ExprName
-    - Identifier
-    - StmtPass
+  - Suite
+    - StmtFunctionDef
+      - Decorator
+        - ExprName
+      - Identifier
+      - Parameters
+      - Suite
+        - StmtPass
+    - StmtClassDef
+      - Decorator
+        - ExprName
+      - Identifier
+      - Suite
+        - StmtPass

@@ -9,30 +9,79 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..30,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 0..9,
-                    value: FString(
-                        ExprFString {
-                            node_index: NodeIndex(None),
-                            range: 0..9,
-                            value: FStringValue {
-                                inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 0..9,
+        body: Suite {
+            range: 0..30,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 0..9,
+                        value: FString(
+                            ExprFString {
+                                node_index: NodeIndex(None),
+                                range: 0..9,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 0..9,
+                                                node_index: NodeIndex(None),
+                                                elements: [
+                                                    Interpolation(
+                                                        InterpolatedElement {
+                                                            range: 2..8,
+                                                            node_index: NodeIndex(None),
+                                                            expression: Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 3..4,
+                                                                    id: Name("x"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: Str,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 10..19,
+                        value: TString(
+                            ExprTString {
+                                node_index: NodeIndex(None),
+                                range: 10..19,
+                                value: TStringValue {
+                                    inner: Single(
+                                        TString {
+                                            range: 10..19,
                                             node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
-                                                        range: 2..8,
+                                                        range: 12..18,
                                                         node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
                                                                 node_index: NodeIndex(None),
-                                                                range: 3..4,
+                                                                range: 13..14,
                                                                 id: Name("x"),
                                                                 ctx: Load,
                                                             },
@@ -43,7 +92,7 @@ Module(
                                                     },
                                                 ),
                                             ],
-                                            flags: FStringFlags {
+                                            flags: TStringFlags {
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
@@ -51,105 +100,60 @@ Module(
                                             },
                                         },
                                     ),
-                                ),
+                                },
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 10..19,
-                    value: TString(
-                        ExprTString {
-                            node_index: NodeIndex(None),
-                            range: 10..19,
-                            value: TStringValue {
-                                inner: Single(
-                                    TString {
-                                        range: 10..19,
-                                        node_index: NodeIndex(None),
-                                        elements: [
-                                            Interpolation(
-                                                InterpolatedElement {
-                                                    range: 12..18,
-                                                    node_index: NodeIndex(None),
-                                                    expression: Name(
-                                                        ExprName {
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 20..29,
+                        value: FString(
+                            ExprFString {
+                                node_index: NodeIndex(None),
+                                range: 20..29,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 20..29,
+                                                node_index: NodeIndex(None),
+                                                elements: [
+                                                    Interpolation(
+                                                        InterpolatedElement {
+                                                            range: 22..28,
                                                             node_index: NodeIndex(None),
-                                                            range: 13..14,
-                                                            id: Name("x"),
-                                                            ctx: Load,
+                                                            expression: Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 23..24,
+                                                                    id: Name("x"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
                                                         },
                                                     ),
-                                                    debug_text: None,
-                                                    conversion: Str,
-                                                    format_spec: None,
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
                                                 },
-                                            ),
-                                        ],
-                                        flags: TStringFlags {
-                                            quote_style: Double,
-                                            prefix: Regular,
-                                            triple_quoted: false,
-                                            unclosed: false,
-                                        },
-                                    },
-                                ),
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 20..29,
-                    value: FString(
-                        ExprFString {
-                            node_index: NodeIndex(None),
-                            range: 20..29,
-                            value: FStringValue {
-                                inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 20..29,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 22..28,
-                                                        node_index: NodeIndex(None),
-                                                        expression: Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 23..24,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                                unclosed: false,
                                             },
-                                        },
+                                        ),
                                     ),
-                                ),
+                                },
                             },
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```

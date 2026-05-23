@@ -9,72 +9,80 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..144,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 118..123,
-                    value: Set(
-                        ExprSet {
+        body: Suite {
+            range: 0..144,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 118..123,
+                        value: Set(
+                            ExprSet {
+                                node_index: NodeIndex(None),
+                                range: 118..123,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 119..120,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 122..123,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        node_index: NodeIndex(None),
+                        range: 125..144,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 129..132,
                             node_index: NodeIndex(None),
-                            range: 118..123,
-                            elts: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 132..134,
+                            node_index: NodeIndex(None),
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: Suite {
+                            range: 135..144,
+                            node_index: NodeIndex(None),
+                            statements: [
+                                Pass(
+                                    StmtPass {
                                         node_index: NodeIndex(None),
-                                        range: 119..120,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 122..123,
-                                        value: Int(
-                                            2,
-                                        ),
+                                        range: 140..144,
                                     },
                                 ),
                             ],
                         },
-                    ),
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 125..144,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 129..132,
-                        node_index: NodeIndex(None),
                     },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 132..134,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 140..144,
-                            },
-                        ),
-                    ],
-                },
-            ),
-        ],
+                ),
+            ],
+        },
     },
 )
 ```

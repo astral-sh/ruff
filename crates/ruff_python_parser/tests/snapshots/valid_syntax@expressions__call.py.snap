@@ -9,675 +9,679 @@ Module(
     ModModule {
         node_index: NodeIndex(None),
         range: 0..349,
-        body: [
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 114..120,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 114..120,
-                            func: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 114..118,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 118..120,
+        body: Suite {
+            range: 0..349,
+            node_index: NodeIndex(None),
+            statements: [
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 114..120,
+                        value: Call(
+                            ExprCall {
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 121..132,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 121..132,
-                            func: Attribute(
-                                ExprAttribute {
-                                    node_index: NodeIndex(None),
-                                    range: 121..130,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 121..125,
-                                            id: Name("attr"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    attr: Identifier {
-                                        id: Name("expr"),
-                                        range: 126..130,
+                                range: 114..120,
+                                func: Name(
+                                    ExprName {
                                         node_index: NodeIndex(None),
+                                        range: 114..118,
+                                        id: Name("call"),
+                                        ctx: Load,
                                     },
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 130..132,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 133..150,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 133..150,
-                            func: Subscript(
-                                ExprSubscript {
+                                ),
+                                arguments: Arguments {
+                                    range: 118..120,
                                     node_index: NodeIndex(None),
-                                    range: 133..148,
-                                    value: Name(
-                                        ExprName {
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 121..132,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 121..132,
+                                func: Attribute(
+                                    ExprAttribute {
+                                        node_index: NodeIndex(None),
+                                        range: 121..130,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 121..125,
+                                                id: Name("attr"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        attr: Identifier {
+                                            id: Name("expr"),
+                                            range: 126..130,
                                             node_index: NodeIndex(None),
-                                            range: 133..142,
-                                            id: Name("subscript"),
-                                            ctx: Load,
                                         },
-                                    ),
-                                    slice: Tuple(
-                                        ExprTuple {
-                                            node_index: NodeIndex(None),
-                                            range: 143..147,
-                                            elts: [
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 143..144,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 146..147,
-                                                        value: Int(
-                                                            2,
-                                                        ),
-                                                    },
-                                                ),
-                                            ],
-                                            ctx: Load,
-                                            parenthesized: false,
-                                        },
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 148..150,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 151..162,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 151..162,
-                            func: Subscript(
-                                ExprSubscript {
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 130..132,
                                     node_index: NodeIndex(None),
-                                    range: 151..160,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 151..156,
-                                            id: Name("slice"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    slice: Slice(
-                                        ExprSlice {
-                                            node_index: NodeIndex(None),
-                                            range: 157..159,
-                                            lower: None,
-                                            upper: Some(
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 158..159,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            step: None,
-                                        },
-                                    ),
-                                    ctx: Load,
+                                    args: [],
+                                    keywords: [],
                                 },
-                            ),
-                            arguments: Arguments {
-                                range: 160..162,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 163..174,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 163..174,
-                            func: List(
-                                ExprList {
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 133..150,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 133..150,
+                                func: Subscript(
+                                    ExprSubscript {
+                                        node_index: NodeIndex(None),
+                                        range: 133..148,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 133..142,
+                                                id: Name("subscript"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        slice: Tuple(
+                                            ExprTuple {
+                                                node_index: NodeIndex(None),
+                                                range: 143..147,
+                                                elts: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 143..144,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 146..147,
+                                                            value: Int(
+                                                                2,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                                parenthesized: false,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 148..150,
                                     node_index: NodeIndex(None),
-                                    range: 163..172,
-                                    elts: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 164..165,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 167..168,
-                                                value: Int(
-                                                    2,
-                                                ),
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 170..171,
-                                                value: Int(
-                                                    3,
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
+                                    args: [],
+                                    keywords: [],
                                 },
-                            ),
-                            arguments: Arguments {
-                                range: 172..174,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 175..186,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 175..186,
-                            func: Tuple(
-                                ExprTuple {
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 151..162,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 151..162,
+                                func: Subscript(
+                                    ExprSubscript {
+                                        node_index: NodeIndex(None),
+                                        range: 151..160,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 151..156,
+                                                id: Name("slice"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        slice: Slice(
+                                            ExprSlice {
+                                                node_index: NodeIndex(None),
+                                                range: 157..159,
+                                                lower: None,
+                                                upper: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 158..159,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                step: None,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 160..162,
                                     node_index: NodeIndex(None),
-                                    range: 175..184,
-                                    elts: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 176..177,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 179..180,
-                                                value: Int(
-                                                    2,
-                                                ),
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 182..183,
-                                                value: Int(
-                                                    3,
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
+                                    args: [],
+                                    keywords: [],
                                 },
-                            ),
-                            arguments: Arguments {
-                                range: 184..186,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 187..206,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 187..206,
-                            func: Generator(
-                                ExprGenerator {
-                                    node_index: NodeIndex(None),
-                                    range: 187..204,
-                                    elt: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 188..189,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    generators: [
-                                        Comprehension {
-                                            range: 190..203,
-                                            node_index: NodeIndex(None),
-                                            target: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 194..195,
-                                                    id: Name("x"),
-                                                    ctx: Store,
-                                                },
-                                            ),
-                                            iter: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 199..203,
-                                                    id: Name("iter"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            ifs: [],
-                                            is_async: false,
-                                        },
-                                    ],
-                                    parenthesized: true,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 204..206,
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 163..174,
+                        value: Call(
+                            ExprCall {
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 207..218,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 207..218,
-                            func: Set(
-                                ExprSet {
-                                    node_index: NodeIndex(None),
-                                    range: 207..216,
-                                    elts: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 208..209,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 211..212,
-                                                value: Int(
-                                                    2,
-                                                ),
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 214..215,
-                                                value: Int(
-                                                    3,
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 216..218,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 219..233,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 219..233,
-                            func: Dict(
-                                ExprDict {
-                                    node_index: NodeIndex(None),
-                                    range: 219..231,
-                                    items: [
-                                        DictItem {
-                                            key: Some(
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 220..221,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            value: NumberLiteral(
+                                range: 163..174,
+                                func: List(
+                                    ExprList {
+                                        node_index: NodeIndex(None),
+                                        range: 163..172,
+                                        elts: [
+                                            NumberLiteral(
                                                 ExprNumberLiteral {
                                                     node_index: NodeIndex(None),
-                                                    range: 223..224,
+                                                    range: 164..165,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 167..168,
                                                     value: Int(
                                                         2,
                                                     ),
                                                 },
                                             ),
-                                        },
-                                        DictItem {
-                                            key: Some(
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 226..227,
-                                                        value: Int(
-                                                            3,
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            value: NumberLiteral(
+                                            NumberLiteral(
                                                 ExprNumberLiteral {
                                                     node_index: NodeIndex(None),
-                                                    range: 229..230,
+                                                    range: 170..171,
                                                     value: Int(
-                                                        4,
+                                                        3,
                                                     ),
                                                 },
                                             ),
-                                        },
-                                    ],
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 231..233,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 234..245,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 234..245,
-                            func: Yield(
-                                ExprYield {
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 172..174,
                                     node_index: NodeIndex(None),
-                                    range: 235..242,
-                                    value: Some(
-                                        Name(
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 175..186,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 175..186,
+                                func: Tuple(
+                                    ExprTuple {
+                                        node_index: NodeIndex(None),
+                                        range: 175..184,
+                                        elts: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 176..177,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 179..180,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 182..183,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 184..186,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 187..206,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 187..206,
+                                func: Generator(
+                                    ExprGenerator {
+                                        node_index: NodeIndex(None),
+                                        range: 187..204,
+                                        elt: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 241..242,
+                                                range: 188..189,
                                                 id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
-                                    ),
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 243..245,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 306..312,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 306..312,
-                            func: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 306..310,
-                                    value: true,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 310..312,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 313..320,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 313..320,
-                            func: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 313..318,
-                                    value: false,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 318..320,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 321..327,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 321..327,
-                            func: NoneLiteral(
-                                ExprNoneLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 321..325,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 325..327,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 328..338,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 328..338,
-                            func: StringLiteral(
-                                ExprStringLiteral {
-                                    node_index: NodeIndex(None),
-                                    range: 328..336,
-                                    value: StringLiteralValue {
-                                        inner: Single(
-                                            StringLiteral {
-                                                range: 328..336,
+                                        generators: [
+                                            Comprehension {
+                                                range: 190..203,
                                                 node_index: NodeIndex(None),
-                                                value: "string",
-                                                flags: StringLiteralFlags {
-                                                    quote_style: Double,
-                                                    prefix: Empty,
-                                                    triple_quoted: false,
-                                                    unclosed: false,
-                                                },
+                                                target: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 194..195,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                iter: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 199..203,
+                                                        id: Name("iter"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ifs: [],
+                                                is_async: false,
                                             },
+                                        ],
+                                        parenthesized: true,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 204..206,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 207..218,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 207..218,
+                                func: Set(
+                                    ExprSet {
+                                        node_index: NodeIndex(None),
+                                        range: 207..216,
+                                        elts: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 208..209,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 211..212,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 214..215,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 216..218,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 219..233,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 219..233,
+                                func: Dict(
+                                    ExprDict {
+                                        node_index: NodeIndex(None),
+                                        range: 219..231,
+                                        items: [
+                                            DictItem {
+                                                key: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 220..221,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 223..224,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                            DictItem {
+                                                key: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 226..227,
+                                                            value: Int(
+                                                                3,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 229..230,
+                                                        value: Int(
+                                                            4,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 231..233,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 234..245,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 234..245,
+                                func: Yield(
+                                    ExprYield {
+                                        node_index: NodeIndex(None),
+                                        range: 235..242,
+                                        value: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 241..242,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         ),
                                     },
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 336..338,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 339..342,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 339..342,
-                            func: NumberLiteral(
-                                ExprNumberLiteral {
+                                ),
+                                arguments: Arguments {
+                                    range: 243..245,
                                     node_index: NodeIndex(None),
-                                    range: 339..340,
-                                    value: Int(
-                                        1,
-                                    ),
+                                    args: [],
+                                    keywords: [],
                                 },
-                            ),
-                            arguments: Arguments {
-                                range: 340..342,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 343..348,
-                    value: Call(
-                        ExprCall {
-                            node_index: NodeIndex(None),
-                            range: 343..348,
-                            func: NumberLiteral(
-                                ExprNumberLiteral {
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 306..312,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 306..312,
+                                func: BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 306..310,
+                                        value: true,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 310..312,
                                     node_index: NodeIndex(None),
-                                    range: 343..346,
-                                    value: Float(
-                                        1.0,
-                                    ),
+                                    args: [],
+                                    keywords: [],
                                 },
-                            ),
-                            arguments: Arguments {
-                                range: 346..348,
-                                node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
                             },
-                        },
-                    ),
-                },
-            ),
-        ],
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 313..320,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 313..320,
+                                func: BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 313..318,
+                                        value: false,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 318..320,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 321..327,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 321..327,
+                                func: NoneLiteral(
+                                    ExprNoneLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 321..325,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 325..327,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 328..338,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 328..338,
+                                func: StringLiteral(
+                                    ExprStringLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 328..336,
+                                        value: StringLiteralValue {
+                                            inner: Single(
+                                                StringLiteral {
+                                                    range: 328..336,
+                                                    node_index: NodeIndex(None),
+                                                    value: "string",
+                                                    flags: StringLiteralFlags {
+                                                        quote_style: Double,
+                                                        prefix: Empty,
+                                                        triple_quoted: false,
+                                                        unclosed: false,
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 336..338,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 339..342,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 339..342,
+                                func: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 339..340,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 340..342,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        node_index: NodeIndex(None),
+                        range: 343..348,
+                        value: Call(
+                            ExprCall {
+                                node_index: NodeIndex(None),
+                                range: 343..348,
+                                func: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 343..346,
+                                        value: Float(
+                                            1.0,
+                                        ),
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 346..348,
+                                    node_index: NodeIndex(None),
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
     },
 )
 ```
