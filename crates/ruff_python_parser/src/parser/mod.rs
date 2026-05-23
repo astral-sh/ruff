@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
+use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::UnsupportedSyntaxError;
@@ -181,10 +181,7 @@ impl<'src> Parser<'src> {
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
     fn parse_module(&mut self) -> ModModule {
-        let body = self.parse_list_into_vec(
-            RecoveryContextKind::ModuleStatements,
-            Parser::parse_statement,
-        );
+        let body = self.parse_statements(RecoveryContextKind::ModuleStatements);
 
         self.bump(TokenKind::EndOfFile);
 
@@ -510,22 +507,19 @@ impl<'src> Parser<'src> {
         &self.source[ranged.range()]
     }
 
-    /// Parses a list of elements into a vector where each element is parsed using
-    /// the given `parse_element` function.
-    fn parse_list_into_vec<T>(
-        &mut self,
-        recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
-    ) -> Vec<T> {
-        let mut elements = Vec::new();
-        self.parse_list(recovery_context_kind, |p| elements.push(parse_element(p)));
-        elements
+    /// Parses a list of statements into a suite.
+    fn parse_statements(&mut self, recovery_context_kind: RecoveryContextKind) -> Suite {
+        let mut statements = Suite::new();
+        self.parse_list(recovery_context_kind, |parser| {
+            statements.push(parser.parse_statement());
+        });
+        statements
     }
 
     /// Parses a list of elements where each element is parsed using the given
     /// `parse_element` function.
     ///
-    /// The difference between this function and `parse_list_into_vec` is that
+    /// The difference between this function and `parse_statements` is that
     /// this function does not return the parsed elements. Instead, it is the
     /// caller's responsibility to handle the parsed elements. This is the reason
     /// that the `parse_element` parameter is bound to [`FnMut`] instead of [`Fn`].

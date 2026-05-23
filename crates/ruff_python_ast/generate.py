@@ -987,7 +987,12 @@ def write_node(out: list[str], ast: Ast) -> None:
                     rust_ty = f"Box<{rust_ty}>"
 
                 if ty.seq:
-                    rust_ty = f"Vec<{rust_ty}>"
+                    if ty.name == "Stmt":
+                        rust_ty = "crate::Suite"
+                    elif ty.name == "Decorator":
+                        rust_ty = "crate::DecoratorList"
+                    else:
+                        rust_ty = f"Vec<{rust_ty}>"
                 elif ty.optional:
                     rust_ty = f"Option<{rust_ty}>"
 
