@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use static_assertions::assert_eq_size;
 use std::cmp::Ordering;
 use std::fmt::Debug;
@@ -86,7 +87,9 @@ pub(super) struct UnexpectedIndentation;
 /// [See Indentation](docs.python.org/3/reference/lexical_analysis.html#indentation).
 #[derive(Debug, Clone, Default)]
 pub(super) struct Indentations {
-    stack: Vec<Indentation>,
+    // Inlines up to 8 levels on the stack (8 × 8 = 64 bytes); spills to the heap only for
+    // unusually deeply-nested code. Python's practical nesting depth rarely exceeds 8.
+    stack: SmallVec<[Indentation; 8]>,
 }
 
 impl Indentations {
@@ -135,7 +138,7 @@ impl Indentations {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct IndentationsCheckpoint(Vec<Indentation>);
+pub(crate) struct IndentationsCheckpoint(SmallVec<[Indentation; 8]>);
 
 assert_eq_size!(Indentation, u64);
 
