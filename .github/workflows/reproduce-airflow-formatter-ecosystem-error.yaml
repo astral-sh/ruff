@@ -92,14 +92,17 @@ jobs:
               ).with_preview_enabled()
               repository = await ClonedRepository.from_path(Path("."), target.repo)
               ruff = Path(os.environ["RUFF_BIN"])
-              await compare_format(
-                  ruff,
-                  ruff,
-                  target.format_options,
-                  target.config_overrides,
-                  repository,
-                  FormatComparison.ruff_and_ruff,
-              )
+              for attempt in range(1, 101):
+                  print(f"Running pinned Airflow comparison attempt {attempt}", flush=True)
+                  await repository.reset()
+                  await compare_format(
+                      ruff,
+                      ruff,
+                      target.format_options,
+                      target.config_overrides,
+                      repository,
+                      FormatComparison.ruff_and_ruff,
+                  )
 
 
           asyncio.run(run())
