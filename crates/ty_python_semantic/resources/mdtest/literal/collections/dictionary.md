@@ -251,6 +251,17 @@ def _(x: dict[str, object], y: int):
     x = {"a": (y := "bad")}
     reveal_type(x["a"])  # revealed: int
 
+class Normalizing:
+    def __getitem__(self, key: str) -> dict[str, object]:
+        return {}
+    def __setitem__(self, key: str, value: dict[str, object]) -> None:
+        pass
+
+def _(normalizing: Normalizing):
+    # An arbitrary setter may transform the assigned value, so its children are not narrowed.
+    normalizing["mapping"] = {"a": 1}
+    reveal_type(normalizing["mapping"]["a"])  # revealed: object
+
 class Y:
     inner: dict[str, object]
 
