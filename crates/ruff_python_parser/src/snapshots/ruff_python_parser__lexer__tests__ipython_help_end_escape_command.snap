@@ -6,10 +6,7 @@ expression: lex_jupyter_source(source)
 ```
 [
     (
-        IpyEscapeCommand {
-            value: "foo",
-            kind: Help,
-        },
+        IpyEscapeCommand,
         0..5,
     ),
     (
@@ -17,10 +14,7 @@ expression: lex_jupyter_source(source)
         5..6,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo",
-            kind: Help,
-        },
+        IpyEscapeCommand,
         6..15,
     ),
     (
@@ -28,10 +22,7 @@ expression: lex_jupyter_source(source)
         15..16,
     ),
     (
-        IpyEscapeCommand {
-            value: "   foo  ?",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         16..27,
     ),
     (
@@ -39,10 +30,7 @@ expression: lex_jupyter_source(source)
         27..28,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         28..34,
     ),
     (
@@ -50,10 +38,7 @@ expression: lex_jupyter_source(source)
         34..35,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         35..42,
     ),
     (
@@ -61,10 +46,7 @@ expression: lex_jupyter_source(source)
         42..43,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo",
-            kind: Help,
-        },
+        IpyEscapeCommand,
         43..50,
     ),
     (
@@ -72,10 +54,7 @@ expression: lex_jupyter_source(source)
         50..51,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         51..59,
     ),
     (
@@ -83,10 +62,7 @@ expression: lex_jupyter_source(source)
         59..60,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo???",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         60..68,
     ),
     (
@@ -94,10 +70,7 @@ expression: lex_jupyter_source(source)
         68..69,
     ),
     (
-        IpyEscapeCommand {
-            value: "?foo???",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         69..78,
     ),
     (
@@ -105,10 +78,7 @@ expression: lex_jupyter_source(source)
         78..79,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo",
-            kind: Help,
-        },
+        IpyEscapeCommand,
         79..92,
     ),
     (
@@ -116,10 +86,7 @@ expression: lex_jupyter_source(source)
         92..93,
     ),
     (
-        IpyEscapeCommand {
-            value: " ?",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         93..99,
     ),
     (
@@ -127,10 +94,7 @@ expression: lex_jupyter_source(source)
         99..100,
     ),
     (
-        IpyEscapeCommand {
-            value: "??",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         100..104,
     ),
     (
@@ -138,10 +102,7 @@ expression: lex_jupyter_source(source)
         104..105,
     ),
     (
-        IpyEscapeCommand {
-            value: "%foo",
-            kind: Help,
-        },
+        IpyEscapeCommand,
         105..110,
     ),
     (
@@ -149,10 +110,7 @@ expression: lex_jupyter_source(source)
         110..111,
     ),
     (
-        IpyEscapeCommand {
-            value: "%foo",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         111..117,
     ),
     (
@@ -160,10 +118,7 @@ expression: lex_jupyter_source(source)
         117..118,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo???",
-            kind: Magic2,
-        },
+        IpyEscapeCommand,
         118..126,
     ),
     (
@@ -171,10 +126,7 @@ expression: lex_jupyter_source(source)
         126..127,
     ),
     (
-        IpyEscapeCommand {
-            value: "pwd?",
-            kind: Shell,
-        },
+        IpyEscapeCommand,
         127..132,
     ),
     (

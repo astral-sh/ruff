@@ -6,66 +6,48 @@ expression: lex_source(source)
 ```
 [
     (
-        String(
-            "double",
-        ),
+        String,
         0..8,
         TokenFlags(
             DOUBLE_QUOTES,
         ),
     ),
     (
-        String(
-            "single",
-        ),
+        String,
         9..17,
     ),
     (
-        String(
-            "can\\'t",
-        ),
+        String,
         18..26,
     ),
     (
-        String(
-            "\\\\\\\"",
-        ),
+        String,
         27..33,
         TokenFlags(
             DOUBLE_QUOTES,
         ),
     ),
     (
-        String(
-            "\\t\\r\\n",
-        ),
+        String,
         34..42,
     ),
     (
-        String(
-            "\\g",
-        ),
+        String,
         43..47,
     ),
     (
-        String(
-            "raw\\'",
-        ),
+        String,
         48..56,
         TokenFlags(
             RAW_STRING_LOWERCASE,
         ),
     ),
     (
-        String(
-            "\\420",
-        ),
+        String,
         57..63,
     ),
     (
-        String(
-            "\\200\\0a",
-        ),
+        String,
         64..73,
     ),
     (

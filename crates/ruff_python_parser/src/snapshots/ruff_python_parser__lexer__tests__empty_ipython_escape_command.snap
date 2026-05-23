@@ -6,10 +6,7 @@ expression: lex_jupyter_source(source)
 ```
 [
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: Magic,
-        },
+        IpyEscapeCommand,
         0..1,
     ),
     (
@@ -17,10 +14,7 @@ expression: lex_jupyter_source(source)
         1..2,
     ),
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: Magic2,
-        },
+        IpyEscapeCommand,
         2..4,
     ),
     (
@@ -28,10 +22,7 @@ expression: lex_jupyter_source(source)
         4..5,
     ),
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: Shell,
-        },
+        IpyEscapeCommand,
         5..6,
     ),
     (
@@ -39,10 +30,7 @@ expression: lex_jupyter_source(source)
         6..7,
     ),
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: ShCap,
-        },
+        IpyEscapeCommand,
         7..9,
     ),
     (
@@ -50,10 +38,7 @@ expression: lex_jupyter_source(source)
         9..10,
     ),
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: Help,
-        },
+        IpyEscapeCommand,
         10..11,
     ),
     (
@@ -61,10 +46,7 @@ expression: lex_jupyter_source(source)
         11..12,
     ),
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: Help2,
-        },
+        IpyEscapeCommand,
         12..14,
     ),
     (
@@ -72,10 +54,7 @@ expression: lex_jupyter_source(source)
         14..15,
     ),
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: Paren,
-        },
+        IpyEscapeCommand,
         15..16,
     ),
     (
@@ -83,10 +62,7 @@ expression: lex_jupyter_source(source)
         16..17,
     ),
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: Quote,
-        },
+        IpyEscapeCommand,
         17..18,
     ),
     (
@@ -94,10 +70,7 @@ expression: lex_jupyter_source(source)
         18..19,
     ),
     (
-        IpyEscapeCommand {
-            value: "",
-            kind: Quote2,
-        },
+        IpyEscapeCommand,
         19..20,
     ),
     (

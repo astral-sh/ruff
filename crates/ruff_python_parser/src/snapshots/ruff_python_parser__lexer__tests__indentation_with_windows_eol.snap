@@ -10,9 +10,7 @@ expression: indentation_with_eol(WINDOWS_EOL)
         0..3,
     ),
     (
-        Name(
-            Name("foo"),
-        ),
+        Name,
         4..7,
     ),
     (
@@ -40,9 +38,7 @@ expression: indentation_with_eol(WINDOWS_EOL)
         16..22,
     ),
     (
-        Int(
-            99,
-        ),
+        Int,
         23..25,
     ),
     (

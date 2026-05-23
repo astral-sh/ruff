@@ -6,9 +6,7 @@ expression: line_continuation_at_eof(MAC_EOL)
 ```
 [
     (
-        Int(
-            1,
-        ),
+        Int,
         0..1,
     ),
     (

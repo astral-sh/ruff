@@ -17,9 +17,7 @@ expression: lex_source(source)
         2..3,
     ),
     (
-        Name(
-            Name("foo"),
-        ),
+        Name,
         3..6,
     ),
     (
@@ -31,9 +29,7 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        InterpolatedStringMiddle(
-            " ",
-        ),
+        TStringMiddle,
         8..9,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -44,9 +40,7 @@ expression: lex_source(source)
         9..10,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         10..11,
     ),
     (
@@ -58,9 +52,7 @@ expression: lex_source(source)
         12..13,
     ),
     (
-        Name(
-            Name("s"),
-        ),
+        Name,
         13..14,
     ),
     (
@@ -68,9 +60,7 @@ expression: lex_source(source)
         14..15,
     ),
     (
-        InterpolatedStringMiddle(
-            ".3f",
-        ),
+        TStringMiddle,
         15..18,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -81,9 +71,7 @@ expression: lex_source(source)
         18..19,
     ),
     (
-        InterpolatedStringMiddle(
-            " ",
-        ),
+        TStringMiddle,
         19..20,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -94,9 +82,7 @@ expression: lex_source(source)
         20..21,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         21..22,
     ),
     (
@@ -104,9 +90,7 @@ expression: lex_source(source)
         22..23,
     ),
     (
-        InterpolatedStringMiddle(
-            ".",
-        ),
+        TStringMiddle,
         23..24,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -117,9 +101,7 @@ expression: lex_source(source)
         24..25,
     ),
     (
-        Name(
-            Name("y"),
-        ),
+        Name,
         25..26,
     ),
     (
@@ -127,9 +109,7 @@ expression: lex_source(source)
         26..27,
     ),
     (
-        InterpolatedStringMiddle(
-            "f",
-        ),
+        TStringMiddle,
         27..28,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -140,9 +120,7 @@ expression: lex_source(source)
         28..29,
     ),
     (
-        InterpolatedStringMiddle(
-            " ",
-        ),
+        TStringMiddle,
         29..30,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -153,9 +131,7 @@ expression: lex_source(source)
         30..31,
     ),
     (
-        String(
-            "",
-        ),
+        String,
         31..33,
     ),
     (
@@ -163,9 +139,7 @@ expression: lex_source(source)
         33..34,
     ),
     (
-        InterpolatedStringMiddle(
-            "*^",
-        ),
+        TStringMiddle,
         34..36,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -176,9 +150,7 @@ expression: lex_source(source)
         36..37,
     ),
     (
-        Int(
-            1,
-        ),
+        Int,
         37..38,
     ),
     (
@@ -190,9 +162,7 @@ expression: lex_source(source)
         39..40,
     ),
     (
-        Int(
-            1,
-        ),
+        Int,
         40..41,
     ),
     (
@@ -208,9 +178,7 @@ expression: lex_source(source)
         43..44,
     ),
     (
-        InterpolatedStringMiddle(
-            " ",
-        ),
+        TStringMiddle,
         44..45,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -221,9 +189,7 @@ expression: lex_source(source)
         45..46,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         46..47,
     ),
     (
@@ -239,9 +205,7 @@ expression: lex_source(source)
         49..50,
     ),
     (
-        Int(
-            1,
-        ),
+        Int,
         50..51,
     ),
     (
@@ -253,9 +217,7 @@ expression: lex_source(source)
         52..53,
     ),
     (
-        Name(
-            Name("pop"),
-        ),
+        Name,
         53..56,
     ),
     (

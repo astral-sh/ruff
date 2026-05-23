@@ -6,9 +6,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
 ```
 [
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         0..1,
     ),
     (
@@ -28,9 +26,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         7..9,
     ),
     (
-        Int(
-            1,
-        ),
+        Int,
         13..14,
     ),
     (
@@ -38,9 +34,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         14..15,
     ),
     (
-        Int(
-            2,
-        ),
+        Int,
         15..16,
     ),
     (
@@ -56,9 +50,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         19..20,
     ),
     (
-        Int(
-            3,
-        ),
+        Int,
         20..21,
     ),
     (
@@ -70,9 +62,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         22..24,
     ),
     (
-        Int(
-            4,
-        ),
+        Int,
         24..25,
     ),
     (
@@ -100,9 +90,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         32..34,
     ),
     (
-        Int(
-            5,
-        ),
+        Int,
         34..35,
     ),
     (
@@ -114,9 +102,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         36..38,
     ),
     (
-        Int(
-            6,
-        ),
+        Int,
         38..39,
     ),
     (
@@ -124,9 +110,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         39..40,
     ),
     (
-        Int(
-            7,
-        ),
+        Int,
         43..44,
     ),
     (

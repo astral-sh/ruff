@@ -6,9 +6,7 @@ expression: lex_source(&source)
 ```
 [
     (
-        Int(
-            99232,
-        ),
+        Int,
         0..5,
     ),
     (

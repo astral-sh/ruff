@@ -6,10 +6,7 @@ expression: ipython_escape_command_line_continuation_eol(WINDOWS_EOL)
 ```
 [
     (
-        IpyEscapeCommand {
-            value: "matplotlib   --inline",
-            kind: Magic,
-        },
+        IpyEscapeCommand,
         0..25,
     ),
     (

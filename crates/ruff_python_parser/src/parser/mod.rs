@@ -1,16 +1,22 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::str::FromStr;
 
 use bitflags::bitflags;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
+use ruff_python_ast::{
+    AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
+};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use thin_vec::ThinVec;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::string::InterpolatedStringKind;
-use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, UnsupportedSyntaxErrorKind};
@@ -386,15 +392,150 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    /// Take the token value from the underlying token source and bump the current token.
-    ///
-    /// # Panics
-    ///
-    /// If the current token is not of the given kind.
-    fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
-        let value = self.tokens.take_value();
+    fn bump_name(&mut self) -> Name {
+        let range = self.current_token_range();
+        let text = self.src_text(range);
+        let name = if text.is_ascii() {
+            Name::new(text)
+        } else {
+            text.nfkc().collect::<Name>()
+        };
+        self.bump(TokenKind::Name);
+        name
+    }
+
+    fn bump_int(&mut self) -> Int {
+        let text = self.current_token_text();
+        let value = if let Some(digits) =
+            text.strip_prefix("0x").or_else(|| text.strip_prefix("0X"))
+        {
+            Int::from_str_radix(&strip_underscores(digits), 16, text)
+        } else if let Some(digits) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            Int::from_str_radix(&strip_underscores(digits), 8, text)
+        } else if let Some(digits) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            Int::from_str_radix(&strip_underscores(digits), 2, text)
+        } else {
+            Int::from_str(&strip_underscores(text))
+        }
+        .expect("lexer validated integer literal");
+        self.bump(TokenKind::Int);
+        value
+    }
+
+    fn bump_float(&mut self) -> f64 {
+        let value = f64::from_str(&strip_underscores(self.current_token_text()))
+            .expect("lexer validated float literal");
+        self.bump(TokenKind::Float);
+        value
+    }
+
+    fn bump_complex(&mut self) -> (f64, f64) {
+        let text = self.current_token_text();
+        let value = f64::from_str(&strip_underscores(&text[..text.len() - 1]))
+            .expect("lexer validated complex literal");
+        self.bump(TokenKind::Complex);
+        (0.0, value)
+    }
+
+    fn bump_string_value(&mut self) -> Box<str> {
+        let range = self.current_token_range();
+        let flags = self.tokens.current_flags().as_any_string_flags();
+        let value_range = TextRange::new(
+            range.start() + flags.opener_len(),
+            range.end() - flags.closer_len(),
+        );
+        let value = self.source[value_range].to_string().into_boxed_str();
+        self.bump(TokenKind::String);
+        value
+    }
+
+    fn bump_interpolated_string_middle_value(&mut self, kind: TokenKind) -> Box<str> {
+        let value = self.current_token_text().to_string().into_boxed_str();
         self.bump(kind);
         value
+    }
+
+    fn bump_ipython_escape_command(&mut self, allows_help_end: bool) -> (Box<str>, IpyEscapeKind) {
+        let range = self.current_token_range();
+        let (value, kind) = self.cook_ipython_escape_command_value(range, allows_help_end);
+        self.bump(TokenKind::IpyEscapeCommand);
+        (value, kind)
+    }
+
+    fn current_token_text(&self) -> &'src str {
+        self.src_text(self.current_token_range())
+    }
+
+    fn cook_ipython_escape_command_value(
+        &self,
+        range: TextRange,
+        allows_help_end: bool,
+    ) -> (Box<str>, IpyEscapeKind) {
+        let raw = self.src_text(range);
+        let initial_kind = IpyEscapeKind::try_from([
+            raw.as_bytes()[0] as char,
+            raw[1..].chars().next().unwrap_or('\0'),
+        ])
+        .ok()
+        .filter(|kind| kind.as_str().len() == 2)
+        .unwrap_or_else(|| {
+            IpyEscapeKind::try_from(raw.as_bytes()[0] as char).expect("IPython escape token")
+        });
+
+        let mut kind = initial_kind;
+        let mut value = String::new();
+        let mut chars = raw[initial_kind.as_str().len()..].chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '\\' if matches!(chars.peek(), Some('\r' | '\n')) => {
+                    if chars.next() == Some('\r') && matches!(chars.peek(), Some('\n')) {
+                        chars.next();
+                    }
+                }
+                '?' => {
+                    let mut question_count = 1u32;
+                    while matches!(chars.peek(), Some('?')) {
+                        chars.next();
+                        question_count += 1;
+                    }
+
+                    if !allows_help_end
+                        || !matches!(
+                            initial_kind,
+                            IpyEscapeKind::Magic
+                                | IpyEscapeKind::Magic2
+                                | IpyEscapeKind::Help
+                                | IpyEscapeKind::Help2
+                        )
+                        || question_count > 2
+                        || value.chars().last().is_none_or(is_python_whitespace)
+                        || !matches!(chars.peek(), None | Some('\n' | '\r'))
+                    {
+                        value.reserve(question_count as usize);
+                        for _ in 0..question_count {
+                            value.push('?');
+                        }
+                        continue;
+                    }
+
+                    kind = if question_count == 1 {
+                        IpyEscapeKind::Help
+                    } else {
+                        IpyEscapeKind::Help2
+                    };
+
+                    if initial_kind.is_help() {
+                        value = value.trim_start_matches([' ', '?']).to_string();
+                    } else if initial_kind.is_magic() {
+                        value.insert_str(0, initial_kind.as_str());
+                    }
+                }
+                '\n' | '\r' => break,
+                c => value.push(c),
+            }
+        }
+
+        (value.into_boxed_str(), kind)
     }
 
     /// Bumps the current token assuming it is found in the given token set.
@@ -744,6 +885,14 @@ impl<'src> Parser<'src> {
         self.current_token_id = current_token_id;
         self.prev_token_end = prev_token_end;
         self.recovery_context = recovery_context;
+    }
+}
+
+fn strip_underscores(text: &str) -> Cow<'_, str> {
+    if text.as_bytes().contains(&b'_') {
+        Cow::Owned(text.chars().filter(|&c| c != '_').collect())
+    } else {
+        Cow::Borrowed(text)
     }
 }
 

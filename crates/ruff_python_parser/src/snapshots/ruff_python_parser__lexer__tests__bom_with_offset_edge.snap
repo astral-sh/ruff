@@ -6,9 +6,7 @@ expression: "lex_source_with_offset(source, TextSize::new(11))"
 ```
 [
     (
-        Name(
-            Name("z"),
-        ),
+        Name,
         11..12,
     ),
     (

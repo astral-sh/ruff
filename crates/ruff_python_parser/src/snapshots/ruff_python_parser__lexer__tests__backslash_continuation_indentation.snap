@@ -26,9 +26,7 @@ expression: lex_source(&source)
         9..13,
     ),
     (
-        Int(
-            1,
-        ),
+        Int,
         13..14,
     ),
     (
@@ -36,9 +34,7 @@ expression: lex_source(&source)
         14..15,
     ),
     (
-        Int(
-            2,
-        ),
+        Int,
         29..30,
     ),
     (
@@ -46,9 +42,7 @@ expression: lex_source(&source)
         30..31,
     ),
     (
-        Int(
-            3,
-        ),
+        Int,
         37..38,
     ),
     (

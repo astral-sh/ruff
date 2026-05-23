@@ -13,9 +13,7 @@ expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "text \\\r\n more text",
-        ),
+        FStringMiddle,
         2..20,
         TokenFlags(
             F_STRING,

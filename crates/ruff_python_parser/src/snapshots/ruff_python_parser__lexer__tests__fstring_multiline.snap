@@ -13,9 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "\nhello\n    world\n",
-        ),
+        FStringMiddle,
         4..21,
         TokenFlags(
             DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
@@ -36,9 +34,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "\n    world\nhello\n",
-        ),
+        FStringMiddle,
         29..46,
         TokenFlags(
             TRIPLE_QUOTED_STRING | F_STRING,
@@ -59,9 +55,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "some ",
-        ),
+        FStringMiddle,
         52..57,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -79,9 +73,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "multiline\nallowed ",
-        ),
+        FStringMiddle,
         62..80,
         TokenFlags(
             DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
@@ -92,9 +84,7 @@ expression: lex_source(source)
         80..81,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         81..82,
     ),
     (
@@ -113,9 +103,7 @@ expression: lex_source(source)
         86..87,
     ),
     (
-        InterpolatedStringMiddle(
-            " string",
-        ),
+        FStringMiddle,
         87..94,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,

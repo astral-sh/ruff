@@ -6,9 +6,7 @@ expression: string_continuation_with_eol(WINDOWS_EOL)
 ```
 [
     (
-        String(
-            "abc\\\r\ndef",
-        ),
+        String,
         0..11,
         TokenFlags(
             DOUBLE_QUOTES,

@@ -17,9 +17,7 @@ expression: "lex_invalid(source, Mode::Module)"
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "__",
-        ),
+        FStringMiddle,
         3..5,
         TokenFlags(
             F_STRING,
@@ -34,9 +32,7 @@ expression: "lex_invalid(source, Mode::Module)"
         6..7,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         11..12,
     ),
     (
@@ -44,9 +40,7 @@ expression: "lex_invalid(source, Mode::Module)"
         12..13,
     ),
     (
-        InterpolatedStringMiddle(
-            "d",
-        ),
+        FStringMiddle,
         13..14,
         TokenFlags(
             F_STRING,
@@ -61,15 +55,11 @@ expression: "lex_invalid(source, Mode::Module)"
         15..16,
     ),
     (
-        Name(
-            Name("__"),
-        ),
+        Name,
         16..18,
     ),
     (
-        String(
-            "",
-        ),
+        String,
         18..19,
         TokenFlags(
             UNCLOSED_STRING,
@@ -87,9 +77,7 @@ expression: "lex_invalid(source, Mode::Module)"
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "__",
-        ),
+        FStringMiddle,
         22..24,
         TokenFlags(
             F_STRING,
@@ -104,9 +92,7 @@ expression: "lex_invalid(source, Mode::Module)"
         25..26,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         30..31,
     ),
     (
@@ -114,9 +100,7 @@ expression: "lex_invalid(source, Mode::Module)"
         31..32,
     ),
     (
-        InterpolatedStringMiddle(
-            "a",
-        ),
+        FStringMiddle,
         32..33,
         TokenFlags(
             F_STRING,
@@ -131,9 +115,7 @@ expression: "lex_invalid(source, Mode::Module)"
         34..42,
     ),
     (
-        Name(
-            Name("b"),
-        ),
+        Name,
         42..43,
     ),
     (
@@ -149,15 +131,11 @@ expression: "lex_invalid(source, Mode::Module)"
         44..45,
     ),
     (
-        Name(
-            Name("__"),
-        ),
+        Name,
         45..47,
     ),
     (
-        String(
-            "",
-        ),
+        String,
         47..48,
         TokenFlags(
             UNCLOSED_STRING,

@@ -10,9 +10,7 @@ expression: indentation_with_eol(MAC_EOL)
         0..3,
     ),
     (
-        Name(
-            Name("foo"),
-        ),
+        Name,
         4..7,
     ),
     (
@@ -40,9 +38,7 @@ expression: indentation_with_eol(MAC_EOL)
         15..21,
     ),
     (
-        Int(
-            99,
-        ),
+        Int,
         22..24,
     ),
     (

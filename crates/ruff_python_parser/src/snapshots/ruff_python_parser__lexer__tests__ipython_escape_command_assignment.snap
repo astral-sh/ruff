@@ -6,9 +6,7 @@ expression: lex_jupyter_source(source)
 ```
 [
     (
-        Name(
-            Name("pwd"),
-        ),
+        Name,
         0..3,
     ),
     (
@@ -16,10 +14,7 @@ expression: lex_jupyter_source(source)
         4..5,
     ),
     (
-        IpyEscapeCommand {
-            value: "pwd",
-            kind: Shell,
-        },
+        IpyEscapeCommand,
         6..10,
     ),
     (
@@ -27,9 +22,7 @@ expression: lex_jupyter_source(source)
         10..11,
     ),
     (
-        Name(
-            Name("foo"),
-        ),
+        Name,
         11..14,
     ),
     (
@@ -37,10 +30,7 @@ expression: lex_jupyter_source(source)
         15..16,
     ),
     (
-        IpyEscapeCommand {
-            value: "timeit a = b",
-            kind: Magic,
-        },
+        IpyEscapeCommand,
         17..30,
     ),
     (
@@ -48,9 +38,7 @@ expression: lex_jupyter_source(source)
         30..31,
     ),
     (
-        Name(
-            Name("bar"),
-        ),
+        Name,
         31..34,
     ),
     (
@@ -58,10 +46,7 @@ expression: lex_jupyter_source(source)
         35..36,
     ),
     (
-        IpyEscapeCommand {
-            value: "timeit a % 3",
-            kind: Magic,
-        },
+        IpyEscapeCommand,
         37..50,
     ),
     (
@@ -69,9 +54,7 @@ expression: lex_jupyter_source(source)
         50..51,
     ),
     (
-        Name(
-            Name("baz"),
-        ),
+        Name,
         51..54,
     ),
     (
@@ -79,10 +62,7 @@ expression: lex_jupyter_source(source)
         55..56,
     ),
     (
-        IpyEscapeCommand {
-            value: "matplotlib         inline",
-            kind: Magic,
-        },
+        IpyEscapeCommand,
         57..85,
     ),
     (
@@ -90,9 +70,7 @@ expression: lex_jupyter_source(source)
         85..86,
     ),
     (
-        Name(
-            Name("qux"),
-        ),
+        Name,
         86..89,
     ),
     (
@@ -100,10 +78,7 @@ expression: lex_jupyter_source(source)
         90..91,
     ),
     (
-        IpyEscapeCommand {
-            value: "foo?",
-            kind: Magic,
-        },
+        IpyEscapeCommand,
         92..97,
     ),
     (
@@ -111,9 +86,7 @@ expression: lex_jupyter_source(source)
         97..98,
     ),
     (
-        Name(
-            Name("quux"),
-        ),
+        Name,
         98..102,
     ),
     (
@@ -121,10 +94,7 @@ expression: lex_jupyter_source(source)
         103..104,
     ),
     (
-        IpyEscapeCommand {
-            value: "pwd?",
-            kind: Shell,
-        },
+        IpyEscapeCommand,
         105..110,
     ),
     (
