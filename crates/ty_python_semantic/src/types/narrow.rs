@@ -4,6 +4,7 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
+use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -1034,6 +1035,36 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    /// Intersect a type with `ExactlySized[Literal[length]]`, materializing the exact tuple shape
+    /// when a tuple spec can represent the result directly.
+    fn narrow_type_by_exact_len(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        length: usize,
+        exactly_sized: Type<'db>,
+    ) -> Type<'db> {
+        match ty.resolve_type_alias(db) {
+            Type::Union(union) => UnionType::from_elements(
+                db,
+                union.elements(db).iter().map(|element| {
+                    Self::narrow_type_by_exact_len(db, *element, length, exactly_sized)
+                }),
+            ),
+            Type::NominalInstance(instance) => {
+                if let Some(tuple) = instance.own_tuple_spec(db) {
+                    tuple
+                        .resize(db, TupleLength::Fixed(length))
+                        .ok()
+                        .map(|tuple| Type::tuple(TupleType::new(db, &tuple)))
+                        .unwrap_or(Type::Never)
+                } else {
+                    IntersectionType::from_two_elements(db, ty, exactly_sized)
+                }
+            }
+            ty => IntersectionType::from_two_elements(db, ty, exactly_sized),
+        }
+    }
+
     fn evaluate_simple_expr(
         &mut self,
         expr: &ast::Expr,
@@ -1472,6 +1503,58 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // For `==`, we use equality semantics on the `if` branch (is_positive=true).
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
             let constrain_with_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
+
+            let mut narrow_len_call = |call: &ast::ExprCall, length_type: Type<'db>| {
+                let Type::FunctionLiteral(function_type) = inference.expression_type(&*call.func)
+                else {
+                    return;
+                };
+                if function_type.known(self.db) != Some(KnownFunction::Len)
+                    || !call.arguments.keywords.is_empty()
+                {
+                    return;
+                }
+                let [arg] = &*call.arguments.args else {
+                    return;
+                };
+                let Some(length_literal) = length_type.as_int_literal() else {
+                    return;
+                };
+                let Ok(length) = usize::try_from(length_literal) else {
+                    return;
+                };
+                let Some(target) = PlaceExpr::try_from_expr(arg) else {
+                    return;
+                };
+
+                let exactly_sized = KnownClass::ExactlySized
+                    .to_specialized_instance(self.db, &[Type::int_literal(length_literal)]);
+                let narrowed = if constrain_with_equality {
+                    Self::narrow_type_by_exact_len(
+                        self.db,
+                        inference.expression_type(arg),
+                        length,
+                        exactly_sized,
+                    )
+                } else {
+                    exactly_sized.negate(self.db)
+                };
+                let constraint = NarrowingConstraint::intersection(narrowed);
+                constraints
+                    .entry(self.expect_place(&target))
+                    .and_modify(|existing| {
+                        *existing = existing.merge_constraint_and(constraint.clone());
+                    })
+                    .or_insert(constraint);
+            };
+
+            if let ast::Expr::Call(call) = left.expression_value() {
+                narrow_len_call(call, inference.expression_type(&comparators[0]));
+            }
+
+            if let ast::Expr::Call(call) = comparators[0].expression_value() {
+                narrow_len_call(call, inference.expression_type(&**left));
+            }
 
             let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
                 let value_type = inference.expression_type(&*subscript.value);

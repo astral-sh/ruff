@@ -52,8 +52,8 @@ def _(x: LiteralString):
 
 ## Tuples
 
-Ideally we'd narrow these types further, e.g. to `tuple[int, ...] & ~tuple[()]` in the positive case
-and `tuple[()]` in the negative case (see <https://github.com/astral-sh/ty/issues/560>).
+Boolean length checks narrow a tuple according to its truthiness. Exact length comparisons are
+covered separately below.
 
 ```py
 def _(x: tuple[int, ...]):
@@ -61,6 +61,54 @@ def _(x: tuple[int, ...]):
         reveal_type(x)  # revealed: tuple[int, ...] & ~AlwaysFalsy
     else:
         reveal_type(x)  # revealed: tuple[int, ...] & ~AlwaysTruthy
+```
+
+## Exact length comparisons
+
+Tuple length narrowing follows the typing specification for both fixed-length and partially unpacked
+tuple types:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def _(val: tuple[int] | tuple[str, str] | tuple[int, *tuple[str, ...], int]):
+    if len(val) == 1:
+        reveal_type(val)  # revealed: tuple[int]
+
+    if len(val) == 2:
+        reveal_type(val)  # revealed: tuple[str, str] | tuple[int, int]
+
+    if len(val) == 3:
+        reveal_type(val)  # revealed: tuple[int, str, int]
+
+def _(val: tuple[int] | tuple[str, str]):
+    if 1 != len(val):
+        reveal_type(val)  # revealed: tuple[str, str]
+    else:
+        reveal_type(val)  # revealed: tuple[int]
+```
+
+Types that define a precise `__len__` method can also be narrowed by an exact length comparison:
+
+```py
+from typing import Literal
+
+class LengthThree:
+    def __len__(self) -> Literal[3]:
+        return 3
+
+class LengthFour:
+    def __len__(self) -> Literal[4]:
+        return 4
+
+def _(value: LengthThree | LengthFour):
+    if len(value) == 3:
+        reveal_type(value)  # revealed: LengthThree & ExactlySized[Literal[3]]
+    else:
+        reveal_type(value)  # revealed: LengthFour
 ```
 
 ## Unions of narrowable types
