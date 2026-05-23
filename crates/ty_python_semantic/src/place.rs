@@ -14,7 +14,10 @@ use crate::types::{
     TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
-use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::definition::{
+    Definition, DefinitionKind, DefinitionState, NestedScopeBindingDefinitionKind,
+    NestedScopeBindingTarget,
+};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
@@ -25,7 +28,7 @@ use ty_python_core::scope::{FileScopeId, ScopeId};
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
     DeclarationWithConstraint, DeclarationsIterator, Truthiness, get_loop_header, global_scope,
-    place_table, use_def_map,
+    place_table, semantic_index, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -862,6 +865,7 @@ pub(crate) fn nested_binding_scopes_ty<'db>(
     owner_scope: ScopeId<'db>,
     symbol_name: &str,
     nested_scopes: &[FileScopeId],
+    target: NestedScopeBindingTarget,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Option<Type<'db>> {
     // If there are any nested bindings (via `global` or `nonlocal` variables) for this symbol,
@@ -875,6 +879,9 @@ pub(crate) fn nested_binding_scopes_ty<'db>(
     //         x += 1
     // ```
     if nested_scopes.is_empty() {
+        return None;
+    }
+    if !nested_scope_binding_target_is_visible(db, owner_scope, symbol_name, target) {
         return None;
     }
 
@@ -1363,6 +1370,79 @@ pub(crate) struct ReachableLoopBinding<'db> {
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
 }
 
+fn nested_scope_binding_is_visible(
+    db: &dyn Db,
+    binding: Definition<'_>,
+    nested_binding: &NestedScopeBindingDefinitionKind,
+) -> bool {
+    let scope = binding.scope(db);
+    let Some(symbol_id) = binding.place(db).as_symbol() else {
+        return false;
+    };
+    let place_table = place_table(db, scope);
+    let symbol_name = place_table.symbol(symbol_id).name();
+
+    nested_scope_binding_target_is_visible(db, scope, symbol_name.as_str(), nested_binding.target())
+}
+
+fn nested_scope_binding_target_is_visible(
+    db: &dyn Db,
+    scope: ScopeId<'_>,
+    name: &str,
+    target: NestedScopeBindingTarget,
+) -> bool {
+    match target {
+        NestedScopeBindingTarget::Global => nested_global_binding_is_visible(db, scope, name),
+        NestedScopeBindingTarget::Nonlocal => {
+            let place_table = place_table(db, scope);
+            let Some(symbol_id) = place_table.symbol_id(name) else {
+                return false;
+            };
+            let symbol = place_table.symbol(symbol_id);
+
+            !scope.file_scope_id(db).is_global()
+                && !symbol.is_global()
+                && !(scope.scope(db).kind().is_class() && symbol.is_local())
+        }
+    }
+}
+
+fn nested_global_binding_is_visible(db: &dyn Db, scope: ScopeId<'_>, name: &str) -> bool {
+    let file = scope.file(db);
+    let index = semantic_index(db, file);
+
+    for (visible_scope_id, _) in index.visible_ancestor_scopes(scope.file_scope_id(db)) {
+        if visible_scope_id.is_global() {
+            return true;
+        }
+
+        let visible_scope = visible_scope_id.to_scope_id(db, file);
+        let place_table = place_table(db, visible_scope);
+        let Some(symbol_id) = place_table.symbol_id(name) else {
+            continue;
+        };
+        let symbol = place_table.symbol(symbol_id);
+
+        if symbol.is_global() {
+            // A bare `global x` in a function makes `x` resolve to the module, but it doesn't
+            // itself make a nested write visible as a local binding in that function. Let the
+            // normal global fallback handle it so the existing module binding keeps its ordering.
+            if visible_scope.scope(db).kind().is_function_like() && !symbol.is_bound() {
+                return false;
+            }
+            return true;
+        }
+        if symbol.is_nonlocal() {
+            continue;
+        }
+        if symbol.is_local() {
+            return false;
+        }
+    }
+
+    false
+}
+
 /// Implementation of [`place_from_bindings`].
 ///
 /// ## Implementation Note
@@ -1497,7 +1577,11 @@ fn place_from_bindings_impl<'db>(
                 if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
-            } else if !matches!(binding.kind(db), DefinitionKind::NestedScopeBinding(_)) {
+            } else if let DefinitionKind::NestedScopeBinding(nested_binding) = binding.kind(db) {
+                if !nested_scope_binding_is_visible(db, binding, nested_binding) {
+                    return None;
+                }
+            } else {
                 only_non_shadowing_bindings = false;
             }
 

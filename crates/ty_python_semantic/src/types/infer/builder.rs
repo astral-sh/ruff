@@ -2110,6 +2110,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             scope,
             symbol_name.as_str(),
             nested_binding_kind.binding_scopes(),
+            nested_binding_kind.target(),
             RequiresExplicitReExport::No,
         )
         .unwrap_or(Type::Never);

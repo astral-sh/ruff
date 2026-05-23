@@ -1483,13 +1483,19 @@ pub struct LoopHeaderDefinitionKind<'db> {
 pub struct NestedScopeBindingDefinitionKind {
     binding_scopes: smallvec::SmallVec<[FileScopeId; 1]>,
     range: TextRange,
+    target: NestedScopeBindingTarget,
 }
 
 impl NestedScopeBindingDefinitionKind {
-    pub fn new(binding_scopes: smallvec::SmallVec<[FileScopeId; 1]>, range: TextRange) -> Self {
+    pub fn new(
+        binding_scopes: smallvec::SmallVec<[FileScopeId; 1]>,
+        range: TextRange,
+        target: NestedScopeBindingTarget,
+    ) -> Self {
         Self {
             binding_scopes,
             range,
+            target,
         }
     }
 
@@ -1500,6 +1506,16 @@ impl NestedScopeBindingDefinitionKind {
     pub fn range(&self) -> TextRange {
         self.range
     }
+
+    pub fn target(&self) -> NestedScopeBindingTarget {
+        self.target
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+pub enum NestedScopeBindingTarget {
+    Global,
+    Nonlocal,
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]

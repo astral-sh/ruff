@@ -493,6 +493,27 @@ x = 3
 reveal_type(x)  # revealed: Literal[2, 3]
 ```
 
+## Nested `global` binding hidden by an enclosing local
+
+A synthetic definition for the nested `global x` needs to flow through `outer`, so it can still
+reach the module scope. But it should be ignored when resolving `x` in scopes where the name
+resolves to `outer`'s local binding instead.
+
+```py
+x = 1
+
+def outer():
+    x = 2
+    def inner():
+        def writer():
+            global x
+            x = 3
+        reveal_type(x)  # revealed: Literal[2]
+    reveal_type(x)  # revealed: Literal[2]
+
+reveal_type(x)  # revealed: Literal[1, 3]
+```
+
 ## Global `+=` widening works like it does in loops
 
 Using `+=` in a loop usually triggers fixpoint analysis, where after the list of `Literal` values
@@ -685,6 +706,7 @@ including the global/module scope.
 
 ```py
 x = 1
+
 def _():
     def _():
         def global_middle():
@@ -704,6 +726,7 @@ def _():
         reveal_type(x)  # revealed: Literal[4, 5]
         x = 4
     x = 5
+
 # The module case: we see the global `x`.
 reveal_type(x)  # revealed: Literal[1, 2]
 ```

@@ -31,8 +31,8 @@ use crate::definition::{
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
     LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
-    MatchPatternDefinitionNodeRef, NestedScopeBindingDefinitionKind, ParameterDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, NestedScopeBindingDefinitionKind, NestedScopeBindingTarget,
+    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::member::MemberExprBuilder;
@@ -104,34 +104,27 @@ struct ScopeInfo<'ast> {
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
-    /// `nonlocal` variables from scopes nested inside of this one that haven't yet been resolved
-    /// to a definition. They might end up resolving in this scope, or in an enclosing scope.
+    /// `nonlocal` declarations from this scope and from scopes nested inside this one that haven't
+    /// yet been resolved to a definition. They might end up resolving in this scope, or in an
+    /// enclosing scope.
     ///
     /// Nested functions with `nonlocal` variables can come before or after those variables are
     /// defined in the containing scope, so we wait until the end of each scope (`pop_scope`) to
     /// decide which nonlocals resolve there. Any still-unresolved nonlocals get merged into the
-    /// parent scope's collection. After popping a scope, we synthesize a `NestedScopeBinding`
-    /// definition in the parent scope for each symbol that was bound anywhere (transitively)
-    /// within the popped scope. Nested bindings from function scopes have special shadowing
-    /// behavior (they don't shadow prior bindings, and subsequent bindings don't shadow them),
-    /// since we don't track when nested functions are called, so we assume they might be called at
-    /// any time. On the other hand, nested bindings from class scopes (which are "eager") have
-    /// normal shadowing behavior.
+    /// parent scope's collection.
     ///
-    /// The reason we need to track these for each scope separately, instead of using one map for
-    /// the whole builder, is because of sibling scope arrangements like this:
+    /// The reason we need to track these for each scope separately is because of sibling scope
+    /// arrangements like this:
     ///
     /// ```py
     /// def f():
     ///     def g():
-    ///         # When we encounter the `nonlocal` statement, we add `x` to `f`'s collection of
-    ///         # unresolved nonlocals. (It would be ok to put it in `g`s collection, but we know
-    ///         # it can't resolve here in `g`.)
+    ///         # When we encounter the `nonlocal` statement, we add `x` to `g`'s collection of
+    ///         # unresolved nonlocals.
     ///         nonlocal x
     ///     def h():
     ///         # When we pop `h`, this binding of `x` will *not* resolve the nonlocal from `g`,
-    ///         # because that binding is not in `h`'s set of unresolved nonlocals. (`h`'s set is
-    ///         # currently empty.)
+    ///         # because that nonlocal has not been folded into `f`'s collection yet.
     ///         x = 1
     ///     # When we pop `f`, this binding of `x` will resolve the nonlocal from `g`. Or if `f`
     ///     # didn't have a binding for `x`, then we'd merge `x` into the caller's collection.
@@ -148,11 +141,22 @@ struct ScopeInfo<'ast> {
     /// binding in their scope, because those can still trigger semantic syntax errors if they fail
     /// to resolve properly.
     unresolved_nonlocals: FxHashMap<Name, Vec<UnresolvedNonlocal>>,
+    /// Bound variables declared `global` somewhere in this scope or in one of its descendants.
+    /// These are propagated outward after the scope has had a chance to synthesize definitions for
+    /// its own parent.
+    nested_global_bindings: FxHashMap<Name, Vec<FileScopeId>>,
+    /// Bound variables declared `nonlocal` somewhere in this scope or in one of its descendants
+    /// that have not yet resolved to an owning function scope.
+    nested_nonlocal_bindings: FxHashMap<Name, Vec<FileScopeId>>,
 }
 
 struct UnresolvedNonlocal {
-    scope_id: FileScopeId,
     range: TextRange,
+}
+
+struct PoppedScope {
+    nested_global_bindings: FxHashMap<Name, Vec<FileScopeId>>,
+    nested_nonlocal_bindings: FxHashMap<Name, Vec<FileScopeId>>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -252,10 +256,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
-    /// Similar to `ScopeInfo::unresolved_nonlocals`, but for bound variables declared `global`.
-    /// We use these to synthesize `NestedScopeBinding` definitions after every nested non-global
-    /// scope that contains a `global` binding.
-    nested_global_bindings: FxHashMap<Name, Vec<FileScopeId>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
@@ -309,8 +309,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast_ids: IndexVec::new(),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
-            nested_global_bindings: FxHashMap::default(),
-
             scopes_by_expression: ExpressionsScopeMapBuilder::new(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
@@ -503,6 +501,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_loop: None,
             narrowing_aliases: saved_aliases,
             unresolved_nonlocals: FxHashMap::default(),
+            nested_global_bindings: FxHashMap::default(),
+            nested_nonlocal_bindings: FxHashMap::default(),
         });
     }
 
@@ -588,10 +588,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
-                // For the same reason, we don't snapshot bindings owned by `global`/`nonlocal`
-                // forwarding declarations here; `snapshot_enclosing_state` stores only a
-                // constraint for those symbols. Also, if the enclosing scope allows its members to
-                // be modified from elsewhere, the snapshot will not be recorded.
+                // `global`/`nonlocal` symbols are forwarding declarations, not captures of a
+                // same-named binding in the enclosing scope. Their writes are represented by
+                // synthesized nested binding definitions instead.
+                if nested_symbol.is_global() || nested_symbol.is_nonlocal() {
+                    continue;
+                }
+                // If the enclosing scope allows its members to be modified from elsewhere, the
+                // snapshot will not be recorded.
                 // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
                 // as class variables are not visible to them)
                 if self.scopes[enclosing_scope_id].kind().is_module() {
@@ -801,13 +805,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn pop_scope(&mut self) -> FileScopeId {
+    fn pop_scope(&mut self) -> PoppedScope {
         self.try_node_context_stack_manager.exit_scope();
 
         let ScopeInfo {
             file_scope_id: popped_scope_id,
             narrowing_aliases,
             unresolved_nonlocals: mut popped_unresolved_nonlocals,
+            nested_global_bindings: mut popped_nested_global_bindings,
+            nested_nonlocal_bindings: mut popped_nested_nonlocal_bindings,
             ..
         } = self
             .scope_stack
@@ -829,13 +835,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let popped_scope_kind = self.scopes[popped_scope_id].kind();
 
         if !popped_scope_id.is_global() {
-            // Record any bound `global` variables in this scope. We do this here, rather than when
-            // we visit the `global` statement, because at that point we don't know whether the
-            // variable will be bound.
+            // Record any bound `global`/`nonlocal` variables in this scope. We do this here,
+            // rather than when we visit the `global`/`nonlocal` statement, because at that point
+            // we don't know whether the variable will be bound.
             for symbol in self.place_tables[popped_scope_id].symbols() {
                 if symbol.is_global() && symbol.is_bound() {
-                    let binding_scopes = self
-                        .nested_global_bindings
+                    let binding_scopes = popped_nested_global_bindings
+                        .entry(symbol.name().clone())
+                        .or_default();
+                    if !binding_scopes.contains(&popped_scope_id) {
+                        binding_scopes.push(popped_scope_id);
+                    }
+                } else if symbol.is_nonlocal() && symbol.is_bound() {
+                    let binding_scopes = popped_nested_nonlocal_bindings
                         .entry(symbol.name().clone())
                         .or_default();
                     if !binding_scopes.contains(&popped_scope_id) {
@@ -856,7 +868,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         !symbol.is_nonlocal() && (symbol.is_local() || symbol.is_global());
                     let symbol_is_global = symbol.is_global(); // borrowck
                     if symbol_is_resolved {
-                        for &mut UnresolvedNonlocal { range, .. } in nonlocals_with_this_name {
+                        for &mut UnresolvedNonlocal { range } in nonlocals_with_this_name {
                             if symbol_is_global {
                                 // It's a syntax error for a nonlocal variable to resolve to the global
                                 // scope or to a `global` statement in an enclosing scope.
@@ -871,6 +883,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             }
                         }
                         // This name was resolved. Remove it and its references.
+                        popped_nested_nonlocal_bindings.remove(name);
                         return false;
                     }
                 }
@@ -909,7 +922,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        popped_scope_id
+        PoppedScope {
+            nested_global_bindings: popped_nested_global_bindings,
+            nested_nonlocal_bindings: popped_nested_nonlocal_bindings,
+        }
     }
 
     fn current_place_table(&self) -> &PlaceTableBuilder {
@@ -942,32 +958,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         symbol_id
     }
 
-    fn symbol_resolves_to_global_scope(&self, scope_id: FileScopeId, name: &str) -> bool {
-        for (visible_scope_id, _) in self.visible_ancestor_scopes(scope_id) {
-            if visible_scope_id.is_global() {
-                return true;
-            }
-
-            let place_table = &self.place_tables[visible_scope_id];
-            let Some(symbol_id) = place_table.symbol_id(name) else {
-                continue;
-            };
-            let symbol = place_table.symbol(symbol_id);
-
-            if symbol.is_global() {
-                return true;
-            }
-            if symbol.is_nonlocal() {
-                continue;
-            }
-            if symbol.is_local() {
-                return false;
-            }
-        }
-
-        false
-    }
-
     /// Figure out whether bindings in `binding_scope` are eager vs lazy from the perspective of
     /// `current_scope`. Class bodies are eagerly evaluated, so a nonlocal/global binding in a
     /// class scope takes effect immediately in its caller. Function bodies are not eagerly
@@ -995,157 +985,147 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         nested_bindings: &mut Vec<(
             ScopedPlaceId,
             NestedBindingLaziness,
+            NestedScopeBindingTarget,
             smallvec::SmallVec<[FileScopeId; 1]>,
         )>,
         place: ScopedPlaceId,
         laziness: NestedBindingLaziness,
+        target: NestedScopeBindingTarget,
         binding_scope: FileScopeId,
     ) {
         // Keep eager scopes separate so later class-body writes can shadow earlier ones.
         if laziness == NestedBindingLaziness::Eager {
-            nested_bindings.push((place, laziness, smallvec::smallvec![binding_scope]));
+            nested_bindings.push((place, laziness, target, smallvec::smallvec![binding_scope]));
             return;
         }
 
-        if let Some((_, _, binding_scopes)) =
+        if let Some((_, _, _, binding_scopes)) =
             nested_bindings
                 .iter_mut()
-                .find(|(nested_place, nested_laziness, _)| {
-                    *nested_place == place && *nested_laziness == laziness
+                .find(|(nested_place, nested_laziness, nested_target, _)| {
+                    *nested_place == place
+                        && *nested_laziness == laziness
+                        && *nested_target == target
                 })
         {
             if !binding_scopes.contains(&binding_scope) {
                 binding_scopes.push(binding_scope);
             }
         } else {
-            nested_bindings.push((place, laziness, smallvec::smallvec![binding_scope]));
+            nested_bindings.push((place, laziness, target, smallvec::smallvec![binding_scope]));
         }
     }
 
     fn synthesize_nested_binding_definitions(
         &mut self,
-        nested_scope_id: FileScopeId,
+        popped_scope: &PoppedScope,
         range: TextRange,
     ) {
         let current_scope = self.current_scope();
-        let nested_scope_descendants = self.scopes[nested_scope_id].descendants();
-        let nested_scope_contains = |scope_id: FileScopeId| {
-            scope_id == nested_scope_id
-                || (nested_scope_descendants.start.index() <= scope_id.index()
-                    && scope_id.index() < nested_scope_descendants.end.index())
-        };
         let mut nested_bindings: Vec<(
             ScopedPlaceId,
             NestedBindingLaziness,
+            NestedScopeBindingTarget,
             smallvec::SmallVec<[FileScopeId; 1]>,
         )> = Vec::new();
 
         if self.scopes[current_scope].kind().is_function_like()
             || self.scopes[current_scope].kind().is_class()
         {
-            let mut unresolved_nonlocal_bindings: Vec<(Name, FileScopeId)> = self
-                .current_scope_info()
-                .unresolved_nonlocals
-                .iter()
-                .flat_map(|(name, nonlocals)| {
-                    nonlocals.iter().filter_map(|nonlocal| {
-                        let binding_scope = nonlocal.scope_id;
-                        nested_scope_contains(binding_scope).then(|| (name.clone(), binding_scope))
-                    })
-                })
-                .collect();
-            unresolved_nonlocal_bindings.sort_by_key(|(_, binding_scope)| binding_scope.index());
-
-            for (name, binding_scope) in unresolved_nonlocal_bindings {
-                let nested_place_table = &self.place_tables[binding_scope];
-                let Some(nested_symbol_id) = nested_place_table.symbol_id(&name) else {
-                    continue;
-                };
-                let nested_symbol = nested_place_table.symbol(nested_symbol_id);
-                // The unresolved nonlocals include read-only references. Only nested bindings need a
-                // definition in the parent scope.
-                if !nested_symbol.is_bound() {
-                    continue;
-                }
-
-                if let Some(symbol_id) = self.place_tables[current_scope].symbol_id(&name) {
-                    let symbol = self.place_tables[current_scope].symbol(symbol_id);
-                    if symbol.is_global()
-                        || (self.scopes[current_scope].kind().is_class() && symbol.is_local())
-                    {
-                        continue;
-                    }
-                }
-
-                let place = self.add_symbol_to_scope(name, current_scope).into();
-                let laziness = self.nested_binding_laziness(current_scope, binding_scope);
-                Self::push_nested_binding_definition(
-                    &mut nested_bindings,
-                    place,
-                    laziness,
-                    binding_scope,
-                );
-            }
+            self.collect_nested_binding_definitions(
+                &mut nested_bindings,
+                &popped_scope.nested_nonlocal_bindings,
+                NestedScopeBindingTarget::Nonlocal,
+            );
         }
 
-        let nested_global_bindings: Vec<(Name, smallvec::SmallVec<[FileScopeId; 1]>)> = self
-            .nested_global_bindings
-            .iter()
-            .filter_map(|(name, binding_scopes)| {
-                let mut binding_scopes: smallvec::SmallVec<[FileScopeId; 1]> = binding_scopes
-                    .iter()
-                    .copied()
-                    .filter(|&binding_scope| nested_scope_contains(binding_scope))
-                    .collect();
-                binding_scopes.sort_by_key(|binding_scope| binding_scope.index());
-                (!binding_scopes.is_empty()).then(|| (name.clone(), binding_scopes))
-            })
-            .collect();
+        self.collect_nested_binding_definitions(
+            &mut nested_bindings,
+            &popped_scope.nested_global_bindings,
+            NestedScopeBindingTarget::Global,
+        );
 
-        for (name, binding_scopes) in nested_global_bindings {
-            if !self.symbol_resolves_to_global_scope(current_scope, &name) {
-                continue;
-            }
-
-            let place = self.add_symbol_to_scope(name.clone(), current_scope).into();
-
-            for binding_scope in binding_scopes {
-                let laziness = self.nested_binding_laziness(current_scope, binding_scope);
-                Self::push_nested_binding_definition(
-                    &mut nested_bindings,
-                    place,
-                    laziness,
-                    binding_scope,
-                );
-            }
-
-            if current_scope.is_global() {
-                // Non-global installs need to leave these binding scopes available so enclosing
-                // scopes can synthesize the same nested global binding later. Once we've installed
-                // the binding in the global/module scope, there is no enclosing scope left to
-                // propagate it to, so discard those scopes from this builder-only collection.
-                let should_remove = {
-                    let binding_scopes = self
-                        .nested_global_bindings
-                        .get_mut(&name)
-                        .expect("binding scopes should still exist");
-                    binding_scopes.retain(|binding_scope| !nested_scope_contains(*binding_scope));
-                    binding_scopes.is_empty()
-                };
-                if should_remove {
-                    self.nested_global_bindings.remove(&name);
-                }
-            }
-        }
-
-        for (place, laziness, binding_scopes) in nested_bindings {
+        for (place, laziness, target, binding_scopes) in nested_bindings {
             self.add_nested_scope_binding_definition(
                 current_scope,
                 place,
                 binding_scopes,
                 range,
                 laziness,
+                target,
             );
+        }
+    }
+
+    fn collect_nested_binding_definitions(
+        &mut self,
+        nested_bindings: &mut Vec<(
+            ScopedPlaceId,
+            NestedBindingLaziness,
+            NestedScopeBindingTarget,
+            smallvec::SmallVec<[FileScopeId; 1]>,
+        )>,
+        binding_scopes_by_name: &FxHashMap<Name, Vec<FileScopeId>>,
+        target: NestedScopeBindingTarget,
+    ) {
+        let current_scope = self.current_scope();
+        let mut binding_scopes_by_name: Vec<(Name, smallvec::SmallVec<[FileScopeId; 1]>)> =
+            binding_scopes_by_name
+                .iter()
+                .map(|(name, binding_scopes)| {
+                    let mut binding_scopes = binding_scopes
+                        .iter()
+                        .copied()
+                        .collect::<smallvec::SmallVec<[FileScopeId; 1]>>();
+                    binding_scopes.sort_by_key(|binding_scope| binding_scope.index());
+                    (name.clone(), binding_scopes)
+                })
+                .collect();
+        binding_scopes_by_name.sort_by_key(|(_, binding_scopes)| binding_scopes[0].index());
+
+        for (name, binding_scopes) in binding_scopes_by_name {
+            let place = self.add_symbol_to_scope(name, current_scope).into();
+
+            for binding_scope in binding_scopes {
+                let laziness = self.nested_binding_laziness(current_scope, binding_scope);
+                Self::push_nested_binding_definition(
+                    nested_bindings,
+                    place,
+                    laziness,
+                    target,
+                    binding_scope,
+                );
+            }
+        }
+    }
+
+    fn merge_popped_nested_bindings_into_current_scope(&mut self, popped_scope: PoppedScope) {
+        if self.current_scope().is_global() {
+            return;
+        }
+
+        let current_scope_info = self.current_scope_info_mut();
+        Self::extend_nested_binding_scopes(
+            &mut current_scope_info.nested_global_bindings,
+            popped_scope.nested_global_bindings,
+        );
+        Self::extend_nested_binding_scopes(
+            &mut current_scope_info.nested_nonlocal_bindings,
+            popped_scope.nested_nonlocal_bindings,
+        );
+    }
+
+    fn extend_nested_binding_scopes(
+        merged_bindings: &mut FxHashMap<Name, Vec<FileScopeId>>,
+        new_bindings: FxHashMap<Name, Vec<FileScopeId>>,
+    ) {
+        for (name, binding_scopes) in new_bindings {
+            let merged_binding_scopes = merged_bindings.entry(name).or_default();
+            for binding_scope in binding_scopes {
+                if !merged_binding_scopes.contains(&binding_scope) {
+                    merged_binding_scopes.push(binding_scope);
+                }
+            }
         }
     }
 
@@ -1156,6 +1136,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         binding_scopes: smallvec::SmallVec<[FileScopeId; 1]>,
         range: TextRange,
         laziness: NestedBindingLaziness,
+        target: NestedScopeBindingTarget,
     ) {
         debug_assert_eq!(scope_id, self.current_scope());
 
@@ -1167,6 +1148,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             DefinitionKind::NestedScopeBinding(NestedScopeBindingDefinitionKind::new(
                 binding_scopes,
                 range,
+                target,
             )),
             true,
         );
@@ -2287,12 +2269,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         statement
     }
 
-    fn with_type_params(
+    fn with_type_params<T>(
         &mut self,
         with_scope: NodeWithScopeRef,
         type_params: Option<&'ast ast::TypeParams>,
-        nested: impl FnOnce(&mut Self) -> FileScopeId,
-    ) -> FileScopeId {
+        nested: impl FnOnce(&mut Self) -> T,
+    ) -> T {
         if let Some(type_params) = type_params {
             self.push_scope(with_scope);
 
@@ -2781,9 +2763,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Nested body writes become visible in the enclosing scope only once the
                 // definition reaches its parent-scope binding point.
                 self.synthesize_nested_binding_definitions(
-                    function_scope,
+                    &function_scope,
                     function_def.name.range(),
                 );
+                self.merge_popped_nested_bindings_into_current_scope(function_scope);
             }
             ast::Stmt::ClassDef(class) => {
                 for decorator in &class.decorator_list {
@@ -2810,7 +2793,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.add_definition(symbol.into(), class);
                 // Nested body writes become visible in the enclosing scope only after the class
                 // has been registered there.
-                self.synthesize_nested_binding_definitions(class_scope, class.name.range());
+                self.synthesize_nested_binding_definitions(&class_scope, class.name.range());
+                self.merge_popped_nested_bindings_into_current_scope(class_scope);
             }
             ast::Stmt::TypeAlias(type_alias) => {
                 let symbol = self.add_symbol(
@@ -3867,20 +3851,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.current_place_table_mut()
                         .symbol_mut(symbol_id)
                         .mark_nonlocal();
-                    // Add this symbol to the parent scope's set of unresolved nonlocals. (It would
-                    // also work to add it to this scope's set, which will get folded into the
-                    // parent's in `pop_scope`. But since it can't possibly resolve here, we might
-                    // as well try to spare an allocation.) We checked above that we aren't in the
-                    // module scope, so there's definitely a parent scope.
-                    let parent_scope_index = self.scope_stack.len() - 2;
-                    self.scope_stack[parent_scope_index]
+                    self.current_scope_info_mut()
                         .unresolved_nonlocals
                         .entry(name.id.clone())
                         .or_default()
-                        .push(UnresolvedNonlocal {
-                            scope_id,
-                            range: name.range,
-                        });
+                        .push(UnresolvedNonlocal { range: name.range });
                 }
                 walk_stmt(self, stmt);
             }
