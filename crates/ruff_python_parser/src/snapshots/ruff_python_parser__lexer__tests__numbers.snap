@@ -16,9 +16,13 @@ expression: lex_source(source)
     Float 46..51,
     Complex 52..54,
     Complex 55..59,
-    Int 60..63,
-    Int 64..82,
-    Int 83..117,
-    Newline 117..117,
+    Float 60..65,
+    Complex 66..72,
+    Int 73..109,
+    Complex 110..147,
+    Int 148..151,
+    Int 152..170,
+    Int 171..205,
+    Newline 205..205,
 ]
 ```

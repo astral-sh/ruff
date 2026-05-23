@@ -85,9 +85,9 @@ enum EscapedChar {
     Escape(char),
 }
 
-struct StringParser {
+struct StringParser<'src> {
     /// The raw content of the string e.g., the `foo` part in `"foo"`.
-    source: Box<str>,
+    source: &'src str,
     /// Current position of the parser in the source.
     cursor: usize,
     /// Flags that can be used to query information about the string.
@@ -98,8 +98,8 @@ struct StringParser {
     range: TextRange,
 }
 
-impl StringParser {
-    fn new(source: Box<str>, flags: AnyStringFlags, offset: TextSize, range: TextRange) -> Self {
+impl<'src> StringParser<'src> {
+    fn new(source: &'src str, flags: AnyStringFlags, offset: TextSize, range: TextRange) -> Self {
         Self {
             source,
             cursor: 0,
@@ -135,7 +135,7 @@ impl StringParser {
     /// When the next byte is a part of a multi-byte character.
     #[inline]
     fn next_byte(&mut self) -> Option<u8> {
-        self.source[self.cursor..].as_bytes().first().map(|&byte| {
+        self.source.as_bytes()[self.cursor..].first().map(|&byte| {
             self.cursor += 1;
             byte
         })
@@ -150,7 +150,7 @@ impl StringParser {
 
     #[inline]
     fn peek_byte(&self) -> Option<u8> {
-        self.source[self.cursor..].as_bytes().first().copied()
+        self.source.as_bytes()[self.cursor..].first().copied()
     }
 
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
@@ -283,7 +283,7 @@ impl StringParser {
         // Fast-path: if the f-string or t-string doesn't contain any escape sequences, return the literal.
         let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
             return Ok(ast::InterpolatedStringLiteralElement {
-                value: self.source,
+                value: self.source.into(),
                 range: self.range,
                 node_index: AtomicNodeIndex::NONE,
             });
@@ -354,7 +354,7 @@ impl StringParser {
             }
 
             let Some(next_index) =
-                memchr::memchr3(b'{', b'}', b'\\', self.source[self.cursor..].as_bytes())
+                memchr::memchr3(b'{', b'}', b'\\', &self.source.as_bytes()[self.cursor..])
             else {
                 // Add the rest of the string to the value.
                 let rest = &self.source[self.cursor..];
@@ -387,7 +387,7 @@ impl StringParser {
         if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.into_boxed_bytes(),
+                value: self.source.as_bytes().to_vec().into_boxed_slice(),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -397,7 +397,7 @@ impl StringParser {
         let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.into_boxed_bytes(),
+                value: self.source.as_bytes().to_vec().into_boxed_slice(),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -422,7 +422,7 @@ impl StringParser {
                 }
             }
 
-            let Some(next_escape) = memchr::memchr(b'\\', self.source[self.cursor..].as_bytes())
+            let Some(next_escape) = memchr::memchr(b'\\', &self.source.as_bytes()[self.cursor..])
             else {
                 // Add the rest of the string to the value.
                 let rest = &self.source[self.cursor..];
@@ -446,7 +446,7 @@ impl StringParser {
         if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Str(ast::StringLiteral {
-                value: self.source,
+                value: self.source.into(),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -456,7 +456,7 @@ impl StringParser {
         let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Str(ast::StringLiteral {
-                value: self.source,
+                value: self.source.into(),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -511,7 +511,7 @@ impl StringParser {
 }
 
 pub(crate) fn parse_string_literal(
-    source: Box<str>,
+    source: &str,
     flags: AnyStringFlags,
     range: TextRange,
 ) -> Result<StringType, LexicalError> {
@@ -520,7 +520,7 @@ pub(crate) fn parse_string_literal(
 
 // TODO(dhruvmanila): Move this to the new parser
 pub(crate) fn parse_interpolated_string_literal_element(
-    source: Box<str>,
+    source: &str,
     flags: AnyStringFlags,
     range: TextRange,
 ) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
