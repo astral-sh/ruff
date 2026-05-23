@@ -55,3 +55,51 @@ jobs:
           if grep -q "project error" ecosystem-result-format-stable ecosystem-result-format-preview; then
             exit 1
           fi
+
+      - name: "Checkout Airflow revision from the failed ecosystem run"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: apache/airflow
+          # This was Airflow main until 19:53 UTC; #25330 failed at 19:41 UTC.
+          ref: eca91dc5c2cab36b3a8e6d53772cf13716d98a8d
+          path: failed-airflow
+          persist-credentials: false
+
+      - name: "Run formatter comparison on the failed Airflow revision"
+        env:
+          RUFF_BIN: ${{ github.workspace }}/target/debug/ruff
+        working-directory: failed-airflow
+        run: |
+          git config user.email "ecosystem@astral.sh"
+          git config user.name "Ecosystem Bot"
+
+          python - <<'PY'
+          import asyncio
+          import os
+          from pathlib import Path
+
+          from ruff_ecosystem.defaults import DEFAULT_TARGETS
+          from ruff_ecosystem.format import FormatComparison, compare_format
+          from ruff_ecosystem.projects import ClonedRepository
+
+
+          async def run() -> None:
+              target = next(
+                  target
+                  for target in DEFAULT_TARGETS
+                  if target.repo.fullname == "apache/airflow"
+              ).with_preview_enabled()
+              repository = await ClonedRepository.from_path(Path("."), target.repo)
+              ruff = Path(os.environ["RUFF_BIN"])
+              await compare_format(
+                  ruff,
+                  ruff,
+                  target.format_options,
+                  target.config_overrides,
+                  repository,
+                  FormatComparison.ruff_and_ruff,
+              )
+
+
+          asyncio.run(run())
+          PY
