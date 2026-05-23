@@ -41,7 +41,28 @@ use std::borrow::Cow;
 use lsp_types::Url;
 use lsp_types::notification::Notification;
 use lsp_types::request::Request;
+use lsp_types::{
+    DocumentDiagnosticReport, DocumentDiagnosticReportResult, RelatedFullDocumentDiagnosticReport,
+};
 use ty_project::ProjectDatabase;
+
+pub(super) trait NoProjectResult {
+    fn no_project_result() -> Self;
+}
+
+impl<T> NoProjectResult for Option<T> {
+    fn no_project_result() -> Self {
+        None
+    }
+}
+
+impl NoProjectResult for DocumentDiagnosticReportResult {
+    fn no_project_result() -> Self {
+        DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
+            RelatedFullDocumentDiagnosticReport::default(),
+        ))
+    }
+}
 
 /// A supertrait for any server request handler.
 pub(super) trait RequestHandler {
@@ -85,7 +106,10 @@ pub(super) trait RetriableRequestHandler: RequestHandler {
 /// A request handler that can be run on a background thread.
 ///
 /// This handler is specific to requests that operate on a single document.
-pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
+pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler
+where
+    <<Self as RequestHandler>::RequestType as Request>::Result: NoProjectResult,
+{
     /// Returns the URL of the document that this request handler operates on.
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
@@ -102,6 +126,16 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 
+    fn run_without_db(
+        _snapshot: &DocumentSnapshot,
+        _client: &Client,
+        _params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result> {
+        Ok(
+            <<<Self as RequestHandler>::RequestType as Request>::Result as NoProjectResult>::no_project_result(),
+        )
+    }
+
     /// Handles the entire request lifecycle and sends the response to the client.
     ///
     /// It allows handlers to customize how the server sends the response to the client.
@@ -113,6 +147,25 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) {
         let result = Self::run_with_snapshot(db, &snapshot, client, params);
+
+        if let Err(err) = &result {
+            tracing::error!("An error occurred with request ID {id}: {err}");
+            client.show_error_message(format!(
+                "ty encountered a problem. {}",
+                snapshot.client_name().log_guidance()
+            ));
+        }
+
+        client.respond(id, result);
+    }
+
+    fn handle_request_without_db(
+        id: &RequestId,
+        snapshot: DocumentSnapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) {
+        let result = Self::run_without_db(&snapshot, client, params);
 
         if let Err(err) = &result {
             tracing::error!("An error occurred with request ID {id}: {err}");

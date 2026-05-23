@@ -311,6 +311,13 @@ impl Session {
         &self.project_state(path).db
     }
 
+    /// Returns a reference to the project's [`ProjectDatabase`] in which the given `path`
+    /// belongs, if the session has any projects.
+    pub(crate) fn try_project_db(&self, path: &AnySystemPath) -> Option<&ProjectDatabase> {
+        self.try_project_state(path)
+            .map(|project_state| &project_state.db)
+    }
+
     /// Returns an iterator, in arbitrary order, over all project databases
     /// in this session.
     pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> {
@@ -329,6 +336,16 @@ impl Session {
         &mut self.project_state_mut(path).db
     }
 
+    /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given
+    /// `path` belongs, if the session has any projects.
+    pub(crate) fn try_project_db_mut(
+        &mut self,
+        path: &AnySystemPath,
+    ) -> Option<&mut ProjectDatabase> {
+        self.try_project_state_mut(path)
+            .map(|project_state| &mut project_state.db)
+    }
+
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
@@ -336,10 +353,17 @@ impl Session {
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
+        self.try_project_state(path)
+            .expect("To always have at least one project")
+    }
+
+    /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs,
+    /// if the session has any projects.
+    pub(crate) fn try_project_state(&self, path: &AnySystemPath) -> Option<&ProjectState> {
         match path {
             AnySystemPath::System(system_path) => self
                 .project_state_for_path(system_path)
-                .unwrap_or_else(|| self.project_state_virtual_fallback()),
+                .or_else(|| self.project_state_virtual_fallback()),
             AnySystemPath::SystemVirtual(_virtual_path) => self.project_state_virtual_fallback(),
         }
     }
@@ -351,6 +375,16 @@ impl Session {
     ///
     /// [`project_db`]: Session::project_db
     pub(crate) fn project_state_mut(&mut self, path: &AnySystemPath) -> &mut ProjectState {
+        self.try_project_state_mut(path)
+            .expect("To always have at least one project")
+    }
+
+    /// Returns a mutable reference to the project's [`ProjectState`] in which the given `path`
+    /// belongs, if the session has any projects.
+    pub(crate) fn try_project_state_mut(
+        &mut self,
+        path: &AnySystemPath,
+    ) -> Option<&mut ProjectState> {
         match path {
             AnySystemPath::System(system_path) => {
                 let range = ..=system_path.to_path_buf();
@@ -364,12 +398,13 @@ impl Session {
                     .range(range.clone())
                     .any(|(workspace_root, _)| system_path.starts_with(workspace_root))
                 {
-                    return self
-                        .projects
-                        .range_mut(range)
-                        .rfind(|(workspace_root, _)| system_path.starts_with(workspace_root))
-                        .unwrap()
-                        .1;
+                    return Some(
+                        self.projects
+                            .range_mut(range)
+                            .rfind(|(workspace_root, _)| system_path.starts_with(workspace_root))
+                            .unwrap()
+                            .1,
+                    );
                 }
 
                 self.project_state_virtual_fallback_mut()
@@ -397,15 +432,12 @@ impl Session {
     // need to figure out which project should this virtual path
     // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
     // look for the first project with an overlapping search path?)
-    fn project_state_virtual_fallback(&self) -> &ProjectState {
-        self.projects
-            .values()
-            .next()
-            .expect("To always have at least one project")
+    fn project_state_virtual_fallback(&self) -> Option<&ProjectState> {
+        self.projects.values().next()
     }
 
-    fn project_state_virtual_fallback_mut(&mut self) -> &mut ProjectState {
-        self.projects.values_mut().next().unwrap()
+    fn project_state_virtual_fallback_mut(&mut self) -> Option<&mut ProjectState> {
+        self.projects.values_mut().next()
     }
 
     pub(crate) fn apply_changes(
@@ -413,6 +445,10 @@ impl Session {
         path: &AnySystemPath,
         changes: &[ChangeEvent],
     ) -> ChangeResult {
+        if self.try_project_db(path).is_none() {
+            return ChangeResult::default();
+        }
+
         let overrides = path.as_system().and_then(|root| {
             self.workspaces()
                 .for_path(root)?
@@ -1125,7 +1161,7 @@ impl Session {
         match path {
             AnySystemPath::System(system_path) => self.workspaces.settings_for_path(system_path),
             AnySystemPath::SystemVirtual(_) => {
-                let project = self.project_state(path);
+                let project = self.try_project_state(path)?;
                 self.workspaces
                     .settings_for_path(project.db.project().root(&project.db))
                     .or_else(|| self.workspaces.settings_virtual_fallback())
@@ -1194,6 +1230,10 @@ impl Session {
 
     fn open_document_in_db(&mut self, document: &DocumentHandle, language_id: Option<LanguageId>) {
         let path = document.notebook_or_file_path();
+
+        if self.try_project_db(path).is_none() {
+            return;
+        }
 
         // This is a "maybe" because the `File` might've not been interned yet i.e., the
         // `try_system` call will return `None` which doesn't mean that the file is new, it's just
@@ -1890,7 +1930,10 @@ impl DocumentHandle {
         let requires_clear_diagnostics = if is_cell {
             true
         } else {
-            let db = session.project_db_mut(path);
+            let Some(db) = session.try_project_db_mut(path) else {
+                session.bump_revision();
+                return Ok(true);
+            };
 
             match path {
                 AnySystemPath::System(system_path) => {

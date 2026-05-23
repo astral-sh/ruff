@@ -201,7 +201,9 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
         return;
     }
 
-    let db = session.project_db(document.notebook_or_file_path());
+    let Some(db) = session.try_project_db(document.notebook_or_file_path()) else {
+        return;
+    };
 
     let Some(diagnostics) = compute_diagnostics(db, document, session.position_encoding()) else {
         return;

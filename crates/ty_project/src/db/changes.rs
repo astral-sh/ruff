@@ -15,6 +15,7 @@ use salsa::Setter;
 use ty_python_core::program::{FallibleStrategy, Program};
 
 /// Represents the result of applying changes to the project database.
+#[derive(Default)]
 pub struct ChangeResult {
     project_changed: bool,
     custom_stdlib_changed: bool,

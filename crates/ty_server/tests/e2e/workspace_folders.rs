@@ -395,6 +395,34 @@ fn remove_only_workspace() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn open_document_after_removing_only_workspace() -> Result<()> {
+    let root1 = SystemPath::new("root1");
+    let main1 = root1.join("main.py");
+    let main_content = "does_not_exist()";
+
+    let mut server = TestServerBuilder::new()?
+        .with_file(&main1, main_content)?
+        .with_workspace(root1, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.change_workspace_folders([], [root1]);
+
+    server.open_text_document(&main1, main_content, 1);
+
+    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(document_diagnostics),
+        @"",
+    );
+
+    let hover = server.hover_request(&main1, Position::new(0, 0));
+    assert_snapshot!(format!("{hover:?}"), @"None");
+
+    Ok(())
+}
+
 /// Test that we can have different settings for each workspace folder.
 #[test]
 fn different_settings() -> Result<()> {
