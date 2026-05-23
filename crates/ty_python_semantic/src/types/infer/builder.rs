@@ -99,8 +99,7 @@ use crate::types::{
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeFormType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
     TypeVarVariance, TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
-    binding_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+    binding_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;

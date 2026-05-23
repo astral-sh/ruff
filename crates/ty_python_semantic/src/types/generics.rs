@@ -2284,7 +2284,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     formal_typeform.type_argument(self.db),
                     actual_typeform.type_argument(self.db),
                     variance,
-                    f,
                     seen,
                 );
             }
@@ -2299,7 +2298,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         formal_typeform.type_argument(self.db),
                         actual_instance,
                         variance,
-                        f,
                         seen,
                     );
                 }

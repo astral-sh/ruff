@@ -1,88 +1,151 @@
 # `TypeForm`
 
+A `TypeForm[T]` value is a runtime object that represents a type expression whose type is `T`.
+Classes, generic aliases, unions, string forward annotations, and type aliases can all appear in a
+`TypeForm` context.
+
 ```toml
 [environment]
 python-version = "3.12"
 ```
 
-## Contextual type-form expressions and covariance
+## Basic
+
+When an expression appears in a `TypeForm` context, valid type-expression syntax is interpreted as a
+`TypeForm` value. The type argument of `TypeForm` is the type denoted by the expression, not the
+ordinary runtime type of the expression object.
 
 ```py
-from typing import Any, assert_type
+from typing import assert_type
 from typing_extensions import TypeForm
 
-broad: TypeForm[Any] = int | str
-specific: TypeForm[str] = str
+def accepts_str(form: TypeForm[str]) -> None: ...
+def accepts_union(form: TypeForm[int | str]) -> None: ...
 
-assert_type(broad, TypeForm[Any])
-assert_type(specific, TypeForm[str])
+string_form: TypeForm[str] = str
+union_form: TypeForm[int | str] = int | str
+list_form: TypeForm[list[int]] = list[int]
+quoted: TypeForm[str] = "str"
 
-broad = specific
-specific = broad
+type Alias = str
+aliased: TypeForm[str] = Alias
+
+accepts_str(str)
+accepts_str("str")
+accepts_union(int | str)
+
+def returns_union() -> TypeForm[int | str]:
+    return int | str
+
+assert_type(string_form, TypeForm[str])
+assert_type(union_form, TypeForm[int | str])
+assert_type(list_form, TypeForm[list[int]])
+assert_type(quoted, TypeForm[str])
+assert_type(aliased, TypeForm[str])
+```
+
+`TypeForm` is covariant in its type argument:
+
+```py
+from typing import Any
+from typing_extensions import TypeForm
+
+def check_assignability(
+    any_form: TypeForm[Any],
+    int_form: TypeForm[int],
+    object_form: TypeForm[object],
+    str_form: TypeForm[str],
+) -> None:
+    any_form = str_form
+    str_form = any_form
+
+    object_form = str_form
+    str_form = int_form  # error: [invalid-assignment]
+
+def reject_wide_type_form(object_form: TypeForm[object]) -> None:
+    str_form: TypeForm[str] = object_form  # error: [invalid-assignment]
 
 invalid: TypeForm[str] = int  # error: [invalid-assignment]
 ```
 
-## Existing type-form values and union contexts
+## Preserving existing `TypeForm` values
 
-Implicit type-form evaluation should not reinterpret ordinary expressions whose value already has a
-`TypeForm` type. It also applies when `TypeForm` is one branch of the expected type.
+Contextual `TypeForm` inference should not reinterpret an expression whose ordinary value type is
+already a `TypeForm`. This matters for names, subscripts, conditional expressions, and other
+ordinary value expressions that can produce a `TypeForm` at runtime.
 
 ```py
-from typing import Any, Literal, Never
-from typing_extensions import TypeForm, TypeIs
+from typing_extensions import TypeForm
 
 def get_form() -> TypeForm[str]:
     return str
 
-def choose(value: TypeForm[str], flag: bool) -> TypeForm[str]:
-    return value if flag else get_form()
-
 class Holder:
     item: TypeForm[str]
 
-def use_existing(holder: Holder, values: list[TypeForm[str]]) -> None:
+def use_existing(
+    value: TypeForm[str],
+    holder: Holder,
+    values: list[TypeForm[str]],
+    flag: bool,
+) -> None:
+    by_name: TypeForm[str] = value
     by_attribute: TypeForm[str] = holder.item
     by_subscript: TypeForm[str] = values[0]
+    by_condition: TypeForm[str] = value if flag else get_form()
 
-def incompatible_existing(value: TypeForm[int], runtime_type: type[int]) -> None:
-    invalid_form: TypeForm[str] = value  # error: [invalid-assignment]
-    invalid_runtime_type: TypeForm[str] = runtime_type  # error: [invalid-assignment]
-
-def accepts_type_form(value: TypeForm[Any]) -> None:
-    pass
-
-def accept_bare_runtime_type(runtime_type: type) -> None:
-    bare: TypeForm[Any] = runtime_type
-    accepts_type_form(runtime_type)
-
-def reject_broad_runtime_type(runtime_type: type[object], bare: type) -> None:
-    preserved: TypeForm[object] = runtime_type
-    explicit: TypeForm[str] = runtime_type  # error: [invalid-assignment]
-    implicit: TypeForm[str] = bare  # error: [invalid-assignment]
-
-def is_bare_runtime_type(value: TypeForm[Any]) -> TypeIs[type]:
-    return isinstance(value, type)
-
-def reject_broad_runtime_type_narrowing(
-    value: TypeForm[str],
-) -> TypeIs[type]:  # error: [invalid-type-guard-definition]
-    return isinstance(value, type)
-
-def accept_gradual(value: Any) -> None:
-    dynamic: TypeForm[str] = value
-
-def abort() -> Never:
-    raise RuntimeError
-
-quoted: TypeForm[str] | None = "str"
-union_syntax: TypeForm[str | None] | None = str | None
-literal_syntax: TypeForm[None] | None = Literal[None]
-ordinary_arm: TypeForm[str] | int = 1
-bottom: TypeForm[str] = abort()
+def reject_incompatible_existing(value: TypeForm[int]) -> None:
+    invalid: TypeForm[str] = value  # error: [invalid-assignment]
 ```
 
-## Bare `TypeForm` validates type-form expressions
+## Runtime class objects and gradual values
+
+Runtime class objects are also valid `TypeForm` values when their instance type is compatible with
+the `TypeForm` type argument. Bare `type` is treated as gradual and is only accepted by
+`TypeForm[Any]`.
+
+```py
+from typing import Any, Never
+from typing_extensions import TypeForm
+
+def accept_runtime_classes(
+    exact: type[int],
+    broad: type[object],
+    bare: type,
+) -> None:
+    exact_form: TypeForm[int | str] = exact
+    broad_form: TypeForm[object] = broad
+    bare_form: TypeForm[Any] = bare
+
+    invalid_broad: TypeForm[str] = broad  # error: [invalid-assignment]
+    invalid_bare: TypeForm[str] = bare  # error: [invalid-assignment]
+
+def accept_gradual_and_bottom(dynamic: Any, bottom: Never) -> None:
+    dynamic_form: TypeForm[str] = dynamic
+    bottom_form: TypeForm[str] = bottom
+```
+
+## Union contexts
+
+If a union contains both `TypeForm` and non-`TypeForm` arms, ordinary expression inference should
+win when it satisfies the non-`TypeForm` arm. Otherwise, ty tries the `TypeForm` interpretation.
+
+```py
+from typing import Literal
+from typing_extensions import TypeForm
+
+ordinary_none: TypeForm[str] | None = None
+ordinary_int: TypeForm[str] | int = 1
+
+quoted_form: TypeForm[str] | None = "str"
+union_form: TypeForm[str | None] | None = str | None
+literal_form: TypeForm[None] | None = Literal[None]
+```
+
+## Invalid type-form expressions
+
+A bare `TypeForm` is equivalent to `TypeForm[Any]`, but the assigned expression still has to be a
+valid type expression.
 
 ```py
 from typing import ClassVar
@@ -98,7 +161,11 @@ bad_tuple: TypeForm = (1, 2)  # error: [invalid-type-form]
 bad_qualifier: TypeForm = ClassVar[int]  # error: [invalid-type-form]
 ```
 
-## Explicit construction and `type[T]` compatibility
+## Explicit construction
+
+`TypeForm(...)` explicitly constructs a `TypeForm` from exactly one positional type-expression
+argument. The argument is checked using the same type-expression rules as contextual `TypeForm`
+inference.
 
 ```py
 from typing import assert_type
@@ -112,15 +179,12 @@ TypeForm()  # error: [invalid-type-form]
 TypeForm(int, str)  # error: [invalid-type-form]
 TypeForm(value=int)  # error: [invalid-type-form]
 TypeForm(*(int,))  # error: [invalid-type-form]
-
-def get_type() -> type[int]:
-    return int
-
-compatible: TypeForm[int | str] = get_type()
-incompatible: TypeForm[str] = get_type()  # error: [invalid-assignment]
 ```
 
-## Generic specialization
+## Generic specialization and aliases
+
+When `TypeForm` appears in a generic parameter or return annotation, the type argument can be
+inferred from the type expression passed by the caller or returned by the function.
 
 ```py
 from typing import assert_type
@@ -136,6 +200,9 @@ assert_type(construct(int | str), int | str)
 def use_runtime_type(form: type[int]) -> None:
     assert_type(construct(form), int)
 
+def return_form() -> TypeForm[int | str]:
+    return int | str
+
 type Alias[T] = TypeForm[T]
 
 def construct_alias[T](form: Alias[T]) -> T:
@@ -144,17 +211,29 @@ def construct_alias[T](form: Alias[T]) -> T:
 assert_type(construct_alias(int), int)
 ```
 
-## Narrowing to a runtime class
+## Narrowing to runtime classes
+
+A `TypeForm[T]` value may or may not be a runtime class object. An `isinstance(..., type)` check can
+narrow the form to `type[T]`, but only when that narrowing is sound for the original `TypeForm`
+argument.
 
 ```py
-from typing import assert_type
-from typing_extensions import TypeForm
+from typing import Any, assert_type
+from typing_extensions import TypeForm, TypeIs
 
 def as_type[T](form: TypeForm[T]) -> type[T] | None:
     if isinstance(form, type):
         assert_type(form, type[T])
         return form
     return None
+
+def is_bare_runtime_type(value: TypeForm[Any]) -> TypeIs[type]:
+    return isinstance(value, type)
+
+def reject_broad_runtime_type_narrowing(
+    value: TypeForm[str],
+) -> TypeIs[type]:  # error: [invalid-type-guard-definition]
+    return isinstance(value, type)
 
 class A: ...
 
