@@ -123,7 +123,7 @@ impl Parser<'_> {
                 self.add_error(ParseErrorType::InvalidStarPatternUsage, &lhs);
             }
 
-            let mut patterns = vec![lhs];
+            let mut patterns = ast::PatternList::from([lhs]);
             let mut progress = ParserProgress::default();
 
             while self.eat(TokenKind::Vbar) {
@@ -202,8 +202,8 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        let mut keys = vec![];
-        let mut patterns = vec![];
+        let mut keys = ast::PatternKeyList::new();
+        let mut patterns = ast::PatternList::new();
         let mut rest = None;
 
         self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
@@ -340,7 +340,7 @@ impl Parser<'_> {
 
         if self.eat(parentheses.closing_kind()) {
             return Pattern::MatchSequence(ast::PatternMatchSequence {
-                patterns: vec![],
+                patterns: ast::PatternList::new(),
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
             });
@@ -383,7 +383,7 @@ impl Parser<'_> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut patterns = vec![first_element];
+        let mut patterns = ast::PatternList::from([first_element]);
 
         self.parse_comma_separated_list(
             RecoveryContextKind::SequenceMatchPattern(parentheses),
@@ -702,7 +702,7 @@ impl Parser<'_> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut patterns = vec![];
+        let mut patterns = ast::PatternList::new();
         let mut keywords = vec![];
         let mut has_seen_pattern = false;
         let mut has_seen_keyword_pattern = false;

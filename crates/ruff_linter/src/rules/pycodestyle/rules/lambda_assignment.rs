@@ -208,7 +208,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<Vec<_>>();
+                .collect::<ast::ParameterList>();
             let new_args = parameters
                 .args
                 .iter()
@@ -222,7 +222,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<Vec<_>>();
+                .collect::<ast::ParameterList>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
                 name: Identifier::new(name.to_string(), TextRange::default()),

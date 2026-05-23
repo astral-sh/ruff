@@ -991,6 +991,10 @@ def write_node(out: list[str], ast: Ast) -> None:
                         rust_ty = "crate::Suite"
                     elif ty.name == "Decorator":
                         rust_ty = "crate::DecoratorList"
+                    elif ty.name == "Pattern":
+                        rust_ty = "crate::PatternList"
+                    elif name == "PatternMatchMapping" and field.name == "keys":
+                        rust_ty = "crate::PatternKeyList"
                     else:
                         rust_ty = f"Vec<{rust_ty}>"
                 elif ty.optional:

@@ -9663,7 +9663,7 @@ pub struct PatternMatchSingleton {
 pub struct PatternMatchSequence {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub patterns: Vec<Pattern>,
+    pub patterns: crate::PatternList,
 }
 
 /// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
@@ -9672,8 +9672,8 @@ pub struct PatternMatchSequence {
 pub struct PatternMatchMapping {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub keys: Vec<Expr>,
-    pub patterns: Vec<Pattern>,
+    pub keys: crate::PatternKeyList,
+    pub patterns: crate::PatternList,
     pub rest: Option<crate::Identifier>,
 }
 
@@ -9712,7 +9712,7 @@ pub struct PatternMatchAs {
 pub struct PatternMatchOr {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub patterns: Vec<Pattern>,
+    pub patterns: crate::PatternList,
 }
 
 /// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)

@@ -2930,7 +2930,7 @@ pub enum IrrefutablePatternKind {
 pub struct PatternArguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub patterns: Vec<Pattern>,
+    pub patterns: PatternList,
     pub keywords: Vec<PatternKeyword>,
 }
 
@@ -3097,10 +3097,10 @@ impl Ranged for AnyParameterRef<'_> {
 pub struct Parameters {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub posonlyargs: Vec<ParameterWithDefault>,
-    pub args: Vec<ParameterWithDefault>,
+    pub posonlyargs: ParameterList,
+    pub args: ParameterList,
     pub vararg: Option<Box<Parameter>>,
-    pub kwonlyargs: Vec<ParameterWithDefault>,
+    pub kwonlyargs: ParameterList,
     pub kwarg: Option<Box<Parameter>>,
 }
 
@@ -3694,6 +3694,15 @@ pub type Suite = ThinVec<Stmt>;
 /// Decorators attached to a function or class definition.
 pub type DecoratorList = ThinVec<Decorator>;
 
+/// Non-variadic parameters grouped by parameter kind.
+pub type ParameterList = ThinVec<ParameterWithDefault>;
+
+/// Child patterns in sequence, mapping, class, and or-pattern nodes.
+pub type PatternList = ThinVec<Pattern>;
+
+/// Keys in a mapping-pattern node.
+pub type PatternKeyList = ThinVec<Expr>;
+
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
 /// [IPython Syntax]: https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L335-L343
@@ -3885,8 +3894,8 @@ impl From<bool> for Singleton {
 
 #[cfg(test)]
 mod tests {
-    use crate::Mod;
     use crate::generated::*;
+    use crate::{Mod, Parameters};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
@@ -3896,7 +3905,8 @@ mod tests {
         assert_eq!(std::mem::size_of::<StmtClassDef>(), 88);
         assert_eq!(std::mem::size_of::<StmtTry>(), 64);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
-        assert_eq!(std::mem::size_of::<Pattern>(), 104);
+        assert_eq!(std::mem::size_of::<Pattern>(), 80);
+        assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Expr>(), 80);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
