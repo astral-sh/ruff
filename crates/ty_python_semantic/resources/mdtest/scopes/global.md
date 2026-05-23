@@ -465,8 +465,7 @@ bindings from outer or sibling scopes, but we conservatively include bindings fr
 within the current one, once we've encountered them (i.e. in a top-to-bottom reading of the code).
 This second behavior is _also_ unsound, because nested functions can "escape" the scope where
 they're defined and affect reads on lines above their definition. But again these are the behaviors
-that users expect. Here's a more involved example of these rules interacting at different levels of
-nesting:
+that users expect. Here's the shadowing behavior in more detail:
 
 `global3.py`:
 
@@ -664,4 +663,47 @@ class C:
 
 # TODO: `x = 2` should shadow `x = 3`.
 reveal_type(x)  # revealed: Literal[3]
+```
+
+## Interleaving `global` and local/`nonlocal` scopes using the same variable
+
+`nonlocal` declarations aren't allowed to resolve to a scope with a `global` declaration for the
+same variable; that's a semantic syntax error. That means that a `nonlocal` binding can't exactly
+"flow through" a scope where the same name is `global`. (Similarly, free variable uses resolve when
+they see a `global` declaration in an enclosing scope.) However, the reverse is possible: `global`
+bindings can "flow through" intervening scopes where the same name is local/`nonlocal`, as long as
+any `nonlocal` declarations in the picture get resolved legally.
+
+So concretely, if a nested scope contributes a not-yet-resolved `nonlocal` binding, we can safely
+assume that that binding is visible in the current scope. (The only way it wouldn't be is if the
+current scope declares the same name `global`, but that's necessarily a semantic syntax error.)
+However, if a nested scope has a `global` binding, we might not know yet whether it should be
+visible in the current scope. If and only if we encounter a `global` declaration for that name
+before any other uses, then the nested `global` binding is visible. But even in scopes where it's
+not visible, it still needs to "flow through" to other scopes where it might be visible again,
+including the global/module scope.
+
+```py
+x = 1
+def _():
+    def _():
+        def global_middle():
+            def _():
+                def _():
+                    def global_inner():
+                        global x
+                        x = 2
+                    # The "free" case: we see the local `x` in the parent scope.
+                    reveal_type(x)  # revealed: Literal[3]
+                x = 3
+            global x
+            # The `global` case: we see the global `x`.
+            reveal_type(x)  # revealed: Literal[1, 2]
+        nonlocal x
+        # The `nonlocal` case: we see the *other* local `x` in the parent scope.
+        reveal_type(x)  # revealed: Literal[4, 5]
+        x = 4
+    x = 5
+# The module case: we see the global `x`.
+reveal_type(x)  # revealed: Literal[1, 2]
 ```

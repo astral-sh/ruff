@@ -535,8 +535,7 @@ bindings from outer or sibling scopes, but we conservatively include bindings fr
 within the current one, once we've encountered them (i.e. in a top-to-bottom reading of the code).
 This second behavior is _also_ unsound, because nested functions can "escape" the scope where
 they're defined and affect reads on lines above their definition. But again these are the behaviors
-that users expect. Here's a more involved example of these rules interacting at different levels of
-nesting:
+that users expect. Here's the shadowing behavior in more detail:
 
 ```py
 def foo():
