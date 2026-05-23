@@ -251,6 +251,43 @@ def other_function(): ...
         ");
     }
 
+    #[test]
+    fn goto_definition_stub_map_reexported_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from a import bar
+bar<CURSOR>()
+",
+            )
+            .source("a/__init__.pyi", "def bar() -> None: ...\n")
+            .source("a/__init__.py", "from .impl import bar as bar\n")
+            .source(
+                "a/impl.py",
+                r#"
+def bar() -> None:
+    pass
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:3:1
+          |
+        3 | bar()
+          | ^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> a/impl.py:2:5
+          |
+        2 | def bar() -> None:
+          |     ---
+          |
+        ");
+    }
+
     /// goto-definition on a function definition in a .pyi should go to the .py
     #[test]
     fn goto_definition_stub_map_function_def() {
