@@ -499,12 +499,12 @@ impl<'db> AllMembers<'db> {
         ty: Type<'db>,
         metaclass: Type<'db>,
     ) {
-        let Type::ClassLiteral(metaclass) = metaclass else {
+        let Some(metaclass) = metaclass.to_class_type(db) else {
             return;
         };
 
-        self.extend_with_class_members(db, ty, metaclass);
-        if let ClassLiteral::Static(metaclass) = metaclass {
+        self.extend_with_class_members(db, ty, metaclass.class_literal(db));
+        if let Some((metaclass, _)) = metaclass.static_class_literal(db) {
             self.extend_with_instance_members(db, ty, metaclass);
         }
     }

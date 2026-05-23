@@ -243,6 +243,25 @@ def f(x: type[E[str]]):
     static_assert(has_member(x, "initialized_attr"))
 ```
 
+### Generic metaclasses
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import has_member, static_assert
+
+class InitializingMeta[T](type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized_attr: int = 1
+
+class Initialized(metaclass=InitializingMeta[int]): ...
+
+static_assert(has_member(Initialized, "initialized_attr"))
+```
+
 ### `type[Any]` and `Any`
 
 `type[Any]` has all members of `type`.
