@@ -1091,18 +1091,34 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     constrain_with_equality,
                 )
             }),
+            Type::LiteralValue(_) => match resolved.len(db).and_then(Type::as_int_literal) {
+                Some(actual_length) if usize::try_from(actual_length).ok() == Some(length) => {
+                    if constrain_with_equality {
+                        resolved
+                    } else {
+                        Type::Never
+                    }
+                }
+                Some(_) => {
+                    if constrain_with_equality {
+                        Type::Never
+                    } else {
+                        resolved
+                    }
+                }
+                None => resolved,
+            },
             Type::NominalInstance(instance) => {
                 if let Some(tuple) = instance.own_tuple_spec(db) {
-                    let narrowed = if constrain_with_equality {
+                    if constrain_with_equality {
                         tuple
                             .resize(db, TupleLength::Fixed(length))
                             .ok()
                             .map(|tuple| Type::tuple(TupleType::new(db, &tuple)))
                             .unwrap_or(Type::Never)
                     } else {
-                        resolved
-                    };
-                    constrain(db, narrowed, exactly_sized, constrain_with_equality)
+                        constrain(db, resolved, exactly_sized, false)
+                    }
                 } else if has_declared_fixed_length(db, resolved) {
                     constrain(db, resolved, exactly_sized, constrain_with_equality)
                 } else {
@@ -1569,7 +1585,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let [arg] = &*call.arguments.args else {
                     return;
                 };
-                let Some(length_literal) = length_type.as_int_literal() else {
+                let Some(length_literal) = length_type.as_int_like_literal() else {
                     return;
                 };
                 let Ok(length) = usize::try_from(length_literal) else {

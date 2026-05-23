@@ -52,8 +52,8 @@ def _(x: LiteralString):
 
 ## Tuples
 
-Boolean length checks narrow a tuple according to its truthiness. Exact length comparisons are
-covered separately below.
+Ideally we'd narrow these types further, e.g. to `tuple[int, ...] & ~tuple[()]` in the positive case
+and `tuple[()]` in the negative case (see <https://github.com/astral-sh/ty/issues/560>).
 
 ```py
 def _(x: tuple[int, ...]):
@@ -95,6 +95,36 @@ def _(val: tuple[int, ...]):
         reveal_type(val)  # revealed: tuple[int, int]
         fixed: tuple[int, int] = val
         _ = val[2]  # error: [index-out-of-bounds]
+
+def _(val: tuple[int] | tuple[str, str]):
+    if len(val) == True:
+        reveal_type(val)  # revealed: tuple[int]
+        one: tuple[int] = val
+
+def _(val: tuple[()] | tuple[int]):
+    if False == len(val):
+        reveal_type(val)  # revealed: tuple[()]
+        empty: tuple[()] = val
+```
+
+Literal string and bytes values can be filtered directly because their lengths are known:
+
+```py
+from typing import Literal
+
+def _(value: Literal["a", "bb", "ccc"]):
+    if len(value) == 2:
+        reveal_type(value)  # revealed: Literal["bb"]
+        exact: Literal["bb"] = value
+    else:
+        reveal_type(value)  # revealed: Literal["a", "ccc"]
+
+def _(value: Literal[b"a", b"bb", b"ccc"]):
+    if len(value) == 2:
+        reveal_type(value)  # revealed: Literal[b"bb"]
+        exact: Literal[b"bb"] = value
+    else:
+        reveal_type(value)  # revealed: Literal[b"a", b"ccc"]
 ```
 
 Types that define a precise `__len__` method can also be narrowed by an exact length comparison:
