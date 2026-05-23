@@ -1014,7 +1014,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
             }
             ProtocolMemberKind::Property(property) => {
-                let read_result = if let Some(required_type) = property_get_type(db, *property) {
+                let fallback_other = ty.literal_fallback_instance(db).unwrap_or(ty);
+                let property = protocol_bind_property_self(db, *property, fallback_other);
+                let read_result = if let Some(required_type) = property_get_type(db, property) {
                     let Place::Defined(DefinedPlace {
                         ty: attribute_type,
                         definedness: Definedness::AlwaysDefined,
@@ -1032,7 +1034,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.always()
                 };
                 read_result.and(db, self.constraints, || {
-                    property_set_type(db, *property).when_none_or(
+                    property_set_type(db, property).when_none_or(
                         db,
                         self.constraints,
                         |value_type| self.check_property_write(db, ty, member.name, value_type),
@@ -1483,6 +1485,30 @@ fn non_never_callable_return_type<'db>(
         .iter()
         .all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
         .then(|| callable.signatures(db).overload_return_type_or_unknown(db))
+}
+
+fn protocol_bind_property_self<'db>(
+    db: &'db dyn Db,
+    property: PropertyInstanceType<'db>,
+    self_type: Type<'db>,
+) -> PropertyInstanceType<'db> {
+    let bind_self = |accessor: Type<'db>| {
+        accessor
+            .try_upcast_to_callable(db)
+            .map(|callables| {
+                callables
+                    .map(|callable| callable.apply_self(db, self_type))
+                    .into_type(db)
+            })
+            .unwrap_or(accessor)
+    };
+
+    PropertyInstanceType::new(
+        db,
+        property.getter(db).map(bind_self),
+        property.setter(db).map(bind_self),
+        property.deleter(db).map(bind_self),
+    )
 }
 
 /// Protocol compatibility can only succeed if every required member is present.
