@@ -148,8 +148,9 @@ impl InterpolatedStrings {
         InterpolatedStringsCheckpoint(self.stack.clone())
     }
 
-    pub(crate) fn rewind(&mut self, checkpoint: InterpolatedStringsCheckpoint) {
-        self.stack = checkpoint.0;
+    pub(crate) fn rewind(&mut self, mut checkpoint: InterpolatedStringsCheckpoint) {
+        self.stack.clear();
+        self.stack.append(&mut checkpoint.0);
     }
 }
 

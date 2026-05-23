@@ -84,7 +84,7 @@ pub(super) struct UnexpectedIndentation;
 
 /// The indentations stack is used to keep track of the current indentation level
 /// [See Indentation](docs.python.org/3/reference/lexical_analysis.html#indentation).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub(super) struct Indentations {
     stack: Vec<Indentation>,
 }
@@ -129,8 +129,9 @@ impl Indentations {
         IndentationsCheckpoint(self.stack.clone())
     }
 
-    pub(crate) fn rewind(&mut self, checkpoint: IndentationsCheckpoint) {
-        self.stack = checkpoint.0;
+    pub(crate) fn rewind(&mut self, mut checkpoint: IndentationsCheckpoint) {
+        self.stack.clear();
+        self.stack.append(&mut checkpoint.0);
     }
 }
 
