@@ -249,6 +249,8 @@ impl<'src> TokenSource<'src> {
             assert_eq!(last.kind(), TokenKind::EndOfFile);
         }
 
+        self.tokens.shrink_to_fit();
+
         (self.tokens, self.lexer.finish())
     }
 }
