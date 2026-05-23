@@ -213,40 +213,6 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition()
 }
 
-/// Returns `true` if a synthesized dictionary-key binding belongs to a rejected assignment.
-///
-/// Synthesized descendants describe refinement information derived from the right-hand side of
-/// their enclosing assignment. If the right-hand side is rejected, they must not participate in
-/// place resolution.
-#[salsa::tracked]
-pub(crate) fn is_rejected_dict_key_assignment<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-) -> bool {
-    let DefinitionKind::DictKeyAssignment(dict_key_assignment) = definition.kind(db) else {
-        return false;
-    };
-
-    is_rejected_assignment(db, dict_key_assignment.assignment())
-}
-
-/// Returns `true` if an assignment's right-hand side was rejected.
-///
-/// This is keyed on the parent assignment so all synthesized descendant bindings reuse the same
-/// inference-derived result.
-#[salsa::tracked]
-fn is_rejected_assignment<'db>(db: &'db dyn Db, assignment: Definition<'db>) -> bool {
-    let module = parsed_module(db, assignment.file(db)).load(db);
-    let Some(value) = assignment.kind(db).value(&module) else {
-        return false;
-    };
-    let assignment_types = infer_definition_types(db, assignment);
-
-    !assignment_types
-        .expression_type(value)
-        .is_assignable_to(db, assignment_types.binding_type(assignment))
-}
-
 /// Infer decorator expression types for a function definition.
 ///
 /// This is a lightweight query that avoids the cycle risk of calling
