@@ -2294,6 +2294,39 @@ def _(value: WritableSelfAttr) -> None:
     value.x = WritableSelfAttr()
 ```
 
+Property members annotated with `Self` bind it to the implementation type:
+
+```py
+class HasReadableSelfProperty(Protocol):
+    @property
+    def x(self) -> Self: ...
+
+class ReadableSelfProperty:
+    @property
+    def x(self) -> "ReadableSelfProperty":
+        return self
+
+static_assert(is_subtype_of(ReadableSelfProperty, HasReadableSelfProperty))
+static_assert(is_assignable_to(ReadableSelfProperty, HasReadableSelfProperty))
+
+class HasWritableSelfProperty(Protocol):
+    @property
+    def x(self) -> object: ...
+    @x.setter
+    def x(self, value: Self) -> None: ...
+
+class WritableSelfProperty:
+    @property
+    def x(self) -> "WritableSelfProperty":
+        return self
+
+    @x.setter
+    def x(self, value: "WritableSelfProperty") -> None: ...
+
+static_assert(is_subtype_of(WritableSelfProperty, HasWritableSelfProperty))
+static_assert(is_assignable_to(WritableSelfProperty, HasWritableSelfProperty))
+```
+
 ## Variance of generic protocols with `Final` members
 
 A `Final` attribute is readable but not writable, so it constrains an inferred type parameter
