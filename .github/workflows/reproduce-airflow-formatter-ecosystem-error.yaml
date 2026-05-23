@@ -28,6 +28,15 @@ jobs:
       - name: "Build Ruff"
         run: cargo build --bin ruff
 
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.14"
+          activate-environment: true
+          version: "0.11.15"
+
+      - name: "Install ruff-ecosystem"
+        run: uv pip install ./python/ruff-ecosystem
+
       - name: "Checkout apache/airflow"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -39,6 +48,41 @@ jobs:
       - name: "Report Airflow revision"
         run: git -C checkouts/airflow rev-parse HEAD
 
-      - name: "Run `ruff format --preview`"
+      - name: "Run Airflow formatter ecosystem comparison"
+        env:
+          RUFF_BIN: ${{ github.workspace }}/target/debug/ruff
         working-directory: checkouts/airflow
-        run: '"$GITHUB_WORKSPACE/target/debug/ruff" format --preview .'
+        run: |
+          git config user.email "ecosystem@astral.sh"
+          git config user.name "Ecosystem Bot"
+
+          python - <<'PY'
+          import asyncio
+          import os
+          from pathlib import Path
+
+          from ruff_ecosystem.defaults import DEFAULT_TARGETS
+          from ruff_ecosystem.format import FormatComparison, compare_format
+          from ruff_ecosystem.projects import ClonedRepository
+
+
+          async def run() -> None:
+              target = next(
+                  target
+                  for target in DEFAULT_TARGETS
+                  if target.repo.fullname == "apache/airflow"
+              ).with_preview_enabled()
+              repository = await ClonedRepository.from_path(Path("."), target.repo)
+              ruff = Path(os.environ["RUFF_BIN"])
+              await compare_format(
+                  ruff,
+                  ruff,
+                  target.format_options,
+                  target.config_overrides,
+                  repository,
+                  FormatComparison.ruff_and_ruff,
+              )
+
+
+          asyncio.run(run())
+          PY
