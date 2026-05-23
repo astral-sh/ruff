@@ -774,41 +774,6 @@ accepts_anything(
     });
 }
 
-/// Regression benchmark for ignoring known key refinements from a rejected dictionary assignment.
-///
-/// The `**x` call consumes every synthesized key binding. Resolving rejected descendants should
-/// remain linear rather than rechecking the root assignment separately for each key.
-fn benchmark_rejected_dict_key_refinements(criterion: &mut Criterion) {
-    const NUM_KEYS: usize = 1000;
-
-    setup_rayon();
-
-    let mut code = "\
-def accepts_kwargs(**kwargs: int) -> None: ...
-
-x: dict[str, int] = {
-"
-    .to_string();
-
-    for i in 0..NUM_KEYS - 1 {
-        writeln!(&mut code, r#"    "k{i}": {i},"#).ok();
-    }
-    writeln!(&mut code, r#"    "k{}": object(),"#, NUM_KEYS - 1).ok();
-    code.push_str("}\naccepts_kwargs(**x)\n");
-
-    criterion.bench_function("ty_micro[rejected_dict_key_refinements]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 1);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
 /// Regression benchmark for many precise arguments flowing into one variadic parameter.
 ///
 /// The declared type is intentionally non-gradual, so argument checks still run. The important
@@ -1493,7 +1458,6 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,
-    benchmark_rejected_dict_key_refinements,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,

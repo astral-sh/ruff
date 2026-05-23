@@ -8407,17 +8407,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
                         match binding.binding {
-                            DefinitionState::Defined(definition)
-                                if !is_rejected_dict_key_assignment(db, definition) =>
-                            {
-                                let binding_ty = binding_type(db, definition);
+                            DefinitionState::Defined(definition) => {
+                                let binding_ty = if is_rejected_dict_key_assignment(db, definition)
+                                {
+                                    ty
+                                } else {
+                                    binding_type(db, definition)
+                                };
                                 union = union.add(
                                     binding.narrowing_constraint.narrow(db, binding_ty, place),
                                 );
                             }
-                            DefinitionState::Defined(_)
-                            | DefinitionState::Undefined
-                            | DefinitionState::Deleted => {
+                            DefinitionState::Undefined | DefinitionState::Deleted => {
                                 union =
                                     union.add(binding.narrowing_constraint.narrow(db, ty, place));
                             }
