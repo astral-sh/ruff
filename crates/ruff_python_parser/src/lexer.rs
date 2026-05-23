@@ -1099,17 +1099,28 @@ impl<'src> Lexer<'src> {
     /// Numeric lexing. The feast can start!
     fn lex_number(&mut self, first: char) -> TokenKind {
         if first == '0' {
-            if self.cursor.eat_if(|c| matches!(c, 'x' | 'X')).is_some() {
+            if self.eat_ascii(b"xX").is_some() {
                 self.lex_number_radix(Radix::Hex)
-            } else if self.cursor.eat_if(|c| matches!(c, 'o' | 'O')).is_some() {
+            } else if self.eat_ascii(b"oO").is_some() {
                 self.lex_number_radix(Radix::Octal)
-            } else if self.cursor.eat_if(|c| matches!(c, 'b' | 'B')).is_some() {
+            } else if self.eat_ascii(b"bB").is_some() {
                 self.lex_number_radix(Radix::Binary)
             } else {
                 self.lex_decimal_number(first)
             }
         } else {
             self.lex_decimal_number(first)
+        }
+    }
+
+    fn eat_ascii(&mut self, expected: &[u8]) -> Option<char> {
+        debug_assert!(expected.is_ascii());
+        let byte = self.cursor.rest().as_bytes().first().copied()?;
+        if expected.contains(&byte) {
+            self.cursor.skip_bytes(1);
+            Some(char::from(byte))
+        } else {
+            None
         }
     }
 
@@ -1153,10 +1164,10 @@ impl<'src> Lexer<'src> {
             self.radix_run(&mut number, Radix::Decimal);
         }
 
-        let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
+        let is_float = if first_digit_or_dot == '.' || self.eat_ascii(b".").is_some() {
             number.push('.');
 
-            if self.cursor.eat_char('_') {
+            if self.eat_ascii(b"_").is_some() {
                 return self.push_error(LexicalError::new(
                     LexicalErrorType::OtherError("Invalid Syntax".to_string().into_boxed_str()),
                     TextRange::new(self.offset() - TextSize::new(1), self.offset()),
@@ -1173,9 +1184,9 @@ impl<'src> Lexer<'src> {
         let is_float = match self.cursor.rest().as_bytes() {
             [b'e' | b'E', b'0'..=b'9', ..] | [b'e' | b'E', b'-' | b'+', b'0'..=b'9', ..] => {
                 // 'e' | 'E'
-                number.push(self.cursor.bump().unwrap());
+                number.push(self.eat_ascii(b"eE").unwrap());
 
-                if let Some(sign) = self.cursor.eat_if(|c| matches!(c, '+' | '-')) {
+                if let Some(sign) = self.eat_ascii(b"+-") {
                     number.push(sign);
                 }
 
@@ -1198,7 +1209,7 @@ impl<'src> Lexer<'src> {
             };
 
             // Parse trailing 'j':
-            if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
+            if self.eat_ascii(b"jJ").is_some() {
                 self.current_value = TokenValue::Complex {
                     real: 0.0,
                     imag: value,
@@ -1210,7 +1221,7 @@ impl<'src> Lexer<'src> {
             }
         } else {
             // Parse trailing 'j':
-            if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
+            if self.eat_ascii(b"jJ").is_some() {
                 let imag = f64::from_str(number.as_str()).unwrap();
                 self.current_value = TokenValue::Complex { real: 0.0, imag };
                 TokenKind::Complex
@@ -2195,6 +2206,11 @@ def f(arg=%timeit a = b):
     fn test_numbers() {
         let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
         assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_invalid_fractional_separator() {
+        assert_snapshot!(lex_invalid("0._1", Mode::Module));
     }
 
     #[test]
