@@ -248,20 +248,18 @@ impl<'src> Lexer<'src> {
         let mut indentation = Indentation::root();
 
         loop {
-            match self.cursor.first() {
-                ' ' => {
-                    self.cursor.bump();
+            match self.cursor.rest().as_bytes() {
+                [b' ', ..] => {
+                    self.cursor.skip_bytes(1);
                     indentation = indentation.add_space();
                 }
-                '\t' => {
-                    self.cursor.bump();
+                [b'\t', ..] => {
+                    self.cursor.skip_bytes(1);
                     indentation = indentation.add_tab();
                 }
-                '\\' => {
-                    self.cursor.bump();
-                    if self.cursor.eat_char('\r') {
-                        self.cursor.eat_char('\n');
-                    } else if !self.cursor.eat_char('\n') {
+                [b'\\', ..] => {
+                    self.cursor.skip_bytes(1);
+                    if !self.eat_ascii_line_ending() {
                         return Some(self.push_error(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
                             TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
@@ -304,8 +302,8 @@ impl<'src> Lexer<'src> {
                     }
                 }
                 // Form feed
-                '\x0C' => {
-                    self.cursor.bump();
+                [b'\x0C', ..] => {
+                    self.cursor.skip_bytes(1);
                     indentation = Indentation::root();
                 }
                 _ => break,
@@ -313,7 +311,10 @@ impl<'src> Lexer<'src> {
         }
 
         // Handle indentation if this is a new, not all empty, logical line
-        if !matches!(self.cursor.first(), '\n' | '\r' | '#' | EOF_CHAR) {
+        if !matches!(
+            self.cursor.rest().as_bytes(),
+            [] | [b'\n', ..] | [b'\r', ..] | [b'#', ..]
+        ) {
             self.state = State::NonEmptyLogicalLine;
 
             // Set to false so that we don't handle indentation on the next call.
@@ -321,6 +322,17 @@ impl<'src> Lexer<'src> {
         }
 
         None
+    }
+
+    fn eat_ascii_line_ending(&mut self) -> bool {
+        let count = match self.cursor.rest().as_bytes() {
+            [b'\r', b'\n', ..] => 2,
+            [b'\r', ..] | [b'\n', ..] => 1,
+            _ => return false,
+        };
+
+        self.cursor.skip_bytes(count);
+        true
     }
 
     fn handle_indentation(&mut self, indentation: Indentation) -> Option<TokenKind> {
@@ -370,18 +382,13 @@ impl<'src> Lexer<'src> {
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
         loop {
-            match self.cursor.first() {
-                ' ' => {
-                    self.cursor.bump();
+            match self.cursor.rest().as_bytes() {
+                [b' ' | b'\t' | b'\x0C', ..] => {
+                    self.cursor.skip_bytes(1);
                 }
-                '\t' => {
-                    self.cursor.bump();
-                }
-                '\\' => {
-                    self.cursor.bump();
-                    if self.cursor.eat_char('\r') {
-                        self.cursor.eat_char('\n');
-                    } else if !self.cursor.eat_char('\n') {
+                [b'\\', ..] => {
+                    self.cursor.skip_bytes(1);
+                    if !self.eat_ascii_line_ending() {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
                             TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
@@ -390,10 +397,6 @@ impl<'src> Lexer<'src> {
                     if self.cursor.is_eof() {
                         return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     }
-                }
-                // Form feed
-                '\x0C' => {
-                    self.cursor.bump();
                 }
                 _ => break,
             }
