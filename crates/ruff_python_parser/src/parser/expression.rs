@@ -342,6 +342,7 @@ impl<'src> Parser<'src> {
     /// is valid in that context. For example, a unary operator is not valid
     /// in an `await` expression in which case the `left_precedence` would
     /// be [`OperatorPrecedence::Await`].
+    #[inline(never)]
     fn parse_lhs_expression(
         &mut self,
         left_precedence: OperatorPrecedence,
@@ -352,6 +353,16 @@ impl<'src> Parser<'src> {
             return self.parse_lhs_expression_inner(left_precedence, context, token);
         }
 
+        self.parse_recursive_lhs_expression(left_precedence, context, token)
+    }
+
+    #[inline(never)]
+    fn parse_recursive_lhs_expression(
+        &mut self,
+        left_precedence: OperatorPrecedence,
+        context: ExpressionContext,
+        token: TokenKind,
+    ) -> ParsedExpr {
         if let Some(result) = self.with_recursion(|parser| {
             parser.parse_lhs_expression_inner(left_precedence, context, token)
         }) {
@@ -483,7 +494,7 @@ impl<'src> Parser<'src> {
             _ => {}
         }
 
-        let lhs = self.parse_atom(context);
+        let lhs = self.parse_atom(context, token);
 
         ParsedExpr {
             expr: self.parse_postfix_expression(lhs.expr, start, context),
@@ -573,7 +584,9 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
-            let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
+            let value = self.tokens.take_value();
+            self.do_bump(TokenKind::Name);
+            let TokenValue::Name(name) = value else {
                 unreachable!();
             };
             return ast::Identifier {
@@ -646,10 +659,10 @@ impl<'src> Parser<'src> {
     /// Parses an atom.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
-    fn parse_atom(&mut self, context: ExpressionContext) -> ParsedExpr {
+    fn parse_atom(&mut self, context: ExpressionContext, token: TokenKind) -> ParsedExpr {
         let start = self.node_start();
 
-        let lhs = match self.current_token_kind() {
+        let lhs = match token {
             TokenKind::Float => {
                 let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
                     unreachable!()
