@@ -22,7 +22,7 @@ pub struct FormatExceptHandler {
     last_suite_in_statement: bool,
 }
 
-impl FormatRuleWithOptions<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
+impl FormatRuleWithOptions<ExceptHandler<'_>, PyFormatContext<'_>> for FormatExceptHandler {
     type Options = FormatExceptHandler;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -32,7 +32,7 @@ impl FormatRuleWithOptions<ExceptHandler, PyFormatContext<'_>> for FormatExceptH
     }
 }
 
-impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
+impl FormatRule<ExceptHandler<'_>, PyFormatContext<'_>> for FormatExceptHandler {
     fn fmt(&self, item: &ExceptHandler, f: &mut PyFormatter) -> FormatResult<()> {
         match item {
             ExceptHandler::ExceptHandler(except_handler) => except_handler
@@ -46,9 +46,9 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
+impl<'ast, 'context> AsFormat<PyFormatContext<'context>> for ExceptHandler<'ast> {
     type Format<'a>
-        = FormatRefWithRule<'a, ExceptHandler, FormatExceptHandler, PyFormatContext<'ast>>
+        = FormatRefWithRule<'a, ExceptHandler<'ast>, FormatExceptHandler, PyFormatContext<'context>>
     where
         Self: 'a;
 
@@ -57,7 +57,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
     }
 }
 
-impl FormatNodeRule<StmtTry> for FormatStmtTry {
+impl FormatNodeRule<StmtTry<'_>> for FormatStmtTry {
     fn fmt_fields(&self, item: &StmtTry, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtTry {
             body,
@@ -123,13 +123,13 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
 }
 
 fn format_case<'a>(
-    try_statement: &'a StmtTry,
+    try_statement: &'a StmtTry<'a>,
     kind: CaseKind,
-    previous_node: Option<&'a Stmt>,
+    previous_node: Option<&'a Stmt<'a>>,
     dangling_comments: &'a [SourceComment],
     last_suite_in_statement: bool,
     f: &mut PyFormatter,
-) -> FormatResult<(Option<&'a Stmt>, &'a [SourceComment])> {
+) -> FormatResult<(Option<&'a Stmt<'a>>, &'a [SourceComment])> {
     let body = match kind {
         CaseKind::Try => &try_statement.body,
         CaseKind::Else => &try_statement.orelse,

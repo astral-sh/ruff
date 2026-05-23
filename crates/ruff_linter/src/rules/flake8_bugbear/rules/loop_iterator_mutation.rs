@@ -130,8 +130,8 @@ struct SkipsElseFinder {
     found: bool,
 }
 
-impl StatementVisitor<'_> for SkipsElseFinder {
-    fn visit_body(&mut self, body: &[Stmt]) {
+impl<'ast> StatementVisitor<'ast> for SkipsElseFinder {
+    fn visit_body(&mut self, body: &'ast [Stmt<'ast>]) {
         for stmt in body {
             self.visit_stmt(stmt);
             // After a terminator, remaining statements are unreachable.
@@ -206,9 +206,9 @@ fn is_mutating_function(function_name: &str) -> bool {
 /// loop's mutations.
 #[derive(Debug)]
 struct LoopMutationsVisitor<'a> {
-    iter: &'a Expr,
-    target: &'a Expr,
-    index: &'a Expr,
+    iter: &'a Expr<'a>,
+    target: &'a Expr<'a>,
+    index: &'a Expr<'a>,
     mutations: HashMap<u32, Vec<TextRange>>,
     branch: u32,
     next_branch_id: u32,

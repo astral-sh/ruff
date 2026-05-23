@@ -92,7 +92,7 @@ pub struct FormatSuite {
     kind: SuiteKind,
 }
 
-impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
+impl FormatRule<Suite<'_>, PyFormatContext<'_>> for FormatSuite {
     fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
@@ -519,7 +519,7 @@ impl FormatSuite {
 ///     print("below function")
 /// ```
 fn trailing_function_or_class_def<'a>(
-    preceding: Option<&'a Stmt>,
+    preceding: Option<&'a Stmt<'a>>,
     comments: &Comments,
 ) -> Option<AnyNodeRef<'a>> {
     std::iter::successors(
@@ -746,7 +746,10 @@ pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> b
 
 /// Returns `Some(Stmt::Ellipsis)` if a function or class body contains only an ellipsis with no
 /// comments.
-pub(crate) fn as_only_an_ellipsis<'a>(body: &'a [Stmt], comments: &Comments) -> Option<&'a Stmt> {
+pub(crate) fn as_only_an_ellipsis<'a>(
+    body: &'a [Stmt],
+    comments: &Comments,
+) -> Option<&'a Stmt<'a>> {
     if let [node @ Stmt::Expr(ast::StmtExpr { value, .. })] = body
         && value.is_ellipsis_literal_expr()
         && !comments.has_leading(node)
@@ -768,7 +771,7 @@ const fn is_import_definition(stmt: &Stmt) -> bool {
     matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
 }
 
-impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
+impl FormatRuleWithOptions<Suite<'_>, PyFormatContext<'_>> for FormatSuite {
     type Options = SuiteKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -777,16 +780,19 @@ impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite {
-    type Format<'a> = FormatRefWithRule<'a, Suite, FormatSuite, PyFormatContext<'ast>>;
+impl<'ast, 'context> AsFormat<PyFormatContext<'context>> for Suite<'ast> {
+    type Format<'a>
+        = FormatRefWithRule<'a, Suite<'ast>, FormatSuite, PyFormatContext<'context>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatSuite::default())
     }
 }
 
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
-    type Format = FormatOwnedWithRule<Suite, FormatSuite, PyFormatContext<'ast>>;
+impl<'ast, 'context> IntoFormat<PyFormatContext<'context>> for Suite<'ast> {
+    type Format = FormatOwnedWithRule<Suite<'ast>, FormatSuite, PyFormatContext<'context>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatSuite::default())
@@ -797,7 +803,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct DocstringStmt<'a> {
     /// The [`Stmt::Expr`]
-    docstring: &'a Stmt,
+    docstring: &'a Stmt<'a>,
     /// The parent suite kind
     suite_kind: SuiteKind,
 }
@@ -805,7 +811,7 @@ pub(crate) struct DocstringStmt<'a> {
 impl<'a> DocstringStmt<'a> {
     /// Checks if the statement is a simple string that can be formatted as a docstring
     fn try_from_statement(
-        stmt: &'a Stmt,
+        stmt: &'a Stmt<'a>,
         suite_kind: SuiteKind,
         context: &PyFormatContext,
     ) -> Option<DocstringStmt<'a>> {
@@ -896,11 +902,11 @@ pub(crate) enum SuiteChildStatement<'a> {
     Docstring(DocstringStmt<'a>),
 
     /// Any other statement.
-    Other(&'a Stmt),
+    Other(&'a Stmt<'a>),
 }
 
 impl<'a> SuiteChildStatement<'a> {
-    pub(crate) const fn statement(self) -> &'a Stmt {
+    pub(crate) const fn statement(self) -> &'a Stmt<'a> {
         match self {
             SuiteChildStatement::Docstring(docstring) => docstring.docstring,
             SuiteChildStatement::Other(statement) => statement,
@@ -983,6 +989,7 @@ fn new_logical_line_between_statements(source: &str, between_statement_range: Te
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_formatter::format;
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
@@ -1014,7 +1021,8 @@ def trailing_func():
     pass
 ";
 
-        let parsed = parse_module(source).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(source, &allocator).unwrap();
         let comment_ranges = CommentRanges::from(parsed.tokens());
 
         let context = PyFormatContext::new(

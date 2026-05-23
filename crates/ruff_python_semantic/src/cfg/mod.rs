@@ -10,6 +10,7 @@ mod tests {
     use crate::cfg::graph::build_cfg;
     use crate::cfg::visualize::draw_cfg;
     use insta;
+    use ruff_allocator::Allocator;
 
     use ruff_python_parser::parse_module;
     use ruff_text_size::Ranged;
@@ -18,9 +19,10 @@ mod tests {
     #[test_case("no_flow.py")]
     #[test_case("jumps.py")]
     fn control_flow_graph(filename: &str) {
+        let allocator = Allocator::new();
         let path = PathBuf::from("resources/test/fixtures/cfg").join(filename);
         let source = fs::read_to_string(path).expect("failed to read file");
-        let stmts = parse_module(&source)
+        let stmts = parse_module(&source, &allocator)
             .unwrap_or_else(|err| panic!("failed to parse source: '{source}': {err}"))
             .into_suite();
 

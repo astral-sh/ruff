@@ -1,8 +1,7 @@
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::AstName;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, PatternKeys,
-    Patterns, Singleton,
+    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, Singleton,
 };
 use ruff_text_size::{Ranged, TextSize};
 
@@ -52,7 +51,7 @@ const MAPPING_PATTERN_START_SET: TokenSet = TokenSet::new([
 ])
 .union(LITERAL_PATTERN_START_SET);
 
-impl Parser<'_> {
+impl<'ast> Parser<'_, 'ast> {
     /// Returns `true` if the current token is a valid start of a pattern.
     pub(super) fn at_pattern_start(&self) -> bool {
         self.at_ts(PATTERN_START_SET) || self.at_soft_keyword()
@@ -66,7 +65,7 @@ impl Parser<'_> {
     /// Entry point to start parsing a pattern.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-patterns>
-    pub(super) fn parse_match_patterns(&mut self) -> Pattern {
+    pub(super) fn parse_match_patterns(&mut self) -> Pattern<'ast> {
         let start = self.node_start();
 
         // We don't yet know if it's a sequence pattern or a single pattern, so
@@ -87,7 +86,7 @@ impl Parser<'_> {
     /// Parses an `or_pattern` or an `as_pattern`.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern>
-    fn parse_match_pattern(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
+    fn parse_match_pattern(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern<'ast> {
         if let Some(result) =
             self.with_recursion(|parser| parser.parse_match_pattern_inner(allow_star_pattern))
         {
@@ -97,19 +96,19 @@ impl Parser<'_> {
             self.report_recursion_limit_exceeded(self.current_token_range());
             let invalid_node = Expr::Name(ast::ExprName {
                 range,
-                id: Name::empty(),
+                id: AstName::empty(),
                 ctx: ExprContext::Invalid,
                 node_index: AtomicNodeIndex::NONE,
             });
             Pattern::MatchValue(ast::PatternMatchValue {
                 range: invalid_node.range(),
-                value: Box::new(invalid_node),
+                value: self.alloc(invalid_node),
                 node_index: AtomicNodeIndex::NONE,
             })
         }
     }
 
-    fn parse_match_pattern_inner(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
+    fn parse_match_pattern_inner(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern<'ast> {
         let start = self.node_start();
 
         // We don't yet know if it's an or pattern or an as pattern, so use whatever
@@ -134,7 +133,7 @@ impl Parser<'_> {
 
             lhs = Pattern::MatchOr(ast::PatternMatchOr {
                 range: self.node_range(start),
-                patterns,
+                patterns: self.alloc_vec(patterns),
                 node_index: AtomicNodeIndex::NONE,
             });
         }
@@ -150,7 +149,7 @@ impl Parser<'_> {
             lhs = Pattern::MatchAs(ast::PatternMatchAs {
                 range: self.node_range(start),
                 name: Some(ident),
-                pattern: Some(Box::new(lhs)),
+                pattern: Some(self.alloc(lhs)),
                 node_index: AtomicNodeIndex::NONE,
             });
         }
@@ -161,7 +160,7 @@ impl Parser<'_> {
     /// Parses a pattern.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-closed_pattern>
-    fn parse_match_pattern_lhs(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
+    fn parse_match_pattern_lhs(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern<'ast> {
         let start = self.node_start();
 
         let mut lhs = match self.current_token_kind() {
@@ -198,12 +197,12 @@ impl Parser<'_> {
     /// If the parser isn't positioned at a `{` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#mapping-patterns>
-    fn parse_match_pattern_mapping(&mut self) -> ast::PatternMatchMapping {
+    fn parse_match_pattern_mapping(&mut self) -> ast::PatternMatchMapping<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        let mut keys = PatternKeys::new();
-        let mut patterns = Patterns::new();
+        let mut keys = vec![];
+        let mut patterns = vec![];
         let mut rest = None;
 
         self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
@@ -226,7 +225,7 @@ impl Parser<'_> {
                 rest = Some(identifier);
             } else {
                 let key = match parser.parse_match_pattern_lhs(AllowStarPattern::No) {
-                    Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
+                    Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => (*value).clone(),
                     Pattern::MatchSingleton(ast::PatternMatchSingleton {
                         value,
                         range,
@@ -251,7 +250,7 @@ impl Parser<'_> {
                             ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
                             &pattern,
                         );
-                        recovery::pattern_to_expr(pattern)
+                        recovery::pattern_to_expr(pattern, parser.allocator)
                     }
                 };
                 keys.push(key);
@@ -275,8 +274,8 @@ impl Parser<'_> {
 
         ast::PatternMatchMapping {
             range: self.node_range(start),
-            keys,
-            patterns,
+            keys: self.alloc_vec(keys),
+            patterns: self.alloc_vec(patterns),
             rest,
             node_index: AtomicNodeIndex::NONE,
         }
@@ -289,7 +288,7 @@ impl Parser<'_> {
     /// If the parser isn't positioned at a `*` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-star_pattern>
-    fn parse_match_pattern_star(&mut self) -> ast::PatternMatchStar {
+    fn parse_match_pattern_star(&mut self) -> ast::PatternMatchStar<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
@@ -313,7 +312,7 @@ impl Parser<'_> {
     /// If the parser isn't positioned at a `(` or `[` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#sequence-patterns>
-    fn parse_parenthesized_or_sequence_pattern(&mut self) -> Pattern {
+    fn parse_parenthesized_or_sequence_pattern(&mut self) -> Pattern<'ast> {
         let start = self.node_start();
         let parentheses = if self.eat(TokenKind::Lpar) {
             SequenceMatchPatternParentheses::Tuple
@@ -340,7 +339,7 @@ impl Parser<'_> {
 
         if self.eat(parentheses.closing_kind()) {
             return Pattern::MatchSequence(ast::PatternMatchSequence {
-                patterns: Vec::new(),
+                patterns: self.alloc_vec(vec![]),
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
             });
@@ -370,10 +369,10 @@ impl Parser<'_> {
     /// [open sequence pattern]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-open_sequence_pattern
     fn parse_sequence_match_pattern(
         &mut self,
-        first_element: Pattern,
+        first_element: Pattern<'ast>,
         start: TextSize,
         parentheses: Option<SequenceMatchPatternParentheses>,
-    ) -> ast::PatternMatchSequence {
+    ) -> ast::PatternMatchSequence<'ast> {
         if parentheses.is_some_and(|parentheses| {
             self.at(parentheses.closing_kind()) || self.peek() == parentheses.closing_kind()
         }) {
@@ -396,7 +395,7 @@ impl Parser<'_> {
 
         ast::PatternMatchSequence {
             range: self.node_range(start),
-            patterns,
+            patterns: self.alloc_vec(patterns),
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -404,7 +403,7 @@ impl Parser<'_> {
     /// Parses a literal pattern.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-literal_pattern>
-    fn parse_match_pattern_literal(&mut self) -> Pattern {
+    fn parse_match_pattern_literal(&mut self) -> Pattern<'ast> {
         let start = self.node_start();
         match self.current_token_kind() {
             TokenKind::None => {
@@ -435,7 +434,7 @@ impl Parser<'_> {
                 let str = self.parse_strings();
 
                 Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(str),
+                    value: self.alloc(str),
                     range: self.node_range(start),
                     node_index: AtomicNodeIndex::NONE,
                 })
@@ -445,7 +444,7 @@ impl Parser<'_> {
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: self.alloc(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Complex { real, imag },
                         range,
                         node_index: AtomicNodeIndex::NONE,
@@ -459,7 +458,7 @@ impl Parser<'_> {
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: self.alloc(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Int(value),
                         range,
                         node_index: AtomicNodeIndex::NONE,
@@ -473,7 +472,7 @@ impl Parser<'_> {
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: self.alloc(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Float(value),
                         range,
                         node_index: AtomicNodeIndex::NONE,
@@ -504,7 +503,7 @@ impl Parser<'_> {
                         }
 
                         return Pattern::MatchValue(ast::PatternMatchValue {
-                            value: Box::new(Expr::UnaryOp(unary_expr)),
+                            value: self.alloc(Expr::UnaryOp(unary_expr)),
                             range: self.node_range(start),
                             node_index: AtomicNodeIndex::NONE,
                         });
@@ -524,7 +523,7 @@ impl Parser<'_> {
                         let attribute = self.parse_attr_expr_for_match_pattern(id, start);
 
                         Pattern::MatchValue(ast::PatternMatchValue {
-                            value: Box::new(attribute),
+                            value: self.alloc(attribute),
                             range: self.node_range(start),
                             node_index: AtomicNodeIndex::NONE,
                         })
@@ -559,13 +558,13 @@ impl Parser<'_> {
                     );
                     let invalid_node = Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
-                        id: Name::empty(),
+                        id: AstName::empty(),
                         ctx: ExprContext::Invalid,
                         node_index: AtomicNodeIndex::NONE,
                     });
                     Pattern::MatchValue(ast::PatternMatchValue {
                         range: invalid_node.range(),
-                        value: Box::new(invalid_node),
+                        value: self.alloc(invalid_node),
                         node_index: AtomicNodeIndex::NONE,
                     })
                 }
@@ -583,9 +582,9 @@ impl Parser<'_> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#literal-patterns>
     fn parse_complex_literal_pattern(
         &mut self,
-        lhs: Pattern,
+        lhs: Pattern<'ast>,
         start: TextSize,
-    ) -> ast::PatternMatchValue {
+    ) -> ast::PatternMatchValue<'ast> {
         let operator = if self.eat(TokenKind::Plus) {
             Operator::Add
         } else {
@@ -600,7 +599,7 @@ impl Parser<'_> {
             lhs.value
         } else {
             self.add_error(ParseErrorType::ExpectedRealNumber, &lhs);
-            Box::new(recovery::pattern_to_expr(lhs))
+            self.alloc(recovery::pattern_to_expr(lhs, self.allocator))
         };
 
         let rhs_pattern = self.parse_match_pattern_lhs(AllowStarPattern::No);
@@ -611,13 +610,13 @@ impl Parser<'_> {
             rhs.value
         } else {
             self.add_error(ParseErrorType::ExpectedImaginaryNumber, &rhs_pattern);
-            Box::new(recovery::pattern_to_expr(rhs_pattern))
+            self.alloc(recovery::pattern_to_expr(rhs_pattern, self.allocator))
         };
 
         let range = self.node_range(start);
 
         ast::PatternMatchValue {
-            value: Box::new(Expr::BinOp(ast::ExprBinOp {
+            value: self.alloc(Expr::BinOp(ast::ExprBinOp {
                 left: lhs_value,
                 op: operator,
                 right: rhs_value,
@@ -630,7 +629,11 @@ impl Parser<'_> {
     }
 
     /// Parses an attribute expression until the current token is not a `.`.
-    fn parse_attr_expr_for_match_pattern(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
+    fn parse_attr_expr_for_match_pattern(
+        &mut self,
+        mut lhs: Expr<'ast>,
+        start: TextSize,
+    ) -> Expr<'ast> {
         while self.current_token_kind() == TokenKind::Dot {
             lhs = Expr::Attribute(self.parse_attribute_expression(
                 lhs,
@@ -653,9 +656,9 @@ impl Parser<'_> {
     /// [pattern arguments]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern_arguments
     fn parse_match_pattern_class(
         &mut self,
-        cls: Pattern,
+        cls: Pattern<'ast>,
         start: TextSize,
-    ) -> ast::PatternMatchClass {
+    ) -> ast::PatternMatchClass<'ast> {
         let arguments_start = self.node_start();
 
         let cls = match cls {
@@ -665,16 +668,16 @@ impl Parser<'_> {
                 ..
             }) => {
                 if ident.is_valid() {
-                    Box::new(Expr::Name(ast::ExprName {
+                    self.alloc(Expr::Name(ast::ExprName {
                         range: ident.range(),
                         id: ident.id,
                         ctx: ExprContext::Load,
                         node_index: AtomicNodeIndex::NONE,
                     }))
                 } else {
-                    Box::new(Expr::Name(ast::ExprName {
+                    self.alloc(Expr::Name(ast::ExprName {
                         range: ident.range(),
-                        id: Name::empty(),
+                        id: AstName::empty(),
                         ctx: ExprContext::Invalid,
                         node_index: AtomicNodeIndex::NONE,
                     }))
@@ -690,13 +693,13 @@ impl Parser<'_> {
                     ParseErrorType::OtherError("Invalid value for a class pattern".to_string()),
                     &pattern,
                 );
-                Box::new(recovery::pattern_to_expr(pattern))
+                self.alloc(recovery::pattern_to_expr(pattern, self.allocator))
             }
         };
 
         self.bump(TokenKind::Lpar);
 
-        let mut patterns = Patterns::new();
+        let mut patterns = vec![];
         let mut keywords = vec![];
         let mut has_seen_pattern = false;
         let mut has_seen_keyword_pattern = false;
@@ -726,7 +729,7 @@ impl Parser<'_> {
                             &pattern,
                         );
                         ast::Identifier {
-                            id: Name::empty(),
+                            id: AstName::empty(),
                             range: parser.missing_node_range(),
                             node_index: AtomicNodeIndex::NONE,
                         }
@@ -761,8 +764,8 @@ impl Parser<'_> {
         ast::PatternMatchClass {
             cls,
             arguments: ast::PatternArguments {
-                patterns,
-                keywords,
+                patterns: self.alloc_vec(patterns),
+                keywords: self.alloc_vec(keywords),
                 range: self.node_range(arguments_start),
                 node_index: AtomicNodeIndex::NONE,
             },
@@ -786,7 +789,7 @@ impl AllowStarPattern {
 
 /// Returns `true` if the given expression is a real number literal or a unary
 /// addition or subtraction of a real number literal.
-const fn is_real_number(expr: &Expr) -> bool {
+fn is_real_number(expr: &Expr<'_>) -> bool {
     match expr {
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(_) | ast::Number::Float(_),
@@ -802,7 +805,7 @@ const fn is_real_number(expr: &Expr) -> bool {
 }
 
 /// Returns `true` if the given expression is a complex number literal.
-const fn is_complex_number(expr: &Expr) -> bool {
+fn is_complex_number(expr: &Expr<'_>) -> bool {
     matches!(
         expr,
         Expr::NumberLiteral(ast::ExprNumberLiteral {

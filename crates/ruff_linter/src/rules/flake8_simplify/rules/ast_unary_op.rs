@@ -2,7 +2,6 @@ use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, Un
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
@@ -185,9 +184,9 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         expr.range(),
     );
     let node = ast::ExprCompare {
-        left: left.clone(),
-        ops: Box::from([CmpOp::NotEq]),
-        comparators: comparators.clone(),
+        left: *left,
+        ops: checker.alloc_vec(vec![CmpOp::NotEq]),
+        comparators: *comparators,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
@@ -241,9 +240,9 @@ pub(crate) fn negation_with_not_equal_op(
         expr.range(),
     );
     let node = ast::ExprCompare {
-        left: left.clone(),
-        ops: Box::from([CmpOp::Eq]),
-        comparators: comparators.clone(),
+        left: *left,
+        ops: checker.alloc_vec(vec![CmpOp::Eq]),
+        comparators: *comparators,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
@@ -284,16 +283,16 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         )));
     } else if checker.semantic().has_builtin_binding("bool") {
         let node = ast::ExprName {
-            id: Name::new_static("bool"),
+            id: ast::name::AstName::new_static("bool"),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         let node1 = ast::ExprCall {
-            func: Box::new(node.into()),
+            func: checker.alloc_expr(node.into()),
             arguments: Arguments {
-                args: Box::from([*operand.clone()]),
-                keywords: Box::from([]),
+                args: checker.alloc_vec(vec![(**operand).clone()]),
+                keywords: checker.alloc_vec(vec![]),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

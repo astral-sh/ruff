@@ -1,6 +1,7 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
+use ruff_allocator::{Allocator, Box as ArenaBox};
 use ruff_python_ast::{
     self as ast, BytesLiteralFlags, Expr, FStringFlags, FStringPart, InterpolatedStringElement,
     InterpolatedStringLiteralElement, Stmt, StringFlags,
@@ -22,36 +23,49 @@ use ruff_text_size::{Ranged, TextRange};
 ///   so we carve our own path here by stripping everything that looks like code snippets from
 ///   string literals.
 /// - Ignores nested tuples in deletions. (Black does the same.)
-pub(crate) struct Normalizer;
+pub(crate) struct Normalizer<'ast> {
+    allocator: &'ast Allocator,
+}
 
-impl Normalizer {
+impl<'ast> Normalizer<'ast> {
+    #[allow(dead_code)]
+    pub(crate) const fn new(allocator: &'ast Allocator) -> Self {
+        Self { allocator }
+    }
+
     /// Transform an AST module into a normalized representation.
     #[allow(dead_code)]
-    pub(crate) fn visit_module(&self, module: &mut ast::Mod) {
+    pub(crate) fn visit_module(&self, module: &mut ast::Mod<'ast>) {
         match module {
             ast::Mod::Module(module) => {
                 self.visit_body(&mut module.body);
             }
             ast::Mod::Expression(expression) => {
-                self.visit_expr(&mut expression.body);
+                let mut body = (*expression.body).clone();
+                self.visit_expr(&mut body);
+                expression.body = ArenaBox::new_in(body, self.allocator);
             }
         }
     }
 }
 
-impl Transformer for Normalizer {
-    fn visit_stmt(&self, stmt: &mut Stmt) {
+impl<'ast> Transformer<'ast> for Normalizer<'ast> {
+    fn allocator(&self) -> &'ast Allocator {
+        self.allocator
+    }
+
+    fn visit_stmt(&self, stmt: &mut Stmt<'ast>) {
         if let Stmt::Delete(delete) = stmt {
             // Treat `del a, b` and `del (a, b)` equivalently.
             if let [Expr::Tuple(tuple)] = delete.targets.as_slice() {
-                delete.targets = tuple.elts.clone();
+                delete.targets = tuple.elts;
             }
         }
 
         transformer::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&self, expr: &mut Expr) {
+    fn visit_expr(&self, expr: &mut Expr<'ast>) {
         // Ruff supports joining implicitly concatenated strings. The code below implements this
         // at an AST level by joining the string literals in the AST if they can be joined (it doesn't mean that
         // they'll be joined in the formatted output but they could).
@@ -66,7 +80,7 @@ impl Transformer for Normalizer {
 
                 if can_join {
                     string.value = ast::StringLiteralValue::single(ast::StringLiteral {
-                        value: Box::from(string.value.to_str()),
+                        value: ArenaBox::from_str_in(string.value.to_str(), self.allocator),
                         range: string.range,
                         flags: StringLiteralFlags::empty(),
                         node_index: AtomicNodeIndex::NONE,
@@ -81,7 +95,10 @@ impl Transformer for Normalizer {
 
                 if can_join {
                     bytes.value = ast::BytesLiteralValue::single(ast::BytesLiteral {
-                        value: bytes.value.bytes().collect(),
+                        value: ArenaBox::from_slice_copy_in(
+                            &bytes.value.bytes().collect::<Vec<_>>(),
+                            self.allocator,
+                        ),
                         range: bytes.range,
                         flags: BytesLiteralFlags::empty(),
                         node_index: AtomicNodeIndex::NONE,
@@ -100,12 +117,12 @@ impl Transformer for Normalizer {
                 });
 
                 if can_join {
-                    #[derive(Default)]
-                    struct Collector {
-                        elements: Vec<InterpolatedStringElement>,
+                    struct Collector<'ast> {
+                        allocator: &'ast Allocator,
+                        elements: Vec<InterpolatedStringElement<'ast>>,
                     }
 
-                    impl Collector {
+                    impl<'ast> Collector<'ast> {
                         // The logic for concatenating adjacent string literals
                         // occurs here, implicitly: when we encounter a sequence
                         // of string literals, the first gets pushed to the
@@ -115,30 +132,33 @@ impl Transformer for Normalizer {
                             if let Some(InterpolatedStringElement::Literal(existing_literal)) =
                                 self.elements.last_mut()
                             {
-                                let value = std::mem::take(&mut existing_literal.value);
-                                let mut value = value.into_string();
+                                let mut value = existing_literal.value.to_string();
                                 value.push_str(literal);
-                                existing_literal.value = value.into_boxed_str();
+                                existing_literal.value =
+                                    ArenaBox::from_str_in(&value, self.allocator);
                                 existing_literal.range =
                                     TextRange::new(existing_literal.start(), range.end());
                             } else {
                                 self.elements.push(InterpolatedStringElement::Literal(
                                     InterpolatedStringLiteralElement {
                                         range,
-                                        value: literal.into(),
+                                        value: ArenaBox::from_str_in(literal, self.allocator),
                                         node_index: AtomicNodeIndex::NONE,
                                     },
                                 ));
                             }
                         }
 
-                        fn push_expression(&mut self, expression: ast::InterpolatedElement) {
+                        fn push_expression(&mut self, expression: ast::InterpolatedElement<'ast>) {
                             self.elements
                                 .push(InterpolatedStringElement::Interpolation(expression));
                         }
                     }
 
-                    let mut collector = Collector::default();
+                    let mut collector = Collector {
+                        allocator: self.allocator,
+                        elements: Vec::new(),
+                    };
 
                     for part in &fstring.value {
                         match part {
@@ -163,7 +183,10 @@ impl Transformer for Normalizer {
                     }
 
                     fstring.value = ast::FStringValue::single(ast::FString {
-                        elements: collector.elements.into(),
+                        elements: ast::InterpolatedStringElements::from_vec_in(
+                            collector.elements,
+                            self.allocator,
+                        ),
                         range: fstring.range,
                         flags: FStringFlags::empty(),
                         node_index: AtomicNodeIndex::NONE,
@@ -178,7 +201,7 @@ impl Transformer for Normalizer {
 
     fn visit_interpolated_string_element(
         &self,
-        interpolated_string_element: &mut InterpolatedStringElement,
+        interpolated_string_element: &mut InterpolatedStringElement<'ast>,
     ) {
         let InterpolatedStringElement::Interpolation(interpolation) = interpolated_string_element
         else {
@@ -193,10 +216,10 @@ impl Transformer for Normalizer {
         let leading = debug.leading().replace("\r\n", "\n").replace('\r', "\n");
         let expression = debug.expression().to_string();
         let trailing = debug.trailing().replace("\r\n", "\n").replace('\r', "\n");
-        *debug = ast::DebugText::new(&leading, &expression, &trailing);
+        *debug = ast::DebugText::new_in(&leading, &expression, &trailing, self.allocator);
     }
 
-    fn visit_string_literal(&self, string_literal: &mut ast::StringLiteral) {
+    fn visit_string_literal(&self, string_literal: &mut ast::StringLiteral<'ast>) {
         static STRIP_DOC_TESTS: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
                 r"(?mx)
@@ -227,37 +250,37 @@ impl Transformer for Normalizer {
         // Start by (1) stripping everything that looks like a code
         // snippet, since code snippets may be completely reformatted if
         // they are Python code.
-        string_literal.value = STRIP_DOC_TESTS
+        let value = STRIP_DOC_TESTS
             .replace_all(
                 &string_literal.value,
                 "<DOCTEST-CODE-SNIPPET: Removed by normalizer>\n",
             )
-            .into_owned()
-            .into_boxed_str();
-        string_literal.value = STRIP_RST_BLOCKS
+            .into_owned();
+        string_literal.value = ArenaBox::from_str_in(&value, self.allocator);
+        let value = STRIP_RST_BLOCKS
             .replace_all(
                 &string_literal.value,
                 "<RSTBLOCK-CODE-SNIPPET: Removed by normalizer>\n",
             )
-            .into_owned()
-            .into_boxed_str();
-        string_literal.value = STRIP_MARKDOWN_BLOCKS
+            .into_owned();
+        string_literal.value = ArenaBox::from_str_in(&value, self.allocator);
+        let value = STRIP_MARKDOWN_BLOCKS
             .replace_all(
                 &string_literal.value,
                 "<MARKDOWN-CODE-SNIPPET: Removed by normalizer>\n",
             )
-            .into_owned()
-            .into_boxed_str();
+            .into_owned();
+        string_literal.value = ArenaBox::from_str_in(&value, self.allocator);
         // Normalize a string by (2) stripping any leading and trailing space from each
         // line, and (3) removing any blank lines from the start and end of the string.
-        string_literal.value = string_literal
+        let value = string_literal
             .value
             .lines()
             .map(str::trim)
             .collect::<Vec<_>>()
             .join("\n")
             .trim()
-            .to_owned()
-            .into_boxed_str();
+            .to_owned();
+        string_literal.value = ArenaBox::from_str_in(&value, self.allocator);
     }
 }

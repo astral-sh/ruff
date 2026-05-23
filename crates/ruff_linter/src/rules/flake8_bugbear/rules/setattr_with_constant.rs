@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use unicode_normalization::UnicodeNormalization;
 
@@ -68,20 +67,20 @@ impl AlwaysFixableViolation for SetAttrWithConstant {
     }
 }
 
-fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> String {
+fn assignment(obj: &Expr, name: &str, value: &Expr, checker: &Checker) -> String {
     let stmt = Stmt::Assign(ast::StmtAssign {
-        targets: vec![Expr::Attribute(ast::ExprAttribute {
-            value: Box::new(obj.clone()),
-            attr: Identifier::new(name.to_string(), TextRange::default()),
+        targets: checker.alloc_vec(vec![Expr::Attribute(ast::ExprAttribute {
+            value: Checker::expr_ref(obj),
+            attr: checker.alloc_identifier(name, TextRange::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })],
-        value: Box::new(value.clone()),
+        })]),
+        value: Checker::expr_ref(value),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
-    generator.stmt(&stmt)
+    checker.generator().stmt(&stmt)
 }
 
 /// B010
@@ -129,7 +128,7 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         if expr == child.as_ref() {
             let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
             let edit = Edit::range_replacement(
-                assignment(obj, name.to_str(), value, checker.generator()),
+                assignment(obj, name.to_str(), value, checker),
                 expr.range(),
             );
             let fix = if is_unsafe {

@@ -8,13 +8,13 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprYieldFrom;
 
-impl FormatNodeRule<ExprYieldFrom> for FormatExprYieldFrom {
+impl FormatNodeRule<ExprYieldFrom<'_>> for FormatExprYieldFrom {
     fn fmt_fields(&self, item: &ExprYieldFrom, f: &mut PyFormatter) -> FormatResult<()> {
         AnyExpressionYield::from(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprYieldFrom {
+impl NeedsParentheses for ExprYieldFrom<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

@@ -184,6 +184,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
         checker.stylist(),
         checker.locator(),
         checker.default_string_flags(),
+        checker.allocator(),
     );
     for name in names {
         let mut diagnostic = checker.report_diagnostic(UnquotedTypeAlias, name.range());
@@ -197,8 +198,8 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
 /// become available through `[Rule::RuntimeImportInTypeCheckingBlock]`.
 fn collect_typing_references<'a>(
     checker: &Checker,
-    expr: &'a Expr,
-    names: &mut Vec<&'a ast::ExprName>,
+    expr: &'a Expr<'a>,
+    names: &mut Vec<&'a ast::ExprName<'a>>,
 ) {
     match expr {
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {

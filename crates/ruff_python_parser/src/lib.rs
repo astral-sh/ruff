@@ -71,6 +71,7 @@ pub use crate::parser::ParseOptions;
 
 use crate::parser::Parser;
 
+use ruff_allocator::{Allocator, Box as ArenaBox};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
     Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
@@ -96,8 +97,10 @@ pub mod typing;
 /// For example, parsing a simple function definition and a call to that function:
 ///
 /// ```
+/// use ruff_allocator::Allocator;
 /// use ruff_python_parser::parse_module;
 ///
+/// let allocator = Allocator::new();
 /// let source = r#"
 /// def foo():
 ///    return 42
@@ -105,11 +108,14 @@ pub mod typing;
 /// print(foo())
 /// "#;
 ///
-/// let module = parse_module(source);
+/// let module = parse_module(source, &allocator);
 /// assert!(module.is_ok());
 /// ```
-pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
-    Parser::new(source, ParseOptions::from(Mode::Module))
+pub fn parse_module<'ast>(
+    source: &str,
+    allocator: &'ast Allocator,
+) -> Result<Parsed<ModModule<'ast>>, ParseError> {
+    Parser::new(source, ParseOptions::from(Mode::Module), allocator)
         .parse()
         .try_into_module()
         .unwrap()
@@ -126,13 +132,18 @@ pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
 /// For example, parsing a single expression denoting the addition of two numbers:
 ///
 /// ```
+/// use ruff_allocator::Allocator;
 /// use ruff_python_parser::parse_expression;
 ///
-/// let expr = parse_expression("1 + 2");
+/// let allocator = Allocator::new();
+/// let expr = parse_expression("1 + 2", &allocator);
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseError> {
-    Parser::new(source, ParseOptions::from(Mode::Expression))
+pub fn parse_expression<'ast>(
+    source: &str,
+    allocator: &'ast Allocator,
+) -> Result<Parsed<ModExpression<'ast>>, ParseError> {
+    Parser::new(source, ParseOptions::from(Mode::Expression), allocator)
         .parse()
         .try_into_expression()
         .unwrap()
@@ -149,22 +160,30 @@ pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseErro
 /// Parsing one of the numeric literal which is part of an addition expression:
 ///
 /// ```
+/// use ruff_allocator::Allocator;
 /// use ruff_python_parser::parse_expression_range;
 /// # use ruff_text_size::{TextRange, TextSize};
 ///
-/// let parsed = parse_expression_range("11 + 22 + 33", TextRange::new(TextSize::new(5), TextSize::new(7)));
+/// let allocator = Allocator::new();
+/// let parsed = parse_expression_range("11 + 22 + 33", TextRange::new(TextSize::new(5), TextSize::new(7)), &allocator);
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse_expression_range(
+pub fn parse_expression_range<'ast>(
     source: &str,
     range: TextRange,
-) -> Result<Parsed<ModExpression>, ParseError> {
+    allocator: &'ast Allocator,
+) -> Result<Parsed<ModExpression<'ast>>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    Parser::new_starts_at(source, range.start(), ParseOptions::from(Mode::Expression))
-        .parse()
-        .try_into_expression()
-        .unwrap()
-        .into_result()
+    Parser::new_starts_at(
+        source,
+        range.start(),
+        ParseOptions::from(Mode::Expression),
+        allocator,
+    )
+    .parse()
+    .try_into_expression()
+    .unwrap()
+    .into_result()
 }
 
 /// Parses a Python expression as if it is parenthesized.
@@ -176,20 +195,24 @@ pub fn parse_expression_range(
 /// Parsing an expression that would be valid within parenthesis:
 ///
 /// ```
+/// use ruff_allocator::Allocator;
 /// use ruff_python_parser::parse_parenthesized_expression_range;
 /// # use ruff_text_size::{TextRange, TextSize};
 ///
-/// let parsed = parse_parenthesized_expression_range("'''\n int | str'''", TextRange::new(TextSize::new(3), TextSize::new(14)));
+/// let allocator = Allocator::new();
+/// let parsed = parse_parenthesized_expression_range("'''\n int | str'''", TextRange::new(TextSize::new(3), TextSize::new(14)), &allocator);
 /// assert!(parsed.is_ok());
-pub fn parse_parenthesized_expression_range(
+pub fn parse_parenthesized_expression_range<'ast>(
     source: &str,
     range: TextRange,
-) -> Result<Parsed<ModExpression>, ParseError> {
+    allocator: &'ast Allocator,
+) -> Result<Parsed<ModExpression<'ast>>, ParseError> {
     let source = &source[..range.end().to_usize()];
     let parsed = Parser::new_starts_at(
         source,
         range.start(),
         ParseOptions::from(Mode::ParenthesizedExpression),
+        allocator,
     )
     .parse();
     parsed.try_into_expression().unwrap().into_result()
@@ -202,32 +225,35 @@ pub fn parse_parenthesized_expression_range(
 /// Parsing a string annotation:
 ///
 /// ```
+/// use ruff_allocator::Allocator;
 /// use ruff_python_parser::parse_string_annotation;
 /// use ruff_python_ast::{StringLiteral, StringLiteralFlags, AtomicNodeIndex};
 /// use ruff_text_size::{TextRange, TextSize};
 ///
+/// let allocator = Allocator::new();
 /// let string = StringLiteral {
-///     value: "'''\n int | str'''".to_string().into_boxed_str(),
+///     value: "'''\n int | str'''".into(),
 ///     flags: StringLiteralFlags::empty(),
 ///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
 ///     node_index: AtomicNodeIndex::NONE
 /// };
-/// let parsed = parse_string_annotation("'''\n int | str'''", &string);
+/// let parsed = parse_string_annotation("'''\n int | str'''", &string, &allocator);
 /// assert!(!parsed.is_ok());
 /// ```
-pub fn parse_string_annotation(
+pub fn parse_string_annotation<'ast>(
     source: &str,
     string: &StringLiteral,
-) -> Result<Parsed<ModExpression>, ParseError> {
+    allocator: &'ast Allocator,
+) -> Result<Parsed<ModExpression<'ast>>, ParseError> {
     let range = string
         .range()
         .add_start(string.flags.opener_len())
         .sub_end(string.flags.closer_len());
     let source = &source[..range.end().to_usize()];
     if string.flags.is_triple_quoted() {
-        parse_parenthesized_expression_range(source, range)
+        parse_parenthesized_expression_range(source, range, allocator)
     } else {
-        parse_expression_range(source, range)
+        parse_expression_range(source, range, allocator)
     }
 }
 
@@ -243,63 +269,81 @@ pub fn parse_string_annotation(
 /// parsing:
 ///
 /// ```
+/// use ruff_allocator::Allocator;
 /// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
-/// let parsed = parse("1 + 2", ParseOptions::from(Mode::Expression));
+/// let allocator = Allocator::new();
+/// let parsed = parse("1 + 2", ParseOptions::from(Mode::Expression), &allocator);
 /// assert!(parsed.is_ok());
 /// ```
 ///
 /// Alternatively, we can parse a full Python program consisting of multiple lines:
 ///
 /// ```
+/// use ruff_allocator::Allocator;
 /// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
+/// let allocator = Allocator::new();
 /// let source = r#"
 /// class Greeter:
 ///
 ///   def greet(self):
 ///    print("Hello, world!")
 /// "#;
-/// let parsed = parse(source, ParseOptions::from(Mode::Module));
+/// let parsed = parse(source, ParseOptions::from(Mode::Module), &allocator);
 /// assert!(parsed.is_ok());
 /// ```
 ///
 /// Additionally, we can parse a Python program containing IPython escapes:
 ///
 /// ```
+/// use ruff_allocator::Allocator;
 /// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
+/// let allocator = Allocator::new();
 /// let source = r#"
 /// %timeit 1 + 2
 /// ?str.replace
 /// !ls
 /// "#;
-/// let parsed = parse(source, ParseOptions::from(Mode::Ipython));
+/// let parsed = parse(source, ParseOptions::from(Mode::Ipython), &allocator);
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse(source: &str, options: ParseOptions) -> Result<Parsed<Mod>, ParseError> {
-    parse_unchecked(source, options).into_result()
+pub fn parse<'ast>(
+    source: &str,
+    options: ParseOptions,
+    allocator: &'ast Allocator,
+) -> Result<Parsed<Mod<'ast>>, ParseError> {
+    parse_unchecked(source, options, allocator).into_result()
 }
 
 /// Parse the given Python source code using the specified [`ParseOptions`].
 ///
 /// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
 /// and returns the [`Parsed`] as is.
-pub fn parse_unchecked(source: &str, options: ParseOptions) -> Parsed<Mod> {
-    Parser::new(source, options).parse()
+pub fn parse_unchecked<'ast>(
+    source: &str,
+    options: ParseOptions,
+    allocator: &'ast Allocator,
+) -> Parsed<Mod<'ast>> {
+    Parser::new(source, options, allocator).parse()
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].
-pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModule> {
-    // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
-    Parser::new(source, ParseOptions::from(source_type))
+pub fn parse_unchecked_source<'ast>(
+    source: &str,
+    source_type: PySourceType,
+    allocator: &'ast Allocator,
+) -> Parsed<ModModule<'ast>> {
+    // `PySourceType` always parses to a `ModModule`.
+    Parser::new(source, ParseOptions::from(source_type), allocator)
         .parse()
         .try_into_module()
         .unwrap()
 }
 
 /// Represents the parsed source code.
-#[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
+#[derive(Debug, PartialEq, get_size2::GetSize)]
 pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
@@ -399,7 +443,7 @@ impl<T> Parsed<T> {
     }
 }
 
-impl Parsed<Mod> {
+impl<'ast> Parsed<Mod<'ast>> {
     /// Attempts to convert the [`Parsed<Mod>`] into a [`Parsed<ModModule>`].
     ///
     /// This method checks if the `syntax` field of the output is a [`Mod::Module`]. If it is, the
@@ -407,7 +451,7 @@ impl Parsed<Mod> {
     /// returns [`None`].
     ///
     /// [`Some(Parsed<ModModule>)`]: Some
-    pub fn try_into_module(self) -> Option<Parsed<ModModule>> {
+    pub fn try_into_module(self) -> Option<Parsed<ModModule<'ast>>> {
         match self.syntax {
             Mod::Module(module) => Some(Parsed {
                 syntax: module,
@@ -426,7 +470,7 @@ impl Parsed<Mod> {
     /// Otherwise, it returns [`None`].
     ///
     /// [`Some(Parsed<ModExpression>)`]: Some
-    pub fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
+    pub fn try_into_expression(self) -> Option<Parsed<ModExpression<'ast>>> {
         match self.syntax {
             Mod::Module(_) => None,
             Mod::Expression(expression) => Some(Parsed {
@@ -439,32 +483,32 @@ impl Parsed<Mod> {
     }
 }
 
-impl Parsed<ModModule> {
+impl<'ast> Parsed<ModModule<'ast>> {
     /// Returns the module body contained in this parsed output as a [`Suite`].
-    pub fn suite(&self) -> &Suite {
+    pub fn suite(&self) -> &Suite<'ast> {
         &self.syntax.body
     }
 
     /// Consumes the [`Parsed`] output and returns the module body as a [`Suite`].
-    pub fn into_suite(self) -> Suite {
+    pub fn into_suite(self) -> Suite<'ast> {
         self.syntax.body
     }
 }
 
-impl Parsed<ModExpression> {
+impl<'ast> Parsed<ModExpression<'ast>> {
     /// Returns the expression contained in this parsed output.
-    pub fn expr(&self) -> &Expr {
+    pub fn expr(&self) -> &Expr<'ast> {
         &self.syntax.body
     }
 
-    /// Returns a mutable reference to the expression contained in this parsed output.
-    pub fn expr_mut(&mut self) -> &mut Expr {
-        &mut self.syntax.body
+    /// Replaces the expression contained in this parsed output.
+    pub fn replace_expr(&mut self, expr: Expr<'ast>, allocator: &'ast Allocator) {
+        self.syntax.body = ArenaBox::new_in(expr, allocator);
     }
 
     /// Consumes the [`Parsed`] output and returns the contained [`Expr`].
-    pub fn into_expr(self) -> Expr {
-        *self.syntax.body
+    pub fn into_expr(self) -> Expr<'ast> {
+        (*self.syntax.body).clone()
     }
 }
 

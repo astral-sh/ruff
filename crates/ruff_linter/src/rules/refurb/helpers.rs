@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
-use ruff_python_codegen::Generator;
 use ruff_python_semantic::{ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -11,28 +10,28 @@ use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pat
 use crate::{Applicability, Edit, Fix};
 
 /// Format a code snippet to call `name.method()`.
-pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
+pub(super) fn generate_method_call(name: &str, method: &str, checker: &Checker) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name,
+        id: checker.alloc_name(name),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `name.method`.
     let attr = ast::ExprAttribute {
-        value: Box::new(var.into()),
-        attr: ast::Identifier::new(method.to_string(), TextRange::default()),
+        value: checker.alloc_expr(var.into()),
+        attr: checker.alloc_identifier(method, TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make it into a call `name.method()`
     let call = ast::ExprCall {
-        func: Box::new(attr.into()),
+        func: checker.alloc_expr(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([]),
-            keywords: Box::from([]),
+            args: checker.alloc_vec(vec![]),
+            keywords: checker.alloc_vec(vec![]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -41,11 +40,11 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
-        value: Box::new(call.into()),
+        value: checker.alloc_expr(call.into()),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    generator.stmt(&stmt.into())
+    checker.generator().stmt(&stmt.into())
 }
 
 /// Returns a fix that replace `range` with
@@ -65,9 +64,9 @@ pub(super) fn replace_with_identity_check(
     };
 
     let new_expr = Expr::Compare(ast::ExprCompare {
-        left: left.clone().into(),
-        ops: [op].into(),
-        comparators: [ast::ExprNoneLiteral::default().into()].into(),
+        left: Checker::expr_ref(left),
+        ops: checker.alloc_vec(vec![op]),
+        comparators: checker.alloc_vec(vec![ast::ExprNoneLiteral::default().into()]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
@@ -119,11 +118,11 @@ impl OpenMode {
 #[derive(Debug)]
 pub(super) struct FileOpen<'a> {
     /// With item where the open happens, we use it for the reporting range.
-    pub(super) item: &'a ast::WithItem,
+    pub(super) item: &'a ast::WithItem<'a>,
     /// The file open mode.
     pub(super) mode: OpenMode,
     /// The file open keywords.
-    pub(super) keywords: Vec<&'a ast::Keyword>,
+    pub(super) keywords: Vec<&'a ast::Keyword<'a>>,
     /// We only check `open` operations whose file handles are used exactly once.
     pub(super) reference: &'a ResolvedReference,
     pub(super) argument: OpenArgument<'a>,
@@ -144,7 +143,7 @@ pub(super) enum OpenArgument<'a> {
     /// ```py
     /// f = open("foo.txt")
     /// ```
-    Builtin { filename: &'a Expr },
+    Builtin { filename: &'a Expr<'a> },
     /// The `Path` receiver of a `pathlib.Path.open` call, e.g. the `p` in the
     /// context manager in:
     ///
@@ -158,7 +157,7 @@ pub(super) enum OpenArgument<'a> {
     /// ```py
     /// with Path("foo.txt").open() as f: ...
     /// ```
-    Pathlib { path: &'a Expr },
+    Pathlib { path: &'a Expr<'a> },
 }
 
 impl OpenArgument<'_> {
@@ -343,7 +342,7 @@ fn find_path_open<'a>(
 }
 
 /// Match positional arguments. Return expression for the file name and open mode.
-fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
+fn match_open_args<'a>(args: &'a [Expr<'a>]) -> Option<(&'a Expr<'a>, OpenMode)> {
     match args {
         [filename] => Some((filename, OpenMode::ReadText)),
         [filename, mode_literal] => match_open_mode(mode_literal).map(|mode| (filename, mode)),
@@ -353,11 +352,11 @@ fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
 }
 
 /// Match keyword arguments. Return keyword arguments to forward and mode.
-fn match_open_keywords(
-    keywords: &[ast::Keyword],
+fn match_open_keywords<'a>(
+    keywords: &'a [ast::Keyword<'a>],
     read_mode: bool,
     target_version: PythonVersion,
-) -> Option<(Vec<&ast::Keyword>, Option<OpenMode>)> {
+) -> Option<(Vec<&'a ast::Keyword<'a>>, Option<OpenMode>)> {
     let mut result: Vec<&ast::Keyword> = vec![];
     let mut mode: Option<OpenMode> = None;
 

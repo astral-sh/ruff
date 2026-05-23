@@ -6,8 +6,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtImport;
 
-impl FormatNodeRule<StmtImport> for FormatStmtImport {
-    fn fmt_fields(&self, item: &StmtImport, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<StmtImport<'_>> for FormatStmtImport {
+    fn fmt_fields(&self, item: &StmtImport<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtImport {
             names,
             is_lazy,

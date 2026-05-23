@@ -4,6 +4,7 @@ use ruff_benchmark::criterion::{
     BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
 
+use ruff_allocator::Allocator;
 use ruff_benchmark::{
     LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
@@ -49,7 +50,8 @@ fn benchmark_formatter(criterion: &mut Criterion) {
             &case,
             |b, case| {
                 // Parse the source.
-                let parsed = parse(case.code(), ParseOptions::from(Mode::Module))
+                let allocator = Allocator::new();
+                let parsed = parse(case.code(), ParseOptions::from(Mode::Module), &allocator)
                     .expect("Input should be a valid Python code");
 
                 let comment_ranges = CommentRanges::from(parsed.tokens());

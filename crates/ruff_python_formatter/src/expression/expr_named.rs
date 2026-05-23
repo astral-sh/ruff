@@ -11,7 +11,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprNamed;
 
-impl FormatNodeRule<ExprNamed> for FormatExprNamed {
+impl FormatNodeRule<ExprNamed<'_>> for FormatExprNamed {
     fn fmt_fields(&self, item: &ExprNamed, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprNamed {
             target,
@@ -45,7 +45,7 @@ impl FormatNodeRule<ExprNamed> for FormatExprNamed {
     }
 }
 
-impl NeedsParentheses for ExprNamed {
+impl NeedsParentheses for ExprNamed<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

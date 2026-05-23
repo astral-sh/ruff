@@ -1340,11 +1340,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         ///
         /// `x.__class__` is modeled as equivalent to `type(x)` by [`Type::dunder_class`], so class
         /// identity checks against either expression can narrow `x`.
-        fn exact_class_narrowing_target<'a, 'db>(
+        fn exact_class_narrowing_target<'a, 'ast: 'a, 'db>(
             db: &'db dyn Db,
             inference: &ExpressionInference<'db>,
-            expr: &'a ast::Expr,
-        ) -> Option<&'a ast::Expr> {
+            expr: &'a ast::Expr<'ast>,
+        ) -> Option<&'a ast::Expr<'ast>> {
             match expr.expression_value() {
                 ast::Expr::Call(ast::ExprCall {
                     func,

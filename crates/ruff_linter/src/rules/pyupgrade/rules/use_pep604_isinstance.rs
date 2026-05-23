@@ -113,7 +113,9 @@ pub(crate) fn use_pep604_isinstance(checker: &Checker, expr: &Expr, func: &Expr,
     checker
         .report_diagnostic(NonPEP604Isinstance { kind }, expr.range())
         .set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&pep_604_union(&tuple.elts)),
+            checker
+                .generator()
+                .expr(&pep_604_union(&tuple.elts, checker.allocator())),
             types.range(),
         )));
 }

@@ -11,8 +11,8 @@ use crate::string::{StringLikeExtensions, implicit::FormatImplicitConcatenatedSt
 #[derive(Default)]
 pub struct FormatExprBytesLiteral;
 
-impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
-    fn fmt_fields(&self, item: &ExprBytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ExprBytesLiteral<'_>> for FormatExprBytesLiteral {
+    fn fmt_fields(&self, item: &ExprBytesLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some(bytes_literal) = item.as_single_part_bytestring() {
             bytes_literal.format().fmt(f)
         } else {
@@ -30,7 +30,7 @@ impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
     }
 }
 
-impl NeedsParentheses for ExprBytesLiteral {
+impl NeedsParentheses for ExprBytesLiteral<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

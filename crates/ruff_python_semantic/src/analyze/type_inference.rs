@@ -65,8 +65,8 @@ impl ResolvedPythonType {
     }
 }
 
-impl From<&Expr> for ResolvedPythonType {
-    fn from(expr: &Expr) -> Self {
+impl From<&Expr<'_>> for ResolvedPythonType {
+    fn from(expr: &Expr<'_>) -> Self {
         match expr {
             // Primitives.
             Expr::Dict(_) => ResolvedPythonType::Atom(PythonType::Dict),
@@ -452,116 +452,118 @@ impl NumberLike {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_ast::ModExpression;
     use ruff_python_parser::{Parsed, parse_expression};
 
     use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
-    fn parse(expression: &str) -> Parsed<ModExpression> {
-        parse_expression(expression).unwrap()
+    fn parse<'ast>(expression: &str, allocator: &'ast Allocator) -> Parsed<ModExpression<'ast>> {
+        parse_expression(expression, allocator).unwrap()
     }
 
     #[test]
     fn type_inference() {
+        let allocator = Allocator::new();
         // Atoms.
         assert_eq!(
-            ResolvedPythonType::from(parse("1").expr()),
+            ResolvedPythonType::from(parse("1", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("'Hello, world'").expr()),
+            ResolvedPythonType::from(parse("'Hello, world'", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::String)
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("b'Hello, world'").expr()),
+            ResolvedPythonType::from(parse("b'Hello, world'", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Bytes)
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("'Hello' % 'world'").expr()),
+            ResolvedPythonType::from(parse("'Hello' % 'world'", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::String)
         );
 
         // Boolean operators.
         assert_eq!(
-            ResolvedPythonType::from(parse("1 and 2").expr()),
+            ResolvedPythonType::from(parse("1 and 2", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("1 and True").expr()),
+            ResolvedPythonType::from(parse("1 and True", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
 
         // Binary operators.
         assert_eq!(
-            ResolvedPythonType::from(parse("1.0 * 2").expr()),
+            ResolvedPythonType::from(parse("1.0 * 2", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("2 * 1.0").expr()),
+            ResolvedPythonType::from(parse("2 * 1.0", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("1.0 * 2j").expr()),
+            ResolvedPythonType::from(parse("1.0 * 2j", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("'AA' * 2").expr()),
+            ResolvedPythonType::from(parse("'AA' * 2", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::String)
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("4 * 'AA'").expr()),
+            ResolvedPythonType::from(parse("4 * 'AA'", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::String)
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("1 / True").expr()),
+            ResolvedPythonType::from(parse("1 / True", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("1 / 2").expr()),
+            ResolvedPythonType::from(parse("1 / 2", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("{1, 2} - {2}").expr()),
+            ResolvedPythonType::from(parse("{1, 2} - {2}", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Set)
         );
 
         // Unary operators.
         assert_eq!(
-            ResolvedPythonType::from(parse("-1").expr()),
+            ResolvedPythonType::from(parse("-1", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("-1.0").expr()),
+            ResolvedPythonType::from(parse("-1.0", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("-1j").expr()),
+            ResolvedPythonType::from(parse("-1j", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("-True").expr()),
+            ResolvedPythonType::from(parse("-True", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("not 'Hello'").expr()),
+            ResolvedPythonType::from(parse("not 'Hello'", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("not x.y.z").expr()),
+            ResolvedPythonType::from(parse("not x.y.z", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
         );
 
         // Conditional expressions.
         assert_eq!(
-            ResolvedPythonType::from(parse("1 if True else 2").expr()),
+            ResolvedPythonType::from(parse("1 if True else 2", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("1 if True else 2.0").expr()),
+            ResolvedPythonType::from(parse("1 if True else 2.0", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
         );
         assert_eq!(
-            ResolvedPythonType::from(parse("1 if True else False").expr()),
+            ResolvedPythonType::from(parse("1 if True else False", &allocator).expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
     }

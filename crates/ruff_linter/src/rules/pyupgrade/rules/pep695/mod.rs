@@ -6,13 +6,11 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, PythonVersion,
-    Stmt, StmtAssign, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    name::Name,
+    Arguments, Expr, ExprCall, ExprName, ExprSubscript, PythonVersion, Stmt, StmtAssign, TypeParam,
     visitor::{self, Visitor},
 };
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_type_var_default_enabled;
@@ -30,9 +28,9 @@ mod private_type_parameter;
 #[derive(Debug)]
 pub(crate) enum TypeVarRestriction<'a> {
     /// A type variable with a bound, e.g., `TypeVar("T", bound=int)`.
-    Bound(&'a Expr),
+    Bound(&'a Expr<'a>),
     /// A type variable with constraints, e.g., `TypeVar("T", int, str)`.
-    Constraint(Vec<&'a Expr>),
+    Constraint(Vec<&'a Expr<'a>>),
     /// `AnyStr` is a special case: the only public `TypeVar` defined in the standard library,
     /// and thus the only one that we recognise when imported from another module.
     AnyStr,
@@ -50,7 +48,7 @@ pub(crate) struct TypeVar<'a> {
     pub(crate) name: &'a str,
     pub(crate) restriction: Option<TypeVarRestriction<'a>>,
     pub(crate) kind: TypeParamKind,
-    pub(crate) default: Option<&'a Expr>,
+    pub(crate) default: Option<&'a Expr<'a>>,
 }
 
 /// Wrapper for formatting a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T,
@@ -132,75 +130,7 @@ impl Display for DisplayTypeVar<'_> {
     }
 }
 
-impl<'a> From<&'a TypeVar<'a>> for TypeParam {
-    fn from(
-        TypeVar {
-            name,
-            restriction,
-            kind,
-            default,
-        }: &'a TypeVar<'a>,
-    ) -> Self {
-        let default = default.map(|expr| Box::new(expr.clone()));
-        match kind {
-            TypeParamKind::TypeVar => TypeParam::TypeVar(TypeParamTypeVar {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                name: Identifier::new(*name, TextRange::default()),
-                bound: match restriction {
-                    Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
-                    Some(TypeVarRestriction::Constraint(constraints)) => {
-                        Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
-                            ctx: ast::ExprContext::Load,
-                            parenthesized: true,
-                        })))
-                    }
-                    Some(TypeVarRestriction::AnyStr) => {
-                        Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            elts: vec![
-                                Expr::Name(ExprName {
-                                    range: TextRange::default(),
-                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                    id: Name::from("str"),
-                                    ctx: ast::ExprContext::Load,
-                                }),
-                                Expr::Name(ExprName {
-                                    range: TextRange::default(),
-                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                    id: Name::from("bytes"),
-                                    ctx: ast::ExprContext::Load,
-                                }),
-                            ],
-                            ctx: ast::ExprContext::Load,
-                            parenthesized: true,
-                        })))
-                    }
-                    None => None,
-                },
-                default,
-            }),
-            TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                name: Identifier::new(*name, TextRange::default()),
-                default,
-            }),
-            TypeParamKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                name: Identifier::new(*name, TextRange::default()),
-                default,
-            }),
-        }
-    }
-}
-
-impl<'a> From<&'a TypeParam> for TypeVar<'a> {
+impl<'a> From<&'a TypeParam<'_>> for TypeVar<'a> {
     fn from(param: &'a TypeParam) -> Self {
         let (kind, restriction) = match param {
             TypeParam::TypeVarTuple(_) => (TypeParamKind::TypeVarTuple, None),
@@ -394,7 +324,7 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
 pub(crate) fn find_generic<'a>(
     class_bases: &'a Arguments,
     semantic: &SemanticModel,
-) -> Option<(usize, &'a ExprSubscript)> {
+) -> Option<(usize, &'a ExprSubscript<'a>)> {
     class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
         expr.as_subscript_expr().and_then(|sub_expr| {
             semantic

@@ -11,7 +11,7 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatStmtIf;
 
-impl FormatNodeRule<StmtIf> for FormatStmtIf {
+impl FormatNodeRule<StmtIf<'_>> for FormatStmtIf {
     fn fmt_fields(&self, item: &StmtIf, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtIf {
             range: _,

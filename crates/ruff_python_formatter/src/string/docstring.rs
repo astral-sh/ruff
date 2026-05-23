@@ -568,8 +568,12 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
                 std::format!(r#""""{}""""#, printed.as_code())
             }
         };
-        let result =
-            ruff_python_parser::parse(&wrapped, ParseOptions::from(self.f.options().source_type()));
+        let allocator = ruff_allocator::Allocator::new();
+        let result = ruff_python_parser::parse(
+            &wrapped,
+            ParseOptions::from(self.f.options().source_type()),
+            &allocator,
+        );
         // If the resulting code is not valid, then reset and pass through
         // the docstring lines as-is.
         if result.is_err() {
@@ -1580,7 +1584,8 @@ fn docstring_format_source(
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
-    let parsed = ruff_python_parser::parse(source, ParseOptions::from(source_type))?;
+    let allocator = ruff_allocator::Allocator::new();
+    let parsed = ruff_python_parser::parse(source, ParseOptions::from(source_type), &allocator)?;
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);

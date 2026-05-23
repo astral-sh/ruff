@@ -244,11 +244,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Preserve normal call-binding diagnostics for `types.new_class()` while still allowing
     /// special inference of the name and bases arguments.
-    fn validate_new_class_call_arguments(
+    fn validate_new_class_call_arguments<'node, 'ast: 'node>(
         &mut self,
-        call_expr: &ast::ExprCall,
-        name_node: Option<&ast::Expr>,
-        bases_arg: Option<&ast::Expr>,
+        call_expr: &'node ast::ExprCall<'ast>,
+        name_node: Option<&'node ast::Expr<'ast>>,
+        bases_arg: Option<&'node ast::Expr<'ast>>,
         definition: Option<Definition<'db>>,
     ) {
         let db = self.db();

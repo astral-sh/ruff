@@ -1135,9 +1135,9 @@ pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
 #[inline]
 fn find_parameter<'a>(
-    parameters: &'a Parameters,
+    parameters: &'a Parameters<'a>,
     binding: &Binding,
-) -> Option<&'a ParameterWithDefault> {
+) -> Option<&'a ParameterWithDefault<'a>> {
     parameters
         .iter_non_variadic_params()
         .find(|param| param.identifier() == binding.range())
@@ -1166,7 +1166,7 @@ fn find_parameter<'a>(
 /// This function will return `["module", "AppContainer", "app", "get"]` for the
 /// attribute access `container.app.get`.
 pub fn resolve_assignment<'a>(
-    expr: &'a Expr,
+    expr: &'a Expr<'a>,
     semantic: &'a SemanticModel<'a>,
 ) -> Option<QualifiedName<'a>> {
     // Resolve any attribute chain.
@@ -1206,7 +1206,10 @@ pub fn resolve_assignment<'a>(
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
+pub fn find_assigned_value<'a>(
+    symbol: &str,
+    semantic: &'a SemanticModel<'a>,
+) -> Option<&'a Expr<'a>> {
     let binding_id = semantic.lookup_symbol(symbol)?;
     let binding = semantic.binding(binding_id);
     find_binding_value(binding, semantic)
@@ -1223,7 +1226,10 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
 #[expect(clippy::single_match)]
-pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+pub fn find_binding_value<'a>(
+    binding: &Binding,
+    semantic: &'a SemanticModel<'a>,
+) -> Option<&'a Expr<'a>> {
     match binding.kind {
         // Ex) `x := 1`
         BindingKind::NamedExprAssignment => {
@@ -1268,7 +1274,11 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
 }
 
 /// Given a target and value, find the value that's assigned to the given symbol.
-fn match_value<'a>(binding: &Binding, target: &Expr, value: &'a Expr) -> Option<&'a Expr> {
+fn match_value<'a>(
+    binding: &Binding,
+    target: &Expr<'a>,
+    value: &'a Expr<'a>,
+) -> Option<&'a Expr<'a>> {
     match target {
         Expr::Name(name) if name.range() == binding.range() => Some(value),
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
@@ -1290,7 +1300,11 @@ fn match_value<'a>(binding: &Binding, target: &Expr, value: &'a Expr) -> Option<
 }
 
 /// Given a target and value, find the value that's assigned to the given symbol.
-fn match_target<'a>(binding: &Binding, targets: &[Expr], values: &'a [Expr]) -> Option<&'a Expr> {
+fn match_target<'a>(
+    binding: &Binding,
+    targets: &[Expr<'a>],
+    values: &'a [Expr<'a>],
+) -> Option<&'a Expr<'a>> {
     for (target, value) in targets.iter().zip(values) {
         match target {
             Expr::Tuple(ast::ExprTuple {

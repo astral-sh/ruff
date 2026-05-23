@@ -3,6 +3,7 @@ use ruff_benchmark::criterion;
 use criterion::{
     BenchmarkId, Criterion, Throughput, criterion_group, criterion_main, measurement::WallTime,
 };
+use ruff_allocator::Allocator;
 use ruff_benchmark::{
     LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
@@ -45,8 +46,12 @@ fn benchmark_parser(criterion: &mut Criterion<WallTime>) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                b.iter_with_large_drop(|| {
-                    parse_module(case.code()).expect("Input should be a valid Python code")
+                b.iter(|| {
+                    let allocator = Allocator::new();
+                    std::hint::black_box(
+                        parse_module(case.code(), &allocator)
+                            .expect("Input should be a valid Python code"),
+                    );
                 });
             },
         );

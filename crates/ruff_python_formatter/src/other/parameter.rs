@@ -5,7 +5,7 @@ use ruff_python_ast::Parameter;
 #[derive(Default)]
 pub struct FormatParameter;
 
-impl FormatNodeRule<Parameter> for FormatParameter {
+impl FormatNodeRule<Parameter<'_>> for FormatParameter {
     fn fmt_fields(&self, item: &Parameter, f: &mut PyFormatter) -> FormatResult<()> {
         let Parameter {
             range: _,

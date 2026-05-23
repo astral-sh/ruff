@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 pub(super) fn get_mark_decorators<'a>(
     decorators: &'a [Decorator],
     semantic: &'a SemanticModel,
-) -> impl Iterator<Item = (&'a Decorator, &'a str)> + 'a {
+) -> impl Iterator<Item = (&'a Decorator<'a>, &'a str)> + 'a {
     decorators.iter().filter_map(move |decorator| {
         let expr = map_callable(&decorator.expression);
         let qualified_name = semantic.resolve_qualified_name(expr)?;

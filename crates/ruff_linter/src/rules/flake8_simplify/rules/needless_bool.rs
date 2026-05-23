@@ -1,5 +1,4 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
@@ -253,9 +252,9 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     };
 
                     Some(Expr::Compare(ast::ExprCompare {
-                        ops: Box::new([op.negate()]),
-                        left: left.clone(),
-                        comparators: Box::new([right.clone()]),
+                        ops: checker.alloc_vec(vec![op.negate()]),
+                        left: *left,
+                        comparators: checker.alloc_vec(vec![right.clone()]),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     }))
@@ -263,7 +262,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
 
                 _ => Some(Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
-                    operand: Box::new(if_test.clone()),
+                    operand: Checker::expr_ref(if_test),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 })),
@@ -275,16 +274,16 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
             let func_node = ast::ExprName {
-                id: Name::new_static("bool"),
+                id: ast::name::AstName::new_static("bool"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             let call_node = ast::ExprCall {
-                func: Box::new(func_node.into()),
+                func: checker.alloc_expr(func_node.into()),
                 arguments: Arguments {
-                    args: Box::from([if_test.clone()]),
-                    keywords: Box::from([]),
+                    args: checker.alloc_vec(vec![if_test.clone()]),
+                    keywords: checker.alloc_vec(vec![]),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
@@ -300,7 +299,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
     // Generate the replacement `return` statement.
     let replacement = condition.as_ref().map(|expr| {
         Stmt::Return(ast::StmtReturn {
-            value: Some(Box::new(expr.clone())),
+            value: Some(Checker::expr_ref(expr)),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })

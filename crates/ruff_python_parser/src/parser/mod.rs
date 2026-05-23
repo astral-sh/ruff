@@ -3,14 +3,14 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use ruff_python_ast::name::Name;
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
+use ruff_python_ast::name::AstName;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
@@ -35,8 +35,10 @@ mod statement;
 mod tests;
 
 #[derive(Debug)]
-pub(crate) struct Parser<'src> {
+pub(crate) struct Parser<'src, 'ast> {
     source: &'src str,
+
+    allocator: &'ast Allocator,
 
     /// Token source for the parser that skips over any non-trivia token.
     tokens: TokenSource<'src>,
@@ -70,10 +72,14 @@ pub(crate) struct Parser<'src> {
     max_nesting_depth: u32,
 }
 
-impl<'src> Parser<'src> {
+impl<'src, 'ast> Parser<'src, 'ast> {
     /// Create a new parser for the given source code.
-    pub(crate) fn new(source: &'src str, options: ParseOptions) -> Self {
-        Parser::new_starts_at(source, TextSize::new(0), options)
+    pub(crate) fn new(
+        source: &'src str,
+        options: ParseOptions,
+        allocator: &'ast Allocator,
+    ) -> Self {
+        Parser::new_starts_at(source, TextSize::new(0), options, allocator)
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.
@@ -81,6 +87,7 @@ impl<'src> Parser<'src> {
         source: &'src str,
         start_offset: TextSize,
         options: ParseOptions,
+        allocator: &'ast Allocator,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
         let depth_remaining = options.max_recursion_depth;
@@ -89,6 +96,7 @@ impl<'src> Parser<'src> {
         Parser {
             options,
             source,
+            allocator,
             errors: Vec::new(),
             unsupported_syntax_errors: Vec::new(),
             tokens,
@@ -132,7 +140,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
-    pub(crate) fn parse(mut self) -> Parsed<Mod> {
+    pub(crate) fn parse(mut self) -> Parsed<Mod<'ast>> {
         let syntax = match self.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
                 Mod::Expression(self.parse_single_expression())
@@ -151,7 +159,7 @@ impl<'src> Parser<'src> {
     ///
     /// After parsing a single expression, an error is reported and all remaining tokens are
     /// dropped by the parser.
-    fn parse_single_expression(&mut self) -> ModExpression {
+    fn parse_single_expression(&mut self) -> ModExpression<'ast> {
         let start = self.node_start();
         let parsed_expr = self.parse_expression_list(ExpressionContext::default());
 
@@ -178,7 +186,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::EndOfFile);
 
         ModExpression {
-            body: Box::new(parsed_expr.expr),
+            body: self.alloc(parsed_expr.expr),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -187,21 +195,30 @@ impl<'src> Parser<'src> {
     /// Parses a Python module.
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
-    fn parse_module(&mut self) -> ModModule {
-        let body = self.parse_list_into_thin_vec(RecoveryContextKind::ModuleStatements, |p| {
-            p.parse_statement()
-        });
+    fn parse_module(&mut self) -> ModModule<'ast> {
+        let body = self.parse_list_into_vec(
+            RecoveryContextKind::ModuleStatements,
+            Parser::parse_statement,
+        );
 
         self.bump(TokenKind::EndOfFile);
 
         ModModule {
-            body,
+            body: self.alloc_vec(body),
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
             node_index: AtomicNodeIndex::NONE,
         }
     }
 
-    fn finish(self, syntax: Mod) -> Parsed<Mod> {
+    fn alloc<T>(&self, value: T) -> ruff_allocator::Box<'ast, T> {
+        ruff_allocator::Box::new_in(value, self.allocator)
+    }
+
+    fn alloc_vec<T>(&self, values: Vec<T>) -> ArenaSlice<'ast, T> {
+        ArenaSlice::from_vec_in(values, self.allocator)
+    }
+
+    fn finish(self, syntax: Mod<'ast>) -> Parsed<Mod<'ast>> {
         assert_eq!(
             self.current_token_kind(),
             TokenKind::EndOfFile,
@@ -392,30 +409,30 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    fn bump_name(&mut self) -> Name {
+    fn bump_name(&mut self) -> AstName<'ast> {
         let range = self.current_token_range();
         let text = self.src_text(range);
         let name = if !self.tokens.current_flags().is_non_ascii_name() {
-            Name::new(text)
+            AstName::new_in(text, self.allocator)
         } else {
-            normalize_name(text)
+            normalize_name(text, self.allocator)
         };
         self.bump(TokenKind::Name);
         name
     }
 
-    fn bump_int(&mut self) -> Int {
+    fn bump_int(&mut self) -> Int<'ast> {
         let text = self.current_token_text();
         let value = if let Some(digits) =
             text.strip_prefix("0x").or_else(|| text.strip_prefix("0X"))
         {
-            Int::from_str_radix(&strip_underscores(digits), 16, text)
+            Int::from_str_radix(&strip_underscores(digits), 16, text, self.allocator)
         } else if let Some(digits) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
-            Int::from_str_radix(&strip_underscores(digits), 8, text)
+            Int::from_str_radix(&strip_underscores(digits), 8, text, self.allocator)
         } else if let Some(digits) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
-            Int::from_str_radix(&strip_underscores(digits), 2, text)
+            Int::from_str_radix(&strip_underscores(digits), 2, text, self.allocator)
         } else {
-            Int::from_str(&strip_underscores(text))
+            Int::from_str_in(&strip_underscores(text), self.allocator)
         }
         .expect("lexer validated integer literal");
         self.bump(TokenKind::Int);
@@ -455,7 +472,10 @@ impl<'src> Parser<'src> {
         value
     }
 
-    fn bump_ipython_escape_command(&mut self, allows_help_end: bool) -> (Box<str>, IpyEscapeKind) {
+    fn bump_ipython_escape_command(
+        &mut self,
+        allows_help_end: bool,
+    ) -> (ArenaBox<'ast, str>, IpyEscapeKind) {
         let range = self.current_token_range();
         let (value, kind) = self.cook_ipython_escape_command_value(range, allows_help_end);
         self.bump(TokenKind::IpyEscapeCommand);
@@ -470,7 +490,7 @@ impl<'src> Parser<'src> {
         &self,
         range: TextRange,
         allows_help_end: bool,
-    ) -> (Box<str>, IpyEscapeKind) {
+    ) -> (ArenaBox<'ast, str>, IpyEscapeKind) {
         let raw = self.src_text(range);
         let initial_kind = IpyEscapeKind::try_from([
             raw.as_bytes()[0] as char,
@@ -535,7 +555,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        (value.into_boxed_str(), kind)
+        (ArenaBox::from_str_in(&value, self.allocator), kind)
     }
 
     /// Bumps the current token assuming it is found in the given token set.
@@ -651,14 +671,14 @@ impl<'src> Parser<'src> {
         &self.source[ranged.range()]
     }
 
-    /// Parses a list of elements into a thin vector where each element is parsed using
+    /// Parses a list of elements into a vector where each element is parsed using
     /// the given `parse_element` function.
-    fn parse_list_into_thin_vec<T>(
+    fn parse_list_into_vec<T>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
-    ) -> ThinVec<T> {
-        let mut elements = ThinVec::new();
+        parse_element: impl Fn(&mut Parser<'src, 'ast>) -> T,
+    ) -> Vec<T> {
+        let mut elements = Vec::new();
         self.parse_list(recovery_context_kind, |p| elements.push(parse_element(p)));
         elements
     }
@@ -668,7 +688,7 @@ impl<'src> Parser<'src> {
     fn parse_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        mut parse_element: impl FnMut(&mut Parser<'src>),
+        mut parse_element: impl FnMut(&mut Parser<'src, 'ast>),
     ) {
         let mut progress = ParserProgress::default();
 
@@ -710,7 +730,7 @@ impl<'src> Parser<'src> {
     fn parse_comma_separated_list_into_vec<T>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        parse_element: impl Fn(&mut Parser<'src, 'ast>) -> T,
     ) -> Vec<T> {
         let mut elements = Vec::new();
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
@@ -729,7 +749,7 @@ impl<'src> Parser<'src> {
     fn parse_comma_separated_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        mut parse_element: impl FnMut(&mut Parser<'src>),
+        mut parse_element: impl FnMut(&mut Parser<'src, 'ast>),
     ) -> bool {
         let mut progress = ParserProgress::default();
 
@@ -897,8 +917,8 @@ fn strip_underscores(text: &str) -> Cow<'_, str> {
 }
 
 #[cold]
-fn normalize_name(text: &str) -> Name {
-    text.nfkc().collect::<Name>()
+fn normalize_name<'ast>(text: &str, allocator: &'ast Allocator) -> AstName<'ast> {
+    AstName::new_in(text.nfkc().collect::<String>(), allocator)
 }
 
 struct ParserCheckpoint {

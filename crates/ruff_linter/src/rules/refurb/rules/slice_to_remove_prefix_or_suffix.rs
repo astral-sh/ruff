@@ -154,7 +154,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData<'_>> {
+fn affix_removal_data_expr<'a>(if_expr: &'a ast::ExprIf<'a>) -> Option<RemoveAffixData<'a>> {
     let ast::ExprIf {
         test,
         body,
@@ -181,7 +181,7 @@ fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData<'_>>
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData<'_>> {
+fn affix_removal_data_stmt<'a>(if_stmt: &'a ast::StmtIf<'a>) -> Option<RemoveAffixData<'a>> {
     let ast::StmtIf {
         test,
         body,
@@ -499,7 +499,7 @@ struct AffixQuery<'a> {
     /// Whether the method called is `startswith` or `endswith`.
     kind: AffixKind,
     /// Node representing the prefix or suffix being passed to the string method.
-    affix: &'a ast::Expr,
+    affix: &'a ast::Expr<'a>,
 }
 
 /// Ingredients for a statement or expression
@@ -509,9 +509,9 @@ struct AffixQuery<'a> {
 #[derive(Debug)]
 struct RemoveAffixData<'a> {
     /// Node representing the string whose prefix or suffix we want to remove
-    text: &'a ast::Expr,
+    text: &'a ast::Expr<'a>,
     /// Node representing the bound used to slice the string
-    bound: &'a ast::Expr,
+    bound: &'a ast::Expr<'a>,
     /// Contains the prefix or suffix used in `text.startswith(prefix)` or `text.endswith(suffix)`
     affix_query: AffixQuery<'a>,
 }

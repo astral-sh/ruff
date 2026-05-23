@@ -24,9 +24,9 @@ use crate::string::implicit::FormatImplicitConcatenatedString;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
-    Binary(&'a ExprBinOp),
-    Compare(&'a ExprCompare),
-    Bool(&'a ExprBoolOp),
+    Binary(&'a ExprBinOp<'a>),
+    Compare(&'a ExprCompare<'a>),
+    Bool(&'a ExprBoolOp<'a>),
 }
 
 impl<'a> BinaryLike<'a> {
@@ -35,7 +35,7 @@ impl<'a> BinaryLike<'a> {
     /// See [`FlatBinaryExpressionSlice`] for an in depth explanation.
     fn flatten(self, comments: &'a Comments<'a>, source: &str) -> FlatBinaryExpression<'a> {
         fn recurse_compare<'a>(
-            compare: &'a ExprCompare,
+            compare: &'a ExprCompare<'a>,
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
@@ -90,7 +90,7 @@ impl<'a> BinaryLike<'a> {
         }
 
         fn recurse_bool<'a>(
-            bool_expression: &'a ExprBoolOp,
+            bool_expression: &'a ExprBoolOp<'a>,
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
@@ -138,7 +138,7 @@ impl<'a> BinaryLike<'a> {
         }
 
         fn recurse_binary<'a>(
-            binary: &'a ExprBinOp,
+            binary: &'a ExprBinOp<'a>,
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
@@ -502,7 +502,7 @@ fn is_simple_power_expression(
 
 /// Return `true` if an [`Expr`] adheres to [Black's definition](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators)
 /// of a non-complex expression, in the context of a power operation.
-const fn is_simple_power_operand(expr: &Expr) -> bool {
+fn is_simple_power_operand(expr: &Expr) -> bool {
     match expr {
         Expr::UnaryOp(ExprUnaryOp {
             op: UnaryOp::Not, ..
@@ -787,7 +787,7 @@ enum Operand<'a> {
     /// a + b + c
     /// ```
     Left {
-        expression: &'a Expr,
+        expression: &'a Expr<'a>,
         /// Leading comments of the outer most binary expression that starts at this node.
         leading_comments: &'a [SourceComment],
     },
@@ -801,7 +801,7 @@ enum Operand<'a> {
     /// ```
     ///
     /// Middle have no leading or trailing comments from the enclosing binary like expression.
-    Middle { expression: &'a Expr },
+    Middle { expression: &'a Expr<'a> },
 
     /// Operand that is on the right side of a binary operation.
     ///
@@ -811,14 +811,14 @@ enum Operand<'a> {
     /// a + b + c
     /// ```
     Right {
-        expression: &'a Expr,
+        expression: &'a Expr<'a>,
         /// Trailing comments of the outer most binary expression that ends at this operand.
         trailing_comments: &'a [SourceComment],
     },
 }
 
 impl<'a> Operand<'a> {
-    fn expression(&self) -> &'a Expr {
+    fn expression(&self) -> &'a Expr<'a> {
         match self {
             Operand::Left { expression, .. } => expression,
             Operand::Right { expression, .. } => expression,

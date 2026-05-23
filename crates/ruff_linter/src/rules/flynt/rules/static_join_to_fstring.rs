@@ -1,6 +1,7 @@
 use ast::FStringFlags;
 use itertools::Itertools;
 
+use ruff_allocator::{Allocator, Box as ArenaBox};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags, str::Quote};
 use ruff_text_size::{Ranged, TextRange};
@@ -70,7 +71,15 @@ fn is_static_length(elts: &[Expr]) -> bool {
 }
 
 /// Build an f-string consisting of `joinees` joined by `joiner` with `flags`.
-fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<Expr> {
+fn build_fstring<'alloc, 'ast>(
+    joiner: &str,
+    joinees: &'alloc [Expr<'ast>],
+    flags: FStringFlags,
+    allocator: &'alloc Allocator,
+) -> Option<Expr<'alloc>>
+where
+    'ast: 'alloc,
+{
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
         let mut flags: Option<ast::StringLiteralFlags> = None;
@@ -107,7 +116,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         }
 
         let node = ast::StringLiteral {
-            value: content.into_boxed_str(),
+            value: ArenaBox::from_str_in(&content, allocator),
             flags,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -127,9 +136,11 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             return None;
         }
         if !std::mem::take(&mut first) {
-            f_string_elements.push(helpers::to_interpolated_string_literal_element(joiner));
+            f_string_elements.push(helpers::to_interpolated_string_literal_element(
+                joiner, allocator,
+            ));
         }
-        let element = helpers::to_interpolated_string_element(expr)?;
+        let element = helpers::to_interpolated_string_element(expr, allocator)?;
         if let ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
             value,
             ..
@@ -150,7 +161,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     };
 
     let node = ast::FString {
-        elements: f_string_elements.into(),
+        elements: ast::InterpolatedStringElements::from_vec_in(f_string_elements, allocator),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         flags: flags.with_quote_style(adjusted_quote),
@@ -159,7 +170,11 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
 }
 
 /// FLY002
-pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &str) {
+pub(crate) fn static_join_to_fstring<'ast>(
+    checker: &Checker<'ast>,
+    expr: &Expr<'ast>,
+    joiner: &str,
+) {
     let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, keywords, .. },
         ..
@@ -186,7 +201,12 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
 
     // Try to build the fstring (internally checks whether e.g. the elements are
     // convertible to f-string elements).
-    let Some(new_expr) = build_fstring(joiner, joinees, checker.default_fstring_flags()) else {
+    let Some(new_expr) = build_fstring(
+        joiner,
+        joinees,
+        checker.default_fstring_flags(),
+        checker.replacement_allocator(),
+    ) else {
         return;
     };
 

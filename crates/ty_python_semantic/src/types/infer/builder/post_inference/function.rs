@@ -56,9 +56,9 @@ fn check_legacy_positional_only_convention<'db>(
         return;
     }
     let parsed_parameters = signature.parameters();
-    let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
+    let mut previous_non_positional_only: Option<&ast::ParameterWithDefault<'_>> = None;
 
-    for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
+    for (param_node, param) in std::iter::zip(ast_parameters.iter(), parsed_parameters) {
         let ast::AnyParameterRef::NonVariadic(param_node) = param_node else {
             continue;
         };

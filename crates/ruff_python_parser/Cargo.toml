@@ -13,6 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true, features = ["get-size"] }
@@ -24,7 +25,6 @@ get-size2 = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
-thin-vec = { workspace = true }
 unicode-ident = { workspace = true }
 unicode-normalization = { workspace = true }
 unicode_names2 = { workspace = true }

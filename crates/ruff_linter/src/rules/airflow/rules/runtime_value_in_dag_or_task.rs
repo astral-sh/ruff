@@ -98,7 +98,7 @@ fn is_dag_or_task_constructor(qualified_name: &QualifiedName) -> bool {
 fn find_runtime_varying_call<'a>(
     expr: &'a Expr,
     semantic: &SemanticModel,
-) -> Option<(&'a Expr, &'static str)> {
+) -> Option<(&'a Expr<'a>, &'static str)> {
     match expr {
         Expr::Call(ExprCall {
             func, arguments, ..
@@ -276,7 +276,7 @@ fn find_runtime_varying_call<'a>(
 fn find_runtime_in_interpolated_element<'a>(
     element: &'a InterpolatedStringElement,
     semantic: &SemanticModel,
-) -> Option<(&'a Expr, &'static str)> {
+) -> Option<(&'a Expr<'a>, &'static str)> {
     match element {
         InterpolatedStringElement::Literal(_) => None,
         InterpolatedStringElement::Interpolation(interpolation) => {

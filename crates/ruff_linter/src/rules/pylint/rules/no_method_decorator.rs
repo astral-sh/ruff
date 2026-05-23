@@ -134,8 +134,8 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
                         };
 
                         if let Expr::Name(ast::ExprName { id, .. }) = &arguments.args[0] {
-                            if target_name == *id {
-                                explicit_decorator_calls.insert(id.clone(), stmt);
+                            if target_name == id.as_str() {
+                                explicit_decorator_calls.insert(id.to_name(), stmt);
                             }
                         }
                     }
@@ -155,7 +155,8 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
             ..
         }) = stmt
         {
-            let Some(decorator_call_statement) = explicit_decorator_calls.get(name.id()) else {
+            let Some(decorator_call_statement) = explicit_decorator_calls.get(name.id().as_str())
+            else {
                 continue;
             };
 

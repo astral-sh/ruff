@@ -111,18 +111,18 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
     // Create a [`Fix`] that flattens all nodes.
     if let Expr::Subscript(subscript) = literal_expr {
         let subscript = Expr::Subscript(ExprSubscript {
-            slice: Box::new(if let [elt] = nodes.as_slice() {
+            slice: checker.alloc_expr(if let [elt] = nodes.as_slice() {
                 (*elt).clone()
             } else {
                 Expr::Tuple(ExprTuple {
-                    elts: nodes.into_iter().cloned().collect(),
+                    elts: checker.alloc_vec(nodes.into_iter().cloned().collect()),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
-            value: subscript.value.clone(),
+            value: subscript.value,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,

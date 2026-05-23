@@ -238,7 +238,7 @@ impl LocatedCmpOp {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-
+    use ruff_allocator::Allocator;
     use ruff_python_ast::CmpOp;
     use ruff_python_parser::parse_expression;
     use ruff_text_size::TextSize;
@@ -246,7 +246,8 @@ mod tests {
     use super::{LocatedCmpOp, locate_cmp_ops};
 
     fn extract_cmp_op_locations(source: &str) -> Result<Vec<LocatedCmpOp>> {
-        let parsed = parse_expression(source)?;
+        let allocator = Allocator::new();
+        let parsed = parse_expression(source, &allocator)?;
         Ok(locate_cmp_ops(parsed.expr(), parsed.tokens()))
     }
 

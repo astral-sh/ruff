@@ -146,7 +146,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
     }
 
     let mut type_vars = Vec::new();
-    for parameter in parameters {
+    for parameter in parameters.iter() {
         if let Some(annotation) = parameter.annotation() {
             let vars = {
                 let mut visitor = TypeVarReferenceVisitor {

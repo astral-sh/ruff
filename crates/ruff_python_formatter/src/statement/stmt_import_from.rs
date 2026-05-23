@@ -10,8 +10,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtImportFrom;
 
-impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
-    fn fmt_fields(&self, item: &StmtImportFrom, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<StmtImportFrom<'_>> for FormatStmtImportFrom {
+    fn fmt_fields(&self, item: &StmtImportFrom<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtImportFrom {
             module,
             names,

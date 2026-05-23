@@ -65,7 +65,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_or_constraint.is_some() || default.is_some() {
             self.deferred.insert(definition);
         }
-        let identity = TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695);
+        let identity =
+            TypeVarIdentity::new(db, name.id.to_name(), Some(definition), TypeVarKind::Pep695);
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,
@@ -165,7 +166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
         default_ty: Type<'db>,
         default_node: &ast::Expr,
-        bound_or_constraints_nodes: Option<BoundOrConstraintsNodes<'ast>>,
+        bound_or_constraints_nodes: Option<BoundOrConstraintsNodes<'_, '_>>,
     ) {
         let Some(bound_or_constraints) = bound_or_constraints else {
             return;
@@ -544,8 +545,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if default.is_some() {
             self.deferred.insert(definition);
         }
-        let identity =
-            TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695ParamSpec);
+        let identity = TypeVarIdentity::new(
+            db,
+            name.id.to_name(),
+            Some(definition),
+            TypeVarKind::Pep695ParamSpec,
+        );
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,
@@ -909,7 +914,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name.to_name(),
             Some(definition),
             TypeVarKind::ParamSpec,
         );
@@ -1171,7 +1176,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name.to_name(),
             Some(definition),
             TypeVarKind::Legacy,
         );

@@ -31,7 +31,7 @@ pub struct FormatPattern {
     parentheses: Parentheses,
 }
 
-impl FormatRuleWithOptions<Pattern, PyFormatContext<'_>> for FormatPattern {
+impl FormatRuleWithOptions<Pattern<'_>, PyFormatContext<'_>> for FormatPattern {
     type Options = Parentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -40,7 +40,7 @@ impl FormatRuleWithOptions<Pattern, PyFormatContext<'_>> for FormatPattern {
     }
 }
 
-impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
+impl FormatRule<Pattern<'_>, PyFormatContext<'_>> for FormatPattern {
     fn fmt(&self, pattern: &Pattern, f: &mut PyFormatter) -> FormatResult<()> {
         let format_pattern = format_with(|f| match pattern {
             Pattern::MatchValue(pattern) => pattern.format().fmt(f),
@@ -92,16 +92,19 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Pattern {
-    type Format<'a> = FormatRefWithRule<'a, Pattern, FormatPattern, PyFormatContext<'ast>>;
+impl<'ast, 'context> AsFormat<PyFormatContext<'context>> for Pattern<'ast> {
+    type Format<'a>
+        = FormatRefWithRule<'a, Pattern<'ast>, FormatPattern, PyFormatContext<'context>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatPattern::default())
     }
 }
 
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Pattern {
-    type Format = FormatOwnedWithRule<Pattern, FormatPattern, PyFormatContext<'ast>>;
+impl<'ast, 'context> IntoFormat<PyFormatContext<'context>> for Pattern<'ast> {
+    type Format = FormatOwnedWithRule<Pattern<'ast>, FormatPattern, PyFormatContext<'context>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatPattern::default())
@@ -135,7 +138,7 @@ fn is_pattern_parenthesized(
     }
 }
 
-impl NeedsParentheses for Pattern {
+impl NeedsParentheses for Pattern<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -155,16 +158,16 @@ impl NeedsParentheses for Pattern {
 }
 
 pub(crate) fn maybe_parenthesize_pattern<'a>(
-    pattern: &'a Pattern,
-    case: &'a MatchCase,
+    pattern: &'a Pattern<'a>,
+    case: &'a MatchCase<'a>,
 ) -> MaybeParenthesizePattern<'a> {
     MaybeParenthesizePattern { pattern, case }
 }
 
 #[derive(Debug)]
 pub(crate) struct MaybeParenthesizePattern<'a> {
-    pattern: &'a Pattern,
-    case: &'a MatchCase,
+    pattern: &'a Pattern<'a>,
+    case: &'a MatchCase<'a>,
 }
 
 impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
@@ -280,12 +283,12 @@ struct CanOmitOptionalParenthesesVisitor<'input> {
     max_precedence: OperatorPrecedence,
     max_precedence_count: usize,
     any_parenthesized_expressions: bool,
-    last: Option<&'input Pattern>,
+    last: Option<&'input Pattern<'input>>,
     first: First<'input>,
 }
 
 impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
-    fn visit_pattern(&mut self, pattern: &'a Pattern, context: &PyFormatContext) {
+    fn visit_pattern(&mut self, pattern: &'a Pattern<'a>, context: &PyFormatContext) {
         match pattern {
             Pattern::MatchSequence(_) | Pattern::MatchMapping(_) => {
                 self.any_parenthesized_expressions = true;
@@ -341,7 +344,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
         }
     }
 
-    fn visit_sub_pattern(&mut self, pattern: &'a Pattern, context: &PyFormatContext) {
+    fn visit_sub_pattern(&mut self, pattern: &'a Pattern<'a>, context: &PyFormatContext) {
         self.last = Some(pattern);
 
         // Rule only applies for non-parenthesized patterns.
@@ -384,7 +387,7 @@ enum First<'a> {
     /// Pattern starts with a non-parentheses token. E.g. `*x`
     Token,
 
-    Pattern(&'a Pattern),
+    Pattern(&'a Pattern<'a>),
 }
 
 impl<'a> First<'a> {
@@ -395,7 +398,7 @@ impl<'a> First<'a> {
         }
     }
 
-    fn pattern(self) -> Option<&'a Pattern> {
+    fn pattern(self) -> Option<&'a Pattern<'a>> {
         match self {
             First::None | First::Token => None,
             First::Pattern(pattern) => Some(pattern),

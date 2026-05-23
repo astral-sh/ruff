@@ -137,9 +137,9 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
 
     diagnostic.set_fix({
         let literal = Expr::Subscript(ast::ExprSubscript {
-            value: Box::new(literal_subscript.clone()),
-            slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                elts: literal_exprs.into_iter().cloned().collect(),
+            value: Checker::expr_ref(literal_subscript),
+            slice: checker.alloc_expr(Expr::Tuple(ast::ExprTuple {
+                elts: checker.alloc_vec(literal_exprs.into_iter().cloned().collect()),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 ctx: ExprContext::Load,
@@ -161,9 +161,9 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                 checker
                     .generator()
                     .expr(&Expr::Subscript(ast::ExprSubscript {
-                        value: union.value.clone(),
-                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                            elts,
+                        value: union.value,
+                        slice: checker.alloc_expr(Expr::Tuple(ast::ExprTuple {
+                            elts: checker.alloc_vec(elts),
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             ctx: ExprContext::Load,
@@ -174,7 +174,9 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                         ctx: ExprContext::Load,
                     }))
             } else {
-                checker.generator().expr(&pep_604_union(&elts))
+                checker
+                    .generator()
+                    .expr(&pep_604_union(&elts, checker.allocator()))
             };
             Edit::range_replacement(content, expr.range())
         };

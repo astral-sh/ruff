@@ -13,7 +13,7 @@ use crate::string::implicit::{
 #[derive(Default)]
 pub struct FormatExprTString;
 
-impl FormatNodeRule<ExprTString> for FormatExprTString {
+impl FormatNodeRule<ExprTString<'_>> for FormatExprTString {
     fn fmt_fields(&self, item: &ExprTString, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some(t_string) = item.as_single_part_tstring() {
             t_string.format().fmt(f)
@@ -32,7 +32,7 @@ impl FormatNodeRule<ExprTString> for FormatExprTString {
     }
 }
 
-impl NeedsParentheses for ExprTString {
+impl NeedsParentheses for ExprTString<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

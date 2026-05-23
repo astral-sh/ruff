@@ -1,4 +1,5 @@
 use itertools::{Either, Itertools};
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, AtomicNodeIndex, Expr, Stmt, StmtExpr, StmtWith, WithItem};
@@ -139,7 +140,9 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
     if !has_leading_content(stmt.start(), checker.source())
         && !has_trailing_content(stmt.end(), checker.source())
     {
-        if let Some(with_stmt) = try_fix_legacy_call(context_type, stmt, semantic) {
+        if let Some(with_stmt) =
+            try_fix_legacy_call(context_type, stmt, semantic, checker.allocator())
+        {
             let generated = checker.generator().stmt(&Stmt::With(with_stmt));
             let first_line = checker.locator().line_str(stmt.start());
             let indentation = leading_indentation(first_line);
@@ -162,11 +165,12 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
     }
 }
 
-fn try_fix_legacy_call(
+fn try_fix_legacy_call<'a>(
     context_type: PytestContextType,
-    stmt: &Stmt,
-    semantic: &SemanticModel,
-) -> Option<StmtWith> {
+    stmt: &'a Stmt<'a>,
+    semantic: &'a SemanticModel<'a>,
+    allocator: &'a Allocator,
+) -> Option<StmtWith<'a>> {
     match stmt {
         Stmt::Expr(StmtExpr { value, .. }) => {
             let call = value.as_call_expr()?;
@@ -180,7 +184,7 @@ fn try_fix_legacy_call(
             // object with a .match() method. We need to preserve this match condition when converting
             // to context manager form.
             if PytestContextType::from_expr_name(&call.func, semantic) == Some(context_type) {
-                generate_with_statement(context_type, call, None, None, None)
+                generate_with_statement(context_type, call, None, None, None, allocator)
             } else if let PytestContextType::Raises = context_type {
                 let inner_raises_call = call
                     .func
@@ -192,7 +196,14 @@ fn try_fix_legacy_call(
                             == Some(PytestContextType::Raises)
                     })?;
                 let match_arg = call.arguments.args.first();
-                generate_with_statement(context_type, inner_raises_call, match_arg, None, None)
+                generate_with_statement(
+                    context_type,
+                    inner_raises_call,
+                    match_arg,
+                    None,
+                    None,
+                    allocator,
+                )
             } else {
                 None
             }
@@ -213,19 +224,27 @@ fn try_fix_legacy_call(
                 }
             };
 
-            generate_with_statement(context_type, call, None, optional_vars, assign_targets)
+            generate_with_statement(
+                context_type,
+                call,
+                None,
+                optional_vars,
+                assign_targets,
+                allocator,
+            )
         }
         _ => None,
     }
 }
 
-fn generate_with_statement(
+fn generate_with_statement<'a>(
     context_type: PytestContextType,
-    legacy_call: &ast::ExprCall,
-    match_arg: Option<&Expr>,
-    optional_vars: Option<&Expr>,
-    assign_targets: Option<&[Expr]>,
-) -> Option<StmtWith> {
+    legacy_call: &'a ast::ExprCall<'a>,
+    match_arg: Option<&'a Expr<'a>>,
+    optional_vars: Option<&'a Expr<'a>>,
+    assign_targets: Option<&'a [Expr<'a>]>,
+    allocator: &'a Allocator,
+) -> Option<StmtWith<'a>> {
     let expected = if let Some((name, position)) = context_type.expected_arg() {
         Some(legacy_call.arguments.find_argument_value(name, position)?)
     } else {
@@ -249,34 +268,41 @@ fn generate_with_statement(
     let context_call = ast::ExprCall {
         node_index: AtomicNodeIndex::NONE,
         range: TextRange::default(),
-        func: legacy_call.func.clone(),
+        func: legacy_call.func,
         arguments: ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
-            args: expected.cloned().as_slice().into(),
-            keywords: match_arg
-                .map(|expr| ast::Keyword {
-                    node_index: AtomicNodeIndex::NONE,
-                    // Take range from the original expression so that the keyword
-                    // argument is generated after positional arguments
-                    range: expr.range(),
-                    arg: Some(ast::Identifier::new("match", TextRange::default())),
-                    value: expr.clone(),
-                })
-                .as_slice()
-                .into(),
+            args: ArenaSlice::from_vec_in(expected.cloned().into_iter().collect(), allocator),
+            keywords: ArenaSlice::from_vec_in(
+                match_arg
+                    .map(|expr| ast::Keyword {
+                        node_index: AtomicNodeIndex::NONE,
+                        // Take range from the original expression so that the keyword
+                        // argument is generated after positional arguments
+                        range: expr.range(),
+                        arg: Some(ast::Identifier::new_in(
+                            "match",
+                            TextRange::default(),
+                            allocator,
+                        )),
+                        value: expr.clone(),
+                    })
+                    .into_iter()
+                    .collect(),
+                allocator,
+            ),
         },
     };
 
     let func_call = ast::ExprCall {
         node_index: AtomicNodeIndex::NONE,
         range: TextRange::default(),
-        func: Box::new(func.clone()),
+        func: ArenaBox::from_ref(func),
         arguments: ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
-            args: func_args.into(),
-            keywords: func_keywords.into(),
+            args: ArenaSlice::from_vec_in(func_args, allocator),
+            keywords: ArenaSlice::from_vec_in(func_keywords, allocator),
         },
     };
 
@@ -284,14 +310,14 @@ fn generate_with_statement(
         Stmt::Assign(ast::StmtAssign {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
-            targets: assign_targets.to_vec(),
-            value: Box::new(func_call.into()),
+            targets: ArenaSlice::from_vec_in(assign_targets.to_vec(), allocator),
+            value: ArenaBox::new_in(func_call.into(), allocator),
         })
     } else {
         Stmt::Expr(StmtExpr {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
-            value: Box::new(func_call.into()),
+            value: ArenaBox::new_in(func_call.into(), allocator),
         })
     };
 
@@ -299,12 +325,15 @@ fn generate_with_statement(
         node_index: AtomicNodeIndex::NONE,
         range: TextRange::default(),
         is_async: false,
-        items: vec![WithItem {
-            node_index: AtomicNodeIndex::NONE,
-            range: TextRange::default(),
-            context_expr: context_call.into(),
-            optional_vars: optional_vars.map(|var| Box::new(var.clone())),
-        }],
-        body: ast::Suite::from([body]),
+        items: ArenaSlice::from_iter_in(
+            [WithItem {
+                node_index: AtomicNodeIndex::NONE,
+                range: TextRange::default(),
+                context_expr: context_call.into(),
+                optional_vars: optional_vars.map(ArenaBox::from_ref),
+            }],
+            allocator,
+        ),
+        body: ArenaSlice::from_iter_in([body], allocator),
     })
 }

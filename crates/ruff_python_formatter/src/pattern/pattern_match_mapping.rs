@@ -14,7 +14,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatPatternMatchMapping;
 
-impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
+impl FormatNodeRule<PatternMatchMapping<'_>> for FormatPatternMatchMapping {
     fn fmt_fields(&self, item: &PatternMatchMapping, f: &mut PyFormatter) -> FormatResult<()> {
         let PatternMatchMapping {
             keys,
@@ -93,7 +93,7 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
     }
 }
 
-impl NeedsParentheses for PatternMatchMapping {
+impl NeedsParentheses for PatternMatchMapping<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
@@ -106,7 +106,7 @@ impl NeedsParentheses for PatternMatchMapping {
 /// A struct to format the `rest` element of a [`PatternMatchMapping`] (e.g., `{**rest}`).
 #[derive(Debug)]
 struct RestPattern<'a> {
-    identifier: &'a Identifier,
+    identifier: &'a Identifier<'a>,
     comments: &'a [SourceComment],
 }
 
@@ -132,8 +132,8 @@ impl Format<PyFormatContext<'_>> for RestPattern<'_> {
 /// A struct to format a key-pattern pair of a [`PatternMatchMapping`] (e.g., `{key: pattern}`).
 #[derive(Debug)]
 struct KeyPatternPair<'a> {
-    key: &'a Expr,
-    pattern: &'a Pattern,
+    key: &'a Expr<'a>,
+    pattern: &'a Pattern<'a>,
 }
 
 impl Ranged for KeyPatternPair<'_> {

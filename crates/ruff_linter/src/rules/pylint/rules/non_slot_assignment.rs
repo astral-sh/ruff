@@ -101,7 +101,7 @@ impl Ranged for AttributeAssignment<'_> {
 /// Return a list of attributes that are assigned to but not included in `__slots__`.
 ///
 /// If the `__slots__` attribute cannot be statically determined, returns an empty vector.
-fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
+fn is_attributes_not_in_slots<'a>(body: &'a [Stmt<'a>]) -> Vec<AttributeAssignment<'a>> {
     // First, collect all the attributes that are assigned to `__slots__`.
     let mut slots = FxHashSet::default();
     for statement in body {
@@ -260,7 +260,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
 /// Return an iterator over the attributes enumerated in the given `__slots__` value.
 ///
 /// If an attribute can't be statically determined, it will be `None`.
-fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Option<&str>> {
+fn slots_attributes<'a>(expr: &'a Expr<'a>) -> impl Iterator<Item = Option<&'a str>> {
     // Ex) `__slots__ = ("name",)`
     let elts_iter = match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. })

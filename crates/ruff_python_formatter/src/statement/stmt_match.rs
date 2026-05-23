@@ -11,7 +11,7 @@ use crate::statement::clause::{ClauseHeader, clause_header};
 #[derive(Default)]
 pub struct FormatStmtMatch;
 
-impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
+impl FormatNodeRule<StmtMatch<'_>> for FormatStmtMatch {
     fn fmt_fields(&self, item: &StmtMatch, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtMatch {
             range: _,

@@ -186,7 +186,7 @@ impl Ranged for SourceComment {
     }
 }
 
-type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
+type CommentsMap = MultiMap<NodeRefEqualityKey, SourceComment>;
 
 /// The comments of a syntax tree stored by node.
 ///
@@ -219,7 +219,7 @@ pub(crate) struct Comments<'a> {
 }
 
 impl<'a> Comments<'a> {
-    fn new(comments: CommentsMap<'a>, comment_ranges: &'a CommentRanges) -> Self {
+    fn new(comments: CommentsMap, comment_ranges: &'a CommentRanges) -> Self {
         Self {
             data: Rc::new(CommentsData {
                 comments,
@@ -270,9 +270,10 @@ impl<'a> Comments<'a> {
 
     /// Returns `true` if the given `node` has any comments.
     #[inline]
-    pub(crate) fn has<T>(&self, node: T) -> bool
+    pub(crate) fn has<'node, 'ast, T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         self.data
             .comments
@@ -281,18 +282,20 @@ impl<'a> Comments<'a> {
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn has_leading<T>(&self, node: T) -> bool
+    pub(crate) fn has_leading<'node, 'ast, T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         !self.leading(node).is_empty()
     }
 
     /// Returns the `node`'s [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn leading<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn leading<'node, 'ast, T>(&self, node: T) -> &[SourceComment]
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         self.data
             .comments
@@ -300,17 +303,19 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns `true` if node has any [dangling comments](self#dangling-comments).
-    pub(crate) fn has_dangling<T>(&self, node: T) -> bool
+    pub(crate) fn has_dangling<'node, 'ast, T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         !self.dangling(node).is_empty()
     }
 
     /// Returns the [dangling comments](self#dangling-comments) of `node`
-    pub(crate) fn dangling<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn dangling<'node, 'ast, T>(&self, node: T) -> &[SourceComment]
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         self.data
             .comments
@@ -319,9 +324,10 @@ impl<'a> Comments<'a> {
 
     /// Returns the `node`'s [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn trailing<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn trailing<'node, 'ast, T>(&self, node: T) -> &[SourceComment]
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         self.data
             .comments
@@ -330,18 +336,20 @@ impl<'a> Comments<'a> {
 
     /// Returns `true` if the given `node` has any [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing<T>(&self, node: T) -> bool
+    pub(crate) fn has_trailing<'node, 'ast, T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         !self.trailing(node).is_empty()
     }
 
     /// Returns `true` if the given `node` has any [trailing own line comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_own_line<T>(&self, node: T) -> bool
+    pub(crate) fn has_trailing_own_line<'node, 'ast, T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         self.trailing(node)
             .iter()
@@ -349,21 +357,26 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
-    pub(crate) fn leading_trailing<T>(&self, node: T) -> impl Iterator<Item = &SourceComment>
+    pub(crate) fn leading_trailing<'node, 'ast, T>(
+        &self,
+        node: T,
+    ) -> impl Iterator<Item = &SourceComment>
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         let comments = self.leading_dangling_trailing(node);
         comments.leading.iter().chain(comments.trailing)
     }
 
     /// Returns an iterator over the [leading](self#leading-comments), [dangling](self#dangling-comments), and [trailing](self#trailing) comments of `node`.
-    pub(crate) fn leading_dangling_trailing<T>(
+    pub(crate) fn leading_dangling_trailing<'node, 'ast, T>(
         &self,
         node: T,
     ) -> LeadingDanglingTrailingComments<'_>
     where
-        T: Into<AnyNodeRef<'a>>,
+        'ast: 'node,
+        T: Into<AnyNodeRef<'node>>,
     {
         self.data
             .comments
@@ -495,7 +508,7 @@ impl LeadingDanglingTrailingComments<'_> {
 
 #[derive(Debug)]
 struct CommentsData<'a> {
-    comments: CommentsMap<'a>,
+    comments: CommentsMap,
 
     /// We need those for backwards lexing
     comment_ranges: &'a CommentRanges,
@@ -515,6 +528,7 @@ pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str
 mod tests {
     use insta::assert_debug_snapshot;
 
+    use ruff_allocator::Allocator;
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
     use ruff_python_parser::{ParseOptions, Parsed, parse};
@@ -523,7 +537,7 @@ mod tests {
     use crate::comments::Comments;
 
     struct CommentsTestCase<'a> {
-        parsed: Parsed<Mod>,
+        parsed: Parsed<Mod<'static>>,
         comment_ranges: CommentRanges,
         source_code: SourceCode<'a>,
     }
@@ -532,7 +546,9 @@ mod tests {
         fn from_code(source: &'a str) -> Self {
             let source_code = SourceCode::new(source);
             let source_type = PySourceType::Python;
-            let parsed = parse(source, ParseOptions::from(source_type))
+            // These fixtures retain parsed syntax for the complete test case.
+            let allocator = Box::leak(Box::new(Allocator::new()));
+            let parsed = parse(source, ParseOptions::from(source_type), allocator)
                 .expect("Expect source to be valid Python");
             let comment_ranges = CommentRanges::from(parsed.tokens());
 

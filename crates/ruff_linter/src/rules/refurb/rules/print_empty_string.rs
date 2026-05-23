@@ -1,3 +1,4 @@
+use ruff_allocator::{Allocator, Slice as ArenaSlice};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{contains_effect, is_empty_f_string};
 use ruff_python_ast::{self as ast, Expr};
@@ -101,6 +102,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                     checker.semantic(),
                     checker.generator(),
                     checker.comment_ranges(),
+                    checker.replacement_allocator(),
                 )
                 .into_fix(),
             );
@@ -128,6 +130,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                         checker.semantic(),
                         checker.generator(),
                         checker.comment_ranges(),
+                        checker.replacement_allocator(),
                     )
                     .into_fix(),
                 );
@@ -194,6 +197,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                     checker.semantic(),
                     checker.generator(),
                     checker.comment_ranges(),
+                    checker.replacement_allocator(),
                 )
                 .into_fix(),
             );
@@ -228,6 +232,7 @@ impl EmptyStringFix {
         semantic: &SemanticModel,
         generator: Generator,
         comment_ranges: &CommentRanges,
+        allocator: &Allocator,
     ) -> Self {
         let range = call.range();
         let mut call = call.clone();
@@ -238,39 +243,39 @@ impl EmptyStringFix {
         }
 
         // Remove all empty string positional arguments.
-        call.arguments.args = call
-            .arguments
-            .args
-            .iter()
-            .filter(|arg| !is_empty_string(arg))
-            .cloned()
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
+        call.arguments.args = ArenaSlice::from_iter_in(
+            call.arguments
+                .args
+                .iter()
+                .filter(|arg| !is_empty_string(arg))
+                .cloned(),
+            allocator,
+        );
 
         // Remove the `sep` keyword argument if it exists.
         if separator == Separator::Remove {
-            call.arguments.keywords = call
-                .arguments
-                .keywords
-                .iter()
-                .filter(|keyword| {
-                    let Some(arg) = keyword.arg.as_ref() else {
-                        return true;
-                    };
+            call.arguments.keywords = ArenaSlice::from_iter_in(
+                call.arguments
+                    .keywords
+                    .iter()
+                    .filter(|keyword| {
+                        let Some(arg) = keyword.arg.as_ref() else {
+                            return true;
+                        };
 
-                    if arg.as_str() != "sep" {
-                        return true;
-                    }
+                        if arg.as_str() != "sep" {
+                            return true;
+                        }
 
-                    if contains_effect(&keyword.value, |id| semantic.has_builtin_binding(id)) {
-                        applicability = Applicability::Unsafe;
-                    }
+                        if contains_effect(&keyword.value, |id| semantic.has_builtin_binding(id)) {
+                            applicability = Applicability::Unsafe;
+                        }
 
-                    false
-                })
-                .cloned()
-                .collect::<Vec<_>>()
-                .into_boxed_slice();
+                        false
+                    })
+                    .cloned(),
+                allocator,
+            );
         }
 
         let contents = generator.expr(&call.into());

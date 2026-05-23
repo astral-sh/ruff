@@ -46,7 +46,7 @@ pub struct StatementInner<'db> {
     #[no_eq]
     #[tracked]
     #[returns(ref)]
-    pub node_ref: AstNodeRef<ast::Stmt>,
+    pub node_ref: AstNodeRef<ast::Stmt<'static>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -61,8 +61,8 @@ impl<'db> StatementInner<'db> {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
 pub struct StatementNodeKey(NodeKey);
 
-impl From<&ast::Stmt> for StatementNodeKey {
-    fn from(node: &ast::Stmt) -> Self {
+impl From<&ast::Stmt<'_>> for StatementNodeKey {
+    fn from(node: &ast::Stmt<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

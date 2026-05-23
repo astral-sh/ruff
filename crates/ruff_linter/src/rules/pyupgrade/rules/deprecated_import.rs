@@ -417,7 +417,7 @@ const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
 const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
 
 struct ImportReplacer<'a> {
-    import_from_stmt: &'a StmtImportFrom,
+    import_from_stmt: &'a StmtImportFrom<'a>,
     module: &'a str,
     locator: &'a Locator<'a>,
     stylist: &'a Stylist<'a>,
@@ -428,7 +428,7 @@ struct ImportReplacer<'a> {
 
 impl<'a> ImportReplacer<'a> {
     const fn new(
-        import_from_stmt: &'a StmtImportFrom,
+        import_from_stmt: &'a StmtImportFrom<'a>,
         module: &'a str,
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
@@ -703,7 +703,7 @@ impl<'a> ImportReplacer<'a> {
     }
 
     /// Partitions imports into matched and unmatched names.
-    fn partition_imports(&self, candidates: &[&str]) -> (Vec<&Alias>, Vec<&Alias>) {
+    fn partition_imports(&self, candidates: &[&str]) -> (Vec<&Alias<'a>>, Vec<&Alias<'a>>) {
         let mut matched_names = vec![];
         let mut unmatched_names = vec![];
         for name in &self.import_from_stmt.names {

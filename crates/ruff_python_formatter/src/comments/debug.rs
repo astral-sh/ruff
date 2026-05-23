@@ -2,11 +2,9 @@ use std::fmt::{Debug, Formatter, Write};
 
 use itertools::Itertools;
 
-use ruff_formatter::SourceCode;
-use ruff_text_size::Ranged;
-
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::{CommentsMap, SourceComment};
+use ruff_formatter::SourceCode;
 
 /// Prints a debug representation of [`SourceComment`] that includes the comment's text
 pub(crate) struct DebugComment<'a> {
@@ -38,7 +36,7 @@ impl Debug for DebugComment<'_> {
 
 /// Pretty-printed debug representation of [`Comments`](super::Comments).
 pub(crate) struct DebugComments<'a> {
-    comments: &'a CommentsMap<'a>,
+    comments: &'a CommentsMap,
     source_code: SourceCode<'a>,
 }
 
@@ -58,7 +56,7 @@ impl Debug for DebugComments<'_> {
         for node in self
             .comments
             .keys()
-            .sorted_by_key(|key| (key.node().start(), key.node().end()))
+            .sorted_by_key(|key| (key.range().start(), key.range().end()))
         {
             map.entry(
                 &NodeKindWithSource {
@@ -79,7 +77,7 @@ impl Debug for DebugComments<'_> {
 
 /// Prints the source code up to the first new line character. Truncates the text if it exceeds 40 characters.
 struct NodeKindWithSource<'a> {
-    key: NodeRefEqualityKey<'a>,
+    key: NodeRefEqualityKey,
     source: SourceCode<'a>,
 }
 
@@ -117,21 +115,21 @@ impl Debug for NodeKindWithSource<'_> {
             }
         }
 
-        let kind = self.key.node().kind();
-        let source = self.source.slice(self.key.node().range()).text(self.source);
+        let kind = self.key.kind();
+        let source = self.source.slice(self.key.range()).text(self.source);
 
         f.debug_struct("Node")
             .field("kind", &kind)
-            .field("range", &self.key.node().range())
+            .field("range", &self.key.range())
             .field("source", &TruncatedSource(source))
             .finish()
     }
 }
 
 struct DebugNodeComments<'a> {
-    comments: &'a CommentsMap<'a>,
+    comments: &'a CommentsMap,
     source_code: SourceCode<'a>,
-    key: NodeRefEqualityKey<'a>,
+    key: NodeRefEqualityKey,
 }
 
 impl Debug for DebugNodeComments<'_> {

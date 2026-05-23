@@ -11,7 +11,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprSlice;
 
-impl FormatNodeRule<ExprSlice> for FormatExprSlice {
+impl FormatNodeRule<ExprSlice<'_>> for FormatExprSlice {
     /// This implementation deviates from black in that comments are attached to the section of the
     /// slice they originate in
     fn fmt_fields(&self, item: &ExprSlice, f: &mut PyFormatter) -> FormatResult<()> {
@@ -274,7 +274,7 @@ fn leading_comments_spacing(
     Ok(())
 }
 
-impl NeedsParentheses for ExprSlice {
+impl NeedsParentheses for ExprSlice<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

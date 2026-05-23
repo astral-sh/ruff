@@ -356,7 +356,7 @@ struct InlayHintVisitor<'a, 'db> {
     dynamic_imports: FxHashMap<DynamicallyImportedMember, ImportAction>,
     importer: Importer<'db>,
     hints: Vec<InlayHint>,
-    assignment_rhs: Option<&'a Expr>,
+    assignment_rhs: Option<&'a Expr<'a>>,
     range: TextRange,
     settings: &'a InlayHintSettings,
     in_no_edits_allowed: bool,
@@ -788,6 +788,7 @@ mod tests {
     use crate::tests::IntoDiagnostic;
     use insta::{assert_snapshot, internals::SettingsBindDropGuard};
     use itertools::Itertools;
+    use ruff_allocator::Allocator;
     use ruff_db::{
         diagnostic::{
             Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
@@ -880,8 +881,10 @@ mod tests {
 
             let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
             let mut text_edit_buf = inlay_hint_buf.clone();
+            let allocator = Allocator::new();
             let source_has_errors =
-                parse_unchecked_source(&text_edit_buf, PySourceType::Python).has_invalid_syntax();
+                parse_unchecked_source(&text_edit_buf, PySourceType::Python, &allocator)
+                    .has_invalid_syntax();
 
             let mut tbd_diagnostics = Vec::new();
 
@@ -919,7 +922,7 @@ mod tests {
                 edit_offset += edit.new_text.text_len() - edit.range.len();
             }
 
-            let edited = parse_unchecked_source(&text_edit_buf, PySourceType::Python);
+            let edited = parse_unchecked_source(&text_edit_buf, PySourceType::Python, &allocator);
             if edited.has_invalid_syntax() && !source_has_errors {
                 let syntax_errors = edited.errors().iter().map(|error| &error.error).join("\n");
 

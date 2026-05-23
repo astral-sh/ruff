@@ -3,13 +3,16 @@ use std::sync::Arc;
 
 use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
+use ruff_allocator::Allocator;
 use ruff_python_ast::{
     AnyRootNodeRef, HasNodeIndex, ModExpression, ModModule, NodeIndex, NodeIndexError,
-    StringLiteral,
+    StringLiteral, Suite, token::Tokens,
 };
 use ruff_python_parser::{
-    ParseError, ParseErrorType, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
+    ParseError, ParseErrorType, ParseOptions, Parsed, UnsupportedSyntaxError,
+    parse_string_annotation,
 };
+use yoke::Yoke;
 
 use crate::Db;
 use crate::files::File;
@@ -34,56 +37,83 @@ use crate::source::source_text;
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
-    let parsed = parsed_module_impl(db, file);
-
-    ParsedModule::new(file, parsed)
+    ParsedModule::new(file, indexed_module(db, file))
 }
 
-pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
+fn indexed_module(db: &dyn Db, file: File) -> Arc<indexed::IndexedModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
     let target_version = db.python_version();
     let options = ParseOptions::from(ty).with_target_version(target_version);
-    parse_unchecked(&source, options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+    indexed::IndexedModule::new(&source, options)
+}
+
+#[derive(yoke::Yokeable)]
+struct ParsedExpressionData<'ast> {
+    parsed: Parsed<ModExpression<'ast>>,
+}
+
+/// An owned parsed string-annotation expression.
+pub struct ParsedExpression {
+    inner: Yoke<ParsedExpressionData<'static>, Box<Allocator>>,
+}
+
+impl ParsedExpression {
+    pub fn syntax(&self) -> &ModExpression<'_> {
+        self.inner.get().parsed.syntax()
+    }
+
+    pub fn tokens(&self) -> &Tokens {
+        self.inner.get().parsed.tokens()
+    }
+
+    pub fn expr(&self) -> &ruff_python_ast::Expr<'_> {
+        self.inner.get().parsed.expr()
+    }
 }
 
 pub fn parsed_string_annotation(
     source: &str,
     string: &StringLiteral,
-) -> Result<Parsed<ModExpression>, ParseError> {
-    let expr = parse_string_annotation(source, string)?;
+) -> Result<ParsedExpression, ParseError> {
+    let inner = Yoke::<ParsedExpressionData<'static>, Box<Allocator>>::try_attach_to_cart(
+        Box::new(Allocator::new()),
+        |allocator| {
+            let expr = parse_string_annotation(source, string, allocator)?;
 
-    // We need the sub-ast of the string annotation to be indexed
-    indexed::ensure_indexed(&expr, string.node_index().load()).map_err(|err| {
-        let message = match err {
-            NodeIndexError::NoParent => {
-                "internal error: string annotation's parent had no NodeIndex".to_owned()
-            }
-            NodeIndexError::TooNested => "too many levels of nested string annotations; remove the redundant nested quotes".to_owned(),
-            NodeIndexError::OverflowedIndices => {
-                "file too long for string annotations; either break up the file or don't use string annotations".to_owned()
-            }
-            NodeIndexError::OverflowedSubIndices => {
-                "file too long for nested string annotations; remove the redundant nested quotes".to_owned()
-            }
-            NodeIndexError::ExhaustedSubIndices => {
-                "string annotation is too long; consider introducing type aliases to simplify".to_owned()
-            }
-            NodeIndexError::ExhaustedSubSubIndices => {
-                "nested string annotation is too long; remove the redundant nested quotes".to_owned()
-            }
-        };
+            // We need the sub-ast of the string annotation to be indexed.
+            indexed::ensure_indexed(&expr, string.node_index().load()).map_err(|err| {
+                let message = match err {
+                    NodeIndexError::NoParent => {
+                        "internal error: string annotation's parent had no NodeIndex".to_owned()
+                    }
+                    NodeIndexError::TooNested => "too many levels of nested string annotations; remove the redundant nested quotes".to_owned(),
+                    NodeIndexError::OverflowedIndices => {
+                        "file too long for string annotations; either break up the file or don't use string annotations".to_owned()
+                    }
+                    NodeIndexError::OverflowedSubIndices => {
+                        "file too long for nested string annotations; remove the redundant nested quotes".to_owned()
+                    }
+                    NodeIndexError::ExhaustedSubIndices => {
+                        "string annotation is too long; consider introducing type aliases to simplify".to_owned()
+                    }
+                    NodeIndexError::ExhaustedSubSubIndices => {
+                        "nested string annotation is too long; remove the redundant nested quotes".to_owned()
+                    }
+                };
 
-        ParseError {
-            error: ParseErrorType::OtherError(message),
-            location: string.range,
-        }
-    })?;
+                ParseError {
+                    error: ParseErrorType::OtherError(message),
+                    location: string.range,
+                }
+            })?;
 
-    Ok(expr)
+            Ok::<_, ParseError>(ParsedExpressionData { parsed: expr })
+        },
+    )?;
+
+    Ok(ParsedExpression { inner })
 }
 
 /// A wrapper around a parsed module.
@@ -98,12 +128,10 @@ pub struct ParsedModule {
 }
 
 impl ParsedModule {
-    pub fn new(file: File, parsed: Parsed<ModModule>) -> Self {
+    fn new(file: File, parsed: Arc<indexed::IndexedModule>) -> Self {
         Self {
             file,
-            inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(
-                parsed,
-            )))),
+            inner: Arc::new(ArcSwapOption::new(Some(parsed))),
         }
     }
     /// Loads a reference to the parsed module.
@@ -115,7 +143,7 @@ impl ParsedModule {
             Some(parsed) => parsed,
             None => {
                 // Re-parse the file.
-                let parsed = indexed::IndexedModule::new(parsed_module_impl(db, self.file));
+                let parsed = indexed_module(db, self.file);
                 tracing::debug!(
                     "File `{}` was reparsed after being collected in the current Salsa revision",
                     self.file.path(db)
@@ -174,13 +202,41 @@ impl ParsedModuleRef {
     pub fn get_by_index<'ast>(&'ast self, index: NodeIndex) -> AnyRootNodeRef<'ast> {
         self.indexed.get_by_index(index)
     }
-}
 
-impl std::ops::Deref for ParsedModuleRef {
-    type Target = Parsed<ModModule>;
+    pub fn syntax(&self) -> &ModModule<'_> {
+        self.indexed.parsed().syntax()
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.indexed.parsed
+    pub fn suite(&self) -> &Suite<'_> {
+        self.indexed.parsed().suite()
+    }
+
+    pub fn tokens(&self) -> &Tokens {
+        self.indexed.parsed().tokens()
+    }
+
+    pub fn errors(&self) -> &[ParseError] {
+        self.indexed.parsed().errors()
+    }
+
+    pub fn unsupported_syntax_errors(&self) -> &[UnsupportedSyntaxError] {
+        self.indexed.parsed().unsupported_syntax_errors()
+    }
+
+    pub fn has_valid_syntax(&self) -> bool {
+        self.indexed.parsed().has_valid_syntax()
+    }
+
+    pub fn has_invalid_syntax(&self) -> bool {
+        self.indexed.parsed().has_invalid_syntax()
+    }
+
+    pub fn has_no_syntax_errors(&self) -> bool {
+        self.indexed.parsed().has_no_syntax_errors()
+    }
+
+    pub fn has_syntax_errors(&self) -> bool {
+        self.indexed.parsed().has_syntax_errors()
     }
 }
 
@@ -199,21 +255,43 @@ where
 mod indexed {
     use std::sync::Arc;
 
+    use get_size2::{GetSize, GetSizeTracker};
+    use ruff_allocator::Allocator;
     use ruff_python_ast::visitor::source_order::*;
     use ruff_python_ast::*;
-    use ruff_python_parser::Parsed;
+    use ruff_python_parser::{ParseOptions, Parsed, parse_unchecked};
+    use yoke::Yoke;
 
-    /// A wrapper around the AST that allows access to AST nodes by index.
-    #[derive(Debug, get_size2::GetSize)]
+    #[derive(yoke::Yokeable)]
+    struct OwnedModule<'ast> {
+        parsed: Parsed<ModModule<'ast>>,
+    }
+
+    /// Owns the arena backing a fully constructed parsed module.
+    struct FrozenAllocator(Allocator);
+
+    // SAFETY: `FrozenAllocator` is private and is only borrowed mutably-through-shared-reference
+    // inside `IndexedModule::new`, before the resulting module can be shared. After construction,
+    // the cart is retained solely to keep immutable AST references alive and is never exposed or
+    // used for further allocations.
+    unsafe impl Sync for FrozenAllocator {}
+
+    type ParsedModule = Yoke<OwnedModule<'static>, Box<FrozenAllocator>>;
+
+    #[derive(yoke::Yokeable)]
+    struct Index<'ast> {
+        nodes: Box<[AnyRootNodeRef<'ast>]>,
+    }
+
+    /// A wrapper around an owned arena-allocated AST that allows access to AST nodes by index.
     pub struct IndexedModule {
-        index: Box<[AnyRootNodeRef<'static>]>,
-        pub parsed: Parsed<ModModule>,
+        index: Yoke<Index<'static>, Arc<ParsedModule>>,
     }
 
     /// Ensure the following sub-AST is indexed, using the parent node's index
     /// as a basis for unambiguous AST node indices.
-    pub fn ensure_indexed(
-        parsed: &Parsed<ModExpression>,
+    pub fn ensure_indexed<'ast>(
+        parsed: &Parsed<ModExpression<'ast>>,
         parent_node_index: NodeIndex,
     ) -> Result<(), NodeIndexError> {
         let parent_index = parent_node_index.as_u32().ok_or(NodeIndexError::NoParent)?;
@@ -240,35 +318,40 @@ mod indexed {
     }
 
     impl IndexedModule {
-        /// Create a new [`IndexedModule`] from the given AST.
-        #[expect(clippy::unnecessary_cast)]
-        pub fn new(parsed: Parsed<ModModule>) -> Arc<Self> {
-            let mut visitor = Visitor {
-                nodes: Some(Vec::new()),
-                index: 0,
-                max_index: MAX_REAL_INDEX,
-                overflowed: false,
-            };
+        /// Create a new [`IndexedModule`] by parsing into its owned arena.
+        pub fn new(source: &str, options: ParseOptions) -> Arc<Self> {
+            let parsed = Arc::new(
+                Yoke::<OwnedModule<'static>, Box<FrozenAllocator>>::attach_to_cart(
+                    Box::new(FrozenAllocator(Allocator::new())),
+                    |allocator| OwnedModule {
+                        parsed: parse_unchecked(source, options, &allocator.0)
+                            .try_into_module()
+                            .expect("PySourceType always parses into a module"),
+                    },
+                ),
+            );
 
-            let mut inner = Arc::new(IndexedModule {
-                parsed,
-                index: Box::new([]),
-            });
+            let index =
+                Yoke::<Index<'static>, Arc<ParsedModule>>::attach_to_cart(parsed, |parsed| {
+                    let mut visitor = Visitor {
+                        nodes: Some(Vec::new()),
+                        index: 0,
+                        max_index: MAX_REAL_INDEX,
+                        overflowed: false,
+                    };
 
-            AnyNodeRef::from(inner.parsed.syntax()).visit_source_order(&mut visitor);
+                    AnyNodeRef::from(parsed.get().parsed.syntax()).visit_source_order(&mut visitor);
 
-            let index: Box<[AnyRootNodeRef<'_>]> = visitor.nodes.unwrap().into_boxed_slice();
+                    Index {
+                        nodes: visitor.nodes.unwrap().into_boxed_slice(),
+                    }
+                });
 
-            // SAFETY: We cast from `Box<[AnyRootNodeRef<'_>]>` to `Box<[AnyRootNodeRef<'static>]>`,
-            // faking the 'static lifetime to create the self-referential struct. The node references
-            // are into the `Arc<Parsed<ModModule>>`, so are valid for as long as the `IndexedModule`
-            // is alive. We make sure to restore the correct lifetime in `get_by_index`.
-            //
-            // Note that we can never move the data within the `Arc` after this point.
-            Arc::get_mut(&mut inner).unwrap().index =
-                unsafe { Box::from_raw(Box::into_raw(index) as *mut [AnyRootNodeRef<'static>]) };
+            Arc::new(Self { index })
+        }
 
-            inner
+        pub fn parsed(&self) -> &Parsed<ModModule<'_>> {
+            &self.index.backing_cart().get().parsed
         }
 
         /// Returns the node at the given index.
@@ -277,9 +360,28 @@ mod indexed {
                 .as_u32()
                 .expect("attempted to access uninitialized `NodeIndex`");
 
-            // Note that this method restores the correct lifetime: the nodes are valid for as
-            // long as the reference to `IndexedModule` is alive.
-            self.index[index as usize]
+            self.index.get().nodes[index as usize]
+        }
+    }
+
+    impl std::fmt::Debug for IndexedModule {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("IndexedModule")
+                .field("parsed", self.parsed())
+                .field("index", &self.index.get().nodes)
+                .finish()
+        }
+    }
+
+    impl GetSize for IndexedModule {
+        fn get_heap_size_with_tracker<Tracker: GetSizeTracker>(
+            &self,
+            tracker: Tracker,
+        ) -> (usize, Tracker) {
+            let (parsed_size, tracker) = self.parsed().get_heap_size_with_tracker(tracker);
+            let (index_size, tracker) = self.index.get().nodes.get_heap_size_with_tracker(tracker);
+            (parsed_size + index_size, tracker)
         }
     }
 
@@ -313,75 +415,75 @@ mod indexed {
 
     impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
         #[inline]
-        fn visit_mod(&mut self, module: &'a Mod) {
+        fn visit_mod(&mut self, module: &'a Mod<'a>) {
             self.visit_node(module);
             walk_module(self, module);
         }
 
         #[inline]
-        fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
             self.visit_node(stmt);
             walk_stmt(self, stmt);
         }
 
         #[inline]
-        fn visit_annotation(&mut self, expr: &'a Expr) {
+        fn visit_annotation(&mut self, expr: &'a Expr<'a>) {
             self.visit_node(expr);
             walk_annotation(self, expr);
         }
 
         #[inline]
-        fn visit_expr(&mut self, expr: &'a Expr) {
+        fn visit_expr(&mut self, expr: &'a Expr<'a>) {
             self.visit_node(expr);
             walk_expr(self, expr);
         }
 
         #[inline]
-        fn visit_decorator(&mut self, decorator: &'a Decorator) {
+        fn visit_decorator(&mut self, decorator: &'a Decorator<'a>) {
             self.visit_node(decorator);
             walk_decorator(self, decorator);
         }
 
         #[inline]
-        fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
+        fn visit_comprehension(&mut self, comprehension: &'a Comprehension<'a>) {
             self.visit_node(comprehension);
             walk_comprehension(self, comprehension);
         }
 
         #[inline]
-        fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+        fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler<'a>) {
             self.visit_node(except_handler);
             walk_except_handler(self, except_handler);
         }
 
         #[inline]
-        fn visit_arguments(&mut self, arguments: &'a Arguments) {
+        fn visit_arguments(&mut self, arguments: &'a Arguments<'a>) {
             self.visit_node(arguments);
             walk_arguments(self, arguments);
         }
 
         #[inline]
-        fn visit_parameters(&mut self, parameters: &'a Parameters) {
+        fn visit_parameters(&mut self, parameters: &'a Parameters<'a>) {
             self.visit_node(parameters);
             walk_parameters(self, parameters);
         }
 
         #[inline]
-        fn visit_parameter(&mut self, arg: &'a Parameter) {
+        fn visit_parameter(&mut self, arg: &'a Parameter<'a>) {
             self.visit_node(arg);
             walk_parameter(self, arg);
         }
 
         fn visit_parameter_with_default(
             &mut self,
-            parameter_with_default: &'a ParameterWithDefault,
+            parameter_with_default: &'a ParameterWithDefault<'a>,
         ) {
             self.visit_node(parameter_with_default);
             walk_parameter_with_default(self, parameter_with_default);
         }
 
         #[inline]
-        fn visit_keyword(&mut self, keyword: &'a Keyword) {
+        fn visit_keyword(&mut self, keyword: &'a Keyword<'a>) {
             self.visit_node(keyword);
             walk_keyword(self, keyword);
         }
@@ -393,55 +495,55 @@ mod indexed {
         }
 
         #[inline]
-        fn visit_with_item(&mut self, with_item: &'a WithItem) {
+        fn visit_with_item(&mut self, with_item: &'a WithItem<'a>) {
             self.visit_node(with_item);
             walk_with_item(self, with_item);
         }
 
         #[inline]
-        fn visit_type_params(&mut self, type_params: &'a TypeParams) {
+        fn visit_type_params(&mut self, type_params: &'a TypeParams<'a>) {
             self.visit_node(type_params);
             walk_type_params(self, type_params);
         }
 
         #[inline]
-        fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+        fn visit_type_param(&mut self, type_param: &'a TypeParam<'a>) {
             self.visit_node(type_param);
             walk_type_param(self, type_param);
         }
 
         #[inline]
-        fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+        fn visit_match_case(&mut self, match_case: &'a MatchCase<'a>) {
             self.visit_node(match_case);
             walk_match_case(self, match_case);
         }
 
         #[inline]
-        fn visit_pattern(&mut self, pattern: &'a Pattern) {
+        fn visit_pattern(&mut self, pattern: &'a Pattern<'a>) {
             self.visit_node(pattern);
             walk_pattern(self, pattern);
         }
 
         #[inline]
-        fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments) {
+        fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments<'a>) {
             self.visit_node(pattern_arguments);
             walk_pattern_arguments(self, pattern_arguments);
         }
 
         #[inline]
-        fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword) {
+        fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword<'a>) {
             self.visit_node(pattern_keyword);
             walk_pattern_keyword(self, pattern_keyword);
         }
 
         #[inline]
-        fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+        fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause<'a>) {
             self.visit_node(elif_else_clause);
             walk_elif_else_clause(self, elif_else_clause);
         }
 
         #[inline]
-        fn visit_f_string(&mut self, f_string: &'a FString) {
+        fn visit_f_string(&mut self, f_string: &'a FString<'a>) {
             self.visit_node(f_string);
             walk_f_string(self, f_string);
         }
@@ -449,14 +551,14 @@ mod indexed {
         #[inline]
         fn visit_interpolated_string_element(
             &mut self,
-            interpolated_string_element: &'a InterpolatedStringElement,
+            interpolated_string_element: &'a InterpolatedStringElement<'a>,
         ) {
             self.visit_node(interpolated_string_element);
             walk_interpolated_string_element(self, interpolated_string_element);
         }
 
         #[inline]
-        fn visit_t_string(&mut self, t_string: &'a TString) {
+        fn visit_t_string(&mut self, t_string: &'a TString<'a>) {
             self.visit_node(t_string);
             walk_t_string(self, t_string);
         }

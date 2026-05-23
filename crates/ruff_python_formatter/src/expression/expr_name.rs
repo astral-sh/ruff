@@ -8,8 +8,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprName;
 
-impl FormatNodeRule<ExprName> for FormatExprName {
-    fn fmt_fields(&self, item: &ExprName, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ExprName<'_>> for FormatExprName {
+    fn fmt_fields(&self, item: &ExprName<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprName {
             id: _,
             range,
@@ -20,7 +20,7 @@ impl FormatNodeRule<ExprName> for FormatExprName {
     }
 }
 
-impl NeedsParentheses for ExprName {
+impl NeedsParentheses for ExprName<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
@@ -32,12 +32,14 @@ impl NeedsParentheses for ExprName {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
     #[test]
     fn name_range_with_comments() {
-        let module = parse_module("a # comment").unwrap();
+        let allocator = Allocator::new();
+        let module = parse_module("a # comment", &allocator).unwrap();
 
         let expression_statement = module
             .suite()

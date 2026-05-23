@@ -11,7 +11,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprDict;
 
-impl FormatNodeRule<ExprDict> for FormatExprDict {
+impl FormatNodeRule<ExprDict<'_>> for FormatExprDict {
     fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprDict {
             range: _,
@@ -63,7 +63,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
     }
 }
 
-impl NeedsParentheses for ExprDict {
+impl NeedsParentheses for ExprDict<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
@@ -74,14 +74,14 @@ impl NeedsParentheses for ExprDict {
 }
 
 #[derive(Debug)]
-struct KeyValuePair<'a> {
-    key: &'a Option<Expr>,
-    value: &'a Expr,
+struct KeyValuePair<'a, 'ast> {
+    key: &'a Option<Expr<'ast>>,
+    value: &'a Expr<'ast>,
     comments: &'a [SourceComment],
 }
 
-impl<'a> KeyValuePair<'a> {
-    fn new(item: &'a DictItem) -> Self {
+impl<'a, 'ast> KeyValuePair<'a, 'ast> {
+    fn new(item: &'a DictItem<'ast>) -> Self {
         Self {
             key: &item.key,
             value: &item.value,
@@ -94,7 +94,7 @@ impl<'a> KeyValuePair<'a> {
     }
 }
 
-impl Ranged for KeyValuePair<'_> {
+impl Ranged for KeyValuePair<'_, '_> {
     fn range(&self) -> TextRange {
         if let Some(key) = self.key {
             TextRange::new(key.start(), self.value.end())
@@ -104,7 +104,7 @@ impl Ranged for KeyValuePair<'_> {
     }
 }
 
-impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
+impl Format<PyFormatContext<'_>> for KeyValuePair<'_, '_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some(key) = self.key {
             write!(

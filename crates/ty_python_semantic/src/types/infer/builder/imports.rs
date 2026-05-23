@@ -342,8 +342,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .place_table(self.scope().file_scope_id(db))
                 .symbol(star_import.symbol_id())
                 .name()
+                .clone()
         } else {
-            &alias.name.id
+            alias.name.id.to_name()
         };
 
         // Avoid looking up attributes on a module if a module imports from itself
@@ -371,7 +372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
-            } = module_ty.member(db, name)
+            } = module_ty.member(db, &name)
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
@@ -408,7 +409,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Evaluate whether `X.Y` would constitute a valid submodule name,
         // given a `from X import Y` statement. If it is valid, this will be `Some()`;
         // else, it will be `None`.
-        let full_submodule_name = ModuleName::new(name).map(|final_part| {
+        let full_submodule_name = ModuleName::new(&name).map(|final_part| {
             let mut ret = module_name.clone();
             ret.extend(&final_part);
             ret
@@ -501,7 +502,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 diagnostic,
                 module_ty,
-                name,
+                name.as_str(),
                 "resolving imports",
             );
         }

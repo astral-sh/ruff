@@ -2,7 +2,6 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, Expr, Stmt};
-use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -113,7 +112,7 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         if_stmt.range(),
     );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-        make_suggestion(check_set, check_element, checker.generator()),
+        make_suggestion(check_set, check_element, checker),
         if_stmt.start(),
         if_stmt.end(),
     )));
@@ -124,7 +123,7 @@ fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {
 }
 
 /// Match `if` condition to be `expr in name`, returns a tuple of (`expr`, `name`) on success.
-fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
+fn match_check<'a>(if_stmt: &'a ast::StmtIf<'a>) -> Option<(&'a Expr<'a>, &'a ast::ExprName<'a>)> {
     let ast::ExprCompare {
         ops,
         left,
@@ -144,7 +143,7 @@ fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
 }
 
 /// Match `if` body to be `name.remove(expr)`, returns a tuple of (`expr`, `name`) on success.
-fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
+fn match_remove<'a>(if_stmt: &'a ast::StmtIf<'a>) -> Option<(&'a Expr<'a>, &'a ast::ExprName<'a>)> {
     let [Stmt::Expr(ast::StmtExpr { value: expr, .. })] = if_stmt.body.as_slice() else {
         return None;
     };
@@ -177,23 +176,23 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
 }
 
 /// Construct the fix suggestion, ie `set.discard(element)`.
-fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) -> String {
+fn make_suggestion(set: &ast::ExprName, element: &Expr, checker: &Checker) -> String {
     // Here we construct `set.discard(element)`
     //
     // Let's make `set.discard`.
     let attr = ast::ExprAttribute {
-        value: Box::new(set.clone().into()),
-        attr: ast::Identifier::new("discard".to_string(), TextRange::default()),
+        value: checker.alloc_expr(set.clone().into()),
+        attr: checker.alloc_identifier("discard", TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `set.discard(element)`
     let call = ast::ExprCall {
-        func: Box::new(attr.into()),
+        func: checker.alloc_expr(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([element.clone()]),
-            keywords: Box::from([]),
+            args: checker.alloc_vec(vec![element.clone()]),
+            keywords: checker.alloc_vec(vec![]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -202,9 +201,9 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
-        value: Box::new(call.into()),
+        value: checker.alloc_expr(call.into()),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    generator.stmt(&stmt.into())
+    checker.generator().stmt(&stmt.into())
 }

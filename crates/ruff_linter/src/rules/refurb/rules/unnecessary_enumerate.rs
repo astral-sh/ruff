@@ -2,9 +2,7 @@ use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{Arguments, Expr, Int};
-use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
 
 use ruff_text_size::{Ranged, TextRange};
@@ -188,7 +186,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
                     )
                 }) {
                     let replace_iter = Edit::range_replacement(
-                        generate_range_len_call(sequence.id.clone(), checker.generator()),
+                        generate_range_len_call(&sequence.id, checker),
                         stmt_for.iter.range(),
                     );
 
@@ -227,19 +225,19 @@ impl fmt::Display for EnumerateSubset {
 
 /// Format a code snippet to call `range(len(name))`, where `name` is the given
 /// sequence name.
-fn generate_range_len_call(name: Name, generator: Generator) -> String {
+fn generate_range_len_call(name: &ast::name::AstName<'_>, checker: &Checker) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name,
+        id: name.clone(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `len(name)`.
     let len = ast::ExprCall {
-        func: Box::new(
+        func: checker.alloc_expr(
             ast::ExprName {
-                id: Name::new_static("len"),
+                id: ast::name::AstName::new_static("len"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -247,8 +245,8 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             .into(),
         ),
         arguments: Arguments {
-            args: Box::from([var.into()]),
-            keywords: Box::from([]),
+            args: checker.alloc_vec(vec![var.into()]),
+            keywords: checker.alloc_vec(vec![]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -257,9 +255,9 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
     };
     // Construct `range(len(name))`.
     let range = ast::ExprCall {
-        func: Box::new(
+        func: checker.alloc_expr(
             ast::ExprName {
-                id: Name::new_static("range"),
+                id: ast::name::AstName::new_static("range"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -267,8 +265,8 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             .into(),
         ),
         arguments: Arguments {
-            args: Box::from([len.into()]),
-            keywords: Box::from([]),
+            args: checker.alloc_vec(vec![len.into()]),
+            keywords: checker.alloc_vec(vec![]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -277,9 +275,9 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
-        value: Box::new(range.into()),
+        value: checker.alloc_expr(range.into()),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    generator.stmt(&stmt.into())
+    checker.generator().stmt(&stmt.into())
 }

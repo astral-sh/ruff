@@ -513,9 +513,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         /// A type argument after expanding any allowed `Unpack[tuple[...]]` syntax.
-        struct TypeArgument<'ast, 'db> {
+        struct TypeArgument<'node, 'ast, 'db> {
             /// The source expression used for diagnostics and deferred inference.
-            node: &'ast ast::Expr,
+            node: &'node ast::Expr<'ast>,
             /// The already-inferred type, if this argument did not need deferred inference.
             ty: Option<Type<'db>>,
             /// The index of the original source argument before any `Unpack` expansion.
@@ -1217,12 +1217,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Validate a subscript assignment of the form `object[key] = rhs_value`.
-    pub(super) fn validate_subscript_assignment(
+    pub(super) fn validate_subscript_assignment<'target, 'rhs, 'arena>(
         &mut self,
-        target: &ast::ExprSubscript,
-        rhs_value: &ast::Expr,
+        target: &'target ast::ExprSubscript<'arena>,
+        rhs_value: &'rhs ast::Expr<'arena>,
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-    ) -> bool {
+    ) -> bool
+    where
+        'arena: 'target,
+        'arena: 'rhs,
+    {
         let ast::ExprSubscript {
             range: _,
             node_index: _,
@@ -1320,16 +1324,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn validate_subscript_assignment_impl(
+    fn validate_subscript_assignment_impl<'target, 'rhs, 'arena>(
         &mut self,
-        target: &ast::ExprSubscript,
+        target: &'target ast::ExprSubscript<'arena>,
         full_object_ty: Option<Type<'db>>,
         object_ty: Type<'db>,
         infer_slice_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-        rhs_value_node: &ast::Expr,
+        rhs_value_node: &'rhs ast::Expr<'arena>,
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostic: bool,
-    ) -> bool {
+    ) -> bool
+    where
+        'arena: 'target,
+        'arena: 'rhs,
+    {
         /// Given a string literal or a union of string literals, return an iterator over the contained
         /// strings, or `None`, if the type is neither.
         fn key_literals<'db>(
@@ -1555,7 +1563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     CallArguments::positional([Type::unknown(), Type::unknown()]);
 
                 let mut infer_argument_ty =
-                    |builder: &mut Self, (argument_index, _, tcx): ArgExpr<'db, '_>| {
+                    |builder: &mut Self, (argument_index, _, tcx): ArgExpr<'db, '_, '_>| {
                         match argument_index {
                             0 => infer_slice_ty(builder, tcx),
                             1 => infer_rhs_value(builder, tcx),

@@ -3,6 +3,7 @@ use ruff_benchmark::criterion;
 use criterion::{
     BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
+use ruff_allocator::Allocator;
 use ruff_benchmark::{
     LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
@@ -73,32 +74,30 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             &case,
             |b, case| {
                 // Parse the source.
-                let parsed =
-                    parse_module(case.code()).expect("Input should be a valid Python code");
+                let allocator = Allocator::new();
+                let parsed = parse_module(case.code(), &allocator)
+                    .expect("Input should be a valid Python code");
 
-                b.iter_batched(
-                    || parsed.clone(),
-                    |parsed| {
-                        // Assert that file contains no parse errors
-                        assert!(parsed.has_valid_syntax());
+                b.iter(|| {
+                    // Assert that file contains no parse errors
+                    assert!(parsed.has_valid_syntax());
 
-                        let path = case.path();
-                        let py_source_type = PySourceType::from(path.as_path());
-                        lint_only(
-                            &path,
-                            None,
-                            settings,
-                            flags::Noqa::Enabled,
-                            &SourceKind::Python {
-                                code: case.code().to_string(),
-                                is_stub: py_source_type.is_stub(),
-                            },
-                            py_source_type,
-                            ParseSource::Precomputed(parsed),
-                        )
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
+                    let path = case.path();
+                    let py_source_type = PySourceType::from(path.as_path());
+                    lint_only(
+                        &allocator,
+                        &path,
+                        None,
+                        settings,
+                        flags::Noqa::Enabled,
+                        &SourceKind::Python {
+                            code: case.code().to_string(),
+                            is_stub: py_source_type.is_stub(),
+                        },
+                        py_source_type,
+                        &ParseSource::Precomputed(&parsed),
+                    )
+                });
             },
         );
     }

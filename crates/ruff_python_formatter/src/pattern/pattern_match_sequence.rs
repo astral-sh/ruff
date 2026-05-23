@@ -12,7 +12,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatPatternMatchSequence;
 
-impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
+impl FormatNodeRule<PatternMatchSequence<'_>> for FormatPatternMatchSequence {
     fn fmt_fields(&self, item: &PatternMatchSequence, f: &mut PyFormatter) -> FormatResult<()> {
         let PatternMatchSequence {
             patterns,
@@ -61,7 +61,7 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
     }
 }
 
-impl NeedsParentheses for PatternMatchSequence {
+impl NeedsParentheses for PatternMatchSequence<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

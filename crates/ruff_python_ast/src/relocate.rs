@@ -1,3 +1,4 @@
+use ruff_allocator::Allocator;
 use ruff_text_size::TextRange;
 
 use crate::visitor::transformer::{Transformer, walk_expr, walk_keyword};
@@ -6,17 +7,22 @@ use crate::{Expr, Keyword};
 
 /// Change an expression's location (recursively) to match a desired, fixed
 /// range.
-pub fn relocate_expr(expr: &mut Expr, range: TextRange) {
-    Relocator { range }.visit_expr(expr);
+pub fn relocate_expr<'ast>(expr: &mut Expr<'ast>, range: TextRange, allocator: &'ast Allocator) {
+    Relocator { range, allocator }.visit_expr(expr);
 }
 
 #[derive(Debug)]
-struct Relocator {
+struct Relocator<'ast> {
     range: TextRange,
+    allocator: &'ast Allocator,
 }
 
-impl Transformer for Relocator {
-    fn visit_expr(&self, expr: &mut Expr) {
+impl<'ast> Transformer<'ast> for Relocator<'ast> {
+    fn allocator(&self) -> &'ast Allocator {
+        self.allocator
+    }
+
+    fn visit_expr(&self, expr: &mut Expr<'ast>) {
         match expr {
             Expr::BoolOp(ast::ExprBoolOp { range, .. }) => {
                 *range = self.range;
@@ -121,7 +127,7 @@ impl Transformer for Relocator {
         walk_expr(self, expr);
     }
 
-    fn visit_keyword(&self, keyword: &mut Keyword) {
+    fn visit_keyword(&self, keyword: &mut Keyword<'ast>) {
         keyword.range = self.range;
         walk_keyword(self, keyword);
     }

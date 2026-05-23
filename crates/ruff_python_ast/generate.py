@@ -24,7 +24,10 @@ types_requiring_crate_prefix = {
     "BytesLiteralValue",
     "StringLiteralValue",
     "FStringValue",
+    "FString",
+    "InterpolatedStringFormatSpec",
     "TStringValue",
+    "TString",
     "Arguments",
     "CmpOp",
     "Comprehension",
@@ -38,9 +41,49 @@ types_requiring_crate_prefix = {
     "ElifElseClause",
     "WithItem",
     "MatchCase",
+    "Parameter",
+    "ParameterWithDefault",
     "Alias",
     "Singleton",
     "PatternArguments",
+}
+
+# Handwritten AST support types that transitively contain generated syntax
+# nodes and therefore borrow the AST allocator.
+types_with_ast_lifetime = {
+    "Arguments",
+    "Alias",
+    "AstName",
+    "BytesLiteral",
+    "BytesLiteralValue",
+    "Comprehension",
+    "Decorator",
+    "DictItem",
+    "ElifElseClause",
+    "FString",
+    "FStringValue",
+    "Identifier",
+    "InterpolatedStringFormatSpec",
+    "Keyword",
+    "MatchCase",
+    "Number",
+    "Parameter",
+    "ParameterWithDefault",
+    "Parameters",
+    "PatternArguments",
+    "PatternKeyword",
+    "StringLiteral",
+    "StringLiteralValue",
+    "TString",
+    "TStringValue",
+    "TypeParams",
+    "WithItem",
+}
+
+handwritten_nodes_with_ast_lifetime = {
+    "ExceptHandlerExceptHandler",
+    "InterpolatedElement",
+    "InterpolatedStringLiteralElement",
 }
 
 
@@ -146,6 +189,7 @@ class Node:
     derives: list[str]
     custom_source_order: bool
     source_order: list[str] | None
+    has_ast_lifetime: bool
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
@@ -159,6 +203,7 @@ class Node:
         self.derives = node.get("derives", [])
         self.doc = node.get("doc")
         self.source_order = node.get("source_order")
+        self.has_ast_lifetime = False
 
     def fields_in_source_order(self) -> list[Field]:
         if self.fields is None:
@@ -199,6 +244,7 @@ class Field:
             "str",
             "ExprContext",
             "Name",
+            "AstName",
             "u32",
             "bool",
             "Number",
@@ -279,6 +325,57 @@ class FieldType:
         self.inner = extract_type_argument(self.name)
 
 
+def group_type(group: Group) -> str:
+    return f"{group.owned_enum_ty}<'ast>"
+
+
+def ref_group_type(group: Group) -> str:
+    return f"{group.ref_enum_ty}<'a>"
+
+
+def node_type(node: Node) -> str:
+    if node.has_ast_lifetime:
+        return f"{node.ty}<'ast>"
+    return node.ty
+
+
+def node_type_elided(node: Node) -> str:
+    if node.has_ast_lifetime:
+        return f"{node.ty}<'_>"
+    return node.ty
+
+
+def borrowed_node_type(node: Node) -> str:
+    if node.has_ast_lifetime:
+        return f"{node.ty}<'a>"
+    return node.ty
+
+
+def impl_ast_lifetime(node: Node) -> str:
+    if node.has_ast_lifetime:
+        return "<'ast>"
+    return ""
+
+
+def annotate_ast_lifetimes(ast: Ast) -> None:
+    group_names = {group.name for group in ast.groups}
+    for node in ast.all_nodes:
+        node.has_ast_lifetime = (
+            node.name in handwritten_nodes_with_ast_lifetime
+            or node.name in types_with_ast_lifetime
+            or (
+                node.fields is not None
+                and any(
+                    field.parsed_ty.inner in group_names
+                    or field.parsed_ty.inner in types_with_ast_lifetime
+                    or field.parsed_ty.sequence_kind is not None
+                    or field.parsed_ty.name.startswith("Box<")
+                    for field in node.fields
+                )
+            )
+        )
+
+
 # ------------------------------------------------------------------------------
 # Preamble
 
@@ -288,8 +385,9 @@ def write_preamble(out: list[str]) -> None:
     // This is a generated file. Don't modify it by hand!
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
 
-    use crate::name::Name;
+    use crate::name::AstName;
     use crate::visitor::source_order::SourceOrderVisitor;
+    use ruff_allocator::{Box as ArenaBox, Slice as ArenaSlice};
     """)
 
 
@@ -328,22 +426,28 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
             write_rustdoc(out, group.doc)
         out.append("#[derive(Clone, Debug, PartialEq)]")
         out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
-        out.append(f"pub enum {group.owned_enum_ty} {{")
+        out.append(f"pub enum {group.owned_enum_ty}<'ast> {{")
         for node in group.nodes:
-            out.append(f"{node.variant}({node.ty}),")
+            out.append(f"{node.variant}({node_type(node)}),")
         out.append("}")
 
         for node in group.nodes:
+            impl_lifetime = "<'ast>" if node.has_ast_lifetime else ""
+            target_type = (
+                group_type(group)
+                if node.has_ast_lifetime
+                else f"{group.owned_enum_ty}<'_>"
+            )
             out.append(f"""
-            impl From<{node.ty}> for {group.owned_enum_ty} {{
-                fn from(node: {node.ty}) -> Self {{
+            impl{impl_lifetime} From<{node_type(node)}> for {target_type} {{
+                fn from(node: {node_type(node)}) -> Self {{
                     Self::{node.variant}(node)
                 }}
             }}
             """)
 
         out.append(f"""
-        impl ruff_text_size::Ranged for {group.owned_enum_ty} {{
+        impl ruff_text_size::Ranged for {group.owned_enum_ty}<'_> {{
             fn range(&self) -> ruff_text_size::TextRange {{
                 match self {{
         """)
@@ -356,7 +460,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         """)
 
         out.append(f"""
-        impl crate::HasNodeIndex for {group.owned_enum_ty} {{
+        impl crate::HasNodeIndex for {group.owned_enum_ty}<'_> {{
             fn node_index(&self) -> &crate::AtomicNodeIndex {{
                 match self {{
         """)
@@ -371,7 +475,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         out.append(
             "#[allow(dead_code, clippy::match_wildcard_for_single_variants)]"
         )  # Not all is_methods are used
-        out.append(f"impl {group.name} {{")
+        out.append(f"impl<'ast> {group_type(group)} {{")
         for node in group.nodes:
             is_name = to_snake_case(node.variant)
             variant_name = node.variant
@@ -386,7 +490,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                     }}
 
                     #[inline]
-                    pub fn {is_name}(self) -> Option<{node.ty}> {{
+                    pub fn {is_name}(self) -> Option<{node_type(node)}> {{
                         match self {{
                             {match_arm}(val) => Some(val),
                             _ => None,
@@ -394,7 +498,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                     }}
 
                     #[inline]
-                    pub fn expect_{is_name}(self) -> {node.ty} {{
+                    pub fn expect_{is_name}(self) -> {node_type(node)} {{
                         match self {{
                             {match_arm}(val) => val,
                             _ => panic!("called expect on {{self:?}}"),
@@ -402,7 +506,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                     }}
 
                     #[inline]
-                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}> {{
+                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node_type(node)}> {{
                         match self {{
                             {match_arm}(val) => Some(val),
                             _ => None,
@@ -410,7 +514,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                     }}
 
                     #[inline]
-                    pub fn as_{is_name}(&self) -> Option<&{node.ty}> {{
+                    pub fn as_{is_name}(&self) -> Option<&{node_type(node)}> {{
                         match self {{
                             {match_arm}(val) => Some(val),
                             _ => None,
@@ -425,28 +529,28 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                     }}
 
                     #[inline]
-                    pub fn {is_name}(self) -> Option<{node.ty}> {{
+                    pub fn {is_name}(self) -> Option<{node_type(node)}> {{
                         match self {{
                             {match_arm}(val) => Some(val),
                         }}
                     }}
 
                     #[inline]
-                    pub fn expect_{is_name}(self) -> {node.ty} {{
+                    pub fn expect_{is_name}(self) -> {node_type(node)} {{
                         match self {{
                             {match_arm}(val) => val,
                         }}
                     }}
 
                     #[inline]
-                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}> {{
+                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node_type(node)}> {{
                         match self {{
                             {match_arm}(val) => Some(val),
                         }}
                     }}
 
                     #[inline]
-                    pub fn as_{is_name}(&self) -> Option<&{node.ty}> {{
+                    pub fn as_{is_name}(&self) -> Option<&{node_type(node)}> {{
                         match self {{
                             {match_arm}(val) => Some(val),
                         }}
@@ -457,7 +561,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
     for node in ast.all_nodes:
         out.append(f"""
-            impl ruff_text_size::Ranged for {node.ty} {{
+            impl ruff_text_size::Ranged for {node_type_elided(node)} {{
                 fn range(&self) -> ruff_text_size::TextRange {{
                     self.range
                 }}
@@ -466,7 +570,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
     for node in ast.all_nodes:
         out.append(f"""
-            impl crate::HasNodeIndex for {node.ty} {{
+            impl crate::HasNodeIndex for {node_type_elided(node)} {{
                 fn node_index(&self) -> &crate::AtomicNodeIndex {{
                     &self.node_index
                 }}
@@ -475,10 +579,11 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
     for group in ast.groups:
         out.append(f"""
-            impl {group.owned_enum_ty} {{
+            impl<'ast> {group_type(group)} {{
                 #[allow(unused)]
                 pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
                 where
+                    'ast: 'a,
                     V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
                 {{
                     match self {{
@@ -533,12 +638,12 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
             if group.add_suffix_to_is_methods:
                 is_name = to_snake_case(node.variant + group.name)
                 out.append(f'#[is(name = "{is_name}")]')
-            out.append(f"""{node.variant}(&'a {node.ty}),""")
+            out.append(f"""{node.variant}(&'a {borrowed_node_type(node)}),""")
         out.append("}")
 
         out.append(f"""
-            impl<'a> From<&'a {group.owned_enum_ty}> for {group.ref_enum_ty}<'a> {{
-                fn from(node: &'a {group.owned_enum_ty}) -> Self {{
+            impl<'a, 'ast: 'a> From<&'a {group_type(group)}> for {ref_group_type(group)} {{
+                fn from(node: &'a {group_type(group)}) -> Self {{
                     match node {{
         """)
         for node in group.nodes:
@@ -552,9 +657,11 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
         """)
 
         for node in group.nodes:
+            impl_lifetimes = "<'a, 'ast: 'a>" if node.has_ast_lifetime else "<'a>"
+            target_type = ref_group_type(group)
             out.append(f"""
-            impl<'a> From<&'a {node.ty}> for {group.ref_enum_ty}<'a> {{
-                fn from(node: &'a {node.ty}) -> Self {{
+            impl{impl_lifetimes} From<&'a {node_type(node)}> for {target_type} {{
+                fn from(node: &'a {node_type(node)}) -> Self {{
                     Self::{node.variant}(node)
                 }}
             }}
@@ -621,15 +728,15 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     pub enum AnyNodeRef<'a> {
     """)
     for node in ast.all_nodes:
-        out.append(f"""{node.name}(&'a {node.ty}),""")
+        out.append(f"""{node.name}(&'a {borrowed_node_type(node)}),""")
     out.append("""
     }
     """)
 
     for group in ast.groups:
         out.append(f"""
-            impl<'a> From<&'a {group.owned_enum_ty}> for AnyNodeRef<'a> {{
-                fn from(node: &'a {group.owned_enum_ty}) -> AnyNodeRef<'a> {{
+            impl<'a, 'ast: 'a> From<&'a {group_type(group)}> for AnyNodeRef<'a> {{
+                fn from(node: &'a {group_type(group)}) -> AnyNodeRef<'a> {{
                     match node {{
         """)
         for node in group.nodes:
@@ -643,8 +750,8 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
         """)
 
         out.append(f"""
-            impl<'a> From<{group.ref_enum_ty}<'a>> for AnyNodeRef<'a> {{
-                fn from(node: {group.ref_enum_ty}<'a>) -> AnyNodeRef<'a> {{
+            impl<'a> From<{ref_group_type(group)}> for AnyNodeRef<'a> {{
+                fn from(node: {ref_group_type(group)}) -> AnyNodeRef<'a> {{
                     match node {{
         """)
         for node in group.nodes:
@@ -660,7 +767,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
         # `as_*` methods to convert from `AnyNodeRef` to e.g. `ExprRef`
         out.append(f"""
             impl<'a> AnyNodeRef<'a> {{
-                pub fn as_{to_snake_case(group.ref_enum_ty)}(self) -> Option<{group.ref_enum_ty}<'a>> {{
+                pub fn as_{to_snake_case(group.ref_enum_ty)}(self) -> Option<{ref_group_type(group)}> {{
                     match self {{
         """)
         for node in group.nodes:
@@ -675,9 +782,11 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
         """)
 
     for node in ast.all_nodes:
+        impl_lifetimes = "<'a, 'ast: 'a>" if node.has_ast_lifetime else "<'a>"
+        target_type = "AnyNodeRef<'a>"
         out.append(f"""
-            impl<'a> From<&'a {node.ty}> for AnyNodeRef<'a> {{
-                fn from(node: &'a {node.ty}) -> AnyNodeRef<'a> {{
+            impl{impl_lifetimes} From<&'a {node_type(node)}> for {target_type} {{
+                fn from(node: &'a {node_type(node)}) -> Self {{
                     AnyNodeRef::{node.name}(node)
                 }}
             }}
@@ -726,10 +835,9 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl<'a> AnyNodeRef<'a> {
-            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
+            pub fn visit_source_order<V>(self, visitor: &mut V)
             where
-                V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
-                'a: 'b,
+                V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
             {
                 match self {
     """)
@@ -800,26 +908,26 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
     pub enum AnyRootNodeRef<'a> {
     """)
     for group in ast.groups:
-        out.append(f"""{group.name}(&'a {group.owned_enum_ty}),""")
+        out.append(f"""{group.name}(&'a {group.owned_enum_ty}<'a>),""")
     for node in ast.ungrouped_nodes:
-        out.append(f"""{node.name}(&'a {node.ty}),""")
+        out.append(f"""{node.name}(&'a {borrowed_node_type(node)}),""")
     out.append("""
     }
     """)
 
     for group in ast.groups:
         out.append(f"""
-            impl<'a> From<&'a {group.owned_enum_ty}> for AnyRootNodeRef<'a> {{
-                fn from(node: &'a {group.owned_enum_ty}) -> AnyRootNodeRef<'a> {{
+            impl<'a, 'ast: 'a> From<&'a {group_type(group)}> for AnyRootNodeRef<'a> {{
+                fn from(node: &'a {group_type(group)}) -> AnyRootNodeRef<'a> {{
                         AnyRootNodeRef::{group.name}(node)
                 }}
             }}
         """)
 
         out.append(f"""
-            impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {group.owned_enum_ty} {{
+            impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {group.owned_enum_ty}<'a> {{
                 type Error = ();
-                fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {group.owned_enum_ty}, ()> {{
+                fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {group.owned_enum_ty}<'a>, ()> {{
                     match node {{
                         AnyRootNodeRef::{group.name}(node) => Ok(node),
                         _ => Err(())
@@ -830,9 +938,9 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
 
         for node in group.nodes:
             out.append(f"""
-                impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {node.ty} {{
+                impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {borrowed_node_type(node)} {{
                     type Error = ();
-                    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {node.ty}, ()> {{
+                    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {borrowed_node_type(node)}, ()> {{
                         match node {{
                             AnyRootNodeRef::{group.name}({group.owned_enum_ty}::{node.variant}(node)) => Ok(node),
                             _ => Err(())
@@ -842,18 +950,20 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
             """)
 
     for node in ast.ungrouped_nodes:
+        impl_lifetimes = "<'a, 'ast: 'a>" if node.has_ast_lifetime else "<'a>"
+        target_type = "AnyRootNodeRef<'a>"
         out.append(f"""
-            impl<'a> From<&'a {node.ty}> for AnyRootNodeRef<'a> {{
-                fn from(node: &'a {node.ty}) -> AnyRootNodeRef<'a> {{
+            impl{impl_lifetimes} From<&'a {node_type(node)}> for {target_type} {{
+                fn from(node: &'a {node_type(node)}) -> Self {{
                     AnyRootNodeRef::{node.name}(node)
                 }}
             }}
         """)
 
         out.append(f"""
-            impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {node.ty} {{
+            impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {borrowed_node_type(node)} {{
                 type Error = ();
-                fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {node.ty}, ()> {{
+                fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {borrowed_node_type(node)}, ()> {{
                     match node {{
                         AnyRootNodeRef::{node.name}(node) => Ok(node),
                         _ => Err(())
@@ -894,10 +1004,9 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl<'a> AnyRootNodeRef<'a> {
-            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
+            pub fn visit_source_order<V>(self, visitor: &mut V)
             where
-                V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
-                'a: 'b,
+                V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
             {
                 match self {
     """)
@@ -973,33 +1082,34 @@ def write_node(out: list[str], ast: Ast) -> None:
                 continue
             if node.doc is not None:
                 write_rustdoc(out, node.doc)
+            default_derives = "Clone, Debug, PartialEq"
             out.append(
-                "#[derive(Clone, Debug, PartialEq"
+                "#[derive("
+                + default_derives
                 + "".join(f", {derive}" for derive in node.derives)
                 + ")]"
             )
             out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
             name = node.name
-            out.append(f"pub struct {name} {{")
+            struct_ty = f"{name}<'ast>" if node.has_ast_lifetime else name
+            out.append(f"pub struct {struct_ty} {{")
             out.append("pub node_index: crate::AtomicNodeIndex,")
             out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
                 field_str = f"pub {field.name}: "
                 ty = field.parsed_ty
 
-                rust_ty = f"{field.parsed_ty.name}"
-                if ty.name in types_requiring_crate_prefix:
+                rust_ty = ty.inner
+                if ty.inner in types_requiring_crate_prefix:
                     rust_ty = f"crate::{rust_ty}"
-
-                if ty.sequence_kind is SequenceKind.VEC:
-                    rust_ty = f"Vec<{rust_ty}>"
-                elif ty.sequence_kind is SequenceKind.BOXED_SLICE:
-                    rust_ty = f"Box<[{rust_ty}]>"
-                elif ty.sequence_kind is SequenceKind.THIN_VEC:
-                    rust_ty = f"thin_vec::ThinVec<{rust_ty}>"
-                else:
-                    if ty.name in group_names:
-                        rust_ty = f"Box<{rust_ty}>"
+                if ty.inner in group_names or ty.inner in types_with_ast_lifetime:
+                    rust_ty = f"{rust_ty}<'ast>"
+                if ty.sequence_kind is not None:
+                    rust_ty = f"ArenaSlice<'ast, {rust_ty}>"
+                elif ty.name.startswith("Box<") or (
+                    ty.name in group_names and ty.sequence_kind is None
+                ):
+                    rust_ty = f"ArenaBox<'ast, {rust_ty}>"
                 if ty.optional:
                     rust_ty = f"Option<{rust_ty}>"
 
@@ -1018,7 +1128,8 @@ def write_source_order(out: list[str], ast: Ast) -> None:
         for node in group.nodes:
             if node.fields is None or node.custom_source_order:
                 continue
-            name = node.name
+            name = node_type(node)
+            pattern_name = node.name
             fields_list = ""
             body = ""
 
@@ -1063,13 +1174,15 @@ def write_source_order(out: list[str], ast: Ast) -> None:
             if len(node.fields_in_source_order()) == 0:
                 visitor_arg_name = "_"
 
+            ast_outlives = "'ast: 'a,\n" if node.has_ast_lifetime else ""
             out.append(f"""
-impl {name} {{
+impl{impl_ast_lifetime(node)} {name} {{
     pub(crate) fn visit_source_order<'a, V>(&'a self, {visitor_arg_name}: &mut V)
     where
+        {ast_outlives}
         V: SourceOrderVisitor<'a> + ?Sized,
     {{
-        let {name} {{
+        let {pattern_name} {{
             {fields_list}
         }} = self;
         {body}
@@ -1084,6 +1197,7 @@ impl {name} {{
 
 def generate(ast: Ast) -> list[str]:
     out = []
+    annotate_ast_lifetimes(ast)
     write_preamble(out)
     write_owned_enum(out, ast)
     write_ref_enum(out, ast)

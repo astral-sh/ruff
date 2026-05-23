@@ -138,7 +138,7 @@ pub(super) enum NdigitsValue {
 pub(super) fn rounded_and_ndigits<'a>(
     arguments: &'a Arguments,
     semantic: &'a SemanticModel,
-) -> Option<(&'a Expr, RoundedValue, NdigitsValue)> {
+) -> Option<(&'a Expr<'a>, RoundedValue, NdigitsValue)> {
     if arguments.len() > 2 {
         return None;
     }

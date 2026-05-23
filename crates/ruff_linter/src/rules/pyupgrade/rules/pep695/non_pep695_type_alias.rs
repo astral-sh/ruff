@@ -1,7 +1,6 @@
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
@@ -187,7 +186,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
     create_diagnostic(
         checker,
         stmt.into(),
-        &target_name.id,
+        target_name.id.as_str(),
         value,
         &vars,
         TypeAliasKind::TypeAliasType,
@@ -248,7 +247,7 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
     create_diagnostic(
         checker,
         stmt.into(),
-        name,
+        name.as_str(),
         value,
         &vars,
         TypeAliasKind::TypeAlias,
@@ -259,7 +258,7 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
 fn create_diagnostic(
     checker: &Checker,
     stmt: StmtRef,
-    name: &Name,
+    name: &str,
     value: &Expr,
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,

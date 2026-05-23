@@ -68,8 +68,8 @@ struct StringLinesVisitor<'a> {
     locator: &'a Locator<'a>,
 }
 
-impl StatementVisitor<'_> for StringLinesVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'ast> StatementVisitor<'ast> for StringLinesVisitor<'ast> {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt<'ast>) {
         if let Stmt::Expr(ast::StmtExpr {
             value: expr,
             range: _,

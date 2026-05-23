@@ -89,7 +89,7 @@ pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<&'a ast::StmtRaise>,
+    raises: Vec<&'a ast::StmtRaise<'a>>,
 }
 
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {

@@ -2,11 +2,10 @@ use std::fmt;
 
 use anyhow::Result;
 
-use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, name::Name};
-use ruff_python_codegen::Generator;
+use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::TypingImporter;
+use crate::checkers::ast::{Checker, TypingImporter};
 use crate::{Applicability, Edit, Fix};
 
 pub(crate) use any_eq_ne_annotation::*;
@@ -120,7 +119,7 @@ impl fmt::Display for TypingModule {
 
 /// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
 fn generate_union_fix(
-    generator: Generator,
+    checker: &Checker,
     importer: &TypingImporter,
     nodes: Vec<&Expr>,
     annotation: &Expr,
@@ -134,14 +133,14 @@ fn generate_union_fix(
     let new_expr = Expr::Subscript(ExprSubscript {
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        value: Box::new(Expr::Name(ExprName {
-            id: Name::new(binding),
+        value: checker.alloc_expr(Expr::Name(ExprName {
+            id: checker.alloc_name(binding),
             ctx: ExprContext::Store,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
-        slice: Box::new(Expr::Tuple(ExprTuple {
-            elts: nodes.into_iter().cloned().collect(),
+        slice: checker.alloc_expr(Expr::Tuple(ExprTuple {
+            elts: checker.alloc_vec(nodes.into_iter().cloned().collect()),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
@@ -151,7 +150,7 @@ fn generate_union_fix(
     });
 
     Ok(Fix::applicable_edits(
-        Edit::range_replacement(generator.expr(&new_expr), annotation.range()),
+        Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
         [import_edit],
         applicability,
     ))

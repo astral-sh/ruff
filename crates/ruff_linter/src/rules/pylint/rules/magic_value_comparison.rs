@@ -62,7 +62,7 @@ impl Violation for MagicValueComparison {
 }
 
 /// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`].
-fn as_literal(expr: &Expr) -> Option<LiteralExpressionRef<'_>> {
+fn as_literal<'a>(expr: &'a Expr<'a>) -> Option<LiteralExpressionRef<'a>> {
     match expr {
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,

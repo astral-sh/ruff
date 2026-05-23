@@ -30,7 +30,7 @@ use crate::string::implicit::{
 #[derive(Default)]
 pub struct FormatStmtAssign;
 
-impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
+impl FormatNodeRule<StmtAssign<'_>> for FormatStmtAssign {
     fn fmt_fields(&self, item: &StmtAssign, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAssign {
             range: _,
@@ -107,7 +107,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
 
 /// Formats a single target with the equal operator.
 struct FormatTargetWithEqualOperator<'a> {
-    target: &'a Expr,
+    target: &'a Expr<'a>,
 
     /// Whether parentheses should be preserved as in the source or if the target
     /// should only be parenthesized if necessary (because of comments or because it doesn't fit).
@@ -199,7 +199,7 @@ pub(super) enum FormatStatementsLastExpression<'a> {
     /// keyword like `return` or a Name) because it has better performance characteristics.
     LeftToRight {
         /// The right side of an assignment or the value returned in a return statement.
-        value: &'a Expr,
+        value: &'a Expr<'a>,
 
         /// The parent statement that encloses the `value` expression.
         statement: AnyNodeRef<'a>,
@@ -262,7 +262,7 @@ pub(super) enum FormatStatementsLastExpression<'a> {
         operator: AnyAssignmentOperator,
 
         /// The assigned `value`.
-        value: &'a Expr,
+        value: &'a Expr<'a>,
 
         /// The assignment statement.
         statement: AnyNodeRef<'a>,
@@ -270,7 +270,10 @@ pub(super) enum FormatStatementsLastExpression<'a> {
 }
 
 impl<'a> FormatStatementsLastExpression<'a> {
-    pub(super) fn left_to_right<S: Into<AnyNodeRef<'a>>>(value: &'a Expr, statement: S) -> Self {
+    pub(super) fn left_to_right<S: Into<AnyNodeRef<'a>>>(
+        value: &'a Expr<'a>,
+        statement: S,
+    ) -> Self {
         Self::LeftToRight {
             value,
             statement: statement.into(),
@@ -1049,8 +1052,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
 #[derive(Debug, Copy, Clone)]
 enum InterpolatedString<'a> {
-    FString(&'a FString),
-    TString(&'a TString),
+    FString(&'a FString<'a>),
+    TString(&'a TString<'a>),
 }
 
 impl Format<PyFormatContext<'_>> for InterpolatedString<'_> {
@@ -1249,8 +1252,8 @@ impl Format<PyFormatContext<'_>> for AnyAssignmentOperator {
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum AnyBeforeOperator<'a> {
-    Expression(&'a Expr),
-    TypeParams(&'a TypeParams),
+    Expression(&'a Expr<'a>),
+    TypeParams(&'a TypeParams<'a>),
 }
 
 impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
@@ -1356,14 +1359,14 @@ fn is_attribute_with_parenthesized_value(target: &Expr, context: &PyFormatContex
 
 /// Like [`maybe_parenthesize_expression`] but with special handling for lambdas.
 fn maybe_parenthesize_value<'a>(
-    expression: &'a Expr,
+    expression: &'a Expr<'a>,
     parent: AnyNodeRef<'a>,
 ) -> MaybeParenthesizeValue<'a> {
     MaybeParenthesizeValue { expression, parent }
 }
 
 struct MaybeParenthesizeValue<'a> {
-    expression: &'a Expr,
+    expression: &'a Expr<'a>,
     parent: AnyNodeRef<'a>,
 }
 

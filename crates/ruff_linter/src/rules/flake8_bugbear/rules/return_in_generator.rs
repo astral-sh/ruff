@@ -125,8 +125,8 @@ struct ReturnInGeneratorVisitor {
     has_yield: bool,
 }
 
-impl Visitor<'_> for ReturnInGeneratorVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'ast> Visitor<'ast> for ReturnInGeneratorVisitor {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt<'ast>) {
         match stmt {
             Stmt::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.

@@ -125,8 +125,22 @@ impl std::fmt::Display for MinMax {
 
 /// Collect a new set of arguments to by either accepting existing args as-is or
 /// collecting child arguments, if it's a call to the same function.
-fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel) -> Vec<Expr> {
-    fn inner(min_max: MinMax, args: &[Expr], semantic: &SemanticModel, new_args: &mut Vec<Expr>) {
+fn collect_nested_args<'alloc, 'ast>(
+    min_max: MinMax,
+    args: &'alloc [Expr<'ast>],
+    semantic: &SemanticModel<'ast>,
+) -> Vec<Expr<'alloc>>
+where
+    'ast: 'alloc,
+{
+    fn inner<'alloc, 'ast>(
+        min_max: MinMax,
+        args: &'alloc [Expr<'ast>],
+        semantic: &SemanticModel<'ast>,
+        new_args: &mut Vec<Expr<'alloc>>,
+    ) where
+        'ast: 'alloc,
+    {
         for arg in args {
             if let Expr::Call(ast::ExprCall {
                 func,
@@ -145,7 +159,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                     if let [arg] = &**args {
                         if arg.as_starred_expr().is_none() {
                             let new_arg = Expr::Starred(ast::ExprStarred {
-                                value: Box::new(arg.clone()),
+                                value: Checker::expr_ref(arg),
                                 ctx: ast::ExprContext::Load,
                                 range: TextRange::default(),
                                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -168,12 +182,12 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
 }
 
 /// PLW3301
-pub(crate) fn nested_min_max(
-    checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+pub(crate) fn nested_min_max<'ast>(
+    checker: &Checker<'ast>,
+    expr: &Expr<'ast>,
+    func: &Expr<'ast>,
+    args: &[Expr<'ast>],
+    keywords: &[Keyword<'ast>],
 ) {
     let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic()) else {
         return;
@@ -200,10 +214,10 @@ pub(crate) fn nested_min_max(
         let mut diagnostic =
             checker.report_diagnostic(NestedMinMax { func: min_max }, expr.range());
         let flattened_expr = Expr::Call(ast::ExprCall {
-            func: Box::new(func.clone()),
+            func: Checker::expr_ref(func),
             arguments: Arguments {
-                args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
-                keywords: Box::from(keywords),
+                args: checker.alloc_vec(collect_nested_args(min_max, args, checker.semantic())),
+                keywords: checker.alloc_vec(keywords.to_vec()),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

@@ -817,15 +817,19 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         .filter_map(|Keyword { arg, value, .. }| Some((arg.as_ref()?, value)));
 
     let mut side_effects = false;
-    let missing: Vec<(usize, &Name)> = keyword_names
+    let missing: Vec<(usize, &str)> = keyword_names
         .enumerate()
         .filter_map(|(index, (keyword, value))| {
-            if summary.keywords.contains(keyword.id()) {
+            if summary
+                .keywords
+                .iter()
+                .any(|name| name.as_str() == keyword.id().as_str())
+            {
                 None
             } else {
                 side_effects |=
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id));
-                Some((index, &keyword.id))
+                Some((index, keyword.id.as_str()))
             }
         })
         .collect();
@@ -834,7 +838,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
-    let names: Vec<Name> = missing.iter().map(|(_, name)| (*name).clone()).collect();
+    let names: Vec<Name> = missing.iter().map(|(_, name)| Name::new(*name)).collect();
     let mut diagnostic = checker.report_diagnostic(
         StringDotFormatExtraNamedArguments { missing: names },
         call.range(),
@@ -956,7 +960,7 @@ pub(crate) fn string_dot_format_missing_argument(
         .iter()
         .filter_map(|k| {
             let Keyword { arg, .. } = &k;
-            arg.as_ref().map(ruff_python_ast::Identifier::id)
+            arg.as_ref().map(|arg| arg.id().as_str())
         })
         .collect();
 
@@ -970,7 +974,7 @@ pub(crate) fn string_dot_format_missing_argument(
             summary
                 .keywords
                 .iter()
-                .filter(|k| !keywords.contains(*k))
+                .filter(|k| !keywords.contains(k.as_str()))
                 .map(ToString::to_string),
         )
         .collect();

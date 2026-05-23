@@ -11,7 +11,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtDelete;
 
-impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
+impl FormatNodeRule<StmtDelete<'_>> for FormatStmtDelete {
     fn fmt_fields(&self, item: &StmtDelete, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtDelete {
             range: _,

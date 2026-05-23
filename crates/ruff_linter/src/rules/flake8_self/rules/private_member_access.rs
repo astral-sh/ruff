@@ -90,7 +90,8 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         .settings()
         .flake8_self
         .ignore_names
-        .contains(attr.id())
+        .iter()
+        .any(|name| name.as_str() == attr.id().as_str())
     {
         return;
     }
@@ -333,7 +334,7 @@ impl TypeChecker for SameClassInstanceChecker {
 }
 
 /// Unwrap `Annotated[X, ...]` and `C[T]` to the innermost type expression.
-fn unwrap_annotated<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> &'a Expr {
+fn unwrap_annotated<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> &'a Expr<'a> {
     match expr {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             if semantic.match_typing_expr(value, "Annotated")

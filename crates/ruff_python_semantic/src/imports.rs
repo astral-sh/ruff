@@ -204,6 +204,7 @@ impl serde::Serialize for NameImport {
 #[cfg(feature = "serde")]
 impl<'de> serde::de::Deserialize<'de> for NameImports {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use ruff_allocator::Allocator;
         use ruff_python_ast::{self as ast, Stmt};
         use ruff_python_parser::Parsed;
 
@@ -217,7 +218,8 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
             }
 
             fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
-                let body = ruff_python_parser::parse_module(value)
+                let allocator = Allocator::new();
+                let body = ruff_python_parser::parse_module(value, &allocator)
                     .map(Parsed::into_suite)
                     .map_err(E::custom)?;
                 let [stmt] = body.as_slice() else {

@@ -84,6 +84,7 @@ pub(crate) fn check_physical_lines(
 mod tests {
     use std::path::Path;
 
+    use ruff_allocator::Allocator;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
@@ -101,7 +102,8 @@ mod tests {
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
-        let parsed = parse_module(line).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(line, &allocator).unwrap();
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 

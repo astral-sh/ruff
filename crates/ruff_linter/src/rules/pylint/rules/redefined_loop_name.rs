@@ -136,12 +136,12 @@ impl PartialEq<InnerBindingKind> for OuterBindingKind {
 }
 
 struct ExprWithOuterBindingKind<'a> {
-    expr: &'a Expr,
+    expr: &'a Expr<'a>,
     binding_kind: OuterBindingKind,
 }
 
 struct ExprWithInnerBindingKind<'a> {
-    expr: &'a Expr,
+    expr: &'a Expr<'a>,
     binding_kind: InnerBindingKind,
 }
 
@@ -270,7 +270,7 @@ fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel
 fn assignment_targets_from_expr<'a>(
     expr: &'a Expr,
     dummy_variable_rgx: &'a Regex,
-) -> Box<dyn Iterator<Item = &'a Expr> + 'a> {
+) -> Box<dyn Iterator<Item = &'a Expr<'a>> + 'a> {
     // The Box is necessary to ensure the match arms have the same return type - we can't use
     // a cast to "impl Iterator", since at the time of writing that is only allowed for
     // return types and argument types.
@@ -328,7 +328,7 @@ fn assignment_targets_from_expr<'a>(
 fn assignment_targets_from_with_items<'a>(
     items: &'a [WithItem],
     dummy_variable_rgx: &'a Regex,
-) -> impl Iterator<Item = &'a Expr> + 'a {
+) -> impl Iterator<Item = &'a Expr<'a>> + 'a {
     items
         .iter()
         .filter_map(|item| {
@@ -342,7 +342,7 @@ fn assignment_targets_from_with_items<'a>(
 fn assignment_targets_from_assign_targets<'a>(
     targets: &'a [Expr],
     dummy_variable_rgx: &'a Regex,
-) -> impl Iterator<Item = &'a Expr> + 'a {
+) -> impl Iterator<Item = &'a Expr<'a>> + 'a {
     targets
         .iter()
         .flat_map(|target| assignment_targets_from_expr(target, dummy_variable_rgx))

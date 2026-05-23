@@ -131,13 +131,13 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
             UnionKind::PEP604 => {
                 let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
                 let types = Expr::Subscript(ast::ExprSubscript {
-                    value: Box::new(Expr::Name(ast::ExprName {
-                        id: Name::new_static("type"),
+                    value: checker.alloc_expr(Expr::Name(ast::ExprName {
+                        id: ast::name::AstName::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     })),
-                    slice: Box::new(pep_604_union(&elts)),
+                    slice: checker.alloc_expr(pep_604_union(&elts, checker.allocator())),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -149,33 +149,37 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                     let elts: Vec<Expr> = std::iter::once(types)
                         .chain(other_exprs.into_iter().cloned())
                         .collect();
-                    checker.generator().expr(&pep_604_union(&elts))
+                    checker
+                        .generator()
+                        .expr(&pep_604_union(&elts, checker.allocator()))
                 }
             }
             UnionKind::TypingUnion => {
                 // When subscript is None, it uses the previous match case.
                 let subscript = subscript.unwrap();
                 let types = &Expr::Subscript(ast::ExprSubscript {
-                    value: Box::new(Expr::Name(ast::ExprName {
-                        id: Name::new_static("type"),
+                    value: checker.alloc_expr(Expr::Name(ast::ExprName {
+                        id: ast::name::AstName::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     })),
-                    slice: Box::new(Expr::Subscript(ast::ExprSubscript {
-                        value: subscript.value.clone(),
-                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                            elts: type_members
-                                .into_iter()
-                                .map(|type_member| {
-                                    Expr::Name(ast::ExprName {
-                                        id: type_member,
-                                        ctx: ExprContext::Load,
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    slice: checker.alloc_expr(Expr::Subscript(ast::ExprSubscript {
+                        value: subscript.value,
+                        slice: checker.alloc_expr(Expr::Tuple(ast::ExprTuple {
+                            elts: checker.alloc_vec(
+                                type_members
+                                    .into_iter()
+                                    .map(|type_member| {
+                                        Expr::Name(ast::ExprName {
+                                            id: checker.alloc_name(type_member.as_str()),
+                                            ctx: ExprContext::Load,
+                                            range: TextRange::default(),
+                                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                        })
                                     })
-                                })
-                                .collect(),
+                                    .collect(),
+                            ),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -198,9 +202,9 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                     exprs.extend(other_exprs);
 
                     let union = Expr::Subscript(ast::ExprSubscript {
-                        value: subscript.value.clone(),
-                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                            elts: exprs.into_iter().cloned().collect(),
+                        value: subscript.value,
+                        slice: checker.alloc_expr(Expr::Tuple(ast::ExprTuple {
+                            elts: checker.alloc_vec(exprs.into_iter().cloned().collect()),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

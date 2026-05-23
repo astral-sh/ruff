@@ -292,9 +292,12 @@ impl<'a> SemanticModel<'a> {
     /// This method returns `true` both for "builtin bindings"
     /// (present even without any imports, e.g. `open()`), and for explicit lookups
     /// via the `builtins` module (e.g. `import builtins; builtins.open()`).
-    pub fn resolve_builtin_symbol<'expr>(&'a self, expr: &'expr Expr) -> Option<&'a str>
+    pub fn resolve_builtin_symbol<'name, 'expr: 'name>(
+        &'name self,
+        expr: &'expr Expr<'_>,
+    ) -> Option<&'name str>
     where
-        'expr: 'a,
+        'a: 'name,
     {
         // Fast path: we only need to worry about name expressions
         if !self.seen_module(Modules::BUILTINS) {
@@ -988,13 +991,13 @@ impl<'a> SemanticModel<'a> {
     /// ...then `resolve_qualified_name(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_qualified_name<'name, 'expr: 'name>(
         &self,
-        value: &'expr Expr,
+        value: &'expr Expr<'_>,
     ) -> Option<QualifiedName<'name>>
     where
         'a: 'name,
     {
         /// Return the [`ast::ExprName`] at the head of the expression, if any.
-        const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
+        fn match_head<'expr>(value: &'expr Expr<'_>) -> Option<&'expr ast::ExprName<'expr>> {
             match value {
                 Expr::Attribute(ast::ExprAttribute { value, .. }) => match_head(value),
                 Expr::Name(name) => Some(name),
@@ -1279,7 +1282,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns an [`Iterator`] over the current statement hierarchy, from the current [`Stmt`]
     /// through to any parents.
-    pub fn current_statements(&self) -> impl Iterator<Item = &'a Stmt> + '_ {
+    pub fn current_statements(&self) -> impl Iterator<Item = &'a Stmt<'a>> + '_ {
         let id = self.node_id.expect("No current node");
         self.nodes
             .ancestor_ids(id)
@@ -1287,20 +1290,20 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return the current [`Stmt`].
-    pub fn current_statement(&self) -> &'a Stmt {
+    pub fn current_statement(&self) -> &'a Stmt<'a> {
         self.current_statements()
             .next()
             .expect("No current statement")
     }
 
     /// Return the parent [`Stmt`] of the current [`Stmt`], if any.
-    pub fn current_statement_parent(&self) -> Option<&'a Stmt> {
+    pub fn current_statement_parent(&self) -> Option<&'a Stmt<'a>> {
         self.current_statements().nth(1)
     }
 
     /// Returns an [`Iterator`] over the current expression hierarchy, from the current [`Expr`]
     /// through to any parents.
-    pub fn current_expressions(&self) -> impl Iterator<Item = &'a Expr> + '_ {
+    pub fn current_expressions(&self) -> impl Iterator<Item = &'a Expr<'a>> + '_ {
         let id = self.node_id.expect("No current node");
         self.nodes
             .ancestor_ids(id)
@@ -1308,17 +1311,17 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return the current [`Expr`].
-    pub fn current_expression(&self) -> Option<&'a Expr> {
+    pub fn current_expression(&self) -> Option<&'a Expr<'a>> {
         self.current_expressions().next()
     }
 
     /// Return the parent [`Expr`] of the current [`Expr`], if any.
-    pub fn current_expression_parent(&self) -> Option<&'a Expr> {
+    pub fn current_expression_parent(&self) -> Option<&'a Expr<'a>> {
         self.current_expressions().nth(1)
     }
 
     /// Return the grandparent [`Expr`] of the current [`Expr`], if any.
-    pub fn current_expression_grandparent(&self) -> Option<&'a Expr> {
+    pub fn current_expression_grandparent(&self) -> Option<&'a Expr<'a>> {
         self.current_expressions().nth(2)
     }
 
@@ -1372,7 +1375,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns the parent of the given [`Scope`], if any.
-    pub fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
+    pub fn parent_scope(&self, scope: &Scope<'a>) -> Option<&Scope<'a>> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
@@ -1383,7 +1386,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`] or
     /// [`ScopeKind::DunderClassCell`], if any.
-    pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
+    pub fn first_non_type_parent_scope(&self, scope: &Scope<'a>) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
         while let Some(parent) = self.parent_scope(current_scope) {
             if matches!(parent.kind, ScopeKind::Type | ScopeKind::DunderClassCell) {
@@ -1420,7 +1423,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
-    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr<'a>> {
         let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
         self.nodes[parent_node_id].as_expression()
     }
@@ -1435,7 +1438,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn statement(&self, node_id: NodeId) -> &'a Stmt {
+    pub fn statement(&self, node_id: NodeId) -> &'a Stmt<'a> {
         self.nodes
             .ancestor_ids(node_id)
             .find_map(|id| self.nodes[id].as_statement())
@@ -1444,7 +1447,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns an [`Iterator`] over the statements, starting from the given [`NodeId`].
     /// through to any parents.
-    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt> + '_ {
+    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt<'a>> + '_ {
         self.nodes
             .ancestor_ids(node_id)
             .filter_map(move |id| self.nodes[id].as_statement())
@@ -1452,7 +1455,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Given a [`Stmt`], return its parent, if any.
     #[inline]
-    pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt> {
+    pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt<'a>> {
         self.nodes
             .ancestor_ids(node_id)
             .filter_map(|id| self.nodes[id].as_statement())
@@ -1469,13 +1472,13 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Expr`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr<'a>> {
         self.nodes[node_id].as_expression()
     }
 
     /// Returns an [`Iterator`] over the expressions, starting from the given [`NodeId`].
     /// through to any parents.
-    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr> + '_ {
+    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr<'a>> + '_ {
         self.nodes
             .ancestor_ids(node_id)
             .map_while(move |id| self.nodes[id].as_expression())
@@ -2185,7 +2188,7 @@ impl<'a> SemanticModel<'a> {
     /// This method searches all scopes created by a function definition, comparing the
     /// [`TextRange`] of the provided `function_def` with the range of the function
     /// associated with the scope.
-    pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope<'_>> {
+    pub fn function_scope(&self, function_def: &ast::StmtFunctionDef<'_>) -> Option<&Scope<'a>> {
         self.scopes.iter().find(|scope| {
             let Some(function) = scope.kind.as_function() else {
                 return false;
@@ -2832,7 +2835,7 @@ impl ImportedName {
         self.context
     }
 
-    pub fn statement<'a>(&self, semantic: &SemanticModel<'a>) -> &'a Stmt {
+    pub fn statement<'a>(&self, semantic: &'a SemanticModel<'a>) -> &'a Stmt<'a> {
         semantic.statement(self.source)
     }
 }
@@ -2848,8 +2851,8 @@ impl Ranged for ImportedName {
 #[derive(Debug, Hash, PartialEq, Eq)]
 struct NameId(TextSize);
 
-impl From<&ast::ExprName> for NameId {
-    fn from(name: &ast::ExprName) -> Self {
+impl From<&ast::ExprName<'_>> for NameId {
+    fn from(name: &ast::ExprName<'_>) -> Self {
         Self(name.start())
     }
 }

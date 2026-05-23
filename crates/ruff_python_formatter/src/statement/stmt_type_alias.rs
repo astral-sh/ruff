@@ -11,7 +11,7 @@ use crate::statement::stmt_assign::{
 #[derive(Default)]
 pub struct FormatStmtTypeAlias;
 
-impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
+impl FormatNodeRule<StmtTypeAlias<'_>> for FormatStmtTypeAlias {
     fn fmt_fields(&self, item: &StmtTypeAlias, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtTypeAlias {
             name,

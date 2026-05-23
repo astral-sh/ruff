@@ -111,9 +111,9 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
 }
 
 /// Generate a [`Edit`] for a `stdout` and `stderr` [`Keyword`] pair.
-fn generate_fix(
-    stdout: &Keyword,
-    stderr: &Keyword,
+fn generate_fix<'a>(
+    stdout: &Keyword<'a>,
+    stderr: &Keyword<'a>,
     call: &ast::ExprCall,
     source: &str,
     tokens: &Tokens,

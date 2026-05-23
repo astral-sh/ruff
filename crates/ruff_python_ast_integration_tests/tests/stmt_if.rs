@@ -1,15 +1,17 @@
+use ruff_allocator::Allocator;
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_parser::{ParseError, parse_module};
 use ruff_text_size::TextSize;
 
 #[test]
 fn extract_elif_else_range() -> Result<(), ParseError> {
+    let allocator = Allocator::new();
     let contents = "if a:
     ...
 elif b:
     ...
 ";
-    let parsed = parse_module(contents)?;
+    let parsed = parse_module(contents, &allocator)?;
     let if_stmt = parsed
         .suite()
         .first()
@@ -25,7 +27,7 @@ elif b:
 else:
     ...
 ";
-    let parsed = parse_module(contents)?;
+    let parsed = parse_module(contents, &allocator)?;
     let if_stmt = parsed
         .suite()
         .first()

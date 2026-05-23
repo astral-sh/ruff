@@ -29,9 +29,9 @@ use ty_python_semantic::{
 #[derive(Clone, Debug)]
 pub(crate) enum GotoTarget<'a> {
     Expression(ast::ExprRef<'a>),
-    FunctionDef(&'a ast::StmtFunctionDef),
-    ClassDef(&'a ast::StmtClassDef),
-    Parameter(&'a ast::Parameter),
+    FunctionDef(&'a ast::StmtFunctionDef<'a>),
+    ClassDef(&'a ast::StmtClassDef<'a>),
+    Parameter(&'a ast::Parameter<'a>),
 
     /// Go to on the operator of a binary operation.
     ///
@@ -40,7 +40,7 @@ pub(crate) enum GotoTarget<'a> {
     ///   ^
     /// ```
     BinOp {
-        expression: &'a ast::ExprBinOp,
+        expression: &'a ast::ExprBinOp<'a>,
         operator_range: TextRange,
     },
 
@@ -51,7 +51,7 @@ pub(crate) enum GotoTarget<'a> {
     /// ^
     /// ```
     UnaryOp {
-        expression: &'a ast::ExprUnaryOp,
+        expression: &'a ast::ExprUnaryOp<'a>,
         operator_range: TextRange,
     },
 
@@ -76,8 +76,8 @@ pub(crate) enum GotoTarget<'a> {
     ///                   ^^^
     /// ```
     ImportModuleAlias {
-        alias: &'a ast::Alias,
-        asname: &'a ast::Identifier,
+        alias: &'a ast::Alias<'a>,
+        asname: &'a ast::Identifier<'a>,
     },
 
     /// In an import statement, the named under which the symbol is exported
@@ -88,8 +88,8 @@ pub(crate) enum GotoTarget<'a> {
     ///                 ^^^
     /// ```
     ImportExportedName {
-        alias: &'a ast::Alias,
-        import_from: &'a ast::StmtImportFrom,
+        alias: &'a ast::Alias<'a>,
+        import_from: &'a ast::StmtImportFrom<'a>,
     },
 
     /// Import alias in from import statement
@@ -98,8 +98,8 @@ pub(crate) enum GotoTarget<'a> {
     ///                        ^^^
     /// ```
     ImportSymbolAlias {
-        alias: &'a ast::Alias,
-        asname: &'a ast::Identifier,
+        alias: &'a ast::Alias<'a>,
+        asname: &'a ast::Identifier<'a>,
     },
 
     /// Go to on the exception handler variable
@@ -108,7 +108,7 @@ pub(crate) enum GotoTarget<'a> {
     /// except Exception as e: ...
     ///                     ^
     /// ```
-    ExceptVariable(&'a ast::ExceptHandlerExceptHandler),
+    ExceptVariable(&'a ast::ExceptHandlerExceptHandler<'a>),
 
     /// Go to on a keyword argument
     /// ```py
@@ -116,8 +116,8 @@ pub(crate) enum GotoTarget<'a> {
     ///      ^
     /// ```
     KeywordArgument {
-        keyword: &'a ast::Keyword,
-        call_expression: &'a ast::ExprCall,
+        keyword: &'a ast::Keyword<'a>,
+        call_expression: &'a ast::ExprCall<'a>,
     },
 
     /// Go to on the rest parameter of a pattern match
@@ -127,7 +127,7 @@ pub(crate) enum GotoTarget<'a> {
     ///     case {"a": a, "b": b, **rest}: ...
     ///                             ^^^^
     /// ```
-    PatternMatchRest(&'a ast::PatternMatchMapping),
+    PatternMatchRest(&'a ast::PatternMatchMapping<'a>),
 
     /// Go to on a keyword argument of a class pattern
     ///
@@ -136,7 +136,7 @@ pub(crate) enum GotoTarget<'a> {
     ///     case Point3D(x=0, y=0, z=0): ...
     ///                  ^    ^    ^
     /// ```
-    PatternKeywordArgument(&'a ast::PatternKeyword),
+    PatternKeywordArgument(&'a ast::PatternKeyword<'a>),
 
     /// Go to on a pattern star argument
     ///
@@ -144,7 +144,7 @@ pub(crate) enum GotoTarget<'a> {
     /// match array:
     ///     case [*args]: ...
     ///            ^^^^
-    PatternMatchStarName(&'a ast::PatternMatchStar),
+    PatternMatchStarName(&'a ast::PatternMatchStar<'a>),
 
     /// Go to on the name of a pattern match as pattern
     ///
@@ -152,7 +152,7 @@ pub(crate) enum GotoTarget<'a> {
     /// match x:
     ///     case [x] as y: ...
     ///                 ^
-    PatternMatchAsName(&'a ast::PatternMatchAs),
+    PatternMatchAsName(&'a ast::PatternMatchAs<'a>),
 
     /// Go to on the name of a type variable
     ///
@@ -160,7 +160,7 @@ pub(crate) enum GotoTarget<'a> {
     /// type Alias[T: int = bool] = list[T]
     ///            ^
     /// ```
-    TypeParamTypeVarName(&'a ast::TypeParamTypeVar),
+    TypeParamTypeVarName(&'a ast::TypeParamTypeVar<'a>),
 
     /// Go to on the name of a type param spec
     ///
@@ -168,7 +168,7 @@ pub(crate) enum GotoTarget<'a> {
     /// type Alias[**P = [int, str]] = Callable[P, int]
     ///              ^
     /// ```
-    TypeParamParamSpecName(&'a ast::TypeParamParamSpec),
+    TypeParamParamSpecName(&'a ast::TypeParamParamSpec<'a>),
 
     /// Go to on the name of a type var tuple
     ///
@@ -176,13 +176,13 @@ pub(crate) enum GotoTarget<'a> {
     /// type Alias[*Ts = ()] = tuple[*Ts]
     ///             ^^
     /// ```
-    TypeParamTypeVarTupleName(&'a ast::TypeParamTypeVarTuple),
+    TypeParamTypeVarTupleName(&'a ast::TypeParamTypeVarTuple<'a>),
 
     NonLocal {
-        identifier: &'a ast::Identifier,
+        identifier: &'a ast::Identifier<'a>,
     },
     Globals {
-        identifier: &'a ast::Identifier,
+        identifier: &'a ast::Identifier<'a>,
     },
     /// Go to on the invocation of a callable
     ///
@@ -202,7 +202,7 @@ pub(crate) enum GotoTarget<'a> {
         /// The callable that can actually be selected by a cursor
         callable: ast::ExprRef<'a>,
         /// The call of the callable
-        call: &'a ast::ExprCall,
+        call: &'a ast::ExprCall<'a>,
         /// Whether the cursor is positioned on the parenthesis.
         ///
         /// This is useful for tweaking the behavior of goto-def.
@@ -223,7 +223,7 @@ pub(crate) enum GotoTarget<'a> {
     /// isn't actually in the AST.
     StringAnnotationSubexpr {
         /// The string literal that is a string annotation.
-        string_expr: &'a ast::ExprStringLiteral,
+        string_expr: &'a ast::ExprStringLiteral<'a>,
         /// The range to query in the sub-AST for the sub-expression.
         subrange: TextRange,
         /// "How many levels of sub-ASTs are you on?"
@@ -236,7 +236,7 @@ pub(crate) enum GotoTarget<'a> {
 
     /// Go to on a string-literal subscript key (e.g. `person["name"]`).
     SubscriptStringLiteralKey {
-        subscript: &'a ast::ExprSubscript,
+        subscript: &'a ast::ExprSubscript<'a>,
         literal_key: &'a str,
     },
 }

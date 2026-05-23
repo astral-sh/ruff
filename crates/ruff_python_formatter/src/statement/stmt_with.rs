@@ -19,7 +19,7 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatStmtWith;
 
-impl FormatNodeRule<StmtWith> for FormatStmtWith {
+impl FormatNodeRule<StmtWith<'_>> for FormatStmtWith {
     fn fmt_fields(&self, with_stmt: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
         // The `with` statement can have one dangling comment on the open parenthesis, like:
         // ```python
@@ -168,7 +168,7 @@ enum WithItemsLayout<'a> {
     ///
     /// Ensure that this layout is compatible with [`Self::SingleWithoutTarget`] because removing the parentheses
     /// results in the formatter taking that layout when formatting the file again
-    SingleParenthesizedContextManager(&'a WithItem),
+    SingleParenthesizedContextManager(&'a WithItem<'a>),
 
     /// The with statement's only item has no target.
     ///
@@ -187,7 +187,7 @@ enum WithItemsLayout<'a> {
     /// Be careful that [`Self::SingleParenthesizedContextManager`] and this layout are compatible because
     /// adding parentheses around a [`WithItem`] will result in the context expression being parenthesized in
     /// the next formatting pass.
-    SingleWithoutTarget(&'a WithItem),
+    SingleWithoutTarget(&'a WithItem<'a>),
 
     /// It's a single with item with a target. Use the optional parentheses layout (see [`optional_parentheses`])
     /// to mimic the `maybe_parenthesize_expression` behavior.
@@ -200,7 +200,7 @@ enum WithItemsLayout<'a> {
     /// ```
     ///
     /// Only used for Python 3.9+
-    SingleWithTarget(&'a WithItem),
+    SingleWithTarget(&'a WithItem<'a>),
 
     /// The target python version doesn't support parenthesized context managers because it is Python 3.8 or older.
     ///
@@ -252,7 +252,7 @@ enum WithItemsLayout<'a> {
 
 impl<'a> WithItemsLayout<'a> {
     fn from_statement(
-        with: &'a StmtWith,
+        with: &'a StmtWith<'a>,
         context: &PyFormatContext,
         parenthesized_comments: &[SourceComment],
     ) -> FormatResult<Self> {

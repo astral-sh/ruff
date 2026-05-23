@@ -204,7 +204,7 @@ pub(crate) fn is_airflow_builtin_or_provider(
 }
 
 /// Return the [`ast::ExprName`] at the head of the expression, if any.
-pub(crate) fn match_head(value: &Expr) -> Option<&ExprName> {
+pub(crate) fn match_head<'a>(value: &'a Expr<'a>) -> Option<&'a ExprName<'a>> {
     match value {
         Expr::Attribute(ExprAttribute { value, .. }) => value.as_name_expr(),
         Expr::Name(name) => Some(name),

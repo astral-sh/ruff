@@ -18,6 +18,7 @@ ignored = ["ruff_cache"]
 doctest = false
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true }
 ruff_formatter = { workspace = true }

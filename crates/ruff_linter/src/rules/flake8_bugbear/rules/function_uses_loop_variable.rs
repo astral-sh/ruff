@@ -57,8 +57,8 @@ impl Violation for FunctionUsesLoopVariable {
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
-    loaded: Vec<&'a ast::ExprName>,
-    stored: Vec<&'a ast::ExprName>,
+    loaded: Vec<&'a ast::ExprName<'a>>,
+    stored: Vec<&'a ast::ExprName<'a>>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -77,8 +77,8 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
 
 #[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
-    names: Vec<&'a ast::ExprName>,
-    safe_functions: Vec<&'a Expr>,
+    names: Vec<&'a ast::ExprName<'a>>,
+    safe_functions: Vec<&'a Expr<'a>>,
 }
 
 /// `Visitor` to collect all suspicious variables (those referenced in

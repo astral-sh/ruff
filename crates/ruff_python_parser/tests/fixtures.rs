@@ -4,6 +4,7 @@ use std::fmt::{Formatter, Write};
 
 use datatest_stable::Utf8Path;
 use itertools::Itertools;
+use ruff_allocator::Allocator;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::token::{Token, Tokens};
 use ruff_python_ast::visitor::Visitor;
@@ -58,12 +59,13 @@ fn snapshot_input_file_for_test(root: &str, test_name: &str) -> String {
 /// Asserts that the parser generates no syntax errors for a valid program.
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
+    let allocator = Allocator::new();
     let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
     let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
     let options = extract_options(source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest_preview())
     });
-    let parsed = parse_unchecked(source, options.clone());
+    let parsed = parse_unchecked(source, options.clone(), &allocator);
 
     if parsed.has_syntax_errors() {
         let line_index = LineIndex::from_source_text(source);
@@ -153,13 +155,14 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 /// Assert that the parser generates at least one syntax error for the given input file.
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
+    let allocator = Allocator::new();
     let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
     let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
 
     let options = extract_options(source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY314)
     });
-    let parsed = parse_unchecked(source, options.clone());
+    let parsed = parse_unchecked(source, options.clone(), &allocator);
 
     validate_tokens(parsed.tokens(), source.text_len());
     validate_ast(&parsed, source.text_len());
@@ -301,12 +304,13 @@ fn extract_options(source: &str) -> Option<ParseOptions> {
 #[ignore]
 #[expect(clippy::print_stdout)]
 fn parser_quick_test() {
+    let allocator = Allocator::new();
     let source = "\
 f'{'
 f'{foo!r'
 ";
 
-    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module), &allocator);
 
     println!("AST:\n----\n{:#?}", parsed.syntax());
     println!("Tokens:\n-------\n{:#?}", parsed.tokens());
@@ -424,7 +428,7 @@ Tokens: {tokens:#?}
 /// * the range of the parent node fully encloses all its child nodes
 /// * the ranges are strictly increasing when traversing the nodes in pre-order.
 /// * all ranges are within the length of the source code.
-fn validate_ast(parsed: &Parsed<Mod>, source_len: TextSize) {
+fn validate_ast<'a, 'ast: 'a>(parsed: &'a Parsed<Mod<'ast>>, source_len: TextSize) {
     walk_module(
         &mut ValidateAstVisitor::new(parsed.tokens(), source_len),
         parsed.syntax(),
@@ -448,12 +452,9 @@ impl<'a> ValidateAstVisitor<'a> {
             source_length,
         }
     }
-}
-
-impl ValidateAstVisitor<'_> {
     /// Check that the node's start doesn't fall within a token.
     /// Called in `enter_node` before visiting children.
-    fn assert_start_boundary(&mut self, node: AnyNodeRef<'_>) {
+    fn assert_start_boundary(&mut self, node: AnyNodeRef<'a>) {
         // Skip tokens that end at or before the node starts.
         self.tokens
             .peeking_take_while(|t| t.end() <= node.start())
@@ -472,7 +473,7 @@ impl ValidateAstVisitor<'_> {
     /// Check that the node's end doesn't fall within a token.
     /// Called in `leave_node` after visiting children, so all tokens
     /// within the node have been consumed.
-    fn assert_end_boundary(&mut self, node: AnyNodeRef<'_>) {
+    fn assert_end_boundary(&mut self, node: AnyNodeRef<'a>) {
         // Skip tokens that end at or before the node ends.
         self.tokens
             .peeking_take_while(|t| t.end() <= node.end())
@@ -489,8 +490,8 @@ impl ValidateAstVisitor<'_> {
     }
 }
 
-impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
-    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+impl<'a> SourceOrderVisitor<'a> for ValidateAstVisitor<'a> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         assert!(
             node.end() <= self.source_length,
             "The range of the node exceeds the length of the source code. Node: {node:#?}",
@@ -520,7 +521,7 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
+    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
         self.assert_end_boundary(node);
 
         self.parents.pop().expect("Expected tree to be balanced");
@@ -667,8 +668,8 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 }
 
-impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+impl<'a> Visitor<'a> for SemanticSyntaxCheckerVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt<'a>) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         match stmt {
             ast::Stmt::ClassDef(ast::StmtClassDef {
@@ -709,7 +710,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &ast::Expr) {
+    fn visit_expr(&mut self, expr: &'a ast::Expr<'a>) {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
         match expr {
             ast::Expr::Lambda(_) => {

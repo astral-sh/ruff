@@ -2419,10 +2419,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    pub(crate) fn infer_literal_parameter_type<'param>(
+    pub(crate) fn infer_literal_parameter_type<'param, 'arena: 'param>(
         &mut self,
-        parameters: &'param ast::Expr,
-    ) -> Result<Type<'db>, Vec<&'param ast::Expr>> {
+        parameters: &'param ast::Expr<'arena>,
+    ) -> Result<Type<'db>, Vec<&'param ast::Expr<'arena>>> {
         let ty = match parameters {
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value, TypeContext::default());

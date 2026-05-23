@@ -1,7 +1,6 @@
-use ruff_db::parsed::parsed_string_annotation;
+use ruff_db::parsed::{ParsedExpression, parsed_string_annotation};
 use ruff_db::source::source_text;
-use ruff_python_ast::{self as ast, ModExpression};
-use ruff_python_parser::Parsed;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::declare_lint;
@@ -127,7 +126,7 @@ pub(crate) fn parse_string_annotation(
     context: &InferContext,
     inference_flags: InferenceFlags,
     string_expr: &ast::ExprStringLiteral,
-) -> Option<Parsed<ModExpression>> {
+) -> Option<ParsedExpression> {
     let file = context.file();
     let db = context.db();
 

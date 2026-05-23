@@ -855,7 +855,7 @@ fn handle_parameters_separator_comment<'a>(
 /// Associate comments with the type annotation when possible.
 fn handle_parameter_comment<'a>(
     comment: DecoratedComment<'a>,
-    parameter: &'a Parameter,
+    parameter: &'a Parameter<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
     if parameter.annotation().is_some() {
@@ -1039,7 +1039,7 @@ fn handle_trailing_binary_like_comment<'a>(
 ///
 /// Comments of an all empty module are leading module comments
 fn handle_trailing_module_comment<'a>(
-    module: &'a ModModule,
+    module: &'a ModModule<'a>,
     comment: DecoratedComment<'a>,
 ) -> CommentPlacement<'a> {
     if comment.preceding_node().is_none() && comment.following_node().is_none() {
@@ -2062,7 +2062,7 @@ fn handle_bracketed_end_of_line_comment<'a>(
 /// as either a leading or trailing comment.
 fn handle_import_from_comment<'a>(
     comment: DecoratedComment<'a>,
-    import_from: &'a ast::StmtImportFrom,
+    import_from: &'a ast::StmtImportFrom<'_>,
     source: &str,
 ) -> CommentPlacement<'a> {
     // The comment needs to be on the same line, but before the first member. For example, we want
@@ -2201,7 +2201,7 @@ fn handle_with_comment<'a>(
 /// ```
 fn handle_comprehension_comment<'a>(
     comment: DecoratedComment<'a>,
-    comprehension: &'a Comprehension,
+    comprehension: &'a Comprehension<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
     let is_own_line = comment.line_position().is_own_line();

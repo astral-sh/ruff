@@ -108,7 +108,7 @@ pub(super) enum DataclassKind {
 pub(super) fn dataclass_kind<'a>(
     class_def: &'a ast::StmtClassDef,
     semantic: &SemanticModel,
-) -> Option<(DataclassKind, &'a ast::Decorator)> {
+) -> Option<(DataclassKind, &'a ast::Decorator<'a>)> {
     if !(semantic.seen_module(Modules::DATACLASSES) || semantic.seen_module(Modules::ATTRS)) {
         return None;
     }

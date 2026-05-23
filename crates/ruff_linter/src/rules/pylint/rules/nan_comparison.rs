@@ -63,7 +63,7 @@ pub(crate) fn nan_comparison_match(checker: &Checker, cases: &[ast::MatchCase]) 
     );
 }
 
-fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = &'a Expr>) {
+fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = &'a Expr<'a>>) {
     for expr in comparators {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
             match qualified_name.segments() {

@@ -164,9 +164,9 @@ struct YieldVisitor<'semantic, 'a> {
     /// The annotated variables in the current function.
     annotations: FxHashSet<&'a str>,
     /// The `assignment`-to-`yield` statement pairs in the current function.
-    assignment_yield: Vec<(&'a ast::StmtAssign, &'a Expr, &'a Stmt)>,
+    assignment_yield: Vec<(&'a ast::StmtAssign<'a>, &'a Expr<'a>, &'a Stmt<'a>)>,
     /// The preceding sibling of the current node.
-    sibling: Option<&'a Stmt>,
+    sibling: Option<&'a Stmt<'a>>,
 }
 
 impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {

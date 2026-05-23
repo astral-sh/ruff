@@ -62,7 +62,7 @@ impl Violation for RaiseWithinTry {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<&'a Stmt>,
+    raises: Vec<&'a Stmt<'a>>,
 }
 
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {

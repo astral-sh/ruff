@@ -205,10 +205,13 @@ pub(crate) fn non_pep604_annotation(
                                 // All elements were `None`; don't provide a fix.
                                 None
                             } else {
-                                Some(pep_604_optional(&pep_604_union(&elements)))
+                                Some(pep_604_optional(
+                                    &pep_604_union(&elements, checker.replacement_allocator()),
+                                    checker.replacement_allocator(),
+                                ))
                             }
                         } else {
-                            Some(pep_604_optional(inner))
+                            Some(pep_604_optional(inner, checker.replacement_allocator()))
                         };
 
                         if let Some(fix_expr) = fix_expr {
@@ -243,7 +246,10 @@ pub(crate) fn non_pep604_annotation(
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(
                                 pad(
-                                    checker.generator().expr(&pep_604_union(elts)),
+                                    checker.generator().expr(&pep_604_union(
+                                        elts,
+                                        checker.replacement_allocator(),
+                                    )),
                                     expr.range(),
                                     checker.locator(),
                                 ),
@@ -359,8 +365,8 @@ fn is_optional_none(operator: Pep604Operator, slice: &Expr) -> bool {
 /// Collect all non-`None` leaf elements of a chain of `BitOr` binary operations.
 ///
 /// For example, `a | None | b` is collected as `[a, b]`.
-fn collect_non_none(expr: &Expr) -> Vec<Expr> {
-    fn inner(expr: &Expr, elements: &mut Vec<Expr>) {
+fn collect_non_none<'ast>(expr: &Expr<'ast>) -> Vec<Expr<'ast>> {
+    fn inner<'ast>(expr: &Expr<'ast>, elements: &mut Vec<Expr<'ast>>) {
         if let Expr::BinOp(ast::ExprBinOp {
             left,
             op: Operator::BitOr,

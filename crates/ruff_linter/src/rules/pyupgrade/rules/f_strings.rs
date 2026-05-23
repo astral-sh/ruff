@@ -62,8 +62,8 @@ impl Violation for FString {
 /// respectively.
 #[derive(Debug)]
 struct FormatSummaryValues<'a> {
-    args: Vec<&'a Expr>,
-    kwargs: FxHashMap<&'a str, &'a Expr>,
+    args: Vec<&'a Expr<'a>>,
+    kwargs: FxHashMap<&'a str, &'a Expr<'a>>,
     auto_index: usize,
 }
 
@@ -114,12 +114,12 @@ impl<'a> FormatSummaryValues<'a> {
     }
 
     /// Return the positional argument at the given index.
-    fn arg_positional(&self, index: usize) -> Option<&Expr> {
+    fn arg_positional(&self, index: usize) -> Option<&'a Expr<'a>> {
         self.args.get(index).copied()
     }
 
     /// Return the keyword argument with the given name.
-    fn arg_keyword(&self, key: &str) -> Option<&Expr> {
+    fn arg_keyword(&self, key: &str) -> Option<&'a Expr<'a>> {
         self.kwargs.get(key).copied()
     }
 }

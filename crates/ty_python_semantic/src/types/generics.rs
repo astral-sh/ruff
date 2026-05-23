@@ -858,10 +858,10 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn binds_named_typevar(
         self,
         db: &'db dyn Db,
-        name: &'db ast::name::Name,
+        name: &str,
     ) -> Option<BoundTypeVarInstance<'db>> {
         self.variables(db)
-            .find(|self_bound_typevar| self_bound_typevar.typevar(db).name(db) == name)
+            .find(|self_bound_typevar| self_bound_typevar.typevar(db).name(db).as_str() == name)
     }
 
     pub(crate) fn binds_typevar(

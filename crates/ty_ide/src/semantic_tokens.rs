@@ -678,8 +678,8 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 }
 
-impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
-    fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
+impl<'a> SourceOrderVisitor<'a> for SemanticTokenVisitor<'_> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         // If we have a range filter and this node doesn't intersect, skip it
         // and all its children as an optimization
         if let Some(range_filter) = self.range_filter {

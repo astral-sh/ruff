@@ -6,7 +6,7 @@ use itertools::Either::{Left, Right};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
+use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -166,40 +166,42 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 .collect();
 
             let node = Expr::Tuple(ast::ExprTuple {
-                elts: words
-                    .iter()
-                    .flat_map(|value| {
-                        if let Expr::Tuple(tuple) = value {
-                            Left(tuple.iter())
-                        } else {
-                            Right(iter::once(*value))
-                        }
-                    })
-                    .cloned()
-                    .collect(),
+                elts: checker.alloc_vec(
+                    words
+                        .iter()
+                        .flat_map(|value| {
+                            if let Expr::Tuple(tuple) = value {
+                                Left(tuple.iter())
+                            } else {
+                                Right(iter::once(*value))
+                            }
+                        })
+                        .cloned()
+                        .collect(),
+                ),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
             });
             let node1 = Expr::Name(ast::ExprName {
-                id: arg_name.into(),
+                id: checker.alloc_name(arg_name),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let node2 = Expr::Attribute(ast::ExprAttribute {
-                value: Box::new(node1),
-                attr: Identifier::new(attr_name.to_string(), TextRange::default()),
+                value: checker.alloc_expr(node1),
+                attr: checker.alloc_identifier(attr_name, TextRange::default()),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let node3 = Expr::Call(ast::ExprCall {
-                func: Box::new(node2),
+                func: checker.alloc_expr(node2),
                 arguments: Arguments {
-                    args: Box::from([node]),
-                    keywords: Box::from([]),
+                    args: checker.alloc_vec(vec![node]),
+                    keywords: checker.alloc_vec(vec![]),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
@@ -212,17 +214,19 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
             let mut call = Some(call);
             let node = Expr::BoolOp(ast::ExprBoolOp {
                 op: BoolOp::Or,
-                values: values
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, elt)| {
-                        if indices.contains(&index) {
-                            std::mem::take(&mut call)
-                        } else {
-                            Some(elt.clone())
-                        }
-                    })
-                    .collect(),
+                values: checker.alloc_vec(
+                    values
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, elt)| {
+                            if indices.contains(&index) {
+                                std::mem::take(&mut call)
+                            } else {
+                                Some(elt.clone())
+                            }
+                        })
+                        .collect(),
+                ),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });

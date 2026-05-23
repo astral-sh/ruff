@@ -7,6 +7,7 @@ use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxBuildHasher;
 
+use ruff_allocator::Allocator;
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
@@ -117,7 +118,8 @@ pub struct FixerResult<'a> {
 
 /// Generate [`Diagnostic`]s from the source code contents at the given `Path`.
 #[expect(clippy::too_many_arguments)]
-pub fn check_path(
+pub fn check_path<'ast>(
+    allocator: &'ast Allocator,
     path: &Path,
     package: Option<PackageRoot<'_>>,
     locator: &Locator,
@@ -128,7 +130,7 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    parsed: &Parsed<ModModule>,
+    parsed: &Parsed<ModModule<'ast>>,
     target_version: TargetVersion,
     suppressions: &Suppressions,
 ) -> Vec<Diagnostic> {
@@ -198,6 +200,7 @@ pub fn check_path(
         let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
 
         semantic_syntax_errors.extend(check_ast(
+            allocator,
             parsed,
             locator,
             stylist,
@@ -385,7 +388,13 @@ pub fn add_noqa_to_path(
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
-    let parsed = parse_unchecked_source(source_kind, source_type, target_version.parser_version());
+    let allocator = Allocator::new();
+    let parsed = parse_unchecked_source(
+        source_kind,
+        source_type,
+        target_version.parser_version(),
+        &allocator,
+    );
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -410,6 +419,7 @@ pub fn add_noqa_to_path(
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let diagnostics = check_path(
+        &allocator,
         path,
         package,
         &locator,
@@ -441,14 +451,16 @@ pub fn add_noqa_to_path(
 }
 
 /// Generate a [`Diagnostic`] for each diagnostic triggered by the given source code.
-pub fn lint_only(
+#[expect(clippy::too_many_arguments)]
+pub fn lint_only<'ast>(
+    allocator: &'ast Allocator,
     path: &Path,
     package: Option<PackageRoot<'_>>,
     settings: &LinterSettings,
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    source: ParseSource,
+    source: &ParseSource<'ast, '_>,
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
 
@@ -460,7 +472,19 @@ pub fn lint_only(
         );
     }
 
-    let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
+    let owned_parsed;
+    let parsed = match source {
+        ParseSource::None => {
+            owned_parsed = parse_unchecked_source(
+                source_kind,
+                source_type,
+                target_version.parser_version(),
+                allocator,
+            );
+            &owned_parsed
+        }
+        ParseSource::Precomputed(parsed) => parsed,
+    };
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -485,6 +509,7 @@ pub fn lint_only(
 
     // Generate diagnostics.
     let diagnostics = check_path(
+        allocator,
         path,
         package,
         &locator,
@@ -495,7 +520,7 @@ pub fn lint_only(
         noqa,
         source_kind,
         source_type,
-        &parsed,
+        parsed,
         target_version,
         &suppressions,
     );
@@ -577,8 +602,13 @@ pub fn lint_fix<'a>(
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
-        let parsed =
-            parse_unchecked_source(&transformed, source_type, target_version.parser_version());
+        let allocator = Allocator::new();
+        let parsed = parse_unchecked_source(
+            &transformed,
+            source_type,
+            target_version.parser_version(),
+            &allocator,
+        );
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
@@ -603,6 +633,7 @@ pub fn lint_fix<'a>(
 
         // Generate diagnostics.
         let diagnostics = check_path(
+            &allocator,
             path,
             package,
             &locator,
@@ -746,42 +777,27 @@ This indicates a bug in Ruff. If you could open an issue at:
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum ParseSource {
+#[derive(Debug)]
+pub enum ParseSource<'ast, 'parsed> {
     /// Parse the [`Parsed`] from the given source code.
     None,
     /// Use the precomputed [`Parsed`].
-    Precomputed(Parsed<ModModule>),
-}
-
-impl ParseSource {
-    /// Consumes the [`ParseSource`] and returns the parsed [`Parsed`], parsing the source code if
-    /// necessary.
-    fn into_parsed(
-        self,
-        source_kind: &SourceKind,
-        source_type: PySourceType,
-        target_version: PythonVersion,
-    ) -> Parsed<ModModule> {
-        match self {
-            ParseSource::None => parse_unchecked_source(source_kind, source_type, target_version),
-            ParseSource::Precomputed(parsed) => parsed,
-        }
-    }
+    Precomputed(&'parsed Parsed<ModModule<'ast>>),
 }
 
 /// Like [`ruff_python_parser::parse_unchecked_source`] but with an additional [`PythonVersion`]
 /// argument.
-fn parse_unchecked_source(
+fn parse_unchecked_source<'ast>(
     source_kind: &SourceKind,
     source_type: PySourceType,
     target_version: PythonVersion,
-) -> Parsed<ModModule> {
+    allocator: &'ast Allocator,
+) -> Parsed<ModModule<'ast>> {
     let options = ParseOptions::from(source_type).with_target_version(target_version);
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
-    ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+    ruff_python_parser::parse_unchecked(source_kind.source_code(), options, allocator)
         .try_into_module()
         .expect("PySourceType always parses into a module")
 }
@@ -791,6 +807,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_allocator::Allocator;
     use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
@@ -969,9 +986,11 @@ mod tests {
         let target_version = settings.resolve_target_version(path);
         let options =
             ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-            .try_into_module()
-            .expect("PySourceType always parses into a module");
+        let allocator = Allocator::new();
+        let parsed =
+            ruff_python_parser::parse_unchecked(source_kind.source_code(), options, &allocator)
+                .try_into_module()
+                .expect("PySourceType always parses into a module");
         let locator = Locator::new(source_kind.source_code());
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -984,6 +1003,7 @@ mod tests {
         let suppressions =
             Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
         let mut diagnostics = check_path(
+            &allocator,
             path,
             None,
             &locator,

@@ -1,5 +1,4 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{Stmt, traversal};
 use ruff_python_semantic::{BindingId, Scope, ScopeId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -41,8 +40,8 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.15.3")]
 pub(crate) struct SwapWithTemporaryVariable<'a> {
-    first: &'a Name,
-    second: &'a Name,
+    first: &'a str,
+    second: &'a str,
 }
 
 impl Violation for SwapWithTemporaryVariable<'_> {
@@ -146,8 +145,8 @@ fn match_consecutive_assignments<'a>(
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 struct VarToVarAssignment<'a> {
-    target: &'a Name,
-    value: &'a Name,
+    target: &'a str,
+    value: &'a str,
     range: TextRange,
 }
 
@@ -185,8 +184,8 @@ impl<'a> VarToVarAssignment<'a> {
         if let (Some(target_expr), Some(value_expr)) = (target.as_name_expr(), value.as_name_expr())
         {
             Some(Self {
-                target: &target_expr.id,
-                value: &value_expr.id,
+                target: target_expr.id.as_str(),
+                value: value_expr.id.as_str(),
                 range: stmt.range(),
             })
         } else {

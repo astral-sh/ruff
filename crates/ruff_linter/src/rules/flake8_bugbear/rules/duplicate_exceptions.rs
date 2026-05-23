@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_allocator::{Allocator, Slice as ArenaSlice};
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
@@ -113,9 +114,12 @@ impl AlwaysFixableViolation for DuplicateHandlerException {
     }
 }
 
-fn type_pattern(elts: Vec<&Expr>) -> Expr {
+fn type_pattern<'alloc, 'ast>(elts: Vec<&Expr<'ast>>, allocator: &'alloc Allocator) -> Expr<'alloc>
+where
+    'ast: 'alloc,
+{
     ast::ExprTuple {
-        elts: elts.into_iter().cloned().collect(),
+        elts: ArenaSlice::from_vec_in(elts.into_iter().cloned().collect(), allocator),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -129,7 +133,7 @@ fn duplicate_handler_exceptions<'a>(
     checker: &Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
-) -> FxHashMap<UnqualifiedName<'a>, &'a Expr> {
+) -> FxHashMap<UnqualifiedName<'a>, &'a Expr<'a>> {
     let mut seen: FxHashMap<UnqualifiedName, &Expr> = FxHashMap::default();
     let mut duplicates: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
@@ -177,7 +181,12 @@ fn duplicate_handler_exceptions<'a>(
                     } else {
                         // Multiple exceptions must always be parenthesized. This is done
                         // manually as the generator never parenthesizes lone tuples.
-                        format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
+                        format!(
+                            "({})",
+                            checker
+                                .generator()
+                                .expr(&type_pattern(unique_elts, checker.replacement_allocator(),))
+                        )
                     },
                     expr.range(),
                 ),

@@ -53,7 +53,10 @@ impl AlwaysFixableViolation for AvoidableEscapedQuote {
 }
 
 /// Q003
-pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike) {
+pub(crate) fn avoidable_escaped_quote<'ast>(
+    checker: &Checker<'ast>,
+    string_like: StringLike<'ast>,
+) {
     if checker.semantic().in_pep_257_docstring()
         || checker.semantic().in_string_type_definition()
         // This rule has support for strings nested inside another f-strings but they're checked
@@ -97,7 +100,7 @@ impl<'a, 'b> AvoidableEscapedQuoteChecker<'a, 'b> {
     }
 }
 
-impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
+impl<'ast> Visitor<'ast> for AvoidableEscapedQuoteChecker<'_, 'ast> {
     fn visit_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         check_string_or_bytes(
             self.checker,
@@ -116,7 +119,7 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
         );
     }
 
-    fn visit_f_string(&mut self, f_string: &'_ ast::FString) {
+    fn visit_f_string(&mut self, f_string: &'ast ast::FString<'ast>) {
         // If the target version doesn't support PEP 701, skip this entire f-string if it contains
         // any string literal in any of the expression element. For example:
         //
@@ -197,7 +200,7 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
         walk_f_string(self, f_string);
     }
 
-    fn visit_t_string(&mut self, t_string: &'_ ast::TString) {
+    fn visit_t_string(&mut self, t_string: &'ast ast::TString<'ast>) {
         let opposite_quote_char = self.quotes_settings.inline_quotes.opposite().as_char();
 
         // If any literal part of this t-string contains the quote character which is opposite to

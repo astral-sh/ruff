@@ -14,7 +14,7 @@ pub struct FormatExprSubscript {
     call_chain_layout: CallChainLayout,
 }
 
-impl FormatRuleWithOptions<ExprSubscript, PyFormatContext<'_>> for FormatExprSubscript {
+impl FormatRuleWithOptions<ExprSubscript<'_>, PyFormatContext<'_>> for FormatExprSubscript {
     type Options = CallChainLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -23,7 +23,7 @@ impl FormatRuleWithOptions<ExprSubscript, PyFormatContext<'_>> for FormatExprSub
     }
 }
 
-impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
+impl FormatNodeRule<ExprSubscript<'_>> for FormatExprSubscript {
     fn fmt_fields(&self, item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprSubscript {
             range: _,
@@ -84,7 +84,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
     }
 }
 
-impl NeedsParentheses for ExprSubscript {
+impl NeedsParentheses for ExprSubscript<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

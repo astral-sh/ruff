@@ -1101,6 +1101,7 @@ mod tests {
 
     use insta::assert_debug_snapshot;
     use itertools::Itertools;
+    use ruff_allocator::Allocator;
     use ruff_python_index::Indexer;
     use ruff_python_parser::{Mode, ParseOptions, parse};
     use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -2633,7 +2634,8 @@ def foo():
     impl Suppressions {
         /// Parse all suppressions and errors in a module for testing
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
-            let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
+            let allocator = Allocator::new();
+            let parsed = parse(source, ParseOptions::from(Mode::Module), &allocator).unwrap();
             let indexer = Indexer::from_tokens(parsed.tokens(), source);
             let suppressions = Suppressions::from_tokens(
                 source,

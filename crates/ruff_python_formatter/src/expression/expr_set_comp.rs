@@ -8,7 +8,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprSetComp;
 
-impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
+impl FormatNodeRule<ExprSetComp<'_>> for FormatExprSetComp {
     fn fmt_fields(&self, item: &ExprSetComp, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprSetComp {
             range: _,
@@ -42,7 +42,7 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
     }
 }
 
-impl NeedsParentheses for ExprSetComp {
+impl NeedsParentheses for ExprSetComp<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

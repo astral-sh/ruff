@@ -11,7 +11,7 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatStmtWhile;
 
-impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
+impl FormatNodeRule<StmtWhile<'_>> for FormatStmtWhile {
     fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtWhile {
             range: _,

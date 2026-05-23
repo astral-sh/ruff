@@ -53,7 +53,7 @@ struct ExportFinder<'db> {
     db: &'db dyn Db,
     file: File,
     visiting_stub_file: bool,
-    exports: FxHashMap<&'db Name, PossibleExportKind>,
+    exports: FxHashMap<&'db str, PossibleExportKind>,
     dunder_all: DunderAll,
 }
 
@@ -68,7 +68,7 @@ impl<'db> ExportFinder<'db> {
         }
     }
 
-    fn possibly_add_export(&mut self, export: &'db Name, kind: PossibleExportKind) {
+    fn possibly_add_export(&mut self, export: &'db str, kind: PossibleExportKind) {
         self.exports.insert(export, kind);
 
         if export == "__all__" {
@@ -88,16 +88,16 @@ impl<'db> ExportFinder<'db> {
                     if name.starts_with('_') {
                         return None;
                     }
-                    Some(name.clone())
+                    Some(Name::new(name))
                 })
                 .collect(),
-            DunderAll::Present => self.exports.into_keys().cloned().collect(),
+            DunderAll::Present => self.exports.into_keys().map(Name::new).collect(),
         }
     }
 }
 
 impl<'db> Visitor<'db> for ExportFinder<'db> {
-    fn visit_alias(&mut self, alias: &'db ast::Alias) {
+    fn visit_alias(&mut self, alias: &'db ast::Alias<'db>) {
         let ast::Alias {
             name,
             asname,
@@ -105,8 +105,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             node_index: _,
         } = alias;
 
-        let name = &name.id;
-        let asname = asname.as_ref().map(|asname| &asname.id);
+        let name = name.id.as_str();
+        let asname = asname.as_ref().map(|asname| asname.id.as_str());
 
         // If the source is a stub, names defined by imports are only exported
         // if they use the explicit `foo as foo` syntax:
@@ -119,7 +119,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         self.possibly_add_export(asname.unwrap_or(name), kind);
     }
 
-    fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
+    fn visit_pattern(&mut self, pattern: &'db ast::Pattern<'db>) {
         match pattern {
             ast::Pattern::MatchAs(ast::PatternMatchAs {
                 pattern,
@@ -136,7 +136,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     // all names with leading underscores, but this will not always be the case
                     // (in the future we will want to support modules with `__all__ = ['_']`).
                     if name != "_" {
-                        self.possibly_add_export(&name.id, PossibleExportKind::Normal);
+                        self.possibly_add_export(name.id.as_str(), PossibleExportKind::Normal);
                     }
                 }
             }
@@ -151,7 +151,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.possibly_add_export(&rest.id, PossibleExportKind::Normal);
+                    self.possibly_add_export(rest.id.as_str(), PossibleExportKind::Normal);
                 }
             }
             ast::Pattern::MatchStar(ast::PatternMatchStar {
@@ -160,7 +160,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 node_index: _,
             }) => {
                 if let Some(name) = name {
-                    self.possibly_add_export(&name.id, PossibleExportKind::Normal);
+                    self.possibly_add_export(name.id.as_str(), PossibleExportKind::Normal);
                 }
             }
             ast::Pattern::MatchSequence(_)
@@ -172,7 +172,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &'db ast::Stmt<'db>) {
         match stmt {
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
@@ -183,7 +183,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 range: _,
                 node_index: _,
             }) => {
-                self.possibly_add_export(&name.id, PossibleExportKind::Normal);
+                self.possibly_add_export(name.id.as_str(), PossibleExportKind::Normal);
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -203,7 +203,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 node_index: _,
                 is_async: _,
             }) => {
-                self.possibly_add_export(&name.id, PossibleExportKind::Normal);
+                self.possibly_add_export(name.id.as_str(), PossibleExportKind::Normal);
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -295,7 +295,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'db ast::Expr) {
+    fn visit_expr(&mut self, expr: &'db ast::Expr<'db>) {
         match expr {
             ast::Expr::Name(ast::ExprName {
                 id,
@@ -304,7 +304,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 node_index: _,
             }) => {
                 if ctx.is_store() {
-                    self.possibly_add_export(id, PossibleExportKind::Normal);
+                    self.possibly_add_export(id.as_str(), PossibleExportKind::Normal);
                 }
             }
 
@@ -358,7 +358,7 @@ struct WalrusFinder<'a, 'db> {
 }
 
 impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
-    fn visit_expr(&mut self, expr: &'db ast::Expr) {
+    fn visit_expr(&mut self, expr: &'db ast::Expr<'db>) {
         match expr {
             // It's important for us to short-circuit here for lambdas specifically,
             // as walruses cannot leak out of the body of a lambda function.
@@ -385,7 +385,7 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
                 }) = &**target
                 {
                     self.export_finder
-                        .possibly_add_export(id, PossibleExportKind::Normal);
+                        .possibly_add_export(id.as_str(), PossibleExportKind::Normal);
                 }
             }
 

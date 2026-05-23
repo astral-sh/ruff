@@ -10,10 +10,10 @@ use crate::types::typed_dict::{
 use crate::types::{KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) fn infer_keyword_only_dict_call(
+    pub(super) fn infer_keyword_only_dict_call<'node, 'ast: 'node>(
         &mut self,
-        func: &ast::Expr,
-        arguments: &ast::Arguments,
+        func: &'node ast::Expr<'ast>,
+        arguments: &'node ast::Arguments<'ast>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         if !arguments.args.is_empty() {
@@ -90,13 +90,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .keywords
             .iter()
             .filter_map(|keyword| {
-                Some((
-                    keyword.value.node_index().load(),
-                    keyword.arg.as_ref()?.id.clone(),
-                ))
+                Some((keyword.value.node_index().load(), &keyword.arg.as_ref()?.id))
             })
             .collect::<FxHashMap<_, _>>();
-        let mut infer_elt_ty = |builder: &mut Self, (i, elt, tcx): ArgExpr<'db, '_>| {
+        let mut infer_elt_ty = |builder: &mut Self, (i, elt, tcx): ArgExpr<'db, '_, '_>| {
             if i == 0 {
                 let key = keyword_names
                     .get(&elt.node_index().load())

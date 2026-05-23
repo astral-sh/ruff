@@ -23,8 +23,8 @@ impl<'a> ImportSearcher<'a> {
         }
     }
 }
-impl StatementVisitor<'_> for ImportSearcher<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'visit> StatementVisitor<'visit> for ImportSearcher<'_> {
+    fn visit_stmt(&mut self, stmt: &'visit Stmt<'visit>) {
         if self.found_import {
             return;
         }
@@ -39,7 +39,7 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
         statement_visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+    fn visit_body(&mut self, body: &'visit [ruff_python_ast::Stmt<'visit>]) {
         for stmt in body {
             self.visit_stmt(stmt);
             if self.found_import {
@@ -70,8 +70,8 @@ impl<'a> AttributeSearcher<'a> {
     }
 }
 
-impl Visitor<'_> for AttributeSearcher<'_> {
-    fn visit_expr(&mut self, expr: &'_ Expr) {
+impl<'ast> Visitor<'ast> for AttributeSearcher<'ast> {
+    fn visit_expr(&mut self, expr: &'ast Expr<'ast>) {
         if self.found_attribute {
             return;
         }
@@ -87,13 +87,13 @@ impl Visitor<'_> for AttributeSearcher<'_> {
         walk_expr(self, expr);
     }
 
-    fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &'ast ruff_python_ast::Stmt<'ast>) {
         if !self.found_attribute {
             walk_stmt(self, stmt);
         }
     }
 
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+    fn visit_body(&mut self, body: &'ast [ruff_python_ast::Stmt<'ast>]) {
         for stmt in body {
             self.visit_stmt(stmt);
             if self.found_attribute {

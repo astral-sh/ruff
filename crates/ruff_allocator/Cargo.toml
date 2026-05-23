@@ -1,0 +1,21 @@
+[package]
+name = "ruff_allocator"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+bumpalo = { workspace = true }
+get-size2 = { workspace = true, optional = true }
+
+[features]
+get-size = ["dep:get-size2"]
+
+[lints]
+workspace = true

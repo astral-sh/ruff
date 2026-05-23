@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprBytesLiteral, ExprCall, ExprCompare, ExprContext,
@@ -126,7 +127,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
 
     // Now we know the pattern is a string literal with no metacharacters, so
     // we can proceed with the str method replacement.
-    let new_expr = re_func.replacement();
+    let new_expr = re_func.replacement(checker.allocator());
 
     let repl = new_expr.map(|expr| checker.generator().expr(&expr));
     let mut diagnostic = checker.report_diagnostic(
@@ -152,7 +153,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
 #[derive(Debug)]
 enum ReFuncKind<'a> {
     // Only `Some` if it's a fixable `re.sub()` call
-    Sub { repl: Option<&'a Expr> },
+    Sub { repl: Option<&'a Expr<'a>> },
     Match,
     Search,
     Fullmatch,
@@ -162,8 +163,8 @@ enum ReFuncKind<'a> {
 #[derive(Debug)]
 struct ReFunc<'a> {
     kind: ReFuncKind<'a>,
-    pattern: &'a Expr,
-    string: &'a Expr,
+    pattern: &'a Expr<'a>,
+    string: &'a Expr<'a>,
     comparison_to_none: Option<ComparisonToNone>,
     range: TextRange,
 }
@@ -281,58 +282,67 @@ impl<'a> ReFunc<'a> {
     /// Examples:
     ///     `re.search("abc", s) is None` => `"abc" not in s`
     ///     `re.search("abc", s)` => `"abc" in s`
-    fn replacement(&self) -> Option<Expr> {
+    fn replacement(&self, allocator: &'a Allocator) -> Option<Expr<'a>> {
         match (&self.kind, &self.comparison_to_none) {
             // string.replace(pattern, repl)
-            (ReFuncKind::Sub { repl }, _) => repl
-                .cloned()
-                .map(|repl| self.method_expr("replace", vec![self.pattern.clone(), repl])),
+            (ReFuncKind::Sub { repl }, _) => repl.cloned().map(|repl| {
+                self.method_expr("replace", vec![self.pattern.clone(), repl], allocator)
+            }),
             // string.split(pattern)
-            (ReFuncKind::Split, _) => Some(self.method_expr("split", vec![self.pattern.clone()])),
-            // pattern in string
-            (ReFuncKind::Search, None | Some(ComparisonToNone::IsNot)) => {
-                Some(ReFunc::compare_expr(self.pattern, CmpOp::In, self.string))
+            (ReFuncKind::Split, _) => {
+                Some(self.method_expr("split", vec![self.pattern.clone()], allocator))
             }
+            // pattern in string
+            (ReFuncKind::Search, None | Some(ComparisonToNone::IsNot)) => Some(
+                ReFunc::compare_expr(self.pattern, CmpOp::In, self.string, allocator),
+            ),
             // pattern not in string
             (ReFuncKind::Search, Some(ComparisonToNone::Is)) => Some(ReFunc::compare_expr(
                 self.pattern,
                 CmpOp::NotIn,
                 self.string,
+                allocator,
             )),
             // string.startswith(pattern)
             (ReFuncKind::Match, None | Some(ComparisonToNone::IsNot)) => {
-                Some(self.method_expr("startswith", vec![self.pattern.clone()]))
+                Some(self.method_expr("startswith", vec![self.pattern.clone()], allocator))
             }
             // not string.startswith(pattern)
             (ReFuncKind::Match, Some(ComparisonToNone::Is)) => {
-                let expr = self.method_expr("startswith", vec![self.pattern.clone()]);
+                let expr = self.method_expr("startswith", vec![self.pattern.clone()], allocator);
                 let negated_expr = Expr::UnaryOp(ExprUnaryOp {
                     op: UnaryOp::Not,
-                    operand: Box::new(expr),
+                    operand: ArenaBox::new_in(expr, allocator),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 });
                 Some(negated_expr)
             }
             // string == pattern
-            (ReFuncKind::Fullmatch, None | Some(ComparisonToNone::IsNot)) => {
-                Some(ReFunc::compare_expr(self.string, CmpOp::Eq, self.pattern))
-            }
+            (ReFuncKind::Fullmatch, None | Some(ComparisonToNone::IsNot)) => Some(
+                ReFunc::compare_expr(self.string, CmpOp::Eq, self.pattern, allocator),
+            ),
             // string != pattern
             (ReFuncKind::Fullmatch, Some(ComparisonToNone::Is)) => Some(ReFunc::compare_expr(
                 self.string,
                 CmpOp::NotEq,
                 self.pattern,
+                allocator,
             )),
         }
     }
 
     /// Return a new compare expr of the form `left op right`
-    fn compare_expr(left: &Expr, op: CmpOp, right: &Expr) -> Expr {
+    fn compare_expr(
+        left: &'a Expr<'a>,
+        op: CmpOp,
+        right: &Expr<'a>,
+        allocator: &'a Allocator,
+    ) -> Expr<'a> {
         Expr::Compare(ExprCompare {
-            left: Box::new(left.clone()),
-            ops: Box::new([op]),
-            comparators: Box::new([right.clone()]),
+            left: ArenaBox::from_ref(left),
+            ops: ArenaSlice::from_iter_in([op], allocator),
+            comparators: ArenaSlice::from_iter_in([right.clone()], allocator),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
@@ -340,19 +350,19 @@ impl<'a> ReFunc<'a> {
 
     /// Return a new method call expression on `self.string` with `args` like
     /// `self.string.method(args...)`
-    fn method_expr(&self, method: &str, args: Vec<Expr>) -> Expr {
+    fn method_expr(&self, method: &str, args: Vec<Expr<'a>>, allocator: &'a Allocator) -> Expr<'a> {
         let method = Expr::Attribute(ExprAttribute {
-            value: Box::new(self.string.clone()),
-            attr: Identifier::new(method, TextRange::default()),
+            value: ArenaBox::from_ref(self.string),
+            attr: Identifier::new_in(method, TextRange::default(), allocator),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         Expr::Call(ExprCall {
-            func: Box::new(method),
+            func: ArenaBox::new_in(method, allocator),
             arguments: Arguments {
-                args: args.into_boxed_slice(),
-                keywords: Box::new([]),
+                args: ArenaSlice::from_vec_in(args, allocator),
+                keywords: ArenaSlice::new_in(allocator),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
@@ -364,8 +374,8 @@ impl<'a> ReFunc<'a> {
 
 /// A literal that can be either a string or a bytes literal.
 enum Literal<'a> {
-    Str(&'a ExprStringLiteral),
-    Bytes(&'a ExprBytesLiteral),
+    Str(&'a ExprStringLiteral<'a>),
+    Bytes(&'a ExprBytesLiteral<'a>),
 }
 
 impl Literal<'_> {
@@ -392,7 +402,7 @@ fn resolve_literal<'a>(name: &'a Expr, semantic: &'a SemanticModel) -> Option<Li
 fn resolve_bytes_literal<'a>(
     name: &'a Expr,
     semantic: &'a SemanticModel,
-) -> Option<&'a ExprBytesLiteral> {
+) -> Option<&'a ExprBytesLiteral<'a>> {
     if name.is_bytes_literal_expr() {
         return name.as_bytes_literal_expr();
     }
@@ -412,7 +422,7 @@ fn resolve_bytes_literal<'a>(
 fn resolve_string_literal<'a>(
     name: &'a Expr,
     semantic: &'a SemanticModel,
-) -> Option<&'a ExprStringLiteral> {
+) -> Option<&'a ExprStringLiteral<'a>> {
     if name.is_string_literal_expr() {
         return name.as_string_literal_expr();
     }

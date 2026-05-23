@@ -9,8 +9,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatPatternMatchStar;
 
-impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
-    fn fmt_fields(&self, item: &PatternMatchStar, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<PatternMatchStar<'_>> for FormatPatternMatchStar {
+    fn fmt_fields(&self, item: &PatternMatchStar<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let PatternMatchStar { name, .. } = item;
 
         let comments = f.context().comments().clone();
@@ -26,7 +26,7 @@ impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
     }
 }
 
-impl NeedsParentheses for PatternMatchStar {
+impl NeedsParentheses for PatternMatchStar<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

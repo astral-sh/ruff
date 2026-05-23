@@ -5,7 +5,7 @@ use crate::codes::Rule;
 use crate::rules::{flake8_bandit, flake8_pyi, flake8_quotes, pycodestyle, ruff};
 
 /// Run lint rules over a [`StringLike`] syntax nodes.
-pub(crate) fn string_like(string_like: StringLike, checker: &Checker) {
+pub(crate) fn string_like<'ast>(string_like: StringLike<'ast>, checker: &Checker<'ast>) {
     if checker.any_rule_enabled(&[
         Rule::AmbiguousUnicodeCharacterString,
         Rule::AmbiguousUnicodeCharacterDocstring,

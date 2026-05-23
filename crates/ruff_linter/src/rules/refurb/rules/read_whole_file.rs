@@ -4,7 +4,6 @@ use ruff_python_ast::{
     self as ast, Expr, Stmt,
     visitor::{self, Visitor},
 };
-use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -102,7 +101,7 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
 struct ReadMatcher<'a, 'b> {
     checker: &'a Checker<'b>,
     candidates: Vec<FileOpen<'a>>,
-    with_stmt: &'a ast::StmtWith,
+    with_stmt: &'a ast::StmtWith<'a>,
 }
 
 impl<'a, 'b> ReadMatcher<'a, 'b> {
@@ -129,7 +128,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
             {
                 let open = self.candidates.remove(open);
                 let filename_display = open.argument.display(self.checker.source());
-                let suggestion = make_suggestion(&open, self.checker.generator());
+                let suggestion = make_suggestion(&open, self.checker);
                 let mut diagnostic = self.checker.report_diagnostic(
                     ReadWholeFile {
                         filename: SourceCodeSnippet::from_str(filename_display),
@@ -152,7 +151,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
 }
 
 /// Match `x.read()` expression and return expression `x` on success.
-fn match_read_call(expr: &Expr) -> Option<&Expr> {
+fn match_read_call<'a>(expr: &'a Expr<'a>) -> Option<&'a Expr<'a>> {
     let call = expr.as_call_expr()?;
     let attr = call.func.as_attribute_expr()?;
     let method_name = &attr.attr;
@@ -168,25 +167,25 @@ fn match_read_call(expr: &Expr) -> Option<&Expr> {
     Some(&*attr.value)
 }
 
-fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
+fn make_suggestion(open: &FileOpen<'_>, checker: &Checker) -> String {
     let name = ast::ExprName {
-        id: open.mode.pathlib_method(),
+        id: checker.alloc_name(open.mode.pathlib_method().as_str()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let call = ast::ExprCall {
-        func: Box::new(name.into()),
+        func: checker.alloc_expr(name.into()),
         arguments: ast::Arguments {
-            args: Box::from([]),
-            keywords: open.keywords.iter().copied().cloned().collect(),
+            args: checker.alloc_vec(vec![]),
+            keywords: checker.alloc_vec(open.keywords.iter().copied().cloned().collect()),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    generator.expr(&call.into())
+    checker.generator().expr(&call.into())
 }
 
 fn generate_fix(

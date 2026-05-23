@@ -40,7 +40,7 @@ pub struct Unpack<'db> {
     #[no_eq]
     #[tracked]
     #[returns(ref)]
-    pub(crate) _target: AstNodeRef<ast::Expr>,
+    pub(crate) _target: AstNodeRef<ast::Expr<'static>>,
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
@@ -51,7 +51,11 @@ pub struct Unpack<'db> {
 impl get_size2::GetSize for Unpack<'_> {}
 
 impl<'db> Unpack<'db> {
-    pub fn target<'ast>(self, db: &'db dyn Db, parsed: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn target<'ast>(
+        self,
+        db: &'db dyn Db,
+        parsed: &'ast ParsedModuleRef,
+    ) -> &'ast ast::Expr<'ast> {
         self._target(db).node(parsed)
     }
 

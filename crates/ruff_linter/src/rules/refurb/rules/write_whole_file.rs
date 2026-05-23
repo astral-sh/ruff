@@ -102,7 +102,7 @@ struct WriteMatcher<'a, 'b> {
     checker: &'a Checker<'b>,
     candidates: Vec<FileOpen<'a>>,
     loop_counter: u32,
-    with_stmt: &'a ast::StmtWith,
+    with_stmt: &'a ast::StmtWith<'a>,
 }
 
 impl<'a, 'b> WriteMatcher<'a, 'b> {
@@ -166,7 +166,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
 }
 
 /// Match `x.write(foo)` expression and return expression `x` and `foo` on success.
-fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
+fn match_write_call<'a>(expr: &'a Expr<'a>) -> Option<(&'a Expr<'a>, &'a Expr<'a>)> {
     let call = expr.as_call_expr()?;
     let attr = call.func.as_attribute_expr()?;
     let method_name = &attr.attr;

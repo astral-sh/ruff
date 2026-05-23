@@ -7241,7 +7241,7 @@ impl<'db> BindingError<'db> {
     fn get_argument_node(
         node: ast::AnyNodeRef<'_>,
         argument_index: Option<usize>,
-    ) -> Option<ArgOrKeyword<'_>> {
+    ) -> Option<ArgOrKeyword<'_, '_>> {
         match (node, argument_index) {
             (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => Some(
                 call_node

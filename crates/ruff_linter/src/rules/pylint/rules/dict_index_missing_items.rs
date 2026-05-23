@@ -90,9 +90,9 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &StmtFor) {
 /// A visitor to detect subscript operations on a target dictionary.
 struct SubscriptVisitor<'a, 'b> {
     /// The target of the for loop (e.g., `key` in `for key in obj:`).
-    target: &'a Expr,
+    target: &'a Expr<'a>,
     /// The name of the iterated object (e.g., `obj` in `for key in obj:`).
-    dict_name: &'a ast::ExprName,
+    dict_name: &'a ast::ExprName<'a>,
     /// The range to use for the primary diagnostic.
     range: TextRange,
     /// The [`Checker`] used to emit diagnostics.
@@ -104,7 +104,11 @@ struct SubscriptVisitor<'a, 'b> {
 }
 
 impl<'a, 'b> SubscriptVisitor<'a, 'b> {
-    fn new(stmt_for: &'a StmtFor, dict_name: &'a ast::ExprName, checker: &'a Checker<'b>) -> Self {
+    fn new(
+        stmt_for: &'a StmtFor<'a>,
+        dict_name: &'a ast::ExprName<'a>,
+        checker: &'a Checker<'b>,
+    ) -> Self {
         let StmtFor { target, iter, .. } = stmt_for;
         let range = {
             let target_start =
@@ -165,7 +169,7 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
 }
 
 /// Extracts the name of the dictionary from the expression.
-fn extract_dict_name(expr: &Expr) -> Option<&ast::ExprName> {
+fn extract_dict_name<'a>(expr: &'a Expr<'a>) -> Option<&'a ast::ExprName<'a>> {
     // Ex) `for key in obj:`
     if let Some(name_expr) = expr.as_name_expr() {
         return Some(name_expr);
@@ -195,7 +199,7 @@ fn extract_dict_name(expr: &Expr) -> Option<&ast::ExprName> {
 }
 
 /// Returns `true` if the binding is a dictionary, inferred from the type.
-fn is_inferred_dict(name: &ast::ExprName, semantic: &SemanticModel) -> bool {
+fn is_inferred_dict(name: &ast::ExprName<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .only_binding(name)
         .map(|id| semantic.binding(id))

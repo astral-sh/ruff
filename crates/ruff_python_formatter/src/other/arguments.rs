@@ -13,7 +13,7 @@ use crate::string::StringLikeExtensions;
 #[derive(Default)]
 pub struct FormatArguments;
 
-impl FormatNodeRule<Arguments> for FormatArguments {
+impl FormatNodeRule<Arguments<'_>> for FormatArguments {
     fn fmt_fields(&self, item: &Arguments, f: &mut PyFormatter) -> FormatResult<()> {
         let Arguments {
             range,

@@ -12,7 +12,7 @@ use crate::{AnyNodeRef, ExprRef};
 /// generally prefer [`parenthesized_range`].
 pub fn parentheses_iterator<'a>(
     expr: ExprRef<'a>,
-    parent: Option<AnyNodeRef>,
+    parent: Option<AnyNodeRef<'a>>,
     tokens: &'a Tokens,
 ) -> impl Iterator<Item = TextRange> + 'a {
     let after_tokens = if let Some(parent) = parent {
@@ -49,9 +49,9 @@ pub fn parentheses_iterator<'a>(
 
 /// Returns the [`TextRange`] of a given expression including parentheses, if the expression is
 /// parenthesized; or `None`, if the expression is not parenthesized.
-pub fn parenthesized_range(
-    expr: ExprRef,
-    parent: AnyNodeRef,
+pub fn parenthesized_range<'a>(
+    expr: ExprRef<'a>,
+    parent: AnyNodeRef<'a>,
     tokens: &Tokens,
 ) -> Option<TextRange> {
     parentheses_iterator(expr, Some(parent), tokens).last()

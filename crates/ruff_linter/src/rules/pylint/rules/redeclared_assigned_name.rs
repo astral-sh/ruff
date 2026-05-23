@@ -48,7 +48,7 @@ impl Violation for RedeclaredAssignedName {
 }
 
 /// PLW0128
-pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &Vec<Expr>) {
+pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &[Expr]) {
     let mut names: Vec<Name> = Vec::new();
 
     for target in targets {
@@ -76,7 +76,7 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
                 // Ignore dummy variable assignments
                 return;
             }
-            if names.contains(id) {
+            if names.iter().any(|name| name.as_str() == id.as_str()) {
                 checker.report_diagnostic(
                     RedeclaredAssignedName {
                         name: id.to_string(),
@@ -84,7 +84,7 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
                     expr.range(),
                 );
             }
-            names.push(id.clone());
+            names.push(id.to_name());
         }
         _ => {}
     }

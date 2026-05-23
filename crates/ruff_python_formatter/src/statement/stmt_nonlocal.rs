@@ -6,8 +6,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtNonlocal;
 
-impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
-    fn fmt_fields(&self, item: &StmtNonlocal, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<StmtNonlocal<'_>> for FormatStmtNonlocal {
+    fn fmt_fields(&self, item: &StmtNonlocal<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         // Join the `nonlocal` names, breaking across continuation lines if necessary, unless the
         // `nonlocal` statement has a trailing comment, in which case, breaking the names would
         // move the comment "off" of the `nonlocal` statement.

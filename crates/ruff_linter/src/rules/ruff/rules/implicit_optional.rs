@@ -4,7 +4,6 @@ use anyhow::{Context, Result};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -140,9 +139,9 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
     match conversion_type {
         ConversionType::BinOpOr => {
             let new_expr = Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(expr.clone()),
+                left: Checker::expr_ref(expr),
                 op: Operator::BitOr,
-                right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+                right: checker.alloc_expr(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
@@ -165,13 +164,13 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                value: Box::new(Expr::Name(ast::ExprName {
-                    id: Name::new(binding),
+                value: checker.alloc_expr(Expr::Name(ast::ExprName {
+                    id: checker.alloc_name(binding),
                     ctx: ast::ExprContext::Store,
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 })),
-                slice: Box::new(expr.clone()),
+                slice: Checker::expr_ref(expr),
                 ctx: ast::ExprContext::Load,
             });
             let content = checker.generator().expr(&new_expr);

@@ -393,6 +393,7 @@ fn match_continuation(s: &str) -> Option<TextSize> {
 mod tests {
     use anyhow::Result;
 
+    use ruff_allocator::Allocator;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::parse_module;
     use ruff_source_file::LineEnding;
@@ -403,7 +404,8 @@ mod tests {
     #[test]
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion<'_>> {
-            let parsed = parse_module(contents)?;
+            let allocator = Allocator::new();
+            let parsed = parse_module(contents, &allocator)?;
             let stylist = Stylist::from_tokens(parsed.tokens(), contents);
             Ok(Insertion::start_of_file(
                 parsed.suite(),
@@ -568,7 +570,8 @@ import datetime as dt
     #[test]
     fn start_of_block() {
         fn insert(contents: &str, offset: TextSize) -> Insertion<'_> {
-            let parsed = parse_module(contents).unwrap();
+            let allocator = Allocator::new();
+            let parsed = parse_module(contents, &allocator).unwrap();
             let stylist = Stylist::from_tokens(parsed.tokens(), contents);
             Insertion::start_of_block(offset, contents, &stylist, parsed.tokens())
         }
@@ -593,7 +596,8 @@ if True:
     #[test]
     fn existing_import_works() {
         fn snapshot(content: &str, member: &str) -> String {
-            let parsed = parse_module(content).unwrap();
+            let allocator = Allocator::new();
+            let parsed = parse_module(content, &allocator).unwrap();
             let edit = Insertion::existing_import(parsed.suite().first().unwrap(), parsed.tokens())
                 .unwrap()
                 .into_edit(member);

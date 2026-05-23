@@ -82,7 +82,7 @@ impl Default for WithItemLayout {
     }
 }
 
-impl FormatRuleWithOptions<WithItem, PyFormatContext<'_>> for FormatWithItem {
+impl FormatRuleWithOptions<WithItem<'_>, PyFormatContext<'_>> for FormatWithItem {
     type Options = WithItemLayout;
 
     fn with_options(self, options: Self::Options) -> Self {
@@ -90,7 +90,7 @@ impl FormatRuleWithOptions<WithItem, PyFormatContext<'_>> for FormatWithItem {
     }
 }
 
-impl FormatNodeRule<WithItem> for FormatWithItem {
+impl FormatNodeRule<WithItem<'_>> for FormatWithItem {
     fn fmt_fields(&self, item: &WithItem, f: &mut PyFormatter) -> FormatResult<()> {
         let WithItem {
             range: _,

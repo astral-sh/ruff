@@ -150,7 +150,7 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
 /// Any assignment statement, including plain assignment, annotated assignments, and augmented
 /// assignments.
 struct Assignment<'a> {
-    targets: &'a [Expr],
+    targets: &'a [Expr<'a>],
 }
 
 impl<'a> Assignment<'a> {

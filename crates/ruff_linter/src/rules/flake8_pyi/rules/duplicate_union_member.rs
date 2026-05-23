@@ -136,14 +136,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
                 else {
                     return;
                 };
-                generate_union_fix(
-                    checker.generator(),
-                    &importer,
-                    unique_nodes,
-                    expr,
-                    applicability,
-                )
-                .ok()
+                generate_union_fix(checker, &importer, unique_nodes, expr, applicability).ok()
             }
         }
     };
@@ -177,9 +170,9 @@ fn generate_pep604_fix(
         .fold(None, |acc: Option<Expr>, right: &Expr| {
             if let Some(left) = acc {
                 Some(Expr::BinOp(ExprBinOp {
-                    left: Box::new(left),
+                    left: checker.alloc_expr(left),
                     op: Operator::BitOr,
-                    right: Box::new(right.clone()),
+                    right: Checker::expr_ref(right),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }))

@@ -11,6 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_allocator::Allocator;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
@@ -1019,9 +1020,11 @@ mod tests {
         let target_version = settings.unresolved_target_version;
         let options =
             ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-            .try_into_module()
-            .expect("PySourceType always parses into a module");
+        let allocator = Allocator::new();
+        let parsed =
+            ruff_python_parser::parse_unchecked(source_kind.source_code(), options, &allocator)
+                .try_into_module()
+                .expect("PySourceType always parses into a module");
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -1034,6 +1037,7 @@ mod tests {
         let suppressions =
             Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, &settings);
         let mut messages = check_path(
+            &allocator,
             Path::new("<filename>"),
             None,
             &locator,

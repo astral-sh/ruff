@@ -12,7 +12,7 @@ use crate::statement::trailing_semicolon;
 #[derive(Default)]
 pub struct FormatStmtAnnAssign;
 
-impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
+impl FormatNodeRule<StmtAnnAssign<'_>> for FormatStmtAnnAssign {
     fn fmt_fields(&self, item: &StmtAnnAssign, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAnnAssign {
             range: _,

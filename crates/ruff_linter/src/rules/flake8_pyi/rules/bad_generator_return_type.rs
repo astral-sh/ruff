@@ -116,7 +116,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
     }
 
     let returns = match &function_def.returns {
-        Some(returns) => returns.as_ref(),
+        Some(returns) => &**returns,
         _ => return,
     };
 
@@ -276,7 +276,7 @@ fn generate_fix(
 
 #[derive(Debug)]
 struct YieldTypeInfo<'a> {
-    expr: &'a ast::Expr,
+    expr: &'a ast::Expr<'a>,
     range: TextRange,
 }
 

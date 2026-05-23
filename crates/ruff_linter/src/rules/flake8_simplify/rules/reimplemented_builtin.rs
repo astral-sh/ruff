@@ -1,11 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
 };
-use ruff_python_codegen::Generator;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -103,13 +101,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
     match (loop_.return_value, terminal.return_value) {
         // Replace with `any`.
         (true, false) => {
-            let contents = return_stmt(
-                Name::new_static("any"),
-                loop_.test,
-                loop_.target,
-                loop_.iter,
-                checker.generator(),
-            );
+            let contents = return_stmt("any", loop_.test, loop_.target, loop_.iter, checker);
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             if !fits(
@@ -147,7 +139,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     node_index: _,
                 }) = &loop_.test
                 {
-                    *operand.clone()
+                    (**operand).clone()
                 } else if let Expr::Compare(ast::ExprCompare {
                     left,
                     ops,
@@ -170,9 +162,9 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             CmpOp::NotIn => CmpOp::In,
                         };
                         let node = ast::ExprCompare {
-                            left: left.clone(),
-                            ops: Box::from([op]),
-                            comparators: Box::from([comparator.clone()]),
+                            left: *left,
+                            ops: checker.alloc_vec(vec![op]),
+                            comparators: checker.alloc_vec(vec![comparator.clone()]),
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         };
@@ -180,7 +172,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     } else {
                         let node = ast::ExprUnaryOp {
                             op: UnaryOp::Not,
-                            operand: Box::new(loop_.test.clone()),
+                            operand: Checker::expr_ref(loop_.test),
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         };
@@ -189,20 +181,14 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 } else {
                     let node = ast::ExprUnaryOp {
                         op: UnaryOp::Not,
-                        operand: Box::new(loop_.test.clone()),
+                        operand: Checker::expr_ref(loop_.test),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     };
                     node.into()
                 }
             };
-            let contents = return_stmt(
-                Name::new_static("all"),
-                &test,
-                loop_.target,
-                loop_.iter,
-                checker.generator(),
-            );
+            let contents = return_stmt("all", &test, loop_.target, loop_.iter, checker);
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
@@ -247,11 +233,11 @@ struct Loop<'a> {
     /// The `return` value of the loop.
     return_value: bool,
     /// The test condition in the loop.
-    test: &'a Expr,
+    test: &'a Expr<'a>,
     /// The target of the loop.
-    target: &'a Expr,
+    target: &'a Expr<'a>,
     /// The iterator of the loop.
-    iter: &'a Expr,
+    iter: &'a Expr<'a>,
 }
 
 /// Represents a `return` statement following a `for` loop, like:
@@ -273,10 +259,10 @@ struct Loop<'a> {
 #[derive(Debug)]
 struct Terminal<'a> {
     return_value: bool,
-    stmt: &'a Stmt,
+    stmt: &'a Stmt<'a>,
 }
 
-fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
+fn match_loop<'a>(stmt: &'a Stmt<'a>) -> Option<Loop<'a>> {
     let Stmt::For(ast::StmtFor {
         body, target, iter, ..
     }) = stmt
@@ -333,7 +319,7 @@ fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
 ///         return True
 /// return False
 /// ```
-fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
+fn match_else_return<'a>(stmt: &'a Stmt<'a>) -> Option<Terminal<'a>> {
     let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
         return None;
     };
@@ -406,32 +392,32 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
+fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, checker: &Checker) -> String {
     let node = ast::ExprGenerator {
-        elt: Box::new(test.clone()),
-        generators: vec![Comprehension {
+        elt: Checker::expr_ref(test),
+        generators: checker.alloc_vec(vec![Comprehension {
             target: target.clone(),
             iter: iter.clone(),
-            ifs: vec![],
+            ifs: checker.alloc_vec(vec![]),
             is_async: false,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        }],
+        }]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         parenthesized: false,
     };
     let node1 = ast::ExprName {
-        id,
+        id: checker.alloc_name(id),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node2 = ast::ExprCall {
-        func: Box::new(node1.into()),
+        func: checker.alloc_expr(node1.into()),
         arguments: Arguments {
-            args: Box::from([node.into()]),
-            keywords: Box::from([]),
+            args: checker.alloc_vec(vec![node.into()]),
+            keywords: checker.alloc_vec(vec![]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -439,11 +425,11 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node3 = ast::StmtReturn {
-        value: Some(Box::new(node2.into())),
+        value: Some(checker.alloc_expr(node2.into())),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    generator.stmt(&node3.into())
+    checker.generator().stmt(&node3.into())
 }
 
 /// Return `true` if the [`Expr`] contains an `await`, `yield`, or `yield from` expression.

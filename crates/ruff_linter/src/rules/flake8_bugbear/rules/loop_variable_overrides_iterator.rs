@@ -77,11 +77,11 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
 
 #[derive(Default)]
 struct NameFinder<'a> {
-    names: FxHashMap<&'a str, &'a Expr>,
+    names: FxHashMap<&'a str, &'a Expr<'a>>,
 }
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 self.names.insert(id, expr);

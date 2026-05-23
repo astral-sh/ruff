@@ -8,8 +8,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatAlias;
 
-impl FormatNodeRule<Alias> for FormatAlias {
-    fn fmt_fields(&self, item: &Alias, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<Alias<'_>> for FormatAlias {
+    fn fmt_fields(&self, item: &Alias<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let Alias {
             range: _,
             node_index: _,

@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
 
+use ruff_allocator::Allocator;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use ruff_python_ast::helpers::to_module_path;
@@ -33,7 +34,8 @@ impl ModuleImports {
         type_checking_imports: bool,
     ) -> Result<Self> {
         // Parse the source code.
-        let parsed = parse(source, ParseOptions::from(source_type))?;
+        let allocator = Allocator::new();
+        let parsed = parse(source, ParseOptions::from(source_type), &allocator)?;
 
         let module_path =
             package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));

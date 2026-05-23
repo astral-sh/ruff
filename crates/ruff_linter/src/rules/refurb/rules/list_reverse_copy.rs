@@ -107,7 +107,7 @@ pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
 ///
 /// For example, given `list(list(list([1, 2, 3])))`, this function
 /// would return the inner `[1, 2, 3]` expression.
-fn peel_lists(expr: &Expr) -> &Expr {
+fn peel_lists<'a>(expr: &'a Expr<'a>) -> &'a Expr<'a> {
     let Some(ExprCall {
         func, arguments, ..
     }) = expr.as_call_expr()
@@ -134,9 +134,9 @@ fn peel_lists(expr: &Expr) -> &Expr {
 ///
 /// For example, given `reversed(l)`, this function would return `l`.
 fn extract_name_from_reversed<'a>(
-    expr: &'a Expr,
+    expr: &'a Expr<'a>,
     semantic: &SemanticModel,
-) -> Option<&'a ExprName> {
+) -> Option<&'a ExprName<'a>> {
     let ExprCall {
         func, arguments, ..
     } = expr.as_call_expr()?;
@@ -159,7 +159,7 @@ fn extract_name_from_reversed<'a>(
 /// Given a slice expression, returns the inner argument if it's a reversed slice.
 ///
 /// For example, given `l[::-1]`, this function would return `l`.
-fn extract_name_from_sliced_reversed(expr: &Expr) -> Option<&ExprName> {
+fn extract_name_from_sliced_reversed<'a>(expr: &'a Expr<'a>) -> Option<&'a ExprName<'a>> {
     let ExprSubscript { value, slice, .. } = expr.as_subscript_expr()?;
     let ExprSlice {
         lower, upper, step, ..
@@ -186,7 +186,7 @@ fn extract_name_from_sliced_reversed(expr: &Expr) -> Option<&ExprName> {
     value.as_name_expr()
 }
 
-fn extract_reversed<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a ExprName> {
+fn extract_reversed<'a>(expr: &'a Expr<'a>, semantic: &SemanticModel) -> Option<&'a ExprName<'a>> {
     let expr = peel_lists(expr);
     extract_name_from_reversed(expr, semantic).or_else(|| extract_name_from_sliced_reversed(expr))
 }

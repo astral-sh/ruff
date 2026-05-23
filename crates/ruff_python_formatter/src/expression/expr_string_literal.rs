@@ -17,7 +17,7 @@ pub struct FormatExprStringLiteral {
     kind: StringLiteralKind,
 }
 
-impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExprStringLiteral {
+impl FormatRuleWithOptions<ExprStringLiteral<'_>, PyFormatContext<'_>> for FormatExprStringLiteral {
     type Options = StringLiteralKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -26,8 +26,8 @@ impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExp
     }
 }
 
-impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
-    fn fmt_fields(&self, item: &ExprStringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ExprStringLiteral<'_>> for FormatExprStringLiteral {
+    fn fmt_fields(&self, item: &ExprStringLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some(string_literal) = item.as_single_part_string() {
             string_literal.format().with_options(self.kind).fmt(f)
         } else {
@@ -63,7 +63,7 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
     }
 }
 
-impl NeedsParentheses for ExprStringLiteral {
+impl NeedsParentheses for ExprStringLiteral<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

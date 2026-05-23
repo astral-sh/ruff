@@ -22,18 +22,18 @@ use crate::{has_skip_comment, prelude::*};
 /// [source](https://docs.python.org/3/reference/compound_stmts.html#compound-statements)
 #[derive(Copy, Clone)]
 pub(crate) enum ClauseHeader<'a> {
-    Class(&'a StmtClassDef),
-    Function(&'a StmtFunctionDef),
-    If(&'a StmtIf),
-    ElifElse(&'a ElifElseClause),
-    Try(&'a StmtTry),
-    ExceptHandler(&'a ExceptHandlerExceptHandler),
-    TryFinally(&'a StmtTry),
-    Match(&'a StmtMatch),
-    MatchCase(&'a MatchCase),
-    For(&'a StmtFor),
-    While(&'a StmtWhile),
-    With(&'a StmtWith),
+    Class(&'a StmtClassDef<'a>),
+    Function(&'a StmtFunctionDef<'a>),
+    If(&'a StmtIf<'a>),
+    ElifElse(&'a ElifElseClause<'a>),
+    Try(&'a StmtTry<'a>),
+    ExceptHandler(&'a ExceptHandlerExceptHandler<'a>),
+    TryFinally(&'a StmtTry<'a>),
+    Match(&'a StmtMatch<'a>),
+    MatchCase(&'a MatchCase<'a>),
+    For(&'a StmtFor<'a>),
+    While(&'a StmtWhile<'a>),
+    With(&'a StmtWith<'a>),
     OrElse(ElseClause<'a>),
 }
 
@@ -397,9 +397,9 @@ impl<'a> From<ClauseHeader<'a>> for AnyNodeRef<'a> {
 
 #[derive(Copy, Clone)]
 pub(crate) enum ElseClause<'a> {
-    Try(&'a StmtTry),
-    For(&'a StmtFor),
-    While(&'a StmtWhile),
+    Try(&'a StmtTry<'a>),
+    For(&'a StmtFor<'a>),
+    While(&'a StmtWhile<'a>),
 }
 
 impl<'a> From<ElseClause<'a>> for AnyNodeRef<'a> {
@@ -475,13 +475,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
 }
 
 struct FormatClauseBody<'a> {
-    body: &'a Suite,
+    body: &'a Suite<'a>,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 }
 
 fn clause_body<'a>(
-    body: &'a Suite,
+    body: &'a Suite<'a>,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 ) -> FormatClauseBody<'a> {
@@ -525,7 +525,7 @@ pub(crate) struct FormatClause<'a, 'ast> {
     leading_comments: Option<(&'a [SourceComment], Option<AnyNodeRef<'a>>)>,
     /// The trailing comments coming after the colon.
     trailing_colon_comment: &'a [SourceComment],
-    body: &'a Suite,
+    body: &'a Suite<'a>,
     kind: SuiteKind,
 }
 
@@ -565,7 +565,7 @@ pub(crate) fn clause<'a, 'ast, Content>(
     header: ClauseHeader<'a>,
     header_formatter: &'a Content,
     trailing_colon_comment: &'a [SourceComment],
-    body: &'a Suite,
+    body: &'a Suite<'a>,
     kind: SuiteKind,
 ) -> FormatClause<'a, 'ast>
 where

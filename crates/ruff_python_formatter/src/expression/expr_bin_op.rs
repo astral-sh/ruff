@@ -10,14 +10,14 @@ use crate::string::StringLikeExtensions;
 #[derive(Default)]
 pub struct FormatExprBinOp;
 
-impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
+impl FormatNodeRule<ExprBinOp<'_>> for FormatExprBinOp {
     #[inline]
     fn fmt_fields(&self, item: &ExprBinOp, f: &mut PyFormatter) -> FormatResult<()> {
         BinaryLike::Binary(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprBinOp {
+impl NeedsParentheses for ExprBinOp<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

@@ -13,7 +13,7 @@ use crate::{AsFormat, FormatNodeRule};
 #[derive(Default)]
 pub struct FormatStmtAugAssign;
 
-impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
+impl FormatNodeRule<StmtAugAssign<'_>> for FormatStmtAugAssign {
     fn fmt_fields(&self, item: &StmtAugAssign, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAugAssign {
             target,

@@ -654,7 +654,7 @@ impl<'m> Context<'m> {
                     // same scope (in which case the bases refer to the prior
                     // definition).
                     if !model.is_class_name_reassigned(class_def) {
-                        bases.insert(class_def.name.id.clone());
+                        bases.insert(class_def.name.id.to_name());
                     }
                     bases
                 });
@@ -798,7 +798,7 @@ impl<'m> ContextCursor<'m> {
     }
 
     /// Returns the string literal expression that the cursor is positioned within, if any.
-    fn enclosing_string_literal_expr(&self) -> Option<&'m ast::ExprStringLiteral> {
+    fn enclosing_string_literal_expr(&self) -> Option<&'m ast::ExprStringLiteral<'_>> {
         match self.covering_node.parent() {
             Some(ast::AnyNodeRef::ExprStringLiteral(string_expr)) => Some(string_expr),
             _ => None,
@@ -927,7 +927,7 @@ impl<'m> ContextCursor<'m> {
     /// arguments node.
     ///
     /// E.g. `class Foo(Bar<CURSOR>)`
-    fn enclosing_class_def(&self) -> Option<&'m ast::StmtClassDef> {
+    fn enclosing_class_def(&self) -> Option<&'m ast::StmtClassDef<'m>> {
         for node in self.covering_node.ancestors() {
             if let ast::AnyNodeRef::StmtClassDef(class_def) = node {
                 return class_def
@@ -1968,7 +1968,7 @@ impl<'t> CompletionTargetTokens<'t> {
 enum CompletionTargetAst<'t> {
     /// A `object.attribute` scenario, where we want to
     /// list attributes on `object` for completions.
-    ObjectDot { expr: &'t ast::ExprAttribute },
+    ObjectDot { expr: &'t ast::ExprAttribute<'t> },
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
     Scoped(ScopedTarget<'t>),
@@ -1994,7 +1994,7 @@ enum ImportStatement<'a> {
 /// `from ... import ...` statement.
 #[derive(Clone, Debug)]
 struct FromImport<'a> {
-    ast: &'a ast::StmtImportFrom,
+    ast: &'a ast::StmtImportFrom<'a>,
     kind: FromImportKind,
 }
 
@@ -2026,7 +2026,7 @@ enum FromImportKind {
 #[derive(Clone, Debug)]
 struct Import<'a> {
     #[expect(dead_code)]
-    ast: &'a ast::StmtImport,
+    ast: &'a ast::StmtImport<'a>,
     kind: ImportKind,
 }
 
@@ -2586,7 +2586,7 @@ fn add_import_completions_impl<'db>(
 fn find_ast_for_from_import<'p>(
     parsed: &'p ParsedModuleRef,
     token: &Token,
-) -> Option<&'p ast::StmtImportFrom> {
+) -> Option<&'p ast::StmtImportFrom<'p>> {
     let covering_node = covering_node(parsed.syntax().into(), token.range())
         .find_first(|node| node.is_stmt_import_from())
         .ok()?;
@@ -2603,7 +2603,7 @@ fn find_ast_for_from_import<'p>(
 fn find_ast_for_import<'p>(
     parsed: &'p ParsedModuleRef,
     token: &Token,
-) -> Option<&'p ast::StmtImport> {
+) -> Option<&'p ast::StmtImport<'p>> {
     let covering_node = covering_node(parsed.syntax().into(), token.range())
         .find_first(|node| node.is_stmt_import())
         .ok()?;
@@ -9902,7 +9902,8 @@ raise <CURSOR>
     }
 
     fn tokenize(src: &str) -> Tokens {
-        let parsed = ruff_python_parser::parse(src, ParseOptions::from(Mode::Module))
+        let allocator = ruff_allocator::Allocator::new();
+        let parsed = ruff_python_parser::parse(src, ParseOptions::from(Mode::Module), &allocator)
             .expect("valid Python source for token stream");
         parsed.tokens().clone()
     }

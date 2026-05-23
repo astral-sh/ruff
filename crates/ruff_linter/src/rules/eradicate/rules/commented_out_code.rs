@@ -160,6 +160,7 @@ fn is_script_tag_start(line: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::LineRanges;
@@ -182,7 +183,8 @@ mod tests {
 a = 10 # abc
         "#;
 
-        let parsed = parse_module(code).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(code, &allocator).unwrap();
         let locator = Locator::new(code);
 
         let comments = CommentRanges::from(parsed.tokens());
@@ -216,7 +218,8 @@ a = 10 # abc
 a = 10 # abc
         "#;
 
-        let parsed = parse_module(code).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(code, &allocator).unwrap();
         let locator = Locator::new(code);
 
         let comments = CommentRanges::from(parsed.tokens());

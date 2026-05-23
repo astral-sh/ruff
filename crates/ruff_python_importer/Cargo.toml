@@ -21,6 +21,7 @@ ruff_text_size = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]
+ruff_allocator = { workspace = true }
 ruff_python_parser = { workspace = true }
 
 insta = { workspace = true }

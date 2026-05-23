@@ -1,5 +1,6 @@
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
+use ruff_allocator::{Allocator, Box as ArenaBox};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::token::{Tokens, parenthesized_range};
@@ -284,15 +285,19 @@ impl Violation for PytestDuplicateParametrizeTestCases {
     }
 }
 
-fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -> Option<String> {
+fn elts_to_csv(
+    elts: &[Expr],
+    generator: Generator,
+    flags: StringLiteralFlags,
+    allocator: &Allocator,
+) -> Option<String> {
     if !elts.iter().all(Expr::is_string_literal_expr) {
         return None;
     }
 
     let node = Expr::from(ast::StringLiteral {
-        value: elts
-            .iter()
-            .fold(String::new(), |mut acc, elt| {
+        value: ArenaBox::from_str_in(
+            &elts.iter().fold(String::new(), |mut acc, elt| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
                     if !acc.is_empty() {
                         acc.push_str(", ");
@@ -300,8 +305,9 @@ fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -
                     acc.push_str(value.to_str());
                 }
                 acc
-            })
-            .into_boxed_str(),
+            }),
+            allocator,
+        ),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         flags,
@@ -348,17 +354,19 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             name_range,
                         );
                         let node = Expr::Tuple(ast::ExprTuple {
-                            elts: names
-                                .iter()
-                                .map(|name| {
-                                    Expr::from(ast::StringLiteral {
-                                        value: Box::from(*name),
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                        flags: checker.default_string_flags(),
+                            elts: checker.alloc_vec(
+                                names
+                                    .iter()
+                                    .map(|name| {
+                                        Expr::from(ast::StringLiteral {
+                                            value: ArenaBox::from_ref(*name),
+                                            range: TextRange::default(),
+                                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                            flags: checker.default_string_flags(),
+                                        })
                                     })
-                                })
-                                .collect(),
+                                    .collect(),
+                            ),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -380,17 +388,19 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             name_range,
                         );
                         let node = Expr::List(ast::ExprList {
-                            elts: names
-                                .iter()
-                                .map(|name| {
-                                    Expr::from(ast::StringLiteral {
-                                        value: Box::from(*name),
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                        flags: checker.default_string_flags(),
+                            elts: checker.alloc_vec(
+                                names
+                                    .iter()
+                                    .map(|name| {
+                                        Expr::from(ast::StringLiteral {
+                                            value: ArenaBox::from_ref(*name),
+                                            range: TextRange::default(),
+                                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                            flags: checker.default_string_flags(),
+                                        })
                                     })
-                                })
-                                .collect(),
+                                    .collect(),
+                            ),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -419,7 +429,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             expr.range(),
                         );
                         let node = Expr::List(ast::ExprList {
-                            elts: elts.clone(),
+                            elts: *elts,
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -437,9 +447,12 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             },
                             expr.range(),
                         );
-                        if let Some(content) =
-                            elts_to_csv(elts, checker.generator(), checker.default_string_flags())
-                        {
+                        if let Some(content) = elts_to_csv(
+                            elts,
+                            checker.generator(),
+                            checker.default_string_flags(),
+                            checker.replacement_allocator(),
+                        ) {
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 content,
                                 expr.range(),
@@ -464,7 +477,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             expr.range(),
                         );
                         let node = Expr::Tuple(ast::ExprTuple {
-                            elts: elts.clone(),
+                            elts: *elts,
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -483,9 +496,12 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             },
                             expr.range(),
                         );
-                        if let Some(content) =
-                            elts_to_csv(elts, checker.generator(), checker.default_string_flags())
-                        {
+                        if let Some(content) = elts_to_csv(
+                            elts,
+                            checker.generator(),
+                            checker.default_string_flags(),
+                            checker.replacement_allocator(),
+                        ) {
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 content,
                                 expr.range(),

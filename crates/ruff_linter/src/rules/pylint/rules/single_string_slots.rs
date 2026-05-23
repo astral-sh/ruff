@@ -65,7 +65,7 @@ pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 for target in targets {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
-                        if id.as_str() == "__slots__" {
+                        if *id == "__slots__" {
                             if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
                                 checker.report_diagnostic(SingleStringSlots, stmt.identifier());
                             }
@@ -79,7 +79,7 @@ pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
                 ..
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    if id.as_str() == "__slots__" {
+                    if *id == "__slots__" {
                         if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
                             checker.report_diagnostic(SingleStringSlots, stmt.identifier());
                         }

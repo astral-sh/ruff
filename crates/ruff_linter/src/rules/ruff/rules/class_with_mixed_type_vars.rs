@@ -120,7 +120,7 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
 fn typing_generic_base_and_arguments<'a>(
     class_arguments: &'a Arguments,
     semantic: &SemanticModel,
-) -> Option<(&'a ExprSubscript, &'a Expr)> {
+) -> Option<(&'a ExprSubscript<'a>, &'a Expr<'a>)> {
     let (_, base @ ExprSubscript { slice, .. }) = find_generic(class_arguments, semantic)?;
 
     Some((base, slice.as_ref()))
@@ -179,7 +179,7 @@ fn convert_type_vars(
 /// If at least one of them cannot be converted to [`TypeVar`],
 /// `None` is returned.
 fn generic_arguments_to_type_vars<'a>(
-    exprs: impl Iterator<Item = &'a Expr>,
+    exprs: impl Iterator<Item = &'a Expr<'a>>,
     existing_type_params: &TypeParams,
     semantic: &'a SemanticModel,
 ) -> Option<Vec<TypeVar<'a>>> {

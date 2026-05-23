@@ -171,16 +171,16 @@ fn generate_fix(
         .collect();
 
     let new_expr = if is_pep604 {
-        pep_604_union(&reordered)
+        pep_604_union(&reordered, checker.allocator())
     } else {
         // Preserve the original subscript value (e.g., `Union`, `U`, `typing.Union`).
         let Expr::Subscript(subscript) = annotation else {
             return None;
         };
         Expr::Subscript(ruff_python_ast::ExprSubscript {
-            value: subscript.value.clone(),
-            slice: Box::new(Expr::Tuple(ruff_python_ast::ExprTuple {
-                elts: reordered,
+            value: subscript.value,
+            slice: checker.alloc_expr(Expr::Tuple(ruff_python_ast::ExprTuple {
+                elts: checker.alloc_vec(reordered),
                 ctx: ruff_python_ast::ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,

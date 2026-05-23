@@ -73,7 +73,7 @@ pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool
 
 /// Return `true` if any expression in the iterator appears to be an infinite iterator.
 pub(crate) fn any_infinite_iterables<'a>(
-    iter: impl IntoIterator<Item = &'a Expr>,
+    iter: impl IntoIterator<Item = &'a Expr<'a>>,
     semantic: &SemanticModel,
 ) -> bool {
     iter.into_iter()

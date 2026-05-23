@@ -288,7 +288,7 @@ fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
 }
 
 /// Find the `Expr` for top-level `__all__` bindings.
-fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> {
+fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr<'a>> {
     semantic
         .global_scope()
         .get_all("__all__")

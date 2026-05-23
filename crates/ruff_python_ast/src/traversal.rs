@@ -53,12 +53,12 @@ pub fn suite<'a>(
 }
 
 pub struct EnclosingSuite<'a> {
-    suite: &'a [Stmt],
+    suite: &'a [Stmt<'a>],
     position: usize,
 }
 
 impl<'a> EnclosingSuite<'a> {
-    pub fn new(suite: &'a [Stmt], stmt: AnyNodeRef<'a>) -> Option<Self> {
+    pub fn new(suite: &'a [Stmt<'a>], stmt: AnyNodeRef<'a>) -> Option<Self> {
         let position = suite
             .iter()
             .position(|sibling| AnyNodeRef::ptr_eq(sibling.into(), stmt))?;
@@ -66,21 +66,21 @@ impl<'a> EnclosingSuite<'a> {
         Some(EnclosingSuite { suite, position })
     }
 
-    pub fn next_sibling(&self) -> Option<&'a Stmt> {
+    pub fn next_sibling(&self) -> Option<&'a Stmt<'a>> {
         self.suite.get(self.position + 1)
     }
 
-    pub fn next_siblings(&self) -> &'a [Stmt] {
+    pub fn next_siblings(&self) -> &'a [Stmt<'a>] {
         self.suite.get(self.position + 1..).unwrap_or_default()
     }
 
-    pub fn previous_sibling(&self) -> Option<&'a Stmt> {
+    pub fn previous_sibling(&self) -> Option<&'a Stmt<'a>> {
         self.suite.get(self.position.checked_sub(1)?)
     }
 }
 
-impl std::ops::Deref for EnclosingSuite<'_> {
-    type Target = [Stmt];
+impl<'a> std::ops::Deref for EnclosingSuite<'a> {
+    type Target = [Stmt<'a>];
 
     fn deref(&self) -> &Self::Target {
         self.suite

@@ -36,7 +36,7 @@ pub struct FormatParameters {
     parentheses: ParametersParentheses,
 }
 
-impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters {
+impl FormatRuleWithOptions<Parameters<'_>, PyFormatContext<'_>> for FormatParameters {
     type Options = ParametersParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -45,7 +45,7 @@ impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters
     }
 }
 
-impl FormatNodeRule<Parameters> for FormatParameters {
+impl FormatNodeRule<Parameters<'_>> for FormatParameters {
     fn fmt_fields(&self, item: &Parameters, f: &mut PyFormatter) -> FormatResult<()> {
         let Parameters {
             range: _,

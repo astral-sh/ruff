@@ -54,7 +54,7 @@ impl Violation for JumpStatementInFinally {
     }
 }
 
-fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
+fn walk_stmt<'ast>(checker: &Checker, body: &[Stmt<'ast>], f: fn(&Stmt<'ast>) -> bool) {
     for stmt in body {
         if f(stmt) {
             checker.report_diagnostic(

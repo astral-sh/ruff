@@ -17,6 +17,7 @@ test = false
 doctest = false
 
 [dependencies]
+ruff_allocator = { workspace = true, optional = true }
 ruff_db = { workspace = true, features = ["testing"] }
 ruff_linter = { workspace = true, optional = true }
 ruff_python_formatter = { workspace = true, optional = true }
@@ -48,6 +49,7 @@ default = ["ty_instrumented", "ty_walltime", "ruff_instrumented"]
 # Enables the ruff instrumented benchmarks
 ruff_instrumented = [
     "criterion",
+    "ruff_allocator",
     "ruff_linter",
     "ruff_python_formatter",
     "ruff_python_parser",

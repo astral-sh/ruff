@@ -114,8 +114,8 @@ pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: &StmtFor) {
 ///     #      ^      ^                   ^
 ///     ...
 /// ```
-fn binding_names(for_target: &Expr) -> Vec<&ExprName> {
-    fn collect_names<'a>(expr: &'a Expr, names: &mut Vec<&'a ExprName>) {
+fn binding_names<'a>(for_target: &'a Expr<'a>) -> Vec<&'a ExprName<'a>> {
+    fn collect_names<'a>(expr: &'a Expr<'a>, names: &mut Vec<&'a ExprName<'a>>) {
         match expr {
             Expr::Name(name) => names.push(name),
 

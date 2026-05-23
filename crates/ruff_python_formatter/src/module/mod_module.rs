@@ -9,7 +9,7 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatModModule;
 
-impl FormatNodeRule<ModModule> for FormatModModule {
+impl FormatNodeRule<ModModule<'_>> for FormatModModule {
     fn fmt_fields(&self, item: &ModModule, f: &mut PyFormatter) -> FormatResult<()> {
         let ModModule {
             range,

@@ -2947,6 +2947,7 @@ dependencies = [
  "path-absolutize",
  "rayon",
  "regex",
+ "ruff_allocator",
  "ruff_cache",
  "ruff_db",
  "ruff_diagnostics",
@@ -2980,6 +2981,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_allocator"
+version = "0.0.0"
+dependencies = [
+ "bumpalo",
+ "get-size2",
+]
+
+[[package]]
 name = "ruff_annotate_snippets"
 version = "0.1.0"
 dependencies = [
@@ -3004,6 +3013,7 @@ dependencies = [
  "criterion",
  "mimalloc",
  "rayon",
+ "ruff_allocator",
  "ruff_db",
  "ruff_linter",
  "ruff_python_ast",
@@ -3049,6 +3059,7 @@ dependencies = [
  "path-slash",
  "pathdiff",
  "quick-junit",
+ "ruff_allocator",
  "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_diagnostics",
@@ -3073,6 +3084,7 @@ dependencies = [
  "ty_static",
  "web-time",
  "which",
+ "yoke",
  "zip",
 ]
 
@@ -3093,6 +3105,7 @@ dependencies = [
  "rayon",
  "regex",
  "ruff",
+ "ruff_allocator",
  "ruff_formatter",
  "ruff_linter",
  "ruff_notebook",
@@ -3153,6 +3166,7 @@ dependencies = [
  "anyhow",
  "clap",
  "memchr",
+ "ruff_allocator",
  "ruff_cache",
  "ruff_db",
  "ruff_linter",
@@ -3204,6 +3218,7 @@ dependencies = [
  "pep440_rs",
  "pyproject-toml",
  "regex",
+ "ruff_allocator",
  "ruff_cache",
  "ruff_db",
  "ruff_diagnostics",
@@ -3319,11 +3334,13 @@ name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
  "aho-corasick",
+ "arrayvec",
  "bitflags 2.11.1",
  "compact_str",
  "get-size2",
  "is-macro",
  "memchr",
+ "ruff_allocator",
  "ruff_cache",
  "ruff_macros",
  "ruff_python_trivia",
@@ -3334,7 +3351,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "thin-vec",
  "thiserror 2.0.18",
 ]
 
@@ -3343,6 +3359,7 @@ name = "ruff_python_ast_integration_tests"
 version = "0.0.0"
 dependencies = [
  "insta",
+ "ruff_allocator",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_trivia",
@@ -3353,6 +3370,7 @@ dependencies = [
 name = "ruff_python_codegen"
 version = "0.0.0"
 dependencies = [
+ "ruff_allocator",
  "ruff_python_ast",
  "ruff_python_literal",
  "ruff_python_parser",
@@ -3373,6 +3391,7 @@ dependencies = [
  "itertools 0.14.0",
  "memchr",
  "regex",
+ "ruff_allocator",
  "ruff_cache",
  "ruff_db",
  "ruff_formatter",
@@ -3400,6 +3419,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "insta",
+ "ruff_allocator",
  "ruff_diagnostics",
  "ruff_python_ast",
  "ruff_python_codegen",
@@ -3413,6 +3433,7 @@ dependencies = [
 name = "ruff_python_index"
 version = "0.0.0"
 dependencies = [
+ "ruff_allocator",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_trivia",
@@ -3443,6 +3464,7 @@ dependencies = [
  "insta",
  "itertools 0.14.0",
  "memchr",
+ "ruff_allocator",
  "ruff_annotate_snippets",
  "ruff_python_ast",
  "ruff_python_trivia",
@@ -3452,7 +3474,6 @@ dependencies = [
  "serde",
  "serde_json",
  "static_assertions",
- "thin-vec",
  "unicode-ident",
  "unicode-normalization",
  "unicode_names2",
@@ -3466,6 +3487,7 @@ dependencies = [
  "bitflags 2.11.1",
  "insta",
  "is-macro",
+ "ruff_allocator",
  "ruff_cache",
  "ruff_index",
  "ruff_macros",
@@ -3503,6 +3525,7 @@ name = "ruff_python_trivia_integration_tests"
 version = "0.0.0"
 dependencies = [
  "insta",
+ "ruff_allocator",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_text_size",
@@ -3522,6 +3545,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "regex",
+ "ruff_allocator",
  "ruff_db",
  "ruff_diagnostics",
  "ruff_formatter",
@@ -3579,6 +3603,7 @@ dependencies = [
  "getrandom 0.4.2",
  "js-sys",
  "log",
+ "ruff_allocator",
  "ruff_formatter",
  "ruff_linter",
  "ruff_python_ast",
@@ -4169,9 +4194,6 @@ name = "thin-vec"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "259cdf8ed4e4aca6f1e9d011e10bd53f524a2d0637d7b28450f6c64ac298c4c6"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "thiserror"
@@ -4556,6 +4578,7 @@ dependencies = [
  "memchr",
  "rayon",
  "regex",
+ "ruff_allocator",
  "ruff_db",
  "ruff_diagnostics",
  "ruff_index",
@@ -4660,6 +4683,7 @@ dependencies = [
  "get-size2",
  "hashbrown 0.17.1",
  "itertools 0.14.0",
+ "ruff_allocator",
  "ruff_db",
  "ruff_index",
  "ruff_macros",

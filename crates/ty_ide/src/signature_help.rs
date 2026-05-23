@@ -111,7 +111,7 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
 fn get_call_expr(
     parsed: &ruff_db::parsed::ParsedModuleRef,
     offset: TextSize,
-) -> Option<(&ast::ExprCall, usize)> {
+) -> Option<(&ast::ExprCall<'_>, usize)> {
     let root_node: AnyNodeRef = parsed.syntax().into();
 
     // Find the token under the cursor and use its offset to find the node

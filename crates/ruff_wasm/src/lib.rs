@@ -6,6 +6,7 @@ use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+use ruff_allocator::Allocator;
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::Locator;
@@ -223,7 +224,8 @@ impl Workspace {
         // Parse once.
         let options =
             ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-        let parsed = parse_unchecked(source_kind.source_code(), options)
+        let allocator = Allocator::new();
+        let parsed = parse_unchecked(source_kind.source_code(), options, &allocator)
             .try_into_module()
             .expect("`PySourceType` always parses to a `ModModule`.");
 
@@ -253,6 +255,7 @@ impl Workspace {
 
         // Generate checks.
         let diagnostics = check_path(
+            &allocator,
             Path::new("<filename>"),
             None,
             &locator,
@@ -307,7 +310,8 @@ impl Workspace {
     }
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {
-        let parsed = ParsedModule::from_source(contents)?;
+        let allocator = Allocator::new();
+        let parsed = ParsedModule::from_source(contents, &allocator)?;
         let formatted = parsed.format(&self.settings).map_err(into_error)?;
         let printed = formatted.print().map_err(into_error)?;
 
@@ -315,14 +319,16 @@ impl Workspace {
     }
 
     pub fn format_ir(&self, contents: &str) -> Result<String, Error> {
-        let parsed = ParsedModule::from_source(contents)?;
+        let allocator = Allocator::new();
+        let parsed = ParsedModule::from_source(contents, &allocator)?;
         let formatted = parsed.format(&self.settings).map_err(into_error)?;
 
         Ok(format!("{formatted}"))
     }
 
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
-        let parsed = ParsedModule::from_source(contents)?;
+        let allocator = Allocator::new();
+        let parsed = ParsedModule::from_source(contents, &allocator)?;
         let comment_ranges = CommentRanges::from(parsed.parsed.tokens());
         let comments = pretty_comments(parsed.parsed.syntax(), &comment_ranges, contents);
         Ok(comments)
@@ -330,13 +336,15 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
+        let allocator = Allocator::new();
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module), &allocator);
 
         Ok(format!("{:#?}", parsed.into_syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
+        let allocator = Allocator::new();
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module), &allocator);
 
         Ok(format!("{:#?}", parsed.tokens().as_ref()))
     }
@@ -346,15 +354,16 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
 }
 
-struct ParsedModule<'a> {
-    source_code: &'a str,
-    parsed: Parsed<Mod>,
+struct ParsedModule<'source, 'ast> {
+    source_code: &'source str,
+    parsed: Parsed<Mod<'ast>>,
     comment_ranges: CommentRanges,
 }
 
-impl<'a> ParsedModule<'a> {
-    fn from_source(source_code: &'a str) -> Result<Self, Error> {
-        let parsed = parse(source_code, ParseOptions::from(Mode::Module)).map_err(into_error)?;
+impl<'source, 'ast> ParsedModule<'source, 'ast> {
+    fn from_source(source_code: &'source str, allocator: &'ast Allocator) -> Result<Self, Error> {
+        let parsed =
+            parse(source_code, ParseOptions::from(Mode::Module), allocator).map_err(into_error)?;
         let comment_ranges = CommentRanges::from(parsed.tokens());
         Ok(Self {
             source_code,

@@ -28,8 +28,8 @@ struct UnknownTargetCollector<'db, 'map> {
     targets: &'map mut FxHashMap<ExpressionNodeKey, Type<'db>>,
 }
 
-impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+impl<'node> Visitor<'node> for UnknownTargetCollector<'_, '_> {
+    fn visit_expr(&mut self, expr: &'node ast::Expr<'node>) {
         self.targets.insert(expr.into(), Type::unknown());
         visitor::walk_expr(self, expr);
     }
@@ -344,7 +344,9 @@ impl<'db> UnpackResult<'db> {
 }
 
 /// Extract the element slice from a list or tuple expression.
-fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+fn sequence_elts<'node, 'ast: 'node>(
+    expr: &'node ast::Expr<'ast>,
+) -> Option<&'node [ast::Expr<'ast>]> {
     match expr {
         ast::Expr::List(list) => Some(&list.elts),
         ast::Expr::Tuple(tuple) => Some(&tuple.elts),

@@ -17,6 +17,7 @@ ignored = ["ruff_cache"]
 [lib]
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
 ruff_macros = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true }
@@ -24,6 +25,7 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 aho-corasick = { workspace = true }
+arrayvec = { workspace = true }
 bitflags = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true, optional = true }
@@ -35,7 +37,6 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
-thin-vec = { workspace = true }
 
 [features]
 schemars = ["dep:schemars", "dep:serde_json"]
@@ -45,9 +46,8 @@ serde = [
     "ruff_text_size/serde",
     "dep:ruff_cache",
     "compact_str/serde",
-    "thin-vec/serde",
 ]
-get-size = ["dep:get-size2", "ruff_text_size/get-size"]
+get-size = ["dep:get-size2", "ruff_allocator/get-size", "ruff_text_size/get-size"]
 
 [lints]
 workspace = true

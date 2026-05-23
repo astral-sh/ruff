@@ -999,8 +999,8 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
         }
     }
 
-    impl SourceOrderVisitor<'_> for Visitor<'_> {
-        fn visit_f_string(&mut self, f_string: &FString) {
+    impl<'visit> SourceOrderVisitor<'visit> for Visitor<'_> {
+        fn visit_f_string(&mut self, f_string: &'visit FString<'visit>) {
             self.visit_string_like_part(StringLikePart::FString(f_string));
         }
 

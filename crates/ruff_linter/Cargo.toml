@@ -13,6 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["junit", "serde"] }
 ruff_diagnostics = { workspace = true, features = ["serde"] }

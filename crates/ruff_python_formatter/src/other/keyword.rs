@@ -6,7 +6,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatKeyword;
 
-impl FormatNodeRule<Keyword> for FormatKeyword {
+impl FormatNodeRule<Keyword<'_>> for FormatKeyword {
     fn fmt_fields(&self, item: &Keyword, f: &mut PyFormatter) -> FormatResult<()> {
         let Keyword {
             range: _,

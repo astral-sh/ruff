@@ -8,7 +8,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatParameterWithDefault;
 
-impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
+impl FormatNodeRule<ParameterWithDefault<'_>> for FormatParameterWithDefault {
     fn fmt_fields(&self, item: &ParameterWithDefault, f: &mut PyFormatter) -> FormatResult<()> {
         let ParameterWithDefault {
             range: _,

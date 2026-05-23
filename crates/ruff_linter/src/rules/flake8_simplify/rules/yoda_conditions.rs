@@ -83,7 +83,7 @@ enum ConstantLikelihood {
     Definitely = 2,
 }
 
-impl From<&Expr> for ConstantLikelihood {
+impl From<&Expr<'_>> for ConstantLikelihood {
     /// Determine the [`ConstantLikelihood`] of an expression.
     fn from(expr: &Expr) -> Self {
         match expr {

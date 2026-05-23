@@ -3618,7 +3618,7 @@ pub(super) fn report_not_subscriptable(
     }
 }
 
-pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
+pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef<'_>) {
     let Some(builder) = context.report_lint(&ZERO_STEPSIZE_IN_SLICE, node) else {
         return;
     };
@@ -4269,11 +4269,11 @@ pub(super) fn report_possibly_missing_attribute(
     };
 }
 
-pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
-    context: &InferContext<'db, 'ast>,
-    node: &'ast ast::ExprTuple,
+pub(super) fn report_invalid_exception_tuple_caught<'db, 'ctx, 'node, 'ast: 'node>(
+    context: &InferContext<'db, 'ctx>,
+    node: &'node ast::ExprTuple<'ast>,
     node_type: Type<'db>,
-    invalid_tuple_nodes: impl IntoIterator<Item = (&'ast ast::Expr, Type<'db>)>,
+    invalid_tuple_nodes: impl IntoIterator<Item = (&'node ast::Expr<'ast>, Type<'db>)>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
         return;
@@ -5682,9 +5682,9 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
 
 pub(crate) fn report_shadowed_type_variable<'db>(
     context: &InferContext<'db, '_>,
-    typevar_name: &ast::name::Name,
+    typevar_name: &str,
     kind: &str,
-    name: &ast::name::Name,
+    name: &str,
     range: TextRange,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
@@ -6147,12 +6147,12 @@ pub(super) fn report_overridden_final_variable<'db>(
     }
 }
 
-pub(super) fn report_unsupported_comparison<'db>(
+pub(super) fn report_unsupported_comparison<'db, 'ast>(
     context: &InferContext<'db, '_>,
     error: &UnsupportedComparisonError<'db>,
     range: TextRange,
-    left: &ast::Expr,
-    right: &ast::Expr,
+    left: &ast::Expr<'ast>,
+    right: &ast::Expr<'ast>,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
 ) {
@@ -6256,7 +6256,7 @@ pub(super) fn report_unsupported_comparison<'db>(
 
 pub(super) fn report_unsupported_augmented_assignment<'db>(
     context: &InferContext<'db, '_>,
-    stmt: &ast::StmtAugAssign,
+    stmt: &ast::StmtAugAssign<'_>,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
 ) {
@@ -6276,7 +6276,7 @@ pub(super) fn report_unsupported_augmented_assignment<'db>(
 
 pub(super) fn report_unsupported_binary_operation<'db>(
     context: &InferContext<'db, '_>,
-    binary_expression: &ast::ExprBinOp,
+    binary_expression: &ast::ExprBinOp<'_>,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
     operator: ast::Operator,
@@ -6311,15 +6311,15 @@ impl std::fmt::Display for OperatorDisplay {
     }
 }
 
-fn report_unsupported_binary_operation_impl<'a>(
-    context: &'a InferContext<'a, 'a>,
+fn report_unsupported_binary_operation_impl<'ctx, 'db, 'ast>(
+    context: &'ctx InferContext<'db, '_>,
     range: TextRange,
-    left: &ast::Expr,
-    right: &ast::Expr,
-    left_ty: Type<'a>,
-    right_ty: Type<'a>,
+    left: &ast::Expr<'ast>,
+    right: &ast::Expr<'ast>,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
     operator: OperatorDisplay,
-) -> Option<LintDiagnosticGuard<'a, 'a>> {
+) -> Option<LintDiagnosticGuard<'ctx, 'db>> {
     let db = context.db();
     let diagnostic_builder = context.report_lint(&UNSUPPORTED_OPERATOR, range)?;
     let display_settings = DisplaySettings::from_possibly_ambiguous_types(db, [left_ty, right_ty]);

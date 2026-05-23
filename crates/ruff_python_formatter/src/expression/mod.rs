@@ -63,7 +63,7 @@ pub struct FormatExpr {
     parentheses: Parentheses,
 }
 
-impl FormatRuleWithOptions<Expr, PyFormatContext<'_>> for FormatExpr {
+impl FormatRuleWithOptions<Expr<'_>, PyFormatContext<'_>> for FormatExpr {
     type Options = Parentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -72,7 +72,7 @@ impl FormatRuleWithOptions<Expr, PyFormatContext<'_>> for FormatExpr {
     }
 }
 
-impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
+impl FormatRule<Expr<'_>, PyFormatContext<'_>> for FormatExpr {
     fn fmt(&self, expression: &Expr, f: &mut PyFormatter) -> FormatResult<()> {
         let parentheses = self.parentheses;
 
@@ -331,7 +331,7 @@ fn format_with_parentheses_comments(
 /// indicates that it is okay to omit the parentheses. For example, parentheses can always be omitted for lists,
 /// because they already bring their own parentheses.
 pub(crate) fn maybe_parenthesize_expression<'a, T>(
-    expression: &'a Expr,
+    expression: &'a Expr<'a>,
     parent: T,
     parenthesize: Parenthesize,
 ) -> MaybeParenthesizeExpression<'a>
@@ -346,7 +346,7 @@ where
 }
 
 pub(crate) struct MaybeParenthesizeExpression<'a> {
-    expression: &'a Expr,
+    expression: &'a Expr<'a>,
     parent: AnyNodeRef<'a>,
     parenthesize: Parenthesize,
 }
@@ -458,7 +458,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
     }
 }
 
-impl NeedsParentheses for Expr {
+impl NeedsParentheses for Expr<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -502,16 +502,19 @@ impl NeedsParentheses for Expr {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Expr {
-    type Format<'a> = FormatRefWithRule<'a, Expr, FormatExpr, PyFormatContext<'ast>>;
+impl<'ast, 'context> AsFormat<PyFormatContext<'context>> for Expr<'ast> {
+    type Format<'a>
+        = FormatRefWithRule<'a, Expr<'ast>, FormatExpr, PyFormatContext<'context>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatExpr::default())
     }
 }
 
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
-    type Format = FormatOwnedWithRule<Expr, FormatExpr, PyFormatContext<'ast>>;
+impl<'ast, 'context> IntoFormat<PyFormatContext<'context>> for Expr<'ast> {
+    type Format = FormatOwnedWithRule<Expr<'ast>, FormatExpr, PyFormatContext<'context>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatExpr::default())
@@ -617,7 +620,7 @@ struct CanOmitOptionalParenthesesVisitor<'input> {
     max_precedence: OperatorPrecedence,
     max_precedence_count: u32,
     any_parenthesized_expressions: bool,
-    last: Option<&'input Expr>,
+    last: Option<&'input Expr<'input>>,
     first: First<'input>,
     context: &'input PyFormatContext<'input>,
 }
@@ -652,7 +655,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     }
 
     // Visits a subexpression, ignoring whether it is parenthesized or not
-    fn visit_subexpression(&mut self, expr: &'input Expr) {
+    fn visit_subexpression(&mut self, expr: &'input Expr<'input>) {
         match expr {
             Expr::Dict(_)
             | Expr::List(_)
@@ -804,7 +807,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 }
 
 impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
-    fn visit_expr(&mut self, expr: &'input Expr) {
+    fn visit_expr(&mut self, expr: &'input Expr<'input>) {
         self.last = Some(expr);
 
         // Rule only applies for non-parenthesized expressions.
@@ -829,7 +832,7 @@ enum First<'a> {
     /// Expression starts with a non-parentheses token. E.g. `not a`
     Token,
 
-    Expression(&'a Expr),
+    Expression(&'a Expr<'a>),
 }
 
 impl<'a> First<'a> {
@@ -840,7 +843,7 @@ impl<'a> First<'a> {
         }
     }
 
-    fn expression(self) -> Option<&'a Expr> {
+    fn expression(self) -> Option<&'a Expr<'a>> {
         match self {
             First::None | First::Token => None,
             First::Expression(expr) => Some(expr),
@@ -1461,10 +1464,10 @@ pub(crate) const fn is_invalid_type_expression(expr: &Expr) -> bool {
 /// Parenthesized expressions are treated as belonging to the enclosing expression. Therefore, the left
 /// most expression for `(a + b) * c` is `a + b` and not `a`.
 pub(crate) fn left_most<'expr>(
-    expression: &'expr Expr,
+    expression: &'expr Expr<'expr>,
     comment_ranges: &CommentRanges,
     source: &str,
-) -> &'expr Expr {
+) -> &'expr Expr<'expr> {
     let mut current = expression;
     loop {
         let left = match current {

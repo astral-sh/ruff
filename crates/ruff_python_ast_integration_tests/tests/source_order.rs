@@ -2,6 +2,7 @@ use std::fmt::{Debug, Write};
 
 use insta::assert_snapshot;
 
+use ruff_allocator::Allocator;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
 use ruff_python_parser::{Mode, ParseOptions, parse};
@@ -156,7 +157,8 @@ fn t_strings() {
 }
 
 fn trace_source_order_visitation(source: &str) -> String {
-    let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
+    let allocator = Allocator::new();
+    let parsed = parse(source, ParseOptions::from(Mode::Module), &allocator).unwrap();
 
     let mut visitor = RecordVisitor::default();
     visitor.visit_mod(parsed.syntax());

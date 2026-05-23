@@ -10,6 +10,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use log::{debug, warn};
+use ruff_allocator::Allocator;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
@@ -284,28 +285,32 @@ pub(crate) fn lint_path(
                 (result, transformed, fixed)
             } else {
                 // If we fail to fix, lint the original source code.
+                let allocator = Allocator::new();
                 let result = lint_only(
+                    &allocator,
                     path,
                     package,
                     settings,
                     noqa,
                     &source_kind,
                     source_type,
-                    ParseSource::None,
+                    &ParseSource::None,
                 );
                 let transformed = source_kind;
                 let fixed = FixTable::default();
                 (result, transformed, fixed)
             }
         } else {
+            let allocator = Allocator::new();
             let result = lint_only(
+                &allocator,
                 path,
                 package,
                 settings,
                 noqa,
                 &source_kind,
                 source_type,
-                ParseSource::None,
+                &ParseSource::None,
             );
             let transformed = source_kind;
             let fixed = FixTable::default();
@@ -435,14 +440,16 @@ pub(crate) fn lint_stdin(
                 (result, transformed, fixed)
             } else {
                 // If we fail to fix, lint the original source code.
+                let allocator = Allocator::new();
                 let result = lint_only(
+                    &allocator,
                     path.unwrap_or_else(|| Path::new("-")),
                     package,
                     &settings.linter,
                     noqa,
                     &source_kind,
                     py_source_type,
-                    ParseSource::None,
+                    &ParseSource::None,
                 );
 
                 // Write the contents to stdout anyway.
@@ -455,14 +462,16 @@ pub(crate) fn lint_stdin(
                 (result, transformed, fixed)
             }
         } else {
+            let allocator = Allocator::new();
             let result = lint_only(
+                &allocator,
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
                 &settings.linter,
                 noqa,
                 &source_kind,
                 py_source_type,
-                ParseSource::None,
+                &ParseSource::None,
             );
             let transformed = source_kind;
             let fixed = FixTable::default();

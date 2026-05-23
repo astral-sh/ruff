@@ -1,10 +1,12 @@
+use ruff_allocator::Allocator;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_parser::{ParseError, parse_expression};
 
 #[track_caller]
 fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
-    let left_parsed = parse_expression(left)?;
-    let right_parsed = parse_expression(right)?;
+    let allocator = Allocator::new();
+    let left_parsed = parse_expression(left, &allocator)?;
+    let right_parsed = parse_expression(right, &allocator)?;
 
     let left_compr = ComparableExpr::from(left_parsed.expr());
     let right_compr = ComparableExpr::from(right_parsed.expr());
@@ -15,8 +17,9 @@ fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
 
 #[track_caller]
 fn assert_noncomparable(left: &str, right: &str) -> Result<(), ParseError> {
-    let left_parsed = parse_expression(left)?;
-    let right_parsed = parse_expression(right)?;
+    let allocator = Allocator::new();
+    let left_parsed = parse_expression(left, &allocator)?;
+    let right_parsed = parse_expression(right, &allocator)?;
 
     let left_compr = ComparableExpr::from(left_parsed.expr());
     let right_compr = ComparableExpr::from(right_parsed.expr());

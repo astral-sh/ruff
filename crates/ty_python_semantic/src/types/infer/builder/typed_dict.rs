@@ -25,15 +25,15 @@ use ty_python_core::definition::Definition;
 
 /// The shape of a `TypedDict` constructor call that affects how we prepare it for inference.
 #[derive(Debug, Clone, Copy)]
-pub(super) enum TypedDictConstructorForm<'expr> {
+pub(super) enum TypedDictConstructorForm<'node, 'ast> {
     /// // Ex) `TD(x=1)`
     KeywordOnly,
     /// // Ex) `TD({"x": 1})`
-    LiteralOnly(&'expr ast::Expr),
+    LiteralOnly(&'node ast::Expr<'ast>),
     /// // Ex) `TD(other)`
-    SinglePositional(&'expr ast::Expr),
+    SinglePositional(&'node ast::Expr<'ast>),
     /// // Ex) `TD({"x": 1}, y=2)`
-    MixedLiteralAndKeywords(&'expr ast::ExprDict),
+    MixedLiteralAndKeywords(&'node ast::ExprDict<'ast>),
     /// // Ex) `TD(other, y=2)`
     MixedPositionalAndKeywords,
     /// // Ex) `TD(*args)` or `TD(*args, y=2)`
@@ -42,9 +42,9 @@ pub(super) enum TypedDictConstructorForm<'expr> {
     MultiplePositionalArguments,
 }
 
-impl<'expr> TypedDictConstructorForm<'expr> {
+impl<'node, 'ast: 'node> TypedDictConstructorForm<'node, 'ast> {
     /// Return the constructor form for `arguments`.
-    pub(super) fn from_arguments(arguments: &'expr ast::Arguments) -> Self {
+    pub(super) fn from_arguments(arguments: &'node ast::Arguments<'ast>) -> Self {
         let [argument] = &arguments.args[..] else {
             return if arguments.args.is_empty() {
                 Self::KeywordOnly
@@ -357,12 +357,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// expression directly, while mixed dict-literal and keyword calls infer the nested key and
     /// value expressions without re-inferring the outer dict literal later during argument
     /// binding.
-    pub(super) fn prepare_typed_dict_constructor<'expr>(
+    pub(super) fn prepare_typed_dict_constructor<'node, 'ast: 'node>(
         &mut self,
         typed_dict: TypedDictType<'db>,
-        form: TypedDictConstructorForm<'expr>,
-        arguments: &'expr ast::Arguments,
-        error_node: AnyNodeRef<'expr>,
+        form: TypedDictConstructorForm<'node, 'ast>,
+        arguments: &'node ast::Arguments<'ast>,
+        error_node: AnyNodeRef<'node>,
     ) {
         match form {
             TypedDictConstructorForm::LiteralOnly(argument) => {

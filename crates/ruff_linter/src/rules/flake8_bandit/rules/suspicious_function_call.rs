@@ -1041,7 +1041,7 @@ fn suspicious_function(
 
     /// Return the leading characters for an expression, if it's a string literal, f-string, or
     /// string concatenation.
-    fn leading_chars(expr: &Expr) -> Option<impl Iterator<Item = char> + Clone + '_> {
+    fn leading_chars<'a>(expr: &'a Expr<'a>) -> Option<impl Iterator<Item = char> + Clone + 'a> {
         match expr {
             // Ex) `"foo"`
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {

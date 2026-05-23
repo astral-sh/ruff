@@ -269,7 +269,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 /// Collects the chain of names from an attribute expression.
 ///
 /// For example, `A.B.C` returns `["A", "B", "C"]`.
-fn collect_attribute_chain(expr: &Expr) -> Vec<&str> {
+fn collect_attribute_chain<'a>(expr: &'a Expr<'a>) -> Vec<&'a str> {
     let mut chain = Vec::new();
     let mut current = expr;
     loop {

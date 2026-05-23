@@ -158,6 +158,7 @@ impl Deref for Indentation {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_parser::{Mode, ParseOptions, parse_module, parse_unchecked};
     use ruff_source_file::{LineEnding, find_newline};
 
@@ -165,8 +166,9 @@ mod tests {
 
     #[test]
     fn indentation() {
+        let allocator = Allocator::new();
         let contents = r"x = 1";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation::default());
 
@@ -174,7 +176,7 @@ mod tests {
 if True:
   pass
 ";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
@@ -182,7 +184,7 @@ if True:
 if True:
     pass
 ";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation("    ".to_string()));
 
@@ -190,7 +192,7 @@ if True:
 if True:
 	pass
 ";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation("\t".to_string()));
 
@@ -201,7 +203,7 @@ x = (
   3,
 )
 ";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
@@ -211,13 +213,14 @@ class FormFeedIndent:
    def __init__(self, a=[]):
         print(a)
 ";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation(" ".to_string()));
     }
 
     #[test]
     fn indent_non_breaking_whitespace() {
+        let allocator = Allocator::new();
         let contents = r"
 x = (
  1,
@@ -225,7 +228,7 @@ x = (
  3,
 )
 ";
-        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module), &allocator);
         assert_eq!(
             Stylist::from_tokens(parsed.tokens(), contents).indentation(),
             &Indentation(" ".to_string())
@@ -234,33 +237,34 @@ x = (
 
     #[test]
     fn quote() {
+        let allocator = Allocator::new();
         let contents = r"x = 1";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::default());
 
         let contents = r"x = '1'";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r"x = f'1'";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r#"x = "1""#;
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r#"x = f"1""#;
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r#"s = "It's done.""#;
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
@@ -270,7 +274,7 @@ def f():
     """Docstring."""
     pass
 "#;
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::default());
 
@@ -280,7 +284,7 @@ def f():
 
 a = 'v'
 "#;
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
 
@@ -289,7 +293,7 @@ a = 'v'
 
 a = "v"
 "#;
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
@@ -299,7 +303,7 @@ a = "v"
 
 a = f'v'
 "#;
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
 
@@ -308,14 +312,14 @@ a = f'v'
 
 a = f"v"
 "#;
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r"
 f'''Module docstring.'''
 ";
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
     }

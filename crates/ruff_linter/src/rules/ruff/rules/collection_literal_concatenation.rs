@@ -1,3 +1,4 @@
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
@@ -69,14 +70,18 @@ impl Violation for CollectionLiteralConcatenation {
     }
 }
 
-fn make_splat_elts(
-    splat_element: &Expr,
-    other_elements: &[Expr],
+fn make_splat_elts<'alloc, 'ast>(
+    splat_element: &Expr<'ast>,
+    other_elements: &[Expr<'ast>],
     splat_at_left: bool,
-) -> Vec<Expr> {
-    let mut new_elts = other_elements.to_owned();
+    allocator: &'alloc Allocator,
+) -> Vec<Expr<'alloc>>
+where
+    'ast: 'alloc,
+{
+    let mut new_elts: Vec<Expr<'alloc>> = other_elements.to_vec();
     let node = ast::ExprStarred {
-        value: Box::from(splat_element.clone()),
+        value: ArenaBox::new_in(splat_element.clone(), allocator),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -97,7 +102,13 @@ enum Type {
 }
 
 /// Recursively merge all the tuples and lists in the expression.
-fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
+fn concatenate_expressions<'alloc, 'ast>(
+    expr: &Expr<'ast>,
+    allocator: &'alloc Allocator,
+) -> Option<(Expr<'alloc>, Type)>
+where
+    'ast: 'alloc,
+{
     let Expr::BinOp(ast::ExprBinOp {
         left,
         op: Operator::Add,
@@ -110,19 +121,19 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
     };
 
     let new_left = match left.as_ref() {
-        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(left) {
+        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(left, allocator) {
             Some((new_left, _)) => new_left,
-            None => *left.clone(),
+            None => (**left).clone(),
         },
-        _ => *left.clone(),
+        _ => (**left).clone(),
     };
 
     let new_right = match right.as_ref() {
-        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(right) {
+        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(right, allocator) {
             Some((new_right, _)) => new_right,
-            None => *right.clone(),
+            None => (**right).clone(),
         },
-        _ => *right.clone(),
+        _ => (**right).clone(),
     };
 
     // Figure out which way the splat is, and the type of the collection.
@@ -146,11 +157,11 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
         // We'll be a bit conservative here; only calls, names and attribute accesses
         // will be considered as splat elements.
         Expr::Call(_) | Expr::Attribute(_) | Expr::Name(_) => {
-            make_splat_elts(splat_element, other_elements, splat_at_left)
+            make_splat_elts(splat_element, other_elements, splat_at_left, allocator)
         }
         // Subscripts are also considered safe-ish to splat if the indexer is a slice.
         Expr::Subscript(ast::ExprSubscript { slice, .. }) if matches!(&**slice, Expr::Slice(_)) => {
-            make_splat_elts(splat_element, other_elements, splat_at_left)
+            make_splat_elts(splat_element, other_elements, splat_at_left, allocator)
         }
         // If the splat element is itself a list/tuple, insert them in the other list/tuple.
         Expr::List(ast::ExprList { elts, .. }) if matches!(type_, Type::List) => {
@@ -164,14 +175,14 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
 
     let new_expr = match type_ {
         Type::List => ast::ExprList {
-            elts: new_elts,
+            elts: ArenaSlice::from_vec_in(new_elts, allocator),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         }
         .into(),
         Type::Tuple => ast::ExprTuple {
-            elts: new_elts,
+            elts: ArenaSlice::from_vec_in(new_elts, allocator),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -196,7 +207,8 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let Some((new_expr, type_)) = concatenate_expressions(expr) else {
+    let Some((new_expr, type_)) = concatenate_expressions(expr, checker.replacement_allocator())
+    else {
         return;
     };
 

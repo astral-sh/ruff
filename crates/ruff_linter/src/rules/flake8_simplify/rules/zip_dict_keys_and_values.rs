@@ -139,7 +139,9 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     ));
 }
 
-fn get_var_attr_args(expr: &Expr) -> Option<(&ExprName, &Identifier, &Arguments)> {
+fn get_var_attr_args<'a>(
+    expr: &'a Expr<'a>,
+) -> Option<(&'a ExprName<'a>, &'a Identifier<'a>, &'a Arguments<'a>)> {
     let Expr::Call(ast::ExprCall {
         func, arguments, ..
     }) = expr

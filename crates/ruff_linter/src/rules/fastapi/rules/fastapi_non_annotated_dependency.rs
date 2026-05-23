@@ -185,16 +185,16 @@ enum FastApiDependency {
 }
 
 struct DependencyParameter<'a> {
-    annotation: &'a ast::Expr,
-    default: &'a ast::Expr,
+    annotation: &'a ast::Expr<'a>,
+    default: &'a ast::Expr<'a>,
     range: TextRange,
     name: &'a str,
     kind: FastApiDependency,
 }
 
 struct DependencyCall<'a> {
-    default_argument: ast::ArgOrKeyword<'a>,
-    keyword_arguments: Vec<&'a ast::Keyword>,
+    default_argument: ast::ArgOrKeyword<'a, 'a>,
+    keyword_arguments: Vec<&'a ast::Keyword<'a>>,
 }
 
 impl<'a> DependencyCall<'a> {

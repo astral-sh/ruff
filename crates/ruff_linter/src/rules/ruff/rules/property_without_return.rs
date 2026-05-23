@@ -96,8 +96,8 @@ struct PropertyVisitor {
 // NOTE: We are actually searching for the presence of
 // `yield`/`yield from`/`raise`/`return` statement/expression,
 // as having one of those indicates that there's likely no implementation mistake
-impl Visitor<'_> for PropertyVisitor {
-    fn visit_expr(&mut self, expr: &Expr) {
+impl<'ast> Visitor<'ast> for PropertyVisitor {
+    fn visit_expr(&mut self, expr: &'ast Expr<'ast>) {
         if self.found {
             return;
         }

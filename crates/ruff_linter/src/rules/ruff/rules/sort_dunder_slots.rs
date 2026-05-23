@@ -157,7 +157,7 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) {
 
     let mut diagnostic = checker.report_diagnostic(
         UnsortedDunderSlots {
-            class_name: enclosing_class.name.id.clone(),
+            class_name: enclosing_class.name.id.to_name(),
         },
         display.range,
     );
@@ -186,7 +186,7 @@ struct StringLiteralDisplay<'a> {
     /// The elts from the original AST node representing the display.
     /// Each elt is the AST representation of a single string literal
     /// element in the display
-    elts: Cow<'a, [ast::Expr]>,
+    elts: Cow<'a, [ast::Expr<'a>]>,
     /// The source-code range of the display as a whole
     range: TextRange,
     /// What kind of a display is it? A dict, set, list or tuple?
@@ -328,7 +328,7 @@ enum MultilineClassification {
 #[derive(Debug, Copy, Clone)]
 enum DisplayKind<'a> {
     Sequence(SequenceKind),
-    Dict { items: &'a [ast::DictItem] },
+    Dict { items: &'a [ast::DictItem<'a>] },
 }
 
 impl DisplayKind<'_> {
@@ -348,7 +348,7 @@ impl DisplayKind<'_> {
 ///
 /// 1. The three iterables that are zipped together have the same length; and,
 /// 2. The length of all three iterables is >= 2
-struct DictElements<'a>(Vec<(&'a &'a str, &'a ast::Expr, &'a ast::Expr)>);
+struct DictElements<'a>(Vec<(&'a &'a str, &'a ast::Expr<'a>, &'a ast::Expr<'a>)>);
 
 impl<'a> DictElements<'a> {
     fn new(elements: &'a [&str], key_elts: &'a [ast::Expr], items: &'a [ast::DictItem]) -> Self {
@@ -367,7 +367,7 @@ impl<'a> DictElements<'a> {
         self.0.len() - 1
     }
 
-    fn into_sorted_elts(mut self) -> impl Iterator<Item = (&'a ast::Expr, &'a ast::Expr)> {
+    fn into_sorted_elts(mut self) -> impl Iterator<Item = (&'a ast::Expr<'a>, &'a ast::Expr<'a>)> {
         self.0
             .sort_by(|(elem1, _, _), (elem2, _, _)| SORTING_STYLE.compare(elem1, elem2));
         self.0.into_iter().map(|(_, key, value)| (key, value))

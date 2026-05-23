@@ -10,7 +10,7 @@ use crate::prelude::*;
 pub struct FormatTypeParams;
 
 /// Formats a sequence of [`TypeParam`](ruff_python_ast::TypeParam) nodes.
-impl FormatNodeRule<TypeParams> for FormatTypeParams {
+impl FormatNodeRule<TypeParams<'_>> for FormatTypeParams {
     fn fmt_fields(&self, item: &TypeParams, f: &mut PyFormatter) -> FormatResult<()> {
         // A dangling comment indicates a comment on the same line as the opening bracket, e.g.:
         // ```python

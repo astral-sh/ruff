@@ -669,6 +669,7 @@ fn all_lines_fit(
 #[cfg(test)]
 mod tests {
     use anyhow::{Result, anyhow};
+    use ruff_allocator::Allocator;
     use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
@@ -684,20 +685,21 @@ mod tests {
     use crate::{Edit, Fix, Locator, Violation};
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
-    fn parse_first_stmt(source: &str) -> Result<Stmt> {
-        let suite = parse_module(source)?.into_suite();
-        Ok(suite.into_iter().next().unwrap())
+    fn parse_first_stmt<'ast>(source: &str, allocator: &'ast Allocator) -> Result<Stmt<'ast>> {
+        let suite = parse_module(source, allocator)?.into_suite();
+        Ok(suite.into_iter().next().unwrap().clone())
     }
 
     #[test]
     fn find_semicolon() -> Result<()> {
+        let allocator = Allocator::new();
         let contents = "x = 1";
-        let stmt = parse_first_stmt(contents)?;
+        let stmt = parse_first_stmt(contents, &allocator)?;
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt.end(), &locator), None);
 
         let contents = "x = 1; y = 1";
-        let stmt = parse_first_stmt(contents)?;
+        let stmt = parse_first_stmt(contents, &allocator)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -705,7 +707,7 @@ mod tests {
         );
 
         let contents = "x = 1 ; y = 1";
-        let stmt = parse_first_stmt(contents)?;
+        let stmt = parse_first_stmt(contents, &allocator)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -717,7 +719,7 @@ x = 1 \
   ; y = 1
 "
         .trim();
-        let stmt = parse_first_stmt(contents)?;
+        let stmt = parse_first_stmt(contents, &allocator)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -757,8 +759,9 @@ x = 1 \
 
     #[test]
     fn redundant_alias() -> Result<()> {
+        let allocator = Allocator::new();
         let contents = "import x, y as y, z as bees";
-        let stmt = parse_first_stmt(contents)?;
+        let stmt = parse_first_stmt(contents, &allocator)?;
         assert_eq!(
             make_redundant_alias(["x"].into_iter(), &stmt),
             vec![Edit::range_replacement(
@@ -803,9 +806,10 @@ x = 1 \
     #[test_case(r#"["a", "b"]"#,  &["x", "y"], r#"["a", "b", "x", "y"]"#   ; "2 into nonempty list")]
     #[test_case(r#"["a", "b"]"#,  &["x"],      r#"["a", "b", "x"]"#        ; "1 into nonempty list")]
     fn add_to_dunder_all_test(raw: &str, names: &[&str], expect: &str) -> Result<()> {
+        let allocator = Allocator::new();
         let locator = Locator::new(raw);
         let edits = {
-            let parsed = parse_expression(raw)?;
+            let parsed = parse_expression(raw, &allocator)?;
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             add_to_dunder_all(names.iter().copied(), parsed.expr(), &stylist)
         };

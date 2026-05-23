@@ -17,7 +17,7 @@ pub struct FormatExprAttribute {
     call_chain_layout: CallChainLayout,
 }
 
-impl FormatRuleWithOptions<ExprAttribute, PyFormatContext<'_>> for FormatExprAttribute {
+impl FormatRuleWithOptions<ExprAttribute<'_>, PyFormatContext<'_>> for FormatExprAttribute {
     type Options = CallChainLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -26,7 +26,7 @@ impl FormatRuleWithOptions<ExprAttribute, PyFormatContext<'_>> for FormatExprAtt
     }
 }
 
-impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
+impl FormatNodeRule<ExprAttribute<'_>> for FormatExprAttribute {
     fn fmt_fields(&self, item: &ExprAttribute, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprAttribute {
             value,
@@ -187,7 +187,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
     }
 }
 
-impl NeedsParentheses for ExprAttribute {
+impl NeedsParentheses for ExprAttribute<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

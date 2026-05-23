@@ -65,7 +65,7 @@ pub(crate) fn write_suppressed_statements_starting_with_leading_comment<'a>(
     first_suppressed: SuiteChildStatement<'a>,
     statements: &mut std::slice::Iter<'a, Stmt>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<&'a Stmt<'a>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
 
@@ -117,7 +117,7 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
     last_formatted: SuiteChildStatement<'a>,
     statements: &mut std::slice::Iter<'a, Stmt>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<&'a Stmt<'a>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
     let indentation = Indentation::from_stmt(last_formatted.statement(), source);
@@ -270,7 +270,7 @@ fn write_suppressed_statements<'a>(
     // The remaining statements
     statements: &mut std::slice::Iter<'a, Stmt>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<&'a Stmt<'a>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
 
@@ -454,11 +454,11 @@ fn write_suppressed_statements<'a>(
 
 #[cold]
 pub(crate) fn write_skipped_statements<'a>(
-    first_skipped: &'a Stmt,
+    first_skipped: &'a Stmt<'a>,
     statements: &mut std::slice::Iter<'a, Stmt>,
     verbatim_range: TextRange,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<&'a Stmt<'a>> {
     let comments = f.context().comments().clone();
     comments.mark_verbatim_node_comments_formatted(first_skipped.into());
 

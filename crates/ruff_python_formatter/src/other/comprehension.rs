@@ -11,10 +11,10 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatComprehension;
 
-impl FormatNodeRule<Comprehension> for FormatComprehension {
+impl FormatNodeRule<Comprehension<'_>> for FormatComprehension {
     fn fmt_fields(&self, item: &Comprehension, f: &mut PyFormatter) -> FormatResult<()> {
         struct Spacer<'a> {
-            expression: &'a Expr,
+            expression: &'a Expr<'a>,
             preserve_parentheses: bool,
         }
 
@@ -153,7 +153,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
     }
 }
 
-struct ExprTupleWithoutParentheses<'a>(&'a Expr);
+struct ExprTupleWithoutParentheses<'a>(&'a Expr<'a>);
 
 impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {

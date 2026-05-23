@@ -116,7 +116,7 @@ fn check_super_slots(checker: &Checker, class_def: &ast::StmtClassDef, slot: &Sl
     }
 }
 
-fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
+fn slots_members<'a>(body: &'a [Stmt<'a>]) -> FxHashSet<Slot<'a>> {
     let mut members = FxHashSet::default();
     for stmt in body {
         match stmt {
@@ -162,7 +162,7 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
     members
 }
 
-fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot<'_>> {
+fn slots_attributes<'a>(expr: &'a Expr<'a>) -> impl Iterator<Item = Slot<'a>> {
     // Ex) `__slots__ = ("name",)`
     let elts_iter = match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. })

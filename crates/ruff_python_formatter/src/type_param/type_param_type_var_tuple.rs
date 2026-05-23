@@ -6,7 +6,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatTypeParamTypeVarTuple;
 
-impl FormatNodeRule<TypeParamTypeVarTuple> for FormatTypeParamTypeVarTuple {
+impl FormatNodeRule<TypeParamTypeVarTuple<'_>> for FormatTypeParamTypeVarTuple {
     fn fmt_fields(&self, item: &TypeParamTypeVarTuple, f: &mut PyFormatter) -> FormatResult<()> {
         let TypeParamTypeVarTuple {
             range: _,

@@ -101,7 +101,7 @@ pub struct FormatExprTuple {
     parentheses: TupleParentheses,
 }
 
-impl FormatRuleWithOptions<ExprTuple, PyFormatContext<'_>> for FormatExprTuple {
+impl FormatRuleWithOptions<ExprTuple<'_>, PyFormatContext<'_>> for FormatExprTuple {
     type Options = TupleParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -110,7 +110,7 @@ impl FormatRuleWithOptions<ExprTuple, PyFormatContext<'_>> for FormatExprTuple {
     }
 }
 
-impl FormatNodeRule<ExprTuple> for FormatExprTuple {
+impl FormatNodeRule<ExprTuple<'_>> for FormatExprTuple {
     fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprTuple {
             elts,
@@ -205,11 +205,11 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
 
 #[derive(Debug)]
 struct ExprSequence<'a> {
-    tuple: &'a ExprTuple,
+    tuple: &'a ExprTuple<'a>,
 }
 
 impl<'a> ExprSequence<'a> {
-    const fn new(expr: &'a ExprTuple) -> Self {
+    const fn new(expr: &'a ExprTuple<'a>) -> Self {
         Self { tuple: expr }
     }
 }
@@ -222,7 +222,7 @@ impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
     }
 }
 
-impl NeedsParentheses for ExprTuple {
+impl NeedsParentheses for ExprTuple<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

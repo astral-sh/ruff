@@ -22,7 +22,7 @@ use crate::rules::{
 use ruff_python_ast::PythonVersion;
 
 /// Run lint rules over an [`Expr`] syntax node.
-pub(crate) fn expression(expr: &Expr, checker: &Checker) {
+pub(crate) fn expression<'ast>(expr: &Expr<'ast>, checker: &Checker<'ast>) {
     match expr {
         Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
             // Ex) Optional[...], Union[...]

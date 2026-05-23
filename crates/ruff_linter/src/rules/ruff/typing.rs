@@ -20,7 +20,7 @@ fn is_known_type(qualified_name: &QualifiedName, version: ast::PythonVersion) ->
 
 /// Returns an iterator over the expressions in a slice. If the slice is not a
 /// tuple, the iterator will only yield the slice.
-fn resolve_slice_value(slice: &Expr) -> impl Iterator<Item = &Expr> {
+fn resolve_slice_value<'a>(slice: &'a Expr<'a>) -> impl Iterator<Item = &'a Expr<'a>> {
     match slice {
         Expr::Tuple(tuple) => Left(tuple.iter()),
         _ => Right(std::iter::once(slice)),
@@ -39,22 +39,22 @@ enum TypingTarget<'a> {
     Object,
 
     /// Forward reference to a type e.g., `"List[str]"`.
-    ForwardReference(&'a Expr),
+    ForwardReference(&'a Expr<'a>),
 
     /// A `typing.Union` type e.g., `Union[int, str]`.
-    Union(Option<&'a Expr>),
+    Union(Option<&'a Expr<'a>>),
 
     /// A PEP 604 union type e.g., `int | str`.
-    PEP604Union(&'a Expr, &'a Expr),
+    PEP604Union(&'a Expr<'a>, &'a Expr<'a>),
 
     /// A `typing.Literal` type e.g., `Literal[1, 2, 3]`.
-    Literal(Option<&'a Expr>),
+    Literal(Option<&'a Expr<'a>>),
 
     /// A `typing.Optional` type e.g., `Optional[int]`.
-    Optional(Option<&'a Expr>),
+    Optional(Option<&'a Expr<'a>>),
 
     /// A `typing.Annotated` type e.g., `Annotated[int, ...]`.
-    Annotated(Option<&'a Expr>),
+    Annotated(Option<&'a Expr<'a>>),
 
     /// The `typing.Hashable` type.
     Hashable,
@@ -251,7 +251,7 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
     annotation: &'a Expr,
     checker: &'a Checker,
     version: ast::PythonVersion,
-) -> Option<&'a Expr> {
+) -> Option<&'a Expr<'a>> {
     match TypingTarget::try_from_expr(annotation, checker, version) {
         None |
             // Short circuit on top level `None`, `Any` or `Optional`

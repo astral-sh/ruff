@@ -16,7 +16,7 @@ pub(crate) mod styles;
 pub(crate) struct Docstring<'a> {
     pub(crate) definition: &'a Definition<'a>,
     /// The literal AST node representing the docstring.
-    pub(crate) expr: &'a ast::StringLiteral,
+    pub(crate) expr: &'a ast::StringLiteral<'a>,
     /// The source file the docstring was defined in.
     pub(crate) source: &'a str,
 }

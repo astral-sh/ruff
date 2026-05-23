@@ -11,7 +11,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprList;
 
-impl FormatNodeRule<ExprList> for FormatExprList {
+impl FormatNodeRule<ExprList<'_>> for FormatExprList {
     fn fmt_fields(&self, item: &ExprList, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprList {
             range: _,
@@ -39,7 +39,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
     }
 }
 
-impl NeedsParentheses for ExprList {
+impl NeedsParentheses for ExprList<'_> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

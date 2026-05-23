@@ -14,7 +14,7 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatStmtClassDef;
 
-impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
+impl FormatNodeRule<StmtClassDef<'_>> for FormatStmtClassDef {
     fn fmt_fields(&self, item: &StmtClassDef, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtClassDef {
             range: _,
@@ -161,12 +161,12 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
     }
 }
 
-pub(super) struct FormatDecorators<'a> {
-    pub(super) decorators: &'a [Decorator],
+pub(super) struct FormatDecorators<'a, 'ast> {
+    pub(super) decorators: &'a [Decorator<'ast>],
     pub(super) leading_definition_comments: &'a [SourceComment],
 }
 
-impl Format<PyFormatContext<'_>> for FormatDecorators<'_> {
+impl Format<PyFormatContext<'_>> for FormatDecorators<'_, '_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         if let Some(last_decorator) = self.decorators.last() {
             f.join_with(hard_line_break())

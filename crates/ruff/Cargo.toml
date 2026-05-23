@@ -20,6 +20,7 @@ ignored = ["jiff"]
 dist = true
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, default-features = false, features = ["os"] }
 ruff_diagnostics = { workspace = true }

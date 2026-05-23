@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, DecoratorList, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
-    ParameterWithDefault, Parameters, Stmt,
+    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Parameter, ParameterWithDefault,
+    Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
@@ -131,7 +131,10 @@ pub(crate) fn lambda_assignment(
 /// The `Callable` import can be from either `collections.abc` or `typing`.
 /// If an ellipsis is used for the argument types, an empty list is returned.
 /// The returned values are cloned, so they can be used as-is.
-fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Expr>, Expr)> {
+fn extract_types<'a>(
+    annotation: &'a Expr<'a>,
+    semantic: &'a SemanticModel<'a>,
+) -> Option<(Vec<Expr<'a>>, Expr<'a>)> {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
         return None;
     };
@@ -159,7 +162,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     // For parameter specifications, we cannot assign per-parameter annotations,
     // but we can still preserve the return type annotation.
     let params = match param_types {
-        Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
+        Expr::List(ast::ExprList { elts, .. }) => elts.to_vec(),
         Expr::EllipsisLiteral(_) => vec![],
         // Treat any other form (e.g., `ParamSpec`, `Concatenate`, etc.) as a
         // parameter specification: do not annotate individual parameters, but
@@ -184,13 +187,15 @@ fn function(
     // Use a dummy body. It gets replaced at the end with the actual body.
     // This allows preserving the source formatting for the body.
     let body = Stmt::Return(ast::StmtReturn {
-        value: Some(Box::new(Expr::EllipsisLiteral(
-            ExprEllipsisLiteral::default(),
-        ))),
+        value: Some(checker.alloc_expr(Expr::EllipsisLiteral(ExprEllipsisLiteral::default()))),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
-    let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
+    let parameters = lambda
+        .parameters
+        .as_deref()
+        .cloned()
+        .unwrap_or_else(|| Parameters::empty_in(checker.replacement_allocator()));
     if let Some(annotation) = annotation {
         if let Some((arg_types, return_type)) = extract_types(annotation, checker.semantic()) {
             // A `lambda` expression can only have positional-only and positional-or-keyword
@@ -201,14 +206,12 @@ fn function(
                 .enumerate()
                 .map(|(idx, parameter)| ParameterWithDefault {
                     parameter: Parameter {
-                        annotation: arg_types
-                            .get(idx)
-                            .map(|arg_type| Box::new(arg_type.clone())),
+                        annotation: arg_types.get(idx).map(Checker::expr_ref),
                         ..parameter.parameter.clone()
                     },
                     ..parameter.clone()
                 })
-                .collect::<ast::ParameterWithDefaults>();
+                .collect::<Vec<_>>();
             let new_args = parameters
                 .args
                 .iter()
@@ -217,23 +220,23 @@ fn function(
                     parameter: Parameter {
                         annotation: arg_types
                             .get(idx + new_posonlyargs.len())
-                            .map(|arg_type| Box::new(arg_type.clone())),
+                            .map(Checker::expr_ref),
                         ..parameter.parameter.clone()
                     },
                     ..parameter.clone()
                 })
-                .collect::<ast::ParameterWithDefaults>();
+                .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
-                name: Identifier::new(name.to_string(), TextRange::default()),
-                parameters: Box::new(Parameters {
-                    posonlyargs: new_posonlyargs,
-                    args: new_args,
+                name: checker.alloc_identifier(name, TextRange::default()),
+                parameters: checker.alloc_parameters(Parameters {
+                    posonlyargs: checker.alloc_vec(new_posonlyargs),
+                    args: checker.alloc_vec(new_args),
                     ..parameters
                 }),
-                body: ast::Suite::from([body]),
-                decorator_list: ast::DecoratorList::new(),
-                returns: Some(Box::new(return_type)),
+                body: checker.alloc_vec(vec![body]),
+                decorator_list: checker.alloc_vec(vec![]),
+                returns: Some(checker.alloc_expr(return_type)),
                 type_params: None,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -245,10 +248,10 @@ fn function(
     }
     let function = Stmt::FunctionDef(ast::StmtFunctionDef {
         is_async: false,
-        name: Identifier::new(name.to_string(), TextRange::default()),
-        parameters: Box::new(parameters),
-        body: ast::Suite::from([body]),
-        decorator_list: DecoratorList::new(),
+        name: checker.alloc_identifier(name, TextRange::default()),
+        parameters: checker.alloc_parameters(parameters),
+        body: checker.alloc_vec(vec![body]),
+        decorator_list: checker.alloc_vec(vec![]),
         returns: None,
         type_params: None,
         range: TextRange::default(),

@@ -36,17 +36,17 @@ impl FromStr for LiteralType {
 }
 
 impl LiteralType {
-    fn as_zero_value_expr(self, checker: &Checker) -> Expr {
+    fn as_zero_value_expr(self, checker: &Checker) -> Expr<'static> {
         match self {
             LiteralType::Str => ast::StringLiteral {
-                value: Box::default(),
+                value: "".into(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 flags: checker.default_string_flags(),
             }
             .into(),
             LiteralType::Bytes => ast::BytesLiteral {
-                value: Box::default(),
+                value: (&[][..]).into(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 flags: checker.default_bytes_flags(),

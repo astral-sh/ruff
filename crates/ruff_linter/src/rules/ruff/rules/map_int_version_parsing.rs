@@ -61,7 +61,7 @@ pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCall) {
 fn map_call_with_two_arguments<'a>(
     semantic: &SemanticModel,
     call: &'a ast::ExprCall,
-) -> Option<(&'a ast::Expr, &'a ast::Expr)> {
+) -> Option<(&'a ast::Expr<'a>, &'a ast::Expr<'a>)> {
     let ast::ExprCall {
         func,
         arguments:

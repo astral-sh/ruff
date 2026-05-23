@@ -506,7 +506,7 @@ fields = [
 [Expr.nodes.ExprName]
 doc = "See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)"
 fields = [
-  { name = "id", type = "Name" },
+  { name = "id", type = "AstName" },
   { name = "ctx", type = "ExprContext" },
 ]
 

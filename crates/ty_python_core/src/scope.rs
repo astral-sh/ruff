@@ -264,22 +264,22 @@ impl ScopeKind {
 
 /// Reference to a node that introduces a new scope.
 #[derive(Copy, Clone, Debug)]
-pub enum NodeWithScopeRef<'a> {
+pub enum NodeWithScopeRef<'node, 'ast> {
     Module,
-    Class(&'a ast::StmtClassDef),
-    Function(&'a ast::StmtFunctionDef),
-    Lambda(&'a ast::ExprLambda),
-    FunctionTypeParameters(&'a ast::StmtFunctionDef),
-    ClassTypeParameters(&'a ast::StmtClassDef),
-    TypeAlias(&'a ast::StmtTypeAlias),
-    TypeAliasTypeParameters(&'a ast::StmtTypeAlias),
-    ListComprehension(&'a ast::ExprListComp),
-    SetComprehension(&'a ast::ExprSetComp),
-    DictComprehension(&'a ast::ExprDictComp),
-    GeneratorExpression(&'a ast::ExprGenerator),
+    Class(&'node ast::StmtClassDef<'ast>),
+    Function(&'node ast::StmtFunctionDef<'ast>),
+    Lambda(&'node ast::ExprLambda<'ast>),
+    FunctionTypeParameters(&'node ast::StmtFunctionDef<'ast>),
+    ClassTypeParameters(&'node ast::StmtClassDef<'ast>),
+    TypeAlias(&'node ast::StmtTypeAlias<'ast>),
+    TypeAliasTypeParameters(&'node ast::StmtTypeAlias<'ast>),
+    ListComprehension(&'node ast::ExprListComp<'ast>),
+    SetComprehension(&'node ast::ExprSetComp<'ast>),
+    DictComprehension(&'node ast::ExprDictComp<'ast>),
+    GeneratorExpression(&'node ast::ExprGenerator<'ast>),
 }
 
-impl NodeWithScopeRef<'_> {
+impl NodeWithScopeRef<'_, '_> {
     /// Converts the unowned reference to an owned [`NodeWithScopeKind`].
     ///
     /// Note that node wrapped by `self` must be a child of `module`.
@@ -364,17 +364,17 @@ impl NodeWithScopeRef<'_> {
 #[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
 pub enum NodeWithScopeKind {
     Module,
-    Class(AstNodeRef<ast::StmtClassDef>),
-    ClassTypeParameters(AstNodeRef<ast::StmtClassDef>),
-    Function(AstNodeRef<ast::StmtFunctionDef>),
-    FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
-    TypeAliasTypeParameters(AstNodeRef<ast::StmtTypeAlias>),
-    TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
-    Lambda(AstNodeRef<ast::ExprLambda>),
-    ListComprehension(AstNodeRef<ast::ExprListComp>),
-    SetComprehension(AstNodeRef<ast::ExprSetComp>),
-    DictComprehension(AstNodeRef<ast::ExprDictComp>),
-    GeneratorExpression(AstNodeRef<ast::ExprGenerator>),
+    Class(AstNodeRef<ast::StmtClassDef<'static>>),
+    ClassTypeParameters(AstNodeRef<ast::StmtClassDef<'static>>),
+    Function(AstNodeRef<ast::StmtFunctionDef<'static>>),
+    FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef<'static>>),
+    TypeAliasTypeParameters(AstNodeRef<ast::StmtTypeAlias<'static>>),
+    TypeAlias(AstNodeRef<ast::StmtTypeAlias<'static>>),
+    Lambda(AstNodeRef<ast::ExprLambda<'static>>),
+    ListComprehension(AstNodeRef<ast::ExprListComp<'static>>),
+    SetComprehension(AstNodeRef<ast::ExprSetComp<'static>>),
+    DictComprehension(AstNodeRef<ast::ExprDictComp<'static>>),
+    GeneratorExpression(AstNodeRef<ast::ExprGenerator<'static>>),
 }
 
 impl NodeWithScopeKind {
@@ -395,36 +395,36 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
+    pub fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef<'static>>> {
         match self {
             Self::Class(class) => Some(class),
             _ => None,
         }
     }
 
-    pub fn expect_class(&self) -> &AstNodeRef<ast::StmtClassDef> {
+    pub fn expect_class(&self) -> &AstNodeRef<ast::StmtClassDef<'static>> {
         self.as_class().expect("expected class")
     }
 
-    pub fn as_function(&self) -> Option<&AstNodeRef<ast::StmtFunctionDef>> {
+    pub fn as_function(&self) -> Option<&AstNodeRef<ast::StmtFunctionDef<'static>>> {
         match self {
             Self::Function(function) => Some(function),
             _ => None,
         }
     }
 
-    pub fn expect_function(&self) -> &AstNodeRef<ast::StmtFunctionDef> {
+    pub fn expect_function(&self) -> &AstNodeRef<ast::StmtFunctionDef<'static>> {
         self.as_function().expect("expected function")
     }
 
-    pub fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
+    pub fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias<'static>>> {
         match self {
             Self::TypeAlias(type_alias) => Some(type_alias),
             _ => None,
         }
     }
 
-    pub fn expect_type_alias(&self) -> &AstNodeRef<ast::StmtTypeAlias> {
+    pub fn expect_type_alias(&self) -> &AstNodeRef<ast::StmtTypeAlias<'static>> {
         self.as_type_alias().expect("expected type alias")
     }
 

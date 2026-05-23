@@ -1596,8 +1596,8 @@ struct LegacyNamespacePackageVisitor {
     in_body: bool,
 }
 
-impl Visitor<'_> for LegacyNamespacePackageVisitor {
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+impl<'a> Visitor<'a> for LegacyNamespacePackageVisitor {
+    fn visit_body(&mut self, body: &'a [ruff_python_ast::Stmt<'a>]) {
         if self.is_legacy_namespace_package {
             return;
         }
@@ -1612,7 +1612,7 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
         walk_body(self, body);
     }
 
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt<'a>) {
         if self.is_legacy_namespace_package {
             return;
         }
@@ -1635,7 +1635,7 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
 impl LegacyNamespacePackageVisitor {
     /// Check for `__path__ = pkgutil.extend_path(__path__, __name__)` or
     /// `__path__ = __import__("pkgutil").extend_path(__path__, __name__)`
-    fn check_pkgutil_extend_path(&mut self, targets: &[ast::Expr], value: &ast::Expr) {
+    fn check_pkgutil_extend_path(&mut self, targets: &[ast::Expr<'_>], value: &ast::Expr<'_>) {
         let [ast::Expr::Name(maybe_path)] = targets else {
             return;
         };
@@ -1715,7 +1715,7 @@ impl LegacyNamespacePackageVisitor {
     }
 
     /// Check for `__import__('pkg_resources').declare_namespace(__name__)`
-    fn check_pkg_resources_declare_namespace(&mut self, value: &ast::Expr) {
+    fn check_pkg_resources_declare_namespace(&mut self, value: &ast::Expr<'_>) {
         let ast::Expr::Call(ast::ExprCall {
             func,
             arguments: declare_arguments,

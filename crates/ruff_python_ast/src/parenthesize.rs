@@ -15,7 +15,7 @@ use crate::ExprRef;
 /// Prefer [`crate::token::parentheses_iterator`] if you have access to [`crate::token::Tokens`].
 pub fn parentheses_iterator<'a>(
     expr: ExprRef<'a>,
-    parent: Option<AnyNodeRef>,
+    parent: Option<AnyNodeRef<'a>>,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
 ) -> impl Iterator<Item = TextRange> + 'a {
@@ -61,9 +61,9 @@ pub fn parentheses_iterator<'a>(
 /// parenthesized; or `None`, if the expression is not parenthesized.
 ///
 /// Prefer [`crate::token::parenthesized_range`] if you have access to [`crate::token::Tokens`].
-pub fn parenthesized_range(
-    expr: ExprRef,
-    parent: AnyNodeRef,
+pub fn parenthesized_range<'a>(
+    expr: ExprRef<'a>,
+    parent: AnyNodeRef<'a>,
     comment_ranges: &CommentRanges,
     source: &str,
 ) -> Option<TextRange> {

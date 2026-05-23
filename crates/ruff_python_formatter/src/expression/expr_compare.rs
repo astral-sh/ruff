@@ -11,14 +11,14 @@ use crate::string::StringLikeExtensions;
 #[derive(Default)]
 pub struct FormatExprCompare;
 
-impl FormatNodeRule<ExprCompare> for FormatExprCompare {
+impl FormatNodeRule<ExprCompare<'_>> for FormatExprCompare {
     #[inline]
     fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
         BinaryLike::Compare(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprCompare {
+impl NeedsParentheses for ExprCompare<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

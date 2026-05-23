@@ -6,8 +6,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtGlobal;
 
-impl FormatNodeRule<StmtGlobal> for FormatStmtGlobal {
-    fn fmt_fields(&self, item: &StmtGlobal, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<StmtGlobal<'_>> for FormatStmtGlobal {
+    fn fmt_fields(&self, item: &StmtGlobal<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         // Join the `global` names, breaking across continuation lines if necessary, unless the
         // `global` statement has a trailing comment, in which case, breaking the names would
         // move the comment "off" of the `global` statement.

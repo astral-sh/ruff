@@ -1,11 +1,9 @@
 use log::debug;
 
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{
-    self as ast, Arguments, DecoratorList, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
-};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -88,13 +86,13 @@ pub(crate) fn convert_named_tuple_functional_to_class(
 
     let fields = match (args, keywords) {
         // Ex) `NamedTuple("MyType")`
-        ([_typename], []) => Suite::from([Stmt::Pass(ast::StmtPass {
+        ([_typename], []) => vec![Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })]),
+        })],
         // Ex) `NamedTuple("MyType", [("a", int), ("b", str)])`
         ([_typename, fields], []) => {
-            if let Some(fields) = create_fields_from_fields_arg(fields) {
+            if let Some(fields) = create_fields_from_fields_arg(fields, checker.allocator()) {
                 fields
             } else {
                 debug!("Skipping `NamedTuple` \"{typename}\": unable to parse fields");
@@ -103,7 +101,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         }
         // Ex) `NamedTuple("MyType", a=int, b=str)`
         ([_typename], keywords) => {
-            if let Some(fields) = create_fields_from_keywords(keywords) {
+            if let Some(fields) = create_fields_from_keywords(keywords, checker.allocator()) {
                 fields
             } else {
                 debug!("Skipping `NamedTuple` \"{typename}\": unable to parse keywords");
@@ -132,6 +130,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             base_class,
             checker.generator(),
             checker.comment_ranges(),
+            checker.allocator(),
         ));
     }
 }
@@ -141,7 +140,7 @@ fn match_named_tuple_assign<'a>(
     targets: &'a [Expr],
     value: &'a Expr,
     semantic: &SemanticModel,
-) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
+) -> Option<(&'a str, &'a [Expr<'a>], &'a [Keyword<'a>], &'a Expr<'a>)> {
     let [Expr::Name(ast::ExprName { id: typename, .. })] = targets else {
         return None;
     };
@@ -161,9 +160,13 @@ fn match_named_tuple_assign<'a>(
 }
 
 /// Generate a [`Stmt::AnnAssign`] representing the provided field definition.
-fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
+fn create_field_assignment_stmt<'a>(
+    field: ast::name::AstName<'a>,
+    annotation: &'a Expr<'a>,
+    allocator: &'a Allocator,
+) -> Stmt<'a> {
     ast::StmtAnnAssign {
-        target: Box::new(
+        target: ArenaBox::new_in(
             ast::ExprName {
                 id: field,
                 ctx: ExprContext::Load,
@@ -171,8 +174,9 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
+            allocator,
         ),
-        annotation: Box::new(annotation.clone()),
+        annotation: ArenaBox::from_ref(annotation),
         value: None,
         simple: true,
         range: TextRange::default(),
@@ -182,14 +186,17 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
 }
 
 /// Create a list of field assignments from the `NamedTuple` fields argument.
-fn create_fields_from_fields_arg(fields: &Expr) -> Option<Suite> {
+fn create_fields_from_fields_arg<'a>(
+    fields: &'a Expr<'a>,
+    allocator: &'a Allocator,
+) -> Option<Vec<Stmt<'a>>> {
     let fields = fields.as_list_expr()?;
     if fields.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Some(Suite::from([node]))
+        Some(vec![node])
     } else {
         fields
             .iter()
@@ -209,8 +216,9 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Suite> {
                     return None;
                 }
                 Some(create_field_assignment_stmt(
-                    Name::new(field.to_str()),
+                    ast::name::AstName::new_in(field.to_str(), allocator),
                     annotation,
+                    allocator,
                 ))
             })
             .collect()
@@ -218,32 +226,42 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Suite> {
 }
 
 /// Create a list of field assignments from the `NamedTuple` keyword arguments.
-fn create_fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
+fn create_fields_from_keywords<'a>(
+    keywords: &'a [Keyword<'a>],
+    allocator: &'a Allocator,
+) -> Option<Vec<Stmt<'a>>> {
     keywords
         .iter()
         .map(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map(|field| create_field_assignment_stmt(field.id.clone(), &keyword.value))
+            keyword.arg.as_ref().map(|field| {
+                create_field_assignment_stmt(field.id.clone(), &keyword.value, allocator)
+            })
         })
         .collect()
 }
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body and
 /// keywords.
-fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt {
+fn create_class_def_stmt<'a>(
+    typename: &'a str,
+    body: Vec<Stmt<'a>>,
+    base_class: &'a Expr<'a>,
+    allocator: &'a Allocator,
+) -> Stmt<'a> {
     ast::StmtClassDef {
-        name: Identifier::new(typename.to_string(), TextRange::default()),
-        arguments: Some(Box::new(Arguments {
-            args: Box::from([base_class.clone()]),
-            keywords: Box::from([]),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })),
-        body,
+        name: Identifier::new_in(typename, TextRange::default(), allocator),
+        arguments: Some(ArenaBox::new_in(
+            Arguments {
+                args: ArenaSlice::from_iter_in([base_class.clone()], allocator),
+                keywords: ArenaSlice::new_in(allocator),
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            },
+            allocator,
+        )),
+        body: ArenaSlice::from_vec_in(body, allocator),
         type_params: None,
-        decorator_list: DecoratorList::new(),
+        decorator_list: ArenaSlice::new_in(allocator),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
@@ -251,17 +269,20 @@ fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt
 }
 
 /// Generate a `Fix` to convert a `NamedTuple` assignment to a class definition.
-fn convert_to_class(
-    stmt: &Stmt,
-    typename: &str,
-    body: Suite,
-    base_class: &Expr,
+fn convert_to_class<'a>(
+    stmt: &Stmt<'a>,
+    typename: &'a str,
+    body: Vec<Stmt<'a>>,
+    base_class: &'a Expr<'a>,
     generator: Generator,
     comment_ranges: &CommentRanges,
+    allocator: &'a Allocator,
 ) -> Fix {
     Fix::applicable_edit(
         Edit::range_replacement(
-            generator.stmt(&create_class_def_stmt(typename, body, base_class)),
+            generator.stmt(&create_class_def_stmt(
+                typename, body, base_class, allocator,
+            )),
             stmt.range(),
         ),
         if comment_ranges.intersects(stmt.range()) {

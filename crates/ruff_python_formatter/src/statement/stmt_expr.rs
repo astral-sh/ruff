@@ -9,7 +9,7 @@ use crate::statement::trailing_semicolon;
 #[derive(Default)]
 pub struct FormatStmtExpr;
 
-impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
+impl FormatNodeRule<StmtExpr<'_>> for FormatStmtExpr {
     fn fmt_fields(&self, item: &StmtExpr, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtExpr { value, .. } = item;
 

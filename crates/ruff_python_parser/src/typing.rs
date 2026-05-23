@@ -1,25 +1,26 @@
 //! This module takes care of parsing a type annotation.
 
+use ruff_allocator::Allocator;
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
 use ruff_text_size::Ranged;
 
 use crate::{ParseError, Parsed, parse_expression, parse_string_annotation};
 
-type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
+type AnnotationParseResult<'ast> = Result<ParsedAnnotation<'ast>, ParseError>;
 
 #[derive(Debug)]
-pub struct ParsedAnnotation {
-    parsed: Parsed<ModExpression>,
+pub struct ParsedAnnotation<'ast> {
+    parsed: Parsed<ModExpression<'ast>>,
     kind: AnnotationKind,
 }
 
-impl ParsedAnnotation {
-    pub fn parsed(&self) -> &Parsed<ModExpression> {
+impl<'ast> ParsedAnnotation<'ast> {
+    pub fn parsed(&self) -> &Parsed<ModExpression<'ast>> {
         &self.parsed
     }
 
-    pub fn expression(&self) -> &Expr {
+    pub fn expression(&self) -> &Expr<'ast> {
         self.parsed.expr()
     }
 
@@ -52,39 +53,46 @@ impl AnnotationKind {
 
 /// Parses the given string expression node as a type annotation. The given `source` is the entire
 /// source code.
-pub fn parse_type_annotation(
+pub fn parse_type_annotation<'ast>(
     string_expr: &ExprStringLiteral,
     source: &str,
-) -> AnnotationParseResult {
+    allocator: &'ast Allocator,
+) -> AnnotationParseResult<'ast> {
     if let Some(string_literal) = string_expr.as_single_part_string() {
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
         if &source[string_literal.content_range()] == string_literal.as_str() {
-            parse_simple_type_annotation(string_literal, source)
+            parse_simple_type_annotation(string_literal, source, allocator)
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the
             // case for annotations that contain escaped quotes.
-            parse_complex_type_annotation(string_expr)
+            parse_complex_type_annotation(string_expr, allocator)
         }
     } else {
         // String is implicitly concatenated.
-        parse_complex_type_annotation(string_expr)
+        parse_complex_type_annotation(string_expr, allocator)
     }
 }
 
-fn parse_simple_type_annotation(
+fn parse_simple_type_annotation<'ast>(
     string_literal: &StringLiteral,
     source: &str,
-) -> AnnotationParseResult {
+    allocator: &'ast Allocator,
+) -> AnnotationParseResult<'ast> {
     Ok(ParsedAnnotation {
-        parsed: parse_string_annotation(source, string_literal)?,
+        parsed: parse_string_annotation(source, string_literal, allocator)?,
         kind: AnnotationKind::Simple,
     })
 }
 
-fn parse_complex_type_annotation(string_expr: &ExprStringLiteral) -> AnnotationParseResult {
-    let mut parsed = parse_expression(string_expr.value.to_str())?;
-    relocate_expr(parsed.expr_mut(), string_expr.range());
+fn parse_complex_type_annotation<'ast>(
+    string_expr: &ExprStringLiteral,
+    allocator: &'ast Allocator,
+) -> AnnotationParseResult<'ast> {
+    let mut parsed = parse_expression(string_expr.value.to_str(), allocator)?;
+    let mut relocated = parsed.expr().clone();
+    relocate_expr(&mut relocated, string_expr.range(), allocator);
+    parsed.replace_expr(relocated, allocator);
     Ok(ParsedAnnotation {
         parsed,
         kind: AnnotationKind::Complex,

@@ -29,12 +29,13 @@ use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticTag, IntoDiagnosticMessage, Span};
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::name::{AstName, QualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
@@ -194,12 +195,13 @@ impl ExpectedDocstringKind {
 }
 
 pub(crate) struct Checker<'a> {
+    allocator: &'a Allocator,
     /// The [`Parsed`] output for the source code.
-    parsed: &'a Parsed<ModModule>,
+    parsed: &'a Parsed<ModModule<'a>>,
     /// An internal cache for parsed string annotations
     parsed_annotations_cache: ParsedAnnotationsCache<'a>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.
-    parsed_type_annotation: Option<&'a ParsedAnnotation>,
+    parsed_type_annotation: Option<&'a ParsedAnnotation<'a>>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// Whether `path` points to an `__init__.py` file.
@@ -255,8 +257,9 @@ pub(crate) struct Checker<'a> {
 impl<'a> Checker<'a> {
     #[expect(clippy::too_many_arguments)]
     pub(crate) fn new(
-        parsed: &'a Parsed<ModModule>,
-        parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
+        allocator: &'a Allocator,
+        parsed: &'a Parsed<ModModule<'a>>,
+        parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation<'a>, ParseError>>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -274,6 +277,7 @@ impl<'a> Checker<'a> {
     ) -> Self {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
+            allocator,
             parsed,
             parsed_type_annotation: None,
             parsed_annotations_cache: ParsedAnnotationsCache::new(parsed_annotations_arena),
@@ -514,6 +518,66 @@ impl<'a> Checker<'a> {
         &self.importer
     }
 
+    pub(crate) const fn allocator(&self) -> &'a Allocator {
+        self.allocator
+    }
+
+    /// Returns the AST allocator with a lifetime limited to a generated replacement.
+    ///
+    /// Replacement nodes are formatted immediately and do not need to borrow the
+    /// allocator for the lifetime of the parsed module.
+    pub(crate) const fn replacement_allocator(&self) -> &Allocator {
+        self.allocator
+    }
+
+    pub(crate) fn alloc_expr<'alloc, 'expr>(
+        &'alloc self,
+        value: Expr<'expr>,
+    ) -> ArenaBox<'alloc, Expr<'alloc>>
+    where
+        'expr: 'alloc,
+    {
+        ArenaBox::new_in(value, self.allocator)
+    }
+
+    pub(crate) fn alloc_vec<'alloc, T: 'alloc>(
+        &'alloc self,
+        values: Vec<T>,
+    ) -> ArenaSlice<'alloc, T> {
+        ArenaSlice::from_vec_in(values, self.allocator)
+    }
+
+    pub(crate) fn alloc_name(&self, name: impl AsRef<str>) -> AstName<'_> {
+        AstName::new_in(name, self.allocator)
+    }
+
+    pub(crate) fn alloc_identifier(
+        &self,
+        name: impl AsRef<str>,
+        range: TextRange,
+    ) -> ast::Identifier<'_> {
+        ast::Identifier::new_in(name, range, self.allocator)
+    }
+
+    pub(crate) fn expr_ref<'alloc, 'expr>(
+        value: &'alloc Expr<'expr>,
+    ) -> ArenaBox<'alloc, Expr<'alloc>>
+    where
+        'expr: 'alloc,
+    {
+        ArenaBox::from_ref(value)
+    }
+
+    pub(crate) fn alloc_parameters<'alloc, 'parameters>(
+        &'alloc self,
+        value: Parameters<'parameters>,
+    ) -> ArenaBox<'alloc, Parameters<'alloc>>
+    where
+        'parameters: 'alloc,
+    {
+        ArenaBox::new_in(value, self.allocator)
+    }
+
     /// The [`SemanticModel`], built up over the course of the AST traversal.
     pub(crate) const fn semantic(&self) -> &SemanticModel<'a> {
         &self.semantic
@@ -573,9 +637,12 @@ impl<'a> Checker<'a> {
     pub(crate) fn parse_type_annotation(
         &self,
         annotation: &ast::ExprStringLiteral,
-    ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
-        self.parsed_annotations_cache
-            .lookup_or_parse(annotation, self.locator.contents())
+    ) -> Result<&'a ParsedAnnotation<'a>, &'a ParseError> {
+        self.parsed_annotations_cache.lookup_or_parse(
+            annotation,
+            self.locator.contents(),
+            self.allocator,
+        )
     }
 
     /// Apply a test to an annotation expression,
@@ -586,7 +653,7 @@ impl<'a> Checker<'a> {
     pub(crate) fn match_maybe_stringized_annotation(
         &self,
         expr: &ast::Expr,
-        match_fn: impl FnOnce(&ast::Expr) -> bool,
+        match_fn: impl for<'expr> FnOnce(&ast::Expr<'expr>) -> bool,
     ) -> bool {
         if let ast::Expr::StringLiteral(string_annotation) = expr {
             let Some(parsed_annotation) = self.parse_type_annotation(string_annotation).ok() else {
@@ -943,7 +1010,7 @@ impl SemanticSyntaxContext for Checker<'_> {
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -1262,7 +1329,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 // The default values of the parameters needs to be evaluated in the enclosing
                 // scope.
-                for parameter in parameters {
+                for parameter in parameters.iter() {
                     if let Some(expr) = parameter.default() {
                         self.visit_expr(expr);
                     }
@@ -1292,7 +1359,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
-                for parameter in parameters {
+                for parameter in parameters.iter() {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
@@ -1635,14 +1702,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.last_stmt_end = stmt.end();
     }
 
-    fn visit_annotation(&mut self, expr: &'a Expr) {
+    fn visit_annotation(&mut self, expr: &'a Expr<'a>) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPING_ONLY_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = flags_snapshot;
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         // Step 0: Pre-processing
@@ -2252,7 +2319,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.pop_node();
     }
 
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler<'a>) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
@@ -2303,7 +2370,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
     }
 
-    fn visit_parameters(&mut self, parameters: &'a Parameters) {
+    fn visit_parameters(&mut self, parameters: &'a Parameters<'a>) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
@@ -2315,7 +2382,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::parameters(parameters, self);
     }
 
-    fn visit_parameter(&mut self, parameter: &'a Parameter) {
+    fn visit_parameter(&mut self, parameter: &'a Parameter<'a>) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
@@ -2330,7 +2397,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::parameter(parameter, self);
     }
 
-    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+    fn visit_pattern(&mut self, pattern: &'a Pattern<'a>) {
         // Step 1: Binding
         if let Pattern::MatchAs(ast::PatternMatchAs {
             name: Some(name), ..
@@ -2359,7 +2426,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::pattern(pattern, self);
     }
 
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&mut self, body: &'a [Stmt<'a>]) {
         // Step 4: Analysis
         analyze::suite(body, self);
 
@@ -2369,7 +2436,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+    fn visit_match_case(&mut self, match_case: &'a MatchCase<'a>) {
         self.visit_pattern(&match_case.pattern);
         if let Some(expr) = &match_case.guard {
             self.visit_boolean_test(expr);
@@ -2380,7 +2447,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.pop_branch();
     }
 
-    fn visit_type_param(&mut self, type_param: &'a ast::TypeParam) {
+    fn visit_type_param(&mut self, type_param: &'a ast::TypeParam<'a>) {
         // Step 1: Binding
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. })
@@ -2443,7 +2510,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_interpolated_string_element(
         &mut self,
-        interpolated_string_element: &'a InterpolatedStringElement,
+        interpolated_string_element: &'a InterpolatedStringElement<'a>,
     ) {
         let snapshot = self.semantic.flags;
         if interpolated_string_element.is_interpolation() {
@@ -2456,7 +2523,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
 impl<'a> Checker<'a> {
     /// Visit a [`Module`].
-    fn visit_module(&mut self, python_ast: &'a Suite) {
+    fn visit_module(&mut self, python_ast: &'a Suite<'a>) {
         // Extract any global bindings from the module body.
         if let Some(globals) = Globals::from_body(python_ast) {
             self.semantic.set_globals(globals);
@@ -2466,7 +2533,7 @@ impl<'a> Checker<'a> {
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
-    fn visit_generators(&mut self, kind: GeneratorKind, generators: &'a [Comprehension]) {
+    fn visit_generators(&mut self, kind: GeneratorKind, generators: &'a [Comprehension<'a>]) {
         let mut iterator = generators.iter();
 
         let Some(generator) = iterator.next() else {
@@ -2541,7 +2608,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit a body of [`Stmt`] nodes within a type-checking block.
-    fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
+    fn visit_type_checking_block(&mut self, body: &'a [Stmt<'a>]) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
@@ -2549,7 +2616,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a runtime-evaluated type annotation.
-    fn visit_runtime_evaluated_annotation(&mut self, expr: &'a Expr) {
+    fn visit_runtime_evaluated_annotation(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION;
         self.visit_type_definition(expr);
@@ -2557,7 +2624,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a runtime-required type annotation.
-    fn visit_runtime_required_annotation(&mut self, expr: &'a Expr) {
+    fn visit_runtime_required_annotation(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION;
         self.visit_type_definition(expr);
@@ -2575,7 +2642,7 @@ impl<'a> Checker<'a> {
     /// ```
     ///
     /// [PEP 613]: https://peps.python.org/pep-0613/
-    fn visit_annotated_type_alias_value(&mut self, expr: &'a Expr) {
+    fn visit_annotated_type_alias_value(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::ANNOTATED_TYPE_ALIAS;
         self.visit_type_definition(expr);
@@ -2591,7 +2658,7 @@ impl<'a> Checker<'a> {
     /// ```
     ///
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-    fn visit_deferred_type_alias_value(&mut self, expr: &'a Expr) {
+    fn visit_deferred_type_alias_value(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         // even though we don't visit these nodes immediately we need to
         // modify the semantic flags before we push the expression and its
@@ -2604,7 +2671,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a type definition.
-    fn visit_type_definition(&mut self, expr: &'a Expr) {
+    fn visit_type_definition(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -2612,7 +2679,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
-    fn visit_non_type_definition(&mut self, expr: &'a Expr) {
+    fn visit_non_type_definition(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -2620,7 +2687,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as the `typ` argument to `typing.cast`.
-    fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
+    fn visit_cast_type_argument(&mut self, arg: &'a Expr<'a>) {
         self.visit_type_definition(arg);
 
         if !self.source_type.is_stub() && self.is_rule_enabled(Rule::RuntimeCastValue) {
@@ -2631,7 +2698,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
     /// expressions return value is significant, or whether the calling context only relies on
     /// its truthiness.
-    fn visit_boolean_test(&mut self, expr: &'a Expr) {
+    fn visit_boolean_test(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
@@ -2639,7 +2706,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`ElifElseClause`]
-    fn visit_elif_else_clause(&mut self, clause: &'a ElifElseClause) {
+    fn visit_elif_else_clause(&mut self, clause: &'a ElifElseClause<'a>) {
         if let Some(test) = &clause.test {
             self.visit_boolean_test(test);
         }
@@ -2880,7 +2947,7 @@ impl<'a> Checker<'a> {
         self.add_binding(id, expr.range(), BindingKind::Assignment, flags);
     }
 
-    fn handle_node_delete(&mut self, expr: &'a Expr) {
+    fn handle_node_delete(&mut self, expr: &'a Expr<'a>) {
         let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
@@ -3278,12 +3345,12 @@ impl<'a> Checker<'a> {
 }
 
 struct ParsedAnnotationsCache<'a> {
-    arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
-    by_offset: RefCell<FxHashMap<TextSize, Result<&'a ParsedAnnotation, &'a ParseError>>>,
+    arena: &'a typed_arena::Arena<Result<ParsedAnnotation<'a>, ParseError>>,
+    by_offset: RefCell<FxHashMap<TextSize, Result<&'a ParsedAnnotation<'a>, &'a ParseError>>>,
 }
 
 impl<'a> ParsedAnnotationsCache<'a> {
-    fn new(arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>) -> Self {
+    fn new(arena: &'a typed_arena::Arena<Result<ParsedAnnotation<'a>, ParseError>>) -> Self {
         Self {
             arena,
             by_offset: RefCell::default(),
@@ -3294,14 +3361,15 @@ impl<'a> ParsedAnnotationsCache<'a> {
         &self,
         annotation: &ast::ExprStringLiteral,
         source: &str,
-    ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
+        allocator: &'a Allocator,
+    ) -> Result<&'a ParsedAnnotation<'a>, &'a ParseError> {
         *self
             .by_offset
             .borrow_mut()
             .entry(annotation.start())
             .or_insert_with(|| {
                 self.arena
-                    .alloc(parse_type_annotation(annotation, source))
+                    .alloc(parse_type_annotation(annotation, source, allocator))
                     .as_ref()
             })
     }
@@ -3312,21 +3380,22 @@ impl<'a> ParsedAnnotationsCache<'a> {
 }
 
 #[expect(clippy::too_many_arguments)]
-pub(crate) fn check_ast(
-    parsed: &Parsed<ModModule>,
-    locator: &Locator,
-    stylist: &Stylist,
-    indexer: &Indexer,
-    noqa_line_for: &NoqaMapping,
-    settings: &LinterSettings,
+pub(crate) fn check_ast<'a>(
+    allocator: &'a Allocator,
+    parsed: &'a Parsed<ModModule<'a>>,
+    locator: &'a Locator<'a>,
+    stylist: &'a Stylist<'a>,
+    indexer: &'a Indexer,
+    noqa_line_for: &'a NoqaMapping,
+    settings: &'a LinterSettings,
     noqa: flags::Noqa,
-    path: &Path,
-    package: Option<PackageRoot<'_>>,
+    path: &'a Path,
+    package: Option<PackageRoot<'a>>,
     source_type: PySourceType,
-    cell_offsets: Option<&CellOffsets>,
-    notebook_index: Option<&NotebookIndex>,
+    cell_offsets: Option<&'a CellOffsets>,
+    notebook_index: Option<&'a NotebookIndex>,
     target_version: TargetVersion,
-    context: &LintContext,
+    context: &'a LintContext<'a>,
 ) -> Vec<SemanticSyntaxError> {
     let module_path = package
         .map(PackageRoot::path)
@@ -3350,10 +3419,11 @@ pub(crate) fn check_ast(
         python_ast: parsed.suite(),
     };
 
-    let allocator = typed_arena::Arena::new();
+    let parsed_annotations_arena = typed_arena::Arena::new();
     let mut checker = Checker::new(
+        allocator,
         parsed,
-        &allocator,
+        &parsed_annotations_arena,
         settings,
         noqa_line_for,
         noqa,

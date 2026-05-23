@@ -1,6 +1,7 @@
 //! Tests for [`ruff_python_ast::tokens::parentheses_iterator`] and
 //! [`ruff_python_ast::tokens::parenthesized_range`].
 
+use ruff_allocator::Allocator;
 use ruff_python_ast::{
     self as ast, Expr,
     token::{parentheses_iterator, parenthesized_range},
@@ -9,8 +10,9 @@ use ruff_python_parser::parse_module;
 
 #[test]
 fn test_no_parentheses() {
+    let allocator = Allocator::new();
     let source = "x = 2 + 2";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -25,8 +27,9 @@ fn test_no_parentheses() {
 
 #[test]
 fn test_single_parentheses() {
+    let allocator = Allocator::new();
     let source = "x = (2 + 2)";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -42,8 +45,9 @@ fn test_single_parentheses() {
 
 #[test]
 fn test_double_parentheses() {
+    let allocator = Allocator::new();
     let source = "x = ((2 + 2))";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -59,8 +63,9 @@ fn test_double_parentheses() {
 
 #[test]
 fn test_parentheses_with_whitespace() {
+    let allocator = Allocator::new();
     let source = "x = (  2 + 2  )";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -76,8 +81,9 @@ fn test_parentheses_with_whitespace() {
 
 #[test]
 fn test_parentheses_with_comments() {
+    let allocator = Allocator::new();
     let source = "x = ( # comment\n    2 + 2\n)";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -93,8 +99,9 @@ fn test_parentheses_with_comments() {
 
 #[test]
 fn test_parenthesized_range_multiple() {
+    let allocator = Allocator::new();
     let source = "x = (((2 + 2)))";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -110,8 +117,9 @@ fn test_parenthesized_range_multiple() {
 
 #[test]
 fn test_parentheses_iterator_multiple() {
+    let allocator = Allocator::new();
     let source = "x = (((2 + 2)))";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -130,8 +138,9 @@ fn test_parentheses_iterator_multiple() {
 
 #[test]
 fn test_call_arguments_not_counted() {
+    let allocator = Allocator::new();
     let source = "f(x)";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -156,8 +165,9 @@ fn test_call_arguments_not_counted() {
 
 #[test]
 fn test_call_with_parenthesized_argument() {
+    let allocator = Allocator::new();
     let source = "f((x))";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
@@ -183,8 +193,9 @@ fn test_call_with_parenthesized_argument() {
 
 #[test]
 fn test_multiline_with_parentheses() {
+    let allocator = Allocator::new();
     let source = "x = (\n    2 + 2 + 2\n)";
-    let parsed = parse_module(source).expect("should parse valid python");
+    let parsed = parse_module(source, &allocator).expect("should parse valid python");
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 

@@ -1624,6 +1624,7 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_ast::{Mod, ModModule};
     use ruff_python_parser::{self, Mode, ParseOptions, parse_module};
     use ruff_source_file::LineEnding;
@@ -1633,9 +1634,10 @@ mod tests {
     use super::{Generator, Mode as UnparseMode};
 
     fn round_trip(contents: &str) -> String {
+        let allocator = Allocator::new();
         let indentation = Indentation::default();
         let line_ending = LineEnding::default();
-        let module = parse_module(contents).unwrap();
+        let module = parse_module(contents, &allocator).unwrap();
         let mut generator = Generator::new(&indentation, line_ending);
         generator.unparse_suite(module.suite());
         generator.generate()
@@ -1649,17 +1651,20 @@ mod tests {
         unparse_mode: UnparseMode,
         contents: &str,
     ) -> String {
-        let module = parse_module(contents).unwrap();
+        let allocator = Allocator::new();
+        let module = parse_module(contents, &allocator).unwrap();
         let mut generator = Generator::new(indentation, line_ending).with_mode(unparse_mode);
         generator.unparse_suite(module.suite());
         generator.generate()
     }
 
     fn jupyter_round_trip(contents: &str) -> String {
+        let allocator = Allocator::new();
         let indentation = Indentation::default();
         let line_ending = LineEnding::default();
         let parsed =
-            ruff_python_parser::parse(contents, ParseOptions::from(Mode::Ipython)).unwrap();
+            ruff_python_parser::parse(contents, ParseOptions::from(Mode::Ipython), &allocator)
+                .unwrap();
         let Mod::Module(ModModule { body, .. }) = parsed.into_syntax() else {
             panic!("Source code didn't return ModModule")
         };

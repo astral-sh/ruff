@@ -20,27 +20,27 @@ pub trait SourceOrderVisitor<'a> {
     fn leave_node(&mut self, _node: AnyNodeRef<'a>) {}
 
     #[inline]
-    fn visit_mod(&mut self, module: &'a Mod) {
+    fn visit_mod(&mut self, module: &'a Mod<'a>) {
         walk_module(self, module);
     }
 
     #[inline]
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         walk_stmt(self, stmt);
     }
 
     #[inline]
-    fn visit_annotation(&mut self, expr: &'a Expr) {
+    fn visit_annotation(&mut self, expr: &'a Expr<'a>) {
         walk_annotation(self, expr);
     }
 
     #[inline]
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         walk_expr(self, expr);
     }
 
     #[inline]
-    fn visit_decorator(&mut self, decorator: &'a Decorator) {
+    fn visit_decorator(&mut self, decorator: &'a Decorator<'a>) {
         walk_decorator(self, decorator);
     }
 
@@ -68,36 +68,39 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
+    fn visit_comprehension(&mut self, comprehension: &'a Comprehension<'a>) {
         walk_comprehension(self, comprehension);
     }
 
     #[inline]
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler<'a>) {
         walk_except_handler(self, except_handler);
     }
 
     #[inline]
-    fn visit_arguments(&mut self, arguments: &'a Arguments) {
+    fn visit_arguments(&mut self, arguments: &'a Arguments<'a>) {
         walk_arguments(self, arguments);
     }
 
     #[inline]
-    fn visit_parameters(&mut self, parameters: &'a Parameters) {
+    fn visit_parameters(&mut self, parameters: &'a Parameters<'a>) {
         walk_parameters(self, parameters);
     }
 
     #[inline]
-    fn visit_parameter(&mut self, arg: &'a Parameter) {
+    fn visit_parameter(&mut self, arg: &'a Parameter<'a>) {
         walk_parameter(self, arg);
     }
 
-    fn visit_parameter_with_default(&mut self, parameter_with_default: &'a ParameterWithDefault) {
+    fn visit_parameter_with_default(
+        &mut self,
+        parameter_with_default: &'a ParameterWithDefault<'a>,
+    ) {
         walk_parameter_with_default(self, parameter_with_default);
     }
 
     #[inline]
-    fn visit_keyword(&mut self, keyword: &'a Keyword) {
+    fn visit_keyword(&mut self, keyword: &'a Keyword<'a>) {
         walk_keyword(self, keyword);
     }
 
@@ -107,65 +110,65 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_with_item(&mut self, with_item: &'a WithItem) {
+    fn visit_with_item(&mut self, with_item: &'a WithItem<'a>) {
         walk_with_item(self, with_item);
     }
 
     #[inline]
-    fn visit_type_params(&mut self, type_params: &'a TypeParams) {
+    fn visit_type_params(&mut self, type_params: &'a TypeParams<'a>) {
         walk_type_params(self, type_params);
     }
 
     #[inline]
-    fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+    fn visit_type_param(&mut self, type_param: &'a TypeParam<'a>) {
         walk_type_param(self, type_param);
     }
 
     #[inline]
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+    fn visit_match_case(&mut self, match_case: &'a MatchCase<'a>) {
         walk_match_case(self, match_case);
     }
 
     #[inline]
-    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+    fn visit_pattern(&mut self, pattern: &'a Pattern<'a>) {
         walk_pattern(self, pattern);
     }
 
     #[inline]
-    fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments) {
+    fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments<'a>) {
         walk_pattern_arguments(self, pattern_arguments);
     }
 
     #[inline]
-    fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword) {
+    fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword<'a>) {
         walk_pattern_keyword(self, pattern_keyword);
     }
 
     #[inline]
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&mut self, body: &'a [Stmt<'a>]) {
         walk_body(self, body);
     }
 
     #[inline]
-    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause<'a>) {
         walk_elif_else_clause(self, elif_else_clause);
     }
 
     #[inline]
-    fn visit_f_string(&mut self, f_string: &'a FString) {
+    fn visit_f_string(&mut self, f_string: &'a FString<'a>) {
         walk_f_string(self, f_string);
     }
 
     #[inline]
     fn visit_interpolated_string_element(
         &mut self,
-        interpolated_string_element: &'a InterpolatedStringElement,
+        interpolated_string_element: &'a InterpolatedStringElement<'a>,
     ) {
         walk_interpolated_string_element(self, interpolated_string_element);
     }
 
     #[inline]
-    fn visit_t_string(&mut self, t_string: &'a TString) {
+    fn visit_t_string(&mut self, t_string: &'a TString<'a>) {
         walk_t_string(self, t_string);
     }
 
@@ -185,7 +188,7 @@ pub trait SourceOrderVisitor<'a> {
     }
 }
 
-pub fn walk_module<'a, V>(visitor: &mut V, module: &'a Mod)
+pub fn walk_module<'a, V>(visitor: &mut V, module: &'a Mod<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -200,7 +203,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_body<'a, V>(visitor: &mut V, body: &'a [Stmt])
+pub fn walk_body<'a, V>(visitor: &mut V, body: &'a [Stmt<'a>])
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -209,7 +212,7 @@ where
     }
 }
 
-pub fn walk_stmt<'a, V>(visitor: &mut V, stmt: &'a Stmt)
+pub fn walk_stmt<'a, V>(visitor: &mut V, stmt: &'a Stmt<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -245,11 +248,14 @@ impl TraversalSignal {
     }
 }
 
-pub fn walk_annotation<'a, V: SourceOrderVisitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
+pub fn walk_annotation<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    expr: &'a Expr<'a>,
+) {
     visitor.visit_expr(expr);
 }
 
-pub fn walk_decorator<'a, V>(visitor: &mut V, decorator: &'a Decorator)
+pub fn walk_decorator<'a, V>(visitor: &mut V, decorator: &'a Decorator<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -261,7 +267,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_expr<'a, V>(visitor: &mut V, expr: &'a Expr)
+pub fn walk_expr<'a, V>(visitor: &mut V, expr: &'a Expr<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -307,7 +313,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_comprehension<'a, V>(visitor: &mut V, comprehension: &'a Comprehension)
+pub fn walk_comprehension<'a, V>(visitor: &mut V, comprehension: &'a Comprehension<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -319,7 +325,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_elif_else_clause<'a, V>(visitor: &mut V, elif_else_clause: &'a ElifElseClause)
+pub fn walk_elif_else_clause<'a, V>(visitor: &mut V, elif_else_clause: &'a ElifElseClause<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -331,7 +337,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_except_handler<'a, V>(visitor: &mut V, except_handler: &'a ExceptHandler)
+pub fn walk_except_handler<'a, V>(visitor: &mut V, except_handler: &'a ExceptHandler<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -348,7 +354,7 @@ where
 
 pub fn walk_format_spec<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor: &mut V,
-    format_spec: &'a Expr,
+    format_spec: &'a Expr<'a>,
 ) {
     let node = AnyNodeRef::from(format_spec);
     if visitor.enter_node(node).is_traverse() {
@@ -358,7 +364,7 @@ pub fn walk_format_spec<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor.leave_node(node);
 }
 
-pub fn walk_arguments<'a, V>(visitor: &mut V, arguments: &'a Arguments)
+pub fn walk_arguments<'a, V>(visitor: &mut V, arguments: &'a Arguments<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -370,7 +376,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_parameters<'a, V>(visitor: &mut V, parameters: &'a Parameters)
+pub fn walk_parameters<'a, V>(visitor: &mut V, parameters: &'a Parameters<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -382,7 +388,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_parameter<'a, V>(visitor: &mut V, parameter: &'a Parameter)
+pub fn walk_parameter<'a, V>(visitor: &mut V, parameter: &'a Parameter<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -396,7 +402,7 @@ where
 
 pub fn walk_parameter_with_default<'a, V>(
     visitor: &mut V,
-    parameter_with_default: &'a ParameterWithDefault,
+    parameter_with_default: &'a ParameterWithDefault<'a>,
 ) where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -409,7 +415,7 @@ pub fn walk_parameter_with_default<'a, V>(
 }
 
 #[inline]
-pub fn walk_keyword<'a, V>(visitor: &mut V, keyword: &'a Keyword)
+pub fn walk_keyword<'a, V>(visitor: &mut V, keyword: &'a Keyword<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -421,7 +427,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_with_item<'a, V>(visitor: &mut V, with_item: &'a WithItem)
+pub fn walk_with_item<'a, V>(visitor: &mut V, with_item: &'a WithItem<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -432,7 +438,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_type_params<'a, V>(visitor: &mut V, type_params: &'a TypeParams)
+pub fn walk_type_params<'a, V>(visitor: &mut V, type_params: &'a TypeParams<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -443,7 +449,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam)
+pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -454,7 +460,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_match_case<'a, V>(visitor: &mut V, match_case: &'a MatchCase)
+pub fn walk_match_case<'a, V>(visitor: &mut V, match_case: &'a MatchCase<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -465,7 +471,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_pattern<'a, V>(visitor: &mut V, pattern: &'a Pattern)
+pub fn walk_pattern<'a, V>(visitor: &mut V, pattern: &'a Pattern<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -485,7 +491,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_pattern_arguments<'a, V>(visitor: &mut V, pattern_arguments: &'a PatternArguments)
+pub fn walk_pattern_arguments<'a, V>(visitor: &mut V, pattern_arguments: &'a PatternArguments<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -496,7 +502,7 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_pattern_keyword<'a, V>(visitor: &mut V, pattern_keyword: &'a PatternKeyword)
+pub fn walk_pattern_keyword<'a, V>(visitor: &mut V, pattern_keyword: &'a PatternKeyword<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -509,7 +515,7 @@ where
 
 pub fn walk_interpolated_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor: &mut V,
-    f_string_element: &'a InterpolatedStringElement,
+    f_string_element: &'a InterpolatedStringElement<'a>,
 ) {
     let node = AnyNodeRef::from(f_string_element);
     if visitor.enter_node(node).is_traverse() {
@@ -551,7 +557,7 @@ where
 }
 
 #[inline]
-pub fn walk_f_string<'a, V>(visitor: &mut V, f_string: &'a FString)
+pub fn walk_f_string<'a, V>(visitor: &mut V, f_string: &'a FString<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
@@ -563,7 +569,7 @@ where
 }
 
 #[inline]
-pub fn walk_t_string<'a, V>(visitor: &mut V, t_string: &'a TString)
+pub fn walk_t_string<'a, V>(visitor: &mut V, t_string: &'a TString<'a>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {

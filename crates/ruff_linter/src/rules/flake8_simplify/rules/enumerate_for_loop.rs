@@ -168,7 +168,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
 
 /// If the statement is an index increment statement (e.g., `i += 1`), return
 /// the name of the index variable.
-fn match_index_increment(stmt: &Stmt) -> Option<&ast::ExprName> {
+fn match_index_increment<'a>(stmt: &'a Stmt<'a>) -> Option<&'a ast::ExprName<'a>> {
     let Stmt::AugAssign(ast::StmtAugAssign {
         target,
         op: Operator::Add,
@@ -199,8 +199,8 @@ struct LoopControlFlowVisitor {
     has_continue: bool,
 }
 
-impl StatementVisitor<'_> for LoopControlFlowVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'ast> StatementVisitor<'ast> for LoopControlFlowVisitor {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt<'ast>) {
         match stmt {
             Stmt::Continue(_) => self.has_continue = true,
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {

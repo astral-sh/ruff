@@ -28,8 +28,8 @@ impl PlaceExpr {
     /// Create a new `PlaceExpr` from a name.
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
-    pub fn from_expr_name(name: &ast::ExprName) -> Self {
-        PlaceExpr::Symbol(Symbol::new(name.id.clone()))
+    pub fn from_expr_name(name: &ast::ExprName<'_>) -> Self {
+        PlaceExpr::Symbol(Symbol::new(name.id.to_name()))
     }
 
     /// Tries to create a `PlaceExpr` from an expression.
@@ -40,7 +40,7 @@ impl PlaceExpr {
     /// * name: `x`
     /// * attribute: `x.y`
     /// * subscripts with integer or string literals: `x[0]`, `x['key']`
-    pub fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
+    pub fn try_from_expr<'a, 'ast: 'a>(expr: impl Into<ast::ExprRef<'a>>) -> Option<Self> {
         let expr = expr.into();
 
         // For named expressions (walrus operator), extract the target. The grammar only permits
@@ -54,7 +54,7 @@ impl PlaceExpr {
         };
 
         if let ast::ExprRef::Name(name) = expr {
-            return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+            return Some(PlaceExpr::Symbol(Symbol::new(name.id.to_name())));
         }
 
         MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr)
@@ -589,7 +589,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     }
 
     /// Compute possibly narrowed places for an expression predicate.
-    pub(crate) fn expression(self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
+    pub(crate) fn expression(self, expr: &ast::Expr<'_>) -> PossiblyNarrowedPlaces {
         self.expression_node(expr)
     }
 
@@ -602,7 +602,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         self.pattern_kind(pattern.kind(self.db), pattern.subject(self.db), module)
     }
 
-    fn expression_node(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
+    fn expression_node(&self, expr: &ast::Expr<'_>) -> PossiblyNarrowedPlaces {
         match expr {
             // Simple expressions that directly narrow a place
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
@@ -631,7 +631,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     }
 
     /// Simple expressions that directly narrow a single place.
-    fn simple_expr(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
+    fn simple_expr(&self, expr: &ast::Expr<'_>) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
         if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
             if let Some(place) = self.places.place_id((&place_expr).into()) {
@@ -713,7 +713,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     }
 
     /// Helper to add a potential narrowing target expression to the set.
-    fn add_narrowing_target(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
+    fn add_narrowing_target(&self, expr: &ast::Expr<'_>, places: &mut PossiblyNarrowedPlaces) {
         if let Some(place_expr) = PlaceExpr::try_from_expr(expr)
             && let Some(place) = self.places.place_id((&place_expr).into())
         {

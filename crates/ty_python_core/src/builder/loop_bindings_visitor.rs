@@ -10,7 +10,7 @@ use crate::symbol::Symbol;
 /// pre-walk so that we can synthesize "loop header definitions" that are visible to the loop body
 /// (and condition). See `LoopHeader`.
 /// TODO: Handle `nonlocal` bindings from nested scopes somehow.
-pub(crate) fn collect_while_loop_bindings(while_stmt: &ast::StmtWhile) -> Vec<PlaceExpr> {
+pub(crate) fn collect_while_loop_bindings(while_stmt: &ast::StmtWhile<'_>) -> Vec<PlaceExpr> {
     let mut collector = LoopBindingsVisitor::default();
     collector.visit_expr(&while_stmt.test);
     collector.visit_body(&while_stmt.body);
@@ -18,7 +18,7 @@ pub(crate) fn collect_while_loop_bindings(while_stmt: &ast::StmtWhile) -> Vec<Pl
 }
 
 /// Like `collect_while_loop_bindings` above, but for `for` loops.
-pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExpr> {
+pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor<'_>) -> Vec<PlaceExpr> {
     let mut collector = LoopBindingsVisitor::default();
     collector.add_place_from_target(&for_stmt.target);
     collector.visit_body(&for_stmt.body);
@@ -34,7 +34,7 @@ pub(crate) struct LoopBindingsVisitor {
 }
 
 impl LoopBindingsVisitor {
-    pub(crate) fn add_place_from_target(&mut self, target: &ast::Expr) {
+    pub(crate) fn add_place_from_target(&mut self, target: &ast::Expr<'_>) {
         match target {
             ast::Expr::Name(name) => {
                 self.bound_places.push(PlaceExpr::from_expr_name(name));
@@ -62,8 +62,8 @@ impl LoopBindingsVisitor {
     }
 }
 
-impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
-    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+impl<'node> Visitor<'node> for LoopBindingsVisitor {
+    fn visit_stmt(&mut self, stmt: &'node ast::Stmt<'node>) {
         match stmt {
             ast::Stmt::Assign(node) => {
                 for target in &node.targets {
@@ -108,7 +108,7 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                     let ast::ExceptHandler::ExceptHandler(h) = handler;
                     if let Some(name) = &h.name {
                         self.bound_places
-                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id.to_name())));
                     }
                     self.visit_body(&h.body);
                 }
@@ -119,7 +119,7 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                 for alias in &node.names {
                     let name = alias.asname.as_ref().unwrap_or(&alias.name);
                     self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.to_name())));
                 }
             }
             ast::Stmt::ImportFrom(node) => {
@@ -127,18 +127,18 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                     if &*alias.name != "*" {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.bound_places
-                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id.to_name())));
                     }
                 }
             }
             ast::Stmt::FunctionDef(node) => {
                 self.bound_places
-                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.to_name())));
                 // Don't descend into function bodies - they're different scopes.
             }
             ast::Stmt::ClassDef(node) => {
                 self.bound_places
-                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.to_name())));
                 // Don't descend into class bodies - they're different scopes.
             }
             ast::Stmt::Match(node) => {
@@ -160,7 +160,7 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+    fn visit_expr(&mut self, expr: &'node ast::Expr<'node>) {
         // the walrus operator
         if let ast::Expr::Named(node) = expr {
             self.add_place_from_target(&node.target);
@@ -168,24 +168,24 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
         walk_expr(self, expr);
     }
 
-    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+    fn visit_pattern(&mut self, pattern: &'node ast::Pattern<'node>) {
         match pattern {
             ast::Pattern::MatchAs(p) => {
                 if let Some(name) = &p.name {
                     self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.to_name())));
                 }
             }
             ast::Pattern::MatchStar(p) => {
                 if let Some(name) = &p.name {
                     self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.to_name())));
                 }
             }
             ast::Pattern::MatchMapping(p) => {
                 if let Some(rest) = &p.rest {
                     self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(rest.id.clone())));
+                        .push(PlaceExpr::Symbol(Symbol::new(rest.id.to_name())));
                 }
             }
             _ => {}
@@ -197,13 +197,15 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::textwrap::dedent;
 
     // Test collecting `while` loop bindings.
 
     fn collect_while_loop_place_names(code: &str) -> Vec<String> {
-        let parsed = parse_module(code).expect("valid Python code");
+        let allocator = Allocator::new();
+        let parsed = parse_module(code, &allocator).expect("valid Python code");
         let stmt = &parsed.suite()[0];
         let ast::Stmt::While(while_stmt) = stmt else {
             panic!("Expected a while statement");
@@ -267,7 +269,8 @@ mod tests {
     // Test collecting `for` loop bindings.
 
     fn collect_for_loop_place_names(code: &str) -> Vec<String> {
-        let parsed = parse_module(code).expect("valid Python code");
+        let allocator = Allocator::new();
+        let parsed = parse_module(code, &allocator).expect("valid Python code");
         let stmt = &parsed.suite()[0];
         let ast::Stmt::For(for_stmt) = stmt else {
             panic!("Expected a for statement");

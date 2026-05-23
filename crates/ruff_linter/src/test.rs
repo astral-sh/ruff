@@ -9,6 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
+use ruff_allocator::Allocator;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
 };
@@ -233,9 +234,11 @@ pub fn test_contents<'a>(
     let target_version = settings.resolve_target_version(path);
     let options =
         ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone())
-        .try_into_module()
-        .expect("PySourceType always parses into a module");
+    let allocator = Allocator::new();
+    let parsed =
+        ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone(), &allocator)
+            .try_into_module()
+            .expect("PySourceType always parses into a module");
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
     let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -248,6 +251,7 @@ pub fn test_contents<'a>(
     let suppressions =
         Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
     let messages = check_path(
+        &allocator,
         path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages))
@@ -299,10 +303,13 @@ pub fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let parsed =
-                ruff_python_parser::parse_unchecked(transformed.source_code(), options.clone())
-                    .try_into_module()
-                    .expect("PySourceType always parses into a module");
+            let parsed = ruff_python_parser::parse_unchecked(
+                transformed.source_code(),
+                options.clone(),
+                &allocator,
+            )
+            .try_into_module()
+            .expect("PySourceType always parses into a module");
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -316,6 +323,7 @@ pub fn test_contents<'a>(
             let suppressions =
                 Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
             let fixed_messages = check_path(
+                &allocator,
                 path,
                 None,
                 &locator,

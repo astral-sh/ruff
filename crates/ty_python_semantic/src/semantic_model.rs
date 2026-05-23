@@ -1,10 +1,9 @@
 use ruff_db::files::{File, FilePath};
-use ruff_db::parsed::{parsed_module, parsed_string_annotation};
+use ruff_db::parsed::{ParsedExpression, parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::find_node::CoveringNode;
-use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
+use ruff_python_ast::{self as ast, ExprStringLiteral};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
-use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
@@ -41,7 +40,7 @@ pub struct SemanticModel<'db> {
     file: File,
     /// If `Some` then this `SemanticModel` is for analyzing the sub-AST of a string annotation.
     /// This expression will be used as a witness to the scope/location we're analyzing.
-    in_string_annotation_expr: Option<Box<Expr>>,
+    in_string_annotation_expr: Option<Box<ExprStringLiteral<'static>>>,
 }
 
 impl<'db> SemanticModel<'db> {
@@ -366,23 +365,11 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If we're analyzing a string annotation, it will return the string literal's node.
     /// Otherwise it will return the input.
-    pub fn node_in_ast<'a>(&'a self, node: ast::AnyNodeRef<'a>) -> ast::AnyNodeRef<'a> {
+    pub fn node_in_ast<'a, 'ast: 'a>(&'a self, node: ast::AnyNodeRef<'a>) -> ast::AnyNodeRef<'a> {
         if let Some(string_annotation) = &self.in_string_annotation_expr {
-            (&**string_annotation).into()
+            ast::AnyNodeRef::ExprStringLiteral(string_annotation)
         } else {
             node
-        }
-    }
-
-    /// Get a "safe" [`Expr`] to use for referring to the given (sub-)expression.
-    ///
-    /// If we're analyzing a string annotation, it will return the string literal's expression.
-    /// Otherwise it will return the input.
-    pub fn expr_in_ast<'a>(&'a self, expr: &'a Expr) -> &'a Expr {
-        if let Some(string_annotation) = &self.in_string_annotation_expr {
-            string_annotation
-        } else {
-            expr
         }
     }
 
@@ -390,9 +377,9 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If we're analyzing a string annotation, it will return the string literal's expression.
     /// Otherwise it will return the input.
-    pub fn expr_ref_in_ast<'a>(&'a self, expr: ExprRef<'a>) -> ExprRef<'a> {
+    pub fn expr_ref_in_ast<'a, 'ast: 'a>(&'a self, expr: ExprRef<'a>) -> ExprRef<'a> {
         if let Some(string_annotation) = &self.in_string_annotation_expr {
-            ExprRef::from(string_annotation)
+            ExprRef::StringLiteral(string_annotation)
         } else {
             expr
         }
@@ -405,8 +392,8 @@ impl<'db> SemanticModel<'db> {
     /// may return nonsense results or even panic!
     pub fn enter_string_annotation(
         &self,
-        string_expr: &ExprStringLiteral,
-    ) -> Option<(Parsed<ModExpression>, Self)> {
+        string_expr: &ExprStringLiteral<'_>,
+    ) -> Option<(ParsedExpression, Self)> {
         // Ask the inference engine whether this is actually a string annotation
         let expr = ExprRef::StringLiteral(string_expr);
         let index = semantic_index(self.db, self.file);
@@ -431,10 +418,21 @@ impl<'db> SemanticModel<'db> {
         let model = Self {
             db: self.db,
             file: self.file,
-            // Use expr_in_ast here because we might be entering a sub-sub-AST
+            // Preserve the top-level expression if this is a nested string annotation.
             in_string_annotation_expr: Some(Box::new(
-                self.expr_in_ast(&Expr::StringLiteral(string_expr.clone()))
-                    .clone(),
+                self.in_string_annotation_expr
+                    .as_deref()
+                    .cloned()
+                    .unwrap_or_else(|| ExprStringLiteral {
+                        range: string_expr.range,
+                        node_index: string_expr.node_index.clone(),
+                        value: ast::StringLiteralValue::single(ast::StringLiteral {
+                            range: string_expr.range,
+                            node_index: string_expr.node_index.clone(),
+                            value: "".into(),
+                            flags: string_expr.value.first_literal_flags(),
+                        }),
+                    }),
             )),
         };
         Some((ast, model))
@@ -467,7 +465,7 @@ impl<'db> SemanticModel<'db> {
                 value_ty
                     .member_lookup_with_policy(
                         self.db,
-                        attr.attr.id.clone(),
+                        attr.attr.id.to_name(),
                         crate::types::MemberLookupPolicy::default(),
                     )
                     .qualifiers
@@ -665,41 +663,41 @@ macro_rules! impl_expression_has_type {
     };
 }
 
-impl_expression_has_type!(ast::ExprBoolOp);
-impl_expression_has_type!(ast::ExprNamed);
-impl_expression_has_type!(ast::ExprBinOp);
-impl_expression_has_type!(ast::ExprUnaryOp);
-impl_expression_has_type!(ast::ExprLambda);
-impl_expression_has_type!(ast::ExprIf);
-impl_expression_has_type!(ast::ExprDict);
-impl_expression_has_type!(ast::ExprSet);
-impl_expression_has_type!(ast::ExprListComp);
-impl_expression_has_type!(ast::ExprSetComp);
-impl_expression_has_type!(ast::ExprDictComp);
-impl_expression_has_type!(ast::ExprGenerator);
-impl_expression_has_type!(ast::ExprAwait);
-impl_expression_has_type!(ast::ExprYield);
-impl_expression_has_type!(ast::ExprYieldFrom);
-impl_expression_has_type!(ast::ExprCompare);
-impl_expression_has_type!(ast::ExprCall);
-impl_expression_has_type!(ast::ExprFString);
-impl_expression_has_type!(ast::ExprTString);
-impl_expression_has_type!(ast::ExprStringLiteral);
-impl_expression_has_type!(ast::ExprBytesLiteral);
-impl_expression_has_type!(ast::ExprNumberLiteral);
+impl_expression_has_type!(ast::ExprBoolOp<'_>);
+impl_expression_has_type!(ast::ExprNamed<'_>);
+impl_expression_has_type!(ast::ExprBinOp<'_>);
+impl_expression_has_type!(ast::ExprUnaryOp<'_>);
+impl_expression_has_type!(ast::ExprLambda<'_>);
+impl_expression_has_type!(ast::ExprIf<'_>);
+impl_expression_has_type!(ast::ExprDict<'_>);
+impl_expression_has_type!(ast::ExprSet<'_>);
+impl_expression_has_type!(ast::ExprListComp<'_>);
+impl_expression_has_type!(ast::ExprSetComp<'_>);
+impl_expression_has_type!(ast::ExprDictComp<'_>);
+impl_expression_has_type!(ast::ExprGenerator<'_>);
+impl_expression_has_type!(ast::ExprAwait<'_>);
+impl_expression_has_type!(ast::ExprYield<'_>);
+impl_expression_has_type!(ast::ExprYieldFrom<'_>);
+impl_expression_has_type!(ast::ExprCompare<'_>);
+impl_expression_has_type!(ast::ExprCall<'_>);
+impl_expression_has_type!(ast::ExprFString<'_>);
+impl_expression_has_type!(ast::ExprTString<'_>);
+impl_expression_has_type!(ast::ExprStringLiteral<'_>);
+impl_expression_has_type!(ast::ExprBytesLiteral<'_>);
+impl_expression_has_type!(ast::ExprNumberLiteral<'_>);
 impl_expression_has_type!(ast::ExprBooleanLiteral);
 impl_expression_has_type!(ast::ExprNoneLiteral);
 impl_expression_has_type!(ast::ExprEllipsisLiteral);
-impl_expression_has_type!(ast::ExprAttribute);
-impl_expression_has_type!(ast::ExprSubscript);
-impl_expression_has_type!(ast::ExprStarred);
-impl_expression_has_type!(ast::ExprName);
-impl_expression_has_type!(ast::ExprList);
-impl_expression_has_type!(ast::ExprTuple);
-impl_expression_has_type!(ast::ExprSlice);
-impl_expression_has_type!(ast::ExprIpyEscapeCommand);
+impl_expression_has_type!(ast::ExprAttribute<'_>);
+impl_expression_has_type!(ast::ExprSubscript<'_>);
+impl_expression_has_type!(ast::ExprStarred<'_>);
+impl_expression_has_type!(ast::ExprName<'_>);
+impl_expression_has_type!(ast::ExprList<'_>);
+impl_expression_has_type!(ast::ExprTuple<'_>);
+impl_expression_has_type!(ast::ExprSlice<'_>);
+impl_expression_has_type!(ast::ExprIpyEscapeCommand<'_>);
 
-impl HasType for ast::Expr {
+impl HasType for ast::Expr<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         match self {
             Expr::BoolOp(inner) => inner.inferred_type(model),
@@ -759,16 +757,16 @@ macro_rules! impl_binding_has_ty_def {
     };
 }
 
-impl_binding_has_ty_def!(ast::StmtFunctionDef);
-impl_binding_has_ty_def!(ast::StmtClassDef);
-impl_binding_has_ty_def!(ast::Parameter);
-impl_binding_has_ty_def!(ast::ParameterWithDefault);
-impl_binding_has_ty_def!(ast::TypeParamTypeVar);
-impl_binding_has_ty_def!(ast::TypeParamParamSpec);
-impl_binding_has_ty_def!(ast::TypeParamTypeVarTuple);
-impl_binding_has_ty_def!(ast::StmtTypeAlias);
+impl_binding_has_ty_def!(ast::StmtFunctionDef<'_>);
+impl_binding_has_ty_def!(ast::StmtClassDef<'_>);
+impl_binding_has_ty_def!(ast::Parameter<'_>);
+impl_binding_has_ty_def!(ast::ParameterWithDefault<'_>);
+impl_binding_has_ty_def!(ast::TypeParamTypeVar<'_>);
+impl_binding_has_ty_def!(ast::TypeParamParamSpec<'_>);
+impl_binding_has_ty_def!(ast::TypeParamTypeVarTuple<'_>);
+impl_binding_has_ty_def!(ast::StmtTypeAlias<'_>);
 
-impl HasType for ast::Alias {
+impl HasType for ast::Alias<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         if &self.name == "*" {
             return Some(Type::Never);
@@ -778,7 +776,7 @@ impl HasType for ast::Alias {
     }
 }
 
-impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
+impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler<'_> {
     fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
         self.name.as_ref()?;
 
@@ -787,7 +785,7 @@ impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
     }
 }
 
-impl HasType for ast::ExceptHandlerExceptHandler {
+impl HasType for ast::ExceptHandlerExceptHandler<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let definition = self.optional_definition(model)?;
         Some(binding_type(model.db, definition))

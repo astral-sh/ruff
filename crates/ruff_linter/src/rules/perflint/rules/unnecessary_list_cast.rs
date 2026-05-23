@@ -173,7 +173,7 @@ impl<'a> MutationVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for MutationVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         if match_mutation(stmt, self.target) {
             self.is_mutated = true;
         } else {
@@ -204,13 +204,13 @@ fn match_mutation(stmt: &Stmt, id: &str) -> bool {
             let Some(ast::ExprName { id: target_id, .. }) = value.as_name_expr() else {
                 return false;
             };
-            target_id == id
+            *target_id == id
         }
         // Ex) `foo[0] = bar`
         Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
             if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
                 if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
-                    return target_id == id;
+                    return *target_id == id;
                 }
             }
             false
@@ -218,7 +218,7 @@ fn match_mutation(stmt: &Stmt, id: &str) -> bool {
         // Ex) `foo += bar`
         Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
             if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
-                target_id == id
+                *target_id == id
             } else {
                 false
             }
@@ -227,7 +227,7 @@ fn match_mutation(stmt: &Stmt, id: &str) -> bool {
         Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
             if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
                 if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
-                    return target_id == id;
+                    return *target_id == id;
                 }
             }
             false
@@ -236,7 +236,7 @@ fn match_mutation(stmt: &Stmt, id: &str) -> bool {
         Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
             if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
                 if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
-                    return target_id == id;
+                    return *target_id == id;
                 }
             }
             false

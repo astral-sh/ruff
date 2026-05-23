@@ -79,7 +79,10 @@ impl AlwaysFixableViolation for FastApiRedundantResponseModel {
 }
 
 /// FAST001
-pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn fastapi_redundant_response_model<'ast>(
+    checker: &Checker<'ast>,
+    function_def: &StmtFunctionDef<'ast>,
+) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
     }
@@ -104,11 +107,11 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
     }
 }
 
-fn check_decorator<'a>(
-    function_def: &StmtFunctionDef,
-    decorator: &'a Decorator,
-    semantic: &'a SemanticModel,
-) -> Option<(&'a ExprCall, &'a Keyword)> {
+fn check_decorator<'a, 'ast>(
+    function_def: &StmtFunctionDef<'ast>,
+    decorator: &'a Decorator<'ast>,
+    semantic: &SemanticModel<'ast>,
+) -> Option<(&'a ExprCall<'ast>, &'a Keyword<'ast>)> {
     let call = is_fastapi_route_decorator(decorator, semantic)?;
     let response_model_arg = call.arguments.find_keyword("response_model")?;
     let return_value = function_def.returns.as_ref()?;

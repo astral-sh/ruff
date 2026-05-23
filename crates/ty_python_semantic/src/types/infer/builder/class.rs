@@ -121,7 +121,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => Type::from(StaticClassLiteral::new(
                     db,
-                    name.id.clone(),
+                    name.id.to_name(),
                     body_scope,
                     maybe_known_class,
                     deprecated,

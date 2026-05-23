@@ -3,7 +3,6 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, Operator, PythonVersion,
     helpers::{pep_604_union, typing_optional},
-    name::Name,
     operator_precedence::OperatorPrecedence,
     token::{Tokens, parenthesized_range},
 };
@@ -206,13 +205,13 @@ fn create_fix(
     }
 
     let new_literal_expr = Expr::Subscript(ast::ExprSubscript {
-        value: Box::new(literal_subscript.clone()),
+        value: Checker::expr_ref(literal_subscript),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         ctx: ExprContext::Load,
-        slice: Box::new(if literal_elements.len() > 1 {
+        slice: checker.alloc_expr(if literal_elements.len() > 1 {
             Expr::Tuple(ast::ExprTuple {
-                elts: literal_elements.into_iter().cloned().collect(),
+                elts: checker.alloc_vec(literal_elements.into_iter().cloned().collect()),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 ctx: ExprContext::Load,
@@ -230,7 +229,7 @@ fn create_fix(
                 return Ok(None);
             };
             let (import_edit, bound_name) = importer.import(literal_expr.start())?;
-            let optional_expr = typing_optional(new_literal_expr, Name::from(bound_name));
+            let optional_expr = typing_optional(new_literal_expr, &bound_name, checker.allocator());
             let content = checker.generator().expr(&optional_expr);
             let optional_edit = Edit::range_replacement(content, literal_expr.range());
             Fix::applicable_edits(import_edit, [optional_edit], applicability)
@@ -240,7 +239,7 @@ fn create_fix(
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
-            let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
+            let union_expr = pep_604_union(&[new_literal_expr, none_expr], checker.allocator());
 
             // Check if we need parentheses to preserve operator precedence
             let content =

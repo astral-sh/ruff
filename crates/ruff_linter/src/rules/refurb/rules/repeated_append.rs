@@ -4,7 +4,6 @@ use ast::traversal;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::traversal::EnclosingSuite;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, BindingId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -93,7 +92,7 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
             continue;
         }
 
-        let replacement = make_suggestion(&group, checker.generator());
+        let replacement = make_suggestion(&group, checker);
 
         let mut diagnostic = checker.report_diagnostic(
             RepeatedAppend {
@@ -126,15 +125,15 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
 #[derive(Debug, Clone)]
 struct Append<'a> {
     /// Receiver of the `append` call (aka `self` argument).
-    receiver: &'a ast::ExprName,
+    receiver: &'a ast::ExprName<'a>,
     /// [`BindingId`] that the receiver references.
     binding_id: BindingId,
     /// [`Binding`] that the receiver references.
     binding: &'a Binding<'a>,
     /// [`Expr`] serving as a sole argument to `append`.
-    argument: &'a Expr,
+    argument: &'a Expr<'a>,
     /// The statement containing the `append` call.
-    stmt: &'a Stmt,
+    stmt: &'a Stmt<'a>,
 }
 
 #[derive(Debug)]
@@ -319,7 +318,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
 }
 
 /// Make fix suggestion for the given group of appends.
-fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
+fn make_suggestion(group: &AppendGroup, checker: &Checker) -> String {
     let appends = &group.appends;
 
     assert!(!appends.is_empty());
@@ -340,7 +339,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         .collect();
     // Join all elements into a tuple: `(elt1, elt2, ..., eltN)`
     let tuple = ast::ExprTuple {
-        elts,
+        elts: checker.alloc_vec(elts),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -349,18 +348,18 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     // Make `var.extend`.
     // NOTE: receiver is the same for all appends and that's why we can take the first.
     let attr = ast::ExprAttribute {
-        value: Box::new(first.receiver.clone().into()),
-        attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
+        value: checker.alloc_expr(first.receiver.clone().into()),
+        attr: checker.alloc_identifier("extend", TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
     let call = ast::ExprCall {
-        func: Box::new(attr.into()),
+        func: checker.alloc_expr(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([tuple.into()]),
-            keywords: Box::from([]),
+            args: checker.alloc_vec(vec![tuple.into()]),
+            keywords: checker.alloc_vec(vec![]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -369,9 +368,9 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
-        value: Box::new(call.into()),
+        value: checker.alloc_expr(call.into()),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    generator.stmt(&stmt.into())
+    checker.generator().stmt(&stmt.into())
 }

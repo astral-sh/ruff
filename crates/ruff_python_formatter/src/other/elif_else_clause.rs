@@ -10,7 +10,7 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatElifElseClause;
 
-impl FormatNodeRule<ElifElseClause> for FormatElifElseClause {
+impl FormatNodeRule<ElifElseClause<'_>> for FormatElifElseClause {
     fn fmt_fields(&self, item: &ElifElseClause, f: &mut PyFormatter) -> FormatResult<()> {
         format_elif_else_clause(
             item,

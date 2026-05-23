@@ -133,17 +133,17 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
 /// Candidate for lambda expression or function definition consisting of a return statement.
 #[derive(Debug)]
 pub(crate) enum FunctionLike<'a> {
-    Lambda(&'a ast::ExprLambda),
-    Function(&'a ast::StmtFunctionDef),
+    Lambda(&'a ast::ExprLambda<'a>),
+    Function(&'a ast::StmtFunctionDef<'a>),
 }
 
-impl<'a> From<&'a ast::ExprLambda> for FunctionLike<'a> {
+impl<'a> From<&'a ast::ExprLambda<'_>> for FunctionLike<'a> {
     fn from(lambda: &'a ast::ExprLambda) -> Self {
         Self::Lambda(lambda)
     }
 }
 
-impl<'a> From<&'a ast::StmtFunctionDef> for FunctionLike<'a> {
+impl<'a> From<&'a ast::StmtFunctionDef<'_>> for FunctionLike<'a> {
     fn from(function: &'a ast::StmtFunctionDef) -> Self {
         Self::Function(function)
     }
@@ -160,7 +160,7 @@ impl Ranged for FunctionLike<'_> {
 
 impl FunctionLike<'_> {
     /// Return the [`Parameters`] of the function-like node.
-    fn parameters(&self) -> Option<&Parameters> {
+    fn parameters(&self) -> Option<&Parameters<'_>> {
         match self {
             Self::Lambda(expr) => expr.parameters.as_deref(),
             Self::Function(stmt) => Some(&stmt.parameters),
@@ -175,7 +175,7 @@ impl FunctionLike<'_> {
     ///
     /// If the node is a function definition that consists of more than a single return statement,
     /// returns `None`.
-    fn body(&self) -> Option<&Expr> {
+    fn body(&self) -> Option<&Expr<'_>> {
         match self {
             Self::Lambda(expr) => Some(&expr.body),
             Self::Function(stmt) => match stmt.body.as_slice() {

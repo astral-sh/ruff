@@ -5,9 +5,10 @@ use crate::{
     self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternKeyword,
 };
 
-impl ast::ElifElseClause {
+impl<'ast> ast::ElifElseClause<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ElifElseClause {
@@ -23,9 +24,10 @@ impl ast::ElifElseClause {
     }
 }
 
-impl ast::ExprDict {
+impl<'ast> ast::ExprDict<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprDict {
@@ -43,9 +45,10 @@ impl ast::ExprDict {
     }
 }
 
-impl ast::ExprBoolOp {
+impl<'ast> ast::ExprBoolOp<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprBoolOp {
@@ -69,9 +72,10 @@ impl ast::ExprBoolOp {
     }
 }
 
-impl ast::ExprCompare {
+impl<'ast> ast::ExprCompare<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprCompare {
@@ -91,9 +95,10 @@ impl ast::ExprCompare {
     }
 }
 
-impl ast::InterpolatedStringFormatSpec {
+impl<'ast> ast::InterpolatedStringFormatSpec<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         for element in &self.elements {
@@ -102,9 +107,10 @@ impl ast::InterpolatedStringFormatSpec {
     }
 }
 
-impl ast::InterpolatedElement {
+impl<'ast> ast::InterpolatedElement<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::InterpolatedElement {
@@ -122,7 +128,7 @@ impl ast::InterpolatedElement {
     }
 }
 
-impl ast::InterpolatedStringLiteralElement {
+impl ast::InterpolatedStringLiteralElement<'_> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
@@ -135,9 +141,10 @@ impl ast::InterpolatedStringLiteralElement {
     }
 }
 
-impl ast::ExprFString {
+impl<'ast> ast::ExprFString<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprFString {
@@ -159,9 +166,10 @@ impl ast::ExprFString {
     }
 }
 
-impl ast::ExprTString {
+impl<'ast> ast::ExprTString<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprTString {
@@ -176,9 +184,10 @@ impl ast::ExprTString {
     }
 }
 
-impl ast::ExprStringLiteral {
+impl<'ast> ast::ExprStringLiteral<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprStringLiteral {
@@ -193,9 +202,10 @@ impl ast::ExprStringLiteral {
     }
 }
 
-impl ast::ExprBytesLiteral {
+impl<'ast> ast::ExprBytesLiteral<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprBytesLiteral {
@@ -210,9 +220,10 @@ impl ast::ExprBytesLiteral {
     }
 }
 
-impl ast::ExceptHandlerExceptHandler {
+impl<'ast> ast::ExceptHandlerExceptHandler<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExceptHandlerExceptHandler {
@@ -234,9 +245,10 @@ impl ast::ExceptHandlerExceptHandler {
     }
 }
 
-impl ast::PatternMatchMapping {
+impl<'ast> ast::PatternMatchMapping<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::PatternMatchMapping {
@@ -266,9 +278,10 @@ impl ast::PatternMatchMapping {
     }
 }
 
-impl ast::PatternArguments {
+impl<'ast> ast::PatternArguments<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         for pattern_or_keyword in self.iter_source_order() {
@@ -282,9 +295,10 @@ impl ast::PatternArguments {
     }
 }
 
-impl ast::PatternKeyword {
+impl<'ast> ast::PatternKeyword<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let PatternKeyword {
@@ -299,9 +313,10 @@ impl ast::PatternKeyword {
     }
 }
 
-impl ast::Comprehension {
+impl<'ast> ast::Comprehension<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::Comprehension {
@@ -321,9 +336,10 @@ impl ast::Comprehension {
     }
 }
 
-impl ast::Arguments {
+impl<'ast> ast::Arguments<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         for arg_or_keyword in self.iter_source_order() {
@@ -335,9 +351,10 @@ impl ast::Arguments {
     }
 }
 
-impl ast::Parameters {
+impl<'ast> ast::Parameters<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         for parameter in self.iter_source_order() {
@@ -351,9 +368,10 @@ impl ast::Parameters {
     }
 }
 
-impl ast::Parameter {
+impl<'ast> ast::Parameter<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::Parameter {
@@ -370,9 +388,10 @@ impl ast::Parameter {
     }
 }
 
-impl ast::ParameterWithDefault {
+impl<'ast> ast::ParameterWithDefault<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ParameterWithDefault {
@@ -388,9 +407,10 @@ impl ast::ParameterWithDefault {
     }
 }
 
-impl ast::Keyword {
+impl<'ast> ast::Keyword<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::Keyword {
@@ -407,9 +427,10 @@ impl ast::Keyword {
     }
 }
 
-impl Alias {
+impl<'ast> Alias<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::Alias {
@@ -426,9 +447,10 @@ impl Alias {
     }
 }
 
-impl ast::WithItem {
+impl<'ast> ast::WithItem<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::WithItem {
@@ -446,9 +468,10 @@ impl ast::WithItem {
     }
 }
 
-impl ast::MatchCase {
+impl<'ast> ast::MatchCase<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::MatchCase {
@@ -467,9 +490,10 @@ impl ast::MatchCase {
     }
 }
 
-impl ast::Decorator {
+impl<'ast> ast::Decorator<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::Decorator {
@@ -482,9 +506,10 @@ impl ast::Decorator {
     }
 }
 
-impl ast::TypeParams {
+impl<'ast> ast::TypeParams<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::TypeParams {
@@ -499,9 +524,10 @@ impl ast::TypeParams {
     }
 }
 
-impl ast::FString {
+impl<'ast> ast::FString<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::FString {
@@ -517,9 +543,10 @@ impl ast::FString {
     }
 }
 
-impl ast::TString {
+impl<'ast> ast::TString<'ast> {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
+        'ast: 'a,
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::TString {
@@ -535,7 +562,7 @@ impl ast::TString {
     }
 }
 
-impl ast::StringLiteral {
+impl ast::StringLiteral<'_> {
     #[inline]
     pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
@@ -550,7 +577,7 @@ impl ast::StringLiteral {
     }
 }
 
-impl ast::BytesLiteral {
+impl ast::BytesLiteral<'_> {
     #[inline]
     pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
@@ -565,7 +592,7 @@ impl ast::BytesLiteral {
     }
 }
 
-impl ast::Identifier {
+impl ast::Identifier<'_> {
     #[inline]
     pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
@@ -581,7 +608,7 @@ impl ast::Identifier {
 
 impl<'a> AnyNodeRef<'a> {
     /// Compares two any node refs by their pointers (referential equality).
-    pub fn ptr_eq(self, other: AnyNodeRef) -> bool {
+    pub fn ptr_eq(self, other: AnyNodeRef<'_>) -> bool {
         self.as_ptr().eq(&other.as_ptr()) && self.kind() == other.kind()
     }
 
@@ -693,7 +720,7 @@ impl<'a> AnyNodeRef<'a> {
     ///     e       <- first statement (a)
     ///     f
     /// ```
-    pub fn is_first_statement_in_body(&self, body: AnyNodeRef) -> bool {
+    pub fn is_first_statement_in_body(&self, body: AnyNodeRef<'a>) -> bool {
         match body {
             AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
             | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
@@ -733,7 +760,7 @@ impl<'a> AnyNodeRef<'a> {
     }
 
     /// Returns `true` if `statement` is the first statement in an alternate `body` (e.g. the else of an if statement)
-    pub fn is_first_statement_in_alternate_body(&self, body: AnyNodeRef) -> bool {
+    pub fn is_first_statement_in_alternate_body(&self, body: AnyNodeRef<'a>) -> bool {
         match body {
             AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
             | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
@@ -760,7 +787,7 @@ impl<'a> AnyNodeRef<'a> {
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
-fn are_same_optional<'a, T>(left: AnyNodeRef, right: Option<T>) -> bool
+fn are_same_optional<'a, T>(left: AnyNodeRef<'a>, right: Option<T>) -> bool
 where
     T: Into<AnyNodeRef<'a>>,
 {

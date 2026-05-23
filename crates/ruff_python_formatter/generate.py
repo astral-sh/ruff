@@ -33,7 +33,7 @@ node_lines = (
 )
 nodes = []
 for node_line in node_lines:
-    node = node_line.split("(")[1].split(")")[0].split("::")[-1].removeprefix("&'a ")
+    node = re.search(r"crate::([A-Za-z0-9_]+)", node_line).group(1)
     # `FString` has a custom implementation while the formatting for
     # `FStringLiteralElement`, `FStringFormatSpec` and `FStringExpressionElement` are
     # handled by the `FString` implementation.
@@ -46,6 +46,23 @@ for node_line in node_lines:
         continue
     nodes.append(node)
 print(nodes)
+
+ast_sources = (
+    nodes_file
+    + root.joinpath("crates", "ruff_python_ast", "src", "nodes.rs").read_text()
+)
+generic_nodes = {
+    node
+    for node in nodes
+    if re.search(rf"pub (?:struct|enum) {node}<'ast>", ast_sources)
+}
+
+
+def ast_type(node: str, lifetime: str = "'ast") -> str:
+    if node in generic_nodes:
+        return f"ast::{node}<{lifetime}>"
+    return f"ast::{node}"
+
 
 # %%
 # Generate newtypes with dummy FormatNodeRule implementations
@@ -124,32 +141,45 @@ generated = """//! This is a generated file. Don't modify it by hand! Run `crate
 #![allow(unknown_lints, clippy::default_constructed_unit_structs)]
 
 use crate::context::PyFormatContext;
-use crate::{AsFormat, FormatNodeRule, IntoFormat, PyFormatter};
+use crate::{AsFormat, FormattableNode, FormatNodeRule, IntoFormat, PyFormatter};
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
 use ruff_python_ast as ast;
 
 """
 for node in nodes:
+    node_type = ast_type(node)
+    node_type_anon = ast_type(node, "'_")
+    node_impl_generics = "<'ast>" if node in generic_nodes else ""
+    context_impl_generics = (
+        "<'ast, 'context>" if node in generic_nodes else "<'context>"
+    )
     text = f"""
-        impl FormatRule<ast::{node}, PyFormatContext<'_>>
+        impl FormattableNode for {node_type_anon} {{
+            fn as_any_node_ref(&self) -> ast::AnyNodeRef<'_> {{
+                self.into()
+            }}
+        }}
+        impl{node_impl_generics} FormatRule<{node_type}, PyFormatContext<'_>>
             for crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}
         {{
             #[inline]
             fn fmt(
                 &self,
-                node: &ast::{node},
+                node: &{node_type},
                 f: &mut PyFormatter,
             ) -> FormatResult<()> {{
-                FormatNodeRule::<ast::{node}>::fmt(self, node, f)
+                FormatNodeRule::<{node_type}>::fmt(self, node, f)
             }}
         }}
-        impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::{node} {{
+        impl{context_impl_generics} AsFormat<PyFormatContext<'context>> for {node_type} {{
             type Format<'a> = FormatRefWithRule<
                 'a,
-                ast::{node},
+                {node_type},
                 crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
-                PyFormatContext<'ast>,
-            >;
+                PyFormatContext<'context>,
+            >
+            where
+                Self: 'a;
             fn format(&self) -> Self::Format<'_> {{
                 FormatRefWithRule::new(
                     self,
@@ -157,11 +187,11 @@ for node in nodes:
                 )
             }}
         }}
-        impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::{node} {{
+        impl{context_impl_generics} IntoFormat<PyFormatContext<'context>> for {node_type} {{
             type Format = FormatOwnedWithRule<
-                ast::{node},
+                {node_type},
                 crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
-                PyFormatContext<'ast>,
+                PyFormatContext<'context>,
             >;
             fn into_format(self) -> Self::Format {{
                 FormatOwnedWithRule::new(

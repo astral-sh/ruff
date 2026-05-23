@@ -591,7 +591,7 @@ impl SemanticSyntaxChecker {
                         Self::check_identifier(type_param.name(), ctx);
                     }
                 }
-                for parameter in parameters {
+                for parameter in parameters.iter() {
                     Self::check_identifier(parameter.name(), ctx);
                 }
             }
@@ -1090,9 +1090,9 @@ impl SemanticSyntaxChecker {
 
     /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
     /// variable in `generators`.
-    fn check_generator_expr<Ctx: SemanticSyntaxContext>(
-        expr: &Expr,
-        comprehensions: &[ast::Comprehension],
+    fn check_generator_expr<'a, Ctx: SemanticSyntaxContext>(
+        expr: &'a Expr<'a>,
+        comprehensions: &'a [ast::Comprehension<'a>],
         ctx: &Ctx,
     ) {
         let rebound_variables = {
@@ -1876,12 +1876,12 @@ pub enum WriteToDebugKind {
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
 /// a comprehension or generator expression.
 struct ReboundComprehensionVisitor<'a> {
-    comprehensions: &'a [ast::Comprehension],
+    comprehensions: &'a [ast::Comprehension<'a>],
     rebound_variables: Vec<TextRange>,
 }
 
-impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
-    fn visit_expr(&mut self, expr: &Expr) {
+impl<'a> Visitor<'a> for ReboundComprehensionVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
             if let Expr::Name(ast::ExprName { id, range, .. }) = &**target {
                 if self.comprehensions.iter().any(|comp| {
@@ -1903,8 +1903,8 @@ struct ReturnVisitor {
     has_yield: bool,
 }
 
-impl Visitor<'_> for ReturnVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'a> Visitor<'a> for ReturnVisitor {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             // Do not recurse into nested functions; they're evaluated separately.
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
@@ -1920,7 +1920,7 @@ impl Visitor<'_> for ReturnVisitor {
         }
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Lambda(_) => {}
             Expr::Yield(_) | Expr::YieldFrom(_) => {
@@ -1932,12 +1932,12 @@ impl Visitor<'_> for ReturnVisitor {
 }
 
 struct MatchPatternVisitor<'a, Ctx> {
-    names: FxHashSet<&'a ast::name::Name>,
+    names: FxHashSet<&'a ast::name::AstName<'a>>,
     ctx: &'a Ctx,
 }
 
 impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
-    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+    fn visit_pattern<'ast: 'a>(&mut self, pattern: &'a Pattern<'ast>) {
         // test_ok class_keyword_in_case_pattern
         // match 2:
         //     case Class(x=x): ...
@@ -2041,7 +2041,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(
-                                keyword.attr.id.clone(),
+                                keyword.attr.id.to_name(),
                             ),
                             keyword.attr.range,
                         );
@@ -2068,7 +2068,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 // match 2:
                 //     case Class(x) | [x] | x: ...
 
-                let mut previous_names: Option<FxHashSet<&ast::name::Name>> = None;
+                let mut previous_names: Option<FxHashSet<&ast::name::AstName<'_>>> = None;
                 for pattern in patterns {
                     let mut visitor = Self {
                         names: FxHashSet::default(),
@@ -2128,11 +2128,11 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
 
     /// Add an identifier to the set of visited names in `self` and emit a [`SemanticSyntaxError`]
     /// if `ident` has already been seen.
-    fn insert(&mut self, ident: &'a ast::Identifier) {
+    fn insert(&mut self, ident: &'a ast::Identifier<'a>) {
         if !self.names.insert(&ident.id) {
             SemanticSyntaxChecker::add_error(
                 self.ctx,
-                SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id.clone()),
+                SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id.to_name()),
                 ident.range(),
             );
         }
@@ -2150,11 +2150,11 @@ struct InvalidExpressionVisitor<'a, Ctx> {
     position: InvalidExpressionPosition,
 }
 
-impl<Ctx> Visitor<'_> for InvalidExpressionVisitor<'_, Ctx>
+impl<'a, Ctx> Visitor<'a> for InvalidExpressionVisitor<'_, Ctx>
 where
     Ctx: SemanticSyntaxContext,
 {
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Named(ast::ExprNamed { range, .. }) => {
                 SemanticSyntaxChecker::add_error(
@@ -2192,7 +2192,7 @@ where
         ast::visitor::walk_expr(self, expr);
     }
 
-    fn visit_type_param(&mut self, type_param: &ast::TypeParam) {
+    fn visit_type_param(&mut self, type_param: &'a ast::TypeParam<'a>) {
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
                 if let Some(expr) = bound {

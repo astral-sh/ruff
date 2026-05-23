@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 
+use ruff_allocator::{Allocator, Box as ArenaBox};
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
@@ -314,12 +315,13 @@ pub(crate) fn is_singledispatch_implementation(
 /// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
 ///
 /// In general, when expanding a component of a call chain, we want to quote the entire call chain.
-pub(crate) fn quote_annotation(
+pub(crate) fn quote_annotation<'ast>(
     node_id: NodeId,
-    semantic: &SemanticModel,
-    stylist: &Stylist,
-    locator: &Locator,
+    semantic: &'ast SemanticModel<'ast>,
+    stylist: &'ast Stylist<'ast>,
+    locator: &'ast Locator<'ast>,
     flags: StringLiteralFlags,
+    allocator: &'ast Allocator,
 ) -> Edit {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
@@ -328,31 +330,31 @@ pub(crate) fn quote_annotation(
                 // If we're quoting the value of a subscript, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                 // should generate `"DataFrame[int]"`.
-                return quote_annotation(parent_id, semantic, stylist, locator, flags);
+                return quote_annotation(parent_id, semantic, stylist, locator, flags, allocator);
             }
             Some(Expr::Attribute(parent)) if expr == parent.value.as_ref() => {
                 // If we're quoting the value of an attribute, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                 // should generate `"pd.DataFrame"`.
-                return quote_annotation(parent_id, semantic, stylist, locator, flags);
+                return quote_annotation(parent_id, semantic, stylist, locator, flags, allocator);
             }
             Some(Expr::Call(parent)) if expr == parent.func.as_ref() => {
                 // If we're quoting the function of a call, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                 // should generate `"DataFrame()"`.
-                return quote_annotation(parent_id, semantic, stylist, locator, flags);
+                return quote_annotation(parent_id, semantic, stylist, locator, flags, allocator);
             }
             Some(Expr::BinOp(parent)) if parent.op.is_bit_or() => {
                 // If we're quoting the left or right side of a binary operation, we need to
                 // quote the entire expression. For example, when quoting `DataFrame` in
                 // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                return quote_annotation(parent_id, semantic, stylist, locator, flags);
+                return quote_annotation(parent_id, semantic, stylist, locator, flags, allocator);
             }
             _ => {}
         }
     }
 
-    quote_type_expression(expr, semantic, stylist, locator, flags)
+    quote_type_expression(expr, semantic, stylist, locator, flags, allocator)
 }
 
 /// Wrap a type expression in quotes.
@@ -363,15 +365,16 @@ pub(crate) fn quote_annotation(
 ///
 /// In most cases you want to call [`quote_annotation`] instead, which provides
 /// that guarantee by expanding the expression before calling into this function.
-pub(crate) fn quote_type_expression(
-    expr: &Expr,
-    semantic: &SemanticModel,
-    stylist: &Stylist,
-    locator: &Locator,
+pub(crate) fn quote_type_expression<'ast>(
+    expr: &Expr<'ast>,
+    semantic: &'ast SemanticModel<'ast>,
+    stylist: &'ast Stylist<'ast>,
+    locator: &'ast Locator<'ast>,
     flags: StringLiteralFlags,
+    allocator: &'ast Allocator,
 ) -> Edit {
     // Quote the entire expression.
-    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags);
+    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags, allocator);
 
     Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
 }
@@ -401,6 +404,7 @@ pub(crate) struct QuoteAnnotator<'a> {
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
     flags: StringLiteralFlags,
+    allocator: &'a Allocator,
 }
 
 impl<'a> QuoteAnnotator<'a> {
@@ -409,16 +413,18 @@ impl<'a> QuoteAnnotator<'a> {
         stylist: &'a Stylist<'a>,
         locator: &'a Locator<'a>,
         flags: StringLiteralFlags,
+        allocator: &'a Allocator,
     ) -> Self {
         Self {
             semantic,
             stylist,
             locator,
             flags,
+            allocator,
         }
     }
 
-    fn into_annotation(self, expr: &Expr) -> String {
+    fn into_annotation(self, expr: &Expr<'a>) -> String {
         let mut expr_without_forward_references = expr.clone();
         self.visit_expr(&mut expr_without_forward_references);
         let generator = Generator::from(self.stylist);
@@ -429,30 +435,37 @@ impl<'a> QuoteAnnotator<'a> {
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            value: annotation.into_boxed_str(),
+            value: ArenaBox::from_str_in(&annotation, self.allocator),
             flags: self.flags,
         }))
     }
 
-    fn visit_annotated_slice(&self, slice: &mut Expr) {
+    fn visit_annotated_slice(&self, slice: &mut Expr<'a>) {
         // we only want to walk the first tuple element if it exists,
         // anything else should not be transformed
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice {
-            if !elts.is_empty() {
-                self.visit_expr(&mut elts[0]);
+            elts.transform_in(self.allocator, |elts| {
+                let Some((first, rest)) = elts.split_first_mut() else {
+                    return;
+                };
+                self.visit_expr(first);
                 // The outer annotation will use the preferred quote.
                 // As such, any quotes found in metadata elements inside an `Annotated` slice
                 // should use the opposite quote to the preferred quote.
-                for elt in elts.iter_mut().skip(1) {
-                    QuoteRewriter::new(self.stylist).visit_expr(elt);
+                for elt in rest {
+                    QuoteRewriter::new(self.stylist, self.allocator).visit_expr(elt);
                 }
-            }
+            });
         }
     }
 }
 
-impl Transformer for QuoteAnnotator<'_> {
-    fn visit_expr(&self, expr: &mut Expr) {
+impl<'a> Transformer<'a> for QuoteAnnotator<'a> {
+    fn allocator(&self) -> &'a Allocator {
+        self.allocator
+    }
+
+    fn visit_expr(&self, expr: &mut Expr<'a>) {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if let Some(qualified_name) = self.semantic.resolve_qualified_name(value) {
@@ -463,14 +476,21 @@ impl Transformer for QuoteAnnotator<'_> {
                         // The outer annotation will use the preferred quote.
                         // As such, any quotes found inside a `Literal` slice
                         // should use the opposite quote to the preferred quote.
-                        QuoteRewriter::new(self.stylist).visit_expr(slice);
+                        let mut rewritten_slice = (**slice).clone();
+                        QuoteRewriter::new(self.stylist, self.allocator)
+                            .visit_expr(&mut rewritten_slice);
+                        *slice = ArenaBox::new_in(rewritten_slice, self.allocator);
                     } else if self
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Annotated")
                     {
-                        self.visit_annotated_slice(slice);
+                        let mut rewritten_slice = (**slice).clone();
+                        self.visit_annotated_slice(&mut rewritten_slice);
+                        *slice = ArenaBox::new_in(rewritten_slice, self.allocator);
                     } else {
-                        self.visit_expr(slice);
+                        let mut rewritten_slice = (**slice).clone();
+                        self.visit_expr(&mut rewritten_slice);
+                        *slice = ArenaBox::new_in(rewritten_slice, self.allocator);
                     }
                 }
             }
@@ -479,7 +499,9 @@ impl Transformer for QuoteAnnotator<'_> {
                 // literal node with the parsed expression, if we fail to
                 // parse the forward reference, we just keep treating this
                 // like a regular string literal
-                if let Ok(annotation) = parse_type_annotation(literal, self.locator.contents()) {
+                if let Ok(annotation) =
+                    parse_type_annotation(literal, self.locator.contents(), self.allocator)
+                {
                     *expr = annotation.expression().clone();
                     // we need to visit the parsed expression too
                     // since it may contain forward references itself
@@ -496,20 +518,26 @@ impl Transformer for QuoteAnnotator<'_> {
 /// A [`Transformer`] struct that rewrites all strings in an expression
 /// to use a specified quotation style
 #[derive(Debug)]
-struct QuoteRewriter {
+struct QuoteRewriter<'a> {
     preferred_inner_quote: Quote,
+    allocator: &'a Allocator,
 }
 
-impl QuoteRewriter {
-    fn new(stylist: &Stylist) -> Self {
+impl<'a> QuoteRewriter<'a> {
+    fn new(stylist: &Stylist, allocator: &'a Allocator) -> Self {
         Self {
             preferred_inner_quote: stylist.quote().opposite(),
+            allocator,
         }
     }
 }
 
-impl Transformer for QuoteRewriter {
-    fn visit_string_literal(&self, literal: &mut ast::StringLiteral) {
+impl<'a> Transformer<'a> for QuoteRewriter<'a> {
+    fn allocator(&self) -> &'a Allocator {
+        self.allocator
+    }
+
+    fn visit_string_literal(&self, literal: &mut ast::StringLiteral<'a>) {
         literal.flags = literal.flags.with_quote_style(self.preferred_inner_quote);
     }
 }

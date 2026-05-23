@@ -187,14 +187,14 @@ pub(crate) fn function_is_too_complex(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-
+    use ruff_allocator::Allocator;
     use ruff_python_ast::Suite;
     use ruff_python_parser::parse_module;
 
     use super::get_complexity_number;
 
-    fn parse_suite(source: &str) -> Result<Suite> {
-        Ok(parse_module(source)?.into_suite())
+    fn parse_suite<'a>(source: &str, allocator: &'a Allocator) -> Result<Suite<'a>> {
+        Ok(parse_module(source, allocator)?.into_suite())
     }
 
     #[test]
@@ -203,7 +203,8 @@ mod tests {
 def trivial():
     pass
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -214,7 +215,8 @@ def trivial():
 def expr_as_statement():
     0xF00D
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -227,7 +229,8 @@ def sequential(n):
     s = k + n
     return s
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -243,7 +246,8 @@ def if_elif_else_dead_path(n):
     else:
         return "smaller than or equal to three"
 "#;
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -260,7 +264,8 @@ def nested_ifs():
     else:
         return "smaller than or equal to three"
 "#;
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -272,7 +277,8 @@ def for_loop():
     for i in range(10):
         print(i)
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -286,7 +292,8 @@ def for_else(mylist):
     else:
         print(None)
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -300,7 +307,8 @@ def recursive(n):
     else:
         return n
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -317,7 +325,8 @@ def nested_functions():
 
     a()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -335,7 +344,8 @@ def try_else():
     else:
         print(4)
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 4);
         Ok(())
     }
@@ -352,7 +362,8 @@ def nested_try_finally():
     finally:
         print(3)
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -369,7 +380,8 @@ async def foobar(a, b, c):
     async for x in a:
         pass
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -380,7 +392,8 @@ async def foobar(a, b, c):
 def annotated_assign():
     x: Any = None
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -416,7 +429,8 @@ class Class:
 
         return ServiceProvider(Logger())
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 9);
         Ok(())
     }
@@ -430,7 +444,8 @@ def process_detect_lines():
     finally:
         pass
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
@@ -445,7 +460,8 @@ def process_detect_lines():
         if res:
             errors.append(f"Non-zero exit code {res}")
 "#;
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -458,7 +474,8 @@ def with_lock():
         if foo:
             print('bar')
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -473,7 +490,8 @@ def f():
         case _:
             print('bar')
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -490,7 +508,8 @@ def f():
         case _:
             print('baz')
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
@@ -505,7 +524,8 @@ def f():
         case x:
             print(x)
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
@@ -520,7 +540,8 @@ def f():
         case 5 | _:
             print(x)
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }

@@ -16,7 +16,7 @@ use crate::rules::{
 use ruff_python_ast::PythonVersion;
 
 /// Run lint rules over a [`Stmt`] syntax node.
-pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
+pub(crate) fn statement<'ast>(stmt: &'ast Stmt<'ast>, checker: &mut Checker<'ast>) {
     match stmt {
         Stmt::Global(ast::StmtGlobal {
             names,

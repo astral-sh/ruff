@@ -36,7 +36,7 @@ pub(crate) mod suite;
 #[derive(Default)]
 pub struct FormatStmt;
 
-impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
+impl FormatRule<Stmt<'_>, PyFormatContext<'_>> for FormatStmt {
     fn fmt(&self, item: &Stmt, f: &mut PyFormatter) -> FormatResult<()> {
         match item {
             Stmt::FunctionDef(x) => x.format().fmt(f),
@@ -68,16 +68,19 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Stmt {
-    type Format<'a> = FormatRefWithRule<'a, Stmt, FormatStmt, PyFormatContext<'ast>>;
+impl<'ast, 'context> AsFormat<PyFormatContext<'context>> for Stmt<'ast> {
+    type Format<'a>
+        = FormatRefWithRule<'a, Stmt<'ast>, FormatStmt, PyFormatContext<'context>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatStmt)
     }
 }
 
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Stmt {
-    type Format = FormatOwnedWithRule<Stmt, FormatStmt, PyFormatContext<'ast>>;
+impl<'ast, 'context> IntoFormat<PyFormatContext<'context>> for Stmt<'ast> {
+    type Format = FormatOwnedWithRule<Stmt<'ast>, FormatStmt, PyFormatContext<'context>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatStmt)

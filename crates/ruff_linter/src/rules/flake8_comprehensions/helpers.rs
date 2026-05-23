@@ -5,7 +5,7 @@ pub(super) fn exactly_one_argument_with_matching_function<'a>(
     func: &Expr,
     args: &'a [Expr],
     keywords: &[Keyword],
-) -> Option<&'a Expr> {
+) -> Option<&'a Expr<'a>> {
     let [arg] = args else {
         return None;
     };
@@ -23,7 +23,7 @@ pub(super) fn first_argument_with_matching_function<'a>(
     name: &str,
     func: &Expr,
     args: &'a [Expr],
-) -> Option<&'a Expr> {
+) -> Option<&'a Expr<'a>> {
     if func.as_name_expr().is_some_and(|func| func.id == name) {
         args.first()
     } else {

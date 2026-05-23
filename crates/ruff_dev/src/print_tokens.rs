@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
+use ruff_allocator::Allocator;
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_parser::parse_unchecked_source;
@@ -24,7 +25,8 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 args.file.display()
             )
         })?;
-    let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
+    let allocator = Allocator::new();
+    let parsed = parse_unchecked_source(source_kind.source_code(), source_type, &allocator);
     for token in parsed.tokens() {
         println!("{token:#?}");
     }

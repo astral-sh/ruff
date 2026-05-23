@@ -217,13 +217,15 @@ impl Indexer {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::Indexer;
 
     fn new_indexer(contents: &str) -> Indexer {
-        let parsed = parse_module(contents).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(contents, &allocator).unwrap();
         Indexer::from_tokens(parsed.tokens(), contents)
     }
 

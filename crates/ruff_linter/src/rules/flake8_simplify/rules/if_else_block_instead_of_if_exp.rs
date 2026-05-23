@@ -97,7 +97,10 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 }
 
 /// SIM108
-pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_if_exp<'ast>(
+    checker: &Checker<'ast>,
+    stmt_if: &ast::StmtIf<'ast>,
+) {
     let ast::StmtIf {
         test,
         body,
@@ -201,7 +204,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
                 && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
         {
             let target_var = &body_target;
-            let binary = assignment_binary_or(target_var, body_value, else_value);
+            let binary = assignment_binary_or(target_var, body_value, else_value, checker);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         (test_node, body_node)
@@ -216,12 +219,12 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
             }) =>
         {
             let target_var = &body_target;
-            let binary = assignment_binary_and(target_var, body_value, else_value);
+            let binary = assignment_binary_and(target_var, body_value, else_value, checker);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         _ => {
             let target_var = &body_target;
-            let ternary = assignment_ternary(target_var, body_value, test, else_value);
+            let ternary = assignment_ternary(target_var, body_value, test, else_value, checker);
             (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
         }
     };
@@ -261,55 +264,75 @@ enum AssignmentKind {
     Ternary,
 }
 
-fn assignment_ternary(
-    target_var: &Expr,
-    body_value: &Expr,
-    test: &Expr,
-    orelse_value: &Expr,
-) -> Stmt {
+fn assignment_ternary<'alloc, 'ast>(
+    target_var: &Expr<'ast>,
+    body_value: &'alloc Expr<'ast>,
+    test: &'alloc Expr<'ast>,
+    orelse_value: &'alloc Expr<'ast>,
+    checker: &'alloc Checker<'ast>,
+) -> Stmt<'alloc>
+where
+    'ast: 'alloc,
+{
     let node = ast::ExprIf {
-        test: Box::new(test.clone()),
-        body: Box::new(body_value.clone()),
-        orelse: Box::new(orelse_value.clone()),
+        test: Checker::expr_ref(test),
+        body: Checker::expr_ref(body_value),
+        orelse: Checker::expr_ref(orelse_value),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
-        value: Box::new(node.into()),
+        targets: checker.alloc_vec(vec![target_var.clone()]),
+        value: checker.alloc_expr(node.into()),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     node1.into()
 }
 
-fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
+fn assignment_binary_and<'alloc, 'ast>(
+    target_var: &Expr<'ast>,
+    left_value: &Expr<'ast>,
+    right_value: &Expr<'ast>,
+    checker: &'alloc Checker<'ast>,
+) -> Stmt<'alloc>
+where
+    'ast: 'alloc,
+{
     let node = ast::ExprBoolOp {
         op: BoolOp::And,
-        values: vec![left_value.clone(), right_value.clone()],
+        values: checker.alloc_vec(vec![left_value.clone(), right_value.clone()]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
-        value: Box::new(node.into()),
+        targets: checker.alloc_vec(vec![target_var.clone()]),
+        value: checker.alloc_expr(node.into()),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     node1.into()
 }
 
-fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
+fn assignment_binary_or<'alloc, 'ast>(
+    target_var: &Expr<'ast>,
+    left_value: &Expr<'ast>,
+    right_value: &Expr<'ast>,
+    checker: &'alloc Checker<'ast>,
+) -> Stmt<'alloc>
+where
+    'ast: 'alloc,
+{
     (ast::StmtAssign {
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        targets: vec![target_var.clone()],
-        value: Box::new(
+        targets: checker.alloc_vec(vec![target_var.clone()]),
+        value: checker.alloc_expr(
             (ast::ExprBoolOp {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 op: BoolOp::Or,
-                values: vec![left_value.clone(), right_value.clone()],
+                values: checker.alloc_vec(vec![left_value.clone(), right_value.clone()]),
             })
             .into(),
         ),

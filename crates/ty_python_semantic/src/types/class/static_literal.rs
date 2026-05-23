@@ -354,7 +354,11 @@ impl<'db> StaticClassLiteral<'db> {
     /// ## Note
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
-    fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
+    fn node<'ast>(
+        self,
+        db: &'db dyn Db,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::StmtClassDef<'ast> {
         let scope = self.body_scope(db);
         scope.node(db).expect_class().node(module)
     }
@@ -2729,16 +2733,19 @@ impl<'db> StaticClassLiteral<'db> {
 
 /// A single semantic class-base entry after expanding starred tuple bases and synthetic bases.
 #[derive(Clone, Copy)]
-pub(crate) enum ExpandedClassBaseEntry<'a, 'db> {
+pub(crate) enum ExpandedClassBaseEntry<'node, 'ast, 'db> {
     /// A base that comes from a concrete expression in the class header.
-    SourceBacked { node: &'a ast::Expr, ty: Type<'db> },
+    SourceBacked {
+        node: &'node ast::Expr<'ast>,
+        ty: Type<'db>,
+    },
     /// A base introduced by semantic expansion with no corresponding source expression.
     Synthetic(Type<'db>),
 }
 
-impl<'a, 'db> ExpandedClassBaseEntry<'a, 'db> {
+impl<'node, 'ast, 'db> ExpandedClassBaseEntry<'node, 'ast, 'db> {
     /// Returns the source expression for this base entry, if it has one.
-    pub(crate) const fn source_node(self) -> Option<&'a ast::Expr> {
+    pub(crate) const fn source_node(self) -> Option<&'node ast::Expr<'ast>> {
         match self {
             Self::SourceBacked { node, .. } => Some(node),
             Self::Synthetic(_) => None,
@@ -2757,12 +2764,12 @@ impl<'a, 'db> ExpandedClassBaseEntry<'a, 'db> {
 ///
 /// Entries are source-backed when they originate from a concrete base expression in the class
 /// header, and synthetic when semantic expansion adds a base with no corresponding source span.
-pub(crate) fn expanded_class_base_entries<'a, 'db>(
+pub(crate) fn expanded_class_base_entries<'node, 'ast: 'node, 'db>(
     db: &'db dyn Db,
     known_class: Option<KnownClass>,
-    class_stmt: &'a ast::StmtClassDef,
+    class_stmt: &'node ast::StmtClassDef<'ast>,
     class_definition: Definition<'db>,
-) -> Vec<ExpandedClassBaseEntry<'a, 'db>> {
+) -> Vec<ExpandedClassBaseEntry<'node, 'ast, 'db>> {
     match known_class {
         Some(KnownClass::VersionInfo) => {
             let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))

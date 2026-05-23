@@ -42,7 +42,7 @@ pub struct Expression<'db> {
     #[no_eq]
     #[tracked]
     #[returns(ref)]
-    pub node_ref: AstNodeRef<ast::Expr>,
+    pub node_ref: AstNodeRef<ast::Expr<'static>>,
 
     /// An assignment statement, if this expression is immediately used as the rhs of that
     /// assignment.
@@ -53,7 +53,7 @@ pub struct Expression<'db> {
     /// to the target, and so have `None` for this field.)
     #[no_eq]
     #[tracked]
-    pub assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
+    pub assigned_to: Option<AstNodeRef<ast::StmtAssign<'static>>>,
 
     /// Should this expression be inferred as a normal expression or a type expression?
     pub kind: ExpressionKind,

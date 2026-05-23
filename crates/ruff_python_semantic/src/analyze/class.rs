@@ -83,18 +83,18 @@ where
 ///
 /// The traversal of the class hierarchy is breadth-first, since
 /// this graph tends to have small width but could be rather deep.
-pub fn iter_super_class<'stmt>(
-    class_def: &'stmt ast::StmtClassDef,
-    semantic: &'stmt SemanticModel,
-) -> impl Iterator<Item = &'stmt ast::StmtClassDef> {
-    struct SuperClassIterator<'stmt> {
-        semantic: &'stmt SemanticModel<'stmt>,
-        to_visit: VecDeque<&'stmt ast::StmtClassDef>,
+pub fn iter_super_class<'stmt, 'ast: 'stmt>(
+    class_def: &'stmt ast::StmtClassDef<'ast>,
+    semantic: &'stmt SemanticModel<'ast>,
+) -> impl Iterator<Item = &'stmt ast::StmtClassDef<'ast>> {
+    struct SuperClassIterator<'stmt, 'ast> {
+        semantic: &'stmt SemanticModel<'ast>,
+        to_visit: VecDeque<&'stmt ast::StmtClassDef<'ast>>,
         seen: FxHashSet<BindingId>,
     }
 
-    impl<'a> Iterator for SuperClassIterator<'a> {
-        type Item = &'a ast::StmtClassDef;
+    impl<'stmt, 'ast: 'stmt> Iterator for SuperClassIterator<'stmt, 'ast> {
+        type Item = &'stmt ast::StmtClassDef<'ast>;
 
         fn next(&mut self) -> Option<Self::Item> {
             let current = self.to_visit.pop_front()?;
@@ -128,21 +128,25 @@ pub fn iter_super_class<'stmt>(
 
 /// Return `true` if any base class, including the given class,
 /// matches an [`ast::StmtClassDef`] predicate.
-pub fn any_super_class<F>(class_def: &ast::StmtClassDef, semantic: &SemanticModel, func: F) -> bool
+pub fn any_super_class<'stmt, 'ast: 'stmt, F>(
+    class_def: &'stmt ast::StmtClassDef<'ast>,
+    semantic: &'stmt SemanticModel<'ast>,
+    func: F,
+) -> bool
 where
-    F: Fn(&ast::StmtClassDef) -> bool,
+    F: Fn(&ast::StmtClassDef<'ast>) -> bool,
 {
     iter_super_class(class_def, semantic).any(func)
 }
 
 #[derive(Clone, Debug)]
-pub struct ClassMemberDeclaration<'a> {
-    kind: ClassMemberKind<'a>,
+pub struct ClassMemberDeclaration<'a, 'ast> {
+    kind: ClassMemberKind<'a, 'ast>,
     boundness: ClassMemberBoundness,
 }
 
-impl<'a> ClassMemberDeclaration<'a> {
-    pub fn kind(&self) -> &ClassMemberKind<'a> {
+impl<'a, 'ast> ClassMemberDeclaration<'a, 'ast> {
+    pub fn kind(&self) -> &ClassMemberKind<'a, 'ast> {
         &self.kind
     }
 
@@ -168,19 +172,22 @@ impl ClassMemberBoundness {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum ClassMemberKind<'a> {
-    Assign(&'a ast::StmtAssign),
-    AnnAssign(&'a ast::StmtAnnAssign),
-    FunctionDef(&'a ast::StmtFunctionDef),
+pub enum ClassMemberKind<'a, 'ast> {
+    Assign(&'a ast::StmtAssign<'ast>),
+    AnnAssign(&'a ast::StmtAnnAssign<'ast>),
+    FunctionDef(&'a ast::StmtFunctionDef<'ast>),
 }
 
-pub fn any_member_declaration<F>(class: &ast::StmtClassDef, mut func: F) -> bool
+pub fn any_member_declaration<'a, 'ast: 'a, F>(
+    class: &'a ast::StmtClassDef<'ast>,
+    mut func: F,
+) -> bool
 where
-    F: FnMut(ClassMemberDeclaration) -> bool,
+    F: FnMut(ClassMemberDeclaration<'a, 'ast>) -> bool,
 {
-    fn any_stmt_in_body(
-        body: &[Stmt],
-        func: &mut dyn FnMut(ClassMemberDeclaration) -> bool,
+    fn any_stmt_in_body<'a, 'ast: 'a>(
+        body: &'a [Stmt<'ast>],
+        func: &mut dyn FnMut(ClassMemberDeclaration<'a, 'ast>) -> bool,
         boundness: ClassMemberBoundness,
     ) -> bool {
         body.iter().any(|stmt| {

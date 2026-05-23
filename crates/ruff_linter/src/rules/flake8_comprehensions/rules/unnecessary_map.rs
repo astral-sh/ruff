@@ -173,7 +173,7 @@ fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {
 fn map_lambda_and_iterables<'a>(
     call: &'a ast::ExprCall,
     semantic: &'a SemanticModel,
-) -> Option<(&'a ExprLambda, &'a [Expr])> {
+) -> Option<(&'a ExprLambda<'a>, &'a [Expr<'a>])> {
     if !semantic.match_builtin_expr(&call.func, "map") {
         return None;
     }
@@ -283,9 +283,9 @@ fn late_binding(parameters: &Parameters, body: &Expr) -> bool {
 #[derive(Debug)]
 struct LateBindingVisitor<'a> {
     /// The arguments to the current lambda.
-    parameters: &'a Parameters,
+    parameters: &'a Parameters<'a>,
     /// The arguments to any lambdas within the current lambda body.
-    lambdas: Vec<Option<&'a Parameters>>,
+    lambdas: Vec<Option<&'a Parameters<'a>>>,
     /// Whether any names within the current lambda body are late-bound within nested lambdas.
     late_bound: bool,
 }
@@ -301,9 +301,9 @@ impl<'a> LateBindingVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
-    fn visit_stmt(&mut self, _stmt: &'a Stmt) {}
+    fn visit_stmt(&mut self, _stmt: &'a Stmt<'a>) {}
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
                 self.lambdas.push(parameters.as_deref());
@@ -335,5 +335,5 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
         }
     }
 
-    fn visit_body(&mut self, _body: &'a [Stmt]) {}
+    fn visit_body(&mut self, _body: &'a [Stmt<'a>]) {}
 }

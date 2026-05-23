@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 
+use ruff_allocator::Allocator;
 use ruff_formatter::SourceCode;
 use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_parser::{ParseOptions, parse};
@@ -50,9 +51,11 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
     let source_type = PySourceType::from(source_path);
 
     // Parse the AST.
+    let allocator = Allocator::new();
     let parsed = parse(
         source,
         ParseOptions::from(source_type).with_target_version(cli.target_version),
+        &allocator,
     )
     .context("Syntax error in input")?;
 

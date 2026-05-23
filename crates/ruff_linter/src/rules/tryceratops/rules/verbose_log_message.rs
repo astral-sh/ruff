@@ -64,7 +64,7 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
         for (expr, logging_level) in calls {
             if matches!(logging_level, LoggingLevel::Exception) {
                 // Collect all referenced names in the `logging.exception` call.
-                let names: Vec<&ast::ExprName> = {
+                let names: Vec<&ast::ExprName<'_>> = {
                     expr.arguments
                         .args
                         .iter()
@@ -93,7 +93,7 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
 
 #[derive(Default)]
 struct NameVisitor<'a> {
-    names: Vec<&'a ast::ExprName>,
+    names: Vec<&'a ast::ExprName<'a>>,
 }
 
 impl<'a> Visitor<'a> for NameVisitor<'a> {

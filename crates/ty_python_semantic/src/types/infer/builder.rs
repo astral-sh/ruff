@@ -1115,11 +1115,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// Returns the result of the `infer_value_ty` closure, which is called with the declared type
     /// as type context.
-    fn add_binding<'a>(
+    fn add_binding<'node>(
         &mut self,
-        node: AnyNodeRef<'a>,
+        node: AnyNodeRef<'node>,
         binding: Definition<'db>,
-    ) -> AddBinding<'db, 'a> {
+    ) -> AddBinding<'db, 'node> {
         let db = self.db();
         debug_assert!(
             binding
@@ -1539,7 +1539,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// If the current scope is a (non-lambda) function, return that function's AST node.
     ///
     /// If the current scope is not a function (or it is a lambda function), return `None`.
-    fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef> {
+    fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef<'_>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         if !current_scope.kind().is_non_lambda_function() {
@@ -1687,7 +1687,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
             TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 self.db(),
-                &type_alias.name.as_name_expr().unwrap().id,
+                type_alias.name.as_name_expr().unwrap().id.to_name(),
                 rhs_scope,
                 None,
             )),
@@ -1869,7 +1869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
     }
 
-    fn infer_exception(&mut self, node: Option<&ast::Expr>, is_star: bool) -> Type<'db> {
+    fn infer_exception(&mut self, node: Option<&ast::Expr<'_>>, is_star: bool) -> Type<'db> {
         // If there is no handled exception, it's invalid syntax;
         // a diagnostic will have already been emitted
         let node_ty = node.map_or(Type::unknown(), |ty| {
@@ -2114,7 +2114,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_match_pattern_definition(
         &mut self,
-        pattern: &'ast ast::Pattern,
+        pattern: &'ast ast::Pattern<'ast>,
         _index: u32,
         definition: Definition<'db>,
     ) {
@@ -2279,12 +2279,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// The `infer_value_expr` function is used to infer the type of the `value` expression which
     /// are not `Name` expressions. The returned type is the one that is eventually assigned to the
     /// `target`.
-    fn infer_target(
+    fn infer_target<'target, 'value, 'arena>(
         &mut self,
-        target: &ast::Expr,
-        value: &ast::Expr,
+        target: &'target ast::Expr<'arena>,
+        value: &'value ast::Expr<'arena>,
         infer_value_expr: &dyn Fn(&mut Self, TypeContext<'db>) -> Type<'db>,
-    ) {
+    ) where
+        'arena: 'target,
+        'arena: 'value,
+    {
         match target {
             ast::Expr::Name(_) => {
                 self.infer_target_impl(target, value, None);
@@ -3324,12 +3327,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[expect(clippy::type_complexity)]
-    fn infer_target_impl(
+    fn infer_target_impl<'target, 'value, 'arena>(
         &mut self,
-        target: &ast::Expr,
-        value: &ast::Expr,
+        target: &'target ast::Expr<'arena>,
+        value: &'value ast::Expr<'arena>,
         infer_assigned_ty: Option<&dyn Fn(&mut Self, TypeContext<'db>) -> Type<'db>>,
-    ) {
+    ) where
+        'arena: 'target,
+        'arena: 'value,
+    {
         match target {
             ast::Expr::Name(name) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
@@ -3711,7 +3717,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Some(repr_arg) = repr_arg else {
             return Some(Type::KnownInstance(KnownInstanceType::Sentinel(
-                SentinelInstance::new(self.db(), target_name.clone(), definition),
+                SentinelInstance::new(self.db(), target_name.to_name(), definition),
             )));
         };
 
@@ -3720,7 +3726,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         Some(Type::KnownInstance(KnownInstanceType::Sentinel(
-            SentinelInstance::new(self.db(), target_name.clone(), definition),
+            SentinelInstance::new(self.db(), target_name.to_name(), definition),
         )))
     }
 
@@ -4454,7 +4460,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Some(class) =
                             nearest_enclosing_class(self.db(), self.index, self.scope())
                         && is_enum_class_by_inheritance(self.db(), class)
-                        && !enum_ignored_names(self.db(), self.scope()).contains(&name_expr.id)
+                        && !enum_ignored_names(self.db(), self.scope())
+                            .contains(name_expr.id.as_str())
                         && let Some(builder) = self
                             .context
                             .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)
@@ -4620,7 +4627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_augment_assignment_definition(
         &mut self,
-        assignment: &'ast ast::StmtAugAssign,
+        assignment: &'ast ast::StmtAugAssign<'ast>,
         definition: Definition<'db>,
     ) {
         let target_ty = self.infer_augment_assignment(assignment);
@@ -4664,8 +4671,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_dict_key_assignment_definition(
         &mut self,
-        key: &'ast ast::Expr,
-        value: &'ast ast::Expr,
+        key: &'ast ast::Expr<'ast>,
+        value: &'ast ast::Expr<'ast>,
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
@@ -5147,14 +5154,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn infer_and_try_call_dunder(
+    fn infer_and_try_call_dunder<'node, 'arena: 'node>(
         &mut self,
         db: &'db dyn Db,
         object: Type<'db>,
         name: &str,
-        ast_arguments: ArgumentsIter<'_>,
+        ast_arguments: ArgumentsIter<'node, 'arena>,
         argument_types: &mut CallArguments<'_, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'node, 'arena>) -> Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match object
@@ -5192,11 +5199,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_and_check_argument_types(
+    fn infer_and_check_argument_types<'node, 'arena: 'node>(
         &mut self,
-        ast_arguments: ArgumentsIter<'_>,
+        ast_arguments: ArgumentsIter<'node, 'arena>,
         argument_types: &mut CallArguments<'_, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'node, 'arena>) -> Type<'db>,
         bindings: &mut Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<(), CallErrorKind> {
@@ -5331,11 +5338,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Note that this method may infer the type of a given argument expression multiple times with
     /// distinct type context. The provided `MultiInferenceState` can be used to dictate multi-inference
     /// behavior.
-    fn infer_all_argument_types<'bindings>(
+    fn infer_all_argument_types<'bindings, 'node, 'arena: 'node>(
         &mut self,
-        ast_arguments: ArgumentsIter<'_>,
+        ast_arguments: ArgumentsIter<'node, 'arena>,
         arguments_types: &mut CallArguments<'_, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'node, 'arena>) -> Type<'db>,
         bindings: &'bindings Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
@@ -6111,7 +6118,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let fallback_tcx = self.incomplete_typed_dict_key_context(set, tcx);
-        let mut infer_elt_ty = |builder: &mut Self, arg: ArgExpr<'db, '_>| {
+        let mut infer_elt_ty = |builder: &mut Self, arg: ArgExpr<'db, '_, '_>| {
             let (_, elt, elt_tcx) = arg;
             builder.infer_set_element(elt, elt_tcx, fallback_tcx)
         };
@@ -6277,7 +6284,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid inferring the items multiple times if we already attempted to infer the
         // dictionary literal as a `TypedDict`. This also allows us to infer using the
         // type context of the expected `TypedDict` field.
-        let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
+        let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_, '_>| {
             item_types
                 .get(&elt.node_index().load())
                 .copied()
@@ -6298,12 +6305,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     // Infer the type of a collection literal expression.
-    fn infer_collection_literal<'expr, const N: usize>(
+    fn infer_collection_literal<'node, 'arena: 'node, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: Option<ast::ExprRef<'_>>,
-        elts: &[[Option<&'expr ast::Expr>; N]],
-        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
+        collection_expr: Option<ast::ExprRef<'node>>,
+        elts: &[[Option<&'node ast::Expr<'arena>>; N]],
+        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'node, 'arena>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
@@ -6352,12 +6359,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     // Infer the type of a collection literal expression.
-    fn infer_collection_literal_impl<'expr, const N: usize>(
+    fn infer_collection_literal_impl<'node, 'arena: 'node, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: Option<ast::ExprRef<'_>>,
-        elts: &[[Option<&'expr ast::Expr>; N]],
-        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
+        collection_expr: Option<ast::ExprRef<'node>>,
+        elts: &[[Option<&'node ast::Expr<'arena>>; N]],
+        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'node, 'arena>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         // Extract the type variable `T` from `list[T]` in typeshed.
@@ -6852,11 +6859,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Return a specialization of the collection class (list, dict, set) based on the type context and the inferred
     /// element / key-value types from the comprehension expression.
-    fn infer_comprehension_specialization<const N: usize>(
+    fn infer_comprehension_specialization<'node, 'arena: 'node, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: ast::ExprRef<'_>,
-        elements: [Option<&ast::Expr>; N],
+        collection_expr: ast::ExprRef<'node>,
+        elements: [Option<&'node ast::Expr<'arena>>; N],
         inference: &ScopeInference<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
@@ -7203,7 +7210,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_named_expression_definition(
         &mut self,
-        named: &'ast ast::ExprNamed,
+        named: &'ast ast::ExprNamed<'ast>,
         definition: Definition<'db>,
     ) -> Type<'db> {
         let ast::ExprNamed {
@@ -7297,7 +7304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .posonlyargs
                 .iter()
                 .map(|param| {
-                    let parameter = Parameter::positional_only(Some(param.name().id.clone()))
+                    let parameter = Parameter::positional_only(Some(param.name().id.to_name()))
                         .with_optional_default_type(param.default().map(|default_expr| {
                             self.infer_expression(default_expr, TypeContext::default())
                                 .replace_parameter_defaults(self.db())
@@ -7314,7 +7321,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .args
                 .iter()
                 .map(|param| {
-                    let parameter = Parameter::positional_or_keyword(param.name().id.clone())
+                    let parameter = Parameter::positional_or_keyword(param.name().id.to_name())
                         .with_optional_default_type(param.default().map(|default_expr| {
                             self.infer_expression(default_expr, TypeContext::default())
                                 .replace_parameter_defaults(self.db())
@@ -7330,12 +7337,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let variadic = parameters
                 .vararg
                 .as_ref()
-                .map(|param| Parameter::variadic(param.name().id.clone()));
+                .map(|param| Parameter::variadic(param.name().id.to_name()));
             let keyword_only = parameters
                 .kwonlyargs
                 .iter()
                 .map(|param| {
-                    Parameter::keyword_only(param.name().id.clone()).with_optional_default_type(
+                    Parameter::keyword_only(param.name().id.to_name()).with_optional_default_type(
                         param.default().map(|default_expr| {
                             self.infer_expression(default_expr, TypeContext::default())
                                 .replace_parameter_defaults(self.db())
@@ -7346,7 +7353,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let keyword_variadic = parameters
                 .kwarg
                 .as_ref()
-                .map(|param| Parameter::keyword_variadic(param.name().id.clone()));
+                .map(|param| Parameter::keyword_variadic(param.name().id.to_name()));
 
             let parameters = positional_only
                 .into_iter()
@@ -8896,7 +8903,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
             Some(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
-                .class_member(self.db(), id.clone())
+                .class_member(self.db(), id.to_name())
                 .place
                 .is_undefined(),
             Some(MethodDecorator::None) => !Type::instance(self.db(), class)
@@ -8925,9 +8932,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn narrow_expr_with_applicable_constraints<'r>(
+    fn narrow_expr_with_applicable_constraints<'node, 'arena: 'node>(
         &mut self,
-        target: impl Into<ast::ExprRef<'r>>,
+        target: impl Into<ast::ExprRef<'node>>,
         target_ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
     ) -> Type<'db> {
@@ -10277,27 +10284,27 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
 
 /// An expression representing the function argument at the given index, along with its type
 /// context.
-type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
+type ArgExpr<'db, 'node, 'ast> = (usize, &'node ast::Expr<'ast>, TypeContext<'db>);
 
 /// An iterator over arguments to a functional call.
 #[derive(Clone)]
-enum ArgumentsIter<'a> {
-    FromAst(ArgumentsSourceOrder<'a>),
-    Synthesized(std::slice::Iter<'a, ArgOrKeyword<'a>>),
+enum ArgumentsIter<'a, 'ast> {
+    FromAst(ArgumentsSourceOrder<'a, 'ast>),
+    Synthesized(std::slice::Iter<'a, ArgOrKeyword<'a, 'ast>>),
 }
 
-impl<'a> ArgumentsIter<'a> {
-    fn from_ast(arguments: &'a ast::Arguments) -> Self {
+impl<'a, 'ast: 'a> ArgumentsIter<'a, 'ast> {
+    fn from_ast(arguments: &'a ast::Arguments<'ast>) -> Self {
         Self::FromAst(arguments.iter_source_order())
     }
 
-    fn synthesized(arguments: &'a [ArgOrKeyword<'a>]) -> Self {
+    fn synthesized(arguments: &'a [ArgOrKeyword<'a, 'ast>]) -> Self {
         Self::Synthesized(arguments.iter())
     }
 }
 
-impl<'a> Iterator for ArgumentsIter<'a> {
-    type Item = ArgOrKeyword<'a>;
+impl<'a, 'ast: 'a> Iterator for ArgumentsIter<'a, 'ast> {
+    type Item = ArgOrKeyword<'a, 'ast>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -10586,22 +10593,22 @@ impl<V> IntoIterator for VecSet<V> {
 }
 
 #[must_use]
-struct AddBinding<'db, 'ast> {
+struct AddBinding<'db, 'node> {
     declared_ty: Option<Type<'db>>,
     binding: Definition<'db>,
-    node: AnyNodeRef<'ast>,
+    node: AnyNodeRef<'node>,
     qualifiers: TypeQualifiers,
     is_local: bool,
 }
 
-impl<'db, 'ast> AddBinding<'db, 'ast> {
+impl<'db> AddBinding<'db, '_> {
     fn type_context(&self) -> TypeContext<'db> {
         TypeContext::new(self.declared_ty)
     }
 
     fn insert(
         self,
-        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        builder: &mut TypeInferenceBuilder<'db, '_>,
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
         let declared_ty = self.declared_ty.unwrap_or(Type::unknown());
@@ -10683,7 +10690,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
             if value_ty
-                .class_member(db, attr.id.clone())
+                .class_member(db, attr.id.to_name())
                 .place
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))
@@ -10740,7 +10747,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum BoundOrConstraintsNodes<'ast> {
-    Bound(&'ast ast::Expr),
-    Constraints(&'ast [ast::Expr]),
+enum BoundOrConstraintsNodes<'node, 'ast> {
+    Bound(&'node ast::Expr<'ast>),
+    Constraints(&'node [ast::Expr<'ast>]),
 }

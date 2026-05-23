@@ -3,7 +3,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 
 use crate::checkers::ast::Checker;
@@ -181,9 +180,9 @@ pub(crate) fn if_expr_with_true_false(
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(
                 &ast::ExprCall {
-                    func: Box::new(
+                    func: checker.alloc_expr(
                         ast::ExprName {
-                            id: Name::new_static("bool"),
+                            id: ast::name::AstName::new_static("bool"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -191,8 +190,8 @@ pub(crate) fn if_expr_with_true_false(
                         .into(),
                     ),
                     arguments: Arguments {
-                        args: Box::from([test.clone()]),
-                        keywords: Box::from([]),
+                        args: checker.alloc_vec(vec![test.clone()]),
+                        keywords: checker.alloc_vec(vec![]),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
@@ -223,7 +222,7 @@ pub(crate) fn if_expr_with_false_true(
         checker.generator().expr(
             &ast::ExprUnaryOp {
                 op: UnaryOp::Not,
-                operand: Box::new(test.clone()),
+                operand: Checker::expr_ref(test),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
@@ -276,9 +275,9 @@ pub(crate) fn twisted_arms_in_ifexpr(
     let node1 = orelse.clone();
     let node2 = orelse.clone();
     let node3 = ast::ExprIf {
-        test: Box::new(node2),
-        body: Box::new(node1),
-        orelse: Box::new(node),
+        test: checker.alloc_expr(node2),
+        body: checker.alloc_expr(node1),
+        orelse: checker.alloc_expr(node),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };

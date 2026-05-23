@@ -48,9 +48,9 @@ impl Violation for TypeCheckWithoutTypeError {
 
 #[derive(Default)]
 struct ControlFlowVisitor<'a> {
-    returns: Vec<&'a Stmt>,
-    breaks: Vec<&'a Stmt>,
-    continues: Vec<&'a Stmt>,
+    returns: Vec<&'a Stmt<'a>>,
+    breaks: Vec<&'a Stmt<'a>>,
+    continues: Vec<&'a Stmt<'a>>,
 }
 
 impl<'a> StatementVisitor<'a> for ControlFlowVisitor<'a> {

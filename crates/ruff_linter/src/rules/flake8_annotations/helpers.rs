@@ -4,7 +4,6 @@ use rustc_hash::FxHashSet;
 use ruff_python_ast::helpers::{
     ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
 };
-use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::terminal::Terminal;
@@ -127,11 +126,11 @@ impl AutoPythonType {
     ///
     /// If the [`Expr`] relies on importing any external symbols, those imports will be returned as
     /// additional edits.
-    pub(crate) fn into_expression(
+    pub(crate) fn into_expression<'alloc>(
         self,
-        checker: &Checker,
+        checker: &'alloc Checker<'_>,
         at: TextSize,
-    ) -> Option<(Expr, Vec<Edit>)> {
+    ) -> Option<(Expr<'alloc>, Vec<Edit>)> {
         let target_version = checker.target_version();
         match self {
             AutoPythonType::Never => {
@@ -145,7 +144,7 @@ impl AutoPythonType {
                     .import(at)
                     .ok()?;
                 let expr = Expr::Name(ast::ExprName {
-                    id: Name::from(binding),
+                    id: checker.alloc_name(binding),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
@@ -168,7 +167,7 @@ impl AutoPythonType {
                         .collect::<Option<Vec<_>>>()?;
 
                     // Wrap in a bitwise union (e.g., `int | float`).
-                    let expr = pep_604_union(&names);
+                    let expr = pep_604_union(&names, checker.replacement_allocator());
 
                     Some((expr, all_edits))
                 } else {
@@ -186,7 +185,8 @@ impl AutoPythonType {
                                 .typing_importer("Optional", PythonVersion::lowest())?
                                 .import(at)
                                 .ok()?;
-                            let expr = typing_optional(element, Name::from(binding));
+                            let expr =
+                                typing_optional(element, &binding, checker.replacement_allocator());
                             edits.push(optional_edit);
                             Some((expr, edits))
                         }
@@ -206,7 +206,8 @@ impl AutoPythonType {
                                 .typing_importer("Union", PythonVersion::lowest())?
                                 .import(at)
                                 .ok()?;
-                            let expr = typing_union(&elements, Name::from(binding));
+                            let expr =
+                                typing_union(&elements, &binding, checker.replacement_allocator());
                             all_edits.push(union_edit);
                             Some((expr, all_edits))
                         }
@@ -221,18 +222,22 @@ impl AutoPythonType {
 ///
 /// If the [`Expr`] relies on importing any external symbols, those imports will be returned as
 /// additional edits.
-pub(crate) fn type_expr(
+pub(crate) fn type_expr<'alloc>(
     python_type: PythonType,
-    checker: &Checker,
+    checker: &'alloc Checker<'_>,
     at: TextSize,
-) -> Option<(Expr, Vec<Edit>)> {
-    fn name(name: &str, checker: &Checker, at: TextSize) -> Option<(Expr, Vec<Edit>)> {
+) -> Option<(Expr<'alloc>, Vec<Edit>)> {
+    fn name<'alloc>(
+        name: &str,
+        checker: &'alloc Checker<'_>,
+        at: TextSize,
+    ) -> Option<(Expr<'alloc>, Vec<Edit>)> {
         let (edit, binding) = checker
             .importer()
             .get_or_import_builtin_symbol(name, at, checker.semantic())
             .ok()?;
         let expr = Expr::Name(ast::ExprName {
-            id: binding.into(),
+            id: checker.alloc_name(binding),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,

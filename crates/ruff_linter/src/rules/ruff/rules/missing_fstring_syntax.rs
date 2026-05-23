@@ -1,6 +1,7 @@
 use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
+use ruff_allocator::Allocator;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_literal::format::FormatSpec;
@@ -196,7 +197,8 @@ fn should_be_fstring(
     }
 
     let fstring_expr = format!("f{}", locator.slice(literal));
-    let Ok(parsed) = parse_expression(&fstring_expr) else {
+    let allocator = Allocator::new();
+    let Ok(parsed) = parse_expression(&fstring_expr, &allocator) else {
         return false;
     };
 

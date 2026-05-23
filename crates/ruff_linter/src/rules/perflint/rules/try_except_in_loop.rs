@@ -122,8 +122,8 @@ struct LoopControlFlowVisitor {
     has_break_or_continue: bool,
 }
 
-impl StatementVisitor<'_> for LoopControlFlowVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'ast> StatementVisitor<'ast> for LoopControlFlowVisitor {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt<'ast>) {
         match stmt {
             Stmt::Break(_) | Stmt::Continue(_) => self.has_break_or_continue = true,
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {

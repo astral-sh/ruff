@@ -216,7 +216,7 @@ impl MemberExprBuilder {
     pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
         match expr {
             ast::ExprRef::Name(name) => Some(MemberExprBuilder {
-                path: name.id.clone(),
+                path: name.id.to_name(),
                 segments: smallvec::SmallVec::new_const(),
             }),
             ast::ExprRef::Named(named) if named.target.is_name_expr() => {
@@ -247,7 +247,7 @@ impl MemberExprBuilder {
 
     pub(super) fn visit_subscript_expr(
         subscript_value: MemberExprBuilder,
-        subscript_slice: &ast::Expr,
+        subscript_slice: &ast::Expr<'_>,
     ) -> Option<MemberExprBuilder> {
         let MemberExprBuilder {
             mut path,
@@ -1006,10 +1006,12 @@ mod tests {
 
     #[test]
     fn test_member_expr_ref_parent() {
+        use ruff_allocator::Allocator;
         use ruff_python_parser::parse_expression;
 
         // Parse a real Python expression
-        let parsed = parse_expression(r#"foo.bar[0]["baz"]"#).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_expression(r#"foo.bar[0]["baz"]"#, &allocator).unwrap();
         let expr = parsed.expr();
 
         // Convert to MemberExpr
@@ -1053,11 +1055,14 @@ mod tests {
 
     #[test]
     fn test_member_expr_small_vs_heap_allocation() {
+        use ruff_allocator::Allocator;
         use ruff_python_parser::parse_expression;
+
+        let allocator = Allocator::new();
 
         // Test Small allocation: 7 segments (maximum for inline storage)
         // Create expression with exactly 7 segments: x.a.b.c.d.e.f.g
-        let small_expr = parse_expression("x.a.b.c.d.e.f.g").unwrap();
+        let small_expr = parse_expression("x.a.b.c.d.e.f.g", &allocator).unwrap();
         let small_member =
             MemberExpr::try_from_expr(ast::ExprRef::from(small_expr.expr())).unwrap();
 
@@ -1067,7 +1072,7 @@ mod tests {
 
         // Test Heap allocation: 8 segments (exceeds inline capacity)
         // Create expression with 8 segments: x.a.b.c.d.e.f.g.h
-        let heap_expr = parse_expression("x.a.b.c.d.e.f.g.h").unwrap();
+        let heap_expr = parse_expression("x.a.b.c.d.e.f.g.h", &allocator).unwrap();
         let heap_member = MemberExpr::try_from_expr(ast::ExprRef::from(heap_expr.expr())).unwrap();
 
         // Should use Heap allocation
@@ -1076,7 +1081,7 @@ mod tests {
 
         // Test Small allocation with relative offset limit
         // Create expression where relative offsets are small enough: a.b[0]["c"]
-        let small_offset_expr = parse_expression(r#"a.b[0]["c"]"#).unwrap();
+        let small_offset_expr = parse_expression(r#"a.b[0]["c"]"#, &allocator).unwrap();
         let small_offset_member =
             MemberExpr::try_from_expr(ast::ExprRef::from(small_offset_expr.expr())).unwrap();
 
@@ -1088,7 +1093,7 @@ mod tests {
         // Create expression where one segment has exactly 63 bytes (the limit)
         let segment_63_bytes = "a".repeat(63);
         let max_offset_expr_code = format!("x.{segment_63_bytes}.y");
-        let max_offset_expr = parse_expression(&max_offset_expr_code).unwrap();
+        let max_offset_expr = parse_expression(&max_offset_expr_code, &allocator).unwrap();
         let max_offset_member =
             MemberExpr::try_from_expr(ast::ExprRef::from(max_offset_expr.expr())).unwrap();
         // Should still use Small allocation (exactly at the limit)
@@ -1100,7 +1105,7 @@ mod tests {
         // but we can test by creating an expression with long attribute names
         let long_name = "a".repeat(64); // 64 bytes (exceeds 63-byte limit)
         let long_expr_code = format!("x.{long_name}.y");
-        let long_expr = parse_expression(&long_expr_code).unwrap();
+        let long_expr = parse_expression(&long_expr_code, &allocator).unwrap();
         let long_member = MemberExpr::try_from_expr(ast::ExprRef::from(long_expr.expr())).unwrap();
         // Should use Heap allocation due to large relative offset
         assert!(matches!(long_member.segments, Segments::Heap(_)));

@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use unicode_normalization::UnicodeNormalization;
 
@@ -104,7 +103,7 @@ pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         if expr == child.as_ref() {
             let mut diagnostic = checker.report_diagnostic(DelAttrWithConstant, expr.range());
             let edit = Edit::range_replacement(
-                generate_del_statement(obj, attr_name, checker.generator()),
+                generate_del_statement(obj, attr_name, checker),
                 expr.range(),
             );
             diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
@@ -112,17 +111,17 @@ pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     }
 }
 
-fn generate_del_statement(obj: &Expr, attr_name: &str, generator: Generator) -> String {
+fn generate_del_statement(obj: &Expr, attr_name: &str, checker: &Checker) -> String {
     let stmt = Stmt::Delete(ast::StmtDelete {
-        targets: vec![Expr::Attribute(ast::ExprAttribute {
-            value: Box::new(obj.clone()),
-            attr: Identifier::new(attr_name.to_string(), TextRange::default()),
+        targets: checker.alloc_vec(vec![Expr::Attribute(ast::ExprAttribute {
+            value: Checker::expr_ref(obj),
+            attr: checker.alloc_identifier(attr_name, TextRange::default()),
             ctx: ExprContext::Del,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })],
+        })]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
-    generator.stmt(&stmt)
+    checker.generator().stmt(&stmt)
 }

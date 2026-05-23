@@ -2,6 +2,7 @@ use std::fmt::{Debug, Write};
 
 use insta::assert_snapshot;
 
+use ruff_allocator::Allocator;
 use ruff_python_ast::visitor::{
     Visitor, walk_alias, walk_bytes_literal, walk_comprehension, walk_except_handler, walk_expr,
     walk_f_string, walk_interpolated_string_element, walk_keyword, walk_match_case, walk_parameter,
@@ -165,7 +166,8 @@ fn t_strings() {
 }
 
 fn trace_visitation(source: &str) -> String {
-    let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
+    let allocator = Allocator::new();
+    let parsed = parse(source, ParseOptions::from(Mode::Module), &allocator).unwrap();
 
     let mut visitor = RecordVisitor::default();
     walk_module(&mut visitor, parsed.syntax());
@@ -173,7 +175,7 @@ fn trace_visitation(source: &str) -> String {
     visitor.output
 }
 
-fn walk_module<'a, V>(visitor: &mut V, module: &'a ast::Mod)
+fn walk_module<'a, V>(visitor: &mut V, module: &'a ast::Mod<'a>)
 where
     V: Visitor<'a> + ?Sized,
 {
@@ -223,20 +225,20 @@ impl RecordVisitor {
     }
 }
 
-impl Visitor<'_> for RecordVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'a> Visitor<'a> for RecordVisitor {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         self.enter_node(stmt);
         walk_stmt(self, stmt);
         self.exit_node();
     }
 
-    fn visit_annotation(&mut self, expr: &Expr) {
+    fn visit_annotation(&mut self, expr: &'a Expr<'a>) {
         self.enter_node(expr);
         walk_expr(self, expr);
         self.exit_node();
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         self.enter_node(expr);
         walk_expr(self, expr);
         self.exit_node();
@@ -258,31 +260,31 @@ impl Visitor<'_> for RecordVisitor {
         self.emit(&cmp_op);
     }
 
-    fn visit_comprehension(&mut self, comprehension: &Comprehension) {
+    fn visit_comprehension(&mut self, comprehension: &'a Comprehension<'a>) {
         self.enter_node(comprehension);
         walk_comprehension(self, comprehension);
         self.exit_node();
     }
 
-    fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler<'a>) {
         self.enter_node(except_handler);
         walk_except_handler(self, except_handler);
         self.exit_node();
     }
 
-    fn visit_parameters(&mut self, parameters: &Parameters) {
+    fn visit_parameters(&mut self, parameters: &'a Parameters<'a>) {
         self.enter_node(parameters);
         walk_parameters(self, parameters);
         self.exit_node();
     }
 
-    fn visit_parameter(&mut self, parameter: &Parameter) {
+    fn visit_parameter(&mut self, parameter: &'a Parameter<'a>) {
         self.enter_node(parameter);
         walk_parameter(self, parameter);
         self.exit_node();
     }
 
-    fn visit_keyword(&mut self, keyword: &Keyword) {
+    fn visit_keyword(&mut self, keyword: &'a Keyword<'a>) {
         self.enter_node(keyword);
         walk_keyword(self, keyword);
         self.exit_node();
@@ -294,25 +296,25 @@ impl Visitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_with_item(&mut self, with_item: &WithItem) {
+    fn visit_with_item(&mut self, with_item: &'a WithItem<'a>) {
         self.enter_node(with_item);
         walk_with_item(self, with_item);
         self.exit_node();
     }
 
-    fn visit_match_case(&mut self, match_case: &MatchCase) {
+    fn visit_match_case(&mut self, match_case: &'a MatchCase<'a>) {
         self.enter_node(match_case);
         walk_match_case(self, match_case);
         self.exit_node();
     }
 
-    fn visit_pattern(&mut self, pattern: &Pattern) {
+    fn visit_pattern(&mut self, pattern: &'a Pattern<'a>) {
         self.enter_node(pattern);
         walk_pattern(self, pattern);
         self.exit_node();
     }
 
-    fn visit_type_param(&mut self, type_param: &TypeParam) {
+    fn visit_type_param(&mut self, type_param: &'a TypeParam<'a>) {
         self.enter_node(type_param);
         walk_type_param(self, type_param);
         self.exit_node();
@@ -330,19 +332,22 @@ impl Visitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_f_string(&mut self, f_string: &FString) {
+    fn visit_f_string(&mut self, f_string: &'a FString<'a>) {
         self.enter_node(f_string);
         walk_f_string(self, f_string);
         self.exit_node();
     }
 
-    fn visit_interpolated_string_element(&mut self, f_string_element: &InterpolatedStringElement) {
+    fn visit_interpolated_string_element(
+        &mut self,
+        f_string_element: &'a InterpolatedStringElement<'a>,
+    ) {
         self.enter_node(f_string_element);
         walk_interpolated_string_element(self, f_string_element);
         self.exit_node();
     }
 
-    fn visit_t_string(&mut self, t_string: &TString) {
+    fn visit_t_string(&mut self, t_string: &'a TString<'a>) {
         self.enter_node(t_string);
         walk_t_string(self, t_string);
         self.exit_node();

@@ -42,7 +42,7 @@ pub struct Globals<'a>(FxHashMap<&'a str, TextRange>);
 impl<'a> Globals<'a> {
     /// Extracts the set of global names from a given scope, or return `None` if the scope does not
     /// contain any `global` declarations.
-    pub fn from_body(body: &'a [Stmt]) -> Option<Self> {
+    pub fn from_body(body: &'a [Stmt<'a>]) -> Option<Self> {
         let mut builder = GlobalsVisitor::new();
         builder.visit_body(body);
         builder.finish()
@@ -72,7 +72,7 @@ impl<'a> GlobalsVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for GlobalsVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::Global(ast::StmtGlobal {
                 names,

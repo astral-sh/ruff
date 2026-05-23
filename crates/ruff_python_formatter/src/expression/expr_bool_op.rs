@@ -9,14 +9,14 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprBoolOp;
 
-impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
+impl FormatNodeRule<ExprBoolOp<'_>> for FormatExprBoolOp {
     #[inline]
     fn fmt_fields(&self, item: &ExprBoolOp, f: &mut PyFormatter) -> FormatResult<()> {
         BinaryLike::Bool(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprBoolOp {
+impl NeedsParentheses for ExprBoolOp<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

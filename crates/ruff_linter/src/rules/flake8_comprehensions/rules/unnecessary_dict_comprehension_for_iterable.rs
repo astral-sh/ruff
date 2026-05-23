@@ -73,9 +73,9 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 }
 
 /// C420
-pub(crate) fn unnecessary_dict_comprehension_for_iterable(
-    checker: &Checker,
-    dict_comp: &ast::ExprDictComp,
+pub(crate) fn unnecessary_dict_comprehension_for_iterable<'ast>(
+    checker: &Checker<'ast>,
+    dict_comp: &ast::ExprDictComp<'ast>,
 ) {
     let [generator] = dict_comp.generators.as_slice() else {
         return;
@@ -154,6 +154,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
                     .expr(&fix_unnecessary_dict_comprehension(
                         dict_comp.value.as_ref(),
                         generator,
+                        checker,
                     )),
                 dict_comp.start(),
                 checker.locator(),
@@ -204,21 +205,28 @@ fn is_constant_like(expr: &Expr) -> bool {
 /// For example:
 /// - Given `{n: None for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3])`.
 /// - Given `{n: 1 for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3], 1)`.
-fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -> Expr {
+fn fix_unnecessary_dict_comprehension<'alloc, 'ast>(
+    value: &Expr<'ast>,
+    generator: &Comprehension<'ast>,
+    checker: &'alloc Checker<'ast>,
+) -> Expr<'alloc>
+where
+    'ast: 'alloc,
+{
     let iterable = generator.iter.clone();
     let args = Arguments {
         args: if value.is_none_literal_expr() {
-            Box::from([iterable])
+            checker.alloc_vec(vec![iterable])
         } else {
-            Box::from([iterable, value.clone()])
+            checker.alloc_vec(vec![iterable, value.clone()])
         },
-        keywords: Box::from([]),
+        keywords: checker.alloc_vec(vec![]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     Expr::Call(ExprCall {
-        func: Box::new(Expr::Name(ExprName {
-            id: "dict.fromkeys".into(),
+        func: checker.alloc_expr(Expr::Name(ExprName {
+            id: ast::name::AstName::new_static("dict.fromkeys"),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

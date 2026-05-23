@@ -466,6 +466,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_ast::ExprRef;
     use ruff_python_parser::parse_expression;
     use ruff_python_trivia::CommentRanges;
@@ -475,7 +476,8 @@ mod tests {
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
-        let parsed = parse_expression(expression).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_expression(expression, &allocator).unwrap();
         assert!(!is_expression_parenthesized(
             ExprRef::from(parsed.expr()),
             &CommentRanges::default(),

@@ -18,7 +18,7 @@ use crate::comments::{CommentsMap, SourceComment};
 /// Collect the preceding, following and enclosing node for each comment without applying
 /// [`place_comment`] for debugging.
 pub(crate) fn collect_comments<'a>(
-    root: &'a Mod,
+    root: &'a Mod<'a>,
     source_code: SourceCode<'a>,
     comment_ranges: &'a CommentRanges,
 ) -> Vec<DecoratedComment<'a>> {
@@ -532,7 +532,7 @@ impl<'a> PushComment<'a> for CommentsVecBuilder<'a> {
 /// A storage for the [`CommentsVisitor`] that fixes the placement and stores the comments in a
 /// [`CommentsMap`].
 pub(super) struct CommentsMapBuilder<'a> {
-    comments: CommentsMap<'a>,
+    comments: CommentsMap,
     /// We need those for backwards lexing
     comment_ranges: &'a CommentRanges,
     source: &'a str,
@@ -610,7 +610,7 @@ impl<'a> CommentsMapBuilder<'a> {
         }
     }
 
-    pub(crate) fn finish(self) -> CommentsMap<'a> {
+    pub(crate) fn finish(self) -> CommentsMap {
         self.comments
     }
 

@@ -11,8 +11,8 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 
 pub(super) enum AnyExpressionYield<'a> {
-    Yield(&'a ExprYield),
-    YieldFrom(&'a ExprYieldFrom),
+    Yield(&'a ExprYield<'a>),
+    YieldFrom(&'a ExprYieldFrom<'a>),
 }
 
 impl AnyExpressionYield<'_> {
@@ -20,7 +20,7 @@ impl AnyExpressionYield<'_> {
         matches!(self, AnyExpressionYield::YieldFrom(_))
     }
 
-    fn value(&self) -> Option<&Expr> {
+    fn value(&self) -> Option<&Expr<'_>> {
         match self {
             AnyExpressionYield::Yield(yld) => yld.value.as_deref(),
             AnyExpressionYield::YieldFrom(yld) => Some(&yld.value),
@@ -80,14 +80,14 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
     }
 }
 
-impl<'a> From<&'a ExprYield> for AnyExpressionYield<'a> {
-    fn from(value: &'a ExprYield) -> Self {
+impl<'a> From<&'a ExprYield<'a>> for AnyExpressionYield<'a> {
+    fn from(value: &'a ExprYield<'a>) -> Self {
         AnyExpressionYield::Yield(value)
     }
 }
 
-impl<'a> From<&'a ExprYieldFrom> for AnyExpressionYield<'a> {
-    fn from(value: &'a ExprYieldFrom) -> Self {
+impl<'a> From<&'a ExprYieldFrom<'a>> for AnyExpressionYield<'a> {
+    fn from(value: &'a ExprYieldFrom<'a>) -> Self {
         AnyExpressionYield::YieldFrom(value)
     }
 }
@@ -129,13 +129,13 @@ impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
 #[derive(Default)]
 pub struct FormatExprYield;
 
-impl FormatNodeRule<ExprYield> for FormatExprYield {
+impl FormatNodeRule<ExprYield<'_>> for FormatExprYield {
     fn fmt_fields(&self, item: &ExprYield, f: &mut PyFormatter) -> FormatResult<()> {
         AnyExpressionYield::from(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprYield {
+impl NeedsParentheses for ExprYield<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

@@ -579,6 +579,7 @@ impl TypeParamsState {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
 
     use crate::Locator;
@@ -664,7 +665,8 @@ if False:
     }
 
     fn assert_logical_lines(contents: &str, expected: &[&str]) {
-        let parsed = parse_module(contents).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(parsed.tokens(), &locator)
             .into_iter()

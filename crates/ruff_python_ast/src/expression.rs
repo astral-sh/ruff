@@ -1,5 +1,6 @@
 use std::iter::FusedIterator;
 
+use ruff_allocator::Box as ArenaBox;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
@@ -7,8 +8,8 @@ use crate::{
     ExprStringLiteral, ExprTString, StringFlags,
 };
 
-impl<'a> From<&'a Box<Expr>> for ExprRef<'a> {
-    fn from(value: &'a Box<Expr>) -> Self {
+impl<'a, 'ast: 'a> From<&'a ArenaBox<'ast, Expr<'ast>>> for ExprRef<'a> {
+    fn from(value: &'a ArenaBox<'ast, Expr<'ast>>) -> Self {
         ExprRef::from(value.as_ref())
     }
 }
@@ -17,9 +18,9 @@ impl<'a> From<&'a Box<Expr>> for ExprRef<'a> {
 /// reference instead of an owned value.
 #[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
 pub enum LiteralExpressionRef<'a> {
-    StringLiteral(&'a ast::ExprStringLiteral),
-    BytesLiteral(&'a ast::ExprBytesLiteral),
-    NumberLiteral(&'a ast::ExprNumberLiteral),
+    StringLiteral(&'a ast::ExprStringLiteral<'a>),
+    BytesLiteral(&'a ast::ExprBytesLiteral<'a>),
+    NumberLiteral(&'a ast::ExprNumberLiteral<'a>),
     BooleanLiteral(&'a ast::ExprBooleanLiteral),
     NoneLiteral(&'a ast::ExprNoneLiteral),
     EllipsisLiteral(&'a ast::ExprEllipsisLiteral),
@@ -83,10 +84,10 @@ impl LiteralExpressionRef<'_> {
 /// literals, bytes literals, f-strings, and t-strings.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StringLike<'a> {
-    String(&'a ast::ExprStringLiteral),
-    Bytes(&'a ast::ExprBytesLiteral),
-    FString(&'a ast::ExprFString),
-    TString(&'a ast::ExprTString),
+    String(&'a ast::ExprStringLiteral<'a>),
+    Bytes(&'a ast::ExprBytesLiteral<'a>),
+    FString(&'a ast::ExprFString<'a>),
+    TString(&'a ast::ExprTString<'a>),
 }
 
 impl<'a> StringLike<'a> {
@@ -124,26 +125,26 @@ impl<'a> StringLike<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
-    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::ExprStringLiteral<'ast>> for StringLike<'a> {
+    fn from(value: &'a ast::ExprStringLiteral<'ast>) -> Self {
         StringLike::String(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
-    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::ExprBytesLiteral<'ast>> for StringLike<'a> {
+    fn from(value: &'a ast::ExprBytesLiteral<'ast>) -> Self {
         StringLike::Bytes(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprFString> for StringLike<'a> {
-    fn from(value: &'a ast::ExprFString) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::ExprFString<'ast>> for StringLike<'a> {
+    fn from(value: &'a ast::ExprFString<'ast>) -> Self {
         StringLike::FString(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprTString> for StringLike<'a> {
-    fn from(value: &'a ast::ExprTString) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::ExprTString<'ast>> for StringLike<'a> {
+    fn from(value: &'a ast::ExprTString<'ast>) -> Self {
         StringLike::TString(value)
     }
 }
@@ -176,10 +177,10 @@ impl<'a> From<&StringLike<'a>> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> TryFrom<&'a Expr> for StringLike<'a> {
+impl<'a, 'ast: 'a> TryFrom<&'a Expr<'ast>> for StringLike<'a> {
     type Error = ();
 
-    fn try_from(value: &'a Expr) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a Expr<'ast>) -> Result<Self, Self::Error> {
         match value {
             Expr::StringLiteral(value) => Ok(Self::String(value)),
             Expr::BytesLiteral(value) => Ok(Self::Bytes(value)),
@@ -218,10 +219,10 @@ impl Ranged for StringLike<'_> {
 /// An enum that holds a reference to an individual part of a string-like expression.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StringLikePart<'a> {
-    String(&'a ast::StringLiteral),
-    Bytes(&'a ast::BytesLiteral),
-    FString(&'a ast::FString),
-    TString(&'a ast::TString),
+    String(&'a ast::StringLiteral<'a>),
+    Bytes(&'a ast::BytesLiteral<'a>),
+    FString(&'a ast::FString<'a>),
+    TString(&'a ast::TString<'a>),
 }
 
 impl<'a> StringLikePart<'a> {
@@ -248,7 +249,7 @@ impl<'a> StringLikePart<'a> {
         matches!(self, Self::String(_))
     }
 
-    pub const fn as_string_literal(self) -> Option<&'a ast::StringLiteral> {
+    pub const fn as_string_literal(self) -> Option<&'a ast::StringLiteral<'a>> {
         match self {
             StringLikePart::String(value) => Some(value),
             _ => None,
@@ -260,26 +261,26 @@ impl<'a> StringLikePart<'a> {
     }
 }
 
-impl<'a> From<&'a ast::StringLiteral> for StringLikePart<'a> {
-    fn from(value: &'a ast::StringLiteral) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::StringLiteral<'ast>> for StringLikePart<'a> {
+    fn from(value: &'a ast::StringLiteral<'ast>) -> Self {
         StringLikePart::String(value)
     }
 }
 
-impl<'a> From<&'a ast::BytesLiteral> for StringLikePart<'a> {
-    fn from(value: &'a ast::BytesLiteral) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::BytesLiteral<'ast>> for StringLikePart<'a> {
+    fn from(value: &'a ast::BytesLiteral<'ast>) -> Self {
         StringLikePart::Bytes(value)
     }
 }
 
-impl<'a> From<&'a ast::FString> for StringLikePart<'a> {
-    fn from(value: &'a ast::FString) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::FString<'ast>> for StringLikePart<'a> {
+    fn from(value: &'a ast::FString<'ast>) -> Self {
         StringLikePart::FString(value)
     }
 }
 
-impl<'a> From<&'a ast::TString> for StringLikePart<'a> {
-    fn from(value: &'a ast::TString) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::TString<'ast>> for StringLikePart<'a> {
+    fn from(value: &'a ast::TString<'ast>) -> Self {
         StringLikePart::TString(value)
     }
 }
@@ -317,10 +318,10 @@ impl Ranged for StringLikePart<'_> {
 /// This is created by the [`StringLike::parts`] method.
 #[derive(Clone)]
 pub enum StringLikePartIter<'a> {
-    String(std::slice::Iter<'a, ast::StringLiteral>),
-    Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
-    FString(std::slice::Iter<'a, ast::FStringPart>),
-    TString(std::slice::Iter<'a, ast::TString>),
+    String(std::slice::Iter<'a, ast::StringLiteral<'a>>),
+    Bytes(std::slice::Iter<'a, ast::BytesLiteral<'a>>),
+    FString(std::slice::Iter<'a, ast::FStringPart<'a>>),
+    TString(std::slice::Iter<'a, ast::TString<'a>>),
 }
 
 impl<'a> Iterator for StringLikePartIter<'a> {

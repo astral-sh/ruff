@@ -1,7 +1,6 @@
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
-};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -96,7 +95,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let Some((body, total_keyword)) = match_fields_and_total(arguments) else {
+    let Some((body, total_keyword)) = match_fields_and_total(arguments, checker.allocator()) else {
         return;
     };
 
@@ -116,6 +115,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             base_class,
             checker.generator(),
             checker.comment_ranges(),
+            checker.allocator(),
         ));
     }
 }
@@ -126,7 +126,7 @@ fn match_typed_dict_assign<'a>(
     targets: &'a [Expr],
     value: &'a Expr,
     semantic: &SemanticModel,
-) -> Option<(&'a str, &'a Arguments, &'a Expr)> {
+) -> Option<(&'a str, &'a Arguments<'a>, &'a Expr<'a>)> {
     let [Expr::Name(ast::ExprName { id: class_name, .. })] = targets else {
         return None;
     };
@@ -146,18 +146,23 @@ fn match_typed_dict_assign<'a>(
 }
 
 /// Generate a [`Stmt::AnnAssign`] representing the provided field definition.
-fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
+fn create_field_assignment_stmt<'a>(
+    field: &'a str,
+    annotation: &'a Expr<'a>,
+    allocator: &'a Allocator,
+) -> Stmt<'a> {
     ast::StmtAnnAssign {
-        target: Box::new(
+        target: ArenaBox::new_in(
             ast::ExprName {
-                id: field.into(),
+                id: ast::name::AstName::new_in(field, allocator),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
+            allocator,
         ),
-        annotation: Box::new(annotation.clone()),
+        annotation: ArenaBox::from_ref(annotation),
         value: None,
         simple: true,
         range: TextRange::default(),
@@ -167,39 +172,46 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
 }
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body, keywords, and base class.
-fn create_class_def_stmt(
-    class_name: &str,
-    body: Suite,
-    total_keyword: Option<&Keyword>,
-    base_class: &Expr,
-) -> Stmt {
+fn create_class_def_stmt<'a>(
+    class_name: &'a str,
+    body: Vec<Stmt<'a>>,
+    total_keyword: Option<&'a Keyword<'a>>,
+    base_class: &'a Expr<'a>,
+    allocator: &'a Allocator,
+) -> Stmt<'a> {
     ast::StmtClassDef {
-        name: Identifier::new(class_name.to_string(), TextRange::default()),
-        arguments: Some(Box::new(Arguments {
-            args: Box::from([base_class.clone()]),
-            keywords: match total_keyword {
-                Some(keyword) => Box::from([keyword.clone()]),
-                None => Box::from([]),
+        name: Identifier::new_in(class_name, TextRange::default(), allocator),
+        arguments: Some(ArenaBox::new_in(
+            Arguments {
+                args: ArenaSlice::from_iter_in([base_class.clone()], allocator),
+                keywords: match total_keyword {
+                    Some(keyword) => ArenaSlice::from_iter_in([keyword.clone()], allocator),
+                    None => ArenaSlice::new_in(allocator),
+                },
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })),
-        body,
+            allocator,
+        )),
+        body: ArenaSlice::from_vec_in(body, allocator),
         type_params: None,
-        decorator_list: ast::DecoratorList::new(),
+        decorator_list: ArenaSlice::new_in(allocator),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
 
-fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Suite> {
+fn fields_from_dict_literal<'a>(
+    items: &'a [ast::DictItem<'a>],
+    allocator: &'a Allocator,
+) -> Option<Vec<Stmt<'a>>> {
     if items.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Some(Suite::from([node]))
+        Some(vec![node])
     } else {
         items
             .iter()
@@ -214,7 +226,11 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Suite> {
                     if field.to_str().starts_with("__") {
                         return None;
                     }
-                    Some(create_field_assignment_stmt(field.to_str(), value))
+                    Some(create_field_assignment_stmt(
+                        field.to_str(),
+                        value,
+                        allocator,
+                    ))
                 }
                 _ => None,
             })
@@ -222,7 +238,11 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Suite> {
     }
 }
 
-fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Suite> {
+fn fields_from_dict_call<'a>(
+    func: &'a Expr<'a>,
+    keywords: &'a [Keyword<'a>],
+    allocator: &'a Allocator,
+) -> Option<Vec<Stmt<'a>>> {
     let ast::ExprName { id, .. } = func.as_name_expr()?;
     if id != "dict" {
         return None;
@@ -233,20 +253,23 @@ fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Suite> {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Some(Suite::from([node]))
+        Some(vec![node])
     } else {
-        fields_from_keywords(keywords)
+        fields_from_keywords(keywords, allocator)
     }
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
-fn fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
+fn fields_from_keywords<'a>(
+    keywords: &'a [Keyword<'a>],
+    allocator: &'a Allocator,
+) -> Option<Vec<Stmt<'a>>> {
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        return Some(Suite::from([node]));
+        return Some(vec![node]);
     }
 
     keywords
@@ -255,13 +278,16 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
             keyword
                 .arg
                 .as_ref()
-                .map(|field| create_field_assignment_stmt(field, &keyword.value))
+                .map(|field| create_field_assignment_stmt(field, &keyword.value, allocator))
         })
         .collect()
 }
 
 /// Match the fields and `total` keyword from a `TypedDict` call.
-fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keyword>)> {
+fn match_fields_and_total<'a>(
+    arguments: &'a Arguments<'a>,
+    allocator: &'a Allocator,
+) -> Option<(Vec<Stmt<'a>>, Option<&'a Keyword<'a>>)> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex) `TypedDict("MyType", {"a": int, "b": str})`
         ([_typename, fields], [..]) => {
@@ -271,13 +297,13 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keywo
                     items,
                     range: _,
                     node_index: _,
-                }) => Some((fields_from_dict_literal(items)?, total)),
+                }) => Some((fields_from_dict_literal(items, allocator)?, total)),
                 Expr::Call(ast::ExprCall {
                     func,
                     arguments: Arguments { keywords, .. },
                     range: _,
                     node_index: _,
-                }) => Some((fields_from_dict_call(func, keywords)?, total)),
+                }) => Some((fields_from_dict_call(func, keywords, allocator)?, total)),
                 _ => None,
             }
         }
@@ -287,24 +313,26 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keywo
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
-            Some((Suite::from([node]), None))
+            Some((vec![node], None))
         }
         // Ex) `TypedDict("MyType", a=int, b=str)`
-        ([_typename], fields) => Some((fields_from_keywords(fields)?, None)),
+        ([_typename], fields) => Some((fields_from_keywords(fields, allocator)?, None)),
         // Ex) `TypedDict()`
         _ => None,
     }
 }
 
 /// Generate a `Fix` to convert a `TypedDict` from functional to class.
-fn convert_to_class(
-    stmt: &Stmt,
-    class_name: &str,
-    body: Suite,
-    total_keyword: Option<&Keyword>,
-    base_class: &Expr,
+#[expect(clippy::too_many_arguments)]
+fn convert_to_class<'a>(
+    stmt: &Stmt<'a>,
+    class_name: &'a str,
+    body: Vec<Stmt<'a>>,
+    total_keyword: Option<&'a Keyword<'a>>,
+    base_class: &'a Expr<'a>,
     generator: Generator,
     comment_ranges: &CommentRanges,
+    allocator: &'a Allocator,
 ) -> Fix {
     Fix::applicable_edit(
         Edit::range_replacement(
@@ -313,6 +341,7 @@ fn convert_to_class(
                 body,
                 total_keyword,
                 base_class,
+                allocator,
             )),
             stmt.range(),
         ),

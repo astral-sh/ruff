@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::{Name, UnqualifiedName};
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -128,7 +128,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
             .all(|elem| !semantic.match_builtin_expr(elem, "OSError"))
         {
             let node = ast::ExprName {
-                id: Name::new_static("OSError"),
+                id: ast::name::AstName::new_static("OSError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -140,7 +140,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
             "OSError".to_string()
         } else {
             let node = ast::ExprTuple {
-                elts: remaining,
+                elts: checker.alloc_vec(remaining),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,

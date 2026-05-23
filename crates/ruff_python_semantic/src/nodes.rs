@@ -82,26 +82,26 @@ impl<'a> Index<NodeId> for Nodes<'a> {
 /// like [`ruff_python_ast::ExprRef`] instead of [`Expr`].
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum NodeRef<'a> {
-    Stmt(&'a Stmt),
-    Expr(&'a Expr),
+    Stmt(&'a Stmt<'a>),
+    Expr(&'a Expr<'a>),
 }
 
 impl<'a> NodeRef<'a> {
     /// Returns the [`Stmt`] if this is a statement, or `None` if the reference is to another
     /// kind of AST node.
-    pub fn as_statement(&self) -> Option<&'a Stmt> {
+    pub fn as_statement(&self) -> Option<&'a Stmt<'a>> {
         match self {
-            NodeRef::Stmt(stmt) => Some(stmt),
+            NodeRef::Stmt(stmt) => Some(*stmt),
             NodeRef::Expr(_) => None,
         }
     }
 
     /// Returns the [`Expr`] if this is a expression, or `None` if the reference is to another
     /// kind of AST node.
-    pub fn as_expression(&self) -> Option<&'a Expr> {
+    pub fn as_expression(&self) -> Option<&'a Expr<'a>> {
         match self {
             NodeRef::Stmt(_) => None,
-            NodeRef::Expr(expr) => Some(expr),
+            NodeRef::Expr(expr) => Some(*expr),
         }
     }
 
@@ -123,14 +123,14 @@ impl Ranged for NodeRef<'_> {
     }
 }
 
-impl<'a> From<&'a Expr> for NodeRef<'a> {
-    fn from(expr: &'a Expr) -> Self {
+impl<'a> From<&'a Expr<'a>> for NodeRef<'a> {
+    fn from(expr: &'a Expr<'a>) -> Self {
         NodeRef::Expr(expr)
     }
 }
 
-impl<'a> From<&'a Stmt> for NodeRef<'a> {
-    fn from(stmt: &'a Stmt) -> Self {
+impl<'a> From<&'a Stmt<'a>> for NodeRef<'a> {
+    fn from(stmt: &'a Stmt<'a>) -> Self {
         NodeRef::Stmt(stmt)
     }
 }

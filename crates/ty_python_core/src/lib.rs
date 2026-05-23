@@ -465,7 +465,7 @@ impl<'db> SemanticIndex<'db> {
     /// its definition.
     pub fn unconstrained_collection_binding(
         &self,
-        collection_use: &ast::Expr,
+        collection_use: &ast::Expr<'_>,
     ) -> Option<Definition<'db>> {
         self.collections_by_use.get(&collection_use.into()).copied()
     }
@@ -612,12 +612,12 @@ impl<'db> SemanticIndex<'db> {
     /// This is different from [`definition::Definition::scope`] which
     /// returns the scope in which that definition is defined in.
     #[track_caller]
-    pub fn node_scope(&self, node: NodeWithScopeRef) -> FileScopeId {
+    pub fn node_scope(&self, node: NodeWithScopeRef<'_, '_>) -> FileScopeId {
         self.scopes_by_node[&node.node_key()]
     }
 
     /// Returns the id of the scope that `node` creates, if it exists.
-    pub fn try_node_scope(&self, node: NodeWithScopeRef) -> Option<FileScopeId> {
+    pub fn try_node_scope(&self, node: NodeWithScopeRef<'_, '_>) -> Option<FileScopeId> {
         self.scopes_by_node.get(&node.node_key()).copied()
     }
 
@@ -988,7 +988,7 @@ pub type PossiblyNarrowedPlaces = FxHashSet<ScopedPlaceId>;
 /// Implemented by types for which the semantic index tracks their scope.
 pub trait HasTrackedScope: ast::HasNodeIndex {}
 
-impl HasTrackedScope for ast::Expr {}
+impl HasTrackedScope for ast::Expr<'_> {}
 impl HasTrackedScope for ast::ExprRef<'_> {}
 impl HasTrackedScope for &ast::ExprRef<'_> {}
 
@@ -996,7 +996,7 @@ impl HasTrackedScope for &ast::ExprRef<'_> {}
 // However, `ExpressionsScopeMap` stores the text ranges of each scope.
 // That allows us to look up the identifier's scope for as long as it's
 // inside an expression (because the ranges overlap).
-impl HasTrackedScope for ast::Identifier {}
+impl HasTrackedScope for ast::Identifier<'_> {}
 
 #[cfg(test)]
 mod tests {

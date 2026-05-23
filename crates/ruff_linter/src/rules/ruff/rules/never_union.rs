@@ -184,9 +184,9 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                                 checker
                                     .generator()
                                     .expr(&Expr::Subscript(ast::ExprSubscript {
-                                        value: value.clone(),
-                                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                                            elts: rest,
+                                        value: *value,
+                                        slice: checker.alloc_expr(Expr::Tuple(ast::ExprTuple {
+                                            elts: checker.alloc_vec(rest),
                                             ctx: ast::ExprContext::Load,
                                             range: TextRange::default(),
                                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

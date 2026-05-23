@@ -344,7 +344,7 @@ fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, ch
 
 fn call<'a>(
     argumentable: Argumentable,
-    parameters: impl Iterator<Item = &'a Parameter>,
+    parameters: impl Iterator<Item = &'a Parameter<'a>>,
     scope: &Scope,
     checker: &Checker,
 ) {

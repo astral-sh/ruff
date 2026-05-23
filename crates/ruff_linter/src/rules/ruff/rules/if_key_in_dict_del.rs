@@ -5,8 +5,8 @@ use ruff_python_semantic::analyze::typing;
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
-type Key = Expr;
-type Dict = ExprName;
+type Key<'a> = Expr<'a>;
+type Dict<'a> = ExprName<'a>;
 
 /// ## What it does
 /// Checks for `if key in dictionary: del dictionary[key]`.
@@ -76,7 +76,7 @@ pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
         .set_fix(fix);
 }
 
-fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {
+fn extract_dict_and_key_from_test<'a>(test: &'a Expr<'a>) -> Option<(&'a Dict<'a>, &'a Key<'a>)> {
     let Expr::Compare(comp) = test else {
         return None;
     };
@@ -92,7 +92,9 @@ fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {
     Some((dict, &comp.left))
 }
 
-fn extract_dict_and_key_from_del(targets: &[Expr]) -> Option<(&Dict, &Key)> {
+fn extract_dict_and_key_from_del<'a>(
+    targets: &'a [Expr<'a>],
+) -> Option<(&'a Dict<'a>, &'a Key<'a>)> {
     let [Expr::Subscript(ExprSubscript { value, slice, .. })] = targets else {
         return None;
     };
@@ -128,11 +130,16 @@ fn is_same_key(test: &Key, del: &Key) -> bool {
     }
 }
 
-fn is_same_dict(test: &Dict, del: &Dict) -> bool {
+fn is_same_dict(test: &Dict<'_>, del: &Dict<'_>) -> bool {
     test.id.as_str() == del.id.as_str()
 }
 
-fn replace_with_dict_pop_fix(checker: &Checker, stmt: &StmtIf, dict: &Dict, key: &Key) -> Fix {
+fn replace_with_dict_pop_fix(
+    checker: &Checker,
+    stmt: &StmtIf<'_>,
+    dict: &Dict<'_>,
+    key: &Key<'_>,
+) -> Fix {
     let locator = checker.locator();
     let dict_expr = locator.slice(dict);
     let key_expr = locator.slice(key);

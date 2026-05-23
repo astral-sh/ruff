@@ -63,7 +63,7 @@ enum Reason {
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
-fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
+fn match_encoded_variable<'a>(func: &'a Expr<'a>) -> Option<&'a Expr<'a>> {
     let Expr::Attribute(ast::ExprAttribute {
         value: variable,
         attr,
@@ -91,14 +91,14 @@ enum EncodingArg<'a> {
     /// Ex) `"".encode()`
     Empty,
     /// Ex) `"".encode("utf-8")`
-    Positional(&'a Expr),
+    Positional(&'a Expr<'a>),
     /// Ex) `"".encode(encoding="utf-8")`
-    Keyword(&'a Keyword),
+    Keyword(&'a Keyword<'a>),
 }
 
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
-fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
+fn match_encoding_arg<'a>(arguments: &'a Arguments<'a>) -> Option<EncodingArg<'a>> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex `"".encode()`
         ([], []) => return Some(EncodingArg::Empty),

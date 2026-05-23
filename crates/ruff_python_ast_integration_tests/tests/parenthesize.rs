@@ -1,3 +1,4 @@
+use ruff_allocator::Allocator;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_parser::parse_expression;
 use ruff_python_trivia::CommentRanges;
@@ -5,8 +6,9 @@ use ruff_text_size::TextRange;
 
 #[test]
 fn test_parenthesized_name() {
+    let allocator = Allocator::new();
     let source_code = r"(x) + 1";
-    let parsed = parse_expression(source_code).unwrap();
+    let parsed = parse_expression(source_code, &allocator).unwrap();
 
     let bin_op = parsed.expr().as_bin_op_expr().unwrap();
     let name = bin_op.left.as_ref();
@@ -22,8 +24,9 @@ fn test_parenthesized_name() {
 
 #[test]
 fn test_non_parenthesized_name() {
+    let allocator = Allocator::new();
     let source_code = r"x + 1";
-    let parsed = parse_expression(source_code).unwrap();
+    let parsed = parse_expression(source_code, &allocator).unwrap();
 
     let bin_op = parsed.expr().as_bin_op_expr().unwrap();
     let name = bin_op.left.as_ref();
@@ -39,8 +42,9 @@ fn test_non_parenthesized_name() {
 
 #[test]
 fn test_parenthesized_argument() {
+    let allocator = Allocator::new();
     let source_code = r"f((a))";
-    let parsed = parse_expression(source_code).unwrap();
+    let parsed = parse_expression(source_code, &allocator).unwrap();
 
     let call = parsed.expr().as_call_expr().unwrap();
     let arguments = &call.arguments;
@@ -57,8 +61,9 @@ fn test_parenthesized_argument() {
 
 #[test]
 fn test_non_parenthesized_argument() {
+    let allocator = Allocator::new();
     let source_code = r"f(a)";
-    let parsed = parse_expression(source_code).unwrap();
+    let parsed = parse_expression(source_code, &allocator).unwrap();
 
     let call = parsed.expr().as_call_expr().unwrap();
     let arguments = &call.arguments;
@@ -75,8 +80,9 @@ fn test_non_parenthesized_argument() {
 
 #[test]
 fn test_parenthesized_tuple_member() {
+    let allocator = Allocator::new();
     let source_code = r"(a, (b))";
-    let parsed = parse_expression(source_code).unwrap();
+    let parsed = parse_expression(source_code, &allocator).unwrap();
 
     let tuple = parsed.expr().as_tuple_expr().unwrap();
     let member = tuple.elts.last().unwrap();
@@ -92,8 +98,9 @@ fn test_parenthesized_tuple_member() {
 
 #[test]
 fn test_non_parenthesized_tuple_member() {
+    let allocator = Allocator::new();
     let source_code = r"(a, b)";
-    let parsed = parse_expression(source_code).unwrap();
+    let parsed = parse_expression(source_code, &allocator).unwrap();
 
     let tuple = parsed.expr().as_tuple_expr().unwrap();
     let member = tuple.elts.last().unwrap();
@@ -109,8 +116,9 @@ fn test_non_parenthesized_tuple_member() {
 
 #[test]
 fn test_twice_parenthesized_name() {
+    let allocator = Allocator::new();
     let source_code = r"((x)) + 1";
-    let parsed = parse_expression(source_code).unwrap();
+    let parsed = parse_expression(source_code, &allocator).unwrap();
 
     let bin_op = parsed.expr().as_bin_op_expr().unwrap();
     let name = bin_op.left.as_ref();
@@ -126,8 +134,9 @@ fn test_twice_parenthesized_name() {
 
 #[test]
 fn test_twice_parenthesized_argument() {
+    let allocator = Allocator::new();
     let source_code = r"f(((a + 1)))";
-    let parsed = parse_expression(source_code).unwrap();
+    let parsed = parse_expression(source_code, &allocator).unwrap();
 
     let call = parsed.expr().as_call_expr().unwrap();
     let arguments = &call.arguments;

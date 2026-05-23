@@ -8,7 +8,7 @@ use crate::statement::stmt_assign::FormatStatementsLastExpression;
 #[derive(Default)]
 pub struct FormatStmtReturn;
 
-impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
+impl FormatNodeRule<StmtReturn<'_>> for FormatStmtReturn {
     fn fmt_fields(&self, item: &StmtReturn, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtReturn {
             range: _,

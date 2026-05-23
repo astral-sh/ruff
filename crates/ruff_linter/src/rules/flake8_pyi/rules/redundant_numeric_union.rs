@@ -184,7 +184,7 @@ where
                     return;
                 };
                 generate_union_fix(
-                    checker.generator(),
+                    checker,
                     &importer,
                     necessary_nodes,
                     &annotation,
@@ -230,19 +230,19 @@ where
 
 enum AnnotationKind<'a> {
     /// A simple non-string annotation like `x: int`.
-    Simple(&'a Expr),
+    Simple(&'a Expr<'a>),
     /// A simple string annotation like `x: "Union[int, str]"`.
-    String(&'a Expr),
+    String(&'a Expr<'a>),
     /// A complex string annotation with a concatenated string, escaped
     /// character, or other complication.
     ///
     /// See [`ruff_python_parser::typing::AnnotationKind::Complex`] for more
     /// details.
-    Complex(&'a Expr),
+    Complex(&'a Expr<'a>),
 }
 
 impl<'a> std::ops::Deref for AnnotationKind<'a> {
-    type Target = &'a Expr;
+    type Target = &'a Expr<'a>;
 
     fn deref(&self) -> &Self::Target {
         match self {
@@ -335,9 +335,9 @@ fn generate_pep604_fix(
         .fold(None, |acc: Option<Expr>, right: &Expr| {
             if let Some(left) = acc {
                 Some(Expr::BinOp(ExprBinOp {
-                    left: Box::new(left),
+                    left: checker.alloc_expr(left),
                     op: Operator::BitOr,
-                    right: Box::new(right.clone()),
+                    right: Checker::expr_ref(right),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }))

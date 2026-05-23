@@ -17,6 +17,7 @@ doctest = false
 test = false
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true }
 ruff_python_ast = { workspace = true }

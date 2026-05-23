@@ -170,7 +170,7 @@ fn sort_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast::Expr) {
         return;
     };
 
-    if id != "__all__" {
+    if *id != "__all__" {
         return;
     }
 

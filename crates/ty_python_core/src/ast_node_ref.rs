@@ -32,7 +32,6 @@ use ruff_text_size::Ranged;
 /// This means that changes to expressions in other scopes don't invalidate the expression's id, giving
 /// us some form of scope-stable identity for expressions. Only queries accessing the node field
 /// run on every AST change. All other queries only run when the expression's identity changes.
-#[derive(Clone)]
 pub struct AstNodeRef<T> {
     /// The index of the node in the AST.
     index: NodeIndex,
@@ -51,32 +50,46 @@ pub struct AstNodeRef<T> {
     _node: PhantomData<T>,
 }
 
+impl<T> Clone for AstNodeRef<T> {
+    fn clone(&self) -> Self {
+        Self {
+            index: self.index,
+            #[cfg(debug_assertions)]
+            kind: self.kind,
+            #[cfg(debug_assertions)]
+            range: self.range,
+            #[cfg(debug_assertions)]
+            file: self.file,
+            _node: PhantomData,
+        }
+    }
+}
+
 impl<T> AstNodeRef<T> {
     pub fn index(&self) -> NodeIndex {
         self.index
     }
 }
 
-impl<T> AstNodeRef<T>
-where
-    T: HasNodeIndex + Ranged + PartialEq + Debug,
-    for<'ast> AnyNodeRef<'ast>: From<&'ast T>,
-    for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
-{
+impl<T: AstNodeKind> AstNodeRef<T> {
     /// Creates a new `AstNodeRef` that references `node`.
     ///
     /// This method may panic or produce unspecified results if the provided module is from a
     /// different file or Salsa revision than the module to which the node belongs.
-    pub(super) fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
+    pub(super) fn new<'node, 'ast: 'node>(
+        module_ref: &ParsedModuleRef,
+        node: &'node T::Node<'ast>,
+    ) -> Self {
         let index = node.node_index().load();
-        debug_assert_eq!(module_ref.get_by_index(index).try_into().ok(), Some(node));
+        debug_assert!(T::from_root(module_ref.get_by_index(index)).is_some());
+        debug_assert_eq!(module_ref.get_by_index(index).range(), node.range());
 
         Self {
             index,
             #[cfg(debug_assertions)]
             file: module_ref.module().file(),
             #[cfg(debug_assertions)]
-            kind: AnyNodeRef::from(node).kind(),
+            kind: T::as_any_node_ref(node).kind(),
             #[cfg(debug_assertions)]
             range: node.range(),
             _node: PhantomData,
@@ -88,18 +101,72 @@ where
     /// This method may panic or produce unspecified results if the provided module is from a
     /// different file or Salsa revision than the module to which the node belongs.
     #[track_caller]
-    pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
+    pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T::Node<'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(module_ref.module().file(), self.file);
         // The user guarantees that the module is from the same file and Salsa
         // revision, so the file contents cannot have changed.
-        module_ref
-            .get_by_index(self.index)
-            .try_into()
-            .ok()
+        T::from_root(module_ref.get_by_index(self.index))
             .expect("AST indices should never change within the same revision")
     }
 }
+
+pub trait AstNodeKind: 'static {
+    type Node<'ast>: HasNodeIndex + Ranged + PartialEq + Debug;
+
+    fn as_any_node_ref<'node, 'ast: 'node>(node: &'node Self::Node<'ast>) -> AnyNodeRef<'node>;
+
+    fn from_root(node: AnyRootNodeRef<'_>) -> Option<&Self::Node<'_>>;
+}
+
+macro_rules! impl_lifetimed_ast_node_kind {
+    ($($node:ident),* $(,)?) => {
+        $(
+            impl AstNodeKind for ruff_python_ast::$node<'static> {
+                type Node<'ast> = ruff_python_ast::$node<'ast>;
+
+                fn as_any_node_ref<'node, 'ast: 'node>(
+                    node: &'node Self::Node<'ast>,
+                ) -> AnyNodeRef<'node> {
+                    node.into()
+                }
+
+                fn from_root(node: AnyRootNodeRef<'_>) -> Option<&Self::Node<'_>> {
+                    node.try_into().ok()
+                }
+            }
+        )*
+    };
+}
+
+impl_lifetimed_ast_node_kind!(
+    ExceptHandlerExceptHandler,
+    Expr,
+    ExprDictComp,
+    ExprGenerator,
+    ExprLambda,
+    ExprListComp,
+    ExprNamed,
+    ExprSetComp,
+    Parameter,
+    ParameterWithDefault,
+    Pattern,
+    Stmt,
+    StmtAssign,
+    StmtAnnAssign,
+    StmtAugAssign,
+    StmtClassDef,
+    StmtFor,
+    StmtFunctionDef,
+    StmtImport,
+    StmtImportFrom,
+    StmtTypeAlias,
+    StmtWhile,
+    Identifier,
+    TypeParamParamSpec,
+    TypeParamTypeVar,
+    TypeParamTypeVarTuple,
+);
 
 #[expect(unsafe_code)]
 unsafe impl<T> salsa::Update for AstNodeRef<T> {
@@ -118,11 +185,7 @@ unsafe impl<T> salsa::Update for AstNodeRef<T> {
 impl<T> get_size2::GetSize for AstNodeRef<T> {}
 
 #[expect(clippy::missing_fields_in_debug)]
-impl<T> Debug for AstNodeRef<T>
-where
-    T: Debug,
-    for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
-{
+impl<T> Debug for AstNodeRef<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         #[cfg(debug_assertions)]
         {

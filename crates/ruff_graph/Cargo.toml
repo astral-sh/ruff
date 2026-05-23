@@ -14,6 +14,7 @@ license.workspace = true
 ignored = ["ruff_cache"]
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["serde"] }
 ruff_linter = { workspace = true }

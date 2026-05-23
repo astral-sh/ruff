@@ -7,7 +7,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatPatternMatchValue;
 
-impl FormatNodeRule<PatternMatchValue> for FormatPatternMatchValue {
+impl FormatNodeRule<PatternMatchValue<'_>> for FormatPatternMatchValue {
     fn fmt_fields(&self, item: &PatternMatchValue, f: &mut PyFormatter) -> FormatResult<()> {
         let PatternMatchValue {
             value,
@@ -18,7 +18,7 @@ impl FormatNodeRule<PatternMatchValue> for FormatPatternMatchValue {
     }
 }
 
-impl NeedsParentheses for PatternMatchValue {
+impl NeedsParentheses for PatternMatchValue<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

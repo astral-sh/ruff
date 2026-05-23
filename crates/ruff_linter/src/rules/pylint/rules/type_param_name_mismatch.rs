@@ -84,7 +84,7 @@ pub(crate) fn type_param_name_mismatch(checker: &Checker, value: &Expr, targets:
         return;
     };
 
-    if var_name == param_name {
+    if *var_name == param_name {
         return;
     }
 

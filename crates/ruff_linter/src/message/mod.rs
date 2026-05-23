@@ -229,6 +229,7 @@ pub fn render_diagnostics(
 mod tests {
     use rustc_hash::FxHashMap;
 
+    use ruff_allocator::Allocator;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
     use ruff_source_file::SourceFileBuilder;
@@ -246,7 +247,8 @@ if call(foo
         pass
 ";
         let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
-        parse_unchecked(source, ParseOptions::from(Mode::Module))
+        let allocator = Allocator::new();
+        parse_unchecked(source, ParseOptions::from(Mode::Module), &allocator)
             .errors()
             .iter()
             .map(|parse_error| {

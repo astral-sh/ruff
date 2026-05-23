@@ -1,8 +1,9 @@
 //! Parsing of string literals, bytes literals, and implicit string concatenation.
 
-use bstr::ByteSlice;
 use std::fmt;
 
+use bstr::ByteSlice;
+use ruff_allocator::{Allocator, Box as ArenaBox};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyStringFlags, AtomicNodeIndex, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -10,14 +11,14 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::error::{LexicalError, LexicalErrorType};
 
 #[derive(Debug)]
-pub(crate) enum StringType {
-    Str(ast::StringLiteral),
-    Bytes(ast::BytesLiteral),
-    FString(ast::FString),
-    TString(ast::TString),
+pub(crate) enum StringType<'ast> {
+    Str(ast::StringLiteral<'ast>),
+    Bytes(ast::BytesLiteral<'ast>),
+    FString(ast::FString<'ast>),
+    TString(ast::TString<'ast>),
 }
 
-impl Ranged for StringType {
+impl Ranged for StringType<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Str(node) => node.range(),
@@ -28,8 +29,8 @@ impl Ranged for StringType {
     }
 }
 
-impl From<StringType> for Expr {
-    fn from(string: StringType) -> Self {
+impl<'ast> From<StringType<'ast>> for Expr<'ast> {
+    fn from(string: StringType<'ast>) -> Self {
         match string {
             StringType::Str(node) => Expr::from(node),
             StringType::Bytes(node) => Expr::from(node),
@@ -85,7 +86,7 @@ enum EscapedChar {
     Escape(char),
 }
 
-struct StringParser<'src> {
+struct StringParser<'src, 'ast> {
     /// The raw content of the string e.g., the `foo` part in `"foo"`.
     source: &'src str,
     /// Current position of the parser in the source.
@@ -96,17 +97,33 @@ struct StringParser<'src> {
     offset: TextSize,
     /// The range of the string literal.
     range: TextRange,
+    allocator: &'ast Allocator,
 }
 
-impl<'src> StringParser<'src> {
-    fn new(source: &'src str, flags: AnyStringFlags, offset: TextSize, range: TextRange) -> Self {
+impl<'src, 'ast> StringParser<'src, 'ast> {
+    fn new(
+        source: &'src str,
+        flags: AnyStringFlags,
+        offset: TextSize,
+        range: TextRange,
+        allocator: &'ast Allocator,
+    ) -> Self {
         Self {
             source,
             cursor: 0,
             flags,
             offset,
             range,
+            allocator,
         }
+    }
+
+    fn alloc_str(&self, value: &str) -> ArenaBox<'ast, str> {
+        ArenaBox::from_str_in(value, self.allocator)
+    }
+
+    fn alloc_bytes(&self, value: &[u8]) -> ArenaBox<'ast, [u8]> {
+        ArenaBox::from_slice_copy_in(value, self.allocator)
     }
 
     #[inline]
@@ -279,11 +296,11 @@ impl<'src> StringParser<'src> {
 
     fn parse_interpolated_string_middle(
         mut self,
-    ) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
+    ) -> Result<ast::InterpolatedStringLiteralElement<'ast>, LexicalError> {
         // Fast-path: if the f-string or t-string doesn't contain any escape sequences, return the literal.
         let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
             return Ok(ast::InterpolatedStringLiteralElement {
-                value: self.source.into(),
+                value: self.alloc_str(self.source),
                 range: self.range,
                 node_index: AtomicNodeIndex::NONE,
             });
@@ -366,13 +383,13 @@ impl<'src> StringParser<'src> {
         }
 
         Ok(ast::InterpolatedStringLiteralElement {
-            value: value.into_boxed_str(),
+            value: self.alloc_str(&value),
             range: self.range,
             node_index: AtomicNodeIndex::NONE,
         })
     }
 
-    fn parse_bytes(mut self) -> Result<StringType, LexicalError> {
+    fn parse_bytes(mut self) -> Result<StringType<'ast>, LexicalError> {
         if let Some(index) = self.source.as_bytes().find_non_ascii_byte() {
             let ch = self.source.chars().nth(index).unwrap();
             return Err(LexicalError::new(
@@ -387,7 +404,7 @@ impl<'src> StringParser<'src> {
         if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().to_vec().into_boxed_slice(),
+                value: self.alloc_bytes(self.source.as_bytes()),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -397,7 +414,7 @@ impl<'src> StringParser<'src> {
         let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().to_vec().into_boxed_slice(),
+                value: self.alloc_bytes(self.source.as_bytes()),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -435,18 +452,18 @@ impl<'src> StringParser<'src> {
         }
 
         Ok(StringType::Bytes(ast::BytesLiteral {
-            value: value.into_boxed_slice(),
+            value: self.alloc_bytes(&value),
             range: self.range,
             flags: self.flags.into(),
             node_index: AtomicNodeIndex::NONE,
         }))
     }
 
-    fn parse_string(mut self) -> Result<StringType, LexicalError> {
+    fn parse_string(mut self) -> Result<StringType<'ast>, LexicalError> {
         if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Str(ast::StringLiteral {
-                value: self.source.into(),
+                value: self.alloc_str(self.source),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -456,7 +473,7 @@ impl<'src> StringParser<'src> {
         let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Str(ast::StringLiteral {
-                value: self.source.into(),
+                value: self.alloc_str(self.source),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -494,14 +511,14 @@ impl<'src> StringParser<'src> {
         }
 
         Ok(StringType::Str(ast::StringLiteral {
-            value: value.into_boxed_str(),
+            value: self.alloc_str(&value),
             range: self.range,
             flags: self.flags.into(),
             node_index: AtomicNodeIndex::NONE,
         }))
     }
 
-    fn parse(self) -> Result<StringType, LexicalError> {
+    fn parse(self) -> Result<StringType<'ast>, LexicalError> {
         if self.flags.is_byte_string() {
             self.parse_bytes()
         } else {
@@ -510,25 +527,36 @@ impl<'src> StringParser<'src> {
     }
 }
 
-pub(crate) fn parse_string_literal(
+pub(crate) fn parse_string_literal<'ast>(
     source: &str,
     flags: AnyStringFlags,
     range: TextRange,
-) -> Result<StringType, LexicalError> {
-    StringParser::new(source, flags, range.start() + flags.opener_len(), range).parse()
+    allocator: &'ast Allocator,
+) -> Result<StringType<'ast>, LexicalError> {
+    StringParser::new(
+        source,
+        flags,
+        range.start() + flags.opener_len(),
+        range,
+        allocator,
+    )
+    .parse()
 }
 
 // TODO(dhruvmanila): Move this to the new parser
-pub(crate) fn parse_interpolated_string_literal_element(
+pub(crate) fn parse_interpolated_string_literal_element<'ast>(
     source: &str,
     flags: AnyStringFlags,
     range: TextRange,
-) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
-    StringParser::new(source, flags, range.start(), range).parse_interpolated_string_middle()
+    allocator: &'ast Allocator,
+) -> Result<ast::InterpolatedStringLiteralElement<'ast>, LexicalError> {
+    StringParser::new(source, flags, range.start(), range, allocator)
+        .parse_interpolated_string_middle()
 }
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
@@ -541,17 +569,22 @@ mod tests {
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
-    fn parse_suite(source: &str) -> Result<Suite, ParseError> {
-        parse_module(source).map(Parsed::into_suite)
+    fn parse_suite<'ast>(
+        source: &str,
+        allocator: &'ast Allocator,
+    ) -> Result<Suite<'ast>, ParseError> {
+        parse_module(source, allocator).map(Parsed::into_suite)
     }
 
-    fn parse_suite_with_recursion_limit(
+    fn parse_suite_with_recursion_limit<'ast>(
         source: &str,
         max_recursion_depth: u16,
-    ) -> Result<Suite, ParseError> {
+        allocator: &'ast Allocator,
+    ) -> Result<Suite<'ast>, ParseError> {
         parse(
             source,
             ParseOptions::from(Mode::Module).with_max_recursion_depth(max_recursion_depth),
+            allocator,
         )
         .map(|parsed| parsed.try_into_module().unwrap().into_suite())
     }
@@ -564,88 +597,100 @@ mod tests {
         format!(r#"{prefix}"{replacement_field}""#)
     }
 
-    fn string_parser_escaped_eol(eol: &str) -> Suite {
+    fn string_parser_escaped_eol<'ast>(eol: &str, allocator: &'ast Allocator) -> Suite<'ast> {
         let source = format!(r"'text \{eol}more text'");
-        parse_suite(&source).unwrap()
+        parse_suite(&source, allocator).unwrap()
     }
 
     #[test]
     fn test_string_parser_escaped_unix_eol() {
-        let suite = string_parser_escaped_eol(UNIX_EOL);
+        let allocator = Allocator::new();
+        let suite = string_parser_escaped_eol(UNIX_EOL, &allocator);
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_string_parser_escaped_mac_eol() {
-        let suite = string_parser_escaped_eol(MAC_EOL);
+        let allocator = Allocator::new();
+        let suite = string_parser_escaped_eol(MAC_EOL, &allocator);
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_string_parser_escaped_windows_eol() {
-        let suite = string_parser_escaped_eol(WINDOWS_EOL);
+        let allocator = Allocator::new();
+        let suite = string_parser_escaped_eol(WINDOWS_EOL, &allocator);
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring() {
+        let allocator = Allocator::new();
         let source = r#"f"{a}{ b }{{foo}}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_nested_spec() {
+        let allocator = Allocator::new();
         let source = r#"f"{foo:{spec}}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_nested_spec_recursion_limit() {
-        assert!(parse_suite_with_recursion_limit(r#"f"{foo:{spec}}""#, 8).is_ok());
+        let allocator = Allocator::new();
+        assert!(parse_suite_with_recursion_limit(r#"f"{foo:{spec}}""#, 8, &allocator).is_ok());
 
-        let err = parse_suite_with_recursion_limit(&nested_format_spec('f', 200), 8).unwrap_err();
+        let err = parse_suite_with_recursion_limit(&nested_format_spec('f', 200), 8, &allocator)
+            .unwrap_err();
         assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
     }
 
     #[test]
     fn test_parse_fstring_not_nested_spec() {
+        let allocator = Allocator::new();
         let source = r#"f"{foo:spec}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_empty_fstring() {
+        let allocator = Allocator::new();
         let source = r#"f"""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_base() {
+        let allocator = Allocator::new();
         let source = r#"f"{user=}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_base_more() {
+        let allocator = Allocator::new();
         let source = r#"f"mix {user=} with text and {second=}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_format() {
+        let allocator = Allocator::new();
         let source = r#"f"{user=:>10}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
-    fn parse_fstring_error(source: &str) -> InterpolatedStringErrorType {
-        parse_suite(source)
+    fn parse_fstring_error(source: &str, allocator: &Allocator) -> InterpolatedStringErrorType {
+        parse_suite(source, allocator)
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(LexicalErrorType::FStringError(e)) => e,
                 ParseErrorType::FStringError(e) => e,
@@ -658,9 +703,13 @@ mod tests {
     fn test_parse_invalid_fstring() {
         use InterpolatedStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
-        assert_eq!(parse_fstring_error(r#"f"{5!x}""#), InvalidConversionFlag);
+        let allocator = Allocator::new();
         assert_eq!(
-            parse_fstring_error("f'{lambda x:{x}}'"),
+            parse_fstring_error(r#"f"{5!x}""#, &allocator),
+            InvalidConversionFlag
+        );
+        assert_eq!(
+            parse_fstring_error("f'{lambda x:{x}}'", &allocator),
             LambdaWithoutParentheses
         );
         // NOTE: The parser produces the `LambdaWithoutParentheses` for this case, but
@@ -669,103 +718,117 @@ mod tests {
         // error appears after the unexpected `FStringMiddle` token, which is between the
         // `:` and the `{`.
         // assert_eq!(parse_fstring_error("f'{lambda x: {x}}'"), LambdaWithoutParentheses);
-        assert!(parse_suite(r#"f"{class}""#).is_err());
+        assert!(parse_suite(r#"f"{class}""#, &allocator).is_err());
     }
 
     #[test]
     fn test_parse_fstring_not_equals() {
+        let allocator = Allocator::new();
         let source = r#"f"{1 != 2}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_equals() {
+        let allocator = Allocator::new();
         let source = r#"f"{42 == 42}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_self_doc_prec_space() {
+        let allocator = Allocator::new();
         let source = r#"f"{x   =}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_self_doc_trailing_space() {
+        let allocator = Allocator::new();
         let source = r#"f"{x=   }""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_yield_expr() {
+        let allocator = Allocator::new();
         let source = r#"f"{yield}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring() {
+        let allocator = Allocator::new();
         let source = r#"t"{a}{ b }{{foo}}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring_nested_spec() {
+        let allocator = Allocator::new();
         let source = r#"t"{foo:{spec}}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring_nested_spec_recursion_limit() {
-        assert!(parse_suite_with_recursion_limit(r#"t"{foo:{spec}}""#, 8).is_ok());
+        let allocator = Allocator::new();
+        assert!(parse_suite_with_recursion_limit(r#"t"{foo:{spec}}""#, 8, &allocator).is_ok());
 
-        let err = parse_suite_with_recursion_limit(&nested_format_spec('t', 200), 8).unwrap_err();
+        let err = parse_suite_with_recursion_limit(&nested_format_spec('t', 200), 8, &allocator)
+            .unwrap_err();
         assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
     }
 
     #[test]
     fn test_parse_tstring_not_nested_spec() {
+        let allocator = Allocator::new();
         let source = r#"t"{foo:spec}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_empty_tstring() {
+        let allocator = Allocator::new();
         let source = r#"t"""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_tstring_parse_self_documenting_base() {
+        let allocator = Allocator::new();
         let source = r#"t"{user=}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_tstring_parse_self_documenting_base_more() {
+        let allocator = Allocator::new();
         let source = r#"t"mix {user=} with text and {second=}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_tstring_parse_self_documenting_format() {
+        let allocator = Allocator::new();
         let source = r#"t"{user=:>10}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
-    fn parse_tstring_error(source: &str) -> InterpolatedStringErrorType {
-        parse_suite(source)
+    fn parse_tstring_error(source: &str, allocator: &Allocator) -> InterpolatedStringErrorType {
+        parse_suite(source, allocator)
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(LexicalErrorType::TStringError(e)) => e,
                 ParseErrorType::TStringError(e) => e,
@@ -778,9 +841,13 @@ mod tests {
     fn test_parse_invalid_tstring() {
         use InterpolatedStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
-        assert_eq!(parse_tstring_error(r#"t"{5!x}""#), InvalidConversionFlag);
+        let allocator = Allocator::new();
         assert_eq!(
-            parse_tstring_error("t'{lambda x:{x}}'"),
+            parse_tstring_error(r#"t"{5!x}""#, &allocator),
+            InvalidConversionFlag
+        );
+        assert_eq!(
+            parse_tstring_error("t'{lambda x:{x}}'", &allocator),
             LambdaWithoutParentheses
         );
         // NOTE: The parser produces the `LambdaWithoutParentheses` for this case, but
@@ -789,385 +856,438 @@ mod tests {
         // error appears after the unexpected `tStringMiddle` token, which is between the
         // `:` and the `{`.
         // assert_eq!(parse_tstring_error("f'{lambda x: {x}}'"), LambdaWithoutParentheses);
-        assert!(parse_suite(r#"t"{class}""#).is_err());
+        assert!(parse_suite(r#"t"{class}""#, &allocator).is_err());
     }
 
     #[test]
     fn test_parse_tstring_not_equals() {
+        let allocator = Allocator::new();
         let source = r#"t"{1 != 2}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring_equals() {
+        let allocator = Allocator::new();
         let source = r#"t"{42 == 42}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring_self_doc_prec_space() {
+        let allocator = Allocator::new();
         let source = r#"t"{x   =}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring_self_doc_trailing_space() {
+        let allocator = Allocator::new();
         let source = r#"t"{x=   }""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring_yield_expr() {
+        let allocator = Allocator::new();
         let source = r#"t"{yield}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_string_concat() {
+        let allocator = Allocator::new();
         let source = "'Hello ' 'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_string_concat_1() {
+        let allocator = Allocator::new();
         let source = "'Hello ' u'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_string_concat_2() {
+        let allocator = Allocator::new();
         let source = "u'Hello ' 'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_string_concat_1() {
+        let allocator = Allocator::new();
         let source = "'Hello ' f'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_string_concat_2() {
+        let allocator = Allocator::new();
         let source = "'Hello ' f'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_string_concat_3() {
+        let allocator = Allocator::new();
         let source = "'Hello ' f'world{\"!\"}'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_string_concat_4() {
+        let allocator = Allocator::new();
         let source = "'Hello ' f'world{\"!\"}' 'again!'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_f_string_concat_1() {
+        let allocator = Allocator::new();
         let source = "u'Hello ' f'world'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_f_string_concat_2() {
+        let allocator = Allocator::new();
         let source = "u'Hello ' f'world' '!'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_t_string_concat_1_error() {
+        let allocator = Allocator::new();
         let source = "'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap_err();
+        let suite = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_t_string_concat_2_error() {
+        let allocator = Allocator::new();
         let source = "'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap_err();
+        let suite = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_t_string_concat_3_error() {
+        let allocator = Allocator::new();
         let source = "'Hello ' t'world{\"!\"}'";
-        let suite = parse_suite(source).unwrap_err();
+        let suite = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_t_string_concat_4_error() {
+        let allocator = Allocator::new();
         let source = "'Hello ' t'world{\"!\"}' 'again!'";
-        let suite = parse_suite(source).unwrap_err();
+        let suite = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_t_string_concat_1_error() {
+        let allocator = Allocator::new();
         let source = "u'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap_err();
+        let suite = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_t_string_concat_2_error() {
+        let allocator = Allocator::new();
         let source = "u'Hello ' t'world' '!'";
-        let suite = parse_suite(source).unwrap_err();
+        let suite = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_t_string_concat_1_error() {
+        let allocator = Allocator::new();
         let source = "f'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap_err();
+        let suite = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_t_string_concat_2_error() {
+        let allocator = Allocator::new();
         let source = "f'Hello ' t'world' '!'";
-        let suite = parse_suite(source).unwrap_err();
+        let suite = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_string_triple_quotes_with_kind() {
+        let allocator = Allocator::new();
         let source = "u'''Hello, world!'''";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_single_quoted_byte() {
+        let allocator = Allocator::new();
         // single quote
         let source = r##"b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff'"##;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_double_quoted_byte() {
+        let allocator = Allocator::new();
         // double quote
         let source = r##"b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff""##;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_escape_char_in_byte_literal() {
+        let allocator = Allocator::new();
         // backslash does not escape
         let source = r#"b"omkmok\Xaa""#; // spell-checker:ignore omkmok
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_raw_byte_literal_1() {
+        let allocator = Allocator::new();
         let source = r"rb'\x1z'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_raw_byte_literal_2() {
+        let allocator = Allocator::new();
         let source = r"rb'\\'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_escape_octet() {
+        let allocator = Allocator::new();
         let source = r"b'\43a\4\1234'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_escaped_newline() {
+        let allocator = Allocator::new();
         let source = r#"f"\n{x}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_constant_range() {
+        let allocator = Allocator::new();
         let source = r#"f"aaa{bbb}ccc{ddd}eee""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_unescaped_newline() {
+        let allocator = Allocator::new();
         let source = r#"f"""
 {x}""""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_escaped_character() {
+        let allocator = Allocator::new();
         let source = r#"f"\\{x}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_raw_fstring() {
+        let allocator = Allocator::new();
         let source = r#"rf"{x}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_triple_quoted_raw_fstring() {
+        let allocator = Allocator::new();
         let source = r#"rf"""{x}""""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_line_continuation() {
+        let allocator = Allocator::new();
         let source = r#"rf"\
 {x}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_nested_string_spec() {
+        let allocator = Allocator::new();
         let source = r#"f"{foo:{''}}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_nested_concatenation_string_spec() {
+        let allocator = Allocator::new();
         let source = r#"f"{foo:{'' ''}}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_tstring_escaped_newline() {
+        let allocator = Allocator::new();
         let source = r#"t"\n{x}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_tstring_constant_range() {
+        let allocator = Allocator::new();
         let source = r#"t"aaa{bbb}ccc{ddd}eee""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_tstring_unescaped_newline() {
+        let allocator = Allocator::new();
         let source = r#"t"""
 {x}""""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_tstring_escaped_character() {
+        let allocator = Allocator::new();
         let source = r#"t"\\{x}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_raw_tstring() {
+        let allocator = Allocator::new();
         let source = r#"rt"{x}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_triple_quoted_raw_tstring() {
+        let allocator = Allocator::new();
         let source = r#"rt"""{x}""""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_tstring_line_continuation() {
+        let allocator = Allocator::new();
         let source = r#"rt"\
 {x}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring_nested_string_spec() {
+        let allocator = Allocator::new();
         let source = r#"t"{foo:{''}}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_tstring_nested_concatenation_string_spec() {
+        let allocator = Allocator::new();
         let source = r#"t"{foo:{'' ''}}""#;
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     /// <https://github.com/astral-sh/ruff/issues/8355>
     #[test]
     fn test_dont_panic_on_8_in_octal_escape() {
+        let allocator = Allocator::new();
         let source = r"bold = '\038[1m'";
-        let suite = parse_suite(source).unwrap();
+        let suite = parse_suite(source, &allocator).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_invalid_unicode_literal() {
+        let allocator = Allocator::new();
         let source = r"'\x1ó34'";
-        let error = parse_suite(source).unwrap_err();
+        let error = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(error);
     }
 
     #[test]
     fn test_missing_unicode_lbrace_error() {
+        let allocator = Allocator::new();
         let source = r"'\N '";
-        let error = parse_suite(source).unwrap_err();
+        let error = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(error);
     }
 
     #[test]
     fn test_missing_unicode_rbrace_error() {
+        let allocator = Allocator::new();
         let source = r"'\N{SPACE'";
-        let error = parse_suite(source).unwrap_err();
+        let error = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(error);
     }
 
     #[test]
     fn test_invalid_unicode_name_error() {
+        let allocator = Allocator::new();
         let source = r"'\N{INVALID}'";
-        let error = parse_suite(source).unwrap_err();
+        let error = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(error);
     }
 
     #[test]
     fn test_invalid_byte_literal_error() {
+        let allocator = Allocator::new();
         let source = r"b'123a𝐁c'";
-        let error = parse_suite(source).unwrap_err();
+        let error = parse_suite(source, &allocator).unwrap_err();
         insta::assert_debug_snapshot!(error);
     }
 
@@ -1176,8 +1296,9 @@ mod tests {
         $(
             #[test]
             fn $name() {
+                let allocator = Allocator::new();
                 let source = format!(r#""\N{{{0}}}""#, $alias);
-                let suite = parse_suite(&source).unwrap();
+                let suite = parse_suite(&source, &allocator).unwrap();
                 insta::assert_debug_snapshot!(suite);
             }
         )*

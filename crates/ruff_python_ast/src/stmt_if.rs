@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{ElifElseClause, Expr, Stmt, StmtIf};
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(clause: &ElifElseClause, contents: &str) -> Option<TextRange> {
+pub fn elif_else_range(clause: &ElifElseClause<'_>, contents: &str) -> Option<TextRange> {
     let token = SimpleTokenizer::new(contents, clause.range)
         .skip_trivia()
         .next()?;
@@ -22,8 +22,8 @@ pub enum BranchKind {
 #[derive(Debug)]
 pub struct IfElifBranch<'a> {
     pub kind: BranchKind,
-    pub test: &'a Expr,
-    pub body: &'a [Stmt],
+    pub test: &'a Expr<'a>,
+    pub body: &'a [Stmt<'a>],
     range: TextRange,
 }
 
@@ -33,7 +33,9 @@ impl Ranged for IfElifBranch<'_> {
     }
 }
 
-pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch<'_>> {
+pub fn if_elif_branches<'a, 'ast: 'a>(
+    stmt_if: &'a StmtIf<'ast>,
+) -> impl Iterator<Item = IfElifBranch<'a>> {
     iter::once(IfElifBranch {
         kind: BranchKind::If,
         test: stmt_if.test.as_ref(),

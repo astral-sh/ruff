@@ -15,6 +15,7 @@ license = "MIT"
 [workspace.dependencies]
 ruff = { path = "crates/ruff" }
 ruff_annotate_snippets = { path = "crates/ruff_annotate_snippets" }
+ruff_allocator = { path = "crates/ruff_allocator" }
 ruff_cache = { path = "crates/ruff_cache" }
 ruff_db = { path = "crates/ruff_db", default-features = false }
 ruff_diagnostics = { path = "crates/ruff_diagnostics" }
@@ -66,7 +67,9 @@ anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
 arc-swap = { version = "1.7.1" }
 argfile = { version = "1.0.0" }
+arrayvec = { version = "0.7.6" }
 assert_fs = { version = "1.1.0" }
+bumpalo = "3.19.0"
 bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
 bitvec = { version = "1.0.1", default-features = false, features = [
@@ -218,6 +221,7 @@ wasm-bindgen-test = { version = "0.3.42" }
 which = { version = "8.0.0" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
+yoke = { version = "0.8.0", features = ["derive"] }
 
 [workspace.metadata.cargo-shear]
 ignored = [

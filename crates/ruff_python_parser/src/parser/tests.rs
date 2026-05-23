@@ -1,68 +1,76 @@
+use ruff_allocator::Allocator;
 use ruff_python_ast::Stmt;
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
 #[test]
 fn test_modes() {
+    let allocator = Allocator::new();
     let source = "a[0][1][2][3][4]";
 
-    assert!(parse(source, ParseOptions::from(Mode::Expression)).is_ok());
-    assert!(parse(source, ParseOptions::from(Mode::Module)).is_ok());
+    assert!(parse(source, ParseOptions::from(Mode::Expression), &allocator).is_ok());
+    assert!(parse(source, ParseOptions::from(Mode::Module), &allocator).is_ok());
 }
 
 #[test]
 fn test_expr_mode_invalid_syntax1() {
+    let allocator = Allocator::new();
     let source = "first second";
-    let error = parse_expression(source).unwrap_err();
+    let error = parse_expression(source, &allocator).unwrap_err();
 
     insta::assert_debug_snapshot!(error);
 }
 
 #[test]
 fn test_expr_mode_invalid_syntax2() {
+    let allocator = Allocator::new();
     let source = r"first
 
 second
 ";
-    let error = parse_expression(source).unwrap_err();
+    let error = parse_expression(source, &allocator).unwrap_err();
 
     insta::assert_debug_snapshot!(error);
 }
 
 #[test]
 fn test_expr_mode_invalid_syntax3() {
+    let allocator = Allocator::new();
     let source = r"first
 
 second
 
 third
 ";
-    let error = parse_expression(source).unwrap_err();
+    let error = parse_expression(source, &allocator).unwrap_err();
 
     insta::assert_debug_snapshot!(error);
 }
 
 #[test]
 fn test_expr_mode_valid_syntax() {
+    let allocator = Allocator::new();
     let source = "first
 
 ";
-    let parsed = parse_expression(source).unwrap();
+    let parsed = parse_expression(source, &allocator).unwrap();
 
     insta::assert_debug_snapshot!(parsed.expr());
 }
 
 #[test]
 fn test_unicode_aliases() {
+    let allocator = Allocator::new();
     // https://github.com/RustPython/RustPython/issues/4566
     let source = r#"x = "\N{BACKSPACE}another cool trick""#;
-    let suite = parse_module(source).unwrap().into_suite();
+    let suite = parse_module(source, &allocator).unwrap().into_suite();
 
     insta::assert_debug_snapshot!(suite);
 }
 
 #[test]
 fn test_ipython_escape_commands() {
+    let allocator = Allocator::new();
     let parsed = parse(
         r"
 # Normal Python code
@@ -134,6 +142,7 @@ foo.bar[0].baz[2].egg??
 "
         .trim(),
         ParseOptions::from(Mode::Ipython),
+        &allocator,
     )
     .unwrap();
     insta::assert_debug_snapshot!(parsed.syntax());
@@ -141,9 +150,10 @@ foo.bar[0].baz[2].egg??
 
 #[test]
 fn test_fstring_expr_inner_line_continuation_and_t_string() {
+    let allocator = Allocator::new();
     let source = r#"f'{\t"i}'"#;
 
-    let parsed = parse_expression(source);
+    let parsed = parse_expression(source, &allocator);
 
     let error = parsed.unwrap_err();
 
@@ -152,10 +162,11 @@ fn test_fstring_expr_inner_line_continuation_and_t_string() {
 
 #[test]
 fn test_fstring_expr_inner_line_continuation_newline_t_string() {
+    let allocator = Allocator::new();
     let source = r#"f'{\
 t"i}'"#;
 
-    let parsed = parse_expression(source);
+    let parsed = parse_expression(source, &allocator);
 
     let error = parsed.unwrap_err();
 
@@ -164,8 +175,9 @@ t"i}'"#;
 
 #[test]
 fn test_tstring_fstring_middle() {
+    let allocator = Allocator::new();
     let source = "t'{:{F'{\0}F";
-    let parsed = parse_expression(source);
+    let parsed = parse_expression(source, &allocator);
 
     let error = parsed.unwrap_err();
 
@@ -174,8 +186,9 @@ fn test_tstring_fstring_middle() {
 
 #[test]
 fn test_tstring_fstring_middle_fuzzer() {
+    let allocator = Allocator::new();
     let source = "A1[A\u{c}\0:+,>1t'{:f\0:{f\"f\0:\0{fm\0:{f:\u{10}\0\0\0:bb\0{@f>f\u{1}'\0f";
-    let parsed = parse_expression(source);
+    let parsed = parse_expression(source, &allocator);
 
     let error = parsed.unwrap_err();
 
@@ -184,23 +197,26 @@ fn test_tstring_fstring_middle_fuzzer() {
 
 #[test]
 fn recursion_limit_nested_parens() {
+    let allocator = Allocator::new();
     let src = format!("{}1{}", "(".repeat(1_000), ")".repeat(1_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
 }
 
 #[test]
 fn recursion_limit_normal_python_unaffected() {
+    let allocator = Allocator::new();
     // 50 levels is well above what real-world Python ever produces and well
     // below the default cap — the point is to confirm the default doesn't
     // reject ordinary input.
     let src = format!("x = {}1{}", "(".repeat(50), ")".repeat(50));
-    parse_module(&src).unwrap();
+    parse_module(&src, &allocator).unwrap();
 }
 
 #[test]
 fn recursion_limit_preserves_prior_statements() {
+    let allocator = Allocator::new();
     // Recursion-limit recovery is limited for now: we drain the rest of the file but keep the
     // statements parsed before the overflowing statement.
     // TODO: Recover at the next newline so the trailing statement is preserved too.
@@ -210,7 +226,7 @@ fn recursion_limit_preserves_prior_statements() {
         ")".repeat(1_000),
     );
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let parsed = crate::parse_unchecked(&src, opts)
+    let parsed = crate::parse_unchecked(&src, opts, &allocator)
         .try_into_module()
         .unwrap();
 
@@ -223,6 +239,7 @@ fn recursion_limit_preserves_prior_statements() {
 
 #[test]
 fn recursion_limit_nested_def_blocks() {
+    let allocator = Allocator::new();
     // Nested function definitions exercise instrumentation on
     // `parse_statement` rather than `parse_lhs_expression`. Each level
     // needs one more leading tab to make indentation valid.
@@ -235,36 +252,40 @@ fn recursion_limit_nested_def_blocks() {
     src.push_str(&"\t".repeat(depth));
     src.push_str("pass\n");
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
 }
 
 #[test]
 fn recursion_limit_nested_lists() {
+    let allocator = Allocator::new();
     let src = format!("{}1{}", "[".repeat(1_000), "]".repeat(1_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
 }
 
 #[test]
 fn recursion_limit_nested_calls() {
+    let allocator = Allocator::new();
     let src = format!("x = {}1{}", "f(".repeat(1_000), ")".repeat(1_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
 }
 
 #[test]
 fn recursion_limit_nested_subscripts() {
+    let allocator = Allocator::new();
     let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
 }
 
 #[test]
 fn recursion_limit_nested_match_patterns() {
+    let allocator = Allocator::new();
     // Deeply parenthesised match patterns — exercises pattern-parsing
     // instrumentation in addition to statement / expression paths.
     let mut src = String::from("match x:\n case ");
@@ -277,12 +298,13 @@ fn recursion_limit_nested_match_patterns() {
     }
     src.push_str(": pass\n");
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
 }
 
 #[test]
 fn recursion_limit_binary_paren_interplay() {
+    let allocator = Allocator::new();
     // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
     // parenthesised sub-expression, exactly like the pattern described in
     // the tracking issue.
@@ -296,12 +318,13 @@ fn recursion_limit_binary_paren_interplay() {
         src.push(')');
     }
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
 }
 
 #[test]
 fn recursion_limit_first_error_is_recursion_not_noise() {
+    let allocator = Allocator::new();
     // When the limit is hit the outer parser frames will emit secondary
     // errors as they unwind. Callers read the first error via `into_result`
     // / `Parsed::errors()`, so `RecursionLimitExceeded` must come first, and
@@ -309,7 +332,7 @@ fn recursion_limit_first_error_is_recursion_not_noise() {
     // small rather than producing one noisy error per unwound frame.
     let src = format!("{}1{}", "(".repeat(2_000), ")".repeat(2_000));
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(50);
-    let parsed = crate::parse_unchecked(&src, opts);
+    let parsed = crate::parse_unchecked(&src, opts, &allocator);
     let errors = parsed.errors();
     let first = errors.first().expect("expected at least one error");
     assert!(matches!(
@@ -344,6 +367,7 @@ fn recursion_limit_default_set() {
 
 #[test]
 fn recursion_limit_right_assoc_pow_chain() {
+    let allocator = Allocator::new();
     // `1**1**1**...**1` — `**` is right-associative, so the right operand
     // is parsed by a recursive `parse_binary_expression_or_higher` call
     // *without* any intervening parentheses or atom nesting. This exercises
@@ -357,7 +381,7 @@ fn recursion_limit_right_assoc_pow_chain() {
     }
     src.push('1');
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(
         matches!(err.error, ParseErrorType::RecursionLimitExceeded),
         "expected RecursionLimitExceeded, got {:?}",
@@ -367,6 +391,7 @@ fn recursion_limit_right_assoc_pow_chain() {
 
 #[test]
 fn recursion_limit_ternary_else_chain() {
+    let allocator = Allocator::new();
     // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
     // conditional layer (`parse_if_expression` -> `orelse`), which is not
     // covered by the `parse_lhs_expression` guard.
@@ -377,7 +402,7 @@ fn recursion_limit_ternary_else_chain() {
     }
     src.push('1');
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(
         matches!(err.error, ParseErrorType::RecursionLimitExceeded),
         "expected RecursionLimitExceeded, got {:?}",
@@ -387,6 +412,7 @@ fn recursion_limit_ternary_else_chain() {
 
 #[test]
 fn recursion_limit_nested_lambda_chain() {
+    let allocator = Allocator::new();
     // `lambda: lambda: lambda: ...` — the lambda body recurses at the
     // conditional layer (`parse_lambda_expr` -> body), bypassing the
     // `parse_lhs_expression` guard entirely.
@@ -397,7 +423,7 @@ fn recursion_limit_nested_lambda_chain() {
     }
     src.push('1');
     let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
+    let err = parse(&src, opts, &allocator).unwrap_err();
     assert!(
         matches!(err.error, ParseErrorType::RecursionLimitExceeded),
         "expected RecursionLimitExceeded, got {:?}",

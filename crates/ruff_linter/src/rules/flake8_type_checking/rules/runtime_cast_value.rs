@@ -70,6 +70,7 @@ pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
         checker.stylist(),
         checker.locator(),
         checker.default_string_flags(),
+        checker.allocator(),
     );
     if checker.comment_ranges().intersects(type_expr.range()) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));

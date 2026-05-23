@@ -11,7 +11,7 @@ pub(crate) mod type_params;
 #[derive(Default)]
 pub struct FormatTypeParam;
 
-impl FormatRule<TypeParam, PyFormatContext<'_>> for FormatTypeParam {
+impl FormatRule<TypeParam<'_>, PyFormatContext<'_>> for FormatTypeParam {
     fn fmt(&self, item: &TypeParam, f: &mut PyFormatter) -> FormatResult<()> {
         match item {
             TypeParam::TypeVar(x) => x.format().fmt(f),
@@ -21,16 +21,19 @@ impl FormatRule<TypeParam, PyFormatContext<'_>> for FormatTypeParam {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for TypeParam {
-    type Format<'a> = FormatRefWithRule<'a, TypeParam, FormatTypeParam, PyFormatContext<'ast>>;
+impl<'ast, 'context> AsFormat<PyFormatContext<'context>> for TypeParam<'ast> {
+    type Format<'a>
+        = FormatRefWithRule<'a, TypeParam<'ast>, FormatTypeParam, PyFormatContext<'context>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatTypeParam)
     }
 }
 
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for TypeParam {
-    type Format = FormatOwnedWithRule<TypeParam, FormatTypeParam, PyFormatContext<'ast>>;
+impl<'ast, 'context> IntoFormat<PyFormatContext<'context>> for TypeParam<'ast> {
+    type Format = FormatOwnedWithRule<TypeParam<'ast>, FormatTypeParam, PyFormatContext<'context>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatTypeParam)

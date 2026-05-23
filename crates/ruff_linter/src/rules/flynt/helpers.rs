@@ -1,10 +1,16 @@
+use ruff_allocator::{Allocator, Box as ArenaBox};
 use ruff_python_ast::{self as ast, Arguments, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
 
 /// Wrap an expression in a [`ast::FStringElement::Expression`] with no special formatting.
-fn to_interpolated_string_interpolation_element(inner: &Expr) -> ast::InterpolatedStringElement {
+fn to_interpolated_string_interpolation_element<'alloc, 'ast>(
+    inner: &'alloc Expr<'ast>,
+) -> ast::InterpolatedStringElement<'alloc>
+where
+    'ast: 'alloc,
+{
     ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
-        expression: Box::new(inner.clone()),
+        expression: ArenaBox::from_ref(inner),
         debug_text: None,
         conversion: ConversionFlag::None,
         format_spec: None,
@@ -14,9 +20,12 @@ fn to_interpolated_string_interpolation_element(inner: &Expr) -> ast::Interpolat
 }
 
 /// Convert a string to a [`ast::InterpolatedStringLiteralElement `].
-pub(super) fn to_interpolated_string_literal_element(s: &str) -> ast::InterpolatedStringElement {
+pub(super) fn to_interpolated_string_literal_element<'alloc>(
+    s: &str,
+    allocator: &'alloc Allocator,
+) -> ast::InterpolatedStringElement<'alloc> {
     ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
-        value: Box::from(s),
+        value: ArenaBox::from_str_in(s, allocator),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })
@@ -53,9 +62,13 @@ fn is_simple_callee(func: &Expr) -> bool {
 }
 
 /// Convert an expression to an f-string or t-string element (if it looks like a good idea).
-pub(super) fn to_interpolated_string_element(
-    expr: &Expr,
-) -> Option<ast::InterpolatedStringElement> {
+pub(super) fn to_interpolated_string_element<'alloc, 'ast>(
+    expr: &'alloc Expr<'ast>,
+    allocator: &'alloc Allocator,
+) -> Option<ast::InterpolatedStringElement<'alloc>>
+where
+    'ast: 'alloc,
+{
     match expr {
         Expr::StringLiteral(ast::ExprStringLiteral {
             value,
@@ -63,7 +76,7 @@ pub(super) fn to_interpolated_string_element(
             node_index,
         }) => Some(ast::InterpolatedStringElement::Literal(
             ast::InterpolatedStringLiteralElement {
-                value: value.to_string().into_boxed_str(),
+                value: ArenaBox::from_str_in(value.to_str(), allocator),
                 range: *range,
                 node_index: node_index.clone(),
             },

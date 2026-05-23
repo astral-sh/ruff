@@ -33,7 +33,7 @@ pub struct FormatExprIf {
     layout: ExprIfLayout,
 }
 
-impl FormatRuleWithOptions<ExprIf, PyFormatContext<'_>> for FormatExprIf {
+impl FormatRuleWithOptions<ExprIf<'_>, PyFormatContext<'_>> for FormatExprIf {
     type Options = ExprIfLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -42,7 +42,7 @@ impl FormatRuleWithOptions<ExprIf, PyFormatContext<'_>> for FormatExprIf {
     }
 }
 
-impl FormatNodeRule<ExprIf> for FormatExprIf {
+impl FormatNodeRule<ExprIf<'_>> for FormatExprIf {
     fn fmt_fields(&self, item: &ExprIf, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprIf {
             range: _,
@@ -83,7 +83,7 @@ impl FormatNodeRule<ExprIf> for FormatExprIf {
     }
 }
 
-impl NeedsParentheses for ExprIf {
+impl NeedsParentheses for ExprIf<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -99,7 +99,7 @@ impl NeedsParentheses for ExprIf {
 
 #[derive(Debug)]
 struct FormatOrElse<'a> {
-    orelse: &'a Expr,
+    orelse: &'a Expr<'a>,
 }
 
 impl Format<PyFormatContext<'_>> for FormatOrElse<'_> {

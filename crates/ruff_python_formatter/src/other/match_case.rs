@@ -13,7 +13,7 @@ pub struct FormatMatchCase {
     last_suite_in_statement: bool,
 }
 
-impl FormatRuleWithOptions<MatchCase, PyFormatContext<'_>> for FormatMatchCase {
+impl FormatRuleWithOptions<MatchCase<'_>, PyFormatContext<'_>> for FormatMatchCase {
     type Options = bool;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -22,7 +22,7 @@ impl FormatRuleWithOptions<MatchCase, PyFormatContext<'_>> for FormatMatchCase {
     }
 }
 
-impl FormatNodeRule<MatchCase> for FormatMatchCase {
+impl FormatNodeRule<MatchCase<'_>> for FormatMatchCase {
     fn fmt_fields(&self, item: &MatchCase, f: &mut PyFormatter) -> FormatResult<()> {
         let MatchCase {
             range: _,

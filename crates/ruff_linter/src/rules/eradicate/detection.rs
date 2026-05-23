@@ -2,6 +2,7 @@
 use aho_corasick::AhoCorasick;
 use itertools::Itertools;
 use regex::{Regex, RegexSet};
+use ruff_allocator::Allocator;
 use ruff_python_parser::parse_module;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
 use ruff_text_size::TextSize;
@@ -123,7 +124,8 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     // Finally, compile the source code.
-    parse_module(line).is_ok()
+    let allocator = Allocator::new();
+    parse_module(line, &allocator).is_ok()
 }
 
 #[cfg(test)]

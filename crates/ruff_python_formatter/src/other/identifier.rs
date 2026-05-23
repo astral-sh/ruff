@@ -7,22 +7,26 @@ use crate::prelude::*;
 
 pub struct FormatIdentifier;
 
-impl FormatRule<Identifier, PyFormatContext<'_>> for FormatIdentifier {
-    fn fmt(&self, item: &Identifier, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatRule<Identifier<'_>, PyFormatContext<'_>> for FormatIdentifier {
+    fn fmt(&self, item: &Identifier<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         source_text_slice(item.range()).fmt(f)
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Identifier {
-    type Format<'a> = FormatRefWithRule<'a, Identifier, FormatIdentifier, PyFormatContext<'ast>>;
+impl<'ast, 'context> AsFormat<PyFormatContext<'context>> for Identifier<'ast> {
+    type Format<'a>
+        = FormatRefWithRule<'a, Identifier<'ast>, FormatIdentifier, PyFormatContext<'context>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatIdentifier)
     }
 }
 
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Identifier {
-    type Format = FormatOwnedWithRule<Identifier, FormatIdentifier, PyFormatContext<'ast>>;
+impl<'ast, 'context> IntoFormat<PyFormatContext<'context>> for Identifier<'ast> {
+    type Format =
+        FormatOwnedWithRule<Identifier<'ast>, FormatIdentifier, PyFormatContext<'context>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatIdentifier)
@@ -46,10 +50,10 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Identifier {
 /// identifiers with newlines must be formatted via `text`. This struct implements both the fast
 /// and slow paths for such identifiers.
 #[derive(Debug)]
-pub(crate) struct DotDelimitedIdentifier<'a>(&'a Identifier);
+pub(crate) struct DotDelimitedIdentifier<'a>(&'a Identifier<'a>);
 
 impl<'a> DotDelimitedIdentifier<'a> {
-    pub(crate) fn new(identifier: &'a Identifier) -> Self {
+    pub(crate) fn new(identifier: &'a Identifier<'a>) -> Self {
         Self(identifier)
     }
 }

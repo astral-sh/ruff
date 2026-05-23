@@ -8,7 +8,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtRaise;
 
-impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
+impl FormatNodeRule<StmtRaise<'_>> for FormatStmtRaise {
     fn fmt_fields(&self, item: &StmtRaise, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtRaise {
             range: _,

@@ -1,5 +1,6 @@
 use tracing::Level;
 
+use ruff_allocator::Allocator;
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
     FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
@@ -74,7 +75,12 @@ pub fn format_range(
 
     assert_valid_char_boundaries(range, source);
 
-    let parsed = parse(source, ParseOptions::from(options.source_type()))?;
+    let allocator = Allocator::new();
+    let parsed = parse(
+        source,
+        ParseOptions::from(options.source_type()),
+        &allocator,
+    )?;
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -365,8 +371,8 @@ struct NarrowRange<'a> {
     level: usize,
 }
 
-impl SourceOrderVisitor<'_> for NarrowRange<'_> {
-    fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
+impl<'visit> SourceOrderVisitor<'visit> for NarrowRange<'_> {
+    fn enter_node(&mut self, node: AnyNodeRef<'visit>) -> TraversalSignal {
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;
         }
@@ -437,7 +443,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
         }
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'_>) {
+    fn leave_node(&mut self, node: AnyNodeRef<'visit>) {
         if !(is_logical_line(node) || node.is_mod_module()) {
             return;
         }
@@ -454,7 +460,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
         );
     }
 
-    fn visit_body(&mut self, body: &'_ [Stmt]) {
+    fn visit_body(&mut self, body: &'visit [Stmt<'visit>]) {
         if let Some(saved_state) = self.enter_level(body.first().map(AnyNodeRef::from)) {
             walk_body(self, body);
             self.leave_level(saved_state);

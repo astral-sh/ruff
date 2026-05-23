@@ -114,7 +114,7 @@ pub(crate) fn task_implicit_multiple_outputs(checker: &Checker, function_def: &S
 fn matching_task_decorator<'a>(
     function_def: &'a StmtFunctionDef,
     semantic: &SemanticModel,
-) -> Option<&'a Decorator> {
+) -> Option<&'a Decorator<'a>> {
     function_def
         .decorator_list
         .iter()

@@ -9,7 +9,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 pub(super) struct LoggerCandidateVisitor<'a, 'b> {
     semantic: &'a SemanticModel<'b>,
     logger_objects: &'a [String],
-    pub(super) calls: Vec<(&'b ast::ExprCall, LoggingLevel)>,
+    pub(super) calls: Vec<(&'b ast::ExprCall<'b>, LoggingLevel)>,
 }
 
 impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {

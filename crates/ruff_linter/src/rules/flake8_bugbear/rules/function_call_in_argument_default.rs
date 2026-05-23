@@ -80,13 +80,16 @@ impl Violation for FunctionCallInDefaultArgument {
     }
 }
 
-struct ArgumentDefaultVisitor<'a, 'b> {
-    checker: &'a Checker<'b>,
-    extend_immutable_calls: &'a [QualifiedName<'b>],
+struct ArgumentDefaultVisitor<'checker, 'calls, 'ast> {
+    checker: &'checker Checker<'ast>,
+    extend_immutable_calls: &'calls [QualifiedName<'ast>],
 }
 
-impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
-    fn new(checker: &'a Checker<'b>, extend_immutable_calls: &'a [QualifiedName<'b>]) -> Self {
+impl<'checker, 'calls, 'ast> ArgumentDefaultVisitor<'checker, 'calls, 'ast> {
+    fn new(
+        checker: &'checker Checker<'ast>,
+        extend_immutable_calls: &'calls [QualifiedName<'ast>],
+    ) -> Self {
         Self {
             checker,
             extend_immutable_calls,
@@ -94,8 +97,8 @@ impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
     }
 }
 
-impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
-    fn visit_expr(&mut self, expr: &Expr) {
+impl<'ast> Visitor<'ast> for ArgumentDefaultVisitor<'_, '_, 'ast> {
+    fn visit_expr(&mut self, expr: &'ast Expr<'ast>) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {
                 if !is_mutable_func(func, self.checker.semantic())
@@ -130,7 +133,10 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 }
 
 /// B008
-pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn function_call_in_argument_default<'ast>(
+    checker: &Checker<'ast>,
+    parameters: &'ast Parameters<'ast>,
+) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings()

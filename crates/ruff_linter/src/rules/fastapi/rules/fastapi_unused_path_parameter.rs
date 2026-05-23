@@ -206,9 +206,9 @@ pub(crate) fn fastapi_unused_path_parameter(
 }
 
 /// Returns an iterator over the non-positional-only, non-variadic parameters of a function.
-fn non_posonly_non_variadic_parameters(
-    function_def: &ast::StmtFunctionDef,
-) -> impl Iterator<Item = &ParameterWithDefault> {
+fn non_posonly_non_variadic_parameters<'a>(
+    function_def: &'a ast::StmtFunctionDef<'a>,
+) -> impl Iterator<Item = &'a ParameterWithDefault<'a>> {
     function_def
         .parameters
         .args
@@ -418,7 +418,7 @@ impl<'a> Dependency<'a> {
     }
 }
 
-fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a Arguments> {
+fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a Arguments<'a>> {
     let Expr::Call(ExprCall {
         func, arguments, ..
     }) = expr

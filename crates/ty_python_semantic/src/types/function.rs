@@ -341,7 +341,7 @@ impl<'db> OverloadLiteral<'db> {
         db: &dyn Db,
         file: File,
         module: &'ast ParsedModuleRef,
-    ) -> &'ast ast::StmtFunctionDef {
+    ) -> &'ast ast::StmtFunctionDef<'ast> {
         debug_assert_eq!(
             file,
             self.file(db),
@@ -1086,7 +1086,7 @@ impl<'db> FunctionType<'db> {
         db: &dyn Db,
         file: File,
         module: &'ast ParsedModuleRef,
-    ) -> &'ast ast::StmtFunctionDef {
+    ) -> &'ast ast::StmtFunctionDef<'ast> {
         self.literal(db).last_definition.node(db, file, module)
     }
 
@@ -1956,11 +1956,11 @@ pub enum KnownFunction {
     NewClass,
 }
 
-fn call_argument_node<'a>(
-    call_expression: &'a ast::ExprCall,
+fn call_argument_node<'node, 'ast: 'node>(
+    call_expression: &'node ast::ExprCall<'ast>,
     name: &str,
     position: usize,
-) -> Option<ast::AnyNodeRef<'a>> {
+) -> Option<ast::AnyNodeRef<'node>> {
     call_expression
         .arguments
         .find_argument(name, position)

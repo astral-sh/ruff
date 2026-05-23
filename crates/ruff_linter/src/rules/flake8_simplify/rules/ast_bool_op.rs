@@ -8,7 +8,6 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{Truthiness, contains_effect};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -303,7 +302,10 @@ pub(crate) fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 }
 
 /// If `call` is an `isinstance()` call, return its target.
-fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+fn isinstance_target<'node, 'ast>(
+    call: &'node Expr<'ast>,
+    semantic: &SemanticModel,
+) -> Option<&'node Expr<'ast>> {
     // Verify that this is an `isinstance` call.
     let ast::ExprCall {
         func,
@@ -456,7 +458,9 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
     }
 }
 
-fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
+fn match_eq_target<'node, 'ast>(
+    expr: &'node Expr<'ast>,
+) -> Option<(&'node str, &'node Expr<'ast>)> {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -479,7 +483,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
     if !comparator.is_name_expr() {
         return None;
     }
-    Some((id, comparator))
+    Some((id.as_str(), comparator))
 }
 
 /// SIM109
@@ -496,7 +500,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
 
     // Given `a == "foo" or a == "bar"`, we generate `{"a": [(0, "foo"), (1,
     // "bar")]}`.
-    let mut id_to_comparators: BTreeMap<&Name, Vec<(usize, &Expr)>> = BTreeMap::new();
+    let mut id_to_comparators: BTreeMap<&str, Vec<(usize, &Expr)>> = BTreeMap::new();
     for (index, value) in values.iter().enumerate() {
         if let Some((id, comparator)) = match_eq_target(value) {
             id_to_comparators
@@ -531,22 +535,22 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
 
         // Create a `x in (a, b)` expression.
         let node = ast::ExprTuple {
-            elts: comparators.into_iter().cloned().collect(),
+            elts: checker.alloc_vec(comparators.into_iter().cloned().collect()),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             parenthesized: true,
         };
         let node1 = ast::ExprName {
-            id: id.clone(),
+            id: checker.alloc_name(id),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         let node2 = ast::ExprCompare {
-            left: Box::new(node1.into()),
-            ops: Box::from([CmpOp::In]),
-            comparators: Box::from([node.into()]),
+            left: checker.alloc_expr(node1.into()),
+            ops: checker.alloc_vec(vec![CmpOp::In]),
+            comparators: checker.alloc_vec(vec![node.into()]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
@@ -569,7 +573,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             // Wrap in a `x in (a, b) or ...` boolean operation.
             let node = ast::ExprBoolOp {
                 op: BoolOp::Or,
-                values: iter::once(in_expr).chain(unmatched).collect(),
+                values: checker.alloc_vec(iter::once(in_expr).chain(unmatched).collect()),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };

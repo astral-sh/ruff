@@ -1,5 +1,6 @@
 //! Access to the Ruff linting API for the LSP
 
+use ruff_allocator::Allocator;
 use ruff_python_ast::SourceType;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -106,9 +107,11 @@ pub(crate) fn check(
         ParseOptions::from(source_type).with_target_version(target_version.parser_version());
 
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
-        .try_into_module()
-        .expect("PySourceType always parses to a ModModule");
+    let allocator = Allocator::new();
+    let parsed =
+        ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options, &allocator)
+            .try_into_module()
+            .expect("PySourceType always parses to a ModModule");
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -132,6 +135,7 @@ pub(crate) fn check(
 
     // Generate checks.
     let diagnostics = check_path(
+        &allocator,
         &document_path,
         package,
         &locator,

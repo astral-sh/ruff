@@ -39,7 +39,11 @@ pub(crate) fn is_gettext_func_call(
     if func
         .as_name_expr()
         .map(ast::ExprName::id)
-        .is_some_and(|id| functions_names.contains(id))
+        .is_some_and(|id| {
+            functions_names
+                .iter()
+                .any(|name| name.as_str() == id.as_str())
+        })
     {
         return true;
     }

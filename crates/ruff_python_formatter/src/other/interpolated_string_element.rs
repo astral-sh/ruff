@@ -22,21 +22,21 @@ use super::interpolated_string::{InterpolatedStringContext, InterpolatedStringLa
 /// Formats an f-string element which is either a literal or a formatted expression.
 ///
 /// This delegates the actual formatting to the appropriate formatter.
-pub(crate) struct FormatInterpolatedStringElement<'a> {
-    element: &'a InterpolatedStringElement,
+pub(crate) struct FormatInterpolatedStringElement<'a, 'ast> {
+    element: &'a InterpolatedStringElement<'ast>,
     context: InterpolatedStringContext,
 }
 
-impl<'a> FormatInterpolatedStringElement<'a> {
+impl<'a, 'ast> FormatInterpolatedStringElement<'a, 'ast> {
     pub(crate) fn new(
-        element: &'a InterpolatedStringElement,
+        element: &'a InterpolatedStringElement<'ast>,
         context: InterpolatedStringContext,
     ) -> Self {
         Self { element, context }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatInterpolatedStringElement<'_> {
+impl Format<PyFormatContext<'_>> for FormatInterpolatedStringElement<'_, '_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.element {
             InterpolatedStringElement::Literal(string_literal) => {
@@ -51,14 +51,14 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedStringElement<'_> {
 
 /// Formats an f-string literal element.
 pub(crate) struct FormatFStringLiteralElement<'a> {
-    element: &'a InterpolatedStringLiteralElement,
+    element: &'a InterpolatedStringLiteralElement<'a>,
     /// Flags of the enclosing F-string part
     fstring_flags: AnyStringFlags,
 }
 
 impl<'a> FormatFStringLiteralElement<'a> {
     pub(crate) fn new(
-        element: &'a InterpolatedStringLiteralElement,
+        element: &'a InterpolatedStringLiteralElement<'a>,
         fstring_flags: AnyStringFlags,
     ) -> Self {
         Self {
@@ -80,21 +80,21 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
 }
 
 /// Formats an f-string expression element.
-pub(crate) struct FormatInterpolatedElement<'a> {
-    element: &'a InterpolatedElement,
+pub(crate) struct FormatInterpolatedElement<'a, 'ast> {
+    element: &'a InterpolatedElement<'ast>,
     context: InterpolatedStringContext,
 }
 
-impl<'a> FormatInterpolatedElement<'a> {
+impl<'a, 'ast> FormatInterpolatedElement<'a, 'ast> {
     pub(crate) fn new(
-        element: &'a InterpolatedElement,
+        element: &'a InterpolatedElement<'ast>,
         context: InterpolatedStringContext,
     ) -> Self {
         Self { element, context }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
+impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_, '_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let InterpolatedElement {
             expression,

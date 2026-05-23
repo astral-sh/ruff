@@ -1,3 +1,4 @@
+use ruff_allocator::Allocator;
 use ruff_python_ast::{self as ast, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -81,6 +82,7 @@ fn fix_banned_relative_import(
     module: Option<&str>,
     module_path: Option<&[String]>,
     generator: Generator,
+    allocator: &Allocator,
 ) -> Option<Fix> {
     // Only fix is the module path is known.
     let module_path = resolve_imported_module_path(level, module, module_path)?;
@@ -95,11 +97,12 @@ fn fix_banned_relative_import(
         panic!("Expected Stmt::ImportFrom");
     };
     let node = ast::StmtImportFrom {
-        module: Some(Identifier::new(
-            module_path.to_string(),
+        module: Some(Identifier::new_in(
+            module_path,
             TextRange::default(),
+            allocator,
         )),
-        names: names.clone(),
+        names: *names,
         level: 0,
         is_lazy: *is_lazy,
         range: TextRange::default(),
@@ -128,9 +131,14 @@ pub(crate) fn banned_relative_import(
     if level > strictness_level {
         let mut diagnostic =
             checker.report_diagnostic(RelativeImports { strictness }, stmt.range());
-        if let Some(fix) =
-            fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
-        {
+        if let Some(fix) = fix_banned_relative_import(
+            stmt,
+            level,
+            module,
+            module_path,
+            checker.generator(),
+            checker.replacement_allocator(),
+        ) {
             diagnostic.set_fix(fix);
         }
     }

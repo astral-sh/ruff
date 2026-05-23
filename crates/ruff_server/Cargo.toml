@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_db = { workspace = true }
 ruff_diagnostics = { workspace = true }
 ruff_formatter = { workspace = true }

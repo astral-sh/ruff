@@ -225,7 +225,7 @@ impl Violation for PytestUnittestAssertion {
 /// the exception name.
 struct ExceptionHandlerVisitor<'a, 'b> {
     exception_name: &'a str,
-    current_assert: Option<&'a Stmt>,
+    current_assert: Option<&'a Stmt<'a>>,
     checker: &'a Checker<'b>,
 }
 
@@ -240,7 +240,7 @@ impl<'a, 'b> ExceptionHandlerVisitor<'a, 'b> {
 }
 
 impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::Assert(_) => {
                 self.current_assert = Some(stmt);
@@ -251,7 +251,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {
@@ -279,12 +279,12 @@ fn check_assert_in_except(checker: &Checker, name: &str, body: &[Stmt]) {
 }
 
 /// PT009
-pub(crate) fn unittest_assertion(
-    checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+pub(crate) fn unittest_assertion<'ast>(
+    checker: &Checker<'ast>,
+    expr: &Expr<'ast>,
+    func: &Expr<'ast>,
+    args: &[Expr<'ast>],
+    keywords: &[Keyword<'ast>],
 ) {
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
         return;
@@ -307,7 +307,7 @@ pub(crate) fn unittest_assertion(
         && checker.semantic().current_expression_parent().is_none()
         && !checker.comment_ranges().intersects(expr.range())
     {
-        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords, checker) {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&stmt),
                 parenthesized_range(
@@ -442,7 +442,10 @@ pub(crate) fn unittest_raises_assertion_binding(checker: &Checker, binding: &Bin
     unittest_raises_assertion(call, edits, checker);
 }
 
-fn corresponding_context_expr<'a>(binding: &Binding, with: &'a ast::StmtWith) -> Option<&'a Expr> {
+fn corresponding_context_expr<'a>(
+    binding: &Binding,
+    with: &'a ast::StmtWith,
+) -> Option<&'a Expr<'a>> {
     with.items.iter().find_map(|item| {
         let Some(optional_var) = &item.optional_vars else {
             return None;

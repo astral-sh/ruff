@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec};
 
 /// Returns the control flow graph associated to an array of statements
-pub fn build_cfg(stmts: &[Stmt]) -> ControlFlowGraph<'_> {
+pub fn build_cfg<'stmt, 'ast: 'stmt>(stmts: &'stmt [Stmt<'ast>]) -> ControlFlowGraph<'stmt, 'ast> {
     let mut builder = CFGBuilder::with_capacity(stmts.len());
     builder.process_stmts(stmts);
     builder.finish()
@@ -12,16 +12,16 @@ pub fn build_cfg(stmts: &[Stmt]) -> ControlFlowGraph<'_> {
 
 /// Control flow graph
 #[derive(Debug)]
-pub struct ControlFlowGraph<'stmt> {
+pub struct ControlFlowGraph<'stmt, 'ast> {
     /// Basic blocks - the nodes of the control flow graph
-    blocks: IndexVec<BlockId, BlockData<'stmt>>,
+    blocks: IndexVec<BlockId, BlockData<'stmt, 'ast>>,
     /// Entry point to the control flow graph
     initial: BlockId,
     /// Terminal block - will always be empty
     terminal: BlockId,
 }
 
-impl<'stmt> ControlFlowGraph<'stmt> {
+impl<'stmt, 'ast> ControlFlowGraph<'stmt, 'ast> {
     /// Index of entry point to the control flow graph
     pub fn initial(&self) -> BlockId {
         self.initial
@@ -38,7 +38,7 @@ impl<'stmt> ControlFlowGraph<'stmt> {
     }
 
     /// Returns the statements comprising the basic block at the given index
-    pub fn stmts(&self, block: BlockId) -> &'stmt [Stmt] {
+    pub fn stmts(&self, block: BlockId) -> &'stmt [Stmt<'ast>] {
         self.blocks[block].stmts
     }
 
@@ -69,10 +69,10 @@ pub struct BlockId;
 /// Holds the data of a basic block. A basic block consists of a collection of
 /// [`Stmt`]s, together with outgoing edges to other basic blocks.
 #[derive(Debug, Default)]
-struct BlockData<'stmt> {
+struct BlockData<'stmt, 'ast> {
     kind: BlockKind,
     /// Slice of statements regarded as executing unconditionally in order
-    stmts: &'stmt [Stmt],
+    stmts: &'stmt [Stmt<'ast>],
     /// Outgoing edges, indicating possible paths of execution after the
     /// block has concluded
     out: Edges,
@@ -81,7 +81,7 @@ struct BlockData<'stmt> {
     parents: SmallVec<[BlockId; 2]>,
 }
 
-impl Ranged for BlockData<'_> {
+impl Ranged for BlockData<'_, '_> {
     fn range(&self) -> TextRange {
         let Some(first) = self.stmts.first() else {
             return TextRange::default();
@@ -157,16 +157,16 @@ pub enum Condition {
     Always,
 }
 
-struct CFGBuilder<'stmt> {
+struct CFGBuilder<'stmt, 'ast> {
     /// Control flow graph under construction
-    cfg: ControlFlowGraph<'stmt>,
+    cfg: ControlFlowGraph<'stmt, 'ast>,
     /// Current basic block index
     current: BlockId,
     /// Exit block index for current control flow
     exit: BlockId,
 }
 
-impl<'stmt> CFGBuilder<'stmt> {
+impl<'stmt, 'ast: 'stmt> CFGBuilder<'stmt, 'ast> {
     /// Returns [`CFGBuilder`] with vector of blocks initialized at given capacity and with both initial and terminal blocks populated.
     fn with_capacity(capacity: usize) -> Self {
         let mut blocks = IndexVec::with_capacity(capacity);
@@ -191,7 +191,7 @@ impl<'stmt> CFGBuilder<'stmt> {
     }
 
     /// Runs the core logic for the builder.
-    fn process_stmts(&mut self, stmts: &'stmt [Stmt]) {
+    fn process_stmts(&mut self, stmts: &'stmt [Stmt<'ast>]) {
         // SAFETY With notation as below, we always maintain the invariant
         // `start <= end + 1`. Since `end <= stmts.len() -1` we conclude that
         // `start <= stmts.len()`. It is therefore always safe to use `start` as
@@ -274,7 +274,7 @@ impl<'stmt> CFGBuilder<'stmt> {
     }
 
     /// Returns finished control flow graph
-    fn finish(self) -> ControlFlowGraph<'stmt> {
+    fn finish(self) -> ControlFlowGraph<'stmt, 'ast> {
         self.cfg
     }
 
@@ -301,7 +301,7 @@ impl<'stmt> CFGBuilder<'stmt> {
     /// Populates the current basic block with the given set of statements.
     ///
     /// This should only be called once on any given block.
-    fn set_current_block_stmts(&mut self, stmts: &'stmt [Stmt]) {
+    fn set_current_block_stmts(&mut self, stmts: &'stmt [Stmt<'ast>]) {
         debug_assert!(
             self.cfg.blocks[self.current].stmts.is_empty(),
             "Attempting to set statements on an already populated basic block."

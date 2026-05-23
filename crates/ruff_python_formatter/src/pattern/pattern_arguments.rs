@@ -9,7 +9,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatPatternArguments;
 
-impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
+impl FormatNodeRule<PatternArguments<'_>> for FormatPatternArguments {
     fn fmt_fields(&self, item: &PatternArguments, f: &mut PyFormatter) -> FormatResult<()> {
         // If there are no arguments, all comments are dangling:
         // ```python

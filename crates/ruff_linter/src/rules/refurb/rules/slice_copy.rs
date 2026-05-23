@@ -1,6 +1,5 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, SemanticModel};
@@ -67,7 +66,7 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
         return;
     };
     let mut diagnostic = checker.report_diagnostic(SliceCopy, subscript.range());
-    let replacement = generate_method_call(name.clone(), "copy", checker.generator());
+    let replacement = generate_method_call(name.as_str(), "copy", checker);
 
     let applicability = if checker.comment_ranges().intersects(subscript.range()) {
         Applicability::Unsafe
@@ -83,9 +82,9 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
 
 /// Matches `obj[:]` where `obj` is a list.
 fn match_list_full_slice<'a>(
-    subscript: &'a ast::ExprSubscript,
+    subscript: &'a ast::ExprSubscript<'a>,
     semantic: &SemanticModel,
-) -> Option<&'a Name> {
+) -> Option<&'a ast::name::AstName<'a>> {
     // Check that it is `obj[:]`.
     if !matches!(
         subscript.slice.as_ref(),
@@ -105,7 +104,7 @@ fn match_list_full_slice<'a>(
     // Check that `obj` is a list.
     let scope = semantic.current_scope();
     let bindings: Vec<&Binding> = scope
-        .get_all(id)
+        .get_all(id.as_str())
         .map(|binding_id| semantic.binding(binding_id))
         .collect();
     let [binding] = bindings.as_slice() else {

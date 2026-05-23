@@ -145,7 +145,7 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 }
 
-fn find_func_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
+fn find_func_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr<'a>> {
     let qualified_name = semantic.resolve_qualified_name(&call.func)?;
 
     match qualified_name.segments() {
@@ -162,7 +162,7 @@ fn find_func_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Optio
     }
 }
 
-fn find_method_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
+fn find_method_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr<'a>> {
     let (type_name, attr_name) = resolve_method_call(&call.func, semantic)?;
 
     match (type_name.segments(), attr_name) {

@@ -22,10 +22,10 @@ pub(crate) fn is_fastapi_route(
 }
 
 /// Returns `true` if the decorator is indicative of a FastAPI route.
-pub(crate) fn is_fastapi_route_decorator<'a>(
-    decorator: &'a ast::Decorator,
-    semantic: &'a SemanticModel,
-) -> Option<&'a ast::ExprCall> {
+pub(crate) fn is_fastapi_route_decorator<'node, 'ast>(
+    decorator: &'node ast::Decorator<'ast>,
+    semantic: &SemanticModel<'ast>,
+) -> Option<&'node ast::ExprCall<'ast>> {
     let call = decorator.expression.as_call_expr()?;
     is_fastapi_route_call(call, semantic).then_some(call)
 }

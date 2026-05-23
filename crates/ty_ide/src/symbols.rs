@@ -441,7 +441,7 @@ impl ImportedFrom {
     fn import_from(
         db: &dyn Db,
         importing_file: File,
-        ast: &ast::StmtImportFrom,
+        ast: &ast::StmtImportFrom<'_>,
         kind: ImportKind,
     ) -> Option<ImportedFrom> {
         let module_name = ModuleName::from_import_statement(db, importing_file, ast).ok()?;
@@ -460,8 +460,8 @@ enum ImportKind {
     Wildcard,
 }
 
-impl From<&ast::Alias> for ImportKind {
-    fn from(alias: &ast::Alias) -> ImportKind {
+impl From<&ast::Alias<'_>> for ImportKind {
+    fn from(alias: &ast::Alias<'_>) -> ImportKind {
         if alias.asname.as_ref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
             ImportKind::RedundantAlias
         } else {
@@ -535,21 +535,21 @@ struct Imports<'db> {
 
 impl<'db> Imports<'db> {
     /// Track the imports from the given `import ...` statement.
-    fn add_import(&mut self, import: &'db ast::StmtImport) {
+    fn add_import(&mut self, import: &'db ast::StmtImport<'db>) {
         for alias in &import.names {
             let asname = alias
                 .asname
                 .as_ref()
                 .map(|ident| &ident.id)
                 .unwrap_or(&alias.name.id);
-            let module_name = ImportModuleName::Import(&alias.name.id);
+            let module_name = ImportModuleName::Import(alias.name.id.as_str());
             self.module_names
-                .insert(asname, ImportModuleKind::Definitive(module_name));
+                .insert(asname.as_str(), ImportModuleKind::Definitive(module_name));
         }
     }
 
     /// Track the imports from the given `from ... import ...` statement.
-    fn add_import_from(&mut self, import_from: &'db ast::StmtImportFrom) {
+    fn add_import_from(&mut self, import_from: &'db ast::StmtImportFrom<'db>) {
         for alias in &import_from.names {
             if &alias.name == "*" {
                 // FIXME: We'd ideally include the names
@@ -567,10 +567,10 @@ impl<'db> Imports<'db> {
                 .unwrap_or(&alias.name.id);
             let module_name = ImportModuleName::ImportFrom {
                 parent: import_from,
-                child: &alias.name.id,
+                child: alias.name.id.as_str(),
             };
             self.module_names
-                .insert(asname, ImportModuleKind::Possible(module_name));
+                .insert(asname.as_str(), ImportModuleKind::Possible(module_name));
         }
     }
 
@@ -626,13 +626,13 @@ enum ImportModuleKind<'db> {
 #[derive(Debug, Clone, Copy, get_size2::GetSize)]
 enum ImportModuleName<'db> {
     /// The `foo` in `import quux, foo as blah, baz`.
-    Import(&'db Name),
+    Import(&'db str),
     /// A possible module in a `from ... import ...` statement.
     ImportFrom {
         /// The `..foo` in `from ..foo import quux`.
-        parent: &'db ast::StmtImportFrom,
+        parent: &'db ast::StmtImportFrom<'db>,
         /// The `foo` in `from quux import foo`.
-        child: &'db Name,
+        child: &'db str,
     },
 }
 
@@ -655,8 +655,8 @@ impl<'db> ImportModuleName<'db> {
 
 #[derive(Clone, Copy, Debug)]
 enum AstImport<'a> {
-    Import(&'a ast::StmtImport),
-    ImportFrom(&'a ast::StmtImportFrom),
+    Import(&'a ast::StmtImport<'a>),
+    ImportFrom(&'a ast::StmtImportFrom<'a>),
 }
 
 impl Ranged for AstImport<'_> {
@@ -1020,7 +1020,7 @@ impl<'db> SymbolVisitor<'db> {
     /// Adds all of the names exported from the module
     /// imported by `import_from`. i.e., This implements
     /// `from module import *` semantics.
-    fn add_exported_from_wildcard(&mut self, import_from: &ast::StmtImportFrom) {
+    fn add_exported_from_wildcard(&mut self, import_from: &ast::StmtImportFrom<'_>) {
         let Some(symbols) = self.get_names_from_wildcard(import_from) else {
             self.all_invalid = true;
             return;
@@ -1062,7 +1062,7 @@ impl<'db> SymbolVisitor<'db> {
 
     /// Adds `__all__` from the module imported by `import_from`. i.e.,
     /// This implements `from module import __all__` semantics.
-    fn add_all_from_import(&mut self, import_from: &ast::StmtImportFrom) {
+    fn add_all_from_import(&mut self, import_from: &ast::StmtImportFrom<'_>) {
         let Some(symbols) = self.get_names_from_wildcard(import_from) else {
             self.all_invalid = true;
             return;
@@ -1079,7 +1079,7 @@ impl<'db> SymbolVisitor<'db> {
     /// module imported in `import_from`.
     fn get_names_from_wildcard(
         &self,
-        import_from: &ast::StmtImportFrom,
+        import_from: &ast::StmtImportFrom<'_>,
     ) -> Option<&'db FlatSymbols> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;

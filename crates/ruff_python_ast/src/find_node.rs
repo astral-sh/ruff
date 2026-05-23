@@ -11,7 +11,7 @@ use std::fmt::Formatter;
 ///
 /// ## Panics
 /// Panics if `range` is not contained within `root`.
-pub fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode {
+pub fn covering_node(root: AnyNodeRef<'_>, range: TextRange) -> CoveringNode<'_> {
     struct Visitor<'a> {
         range: TextRange,
         found: bool,

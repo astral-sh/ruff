@@ -12,7 +12,7 @@ use ruff_python_ast::{StringFlags, TString};
 #[derive(Default)]
 pub struct FormatTString;
 
-impl FormatNodeRule<TString> for FormatTString {
+impl FormatNodeRule<TString<'_>> for FormatTString {
     fn fmt_fields(&self, item: &TString, f: &mut PyFormatter) -> FormatResult<()> {
         let normalizer = StringNormalizer::from_context(f.context());
 

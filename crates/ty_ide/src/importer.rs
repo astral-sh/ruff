@@ -444,7 +444,7 @@ impl ImportAction {
 #[derive(Debug)]
 struct AstImport<'ast> {
     /// The original AST statement containing the import.
-    stmt: &'ast ast::Stmt,
+    stmt: &'ast ast::Stmt<'ast>,
     /// The specific type of import.
     ///
     /// Storing this means we can do exhaustive case analysis
@@ -474,8 +474,8 @@ impl<'ast> AstImport<'ast> {
 /// The specific kind of import.
 #[derive(Debug)]
 enum AstImportKind<'ast> {
-    Import(&'ast ast::StmtImport),
-    ImportFrom(&'ast ast::StmtImportFrom),
+    Import(&'ast ast::StmtImport<'ast>),
+    ImportFrom(&'ast ast::StmtImportFrom<'ast>),
 }
 
 impl<'ast> AstImportKind<'ast> {
@@ -711,10 +711,10 @@ enum ImportResponseKind<'ast> {
     /// statement. Note that `<...>` may be a wildcard import!
     Unqualified {
         /// The AST of the import that satisfied the request.
-        ast: &'ast ast::StmtImportFrom,
+        ast: &'ast ast::StmtImportFrom<'ast>,
         /// The specific alias in the `from <...> import <...>`
         /// statement that satisfied the request's `member`.
-        alias: &'ast ast::Alias,
+        alias: &'ast ast::Alias<'ast>,
     },
     /// The necessary module is imported, but the symbol itself is not
     /// in scope. The symbol can be used via `module.symbol`.
@@ -722,10 +722,10 @@ enum ImportResponseKind<'ast> {
     /// This always corresponds to a `import <...>` statement.
     Qualified {
         /// The AST of the import that satisfied the request.
-        ast: &'ast ast::StmtImport,
+        ast: &'ast ast::StmtImport<'ast>,
         /// The specific alias in the import statement that
         /// satisfied the request's `module`.
-        alias: &'ast ast::Alias,
+        alias: &'ast ast::Alias<'ast>,
     },
     /// The necessary module is imported via `from module import ...`,
     /// but the desired symbol is not listed in `...`.
@@ -735,7 +735,7 @@ enum ImportResponseKind<'ast> {
     ///
     /// It is guaranteed that this never contains a wildcard import.
     /// (otherwise, this import wouldn't be partial).
-    Partial(&'ast ast::StmtImportFrom),
+    Partial(&'ast ast::StmtImportFrom<'ast>),
 }
 
 impl ImportResponseKind<'_> {
@@ -811,7 +811,7 @@ struct TopLevelImports<'ast> {
 
 impl<'ast> TopLevelImports<'ast> {
     /// Find all top-level imports from the given AST of a Python module.
-    fn find(module: &'ast ast::ModModule) -> Vec<AstImport<'ast>> {
+    fn find(module: &'ast ast::ModModule<'ast>) -> Vec<AstImport<'ast>> {
         let mut visitor = TopLevelImports::default();
         visitor.visit_body(&module.body);
         visitor.imports
@@ -819,7 +819,7 @@ impl<'ast> TopLevelImports<'ast> {
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for TopLevelImports<'ast> {
-    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt<'ast>) {
         match *stmt {
             ast::Stmt::Import(ref node) => {
                 if self.level == 0 {

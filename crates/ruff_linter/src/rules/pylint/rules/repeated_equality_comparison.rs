@@ -181,13 +181,13 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
 
             let comparator = if all_hashable {
                 Expr::Set(ast::ExprSet {
-                    elts: comparators.iter().copied().cloned().collect(),
+                    elts: checker.alloc_vec(comparators.iter().copied().cloned().collect()),
                     range: TextRange::default(),
                     node_index: AtomicNodeIndex::NONE,
                 })
             } else {
                 Expr::Tuple(ast::ExprTuple {
-                    elts: comparators.iter().copied().cloned().collect(),
+                    elts: checker.alloc_vec(comparators.iter().copied().cloned().collect()),
                     range: TextRange::default(),
                     node_index: AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
@@ -198,19 +198,21 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().expr(&Expr::BoolOp(ast::ExprBoolOp {
                     op: bool_op.op,
-                    values: before
-                        .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
-                            left: Box::new(expr.clone()),
-                            ops: match bool_op.op {
-                                BoolOp::Or => Box::from([CmpOp::In]),
-                                BoolOp::And => Box::from([CmpOp::NotIn]),
-                            },
-                            comparators: Box::from([comparator]),
-                            range: bool_op.range(),
-                            node_index: AtomicNodeIndex::NONE,
-                        })))
-                        .chain(after)
-                        .collect(),
+                    values: checker.alloc_vec(
+                        before
+                            .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
+                                left: Checker::expr_ref(expr),
+                                ops: checker.alloc_vec(vec![match bool_op.op {
+                                    BoolOp::Or => CmpOp::In,
+                                    BoolOp::And => CmpOp::NotIn,
+                                }]),
+                                comparators: checker.alloc_vec(vec![comparator]),
+                                range: bool_op.range(),
+                                node_index: AtomicNodeIndex::NONE,
+                            })))
+                            .chain(after)
+                            .collect(),
+                    ),
                     range: bool_op.range(),
                     node_index: AtomicNodeIndex::NONE,
                 })),
@@ -227,7 +229,7 @@ fn to_allowed_value<'a>(
     bool_op: BoolOp,
     value: &'a Expr,
     semantic: &SemanticModel,
-) -> Option<(&'a Expr, &'a Expr)> {
+) -> Option<(&'a Expr<'a>, &'a Expr<'a>)> {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,

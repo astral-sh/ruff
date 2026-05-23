@@ -1,9 +1,11 @@
+use ruff_allocator::Allocator;
 use ruff_python_ast::identifier;
 use ruff_python_parser::{ParseError, parse_module};
 use ruff_text_size::{TextRange, TextSize};
 
 #[test]
 fn extract_else_range() -> Result<(), ParseError> {
+    let allocator = Allocator::new();
     let contents = r"
 for x in y:
     pass
@@ -11,7 +13,7 @@ else:
     pass
 "
     .trim();
-    let stmts = parse_module(contents)?.into_suite();
+    let stmts = parse_module(contents, &allocator)?.into_suite();
     let stmt = stmts.first().unwrap();
     let range = identifier::else_(stmt, contents).unwrap();
     assert_eq!(&contents[range], "else");

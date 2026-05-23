@@ -236,11 +236,11 @@ fn is_valid_argument_type(
 }
 
 /// Check if the call has valid arguments for the from_* method
-fn has_valid_method_arguments(
-    call: &ExprCall,
+fn has_valid_method_arguments<'a>(
+    call: &'a ExprCall<'a>,
     method_name: MethodName,
     constructor: Constructor,
-) -> Option<&Expr> {
+) -> Option<&'a Expr<'a>> {
     if call.arguments.len() != 1 {
         return None;
     }

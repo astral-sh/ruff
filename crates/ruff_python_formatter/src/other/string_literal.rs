@@ -10,7 +10,7 @@ pub struct FormatStringLiteral {
     layout: StringLiteralKind,
 }
 
-impl FormatRuleWithOptions<StringLiteral, PyFormatContext<'_>> for FormatStringLiteral {
+impl FormatRuleWithOptions<StringLiteral<'_>, PyFormatContext<'_>> for FormatStringLiteral {
     type Options = StringLiteralKind;
 
     fn with_options(mut self, layout: StringLiteralKind) -> Self {
@@ -36,8 +36,8 @@ impl StringLiteralKind {
     }
 }
 
-impl FormatNodeRule<StringLiteral> for FormatStringLiteral {
-    fn fmt_fields(&self, item: &StringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<StringLiteral<'_>> for FormatStringLiteral {
+    fn fmt_fields(&self, item: &StringLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let quote_style = f.options().quote_style();
         let quote_style = if self.layout.is_docstring() && !quote_style.is_preserve() {
             // Per PEP 8 and PEP 257, always prefer double quotes for docstrings,

@@ -1,3 +1,4 @@
+use ruff_allocator::{Allocator, Box as ArenaBox};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Number};
 use ruff_text_size::{Ranged, TextRange};
@@ -7,24 +8,34 @@ use crate::error::RelaxedDecoratorError;
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
 /// recursively sets the `ctx` for their elements.
-pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
+pub(super) fn set_expr_ctx<'ast>(
+    expr: &mut Expr<'ast>,
+    new_ctx: ExprContext,
+    allocator: &'ast Allocator,
+) {
     match expr {
         Expr::Name(ast::ExprName { ctx, .. })
         | Expr::Attribute(ast::ExprAttribute { ctx, .. })
         | Expr::Subscript(ast::ExprSubscript { ctx, .. }) => *ctx = new_ctx,
         Expr::Starred(ast::ExprStarred { value, ctx, .. }) => {
             *ctx = new_ctx;
-            set_expr_ctx(value, new_ctx);
+            let mut updated_value = (**value).clone();
+            set_expr_ctx(&mut updated_value, new_ctx, allocator);
+            *value = ArenaBox::new_in(updated_value, allocator);
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
-            set_expr_ctx(operand, new_ctx);
+            let mut updated_operand = (**operand).clone();
+            set_expr_ctx(&mut updated_operand, new_ctx, allocator);
+            *operand = ArenaBox::new_in(updated_operand, allocator);
         }
         Expr::List(ast::ExprList { elts, ctx, .. })
         | Expr::Tuple(ast::ExprTuple { elts, ctx, .. }) => {
             *ctx = new_ctx;
-            for element in elts.iter_mut() {
-                set_expr_ctx(element, new_ctx);
-            }
+            elts.transform_in(allocator, |elts| {
+                for element in elts {
+                    set_expr_ctx(element, new_ctx, allocator);
+                }
+            });
         }
         _ => {}
     }

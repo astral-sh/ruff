@@ -1670,7 +1670,7 @@ impl KnownClass {
                             NodeWithScopeKind::Lambda(l) => l
                                 .node(module)
                                 .parameters
-                                .as_ref()
+                                .as_deref()
                                 .into_iter()
                                 .flatten()
                                 .next(),

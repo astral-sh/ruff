@@ -112,7 +112,7 @@ impl<'db> ExpectedReturnType<'db> {
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+    pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef<'_>) {
         fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
             !use_def
                 .reachability_constraints()
@@ -129,7 +129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Parameters are odd: they are Definitions in the function body scope, but have no
         // constituent nodes that are part of the function body. In order to get diagnostics
         // merged/emitted for them, we need to explicitly infer their definitions here.
-        for parameter in &function.parameters {
+        for parameter in function.parameters.iter() {
             self.infer_definition(parameter);
         }
 
@@ -409,7 +409,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let overload_literal = OverloadLiteral::new(
             db,
-            &name.id,
+            name.id.to_name(),
             known_function,
             body_scope,
             function_decorators,
@@ -434,12 +434,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for type_param in type_params.iter() {
                 let param_name = type_param.name();
                 for enclosing in enclosing_generic_contexts(db, self.index, current_scope) {
-                    if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
+                    if let Some(other_typevar) =
+                        enclosing.binds_named_typevar(db, param_name.id.as_str())
+                    {
                         report_shadowed_type_variable(
                             &self.context,
-                            &param_name.id,
+                            param_name.id.as_str(),
                             "function",
-                            &function.name.id,
+                            function.name.id.as_str(),
                             function.name.range(),
                             other_typevar,
                         );
@@ -692,7 +694,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter_non_variadic_params()
             .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
             .map(|parameter| &parameter.parameter)
-            .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
+            .filter(|parameter| unpacked_keys.contains_key(parameter.name.id.as_str()))
             .collect::<Vec<_>>();
 
         if overlapping.is_empty() {
@@ -776,7 +778,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// shouldn't be in-process of inferring the outer scope here.
     pub(super) fn infer_parameter_definition(
         &mut self,
-        parameter_with_default: &'ast ast::ParameterWithDefault,
+        parameter_with_default: &'ast ast::ParameterWithDefault<'ast>,
         definition: Definition<'db>,
     ) {
         let ast::ParameterWithDefault {
@@ -937,7 +939,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
     fn special_first_method_parameter_type(
         &mut self,
-        parameter: &ast::Parameter,
+        parameter: &ast::Parameter<'_>,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let file = self.file();
@@ -1085,8 +1087,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_lambda_parameter_definition(
         &mut self,
         index: usize,
-        parameter_with_default: &'ast ast::ParameterWithDefault,
-        lambda: &'ast ast::ExprLambda,
+        parameter_with_default: &'ast ast::ParameterWithDefault<'ast>,
+        lambda: &'ast ast::ExprLambda<'ast>,
         definition: Definition<'db>,
     ) {
         let ast::ParameterWithDefault {
@@ -1115,8 +1117,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_variadic_positional_lambda_parameter_definition(
         &mut self,
         index: usize,
-        parameter: &'ast ast::Parameter,
-        lambda: &'ast ast::ExprLambda,
+        parameter: &'ast ast::Parameter<'ast>,
+        lambda: &'ast ast::ExprLambda<'ast>,
         definition: Definition<'db>,
     ) {
         // Note that this currently always returns `None` because we do not support `Unpack`
@@ -1134,7 +1136,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in a lambda expression.
     pub(super) fn infer_variadic_keyword_lambda_parameter_definition(
         &mut self,
-        parameter: &'ast ast::Parameter,
+        parameter: &'ast ast::Parameter<'ast>,
         definition: Definition<'db>,
     ) {
         let inferred_ty = KnownClass::Dict.to_specialized_instance(
@@ -1151,7 +1153,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn annotated_lambda_parameter_type(
         &mut self,
         index: usize,
-        lambda: &'ast ast::ExprLambda,
+        lambda: &'ast ast::ExprLambda<'ast>,
     ) -> Option<Type<'db>> {
         let enclosing_stmt = infer_statement_types(
             self.db(),

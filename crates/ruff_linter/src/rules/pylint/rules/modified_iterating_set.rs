@@ -100,7 +100,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     if is_modified {
         let mut diagnostic = checker.report_diagnostic(
             ModifiedIteratingSet {
-                name: name.id.clone(),
+                name: name.id.to_name(),
             },
             for_stmt.range(),
         );

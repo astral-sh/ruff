@@ -16,7 +16,7 @@ pub struct FormatExprLambda {
     layout: ExprLambdaLayout,
 }
 
-impl FormatNodeRule<ExprLambda> for FormatExprLambda {
+impl FormatNodeRule<ExprLambda<'_>> for FormatExprLambda {
     fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprLambda {
             range: _,
@@ -178,7 +178,7 @@ pub enum ExprLambdaLayout {
     Assignment,
 }
 
-impl FormatRuleWithOptions<ExprLambda, PyFormatContext<'_>> for FormatExprLambda {
+impl FormatRuleWithOptions<ExprLambda<'_>, PyFormatContext<'_>> for FormatExprLambda {
     type Options = ExprLambdaLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -187,7 +187,7 @@ impl FormatRuleWithOptions<ExprLambda, PyFormatContext<'_>> for FormatExprLambda
     }
 }
 
-impl NeedsParentheses for ExprLambda {
+impl NeedsParentheses for ExprLambda<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -202,7 +202,7 @@ impl NeedsParentheses for ExprLambda {
 }
 
 struct FormatBody<'a> {
-    body: &'a Expr,
+    body: &'a Expr<'a>,
 
     /// Dangling comments attached to the lambda header that should be formatted with the body.
     ///

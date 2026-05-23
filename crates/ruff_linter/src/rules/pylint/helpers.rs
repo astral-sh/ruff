@@ -9,7 +9,7 @@ use ruff_text_size::TextRange;
 use crate::settings::LinterSettings;
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
-pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
+pub(super) fn type_param_name<'a>(arguments: &'a Arguments<'a>) -> Option<&'a str> {
     // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
     let name_param = arguments.find_argument_value("name", 0)?;
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &name_param {
@@ -114,8 +114,8 @@ impl SequenceIndexVisitor<'_> {
     }
 }
 
-impl Visitor<'_> for SequenceIndexVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'visit> Visitor<'visit> for SequenceIndexVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &'visit Stmt<'visit>) {
         if self.modified {
             return;
         }
@@ -394,13 +394,14 @@ pub(super) fn num_statements(stmts: &[Stmt]) -> usize {
 mod tests {
     use anyhow::Result;
 
+    use ruff_allocator::Allocator;
     use ruff_python_ast::Suite;
     use ruff_python_parser::parse_module;
 
     use super::num_statements;
 
-    fn parse_suite(source: &str) -> Result<Suite> {
-        Ok(parse_module(source)?.into_suite())
+    fn parse_suite<'ast>(source: &str, allocator: &'ast Allocator) -> Result<Suite<'ast>> {
+        Ok(parse_module(source, allocator)?.into_suite())
     }
 
     #[test]
@@ -409,7 +410,8 @@ mod tests {
 def f():
     pass
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
@@ -423,7 +425,8 @@ def f():
     else:
         print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -438,7 +441,8 @@ def f():
         if a:
             print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
@@ -452,7 +456,8 @@ def f():
     elif a:
         print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -470,7 +475,8 @@ def f():
     else:
         print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 9);
         Ok(())
     }
@@ -485,7 +491,8 @@ def f():
         case _:
             pass
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
@@ -514,7 +521,8 @@ async def f():
             import time
             pass
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 19);
         Ok(())
     }
@@ -526,7 +534,8 @@ def f():
     for i in range(10):
         pass
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
@@ -540,7 +549,8 @@ def f():
     else:
         print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
@@ -555,7 +565,8 @@ def f():
 
     print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -573,7 +584,8 @@ def f():
 
     print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
@@ -584,7 +596,8 @@ def f():
 def f():
     return
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 1);
         Ok(())
     }
@@ -600,7 +613,8 @@ def f():
             print()
 
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
@@ -614,7 +628,8 @@ def f():
     except Exception:
         raise
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -630,7 +645,8 @@ def f():
     else:
         print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 7);
         Ok(())
     }
@@ -648,7 +664,8 @@ def f():
     finally:
         pass
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 10);
         Ok(())
     }
@@ -664,7 +681,8 @@ def f():
     except Exception:
         raise
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 8);
         Ok(())
     }
@@ -682,7 +700,8 @@ def f():
     finally:
         print()
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 11);
         Ok(())
     }
@@ -694,7 +713,8 @@ def f():
     for i in range(10):
         yield i
 ";
-        let stmts = parse_suite(source)?;
+        let allocator = Allocator::new();
+        let stmts = parse_suite(source, &allocator)?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }

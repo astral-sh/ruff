@@ -13,7 +13,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprUnaryOp;
 
-impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
+impl FormatNodeRule<ExprUnaryOp<'_>> for FormatExprUnaryOp {
     fn fmt_fields(&self, item: &ExprUnaryOp, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprUnaryOp {
             range: _,
@@ -76,7 +76,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
     }
 }
 
-impl NeedsParentheses for ExprUnaryOp {
+impl NeedsParentheses for ExprUnaryOp<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

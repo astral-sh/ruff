@@ -254,7 +254,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
 #[derive(Debug, Default)]
 struct NameFinder<'a> {
     /// A map from identifier to defining expression.
-    names: Vec<&'a ast::ExprName>,
+    names: Vec<&'a ast::ExprName<'a>>,
 }
 
 impl<'a> Visitor<'a> for NameFinder<'a> {

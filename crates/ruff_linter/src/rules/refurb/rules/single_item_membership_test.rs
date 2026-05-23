@@ -114,7 +114,7 @@ pub(crate) fn single_item_membership_test(
 
 /// Return the single item wrapped in `Some` if the expression contains a single
 /// item, otherwise return `None`.
-fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr<'a>> {
     match expr {
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })

@@ -33,14 +33,14 @@ impl<'a> Collector<'a> {
     }
 
     #[must_use]
-    pub(crate) fn collect(mut self, module: &Mod) -> Vec<CollectedImport> {
+    pub(crate) fn collect(mut self, module: &Mod<'_>) -> Vec<CollectedImport> {
         walk_module(&mut self, module);
         self.imports
     }
 }
 
-impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
-    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
+impl<'a> SourceOrderVisitor<'a> for Collector<'_> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::ImportFrom(ast::StmtImportFrom {
                 names,
@@ -150,7 +150,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'ast Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         if self.string_imports.enabled {
             if let Expr::StringLiteral(ast::ExprStringLiteral {
                 value,
@@ -187,7 +187,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 ///
 /// NOTE: Aliased `TYPE_CHECKING`, i.e. `import typing.TYPE_CHECKING as TC; if TC: ...`
 /// will not be detected!
-fn is_type_checking_condition(expr: &Expr) -> bool {
+fn is_type_checking_condition(expr: &Expr<'_>) -> bool {
     match expr {
         // `if TYPE_CHECKING:`
         Expr::Name(ast::ExprName { id, .. }) => id.as_str() == "TYPE_CHECKING",

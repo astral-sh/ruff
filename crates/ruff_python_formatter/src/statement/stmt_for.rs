@@ -10,7 +10,7 @@ use crate::statement::clause::{ClauseHeader, ElseClause, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Debug)]
-struct ExprTupleWithoutParentheses<'a>(&'a Expr);
+struct ExprTupleWithoutParentheses<'a>(&'a Expr<'a>);
 
 impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
@@ -27,7 +27,7 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
 #[derive(Default)]
 pub struct FormatStmtFor;
 
-impl FormatNodeRule<StmtFor> for FormatStmtFor {
+impl FormatNodeRule<StmtFor<'_>> for FormatStmtFor {
     fn fmt_fields(&self, item: &StmtFor, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtFor {
             is_async,

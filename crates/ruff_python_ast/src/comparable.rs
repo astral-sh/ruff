@@ -17,6 +17,7 @@
 
 use crate as ast;
 use crate::{Expr, Number};
+use ruff_allocator::Box as ArenaBox;
 use std::borrow::Cow;
 use std::hash::Hash;
 
@@ -128,8 +129,8 @@ pub struct ComparableAlias<'a> {
     asname: Option<&'a str>,
 }
 
-impl<'a> From<&'a ast::Alias> for ComparableAlias<'a> {
-    fn from(alias: &'a ast::Alias) -> Self {
+impl<'a, 'ast> From<&'a ast::Alias<'ast>> for ComparableAlias<'a> {
+    fn from(alias: &'a ast::Alias<'ast>) -> Self {
         Self {
             name: alias.name.as_str(),
             asname: alias.asname.as_deref(),
@@ -143,8 +144,8 @@ pub struct ComparableWithItem<'a> {
     optional_vars: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
-    fn from(with_item: &'a ast::WithItem) -> Self {
+impl<'a, 'ast> From<&'a ast::WithItem<'ast>> for ComparableWithItem<'a> {
+    fn from(with_item: &'a ast::WithItem<'ast>) -> Self {
         Self {
             context_expr: (&with_item.context_expr).into(),
             optional_vars: with_item.optional_vars.as_ref().map(Into::into),
@@ -158,8 +159,8 @@ pub struct ComparablePatternArguments<'a> {
     keywords: Vec<ComparablePatternKeyword<'a>>,
 }
 
-impl<'a> From<&'a ast::PatternArguments> for ComparablePatternArguments<'a> {
-    fn from(parameters: &'a ast::PatternArguments) -> Self {
+impl<'a, 'ast> From<&'a ast::PatternArguments<'ast>> for ComparablePatternArguments<'a> {
+    fn from(parameters: &'a ast::PatternArguments<'ast>) -> Self {
         Self {
             patterns: parameters.patterns.iter().map(Into::into).collect(),
             keywords: parameters.keywords.iter().map(Into::into).collect(),
@@ -173,8 +174,8 @@ pub struct ComparablePatternKeyword<'a> {
     pattern: ComparablePattern<'a>,
 }
 
-impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
-    fn from(keyword: &'a ast::PatternKeyword) -> Self {
+impl<'a, 'ast> From<&'a ast::PatternKeyword<'ast>> for ComparablePatternKeyword<'a> {
+    fn from(keyword: &'a ast::PatternKeyword<'ast>) -> Self {
         Self {
             attr: keyword.attr.as_str(),
             pattern: (&keyword.pattern).into(),
@@ -238,8 +239,8 @@ pub enum ComparablePattern<'a> {
     MatchOr(PatternMatchOr<'a>),
 }
 
-impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
-    fn from(pattern: &'a ast::Pattern) -> Self {
+impl<'a, 'ast> From<&'a ast::Pattern<'ast>> for ComparablePattern<'a> {
+    fn from(pattern: &'a ast::Pattern<'ast>) -> Self {
         match pattern {
             ast::Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => {
                 Self::MatchValue(PatternMatchValue {
@@ -292,8 +293,8 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::Pattern>> for Box<ComparablePattern<'a>> {
-    fn from(pattern: &'a Box<ast::Pattern>) -> Self {
+impl<'a, 'ast> From<&'a ArenaBox<'ast, ast::Pattern<'ast>>> for Box<ComparablePattern<'a>> {
+    fn from(pattern: &'a ArenaBox<'ast, ast::Pattern<'ast>>) -> Self {
         Box::new((pattern.as_ref()).into())
     }
 }
@@ -305,8 +306,8 @@ pub struct ComparableMatchCase<'a> {
     body: Vec<ComparableStmt<'a>>,
 }
 
-impl<'a> From<&'a ast::MatchCase> for ComparableMatchCase<'a> {
-    fn from(match_case: &'a ast::MatchCase) -> Self {
+impl<'a, 'ast> From<&'a ast::MatchCase<'ast>> for ComparableMatchCase<'a> {
+    fn from(match_case: &'a ast::MatchCase<'ast>) -> Self {
         Self {
             pattern: (&match_case.pattern).into(),
             guard: match_case.guard.as_ref().map(Into::into),
@@ -320,8 +321,8 @@ pub struct ComparableDecorator<'a> {
     expression: ComparableExpr<'a>,
 }
 
-impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
-    fn from(decorator: &'a ast::Decorator) -> Self {
+impl<'a, 'ast> From<&'a ast::Decorator<'ast>> for ComparableDecorator<'a> {
+    fn from(decorator: &'a ast::Decorator<'ast>) -> Self {
         Self {
             expression: (&decorator.expression).into(),
         }
@@ -347,13 +348,13 @@ impl From<&ast::Singleton> for ComparableSingleton {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableNumber<'a> {
-    Int(&'a ast::Int),
+    Int(&'a ast::Int<'a>),
     Float(u64),
     Complex { real: u64, imag: u64 },
 }
 
-impl<'a> From<&'a ast::Number> for ComparableNumber<'a> {
-    fn from(number: &'a ast::Number) -> Self {
+impl<'a, 'ast: 'a> From<&'a ast::Number<'ast>> for ComparableNumber<'a> {
+    fn from(number: &'a ast::Number<'ast>) -> Self {
         match number {
             ast::Number::Int(value) => Self::Int(value),
             ast::Number::Float(value) => Self::Float(value.to_bits()),
@@ -371,8 +372,8 @@ pub struct ComparableArguments<'a> {
     keywords: Vec<ComparableKeyword<'a>>,
 }
 
-impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
-    fn from(arguments: &'a ast::Arguments) -> Self {
+impl<'a, 'ast> From<&'a ast::Arguments<'ast>> for ComparableArguments<'a> {
+    fn from(arguments: &'a ast::Arguments<'ast>) -> Self {
         Self {
             args: arguments.args.iter().map(Into::into).collect(),
             keywords: arguments.keywords.iter().map(Into::into).collect(),
@@ -380,8 +381,8 @@ impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::Arguments>> for ComparableArguments<'a> {
-    fn from(arguments: &'a Box<ast::Arguments>) -> Self {
+impl<'a, 'ast> From<&'a ArenaBox<'ast, ast::Arguments<'ast>>> for ComparableArguments<'a> {
+    fn from(arguments: &'a ArenaBox<'ast, ast::Arguments<'ast>>) -> Self {
         (arguments.as_ref()).into()
     }
 }
@@ -395,8 +396,8 @@ pub struct ComparableParameters<'a> {
     kwarg: Option<ComparableParameter<'a>>,
 }
 
-impl<'a> From<&'a ast::Parameters> for ComparableParameters<'a> {
-    fn from(parameters: &'a ast::Parameters) -> Self {
+impl<'a, 'ast> From<&'a ast::Parameters<'ast>> for ComparableParameters<'a> {
+    fn from(parameters: &'a ast::Parameters<'ast>) -> Self {
         Self {
             posonlyargs: parameters.posonlyargs.iter().map(Into::into).collect(),
             args: parameters.args.iter().map(Into::into).collect(),
@@ -407,14 +408,14 @@ impl<'a> From<&'a ast::Parameters> for ComparableParameters<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::Parameters>> for ComparableParameters<'a> {
-    fn from(parameters: &'a Box<ast::Parameters>) -> Self {
+impl<'a, 'ast> From<&'a ArenaBox<'ast, ast::Parameters<'ast>>> for ComparableParameters<'a> {
+    fn from(parameters: &'a ArenaBox<'ast, ast::Parameters<'ast>>) -> Self {
         (parameters.as_ref()).into()
     }
 }
 
-impl<'a> From<&'a Box<ast::Parameter>> for ComparableParameter<'a> {
-    fn from(arg: &'a Box<ast::Parameter>) -> Self {
+impl<'a, 'ast> From<&'a ArenaBox<'ast, ast::Parameter<'ast>>> for ComparableParameter<'a> {
+    fn from(arg: &'a ArenaBox<'ast, ast::Parameter<'ast>>) -> Self {
         (arg.as_ref()).into()
     }
 }
@@ -425,8 +426,8 @@ pub struct ComparableParameter<'a> {
     annotation: Option<Box<ComparableExpr<'a>>>,
 }
 
-impl<'a> From<&'a ast::Parameter> for ComparableParameter<'a> {
-    fn from(arg: &'a ast::Parameter) -> Self {
+impl<'a, 'ast> From<&'a ast::Parameter<'ast>> for ComparableParameter<'a> {
+    fn from(arg: &'a ast::Parameter<'ast>) -> Self {
         Self {
             arg: arg.name.as_str(),
             annotation: arg.annotation.as_ref().map(Into::into),
@@ -440,8 +441,8 @@ pub struct ComparableParameterWithDefault<'a> {
     default: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::ParameterWithDefault> for ComparableParameterWithDefault<'a> {
-    fn from(arg: &'a ast::ParameterWithDefault) -> Self {
+impl<'a, 'ast> From<&'a ast::ParameterWithDefault<'ast>> for ComparableParameterWithDefault<'a> {
+    fn from(arg: &'a ast::ParameterWithDefault<'ast>) -> Self {
         Self {
             def: (&arg.parameter).into(),
             default: arg.default.as_ref().map(Into::into),
@@ -455,8 +456,8 @@ pub struct ComparableKeyword<'a> {
     value: ComparableExpr<'a>,
 }
 
-impl<'a> From<&'a ast::Keyword> for ComparableKeyword<'a> {
-    fn from(keyword: &'a ast::Keyword) -> Self {
+impl<'a, 'ast> From<&'a ast::Keyword<'ast>> for ComparableKeyword<'a> {
+    fn from(keyword: &'a ast::Keyword<'ast>) -> Self {
         Self {
             arg: keyword.arg.as_ref().map(ast::Identifier::as_str),
             value: (&keyword.value).into(),
@@ -472,8 +473,8 @@ pub struct ComparableComprehension<'a> {
     is_async: bool,
 }
 
-impl<'a> From<&'a ast::Comprehension> for ComparableComprehension<'a> {
-    fn from(comprehension: &'a ast::Comprehension) -> Self {
+impl<'a, 'ast> From<&'a ast::Comprehension<'ast>> for ComparableComprehension<'a> {
+    fn from(comprehension: &'a ast::Comprehension<'ast>) -> Self {
         Self {
             target: (&comprehension.target).into(),
             iter: (&comprehension.iter).into(),
@@ -495,8 +496,8 @@ pub enum ComparableExceptHandler<'a> {
     ExceptHandler(ExceptHandlerExceptHandler<'a>),
 }
 
-impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
-    fn from(except_handler: &'a ast::ExceptHandler) -> Self {
+impl<'a, 'ast> From<&'a ast::ExceptHandler<'ast>> for ComparableExceptHandler<'a> {
+    fn from(except_handler: &'a ast::ExceptHandler<'ast>) -> Self {
         let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_,
             name,
@@ -528,8 +529,8 @@ pub struct ComparableDebugText<'a> {
     text: Cow<'a, str>,
 }
 
-impl<'a> From<&'a ast::DebugText> for ComparableDebugText<'a> {
-    fn from(debug_text: &'a ast::DebugText) -> Self {
+impl<'a> From<&'a ast::DebugText<'_>> for ComparableDebugText<'a> {
+    fn from(debug_text: &'a ast::DebugText<'_>) -> Self {
         // Normalizing newlines is safe because Python normalizes `\r\n` and `\r` to `\n`
         // at compile time, so they produce identical runtime values.
         Self {
@@ -554,8 +555,10 @@ pub struct InterpolatedElement<'a> {
     format_spec: Option<Vec<ComparableInterpolatedStringElement<'a>>>,
 }
 
-impl<'a> From<&'a ast::InterpolatedStringElement> for ComparableInterpolatedStringElement<'a> {
-    fn from(interpolated_string_element: &'a ast::InterpolatedStringElement) -> Self {
+impl<'a, 'ast> From<&'a ast::InterpolatedStringElement<'ast>>
+    for ComparableInterpolatedStringElement<'a>
+{
+    fn from(interpolated_string_element: &'a ast::InterpolatedStringElement<'ast>) -> Self {
         match interpolated_string_element {
             ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
                 value,
@@ -568,8 +571,8 @@ impl<'a> From<&'a ast::InterpolatedStringElement> for ComparableInterpolatedStri
     }
 }
 
-impl<'a> From<&'a ast::InterpolatedElement> for InterpolatedElement<'a> {
-    fn from(interpolated_element: &'a ast::InterpolatedElement) -> Self {
+impl<'a, 'ast> From<&'a ast::InterpolatedElement<'ast>> for InterpolatedElement<'a> {
+    fn from(interpolated_element: &'a ast::InterpolatedElement<'ast>) -> Self {
         let ast::InterpolatedElement {
             expression,
             debug_text,
@@ -590,8 +593,10 @@ impl<'a> From<&'a ast::InterpolatedElement> for InterpolatedElement<'a> {
     }
 }
 
-impl<'a> From<&'a ast::InterpolatedElement> for ComparableInterpolatedStringElement<'a> {
-    fn from(interpolated_element: &'a ast::InterpolatedElement) -> Self {
+impl<'a, 'ast> From<&'a ast::InterpolatedElement<'ast>>
+    for ComparableInterpolatedStringElement<'a>
+{
+    fn from(interpolated_element: &'a ast::InterpolatedElement<'ast>) -> Self {
         Self::InterpolatedElement(interpolated_element.into())
     }
 }
@@ -602,8 +607,8 @@ pub struct ComparableElifElseClause<'a> {
     body: Vec<ComparableStmt<'a>>,
 }
 
-impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
-    fn from(elif_else_clause: &'a ast::ElifElseClause) -> Self {
+impl<'a, 'ast> From<&'a ast::ElifElseClause<'ast>> for ComparableElifElseClause<'a> {
+    fn from(elif_else_clause: &'a ast::ElifElseClause<'ast>) -> Self {
         let ast::ElifElseClause {
             range: _,
             node_index: _,
@@ -653,7 +658,7 @@ pub struct ComparableFString<'a> {
     elements: Box<[ComparableInterpolatedStringElement<'a>]>,
 }
 
-impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
+impl<'a, 'ast> From<&'a ast::FStringValue<'ast>> for ComparableFString<'a> {
     // The approach below is somewhat complicated, so it may
     // require some justification.
     //
@@ -674,7 +679,7 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
     // literals. String literals may be separated for two reasons: either
     // they appear in adjacent string literal parts, or else a string literal
     // part is adjacent to a string literal _element_ inside of an f-string part.
-    fn from(value: &'a ast::FStringValue) -> Self {
+    fn from(value: &'a ast::FStringValue<'ast>) -> Self {
         #[derive(Default)]
         struct Collector<'a> {
             elements: Vec<ComparableInterpolatedStringElement<'a>>,
@@ -697,7 +702,7 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
                 }
             }
 
-            fn push_expression(&mut self, expression: &'a ast::InterpolatedElement) {
+            fn push_expression<'ast>(&mut self, expression: &'a ast::InterpolatedElement<'ast>) {
                 self.elements.push(expression.into());
             }
         }
@@ -736,7 +741,7 @@ pub struct ComparableTString<'a> {
     interpolations: Box<[InterpolatedElement<'a>]>,
 }
 
-impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
+impl<'a, 'ast> From<&'a ast::TStringValue<'ast>> for ComparableTString<'a> {
     // We model a [`ComparableTString`] on the actual
     // [CPython implementation] of a `string.templatelib.Template` object.
     //
@@ -747,7 +752,7 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
     // difference between, e.g. `t"{foo}bar"` and `t"bar{foo}"`.
     //
     // - [CPython implementation](https://github.com/python/cpython/blob/c91ad5da9d92eac4718e4da8d53689c3cc24535e/Python/codegen.c#L4052-L4103)
-    fn from(value: &'a ast::TStringValue) -> Self {
+    fn from(value: &'a ast::TStringValue<'ast>) -> Self {
         struct Collector<'a> {
             strings: Vec<ComparableInterpolatedStringElement<'a>>,
             interpolations: Vec<InterpolatedElement<'a>>,
@@ -784,7 +789,10 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
                     .push(ComparableInterpolatedStringElement::Literal("".into()));
             }
 
-            fn push_tstring_interpolation(&mut self, expression: &'a ast::InterpolatedElement) {
+            fn push_tstring_interpolation<'ast>(
+                &mut self,
+                expression: &'a ast::InterpolatedElement<'ast>,
+            ) {
                 self.interpolations.push(expression.into());
                 self.start_new_literal();
             }
@@ -815,8 +823,8 @@ pub struct ComparableStringLiteral<'a> {
     value: &'a str,
 }
 
-impl<'a> From<&'a ast::StringLiteral> for ComparableStringLiteral<'a> {
-    fn from(string_literal: &'a ast::StringLiteral) -> Self {
+impl<'a> From<&'a ast::StringLiteral<'_>> for ComparableStringLiteral<'a> {
+    fn from(string_literal: &'a ast::StringLiteral<'_>) -> Self {
         Self {
             value: &string_literal.value,
         }
@@ -828,8 +836,8 @@ pub struct ComparableBytesLiteral<'a> {
     value: Cow<'a, [u8]>,
 }
 
-impl<'a> From<&'a ast::BytesLiteral> for ComparableBytesLiteral<'a> {
-    fn from(bytes_literal: &'a ast::BytesLiteral) -> Self {
+impl<'a> From<&'a ast::BytesLiteral<'_>> for ComparableBytesLiteral<'a> {
+    fn from(bytes_literal: &'a ast::BytesLiteral<'_>) -> Self {
         Self {
             value: Cow::Borrowed(&bytes_literal.value),
         }
@@ -880,8 +888,8 @@ pub struct ComparableDictItem<'a> {
     value: ComparableExpr<'a>,
 }
 
-impl<'a> From<&'a ast::DictItem> for ComparableDictItem<'a> {
-    fn from(ast::DictItem { key, value }: &'a ast::DictItem) -> Self {
+impl<'a, 'ast> From<&'a ast::DictItem<'ast>> for ComparableDictItem<'a> {
+    fn from(ast::DictItem { key, value }: &'a ast::DictItem<'ast>) -> Self {
         Self {
             key: key.as_ref().map(ComparableExpr::from),
             value: value.into(),
@@ -1074,20 +1082,20 @@ pub enum ComparableExpr<'a> {
     IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
 }
 
-impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
-    fn from(expr: &'a Box<ast::Expr>) -> Self {
+impl<'a, 'ast> From<&'a ArenaBox<'ast, ast::Expr<'ast>>> for Box<ComparableExpr<'a>> {
+    fn from(expr: &'a ArenaBox<'ast, ast::Expr<'ast>>) -> Self {
         Box::new((expr.as_ref()).into())
     }
 }
 
-impl<'a> From<&'a Box<ast::Expr>> for ComparableExpr<'a> {
-    fn from(expr: &'a Box<ast::Expr>) -> Self {
+impl<'a, 'ast> From<&'a ArenaBox<'ast, ast::Expr<'ast>>> for ComparableExpr<'a> {
+    fn from(expr: &'a ArenaBox<'ast, ast::Expr<'ast>>) -> Self {
         (expr.as_ref()).into()
     }
 }
 
-impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
-    fn from(expr: &'a ast::Expr) -> Self {
+impl<'a, 'ast> From<&'a ast::Expr<'ast>> for ComparableExpr<'a> {
+    fn from(expr: &'a ast::Expr<'ast>) -> Self {
         match expr {
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 op,
@@ -1354,8 +1362,8 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprName> for ComparableExpr<'a> {
-    fn from(expr: &'a ast::ExprName) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprName<'ast>> for ComparableExpr<'a> {
+    fn from(expr: &'a ast::ExprName<'ast>) -> Self {
         Self::Name(ExprName {
             id: expr.id.as_str(),
         })
@@ -1404,16 +1412,16 @@ pub struct ComparableTypeParams<'a> {
     pub type_params: Vec<ComparableTypeParam<'a>>,
 }
 
-impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
-    fn from(type_params: &'a ast::TypeParams) -> Self {
+impl<'a, 'ast> From<&'a ast::TypeParams<'ast>> for ComparableTypeParams<'a> {
+    fn from(type_params: &'a ast::TypeParams<'ast>) -> Self {
         Self {
             type_params: type_params.iter().map(Into::into).collect(),
         }
     }
 }
 
-impl<'a> From<&'a Box<ast::TypeParams>> for ComparableTypeParams<'a> {
-    fn from(type_params: &'a Box<ast::TypeParams>) -> Self {
+impl<'a, 'ast> From<&'a ArenaBox<'ast, ast::TypeParams<'ast>>> for ComparableTypeParams<'a> {
+    fn from(type_params: &'a ArenaBox<'ast, ast::TypeParams<'ast>>) -> Self {
         type_params.as_ref().into()
     }
 }
@@ -1425,8 +1433,8 @@ pub enum ComparableTypeParam<'a> {
     TypeVarTuple(TypeParamTypeVarTuple<'a>),
 }
 
-impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
-    fn from(type_param: &'a ast::TypeParam) -> Self {
+impl<'a, 'ast> From<&'a ast::TypeParam<'ast>> for ComparableTypeParam<'a> {
+    fn from(type_param: &'a ast::TypeParam<'ast>) -> Self {
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                 name,
@@ -1622,8 +1630,8 @@ pub enum ComparableStmt<'a> {
     Continue,
 }
 
-impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
-    fn from(stmt: &'a ast::Stmt) -> Self {
+impl<'a, 'ast> From<&'a ast::Stmt<'ast>> for ComparableStmt<'a> {
+    fn from(stmt: &'a ast::Stmt<'ast>) -> Self {
         match stmt {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async,
@@ -1879,8 +1887,8 @@ pub struct ComparableModExpression<'a> {
     body: Box<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
-    fn from(mod_: &'a ast::Mod) -> Self {
+impl<'a, 'ast> From<&'a ast::Mod<'ast>> for ComparableMod<'a> {
+    fn from(mod_: &'a ast::Mod<'ast>) -> Self {
         match mod_ {
             ast::Mod::Module(module) => Self::Module(module.into()),
             ast::Mod::Expression(expr) => Self::Expression(expr.into()),
@@ -1888,16 +1896,16 @@ impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ModModule> for ComparableModModule<'a> {
-    fn from(module: &'a ast::ModModule) -> Self {
+impl<'a, 'ast> From<&'a ast::ModModule<'ast>> for ComparableModModule<'a> {
+    fn from(module: &'a ast::ModModule<'ast>) -> Self {
         Self {
             body: module.body.iter().map(Into::into).collect(),
         }
     }
 }
 
-impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
-    fn from(expr: &'a ast::ModExpression) -> Self {
+impl<'a, 'ast> From<&'a ast::ModExpression<'ast>> for ComparableModExpression<'a> {
+    fn from(expr: &'a ast::ModExpression<'ast>) -> Self {
         Self {
             body: (&expr.body).into(),
         }
@@ -1931,11 +1939,11 @@ impl PartialEq<Self> for HashableExpr<'_> {
 
 impl Eq for HashableExpr<'_> {}
 
-impl<'a> From<&'a Expr> for HashableExpr<'a> {
-    fn from(expr: &'a Expr) -> Self {
+impl<'a, 'ast> From<&'a Expr<'ast>> for HashableExpr<'a> {
+    fn from(expr: &'a Expr<'ast>) -> Self {
         /// Returns a version of the given expression that can be hashed and compared according to
         /// Python  semantics.
-        fn as_hashable(expr: &Expr) -> ComparableExpr<'_> {
+        fn as_hashable<'a>(expr: &'a Expr<'_>) -> ComparableExpr<'a> {
             match expr {
                 Expr::Named(named) => ComparableExpr::NamedExpr(ExprNamed {
                     target: Box::new(ComparableExpr::from(&named.target)),
@@ -1953,7 +1961,7 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
 
         /// Returns the `bool` value of the given expression, if it has an equivalent hash to
         /// `True` or `False`.
-        fn as_bool(number: &crate::ExprNumberLiteral) -> Option<bool> {
+        fn as_bool(number: &crate::ExprNumberLiteral<'_>) -> Option<bool> {
             match &number.value {
                 Number::Int(int) => match int.as_u8() {
                     Some(0) => Some(false),

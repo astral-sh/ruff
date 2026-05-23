@@ -72,7 +72,7 @@ pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtF
 struct GeneratorAnalyzer<'a, 'b> {
     checker: &'a Checker<'b>,
     has_yield: bool,
-    stop_iteration_raises: Vec<&'a ast::StmtRaise>,
+    stop_iteration_raises: Vec<&'a ast::StmtRaise<'a>>,
 }
 
 impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {

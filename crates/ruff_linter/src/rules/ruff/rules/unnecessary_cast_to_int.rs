@@ -177,7 +177,7 @@ fn call_applicability(checker: &Checker, inner_call: &ExprCall) -> Option<Applic
 fn single_argument_to_int_call<'a>(
     call: &'a ExprCall,
     semantic: &SemanticModel,
-) -> Option<&'a Expr> {
+) -> Option<&'a Expr<'a>> {
     let ExprCall {
         func, arguments, ..
     } = call;

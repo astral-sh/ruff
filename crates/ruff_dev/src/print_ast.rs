@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
+use ruff_allocator::Allocator;
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_parser::{ParseOptions, parse};
@@ -24,8 +25,13 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 args.file.display()
             )
         })?;
-    let python_ast =
-        parse(source_kind.source_code(), ParseOptions::from(source_type))?.into_syntax();
+    let allocator = Allocator::new();
+    let python_ast = parse(
+        source_kind.source_code(),
+        ParseOptions::from(source_type),
+        &allocator,
+    )?
+    .into_syntax();
     println!("{python_ast:#?}");
     Ok(())
 }

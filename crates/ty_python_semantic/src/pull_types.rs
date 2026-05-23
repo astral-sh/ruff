@@ -41,8 +41,8 @@ impl<'db> PullTypesVisitor<'db> {
     }
 }
 
-impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+impl<'node> SourceOrderVisitor<'node> for PullTypesVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &'node ast::Stmt<'node>) {
         match stmt {
             ast::Stmt::FunctionDef(function) => {
                 let _ty = function.inferred_type(&self.model);

@@ -139,11 +139,11 @@ fn func_is_fromisoformat(func: &Expr, semantic: &SemanticModel) -> bool {
 /// A `datetime.replace` call that replaces the timezone with a zero offset.
 struct ReplaceTimeZone<'a> {
     /// The date expression
-    date: &'a Expr,
+    date: &'a Expr<'a>,
     /// The `date` expression's parent.
-    parent: &'a Expr,
+    parent: &'a Expr<'a>,
     /// The zero offset string literal
-    zero_offset: &'a ExprStringLiteral,
+    zero_offset: &'a ExprStringLiteral<'a>,
 }
 
 impl<'a> ReplaceTimeZone<'a> {
@@ -212,7 +212,7 @@ impl<'a> ReplaceTimeZone<'a> {
 /// Returns `Some` if `call` is a call to `date.strip("Z")`.
 ///
 /// It returns the value of the `date` argument and its parent.
-fn strip_z_date(call: &ExprCall) -> Option<(&Expr, &Expr)> {
+fn strip_z_date<'a>(call: &'a ExprCall<'a>) -> Option<(&'a Expr<'a>, &'a Expr<'a>)> {
     let ExprCall {
         func, arguments, ..
     } = call;
@@ -241,7 +241,7 @@ fn strip_z_date(call: &ExprCall) -> Option<(&Expr, &Expr)> {
 }
 
 /// Returns `Some` if this is a subscript with the form `date[:-1] + "-00"`.
-fn slice_minus_1_date(subscript: &ExprSubscript) -> Option<&Expr> {
+fn slice_minus_1_date<'a>(subscript: &'a ExprSubscript<'a>) -> Option<&'a Expr<'a>> {
     let ExprSubscript { value, slice, .. } = subscript;
     let slice = slice.as_slice_expr()?;
 

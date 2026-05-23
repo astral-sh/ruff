@@ -80,10 +80,10 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
 }
 
 pub(crate) enum BannedModuleImportPolicies<'a> {
-    Import(&'a StmtImport),
+    Import(&'a StmtImport<'a>),
     ImportFrom {
         module: Option<Cow<'a, str>>,
-        node: &'a StmtImportFrom,
+        node: &'a StmtImportFrom<'a>,
     },
     NonImport,
 }
@@ -131,11 +131,11 @@ impl<'a> IntoIterator for &'a BannedModuleImportPolicies<'a> {
 }
 
 pub(crate) enum BannedModuleImportPoliciesIter<'a> {
-    Import(std::slice::Iter<'a, Alias>),
+    Import(std::slice::Iter<'a, Alias<'a>>),
     ImportFrom {
         module: Option<&'a str>,
-        names: std::slice::Iter<'a, Alias>,
-        import: Option<&'a StmtImportFrom>,
+        names: std::slice::Iter<'a, Alias<'a>>,
+        import: Option<&'a StmtImportFrom<'a>>,
     },
     NonImport,
 }

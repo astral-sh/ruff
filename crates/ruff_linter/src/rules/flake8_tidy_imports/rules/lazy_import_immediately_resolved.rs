@@ -108,7 +108,10 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
 }
 
 /// Return the import statement if the binding was created by a `lazy import`.
-fn lazy_import_statement<'a>(binding: &Binding, semantic: &SemanticModel<'a>) -> Option<&'a Stmt> {
+fn lazy_import_statement<'a>(
+    binding: &Binding,
+    semantic: &SemanticModel<'a>,
+) -> Option<&'a Stmt<'a>> {
     if !matches!(
         binding.kind,
         BindingKind::Import(_) | BindingKind::SubmoduleImport(_) | BindingKind::FromImport(_)

@@ -239,8 +239,8 @@ impl Method<'_> {
 
 #[derive(Debug)]
 struct ClassMethod<'a> {
-    cls_annotation: &'a ast::Expr,
-    type_params: Option<&'a ast::TypeParams>,
+    cls_annotation: &'a ast::Expr<'a>,
+    type_params: Option<&'a ast::TypeParams<'a>>,
 }
 
 impl ClassMethod<'_> {
@@ -273,8 +273,8 @@ impl ClassMethod<'_> {
 
 #[derive(Debug)]
 struct InstanceMethod<'a> {
-    self_annotation: &'a ast::Expr,
-    type_params: Option<&'a ast::TypeParams>,
+    self_annotation: &'a ast::Expr<'a>,
+    type_params: Option<&'a ast::TypeParams<'a>>,
 }
 
 impl InstanceMethod<'_> {

@@ -51,35 +51,35 @@ pub trait HasScopedUseId {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId;
 }
 
-impl HasScopedUseId for ast::Identifier {
+impl HasScopedUseId for ast::Identifier<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.use_id(self)
     }
 }
 
-impl HasScopedUseId for ast::ExprName {
+impl HasScopedUseId for ast::ExprName<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, scope)
     }
 }
 
-impl HasScopedUseId for ast::ExprAttribute {
+impl HasScopedUseId for ast::ExprAttribute<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, scope)
     }
 }
 
-impl HasScopedUseId for ast::ExprSubscript {
+impl HasScopedUseId for ast::ExprSubscript<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, scope)
     }
 }
 
-impl HasScopedUseId for ast::Keyword {
+impl HasScopedUseId for ast::Keyword<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.use_id(self)
@@ -136,38 +136,38 @@ pub(crate) mod node_key {
         }
     }
 
-    impl From<&ast::Expr> for ExpressionNodeKey {
-        fn from(value: &ast::Expr) -> Self {
+    impl From<&ast::Expr<'_>> for ExpressionNodeKey {
+        fn from(value: &ast::Expr<'_>) -> Self {
             Self(NodeKey::from_node(value))
         }
     }
 
-    impl From<&Box<ast::Expr>> for ExpressionNodeKey {
-        fn from(value: &Box<ast::Expr>) -> Self {
+    impl From<&ruff_allocator::Box<'_, ast::Expr<'_>>> for ExpressionNodeKey {
+        fn from(value: &ruff_allocator::Box<'_, ast::Expr<'_>>) -> Self {
             Self(NodeKey::from_node(&**value))
         }
     }
 
-    impl From<&ast::ExprCall> for ExpressionNodeKey {
-        fn from(value: &ast::ExprCall) -> Self {
+    impl From<&ast::ExprCall<'_>> for ExpressionNodeKey {
+        fn from(value: &ast::ExprCall<'_>) -> Self {
             Self(NodeKey::from_node(value))
         }
     }
 
-    impl From<&ast::ExprLambda> for ExpressionNodeKey {
-        fn from(value: &ast::ExprLambda) -> Self {
+    impl From<&ast::ExprLambda<'_>> for ExpressionNodeKey {
+        fn from(value: &ast::ExprLambda<'_>) -> Self {
             Self(NodeKey::from_node(value))
         }
     }
 
-    impl From<&ast::Identifier> for ExpressionNodeKey {
-        fn from(value: &ast::Identifier) -> Self {
+    impl From<&ast::Identifier<'_>> for ExpressionNodeKey {
+        fn from(value: &ast::Identifier<'_>) -> Self {
             Self(NodeKey::from_node(value))
         }
     }
 
-    impl From<&ast::Keyword> for ExpressionNodeKey {
-        fn from(value: &ast::Keyword) -> Self {
+    impl From<&ast::Keyword<'_>> for ExpressionNodeKey {
+        fn from(value: &ast::Keyword<'_>) -> Self {
             Self(NodeKey::from_node(value))
         }
     }

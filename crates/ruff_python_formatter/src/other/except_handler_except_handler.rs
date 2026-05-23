@@ -22,7 +22,7 @@ pub struct FormatExceptHandlerExceptHandler {
     pub(crate) last_suite_in_statement: bool,
 }
 
-impl FormatRuleWithOptions<ExceptHandlerExceptHandler, PyFormatContext<'_>>
+impl FormatRuleWithOptions<ExceptHandlerExceptHandler<'_>, PyFormatContext<'_>>
     for FormatExceptHandlerExceptHandler
 {
     type Options = FormatExceptHandlerExceptHandler;
@@ -34,7 +34,7 @@ impl FormatRuleWithOptions<ExceptHandlerExceptHandler, PyFormatContext<'_>>
     }
 }
 
-impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHandler {
+impl FormatNodeRule<ExceptHandlerExceptHandler<'_>> for FormatExceptHandlerExceptHandler {
     fn fmt_fields(
         &self,
         item: &ExceptHandlerExceptHandler,

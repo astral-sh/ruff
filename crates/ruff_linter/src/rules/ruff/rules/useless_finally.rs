@@ -156,7 +156,7 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
 
 /// Returns the end offset of the clause preceding `finally` and the last
 /// statement in that clause's body (used for comment indentation checks)
-fn preceding_clause_info(try_stmt: &StmtTry) -> (TextSize, Option<&Stmt>) {
+fn preceding_clause_info<'a>(try_stmt: &'a StmtTry<'a>) -> (TextSize, Option<&'a Stmt<'a>>) {
     if let Some(last) = try_stmt.orelse.last() {
         return (last.end(), Some(last));
     }

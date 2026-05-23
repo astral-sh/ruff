@@ -13,7 +13,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprAwait;
 
-impl FormatNodeRule<ExprAwait> for FormatExprAwait {
+impl FormatNodeRule<ExprAwait<'_>> for FormatExprAwait {
     fn fmt_fields(&self, item: &ExprAwait, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprAwait {
             range: _,
@@ -32,7 +32,7 @@ impl FormatNodeRule<ExprAwait> for FormatExprAwait {
     }
 }
 
-impl NeedsParentheses for ExprAwait {
+impl NeedsParentheses for ExprAwait<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

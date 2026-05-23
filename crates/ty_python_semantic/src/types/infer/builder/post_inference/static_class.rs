@@ -948,12 +948,14 @@ pub(crate) fn check_static_class_definitions<'db>(
                 for self_typevar in generic_context.variables(db) {
                     let name = self_typevar.typevar(db).name(db);
                     for enclosing in enclosing_generic_contexts(db, index, parent) {
-                        if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
+                        if let Some(other_typevar) =
+                            enclosing.binds_named_typevar(db, name.as_str())
+                        {
                             report_shadowed_type_variable(
                                 context,
-                                name,
+                                name.as_str(),
                                 "class",
-                                &class_node.name.id,
+                                class_node.name.id.as_str(),
                                 class.header_range(db),
                                 other_typevar,
                             );
@@ -970,9 +972,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                     if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
                         report_shadowed_type_variable(
                             context,
-                            typevar.name(db),
+                            typevar.name(db).as_str(),
                             "class",
-                            &class_node.name.id,
+                            class_node.name.id.as_str(),
                             class.header_range(db),
                             other_typevar,
                         );

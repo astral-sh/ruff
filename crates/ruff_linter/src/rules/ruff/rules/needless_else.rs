@@ -203,10 +203,10 @@ fn else_branch_has_trailing_comment(
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum AnyNodeWithOrElse<'a> {
-    While(&'a StmtWhile),
-    For(&'a StmtFor),
-    Try(&'a StmtTry),
-    If(&'a StmtIf),
+    While(&'a StmtWhile<'a>),
+    For(&'a StmtFor<'a>),
+    Try(&'a StmtTry<'a>),
+    If(&'a StmtIf<'a>),
 }
 
 impl<'a> AnyNodeWithOrElse<'a> {
@@ -238,7 +238,7 @@ impl<'a> AnyNodeWithOrElse<'a> {
     }
 
     /// Returns the suite before the else block.
-    fn body_before_else(self) -> &'a [Stmt] {
+    fn body_before_else(self) -> &'a [Stmt<'a>] {
         match self {
             Self::Try(StmtTry { body, handlers, .. }) => handlers
                 .last()
@@ -263,7 +263,7 @@ impl<'a> AnyNodeWithOrElse<'a> {
 
     /// Returns the `else` suite.
     /// Defaults to an empty suite if the statement has no `else` block.
-    fn else_body(self) -> &'a [Stmt] {
+    fn else_body(self) -> &'a [Stmt<'a>] {
         match self {
             Self::While(StmtWhile { orelse, .. })
             | Self::For(StmtFor { orelse, .. })
@@ -280,25 +280,25 @@ impl<'a> AnyNodeWithOrElse<'a> {
     }
 }
 
-impl<'a> From<&'a StmtFor> for AnyNodeWithOrElse<'a> {
+impl<'a> From<&'a StmtFor<'_>> for AnyNodeWithOrElse<'a> {
     fn from(value: &'a StmtFor) -> Self {
         Self::For(value)
     }
 }
 
-impl<'a> From<&'a StmtWhile> for AnyNodeWithOrElse<'a> {
+impl<'a> From<&'a StmtWhile<'_>> for AnyNodeWithOrElse<'a> {
     fn from(value: &'a StmtWhile) -> Self {
         Self::While(value)
     }
 }
 
-impl<'a> From<&'a StmtIf> for AnyNodeWithOrElse<'a> {
+impl<'a> From<&'a StmtIf<'_>> for AnyNodeWithOrElse<'a> {
     fn from(value: &'a StmtIf) -> Self {
         Self::If(value)
     }
 }
 
-impl<'a> From<&'a StmtTry> for AnyNodeWithOrElse<'a> {
+impl<'a> From<&'a StmtTry<'_>> for AnyNodeWithOrElse<'a> {
     fn from(value: &'a StmtTry) -> Self {
         Self::Try(value)
     }

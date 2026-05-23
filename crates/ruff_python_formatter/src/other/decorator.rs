@@ -10,7 +10,7 @@ use crate::{has_skip_comment, prelude::*};
 #[derive(Default)]
 pub struct FormatDecorator;
 
-impl FormatNodeRule<Decorator> for FormatDecorator {
+impl FormatNodeRule<Decorator<'_>> for FormatDecorator {
     fn fmt_fields(&self, item: &Decorator, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments();
         let trailing = comments.trailing(item);

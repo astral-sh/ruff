@@ -72,12 +72,12 @@ impl Ranged for DunderAllDefinition<'_> {
 
 impl SemanticModel<'_> {
     /// Extract the names bound to a given __all__ assignment.
-    pub fn extract_dunder_all_names<'expr>(
+    pub fn extract_dunder_all_names<'expr, 'ast: 'expr>(
         &self,
-        stmt: &'expr Stmt,
+        stmt: &'expr Stmt<'ast>,
     ) -> (Vec<DunderAllName<'expr>>, DunderAllFlags) {
-        fn add_to_names<'expr>(
-            elts: &'expr [Expr],
+        fn add_to_names<'expr, 'ast: 'expr>(
+            elts: &'expr [Expr<'ast>],
             names: &mut Vec<DunderAllName<'expr>>,
             flags: &mut DunderAllFlags,
         ) {
@@ -144,10 +144,10 @@ impl SemanticModel<'_> {
         (names, flags)
     }
 
-    fn extract_dunder_all_elts<'expr>(
+    fn extract_dunder_all_elts<'expr, 'ast: 'expr>(
         &self,
-        expr: &'expr Expr,
-    ) -> (Option<&'expr [Expr]>, DunderAllFlags) {
+        expr: &'expr Expr<'ast>,
+    ) -> (Option<&'expr [Expr<'ast>]>, DunderAllFlags) {
         match expr {
             Expr::List(ast::ExprList { elts, .. }) => {
                 return (Some(elts), DunderAllFlags::empty());

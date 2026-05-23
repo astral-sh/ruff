@@ -71,7 +71,7 @@ pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
 
         // Fix is only supported for single-target deletions.
         if delete.targets.len() == 1 {
-            let replacement = generate_method_call(name.id.clone(), "clear", checker.generator());
+            let replacement = generate_method_call(name.id.as_str(), "clear", checker);
             diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                 replacement,
                 delete.start(),
@@ -82,7 +82,10 @@ pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
 }
 
 /// Match `del expr[:]` where `expr` is a list or a dict.
-fn match_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a ast::ExprName> {
+fn match_full_slice<'a>(
+    expr: &'a Expr<'a>,
+    semantic: &SemanticModel,
+) -> Option<&'a ast::ExprName<'a>> {
     // Check that it is `del expr[...]`.
     let subscript = expr.as_subscript_expr()?;
 

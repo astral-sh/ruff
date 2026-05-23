@@ -100,7 +100,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
     let valid_elts = type_annotation.trim_unnecessary_defaults(elts);
 
     // If we didn't trim any elements, then the default type arguments are necessary.
-    if *elts == valid_elts {
+    if elts.as_slice() == valid_elts.as_slice() {
         return;
     }
 
@@ -120,12 +120,12 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
             checker
                 .generator()
                 .expr(&Expr::Subscript(ast::ExprSubscript {
-                    value: value.clone(),
-                    slice: Box::new(if let [elt] = valid_elts.as_slice() {
+                    value: *value,
+                    slice: checker.alloc_expr(if let [elt] = valid_elts.as_slice() {
                         elt.clone()
                     } else {
                         Expr::Tuple(ast::ExprTuple {
-                            elts: valid_elts,
+                            elts: checker.alloc_vec(valid_elts),
                             ctx: ast::ExprContext::Load,
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -145,7 +145,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
 /// Trim trailing `None` literals from the given elements.
 ///
 /// For example, given `[int, None, None]`, return `[int]`.
-fn trim_trailing_none(elts: &[Expr]) -> &[Expr] {
+fn trim_trailing_none<'a>(elts: &'a [Expr<'a>]) -> &'a [Expr<'a>] {
     match elts.iter().rposition(|elt| !elt.is_none_literal_expr()) {
         Some(trimmed_last_index) => elts[..=trimmed_last_index].as_ref(),
         None => &[],
@@ -187,7 +187,7 @@ impl DefaultedTypeAnnotation {
     }
 
     /// Trim any unnecessary default type arguments from the given elements.
-    fn trim_unnecessary_defaults(self, elts: &[Expr]) -> Vec<Expr> {
+    fn trim_unnecessary_defaults<'a>(self, elts: &'a [Expr<'a>]) -> Vec<Expr<'a>> {
         match self {
             Self::Generator => {
                 // Check only if the number of elements is 2 or 3 (e.g., `Generator[int, None]` or `Generator[int, None, None]`).

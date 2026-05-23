@@ -1,3 +1,4 @@
+use ruff_allocator::Box as ArenaBox;
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
@@ -205,7 +206,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
     let Expr::Name(ast::ExprName { id, .. }) = attr_value.as_ref() else {
         return;
     };
-    if id != "os" || attr != "environ" {
+    if *id != "os" || attr != "environ" {
         return;
     }
     let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = slice.as_ref() else {
@@ -229,7 +230,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
         slice.range(),
     );
     let node = ast::StringLiteral {
-        value: capital_env_var.into_boxed_str(),
+        value: ArenaBox::from_str_in(&capital_env_var, checker.replacement_allocator()),
         flags: checker.default_string_flags().with_prefix({
             if env_var.is_unicode() {
                 StringLiteralPrefix::Unicode

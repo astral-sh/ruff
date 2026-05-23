@@ -70,7 +70,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// either a list/tuple/set of string-literal names or a module's `__all__` variable.
     ///
     /// Returns `true` if the expression is a valid list/tuple/set or module `__all__`, `false` otherwise.
-    fn extend(&mut self, expr: &ast::Expr) -> bool {
+    fn extend(&mut self, expr: &ast::Expr<'_>) -> bool {
         match expr {
             // `__all__ += [...]`
             // `__all__.extend([...])`
@@ -110,7 +110,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     fn process_call_idiom(
         &mut self,
         function_name: &ast::Identifier,
-        arguments: &ast::Arguments,
+        arguments: &ast::Arguments<'_>,
     ) -> bool {
         if arguments.len() != 1 {
             return false;
@@ -168,7 +168,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// # Panics
     ///
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
-    fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
+    fn standalone_expression_type(&self, expr: &ast::Expr<'_>) -> Type<'db> {
         infer_expression_types(self.db, self.index.expression(expr), TypeContext::default())
             .expression_type(expr)
     }
@@ -176,14 +176,14 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// Evaluate the given expression and return its truthiness.
     ///
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
-    fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
+    fn evaluate_test_expr(&self, expr: &ast::Expr<'_>) -> Option<Truthiness> {
         self.standalone_expression_type(expr).try_bool(self.db).ok()
     }
 
     /// Add valid names to the set.
     ///
     /// Returns `false` if any of the names are invalid.
-    fn add_names(&mut self, exprs: &[ast::Expr]) -> bool {
+    fn add_names(&mut self, exprs: &[ast::Expr<'_>]) -> bool {
         for expr in exprs {
             let Some(name) = create_name(expr) else {
                 return false;
@@ -209,8 +209,8 @@ impl<'db> DunderAllNamesCollector<'db> {
     }
 }
 
-impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
-    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+impl<'node> StatementVisitor<'node> for DunderAllNamesCollector<'_> {
+    fn visit_stmt(&mut self, stmt: &'node ast::Stmt<'node>) {
         if self.invalid {
             return;
         }

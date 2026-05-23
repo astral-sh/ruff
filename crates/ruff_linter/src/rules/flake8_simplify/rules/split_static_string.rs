@@ -1,3 +1,4 @@
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringFlags;
 use ruff_python_ast::{
@@ -111,10 +112,21 @@ pub(crate) fn split_static_string(
     let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
-            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value, method),
+            Expr::NoneLiteral(_) => split_default(
+                str_value,
+                maxsplit_value,
+                method,
+                checker.replacement_allocator(),
+            ),
             Expr::StringLiteral(sep_value) => {
                 let sep_value_str = sep_value.value.to_str();
-                Some(split_sep(str_value, sep_value_str, maxsplit_value, method))
+                Some(split_sep(
+                    str_value,
+                    sep_value_str,
+                    maxsplit_value,
+                    method,
+                    checker.replacement_allocator(),
+                ))
             }
             // Ignore names until type inference is available.
             _ => {
@@ -122,7 +134,12 @@ pub(crate) fn split_static_string(
             }
         }
     } else {
-        split_default(str_value, maxsplit_value, method)
+        split_default(
+            str_value,
+            maxsplit_value,
+            method,
+            checker.replacement_allocator(),
+        )
     };
 
     let mut diagnostic = checker.report_diagnostic(SplitStaticString { method }, call.range());
@@ -172,27 +189,36 @@ fn replace_flags(elt: &str, flags: StringLiteralFlags) -> StringLiteralFlags {
     }
 }
 
-fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
+fn construct_replacement<'alloc>(
+    elts: &[&str],
+    flags: StringLiteralFlags,
+    allocator: &'alloc Allocator,
+) -> Expr<'alloc> {
     Expr::List(ExprList {
-        elts: elts
-            .iter()
-            .map(|elt| {
+        elts: ArenaSlice::from_iter_in(
+            elts.iter().map(|elt| {
                 let element_flags = replace_flags(elt, flags);
                 Expr::from(StringLiteral {
-                    value: Box::from(*elt),
+                    value: ArenaBox::from_str_in(elt, allocator),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     flags: element_flags,
                 })
-            })
-            .collect(),
+            }),
+            allocator,
+        ),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })
 }
 
-fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method) -> Option<Expr> {
+fn split_default<'alloc>(
+    str_value: &StringLiteralValue,
+    max_split: i32,
+    method: Method,
+    allocator: &'alloc Allocator,
+) -> Option<Expr<'alloc>> {
     let string_val = str_value.to_str();
     match max_split.cmp(&0) {
         Ordering::Greater | Ordering::Equal => {
@@ -203,6 +229,7 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method)
             Some(construct_replacement(
                 &list_items,
                 str_value.first_literal_flags(),
+                allocator,
             ))
         }
         Ordering::Less => {
@@ -213,17 +240,19 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method)
             Some(construct_replacement(
                 &list_items,
                 str_value.first_literal_flags(),
+                allocator,
             ))
         }
     }
 }
 
-fn split_sep(
+fn split_sep<'alloc>(
     str_value: &StringLiteralValue,
     sep_value: &str,
     max_split: i32,
     method: Method,
-) -> Expr {
+    allocator: &'alloc Allocator,
+) -> Expr<'alloc> {
     let value = str_value.to_str();
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
         match method {
@@ -245,7 +274,7 @@ fn split_sep(
         }
     };
 
-    construct_replacement(&list_items, str_value.first_literal_flags())
+    construct_replacement(&list_items, str_value.first_literal_flags(), allocator)
 }
 
 /// Returns the value of the `maxsplit` argument as an `i32`, if it is a numeric value.

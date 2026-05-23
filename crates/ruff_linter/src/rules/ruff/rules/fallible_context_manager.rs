@@ -60,7 +60,10 @@ impl Violation for FallibleContextManager {
 }
 
 /// RUF075
-pub(crate) fn fallible_context_manager(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn fallible_context_manager<'ast>(
+    checker: &Checker<'ast>,
+    function_def: &'ast StmtFunctionDef<'ast>,
+) {
     if !has_contextmanager_decorator(checker, function_def) {
         return;
     }
@@ -69,7 +72,10 @@ pub(crate) fn fallible_context_manager(checker: &Checker, function_def: &StmtFun
     visitor.visit_body_with_terminal(&function_def.body, true);
 }
 
-fn has_contextmanager_decorator(checker: &Checker, function_def: &StmtFunctionDef) -> bool {
+fn has_contextmanager_decorator<'ast>(
+    checker: &Checker<'ast>,
+    function_def: &'ast StmtFunctionDef<'ast>,
+) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
         checker
             .semantic()
@@ -113,8 +119,8 @@ impl<'a, 'b> YieldFinallyVisitor<'a, 'b> {
     }
 }
 
-impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'ast> Visitor<'ast> for YieldFinallyVisitor<'_, 'ast> {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt<'ast>) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
 
@@ -203,7 +209,7 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, expr: &'ast Expr<'ast>) {
         match expr {
             Expr::Yield(_) | Expr::YieldFrom(_) => {
                 if !self.in_protected_try && !self.in_terminal_position {
@@ -217,9 +223,13 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
     }
 }
 
-impl YieldFinallyVisitor<'_, '_> {
+impl<'ast> YieldFinallyVisitor<'_, 'ast> {
     /// Visits an `except` handler, propagating the surrounding `terminal` flag into its body.
-    fn visit_except_handler_with_terminal(&mut self, handler: &ast::ExceptHandler, terminal: bool) {
+    fn visit_except_handler_with_terminal(
+        &mut self,
+        handler: &'ast ast::ExceptHandler<'ast>,
+        terminal: bool,
+    ) {
         let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_, body, ..
         }) = handler;
@@ -234,7 +244,7 @@ impl YieldFinallyVisitor<'_, '_> {
     ///
     /// A statement is considered terminal if it is the last in the body (when `terminal` is true)
     /// or if it is a yield statement immediately followed by a `return`.
-    fn visit_body_with_terminal(&mut self, body: &[Stmt], terminal: bool) {
+    fn visit_body_with_terminal(&mut self, body: &'ast [Stmt<'ast>], terminal: bool) {
         for (i, stmt) in body.iter().enumerate() {
             let is_last = i == body.len() - 1;
             let is_yield_before_return = Self::is_yield_statement(stmt)
@@ -250,7 +260,7 @@ impl YieldFinallyVisitor<'_, '_> {
     }
 
     /// Returns `true` if the statement is an expression statement containing a `yield` or `yield from`.
-    fn is_yield_statement(stmt: &Stmt) -> bool {
+    fn is_yield_statement(stmt: &'ast Stmt<'ast>) -> bool {
         matches!(
             stmt,
             Stmt::Expr(ast::StmtExpr { value, .. })

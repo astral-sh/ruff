@@ -3377,7 +3377,7 @@ impl<'db> Parameters<'db> {
                 definition,
                 &param.parameter,
                 ParameterKind::PositionalOnly {
-                    name: Some(param.parameter.name.id.clone()),
+                    name: Some(param.parameter.name.id.to_name()),
                     default_type: default_type(param),
                 },
             )
@@ -3409,7 +3409,7 @@ impl<'db> Parameters<'db> {
                 definition,
                 &arg.parameter,
                 ParameterKind::PositionalOrKeyword {
-                    name: arg.parameter.name.id.clone(),
+                    name: arg.parameter.name.id.to_name(),
                     default_type: default_type(arg),
                 },
             )
@@ -3421,7 +3421,7 @@ impl<'db> Parameters<'db> {
                 definition,
                 arg,
                 ParameterKind::Variadic {
-                    name: arg.name.id.clone(),
+                    name: arg.name.id.to_name(),
                 },
             )
         });
@@ -3432,7 +3432,7 @@ impl<'db> Parameters<'db> {
                 definition,
                 &arg.parameter,
                 ParameterKind::KeywordOnly {
-                    name: arg.parameter.name.id.clone(),
+                    name: arg.parameter.name.id.to_name(),
                     default_type: default_type(arg),
                 },
             )
@@ -3444,7 +3444,7 @@ impl<'db> Parameters<'db> {
                 definition,
                 arg,
                 ParameterKind::KeywordVariadic {
-                    name: arg.name.id.clone(),
+                    name: arg.name.id.to_name(),
                 },
             )
         });

@@ -3,11 +3,12 @@ use std::path::Path;
 
 use rustc_hash::FxHashMap;
 
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
+use crate::name::{AstName, QualifiedName, QualifiedNameBuilder};
 use crate::statement_visitor::StatementVisitor;
 use crate::token::Tokens;
 use crate::token::parenthesized_range;
@@ -255,11 +256,11 @@ where
 
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
 /// returns `true`..
-pub fn any_over_expr<F>(expr: &Expr, mut func: F) -> bool
+pub fn any_over_expr<'ast, F>(expr: &Expr<'ast>, mut func: F) -> bool
 where
-    F: FnMut(&Expr) -> bool,
+    F: FnMut(&Expr<'ast>) -> bool,
 {
-    fn inner(expr: &Expr, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
+    fn inner<'ast>(expr: &Expr<'ast>, func: &mut dyn FnMut(&Expr<'ast>) -> bool) -> bool {
         if func(expr) {
             return true;
         }
@@ -455,7 +456,10 @@ where
     inner(expr, &mut func)
 }
 
-fn any_over_type_param(type_param: &TypeParam, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
+fn any_over_type_param<'ast>(
+    type_param: &TypeParam<'ast>,
+    func: &mut dyn FnMut(&Expr<'ast>) -> bool,
+) -> bool {
     match type_param {
         TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
             bound
@@ -474,7 +478,10 @@ fn any_over_type_param(type_param: &TypeParam, func: &mut dyn FnMut(&Expr) -> bo
     }
 }
 
-fn any_over_pattern(pattern: &Pattern, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
+fn any_over_pattern<'ast>(
+    pattern: &Pattern<'ast>,
+    func: &mut dyn FnMut(&Expr<'ast>) -> bool,
+) -> bool {
     match pattern {
         Pattern::MatchValue(ast::PatternMatchValue {
             value,
@@ -520,9 +527,9 @@ fn any_over_pattern(pattern: &Pattern, func: &mut dyn FnMut(&Expr) -> bool) -> b
     }
 }
 
-fn any_over_interpolated_string_element(
-    element: &ast::InterpolatedStringElement,
-    func: &mut dyn FnMut(&Expr) -> bool,
+fn any_over_interpolated_string_element<'ast>(
+    element: &ast::InterpolatedStringElement<'ast>,
+    func: &mut dyn FnMut(&Expr<'ast>) -> bool,
 ) -> bool {
     match element {
         ast::InterpolatedStringElement::Literal(_) => false,
@@ -541,11 +548,11 @@ fn any_over_interpolated_string_element(
     }
 }
 
-fn any_over_stmt<F>(stmt: &Stmt, mut func: F) -> bool
+fn any_over_stmt<'ast, F>(stmt: &Stmt<'ast>, mut func: F) -> bool
 where
-    F: FnMut(&Expr) -> bool,
+    F: FnMut(&Expr<'ast>) -> bool,
 {
-    fn inner(stmt: &Stmt, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
+    fn inner<'ast>(stmt: &Stmt<'ast>, func: &mut dyn FnMut(&Expr<'ast>) -> bool) -> bool {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 parameters,
@@ -781,9 +788,9 @@ where
     inner(stmt, &mut func)
 }
 
-pub fn any_over_body<F>(body: &[Stmt], mut func: F) -> bool
+pub fn any_over_body<'ast, F>(body: &[Stmt<'ast>], mut func: F) -> bool
 where
-    F: FnMut(&Expr) -> bool,
+    F: FnMut(&Expr<'ast>) -> bool,
 {
     body.iter().any(|stmt| any_over_stmt(stmt, &mut func))
 }
@@ -875,7 +882,9 @@ pub const fn is_mutable_iterable_initializer(expr: &Expr) -> bool {
 }
 
 /// Extract the names of all handled exceptions.
-pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
+pub fn extract_handled_exceptions<'a, 'ast>(
+    handlers: &'a [ExceptHandler<'ast>],
+) -> Vec<&'a Expr<'ast>> {
     let mut handled_exceptions = Vec::new();
     for handler in handlers {
         match handler {
@@ -898,7 +907,7 @@ pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
 /// Given an [`Expr`] that can be callable or not (like a decorator, which could
 /// be used with or without explicit call syntax), return the underlying
 /// callable.
-pub fn map_callable(decorator: &Expr) -> &Expr {
+pub fn map_callable<'a, 'ast>(decorator: &'a Expr<'ast>) -> &'a Expr<'ast> {
     if let Expr::Call(ast::ExprCall { func, .. }) = decorator {
         // Ex) `@decorator()`
         func
@@ -910,7 +919,7 @@ pub fn map_callable(decorator: &Expr) -> &Expr {
 
 /// Given an [`Expr`] that can be a [`ExprSubscript`][ast::ExprSubscript] or not
 /// (like an annotation that may be generic or not), return the underlying expr.
-pub fn map_subscript(expr: &Expr) -> &Expr {
+pub fn map_subscript<'a, 'ast>(expr: &'a Expr<'ast>) -> &'a Expr<'ast> {
     if let Expr::Subscript(ast::ExprSubscript { value, .. }) = expr {
         // Ex) `Iterable[T]`  => return `Iterable`
         value
@@ -921,7 +930,7 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
 }
 
 /// Given an [`Expr`] that can be starred, return the underlying starred expression.
-pub fn map_starred(expr: &Expr) -> &Expr {
+pub fn map_starred<'a, 'ast>(expr: &'a Expr<'ast>) -> &'a Expr<'ast> {
     if let Expr::Starred(ast::ExprStarred { value, .. }) = expr {
         // Ex) `*args`
         value
@@ -1128,11 +1137,11 @@ pub fn resolve_imported_module_path<'a>(
 #[derive(Debug, Default)]
 pub struct NameFinder<'a> {
     /// A map from identifier to defining expression.
-    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+    pub names: FxHashMap<&'a str, &'a ast::ExprName<'a>>,
 }
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         if let Expr::Name(name) = expr {
             self.names.insert(&name.id, name);
         }
@@ -1144,11 +1153,11 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
 #[derive(Debug, Default)]
 pub struct StoredNameFinder<'a> {
     /// A map from identifier to defining expression.
-    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+    pub names: FxHashMap<&'a str, &'a ast::ExprName<'a>>,
 }
 
 impl<'a> Visitor<'a> for StoredNameFinder<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         if let Expr::Name(name) = expr {
             if name.ctx.is_store() {
                 self.names.insert(&name.id, name);
@@ -1161,12 +1170,12 @@ impl<'a> Visitor<'a> for StoredNameFinder<'a> {
 /// A [`Visitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
-    pub returns: Vec<&'a ast::StmtReturn>,
+    pub returns: Vec<&'a ast::StmtReturn<'a>>,
     pub is_generator: bool,
 }
 
 impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
@@ -1176,7 +1185,7 @@ impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
             self.is_generator = true;
         } else {
@@ -1188,11 +1197,11 @@ impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
 /// A [`StatementVisitor`] that collects all `raise` statements in a function or method.
 #[derive(Default)]
 pub struct RaiseStatementVisitor<'a> {
-    pub raises: Vec<(TextRange, Option<&'a Expr>, Option<&'a Expr>)>,
+    pub raises: Vec<(TextRange, Option<&'a Expr<'a>>, Option<&'a Expr<'a>>)>,
 }
 
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -1235,8 +1244,8 @@ pub struct AwaitVisitor {
     pub seen_await: bool,
 }
 
-impl Visitor<'_> for AwaitVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'a> Visitor<'a> for AwaitVisitor {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
             Stmt::With(ast::StmtWith { is_async: true, .. }) => {
@@ -1249,7 +1258,7 @@ impl Visitor<'_> for AwaitVisitor {
         }
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         if let Expr::Await(ast::ExprAwait { .. }) = expr {
             self.seen_await = true;
         } else {
@@ -1257,7 +1266,7 @@ impl Visitor<'_> for AwaitVisitor {
         }
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'_ crate::Comprehension) {
+    fn visit_comprehension(&mut self, comprehension: &'a crate::Comprehension<'a>) {
         if comprehension.is_async {
             self.seen_await = true;
         } else {
@@ -1293,7 +1302,7 @@ pub fn is_stub_body(body: &[Stmt]) -> bool {
 }
 
 /// Returns `body` without its leading docstring statement, if present.
-pub fn body_without_leading_docstring(body: &[Stmt]) -> &[Stmt] {
+pub fn body_without_leading_docstring<'a, 'ast>(body: &'a [Stmt<'ast>]) -> &'a [Stmt<'ast>] {
     match body.split_first() {
         Some((first, rest)) if is_docstring_stmt(first) => rest,
         _ => body,
@@ -1301,7 +1310,9 @@ pub fn body_without_leading_docstring(body: &[Stmt]) -> &[Stmt] {
 }
 
 /// Check if a node is part of a conditional branch.
-pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
+pub fn on_conditional_branch<'a, 'ast: 'a>(
+    parents: &mut impl Iterator<Item = &'a Stmt<'ast>>,
+) -> bool {
     parents.any(|parent| {
         if matches!(parent, Stmt::If(_) | Stmt::While(_) | Stmt::Match(_)) {
             return true;
@@ -1321,7 +1332,7 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
 }
 
 /// Check if a node is in a nested block.
-pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool {
+pub fn in_nested_block<'a, 'ast: 'a>(mut parents: impl Iterator<Item = &'a Stmt<'ast>>) -> bool {
     parents.any(|parent| {
         matches!(
             parent,
@@ -1331,7 +1342,10 @@ pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool 
 }
 
 /// Check if a node represents an unpacking assignment.
-pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
+pub fn is_unpacking_assignment<'a, 'ast: 'a>(
+    parent: &'a Stmt<'ast>,
+    child: &'a Expr<'ast>,
+) -> bool {
     match parent {
         Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
             if let Some(optional_vars) = &item.optional_vars {
@@ -1512,7 +1526,7 @@ impl Truthiness {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if let [argument] = &*arguments.args
+                        } else if let [argument] = arguments.args.as_slice()
                             && arguments.keywords.is_empty()
                         {
                             // Ex) `list([1, 2, 3])`
@@ -1559,8 +1573,8 @@ impl Truthiness {
 
 /// Returns `true` if the expression definitely resolves to a non-empty string, when used as an
 /// f-string expression, or `false` if the expression may resolve to an empty string.
-fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
-    fn inner(expr: &Expr) -> bool {
+fn is_non_empty_f_string(expr: &ast::ExprFString<'_>) -> bool {
+    fn inner(expr: &Expr<'_>) -> bool {
         match expr {
             // When stringified, these expressions are always non-empty.
             Expr::Lambda(_) => true,
@@ -1623,8 +1637,8 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
 
 /// Returns `true` if the expression definitely resolves to the empty string, when used as an f-string
 /// expression.
-pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
-    fn inner(expr: &Expr) -> bool {
+pub fn is_empty_f_string(expr: &ast::ExprFString<'_>) -> bool {
+    fn inner(expr: &Expr<'_>) -> bool {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
             // Confusingly, `bool(f"{b""}") == True` even though
@@ -1638,8 +1652,8 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
         }
     }
 
-    fn is_empty_interpolated_elements<'a>(
-        mut elements: impl Iterator<Item = &'a InterpolatedStringElement>,
+    fn is_empty_interpolated_elements<'a, 'ast: 'a>(
+        mut elements: impl Iterator<Item = &'a InterpolatedStringElement<'ast>>,
     ) -> bool {
         elements.all(|element| match element {
             InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
@@ -1663,11 +1677,11 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     })
 }
 
-pub fn generate_comparison(
-    left: &Expr,
+pub fn generate_comparison<'a, 'ast: 'a>(
+    left: &'a Expr<'ast>,
     ops: &[CmpOp],
-    comparators: &[Expr],
-    parent: AnyNodeRef,
+    comparators: &'a [Expr<'ast>],
+    parent: AnyNodeRef<'a>,
     tokens: &Tokens,
     source: &str,
 ) -> String {
@@ -1706,11 +1720,17 @@ pub fn generate_comparison(
 }
 
 /// Format the expression as a PEP 604-style optional.
-pub fn pep_604_optional(expr: &Expr) -> Expr {
+pub fn pep_604_optional<'alloc, 'ast>(
+    expr: &Expr<'ast>,
+    allocator: &'alloc Allocator,
+) -> Expr<'alloc>
+where
+    'ast: 'alloc,
+{
     ast::ExprBinOp {
-        left: Box::new(expr.clone()),
+        left: ArenaBox::new_in((*expr).clone(), allocator),
         op: Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ExprNoneLiteral::default())),
+        right: ArenaBox::new_in(Expr::NoneLiteral(ExprNoneLiteral::default()), allocator),
         range: TextRange::default(),
         node_index: AtomicNodeIndex::NONE,
     }
@@ -1718,21 +1738,30 @@ pub fn pep_604_optional(expr: &Expr) -> Expr {
 }
 
 /// Format the expressions as a PEP 604-style union.
-pub fn pep_604_union(elts: &[Expr]) -> Expr {
+pub fn pep_604_union<'alloc, 'ast>(
+    elts: &[Expr<'ast>],
+    allocator: &'alloc Allocator,
+) -> Expr<'alloc>
+where
+    'ast: 'alloc,
+{
     match elts {
         [] => Expr::Tuple(ast::ExprTuple {
-            elts: vec![],
+            elts: ArenaSlice::new_in(allocator),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
             parenthesized: true,
         }),
-        [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
-        [elt] => elt.clone(),
+        [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts, allocator),
+        [elt] => (*elt).clone(),
         [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(pep_604_union(rest)),
+            left: ArenaBox::new_in(pep_604_union(rest, allocator), allocator),
             op: Operator::BitOr,
-            right: Box::new(pep_604_union(std::slice::from_ref(elt))),
+            right: ArenaBox::new_in(
+                pep_604_union(std::slice::from_ref(elt), allocator),
+                allocator,
+            ),
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
         }),
@@ -1740,15 +1769,25 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
 }
 
 /// Format the expression as a `typing.Optional`-style optional.
-pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
+pub fn typing_optional<'alloc, 'ast>(
+    elt: Expr<'ast>,
+    binding: &str,
+    allocator: &'alloc Allocator,
+) -> Expr<'alloc>
+where
+    'ast: 'alloc,
+{
     Expr::Subscript(ast::ExprSubscript {
-        value: Box::new(Expr::Name(ast::ExprName {
-            id: binding,
-            range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
-            ctx: ExprContext::Load,
-        })),
-        slice: Box::new(elt),
+        value: ArenaBox::new_in(
+            Expr::Name(ast::ExprName {
+                id: AstName::new_in(binding, allocator),
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+                ctx: ExprContext::Load,
+            }),
+            allocator,
+        ),
+        slice: ArenaBox::new_in(elt, allocator),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: AtomicNodeIndex::NONE,
@@ -1759,21 +1798,34 @@ pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
 ///
 /// Note: It is a syntax error to have `Union[]` so the caller
 /// should ensure that the `elts` argument is nonempty.
-pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
+pub fn typing_union<'alloc, 'ast>(
+    elts: &[Expr<'ast>],
+    binding: &str,
+    allocator: &'alloc Allocator,
+) -> Expr<'alloc>
+where
+    'ast: 'alloc,
+{
     Expr::Subscript(ast::ExprSubscript {
-        value: Box::new(Expr::Name(ast::ExprName {
-            id: binding,
-            range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
-            ctx: ExprContext::Load,
-        })),
-        slice: Box::new(Expr::Tuple(ast::ExprTuple {
-            range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
-            elts: elts.to_vec(),
-            ctx: ExprContext::Load,
-            parenthesized: false,
-        })),
+        value: ArenaBox::new_in(
+            Expr::Name(ast::ExprName {
+                id: AstName::new_in(binding, allocator),
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+                ctx: ExprContext::Load,
+            }),
+            allocator,
+        ),
+        slice: ArenaBox::new_in(
+            Expr::Tuple(ast::ExprTuple {
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+                elts: ArenaSlice::from_iter_in(elts.iter().map(|expr| (*expr).clone()), allocator),
+                ctx: ExprContext::Load,
+                parenthesized: false,
+            }),
+            allocator,
+        ),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: AtomicNodeIndex::NONE,
@@ -1865,12 +1917,14 @@ pub fn is_dotted_name(expr: &ast::Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
-    use std::cell::RefCell;
+    use std::cell::Cell;
     use std::vec;
 
+    use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
     use ruff_text_size::TextRange;
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
+    use crate::name::AstName;
     use crate::{
         AtomicNodeIndex, Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number,
         Stmt, StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
@@ -1913,9 +1967,10 @@ mod tests {
 
     #[test]
     fn any_over_stmt_type_alias() {
-        let seen = RefCell::new(Vec::new());
+        let allocator = Allocator::new();
+        let seen = Cell::new(0);
         let name = Expr::Name(ExprName {
-            id: "x".into(),
+            id: AstName::new_static("x"),
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
@@ -1938,46 +1993,52 @@ mod tests {
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
-            bound: Some(Box::new(constant_one.clone())),
+            bound: Some(ArenaBox::new_in(constant_one.clone(), &allocator)),
             default: None,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new_static("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
             bound: None,
-            default: Some(Box::new(constant_two.clone())),
-            name: Identifier::new("x", TextRange::default()),
+            default: Some(ArenaBox::new_in(constant_two.clone(), &allocator)),
+            name: Identifier::new_static("x", TextRange::default()),
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
-            name: Box::new(name.clone()),
-            type_params: Some(Box::new(TypeParams {
-                type_params: vec![type_var_one, type_var_two],
-                range: TextRange::default(),
-                node_index: AtomicNodeIndex::NONE,
-            })),
-            value: Box::new(constant_three.clone()),
+            name: ArenaBox::new_in(name.clone(), &allocator),
+            type_params: Some(ArenaBox::new_in(
+                TypeParams {
+                    type_params: ArenaSlice::from_vec_in(
+                        vec![type_var_one, type_var_two],
+                        &allocator,
+                    ),
+                    range: TextRange::default(),
+                    node_index: AtomicNodeIndex::NONE,
+                },
+                &allocator,
+            )),
+            value: ArenaBox::new_in(constant_three.clone(), &allocator),
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
         });
+        let expected = [&name, &constant_one, &constant_two, &constant_three];
         assert!(!any_over_stmt(&type_alias, |expr| {
-            seen.borrow_mut().push(expr.clone());
+            assert_eq!(expr, expected[seen.get()]);
+            seen.set(seen.get() + 1);
             false
         }));
-        assert_eq!(
-            seen.take(),
-            vec![name, constant_one, constant_two, constant_three]
-        );
+        assert_eq!(seen.get(), expected.len());
     }
 
     #[test]
     fn any_over_type_param_type_var() {
+        let allocator = Allocator::new();
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
             bound: None,
             default: None,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new_static("x", TextRange::default()),
         });
         assert!(!any_over_type_param(&type_var_no_bound, &mut |_expr| true));
 
@@ -1990,9 +2051,9 @@ mod tests {
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
-            bound: Some(Box::new(constant.clone())),
+            bound: Some(ArenaBox::new_in(constant.clone(), &allocator)),
             default: None,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new_static("x", TextRange::default()),
         });
         assert!(
             any_over_type_param(&type_var_with_bound, &mut |expr| {
@@ -2008,9 +2069,9 @@ mod tests {
         let type_var_with_default = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
-            default: Some(Box::new(constant.clone())),
+            default: Some(ArenaBox::new_in(constant.clone(), &allocator)),
             bound: None,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new_static("x", TextRange::default()),
         });
         assert!(
             any_over_type_param(&type_var_with_default, &mut |expr| {
@@ -2026,10 +2087,11 @@ mod tests {
 
     #[test]
     fn any_over_type_param_type_var_tuple() {
+        let allocator = Allocator::new();
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new_static("x", TextRange::default()),
             default: None,
         });
         assert!(
@@ -2046,8 +2108,8 @@ mod tests {
         let type_var_tuple_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
-            default: Some(Box::new(constant.clone())),
-            name: Identifier::new("x", TextRange::default()),
+            default: Some(ArenaBox::new_in(constant.clone(), &allocator)),
+            name: Identifier::new_static("x", TextRange::default()),
         });
         assert!(
             any_over_type_param(&type_var_tuple_with_default, &mut |expr| {
@@ -2063,10 +2125,11 @@ mod tests {
 
     #[test]
     fn any_over_type_param_param_spec() {
+        let allocator = Allocator::new();
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new_static("x", TextRange::default()),
             default: None,
         });
         assert!(
@@ -2083,8 +2146,8 @@ mod tests {
         let param_spec_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
-            default: Some(Box::new(constant.clone())),
-            name: Identifier::new("x", TextRange::default()),
+            default: Some(ArenaBox::new_in(constant.clone(), &allocator)),
+            name: Identifier::new_static("x", TextRange::default()),
         });
         assert!(
             any_over_type_param(&param_spec_with_default, &mut |expr| {

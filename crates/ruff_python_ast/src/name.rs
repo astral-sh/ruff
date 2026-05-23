@@ -3,6 +3,9 @@ use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
+use arrayvec::ArrayString;
+use ruff_allocator::{Allocator, Box as ArenaBox};
+
 use crate::Expr;
 use crate::generated::ExprName;
 
@@ -206,6 +209,187 @@ impl PartialEq<Name> for &String {
     }
 }
 
+/// A syntax identifier that never owns heap storage outside the AST allocator.
+///
+/// Short identifiers stay inline. Longer identifiers are stored in the allocator because arena
+/// nodes are not individually dropped and therefore cannot contain heap-owning `CompactString`s.
+#[derive(Clone)]
+pub struct AstName<'ast>(AstNameStorage<'ast>);
+
+#[derive(Clone)]
+enum AstNameStorage<'ast> {
+    Inline(InlineName),
+    Arena(ArenaBox<'ast, str>),
+}
+
+// Keep the common inline representation the same size as the arena reference so `AstName` adds
+// only its enum tag compared to an arena-only name.
+const INLINE_NAME_CAPACITY: usize = std::mem::size_of::<ArenaBox<'static, str>>() - 1;
+
+type InlineName = ArrayString<INLINE_NAME_CAPACITY>;
+
+impl<'ast> AstName<'ast> {
+    #[inline]
+    pub fn new_in(name: impl AsRef<str>, allocator: &'ast Allocator) -> Self {
+        let name = name.as_ref();
+        if let Ok(name) = InlineName::from(name) {
+            Self(AstNameStorage::Inline(name))
+        } else {
+            Self(AstNameStorage::Arena(ArenaBox::from_str_in(
+                name, allocator,
+            )))
+        }
+    }
+
+    #[inline]
+    pub const fn empty() -> AstName<'static> {
+        Self::new_static("")
+    }
+
+    #[inline]
+    pub const fn new_static(name: &'static str) -> AstName<'static> {
+        AstName(AstNameStorage::Arena(ArenaBox::from_ref(name)))
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        match &self.0 {
+            AstNameStorage::Inline(name) => name.as_str(),
+            AstNameStorage::Arena(name) => name,
+        }
+    }
+
+    #[inline]
+    pub fn to_name(&self) -> Name {
+        Name::new(self.as_str())
+    }
+}
+
+impl PartialEq for AstName<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Eq for AstName<'_> {}
+
+impl PartialOrd for AstName<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AstName<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_str().cmp(other.as_str())
+    }
+}
+
+impl Hash for AstName<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
+}
+
+#[cfg(feature = "get-size")]
+impl get_size2::GetSize for AstName<'_> {
+    fn get_heap_size_with_tracker<Tracker: get_size2::GetSizeTracker>(
+        &self,
+        tracker: Tracker,
+    ) -> (usize, Tracker) {
+        match &self.0 {
+            AstNameStorage::Inline(_) => (0, tracker),
+            AstNameStorage::Arena(name) => name.get_heap_size_with_tracker(tracker),
+        }
+    }
+}
+
+impl Debug for AstName<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Name({:?})", self.as_str())
+    }
+}
+
+impl Display for AstName<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl AsRef<str> for AstName<'_> {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for AstName<'_> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl Borrow<str> for AstName<'_> {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl PartialEq<str> for AstName<'_> {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<AstName<'_>> for str {
+    fn eq(&self, other: &AstName<'_>) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<&str> for AstName<'_> {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<String> for AstName<'_> {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<&String> for AstName<'_> {
+    fn eq(&self, other: &&String) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<AstName<'_>> for &str {
+    fn eq(&self, other: &AstName<'_>) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<Name> for AstName<'_> {
+    fn eq(&self, other: &Name) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<AstName<'_>> for Name {
+    fn eq(&self, other: &AstName<'_>) -> bool {
+        other == self
+    }
+}
+
+impl From<AstName<'_>> for Name {
+    fn from(name: AstName<'_>) -> Self {
+        name.to_name()
+    }
+}
+
 /// A representation of a qualified name, like `typing.List`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct QualifiedName<'a>(SegmentsVec<'a>);
@@ -381,7 +565,7 @@ pub struct UnqualifiedName<'a>(SegmentsVec<'a>);
 
 impl<'a> UnqualifiedName<'a> {
     /// Convert an `Expr` to its [`UnqualifiedName`] (like `["typing", "List"]`).
-    pub fn from_expr(expr: &'a Expr) -> Option<Self> {
+    pub fn from_expr(expr: &'a Expr<'_>) -> Option<Self> {
         // Unroll the loop up to eight times, to match the maximum number of expected attributes.
         // In practice, unrolling appears to give about a 4x speed-up on this hot path.
         let attr1 = match expr {
@@ -859,7 +1043,28 @@ impl<'a> SegmentsStack<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::name::SegmentsVec;
+    use ruff_allocator::Allocator;
+
+    use crate::name::{AstName, AstNameStorage, INLINE_NAME_CAPACITY, SegmentsVec};
+
+    #[test]
+    fn ast_name_inlines_short_names() {
+        let allocator = Allocator::new();
+        let name = AstName::new_in("identifier", &allocator);
+
+        assert!(matches!(&name.0, AstNameStorage::Inline(_)));
+        assert_eq!(name, AstName::new_static("identifier"));
+    }
+
+    #[test]
+    fn ast_name_allocates_long_names_in_the_arena() {
+        let allocator = Allocator::new();
+        let text = "x".repeat(INLINE_NAME_CAPACITY + 1);
+        let name = AstName::new_in(&text, &allocator);
+
+        assert!(matches!(&name.0, AstNameStorage::Arena(_)));
+        assert_eq!(name.as_str(), text);
+    }
 
     #[test]
     fn empty_vec() {

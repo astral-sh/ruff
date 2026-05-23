@@ -118,7 +118,11 @@ fn enumerate_items<'a>(
     call_expr: &'a Expr,
     tuple_expr: &'a Expr,
     semantic: &SemanticModel,
-) -> Option<(&'a ast::ExprName, &'a ast::ExprName, &'a ast::ExprName)> {
+) -> Option<(
+    &'a ast::ExprName<'a>,
+    &'a ast::ExprName<'a>,
+    &'a ast::ExprName<'a>,
+)> {
     let ast::ExprCall {
         func, arguments, ..
     } = call_expr.as_call_expr()?;
@@ -175,6 +179,6 @@ fn enumerate_items<'a>(
 }
 
 /// Return a no-op edit for the given name.
-fn noop(name: &ast::ExprName) -> Edit {
+fn noop(name: &ast::ExprName<'_>) -> Edit {
     Edit::range_replacement(name.id.to_string(), name.range())
 }

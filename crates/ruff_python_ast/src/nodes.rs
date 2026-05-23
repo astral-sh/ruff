@@ -9,12 +9,11 @@ use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
-use std::ops::{Deref, DerefMut};
-use std::slice::{Iter, IterMut};
-use std::sync::OnceLock;
+use std::ops::Deref;
+use std::slice::Iter;
 
 use bitflags::bitflags;
-use thin_vec::ThinVec;
+use ruff_allocator::{Allocator, Box as ArenaBox, Slice as ArenaSlice};
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -24,13 +23,13 @@ use crate::str_prefix::{
 use crate::{
     Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern,
     Stmt, TypeParam, int,
-    name::Name,
+    name::{AstName, Name},
     str::{Quote, TripleQuotes},
 };
 
-impl StmtClassDef {
+impl<'ast> StmtClassDef<'ast> {
     /// Return an iterator over the bases of the class.
-    pub fn bases(&self) -> &[Expr] {
+    pub fn bases(&self) -> &[Expr<'ast>] {
         match &self.arguments {
             Some(arguments) => &arguments.args,
             None => &[],
@@ -38,7 +37,7 @@ impl StmtClassDef {
     }
 
     /// Return an iterator over the metaclass keywords of the class.
-    pub fn keywords(&self) -> &[Keyword] {
+    pub fn keywords(&self) -> &[Keyword<'ast>] {
         match &self.arguments {
             Some(arguments) => &arguments.keywords,
             None => &[],
@@ -48,14 +47,14 @@ impl StmtClassDef {
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct ElifElseClause {
+pub struct ElifElseClause<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub test: Option<Expr>,
-    pub body: Suite,
+    pub test: Option<Expr<'ast>>,
+    pub body: ArenaSlice<'ast, Stmt<'ast>>,
 }
 
-impl Expr {
+impl Expr<'_> {
     /// Returns `true` if the expression is a literal expression.
     ///
     /// A literal expression is either a string literal, bytes literal,
@@ -144,24 +143,24 @@ impl ExprRef<'_> {
 /// ```
 ///
 /// [1]: https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct DictItem {
-    pub key: Option<Expr>,
-    pub value: Expr,
+pub struct DictItem<'ast> {
+    pub key: Option<Expr<'ast>>,
+    pub value: Expr<'ast>,
 }
 
-impl DictItem {
-    fn key(&self) -> Option<&Expr> {
+impl<'ast> DictItem<'ast> {
+    fn key(&self) -> Option<&Expr<'ast>> {
         self.key.as_ref()
     }
 
-    fn value(&self) -> &Expr {
+    fn value(&self) -> &Expr<'ast> {
         &self.value
     }
 }
 
-impl Ranged for DictItem {
+impl Ranged for DictItem<'_> {
     fn range(&self) -> TextRange {
         TextRange::new(
             self.key.as_ref().map_or(self.value.start(), Ranged::start),
@@ -170,7 +169,7 @@ impl Ranged for DictItem {
     }
 }
 
-impl ExprDict {
+impl<'ast> ExprDict<'ast> {
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's keys.
     pub fn iter_keys(&self) -> DictKeyIterator<'_> {
@@ -187,7 +186,7 @@ impl ExprDict {
     /// dictionary.
     ///
     /// Panics: If the index `n` is out of bounds.
-    pub fn key(&self, n: usize) -> Option<&Expr> {
+    pub fn key(&self, n: usize) -> Option<&Expr<'ast>> {
         self.items[n].key()
     }
 
@@ -195,11 +194,11 @@ impl ExprDict {
     /// dictionary.
     ///
     /// Panics: If the index `n` is out of bounds.
-    pub fn value(&self, n: usize) -> &Expr {
+    pub fn value(&self, n: usize) -> &Expr<'ast> {
         self.items[n].value()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, DictItem> {
+    pub fn iter(&self) -> std::slice::Iter<'_, DictItem<'ast>> {
         self.items.iter()
     }
 
@@ -212,9 +211,9 @@ impl ExprDict {
     }
 }
 
-impl<'a> IntoIterator for &'a ExprDict {
-    type IntoIter = std::slice::Iter<'a, DictItem>;
-    type Item = &'a DictItem;
+impl<'a, 'ast> IntoIterator for &'a ExprDict<'ast> {
+    type IntoIter = std::slice::Iter<'a, DictItem<'ast>>;
+    type Item = &'a DictItem<'ast>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -223,11 +222,11 @@ impl<'a> IntoIterator for &'a ExprDict {
 
 #[derive(Debug, Clone)]
 pub struct DictKeyIterator<'a> {
-    items: Iter<'a, DictItem>,
+    items: Iter<'a, DictItem<'a>>,
 }
 
 impl<'a> DictKeyIterator<'a> {
-    fn new(items: &'a [DictItem]) -> Self {
+    fn new<'ast: 'a>(items: &'a [DictItem<'ast>]) -> Self {
         Self {
             items: items.iter(),
         }
@@ -239,7 +238,7 @@ impl<'a> DictKeyIterator<'a> {
 }
 
 impl<'a> Iterator for DictKeyIterator<'a> {
-    type Item = Option<&'a Expr>;
+    type Item = Option<&'a Expr<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.items.next().map(DictItem::key)
@@ -265,11 +264,11 @@ impl ExactSizeIterator for DictKeyIterator<'_> {}
 
 #[derive(Debug, Clone)]
 pub struct DictValueIterator<'a> {
-    items: Iter<'a, DictItem>,
+    items: Iter<'a, DictItem<'a>>,
 }
 
 impl<'a> DictValueIterator<'a> {
-    fn new(items: &'a [DictItem]) -> Self {
+    fn new<'ast: 'a>(items: &'a [DictItem<'ast>]) -> Self {
         Self {
             items: items.iter(),
         }
@@ -281,7 +280,7 @@ impl<'a> DictValueIterator<'a> {
 }
 
 impl<'a> Iterator for DictValueIterator<'a> {
-    type Item = &'a Expr;
+    type Item = &'a Expr<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.items.next().map(DictItem::value)
@@ -305,8 +304,8 @@ impl DoubleEndedIterator for DictValueIterator<'_> {
 impl FusedIterator for DictValueIterator<'_> {}
 impl ExactSizeIterator for DictValueIterator<'_> {}
 
-impl ExprSet {
-    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+impl<'ast> ExprSet<'ast> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr<'ast>> {
         self.elts.iter()
     }
 
@@ -319,9 +318,9 @@ impl ExprSet {
     }
 }
 
-impl<'a> IntoIterator for &'a ExprSet {
-    type IntoIter = std::slice::Iter<'a, Expr>;
-    type Item = &'a Expr;
+impl<'a, 'ast> IntoIterator for &'a ExprSet<'ast> {
+    type IntoIter = std::slice::Iter<'a, Expr<'ast>>;
+    type Item = &'a Expr<'ast>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -330,40 +329,40 @@ impl<'a> IntoIterator for &'a ExprSet {
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct InterpolatedStringFormatSpec {
+pub struct InterpolatedStringFormatSpec<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub elements: InterpolatedStringElements,
+    pub elements: InterpolatedStringElements<'ast>,
 }
 
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct InterpolatedElement {
+pub struct InterpolatedElement<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub expression: Box<Expr>,
-    pub debug_text: Option<DebugText>,
+    pub expression: ArenaBox<'ast, Expr<'ast>>,
+    pub debug_text: Option<DebugText<'ast>>,
     pub conversion: ConversionFlag,
-    pub format_spec: Option<Box<InterpolatedStringFormatSpec>>,
+    pub format_spec: Option<ArenaBox<'ast, InterpolatedStringFormatSpec<'ast>>>,
 }
 
 /// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct InterpolatedStringLiteralElement {
+pub struct InterpolatedStringLiteralElement<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: Box<str>,
+    pub value: ArenaBox<'ast, str>,
 }
 
-impl InterpolatedStringLiteralElement {
+impl InterpolatedStringLiteralElement<'_> {
     pub fn is_valid(&self) -> bool {
         !self.value.is_empty()
     }
 }
 
-impl Deref for InterpolatedStringLiteralElement {
+impl Deref for InterpolatedStringLiteralElement<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -402,23 +401,21 @@ impl ConversionFlag {
 /// The debug text of a self-documenting f-string expression (e.g., `f"{x=}"`).
 ///
 /// Stores the concatenation of leading text, expression source, and trailing text as a single
-/// [`CompactString`], with byte offsets to split them. The offsets are needed because the leading
+/// arena-backed string, with byte offsets to split them. The offsets are needed because the leading
 /// and trailing portions can contain non-whitespace characters (grouping parentheses, comments in
 /// triple-quoted f-strings) that cannot be distinguished from expression content by scanning.
-///
-/// [`CompactString`]: compact_str::CompactString
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct DebugText {
+pub struct DebugText<'ast> {
     /// The full text between the `{` and the conversion / `format_spec` / `}`.
-    text: compact_str::CompactString,
+    text: ArenaBox<'ast, str>,
     /// Byte offset where the expression source begins.
     expression_start: u32,
     /// Byte offset where the expression source ends.
     expression_end: u32,
 }
 
-impl std::fmt::Debug for DebugText {
+impl std::fmt::Debug for DebugText<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DebugText")
             .field("leading", &self.leading())
@@ -428,18 +425,21 @@ impl std::fmt::Debug for DebugText {
     }
 }
 
-impl DebugText {
-    pub fn new(leading: &str, expression: &str, trailing: &str) -> Self {
+impl<'ast> DebugText<'ast> {
+    pub fn new_in(
+        leading: &str,
+        expression: &str,
+        trailing: &str,
+        allocator: &'ast Allocator,
+    ) -> Self {
         let expression_start = leading.text_len().to_u32();
         let expression_end = expression_start + expression.text_len().to_u32();
-        let mut buf = compact_str::CompactString::with_capacity(
-            leading.len() + expression.len() + trailing.len(),
-        );
+        let mut buf = String::with_capacity(leading.len() + expression.len() + trailing.len());
         buf.push_str(leading);
         buf.push_str(expression);
         buf.push_str(trailing);
         Self {
-            text: buf,
+            text: ArenaBox::from_str_in(&buf, allocator),
             expression_start,
             expression_end,
         }
@@ -466,10 +466,10 @@ impl DebugText {
     }
 }
 
-impl ExprFString {
+impl<'ast> ExprFString<'ast> {
     /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
     /// otherwise.
-    pub const fn as_single_part_fstring(&self) -> Option<&FString> {
+    pub const fn as_single_part_fstring(&self) -> Option<&FString<'ast>> {
         match &self.value.inner {
             FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),
             _ => None,
@@ -480,13 +480,13 @@ impl ExprFString {
 /// The value representing an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct FStringValue {
-    inner: FStringValueInner,
+pub struct FStringValue<'ast> {
+    inner: FStringValueInner<'ast>,
 }
 
-impl FStringValue {
+impl<'ast> FStringValue<'ast> {
     /// Creates a new f-string literal with a single [`FString`] part.
-    pub fn single(value: FString) -> Self {
+    pub fn single(value: FString<'ast>) -> Self {
         Self {
             inner: FStringValueInner::Single(FStringPart::FString(value)),
         }
@@ -499,13 +499,14 @@ impl FStringValue {
     ///
     /// Panics if `values` has less than 2 elements.
     /// Use [`FStringValue::single`] instead.
-    pub fn concatenated(values: Vec<FStringPart>) -> Self {
+    /// Creates an implicitly concatenated f-string backed by the AST arena.
+    pub fn concatenated_in(values: Vec<FStringPart<'ast>>, allocator: &'ast Allocator) -> Self {
         assert!(
             values.len() > 1,
             "Use `FStringValue::single` to create single-part f-strings"
         );
         Self {
-            inner: FStringValueInner::Concatenated(values),
+            inner: FStringValueInner::Concatenated(ArenaSlice::from_vec_in(values, allocator)),
         }
     }
 
@@ -515,30 +516,33 @@ impl FStringValue {
     }
 
     /// Returns a slice of all the [`FStringPart`]s contained in this value.
-    pub fn as_slice(&self) -> &[FStringPart] {
+    pub fn as_slice(&self) -> &[FStringPart<'ast>] {
         match &self.inner {
             FStringValueInner::Single(part) => std::slice::from_ref(part),
             FStringValueInner::Concatenated(parts) => parts,
         }
     }
 
-    /// Returns a mutable slice of all the [`FStringPart`]s contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [FStringPart] {
+    pub(crate) fn transform_in(
+        &mut self,
+        allocator: &'ast Allocator,
+        mut transform: impl FnMut(&mut FStringPart<'ast>),
+    ) {
         match &mut self.inner {
-            FStringValueInner::Single(part) => std::slice::from_mut(part),
-            FStringValueInner::Concatenated(parts) => parts,
+            FStringValueInner::Single(part) => transform(part),
+            FStringValueInner::Concatenated(parts) => {
+                parts.transform_in(allocator, |parts| {
+                    for part in parts {
+                        transform(part);
+                    }
+                });
+            }
         }
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value.
-    pub fn iter(&self) -> Iter<'_, FStringPart> {
+    pub fn iter(&self) -> Iter<'_, FStringPart<'ast>> {
         self.as_slice().iter()
-    }
-
-    /// Returns an iterator over all the [`FStringPart`]s contained in this value
-    /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, FStringPart> {
-        self.as_mut_slice().iter_mut()
     }
 
     /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
@@ -550,7 +554,7 @@ impl FStringValue {
     /// ```
     ///
     /// Here, the string literal parts returned would be `"foo"` and `"baz"`.
-    pub fn literals(&self) -> impl Iterator<Item = &StringLiteral> {
+    pub fn literals(&self) -> impl Iterator<Item = &StringLiteral<'ast>> {
         self.iter().filter_map(|part| part.as_literal())
     }
 
@@ -563,7 +567,7 @@ impl FStringValue {
     /// ```
     ///
     /// Here, the f-string parts returned would be `f"bar {x}"` and `f"qux"`.
-    pub fn f_strings(&self) -> impl Iterator<Item = &FString> {
+    pub fn f_strings(&self) -> impl Iterator<Item = &FString<'ast>> {
         self.iter().filter_map(|part| part.as_f_string())
     }
 
@@ -578,7 +582,7 @@ impl FStringValue {
     ///
     /// The f-string elements returned would be string literal (`"bar "`),
     /// expression (`x`) and string literal (`"qux"`).
-    pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
+    pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement<'ast>> {
         self.f_strings().flat_map(|fstring| fstring.elements.iter())
     }
 
@@ -597,46 +601,38 @@ impl FStringValue {
     }
 }
 
-impl<'a> IntoIterator for &'a FStringValue {
-    type Item = &'a FStringPart;
-    type IntoIter = Iter<'a, FStringPart>;
+impl<'a, 'ast> IntoIterator for &'a FStringValue<'ast> {
+    type Item = &'a FStringPart<'ast>;
+    type IntoIter = Iter<'a, FStringPart<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut FStringValue {
-    type Item = &'a mut FStringPart;
-    type IntoIter = IterMut<'a, FStringPart>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
-    }
-}
-
 /// An internal representation of [`FStringValue`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-enum FStringValueInner {
+enum FStringValueInner<'ast> {
     /// A single f-string i.e., `f"foo"`.
     ///
     /// This is always going to be `FStringPart::FString` variant which is
     /// maintained by the `FStringValue::single` constructor.
-    Single(FStringPart),
+    Single(FStringPart<'ast>),
 
     /// An implicitly concatenated f-string i.e., `"foo" f"bar {x}"`.
-    Concatenated(Vec<FStringPart>),
+    Concatenated(ArenaSlice<'ast, FStringPart<'ast>>),
 }
 
 /// An f-string part which is either a string literal or an f-string.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum FStringPart {
-    Literal(StringLiteral),
-    FString(FString),
+pub enum FStringPart<'ast> {
+    Literal(StringLiteral<'ast>),
+    FString(FString<'ast>),
 }
 
-impl FStringPart {
+impl FStringPart<'_> {
     pub fn quote_style(&self) -> Quote {
         match self {
             Self::Literal(string_literal) => string_literal.flags.quote_style(),
@@ -652,7 +648,7 @@ impl FStringPart {
     }
 }
 
-impl Ranged for FStringPart {
+impl Ranged for FStringPart<'_> {
     fn range(&self) -> TextRange {
         match self {
             FStringPart::Literal(string_literal) => string_literal.range(),
@@ -661,10 +657,10 @@ impl Ranged for FStringPart {
     }
 }
 
-impl ExprTString {
+impl<'ast> ExprTString<'ast> {
     /// Returns the single [`TString`] if the t-string isn't implicitly concatenated, [`None`]
     /// otherwise.
-    pub const fn as_single_part_tstring(&self) -> Option<&TString> {
+    pub const fn as_single_part_tstring(&self) -> Option<&TString<'ast>> {
         match &self.value.inner {
             TStringValueInner::Single(tstring) => Some(tstring),
             TStringValueInner::Concatenated(_) => None,
@@ -675,13 +671,13 @@ impl ExprTString {
 /// The value representing an [`ExprTString`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TStringValue {
-    inner: TStringValueInner,
+pub struct TStringValue<'ast> {
+    inner: TStringValueInner<'ast>,
 }
 
-impl TStringValue {
+impl<'ast> TStringValue<'ast> {
     /// Creates a new t-string literal with a single [`TString`] part.
-    pub fn single(value: TString) -> Self {
+    pub fn single(value: TString<'ast>) -> Self {
         Self {
             inner: TStringValueInner::Single(value),
         }
@@ -694,13 +690,14 @@ impl TStringValue {
     ///
     /// Panics if `values` has less than 2 elements.
     /// Use [`TStringValue::single`] instead.
-    pub fn concatenated(values: Vec<TString>) -> Self {
+    /// Creates an implicitly concatenated t-string backed by the AST arena.
+    pub fn concatenated_in(values: Vec<TString<'ast>>, allocator: &'ast Allocator) -> Self {
         assert!(
             values.len() > 1,
             "Use `TStringValue::single` to create single-part t-strings"
         );
         Self {
-            inner: TStringValueInner::Concatenated(values),
+            inner: TStringValueInner::Concatenated(ArenaSlice::from_vec_in(values, allocator)),
         }
     }
 
@@ -710,30 +707,33 @@ impl TStringValue {
     }
 
     /// Returns a slice of all the [`TString`]s contained in this value.
-    pub fn as_slice(&self) -> &[TString] {
+    pub fn as_slice(&self) -> &[TString<'ast>] {
         match &self.inner {
             TStringValueInner::Single(part) => std::slice::from_ref(part),
             TStringValueInner::Concatenated(parts) => parts,
         }
     }
 
-    /// Returns a mutable slice of all the [`TString`]s contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [TString] {
+    pub(crate) fn transform_in(
+        &mut self,
+        allocator: &'ast Allocator,
+        mut transform: impl FnMut(&mut TString<'ast>),
+    ) {
         match &mut self.inner {
-            TStringValueInner::Single(part) => std::slice::from_mut(part),
-            TStringValueInner::Concatenated(parts) => parts,
+            TStringValueInner::Single(part) => transform(part),
+            TStringValueInner::Concatenated(parts) => {
+                parts.transform_in(allocator, |parts| {
+                    for part in parts {
+                        transform(part);
+                    }
+                });
+            }
         }
     }
 
     /// Returns an iterator over all the [`TString`]s contained in this value.
-    pub fn iter(&self) -> Iter<'_, TString> {
+    pub fn iter(&self) -> Iter<'_, TString<'ast>> {
         self.as_slice().iter()
-    }
-
-    /// Returns an iterator over all the [`TString`]s contained in this value
-    /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, TString> {
-        self.as_mut_slice().iter_mut()
     }
 
     /// Returns an iterator over all the [`InterpolatedStringElement`] contained in this value.
@@ -747,7 +747,7 @@ impl TStringValue {
     ///
     /// The interpolated string elements returned would be string literal (`"bar "`),
     /// interpolation (`x`) and string literal (`"qux"`).
-    pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
+    pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement<'ast>> {
         self.iter().flat_map(|tstring| tstring.elements.iter())
     }
 
@@ -768,32 +768,24 @@ impl TStringValue {
     }
 }
 
-impl<'a> IntoIterator for &'a TStringValue {
-    type Item = &'a TString;
-    type IntoIter = Iter<'a, TString>;
+impl<'a, 'ast> IntoIterator for &'a TStringValue<'ast> {
+    type Item = &'a TString<'ast>;
+    type IntoIter = Iter<'a, TString<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut TStringValue {
-    type Item = &'a mut TString;
-    type IntoIter = IterMut<'a, TString>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
-    }
-}
-
 /// An internal representation of [`TStringValue`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-enum TStringValueInner {
+enum TStringValueInner<'ast> {
     /// A single t-string i.e., `t"foo"`.
-    Single(TString),
+    Single(TString<'ast>),
 
     /// An implicitly concatenated t-string i.e., `t"foo" t"bar {x}"`.
-    Concatenated(Vec<TString>),
+    Concatenated(ArenaSlice<'ast, TString<'ast>>),
 }
 
 pub trait StringFlags: Copy {
@@ -1207,15 +1199,15 @@ impl fmt::Debug for TStringFlags {
 /// An AST node that represents a single f-string which is part of an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct FString {
+pub struct FString<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub elements: InterpolatedStringElements,
+    pub elements: InterpolatedStringElements<'ast>,
     pub flags: FStringFlags,
 }
 
-impl From<FString> for Expr {
-    fn from(payload: FString) -> Self {
+impl<'ast> From<FString<'ast>> for Expr<'ast> {
+    fn from(payload: FString<'ast>) -> Self {
         ExprFString {
             node_index: payload.node_index.clone(),
             range: payload.range,
@@ -1226,61 +1218,60 @@ impl From<FString> for Expr {
 }
 
 /// A newtype wrapper around a list of [`InterpolatedStringElement`].
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct InterpolatedStringElements(Vec<InterpolatedStringElement>);
+pub struct InterpolatedStringElements<'ast>(ArenaSlice<'ast, InterpolatedStringElement<'ast>>);
 
-impl InterpolatedStringElements {
+impl<'ast> InterpolatedStringElements<'ast> {
+    /// Freezes parsed elements into the AST arena after temporary vector construction.
+    pub fn from_vec_in(
+        elements: Vec<InterpolatedStringElement<'ast>>,
+        allocator: &'ast Allocator,
+    ) -> Self {
+        Self(ArenaSlice::from_vec_in(elements, allocator))
+    }
+
+    pub(crate) fn transform_in(
+        &mut self,
+        allocator: &'ast Allocator,
+        mut transform: impl FnMut(&mut InterpolatedStringElement<'ast>),
+    ) {
+        self.0.transform_in(allocator, |elements| {
+            for element in elements {
+                transform(element);
+            }
+        });
+    }
+
     /// Returns an iterator over all the [`InterpolatedStringLiteralElement`] nodes contained in this f-string.
-    pub fn literals(&self) -> impl Iterator<Item = &InterpolatedStringLiteralElement> {
+    pub fn literals(&self) -> impl Iterator<Item = &InterpolatedStringLiteralElement<'_>> {
         self.iter().filter_map(|element| element.as_literal())
     }
 
     /// Returns an iterator over all the [`InterpolatedElement`] nodes contained in this f-string.
-    pub fn interpolations(&self) -> impl Iterator<Item = &InterpolatedElement> {
+    pub fn interpolations(&self) -> impl Iterator<Item = &InterpolatedElement<'ast>> {
         self.iter().filter_map(|element| element.as_interpolation())
     }
 }
 
-impl From<Vec<InterpolatedStringElement>> for InterpolatedStringElements {
-    fn from(elements: Vec<InterpolatedStringElement>) -> Self {
-        InterpolatedStringElements(elements)
-    }
-}
-
-impl<'a> IntoIterator for &'a InterpolatedStringElements {
-    type IntoIter = Iter<'a, InterpolatedStringElement>;
-    type Item = &'a InterpolatedStringElement;
+impl<'a, 'ast> IntoIterator for &'a InterpolatedStringElements<'ast> {
+    type IntoIter = Iter<'a, InterpolatedStringElement<'ast>>;
+    type Item = &'a InterpolatedStringElement<'ast>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut InterpolatedStringElements {
-    type IntoIter = IterMut<'a, InterpolatedStringElement>;
-    type Item = &'a mut InterpolatedStringElement;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
-    }
-}
-
-impl Deref for InterpolatedStringElements {
-    type Target = [InterpolatedStringElement];
+impl<'ast> Deref for InterpolatedStringElements<'ast> {
+    type Target = [InterpolatedStringElement<'ast>];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0.as_slice()
     }
 }
 
-impl DerefMut for InterpolatedStringElements {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl fmt::Debug for InterpolatedStringElements {
+impl fmt::Debug for InterpolatedStringElements<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
@@ -1289,14 +1280,14 @@ impl fmt::Debug for InterpolatedStringElements {
 /// An AST node that represents a single t-string which is part of an [`ExprTString`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TString {
+pub struct TString<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub elements: InterpolatedStringElements,
+    pub elements: InterpolatedStringElements<'ast>,
     pub flags: TStringFlags,
 }
 
-impl TString {
+impl TString<'_> {
     pub fn quote_style(&self) -> Quote {
         self.flags.quote_style()
     }
@@ -1306,8 +1297,8 @@ impl TString {
     }
 }
 
-impl From<TString> for Expr {
-    fn from(payload: TString) -> Self {
+impl<'ast> From<TString<'ast>> for Expr<'ast> {
+    fn from(payload: TString<'ast>) -> Self {
         ExprTString {
             node_index: payload.node_index.clone(),
             range: payload.range,
@@ -1317,10 +1308,10 @@ impl From<TString> for Expr {
     }
 }
 
-impl ExprStringLiteral {
+impl ExprStringLiteral<'_> {
     /// Return `Some(literal)` if the string only consists of a single `StringLiteral` part
     /// (indicating that it is not implicitly concatenated). Otherwise, return `None`.
-    pub fn as_single_part_string(&self) -> Option<&StringLiteral> {
+    pub fn as_single_part_string(&self) -> Option<&StringLiteral<'_>> {
         match &self.value.inner {
             StringLiteralValueInner::Single(value) => Some(value),
             StringLiteralValueInner::Concatenated(_) => None,
@@ -1331,13 +1322,13 @@ impl ExprStringLiteral {
 /// The value representing a [`ExprStringLiteral`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct StringLiteralValue {
-    inner: StringLiteralValueInner,
+pub struct StringLiteralValue<'ast> {
+    inner: StringLiteralValueInner<'ast>,
 }
 
-impl StringLiteralValue {
+impl<'ast> StringLiteralValue<'ast> {
     /// Creates a new string literal with a single [`StringLiteral`] part.
-    pub fn single(string: StringLiteral) -> Self {
+    pub fn single(string: StringLiteral<'ast>) -> Self {
         Self {
             inner: StringLiteralValueInner::Single(string),
         }
@@ -1362,15 +1353,19 @@ impl StringLiteralValue {
     ///
     /// Panics if `strings` has less than 2 elements.
     /// Use [`StringLiteralValue::single`] instead.
-    pub fn concatenated(strings: Vec<StringLiteral>) -> Self {
+    pub fn concatenated_in(strings: Vec<StringLiteral<'ast>>, allocator: &'ast Allocator) -> Self {
         assert!(
             strings.len() > 1,
             "Use `StringLiteralValue::single` to create single-part strings"
         );
+        let value = strings
+            .iter()
+            .map(StringLiteral::as_str)
+            .collect::<String>();
         Self {
             inner: StringLiteralValueInner::Concatenated(ConcatenatedStringLiteral {
-                strings,
-                value: OnceLock::new(),
+                strings: ArenaSlice::from_vec_in(strings, allocator),
+                value: ArenaBox::from_str_in(&value, allocator),
             }),
         }
     }
@@ -1395,30 +1390,33 @@ impl StringLiteralValue {
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
-    pub fn as_slice(&self) -> &[StringLiteral] {
+    pub fn as_slice(&self) -> &[StringLiteral<'ast>] {
         match &self.inner {
             StringLiteralValueInner::Single(value) => std::slice::from_ref(value),
             StringLiteralValueInner::Concatenated(value) => value.strings.as_slice(),
         }
     }
 
-    /// Returns a mutable slice of all the [`StringLiteral`] parts contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [StringLiteral] {
+    pub(crate) fn transform_in(
+        &mut self,
+        allocator: &'ast Allocator,
+        mut transform: impl FnMut(&mut StringLiteral<'ast>),
+    ) {
         match &mut self.inner {
-            StringLiteralValueInner::Single(value) => std::slice::from_mut(value),
-            StringLiteralValueInner::Concatenated(value) => value.strings.as_mut_slice(),
+            StringLiteralValueInner::Single(value) => transform(value),
+            StringLiteralValueInner::Concatenated(value) => {
+                let mut strings = value.strings.as_slice().to_vec();
+                for string in &mut strings {
+                    transform(string);
+                }
+                *self = Self::concatenated_in(strings, allocator);
+            }
         }
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
-    pub fn iter(&self) -> Iter<'_, StringLiteral> {
+    pub fn iter(&self) -> Iter<'_, StringLiteral<'ast>> {
         self.as_slice().iter()
-    }
-
-    /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
-    /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, StringLiteral> {
-        self.as_mut_slice().iter_mut()
     }
 
     /// Returns `true` if the node represents an empty string.
@@ -1443,8 +1441,7 @@ impl StringLiteralValue {
 
     /// Returns the concatenated string value as a [`str`].
     ///
-    /// Note that this will perform an allocation on the first invocation if the
-    /// string value is implicitly concatenated.
+    /// Implicitly concatenated string values are materialized when constructed.
     pub fn to_str(&self) -> &str {
         match &self.inner {
             StringLiteralValueInner::Single(value) => value.as_str(),
@@ -1453,24 +1450,16 @@ impl StringLiteralValue {
     }
 }
 
-impl<'a> IntoIterator for &'a StringLiteralValue {
-    type Item = &'a StringLiteral;
-    type IntoIter = Iter<'a, StringLiteral>;
+impl<'a, 'ast> IntoIterator for &'a StringLiteralValue<'ast> {
+    type Item = &'a StringLiteral<'ast>;
+    type IntoIter = Iter<'a, StringLiteral<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut StringLiteralValue {
-    type Item = &'a mut StringLiteral;
-    type IntoIter = IterMut<'a, StringLiteral>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
-    }
-}
-
-impl PartialEq<str> for StringLiteralValue {
+impl PartialEq<str> for StringLiteralValue<'_> {
     fn eq(&self, other: &str) -> bool {
         if self.len() != other.len() {
             return false;
@@ -1480,7 +1469,7 @@ impl PartialEq<str> for StringLiteralValue {
     }
 }
 
-impl fmt::Display for StringLiteralValue {
+impl fmt::Display for StringLiteralValue<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.to_str())
     }
@@ -1489,12 +1478,12 @@ impl fmt::Display for StringLiteralValue {
 /// An internal representation of [`StringLiteralValue`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-enum StringLiteralValueInner {
+enum StringLiteralValueInner<'ast> {
     /// A single string literal i.e., `"foo"`.
-    Single(StringLiteral),
+    Single(StringLiteral<'ast>),
 
     /// An implicitly concatenated string literals i.e., `"foo" "bar"`.
-    Concatenated(ConcatenatedStringLiteral),
+    Concatenated(ConcatenatedStringLiteral<'ast>),
 }
 
 bitflags! {
@@ -1692,14 +1681,14 @@ impl fmt::Debug for StringLiteralFlags {
 /// [`ExprStringLiteral`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct StringLiteral {
+pub struct StringLiteral<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: Box<str>,
+    pub value: ArenaBox<'ast, str>,
     pub flags: StringLiteralFlags,
 }
 
-impl Deref for StringLiteral {
+impl Deref for StringLiteral<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -1707,7 +1696,7 @@ impl Deref for StringLiteral {
     }
 }
 
-impl StringLiteral {
+impl StringLiteral<'_> {
     /// Extracts a string slice containing the entire `String`.
     pub fn as_str(&self) -> &str {
         self
@@ -1717,7 +1706,7 @@ impl StringLiteral {
     pub fn invalid(range: TextRange) -> Self {
         Self {
             range,
-            value: "".into(),
+            value: ArenaBox::from_ref(""),
             node_index: AtomicNodeIndex::NONE,
             flags: StringLiteralFlags::empty().with_invalid(),
         }
@@ -1734,8 +1723,8 @@ impl StringLiteral {
     }
 }
 
-impl From<StringLiteral> for Expr {
-    fn from(payload: StringLiteral) -> Self {
+impl<'ast> From<StringLiteral<'ast>> for Expr<'ast> {
+    fn from(payload: StringLiteral<'ast>) -> Self {
         ExprStringLiteral {
             range: payload.range,
             node_index: AtomicNodeIndex::NONE,
@@ -1749,24 +1738,21 @@ impl From<StringLiteral> for Expr {
 /// implicitly concatenated string.
 #[derive(Clone)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-struct ConcatenatedStringLiteral {
+struct ConcatenatedStringLiteral<'ast> {
     /// The individual [`StringLiteral`] parts that make up the concatenated string.
-    strings: Vec<StringLiteral>,
+    strings: ArenaSlice<'ast, StringLiteral<'ast>>,
     /// The concatenated string value.
-    value: OnceLock<Box<str>>,
+    value: ArenaBox<'ast, str>,
 }
 
-impl ConcatenatedStringLiteral {
+impl ConcatenatedStringLiteral<'_> {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
-        self.value.get_or_init(|| {
-            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
-            concatenated.into_boxed_str()
-        })
+        &self.value
     }
 }
 
-impl PartialEq for ConcatenatedStringLiteral {
+impl PartialEq for ConcatenatedStringLiteral<'_> {
     fn eq(&self, other: &Self) -> bool {
         if self.strings.len() != other.strings.len() {
             return false;
@@ -1779,7 +1765,7 @@ impl PartialEq for ConcatenatedStringLiteral {
     }
 }
 
-impl Debug for ConcatenatedStringLiteral {
+impl Debug for ConcatenatedStringLiteral<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ConcatenatedStringLiteral")
             .field("strings", &self.strings)
@@ -1788,10 +1774,10 @@ impl Debug for ConcatenatedStringLiteral {
     }
 }
 
-impl ExprBytesLiteral {
+impl ExprBytesLiteral<'_> {
     /// Return `Some(literal)` if the bytestring only consists of a single `BytesLiteral` part
     /// (indicating that it is not implicitly concatenated). Otherwise, return `None`.
-    pub const fn as_single_part_bytestring(&self) -> Option<&BytesLiteral> {
+    pub const fn as_single_part_bytestring(&self) -> Option<&BytesLiteral<'_>> {
         match &self.value.inner {
             BytesLiteralValueInner::Single(value) => Some(value),
             BytesLiteralValueInner::Concatenated(_) => None,
@@ -1802,13 +1788,13 @@ impl ExprBytesLiteral {
 /// The value representing a [`ExprBytesLiteral`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct BytesLiteralValue {
-    inner: BytesLiteralValueInner,
+pub struct BytesLiteralValue<'ast> {
+    inner: BytesLiteralValueInner<'ast>,
 }
 
-impl BytesLiteralValue {
+impl<'ast> BytesLiteralValue<'ast> {
     /// Create a new bytestring literal with a single [`BytesLiteral`] part.
-    pub fn single(value: BytesLiteral) -> Self {
+    pub fn single(value: BytesLiteral<'ast>) -> Self {
         Self {
             inner: BytesLiteralValueInner::Single(value),
         }
@@ -1821,13 +1807,14 @@ impl BytesLiteralValue {
     ///
     /// Panics if `values` has less than 2 elements.
     /// Use [`BytesLiteralValue::single`] instead.
-    pub fn concatenated(values: Vec<BytesLiteral>) -> Self {
+    /// Creates an implicitly concatenated bytestring backed by the AST arena.
+    pub fn concatenated_in(values: Vec<BytesLiteral<'ast>>, allocator: &'ast Allocator) -> Self {
         assert!(
             values.len() > 1,
             "Use `BytesLiteralValue::single` to create single-part bytestrings"
         );
         Self {
-            inner: BytesLiteralValueInner::Concatenated(values),
+            inner: BytesLiteralValueInner::Concatenated(ArenaSlice::from_vec_in(values, allocator)),
         }
     }
 
@@ -1837,30 +1824,33 @@ impl BytesLiteralValue {
     }
 
     /// Returns a slice of all the [`BytesLiteral`] parts contained in this value.
-    pub fn as_slice(&self) -> &[BytesLiteral] {
+    pub fn as_slice(&self) -> &[BytesLiteral<'ast>] {
         match &self.inner {
             BytesLiteralValueInner::Single(value) => std::slice::from_ref(value),
-            BytesLiteralValueInner::Concatenated(value) => value.as_slice(),
+            BytesLiteralValueInner::Concatenated(value) => value,
         }
     }
 
-    /// Returns a mutable slice of all the [`BytesLiteral`] parts contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [BytesLiteral] {
+    pub(crate) fn transform_in(
+        &mut self,
+        allocator: &'ast Allocator,
+        mut transform: impl FnMut(&mut BytesLiteral<'ast>),
+    ) {
         match &mut self.inner {
-            BytesLiteralValueInner::Single(value) => std::slice::from_mut(value),
-            BytesLiteralValueInner::Concatenated(value) => value.as_mut_slice(),
+            BytesLiteralValueInner::Single(value) => transform(value),
+            BytesLiteralValueInner::Concatenated(value) => {
+                value.transform_in(allocator, |values| {
+                    for value in values {
+                        transform(value);
+                    }
+                });
+            }
         }
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
-    pub fn iter(&self) -> Iter<'_, BytesLiteral> {
+    pub fn iter(&self) -> Iter<'_, BytesLiteral<'ast>> {
         self.as_slice().iter()
-    }
-
-    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
-    /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, BytesLiteral> {
-        self.as_mut_slice().iter_mut()
     }
 
     /// Return `true` if the node represents an empty bytestring.
@@ -1883,24 +1873,16 @@ impl BytesLiteralValue {
     }
 }
 
-impl<'a> IntoIterator for &'a BytesLiteralValue {
-    type Item = &'a BytesLiteral;
-    type IntoIter = Iter<'a, BytesLiteral>;
+impl<'a, 'ast> IntoIterator for &'a BytesLiteralValue<'ast> {
+    type Item = &'a BytesLiteral<'ast>;
+    type IntoIter = Iter<'a, BytesLiteral<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut BytesLiteralValue {
-    type Item = &'a mut BytesLiteral;
-    type IntoIter = IterMut<'a, BytesLiteral>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
-    }
-}
-
-impl PartialEq<[u8]> for BytesLiteralValue {
+impl PartialEq<[u8]> for BytesLiteralValue<'_> {
     fn eq(&self, other: &[u8]) -> bool {
         if self.len() != other.len() {
             return false;
@@ -1912,8 +1894,8 @@ impl PartialEq<[u8]> for BytesLiteralValue {
     }
 }
 
-impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
-    fn from(value: &'a BytesLiteralValue) -> Self {
+impl<'a> From<&'a BytesLiteralValue<'_>> for Cow<'a, [u8]> {
+    fn from(value: &'a BytesLiteralValue<'_>) -> Self {
         match &value.inner {
             BytesLiteralValueInner::Single(BytesLiteral {
                 value: bytes_value, ..
@@ -1931,12 +1913,12 @@ impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
 /// An internal representation of [`BytesLiteralValue`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-enum BytesLiteralValueInner {
+enum BytesLiteralValueInner<'ast> {
     /// A single-part bytestring literal i.e., `b"foo"`.
-    Single(BytesLiteral),
+    Single(BytesLiteral<'ast>),
 
     /// An implicitly concatenated bytestring literal i.e., `b"foo" b"bar"`.
-    Concatenated(Vec<BytesLiteral>),
+    Concatenated(ArenaSlice<'ast, BytesLiteral<'ast>>),
 }
 
 bitflags! {
@@ -2105,14 +2087,14 @@ impl fmt::Debug for BytesLiteralFlags {
 /// [`ExprBytesLiteral`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct BytesLiteral {
+pub struct BytesLiteral<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: Box<[u8]>,
+    pub value: ArenaBox<'ast, [u8]>,
     pub flags: BytesLiteralFlags,
 }
 
-impl Deref for BytesLiteral {
+impl Deref for BytesLiteral<'_> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -2120,7 +2102,7 @@ impl Deref for BytesLiteral {
     }
 }
 
-impl BytesLiteral {
+impl BytesLiteral<'_> {
     /// Extracts a byte slice containing the entire [`BytesLiteral`].
     pub fn as_slice(&self) -> &[u8] {
         self
@@ -2130,15 +2112,15 @@ impl BytesLiteral {
     pub fn invalid(range: TextRange) -> Self {
         Self {
             range,
-            value: Box::new([]),
+            value: ArenaBox::from_ref(&[]),
             node_index: AtomicNodeIndex::NONE,
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
 }
 
-impl From<BytesLiteral> for Expr {
-    fn from(payload: BytesLiteral) -> Self {
+impl<'ast> From<BytesLiteral<'ast>> for Expr<'ast> {
+    fn from(payload: BytesLiteral<'ast>) -> Self {
         ExprBytesLiteral {
             range: payload.range,
             node_index: AtomicNodeIndex::NONE,
@@ -2480,14 +2462,14 @@ impl From<TStringFlags> for AnyStringFlags {
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum Number {
-    Int(int::Int),
+pub enum Number<'ast> {
+    Int(int::Int<'ast>),
     Float(f64),
     Complex { real: f64, imag: f64 },
 }
 
-impl ExprName {
-    pub fn id(&self) -> &Name {
+impl ExprName<'_> {
+    pub fn id(&self) -> &AstName<'_> {
         &self.id
     }
 
@@ -2499,8 +2481,8 @@ impl ExprName {
     }
 }
 
-impl ExprList {
-    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+impl<'ast> ExprList<'ast> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr<'ast>> {
         self.elts.iter()
     }
 
@@ -2513,17 +2495,17 @@ impl ExprList {
     }
 }
 
-impl<'a> IntoIterator for &'a ExprList {
-    type IntoIter = std::slice::Iter<'a, Expr>;
-    type Item = &'a Expr;
+impl<'a, 'ast> IntoIterator for &'a ExprList<'ast> {
+    type IntoIter = std::slice::Iter<'a, Expr<'ast>>;
+    type Item = &'a Expr<'ast>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl ExprTuple {
-    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+impl<'ast> ExprTuple<'ast> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr<'ast>> {
         self.elts.iter()
     }
 
@@ -2536,9 +2518,9 @@ impl ExprTuple {
     }
 }
 
-impl<'a> IntoIterator for &'a ExprTuple {
-    type IntoIter = std::slice::Iter<'a, Expr>;
-    type Item = &'a Expr;
+impl<'a, 'ast> IntoIterator for &'a ExprTuple<'ast> {
+    type IntoIter = std::slice::Iter<'a, Expr<'ast>>;
+    type Item = &'a Expr<'ast>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -2765,42 +2747,42 @@ impl fmt::Display for CmpOp {
 /// See also [comprehension](https://docs.python.org/3/library/ast.html#ast.comprehension)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct Comprehension {
+pub struct Comprehension<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub target: Expr,
-    pub iter: Expr,
-    pub ifs: Vec<Expr>,
+    pub target: Expr<'ast>,
+    pub iter: Expr<'ast>,
+    pub ifs: ArenaSlice<'ast, Expr<'ast>>,
     pub is_async: bool,
 }
 
 /// See also [ExceptHandler](https://docs.python.org/3/library/ast.html#ast.ExceptHandler)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct ExceptHandlerExceptHandler {
+pub struct ExceptHandlerExceptHandler<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub type_: Option<Box<Expr>>,
-    pub name: Option<Identifier>,
-    pub body: Suite,
+    pub type_: Option<ArenaBox<'ast, Expr<'ast>>>,
+    pub name: Option<Identifier<'ast>>,
+    pub body: ArenaSlice<'ast, Stmt<'ast>>,
 }
 
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct Parameter {
+pub struct Parameter<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub annotation: Option<Box<Expr>>,
+    pub name: Identifier<'ast>,
+    pub annotation: Option<ArenaBox<'ast, Expr<'ast>>>,
 }
 
-impl Parameter {
-    pub const fn name(&self) -> &Identifier {
+impl<'ast> Parameter<'ast> {
+    pub const fn name(&self) -> &Identifier<'ast> {
         &self.name
     }
 
-    pub fn annotation(&self) -> Option<&Expr> {
+    pub fn annotation(&self) -> Option<&Expr<'ast>> {
         self.annotation.as_deref()
     }
 }
@@ -2808,45 +2790,45 @@ impl Parameter {
 /// See also [keyword](https://docs.python.org/3/library/ast.html#ast.keyword)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct Keyword {
+pub struct Keyword<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub arg: Option<Identifier>,
-    pub value: Expr,
+    pub arg: Option<Identifier<'ast>>,
+    pub value: Expr<'ast>,
 }
 
 /// See also [alias](https://docs.python.org/3/library/ast.html#ast.alias)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct Alias {
+pub struct Alias<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub asname: Option<Identifier>,
+    pub name: Identifier<'ast>,
+    pub asname: Option<Identifier<'ast>>,
 }
 
 /// See also [withitem](https://docs.python.org/3/library/ast.html#ast.withitem)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct WithItem {
+pub struct WithItem<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub context_expr: Expr,
-    pub optional_vars: Option<Box<Expr>>,
+    pub context_expr: Expr<'ast>,
+    pub optional_vars: Option<ArenaBox<'ast, Expr<'ast>>>,
 }
 
 /// See also [match_case](https://docs.python.org/3/library/ast.html#ast.match_case)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct MatchCase {
+pub struct MatchCase<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub pattern: Pattern,
-    pub guard: Option<Box<Expr>>,
-    pub body: Suite,
+    pub pattern: Pattern<'ast>,
+    pub guard: Option<ArenaBox<'ast, Expr<'ast>>>,
+    pub body: ArenaSlice<'ast, Stmt<'ast>>,
 }
 
-impl Pattern {
+impl Pattern<'_> {
     /// Checks if the [`Pattern`] is an [irrefutable pattern].
     ///
     /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
@@ -2866,7 +2848,7 @@ impl Pattern {
                 Some(pattern) => pattern.irrefutable_pattern(),
                 None => match name {
                     Some(name) => Some(IrrefutablePattern {
-                        kind: IrrefutablePatternKind::Name(name.id.clone()),
+                        kind: IrrefutablePatternKind::Name(name.id.to_name()),
                         range: *range,
                         node_index: node_index.clone(),
                     }),
@@ -2927,11 +2909,11 @@ pub enum IrrefutablePatternKind {
 /// Like [`Arguments`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternArguments {
+pub struct PatternArguments<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub patterns: ThinVec<Pattern>,
-    pub keywords: Vec<PatternKeyword>,
+    pub patterns: ArenaSlice<'ast, Pattern<'ast>>,
+    pub keywords: ArenaSlice<'ast, PatternKeyword<'ast>>,
 }
 
 /// An AST node to represent the keyword arguments to a [`crate::PatternMatchClass`], i.e., the
@@ -2940,14 +2922,14 @@ pub struct PatternArguments {
 /// Like [`Keyword`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternKeyword {
+pub struct PatternKeyword<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub attr: Identifier,
-    pub pattern: Pattern,
+    pub attr: Identifier<'ast>,
+    pub pattern: Pattern<'ast>,
 }
 
-impl PatternArguments {
+impl PatternArguments<'_> {
     /// Returns an iterator over the patterns and keywords in source order.
     pub fn iter_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
         PatternArgumentsSourceOrder {
@@ -2962,8 +2944,8 @@ impl PatternArguments {
 /// The iterator returned by [`PatternArguments::iter_source_order`].
 #[derive(Clone)]
 pub struct PatternArgumentsSourceOrder<'a> {
-    patterns: &'a [Pattern],
-    keywords: &'a [PatternKeyword],
+    patterns: &'a [Pattern<'a>],
+    keywords: &'a [PatternKeyword<'a>],
     next_pattern: usize,
     next_keyword: usize,
 }
@@ -2971,8 +2953,8 @@ pub struct PatternArgumentsSourceOrder<'a> {
 /// An entry in the argument list of a class pattern.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PatternOrKeyword<'a> {
-    Pattern(&'a Pattern),
-    Keyword(&'a PatternKeyword),
+    Pattern(&'a Pattern<'a>),
+    Keyword(&'a PatternKeyword<'a>),
 }
 
 impl<'a> Iterator for PatternArgumentsSourceOrder<'a> {
@@ -2998,8 +2980,8 @@ impl<'a> Iterator for PatternArgumentsSourceOrder<'a> {
 
 impl FusedIterator for PatternArgumentsSourceOrder<'_> {}
 
-impl TypeParam {
-    pub const fn name(&self) -> &Identifier {
+impl<'ast> TypeParam<'ast> {
+    pub const fn name(&self) -> &Identifier<'ast> {
         match self {
             Self::TypeVar(x) => &x.name,
             Self::ParamSpec(x) => &x.name,
@@ -3007,7 +2989,7 @@ impl TypeParam {
         }
     }
 
-    pub fn default(&self) -> Option<&Expr> {
+    pub fn default(&self) -> Option<&Expr<'ast>> {
         match self {
             Self::TypeVar(x) => x.default.as_deref(),
             Self::ParamSpec(x) => x.default.as_deref(),
@@ -3019,22 +3001,22 @@ impl TypeParam {
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct Decorator {
+pub struct Decorator<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub expression: Expr,
+    pub expression: Expr<'ast>,
 }
 
 /// Enumeration of the two kinds of parameter
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum AnyParameterRef<'a> {
+pub enum AnyParameterRef<'a, 'ast> {
     /// Variadic parameters cannot have default values,
     /// e.g. both `*args` and `**kwargs` in the following function:
     ///
     /// ```python
     /// def foo(*args, **kwargs): pass
     /// ```
-    Variadic(&'a Parameter),
+    Variadic(&'a Parameter<'ast>),
 
     /// Non-variadic parameters can have default values,
     /// though they won't necessarily always have them:
@@ -3042,18 +3024,18 @@ pub enum AnyParameterRef<'a> {
     /// ```python
     /// def bar(a=1, /, b=2, *, c=3): pass
     /// ```
-    NonVariadic(&'a ParameterWithDefault),
+    NonVariadic(&'a ParameterWithDefault<'ast>),
 }
 
-impl<'a> AnyParameterRef<'a> {
-    pub const fn as_parameter(self) -> &'a Parameter {
+impl<'a, 'ast> AnyParameterRef<'a, 'ast> {
+    pub const fn as_parameter(self) -> &'a Parameter<'ast> {
         match self {
             Self::NonVariadic(param) => &param.parameter,
             Self::Variadic(param) => param,
         }
     }
 
-    pub const fn name(self) -> &'a Identifier {
+    pub const fn name(self) -> &'a Identifier<'ast> {
         &self.as_parameter().name
     }
 
@@ -3061,11 +3043,11 @@ impl<'a> AnyParameterRef<'a> {
         matches!(self, Self::Variadic(_))
     }
 
-    pub fn annotation(self) -> Option<&'a Expr> {
+    pub fn annotation(self) -> Option<&'a Expr<'ast>> {
         self.as_parameter().annotation.as_deref()
     }
 
-    pub fn default(self) -> Option<&'a Expr> {
+    pub fn default(self) -> Option<&'a Expr<'ast>> {
         match self {
             Self::NonVariadic(param) => param.default.as_deref(),
             Self::Variadic(_) => None,
@@ -3073,7 +3055,7 @@ impl<'a> AnyParameterRef<'a> {
     }
 }
 
-impl Ranged for AnyParameterRef<'_> {
+impl Ranged for AnyParameterRef<'_, '_> {
     fn range(&self) -> TextRange {
         match self {
             Self::NonVariadic(param) => param.range,
@@ -3092,24 +3074,36 @@ impl Ranged for AnyParameterRef<'_> {
 ///
 /// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct Parameters {
+pub struct Parameters<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub posonlyargs: ThinVec<ParameterWithDefault>,
-    pub args: ThinVec<ParameterWithDefault>,
-    pub vararg: Option<Box<Parameter>>,
-    pub kwonlyargs: ThinVec<ParameterWithDefault>,
-    pub kwarg: Option<Box<Parameter>>,
+    pub posonlyargs: ArenaSlice<'ast, ParameterWithDefault<'ast>>,
+    pub args: ArenaSlice<'ast, ParameterWithDefault<'ast>>,
+    pub vararg: Option<ArenaBox<'ast, Parameter<'ast>>>,
+    pub kwonlyargs: ArenaSlice<'ast, ParameterWithDefault<'ast>>,
+    pub kwarg: Option<ArenaBox<'ast, Parameter<'ast>>>,
 }
 
-impl Parameters {
+impl<'ast> Parameters<'ast> {
+    pub fn empty_in(allocator: &'ast Allocator) -> Self {
+        Self {
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            posonlyargs: ArenaSlice::new_in(allocator),
+            args: ArenaSlice::new_in(allocator),
+            vararg: None,
+            kwonlyargs: ArenaSlice::new_in(allocator),
+            kwarg: None,
+        }
+    }
+
     /// Returns an iterator over all non-variadic parameters included in this [`Parameters`] node.
     ///
     /// The variadic parameters (`.vararg` and `.kwarg`) can never have default values;
     /// non-variadic parameters sometimes will.
-    pub fn iter_non_variadic_params(&self) -> impl Iterator<Item = &ParameterWithDefault> {
+    pub fn iter_non_variadic_params(&self) -> impl Iterator<Item = &ParameterWithDefault<'ast>> {
         self.posonlyargs
             .iter()
             .chain(&self.args)
@@ -3117,7 +3111,7 @@ impl Parameters {
     }
 
     /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
-    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault<'ast>> {
         self.iter_non_variadic_params()
             .find(|arg| arg.parameter.name.as_str() == name)
     }
@@ -3129,7 +3123,7 @@ impl Parameters {
     }
 
     /// Returns an iterator over all parameters included in this [`Parameters`] node.
-    pub fn iter(&self) -> ParametersIterator<'_> {
+    pub fn iter(&self) -> ParametersIterator<'_, 'ast> {
         ParametersIterator::new(self)
     }
 
@@ -3180,7 +3174,7 @@ impl Parameters {
     /// keyword). For well-formed Python the two orderings are identical, but
     /// error recovery can produce ASTs where variadic parameters appear before
     /// non-variadic ones (e.g. `def foo(**kwargs, a):`).
-    pub fn iter_source_order(&self) -> ParametersSourceOrderIterator<'_> {
+    pub fn iter_source_order(&self) -> ParametersSourceOrderIterator<'_, 'ast> {
         let mut variadics = [self.vararg.as_deref(), self.kwarg.as_deref()];
         variadics.sort_by_key(|param| param.map_or(TextSize::new(u32::MAX), Ranged::start));
 
@@ -3195,16 +3189,16 @@ impl Parameters {
     }
 }
 
-pub struct ParametersIterator<'a> {
-    posonlyargs: Iter<'a, ParameterWithDefault>,
-    args: Iter<'a, ParameterWithDefault>,
-    vararg: Option<&'a Parameter>,
-    kwonlyargs: Iter<'a, ParameterWithDefault>,
-    kwarg: Option<&'a Parameter>,
+pub struct ParametersIterator<'a, 'ast> {
+    posonlyargs: Iter<'a, ParameterWithDefault<'ast>>,
+    args: Iter<'a, ParameterWithDefault<'ast>>,
+    vararg: Option<&'a Parameter<'ast>>,
+    kwonlyargs: Iter<'a, ParameterWithDefault<'ast>>,
+    kwarg: Option<&'a Parameter<'ast>>,
 }
 
-impl<'a> ParametersIterator<'a> {
-    fn new(parameters: &'a Parameters) -> Self {
+impl<'a, 'ast> ParametersIterator<'a, 'ast> {
+    fn new(parameters: &'a Parameters<'ast>) -> Self {
         let Parameters {
             range: _,
             node_index: _,
@@ -3224,8 +3218,8 @@ impl<'a> ParametersIterator<'a> {
     }
 }
 
-impl<'a> Iterator for ParametersIterator<'a> {
-    type Item = AnyParameterRef<'a>;
+impl<'a, 'ast> Iterator for ParametersIterator<'a, 'ast> {
+    type Item = AnyParameterRef<'a, 'ast>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let ParametersIterator {
@@ -3286,7 +3280,7 @@ impl<'a> Iterator for ParametersIterator<'a> {
     }
 }
 
-impl DoubleEndedIterator for ParametersIterator<'_> {
+impl DoubleEndedIterator for ParametersIterator<'_, '_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let ParametersIterator {
             posonlyargs,
@@ -3312,41 +3306,33 @@ impl DoubleEndedIterator for ParametersIterator<'_> {
     }
 }
 
-impl FusedIterator for ParametersIterator<'_> {}
+impl FusedIterator for ParametersIterator<'_, '_> {}
 
 /// We rely on the same invariants outlined in the comment above `Parameters::len()`
 /// in order to implement `ExactSizeIterator` here
-impl ExactSizeIterator for ParametersIterator<'_> {}
+impl ExactSizeIterator for ParametersIterator<'_, '_> {}
 
-impl<'a> IntoIterator for &'a Parameters {
-    type IntoIter = ParametersIterator<'a>;
-    type Item = AnyParameterRef<'a>;
+impl<'a, 'ast> IntoIterator for &'a Parameters<'ast> {
+    type IntoIter = ParametersIterator<'a, 'ast>;
+    type Item = AnyParameterRef<'a, 'ast>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a Box<Parameters> {
-    type IntoIter = ParametersIterator<'a>;
-    type Item = AnyParameterRef<'a>;
-    fn into_iter(self) -> Self::IntoIter {
-        (&**self).into_iter()
-    }
-}
-
 /// The iterator returned by [`Parameters::iter_source_order`].
-pub struct ParametersSourceOrderIterator<'a> {
-    next_non_variadic_peeked: Option<&'a ParameterWithDefault>,
-    posonlyargs: Iter<'a, ParameterWithDefault>,
-    args: Iter<'a, ParameterWithDefault>,
-    kwonlyargs: Iter<'a, ParameterWithDefault>,
-    variadics: [Option<&'a Parameter>; 2],
+pub struct ParametersSourceOrderIterator<'a, 'ast> {
+    next_non_variadic_peeked: Option<&'a ParameterWithDefault<'ast>>,
+    posonlyargs: Iter<'a, ParameterWithDefault<'ast>>,
+    args: Iter<'a, ParameterWithDefault<'ast>>,
+    kwonlyargs: Iter<'a, ParameterWithDefault<'ast>>,
+    variadics: [Option<&'a Parameter<'ast>>; 2],
     next_variadic: usize,
 }
 
-impl<'a> ParametersSourceOrderIterator<'a> {
+impl<'a, 'ast> ParametersSourceOrderIterator<'a, 'ast> {
     /// Returns the next variadic parameter that appears before `before`, if any.
-    fn next_variadic_before(&mut self, before: TextSize) -> Option<&'a Parameter> {
+    fn next_variadic_before(&mut self, before: TextSize) -> Option<&'a Parameter<'ast>> {
         let param = self.variadics.get(self.next_variadic).copied().flatten()?;
         if param.start() < before {
             self.next_variadic += 1;
@@ -3356,7 +3342,7 @@ impl<'a> ParametersSourceOrderIterator<'a> {
         }
     }
 
-    fn next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault> {
+    fn next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault<'ast>> {
         self.next_non_variadic_peeked
             .take()
             .or_else(|| self.posonlyargs.next())
@@ -3364,15 +3350,15 @@ impl<'a> ParametersSourceOrderIterator<'a> {
             .or_else(|| self.kwonlyargs.next())
     }
 
-    fn peek_next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault> {
+    fn peek_next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault<'ast>> {
         let next = self.next_non_variadic()?;
         self.next_non_variadic_peeked = Some(next);
         Some(next)
     }
 }
 
-impl<'a> Iterator for ParametersSourceOrderIterator<'a> {
-    type Item = AnyParameterRef<'a>;
+impl<'a, 'ast> Iterator for ParametersSourceOrderIterator<'a, 'ast> {
+    type Item = AnyParameterRef<'a, 'ast>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // If there's a variadic parameter that comes before the next
@@ -3395,7 +3381,7 @@ impl<'a> Iterator for ParametersSourceOrderIterator<'a> {
     }
 }
 
-impl FusedIterator for ParametersSourceOrderIterator<'_> {}
+impl FusedIterator for ParametersSourceOrderIterator<'_, '_> {}
 
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
 /// Used by `Arguments` original type.
@@ -3403,23 +3389,23 @@ impl FusedIterator for ParametersSourceOrderIterator<'_> {}
 /// NOTE: This type is different from original Python AST.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct ParameterWithDefault {
+pub struct ParameterWithDefault<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub parameter: Parameter,
-    pub default: Option<Box<Expr>>,
+    pub parameter: Parameter<'ast>,
+    pub default: Option<ArenaBox<'ast, Expr<'ast>>>,
 }
 
-impl ParameterWithDefault {
-    pub fn default(&self) -> Option<&Expr> {
+impl<'ast> ParameterWithDefault<'ast> {
+    pub fn default(&self) -> Option<&Expr<'ast>> {
         self.default.as_deref()
     }
 
-    pub const fn name(&self) -> &Identifier {
+    pub const fn name(&self) -> &Identifier<'ast> {
         self.parameter.name()
     }
 
-    pub fn annotation(&self) -> Option<&Expr> {
+    pub fn annotation(&self) -> Option<&Expr<'ast>> {
         self.parameter.annotation()
     }
 
@@ -3456,22 +3442,22 @@ impl ParameterWithDefault {
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct Arguments {
+pub struct Arguments<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub args: Box<[Expr]>,
-    pub keywords: Box<[Keyword]>,
+    pub args: ArenaSlice<'ast, Expr<'ast>>,
+    pub keywords: ArenaSlice<'ast, Keyword<'ast>>,
 }
 
 /// An entry in the argument list of a function call.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ArgOrKeyword<'a> {
-    Arg(&'a Expr),
-    Keyword(&'a Keyword),
+pub enum ArgOrKeyword<'a, 'ast> {
+    Arg(&'a Expr<'ast>),
+    Keyword(&'a Keyword<'ast>),
 }
 
-impl<'a> ArgOrKeyword<'a> {
-    pub const fn value(self) -> &'a Expr {
+impl<'a, 'ast> ArgOrKeyword<'a, 'ast> {
+    pub const fn value(self) -> &'a Expr<'ast> {
         match self {
             ArgOrKeyword::Arg(argument) => argument,
             ArgOrKeyword::Keyword(keyword) => &keyword.value,
@@ -3485,14 +3471,14 @@ impl<'a> ArgOrKeyword<'a> {
         }
     }
 
-    pub const fn as_variadic(self) -> Option<&'a Keyword> {
+    pub const fn as_variadic(self) -> Option<&'a Keyword<'ast>> {
         match self {
             ArgOrKeyword::Keyword(keyword) if keyword.arg.is_none() => Some(keyword),
             _ => None,
         }
     }
 
-    pub const fn as_keyword(self) -> Option<&'a Keyword> {
+    pub const fn as_keyword(self) -> Option<&'a Keyword<'ast>> {
         match self {
             ArgOrKeyword::Keyword(keyword) => Some(keyword),
             ArgOrKeyword::Arg(_) => None,
@@ -3500,19 +3486,19 @@ impl<'a> ArgOrKeyword<'a> {
     }
 }
 
-impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
-    fn from(arg: &'a Expr) -> Self {
+impl<'a, 'ast> From<&'a Expr<'ast>> for ArgOrKeyword<'a, 'ast> {
+    fn from(arg: &'a Expr<'ast>) -> Self {
         Self::Arg(arg)
     }
 }
 
-impl<'a> From<&'a Keyword> for ArgOrKeyword<'a> {
-    fn from(keyword: &'a Keyword) -> Self {
+impl<'a, 'ast> From<&'a Keyword<'ast>> for ArgOrKeyword<'a, 'ast> {
+    fn from(keyword: &'a Keyword<'ast>) -> Self {
         Self::Keyword(keyword)
     }
 }
 
-impl Ranged for ArgOrKeyword<'_> {
+impl Ranged for ArgOrKeyword<'_, '_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Arg(arg) => arg.range(),
@@ -3521,7 +3507,7 @@ impl Ranged for ArgOrKeyword<'_> {
     }
 }
 
-impl Arguments {
+impl<'ast> Arguments<'ast> {
     /// Return the number of positional and keyword arguments.
     pub fn len(&self) -> usize {
         self.args.len() + self.keywords.len()
@@ -3533,7 +3519,7 @@ impl Arguments {
     }
 
     /// Return the [`Keyword`] with the given name, or `None` if no such [`Keyword`] exists.
-    pub fn find_keyword(&self, keyword_name: &str) -> Option<&Keyword> {
+    pub fn find_keyword(&self, keyword_name: &str) -> Option<&Keyword<'ast>> {
         self.keywords.iter().find(|keyword| {
             let Keyword { arg, .. } = keyword;
             arg.as_ref().is_some_and(|arg| arg == keyword_name)
@@ -3541,7 +3527,7 @@ impl Arguments {
     }
 
     /// Return the positional argument at the given index, or `None` if no such argument exists.
-    pub fn find_positional(&self, position: usize) -> Option<&Expr> {
+    pub fn find_positional(&self, position: usize) -> Option<&Expr<'ast>> {
         self.args
             .iter()
             .take_while(|expr| !expr.is_starred_expr())
@@ -3551,14 +3537,14 @@ impl Arguments {
     /// Return the value for the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve argument values that can be provided _either_ as keyword or
     /// positional arguments.
-    pub fn find_argument_value(&self, name: &str, position: usize) -> Option<&Expr> {
+    pub fn find_argument_value(&self, name: &str, position: usize) -> Option<&Expr<'ast>> {
         self.find_argument(name, position).map(ArgOrKeyword::value)
     }
 
     /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
-    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword<'_>> {
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword<'_, 'ast>> {
         self.find_keyword(name)
             .map(ArgOrKeyword::from)
             .or_else(|| self.find_positional(position).map(ArgOrKeyword::from))
@@ -3598,7 +3584,7 @@ impl Arguments {
     /// 2
     /// {'4': 5}
     /// ```
-    pub fn iter_source_order(&self) -> ArgumentsSourceOrder<'_> {
+    pub fn iter_source_order(&self) -> ArgumentsSourceOrder<'_, 'ast> {
         ArgumentsSourceOrder {
             args: &self.args,
             keywords: &self.keywords,
@@ -3622,15 +3608,15 @@ impl Arguments {
 
 /// The iterator returned by [`Arguments::iter_source_order`].
 #[derive(Clone)]
-pub struct ArgumentsSourceOrder<'a> {
-    args: &'a [Expr],
-    keywords: &'a [Keyword],
+pub struct ArgumentsSourceOrder<'a, 'ast> {
+    args: &'a [Expr<'ast>],
+    keywords: &'a [Keyword<'ast>],
     next_arg: usize,
     next_keyword: usize,
 }
 
-impl<'a> Iterator for ArgumentsSourceOrder<'a> {
-    type Item = ArgOrKeyword<'a>;
+impl<'a, 'ast> Iterator for ArgumentsSourceOrder<'a, 'ast> {
+    type Item = ArgOrKeyword<'a, 'ast>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let arg = self.args.get(self.next_arg);
@@ -3650,7 +3636,7 @@ impl<'a> Iterator for ArgumentsSourceOrder<'a> {
     }
 }
 
-impl FusedIterator for ArgumentsSourceOrder<'_> {}
+impl FusedIterator for ArgumentsSourceOrder<'_, '_> {}
 
 /// An AST node used to represent a sequence of type parameters.
 ///
@@ -3663,23 +3649,23 @@ impl FusedIterator for ArgumentsSourceOrder<'_> {}
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParams {
+pub struct TypeParams<'ast> {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub type_params: Vec<TypeParam>,
+    pub type_params: ArenaSlice<'ast, TypeParam<'ast>>,
 }
 
-impl Deref for TypeParams {
-    type Target = [TypeParam];
+impl<'ast> Deref for TypeParams<'ast> {
+    type Target = [TypeParam<'ast>];
 
     fn deref(&self) -> &Self::Target {
         &self.type_params
     }
 }
 
-impl<'a> IntoIterator for &'a TypeParams {
-    type Item = &'a TypeParam;
-    type IntoIter = std::slice::Iter<'a, TypeParam>;
+impl<'a, 'ast> IntoIterator for &'a TypeParams<'ast> {
+    type Item = &'a TypeParam<'ast>;
+    type IntoIter = std::slice::Iter<'a, TypeParam<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.type_params.iter()
@@ -3689,15 +3675,7 @@ impl<'a> IntoIterator for &'a TypeParams {
 /// A suite represents a sequence of [`Stmt`].
 ///
 /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
-pub type Suite = ThinVec<Stmt>;
-
-pub type DecoratorList = ThinVec<Decorator>;
-
-pub type Patterns = ThinVec<Pattern>;
-
-pub type PatternKeys = ThinVec<Expr>;
-
-pub type ParameterWithDefaults = ThinVec<ParameterWithDefault>;
+pub type Suite<'ast> = ArenaSlice<'ast, Stmt<'ast>>;
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
@@ -3796,23 +3774,32 @@ impl IpyEscapeKind {
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct Identifier {
-    pub id: Name,
+pub struct Identifier<'ast> {
+    pub id: AstName<'ast>,
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
 }
 
-impl Identifier {
+impl<'ast> Identifier<'ast> {
     #[inline]
-    pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
+    pub fn new_in(id: impl AsRef<str>, range: TextRange, allocator: &'ast Allocator) -> Self {
         Self {
-            id: id.into(),
+            id: AstName::new_in(id, allocator),
             node_index: AtomicNodeIndex::NONE,
             range,
         }
     }
 
-    pub fn id(&self) -> &Name {
+    #[inline]
+    pub const fn new_static(id: &'static str, range: TextRange) -> Identifier<'static> {
+        Identifier {
+            id: AstName::new_static(id),
+            node_index: AtomicNodeIndex::NONE,
+            range,
+        }
+    }
+
+    pub fn id(&self) -> &AstName<'ast> {
         &self.id
     }
 
@@ -3821,28 +3808,28 @@ impl Identifier {
     }
 }
 
-impl Identifier {
+impl Identifier<'_> {
     #[inline]
     pub fn as_str(&self) -> &str {
         self.id.as_str()
     }
 }
 
-impl PartialEq<str> for Identifier {
+impl PartialEq<str> for Identifier<'_> {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         self.id == other
     }
 }
 
-impl PartialEq<String> for Identifier {
+impl PartialEq<String> for Identifier<'_> {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self.id == other
     }
 }
 
-impl std::ops::Deref for Identifier {
+impl std::ops::Deref for Identifier<'_> {
     type Target = str;
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -3850,23 +3837,23 @@ impl std::ops::Deref for Identifier {
     }
 }
 
-impl AsRef<str> for Identifier {
+impl AsRef<str> for Identifier<'_> {
     #[inline]
     fn as_ref(&self) -> &str {
         self.id.as_str()
     }
 }
 
-impl std::fmt::Display for Identifier {
+impl std::fmt::Display for Identifier<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
     }
 }
 
-impl From<Identifier> for Name {
+impl From<Identifier<'_>> for Name {
     #[inline]
-    fn from(identifier: Identifier) -> Name {
-        identifier.id
+    fn from(identifier: Identifier<'_>) -> Name {
+        identifier.id.into()
     }
 }
 
@@ -3890,49 +3877,48 @@ impl From<bool> for Singleton {
 
 #[cfg(test)]
 mod tests {
+    use crate::Mod;
     use crate::generated::*;
-    use crate::{Mod, Parameters};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Stmt>(), 96);
-        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 96);
-        assert_eq!(std::mem::size_of::<StmtClassDef>(), 88);
-        assert_eq!(std::mem::size_of::<StmtTry>(), 64);
+        assert_eq!(std::mem::size_of::<Stmt>(), 112);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 112);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 104);
+        assert_eq!(std::mem::size_of::<StmtTry>(), 80);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
-        assert_eq!(std::mem::size_of::<Pattern>(), 80);
-        assert_eq!(std::mem::size_of::<Parameters>(), 56);
+        assert_eq!(std::mem::size_of::<Pattern>(), 88);
         assert_eq!(std::mem::size_of::<Expr>(), 80);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
-        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 16);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 48);
         assert_eq!(std::mem::size_of::<ExprCall>(), 72);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 56);
-        assert_eq!(std::mem::size_of::<ExprDict>(), 40);
-        assert_eq!(std::mem::size_of::<ExprDictComp>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 12);
         assert_eq!(std::mem::size_of::<ExprFString>(), 56);
-        assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
+        assert_eq!(std::mem::size_of::<ExprGenerator>(), 40);
         assert_eq!(std::mem::size_of::<ExprIf>(), 40);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
         assert_eq!(std::mem::size_of::<ExprLambda>(), 32);
-        assert_eq!(std::mem::size_of::<ExprList>(), 40);
-        assert_eq!(std::mem::size_of::<ExprListComp>(), 48);
-        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprList>(), 32);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName<'_>>(), 40);
         assert_eq!(std::mem::size_of::<ExprNamed>(), 32);
         assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 12);
-        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 40);
-        assert_eq!(std::mem::size_of::<ExprSet>(), 40);
-        assert_eq!(std::mem::size_of::<ExprSetComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral<'_>>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
         assert_eq!(std::mem::size_of::<ExprSlice>(), 40);
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
-        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 64);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
-        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 32);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
         assert_eq!(std::mem::size_of::<ExprYield>(), 24);
         assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 24);

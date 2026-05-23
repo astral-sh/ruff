@@ -19,7 +19,7 @@ pub enum GeneratorExpParentheses {
     Preserve,
 }
 
-impl FormatRuleWithOptions<ExprGenerator, PyFormatContext<'_>> for FormatExprGenerator {
+impl FormatRuleWithOptions<ExprGenerator<'_>, PyFormatContext<'_>> for FormatExprGenerator {
     type Options = GeneratorExpParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -33,7 +33,7 @@ pub struct FormatExprGenerator {
     parentheses: GeneratorExpParentheses,
 }
 
-impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
+impl FormatNodeRule<ExprGenerator<'_>> for FormatExprGenerator {
     fn fmt_fields(&self, item: &ExprGenerator, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprGenerator {
             range: _,
@@ -78,7 +78,7 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
     }
 }
 
-impl NeedsParentheses for ExprGenerator {
+impl NeedsParentheses for ExprGenerator<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

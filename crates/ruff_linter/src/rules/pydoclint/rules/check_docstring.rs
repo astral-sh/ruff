@@ -893,11 +893,11 @@ struct BodyEntries<'a> {
 struct BodyVisitor<'a> {
     returns: Vec<ReturnEntry>,
     yields: Vec<YieldEntry>,
-    currently_suspended_exceptions: Option<&'a ast::Expr>,
+    currently_suspended_exceptions: Option<&'a ast::Expr<'a>>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
     /// Maps exception variable names to their exception expressions in the current except clause
-    exception_variables: FxHashMap<&'a str, &'a ast::Expr>,
+    exception_variables: FxHashMap<&'a str, &'a ast::Expr<'a>>,
 }
 
 impl<'a> BodyVisitor<'a> {
@@ -1127,12 +1127,12 @@ fn yields_documented(
 #[derive(Debug, Copy, Clone)]
 enum GeneratorOrIteratorArguments<'a> {
     Unparameterized,
-    Single(&'a Expr),
-    Several(&'a [Expr]),
+    Single(&'a Expr<'a>),
+    Several(&'a [Expr<'a>]),
 }
 
 impl<'a> GeneratorOrIteratorArguments<'a> {
-    fn first(self) -> Option<&'a Expr> {
+    fn first(self) -> Option<&'a Expr<'a>> {
         match self {
             Self::Unparameterized => None,
             Self::Single(element) => Some(element),
@@ -1207,7 +1207,7 @@ fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<&'a str> {
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
     };
-    for param in &function.parameters {
+    for param in function.parameters.iter() {
         parameters.push(param.name());
     }
     parameters

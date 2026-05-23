@@ -87,18 +87,18 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
     // If there's at least one diagnostic, create a fix to remove the duplicate members.
     if let Expr::Subscript(subscript) = expr {
         let subscript = Expr::Subscript(ast::ExprSubscript {
-            slice: Box::new(if let [elt] = unique_nodes.as_slice() {
+            slice: checker.alloc_expr(if let [elt] = unique_nodes.as_slice() {
                 (*elt).clone()
             } else {
                 Expr::Tuple(ast::ExprTuple {
-                    elts: unique_nodes.into_iter().cloned().collect(),
+                    elts: checker.alloc_vec(unique_nodes.into_iter().cloned().collect()),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
-            value: subscript.value.clone(),
+            value: subscript.value,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
