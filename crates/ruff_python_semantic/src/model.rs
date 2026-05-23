@@ -467,7 +467,7 @@ impl<'a> SemanticModel<'a> {
                 }
 
                 match self.bindings[binding_id].kind {
-                    // If it's a type annotation, don't treat it as resolved. For example, given:
+                    // Type annotations are generally not treated as resolved. For example, given:
                     //
                     // ```python
                     // name: str
@@ -477,16 +477,19 @@ impl<'a> SemanticModel<'a> {
                     // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                     // `name: str` should be treated as used.
                     //
-                    // There is one exception to this rule:
+                    // There are two exceptions to this rule:
                     // 1. Stub files. In a stub file, it _is_ considered valid to resolve to a
                     //    type annotation.
+                    // 2. Bare annotations inside functions. Per PEP 526, these create local
+                    //    variables, so we stop searching outer scopes and resolve them as unbound
+                    //    locals (or not found, if accessed from a nested scope). The binding ID
+                    //    is recorded in the unresolved reference so the linter can suppress the
+                    //    error if a nested scope initializes the variable via `nonlocal`.
                     BindingKind::Annotation if !self.in_stub_file() => {
                         if self.scopes[self.bindings[binding_id].scope]
                             .kind
                             .is_function()
                         {
-                            // Treat bare function-scope annotations as unresolved. These can later be
-                            // suppressed if the binding is declared as `nonlocal` in a nested scope.
                             self.unresolved_references.push(
                                 name.range,
                                 self.exceptions(),
