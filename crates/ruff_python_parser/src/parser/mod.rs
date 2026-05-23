@@ -10,7 +10,6 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxHashMap;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
@@ -37,9 +36,6 @@ mod tests;
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
-
-    /// Interned raw source spellings for names constructed during this parse invocation.
-    names: FxHashMap<&'src str, Name>,
 
     /// Token source for the parser that skips over any non-trivia token.
     tokens: TokenSource<'src>,
@@ -92,7 +88,6 @@ impl<'src> Parser<'src> {
         Parser {
             options,
             source,
-            names: FxHashMap::default(),
             errors: Vec::new(),
             unsupported_syntax_errors: Vec::new(),
             tokens,
@@ -397,22 +392,14 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    fn intern_name(&mut self, raw: &'src str, ascii: bool) -> Name {
-        self.names
-            .entry(raw)
-            .or_insert_with(|| {
-                if ascii {
-                    Name::new(raw)
-                } else {
-                    raw.nfkc().collect::<Name>()
-                }
-            })
-            .clone()
-    }
-
     fn bump_name(&mut self) -> Name {
-        let raw = self.src_text(self.current_token_range());
-        let name = self.intern_name(raw, !self.tokens.current_flags().is_non_ascii_name());
+        let range = self.current_token_range();
+        let text = self.src_text(range);
+        let name = if !self.tokens.current_flags().is_non_ascii_name() {
+            Name::new(text)
+        } else {
+            normalize_name(text)
+        };
         self.bump(TokenKind::Name);
         name
     }
