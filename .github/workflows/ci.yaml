@@ -1137,9 +1137,30 @@ jobs:
       matrix:
         benchmark:
           - name: "check_file|micro-core"
-            filter: "check_file|many_string_assignments|many_tuple_assignments|complex_constrained_attributes|many_enum_members|many_protocol_members_mismatch|gradual_vararg_call|vararg_parameter_type_accumulation|typevar_mapping_small_accumulations|very_large_tuple|large_isinstance_narrowing|literal_match_fallthrough|literal_equality_fallthrough_guarded_any|typeis_narrowing|pandas_tdd"
+            filter:
+              - check_file
+              - many_string_assignments
+              - many_tuple_assignments
+              - complex_constrained_attributes
+              - many_enum_members
+              - many_protocol_members_mismatch
+              - gradual_vararg_call
+              - vararg_parameter_type_accumulation
+              - typevar_mapping_small_accumulations
+              - very_large_tuple
+              - large_isinstance_narrowing
+              - literal_match_fallthrough
+              - literal_equality_fallthrough_guarded_any
+              - typeis_narrowing
+              - pandas_tdd
           - name: "anyio|attrs|hydra|datetype|micro-heavy"
-            filter: "anyio|attrs|hydra|datetype|typevar_mapping_accumulation|large_union_narrowing"
+            filter:
+              - anyio
+              - attrs
+              - hydra
+              - datetype
+              - typevar_mapping_accumulation
+              - large_union_narrowing
         mode:
           - simulation
           - memory
@@ -1171,7 +1192,7 @@ jobs:
         uses: CodSpeedHQ/action@3194d9a39c4d46684cb44bf7207fc56626aad8fd # v4.15.1
         with:
           mode: ${{ matrix.mode }}
-          run: cargo codspeed run --bench ty "${{ matrix.benchmark.filter }}"
+          run: cargo codspeed run --bench ty "${{ join(matrix.benchmark.filter, '|') }}"
 
   benchmarks-walltime-build:
     name: "benchmarks walltime (build)"
