@@ -41,6 +41,11 @@ use crate::checkers::ast::Checker;
 /// the same key. However, `min(data, key=itemgetter(0))` will return the _first_
 /// "minimum" element in the list in the same scenario.
 ///
+/// The fix also changes which exception is raised for an empty sequence:
+/// `sorted([])[0]` raises `IndexError`, but `min([])` and `max([])` raise
+/// `ValueError`. Code that catches one specific exception type will need to
+/// be updated after the fix is applied.
+///
 /// As such, this rule's fix is marked as unsafe.
 ///
 /// ## References
