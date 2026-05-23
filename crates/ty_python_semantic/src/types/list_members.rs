@@ -241,9 +241,7 @@ impl<'db> AllMembers<'db> {
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
                 self.extend_with_synthetic_members(db, ty, class_literal, None);
-                if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                    self.extend_with_class_members(db, ty, metaclass);
-                }
+                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
             Type::GenericAlias(generic_alias) => {
@@ -255,9 +253,7 @@ impl<'db> AllMembers<'db> {
                     ClassLiteral::Static(class_literal),
                     None,
                 );
-                if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                    self.extend_with_class_members(db, ty, metaclass);
-                }
+                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
@@ -280,9 +276,7 @@ impl<'db> AllMembers<'db> {
                                 ClassLiteral::Static(class_literal),
                                 specialization,
                             );
-                            if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                                self.extend_with_class_members(db, ty, metaclass);
-                            }
+                            self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
                         }
                     }
                 }
@@ -492,6 +486,26 @@ impl<'db> AllMembers<'db> {
                     ty,
                 });
             }
+        }
+    }
+
+    /// Extend a class object's members with members inherited from its metaclass.
+    ///
+    /// A static metaclass can also assign attributes onto the class objects that it creates,
+    /// so those implicit instance members are available on the class object as well.
+    fn extend_with_metaclass_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        metaclass: Type<'db>,
+    ) {
+        let Type::ClassLiteral(metaclass) = metaclass else {
+            return;
+        };
+
+        self.extend_with_class_members(db, ty, metaclass);
+        if let ClassLiteral::Static(metaclass) = metaclass {
+            self.extend_with_instance_members(db, ty, metaclass);
         }
     }
 

@@ -1031,6 +1031,28 @@ class C1(metaclass=Meta1): ...
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
 ```
 
+Assignments in instance methods of a metaclass are also attributes on its class-object instances. In
+particular, a metaclass `__init__` assignment happens after the initial class namespace has been
+converted into a class object, so it shadows an attribute from that namespace:
+
+```py
+class InitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: int = 1
+
+class CCreated(metaclass=InitializingMeta): ...
+
+reveal_type(CCreated.attr)  # revealed: int
+
+class CInitialized(metaclass=InitializingMeta):
+    attr = "initial class value"
+
+reveal_type(CInitialized.attr)  # revealed: int
+CInitialized.attr = 2
+# error: [invalid-assignment] "Object of type `Literal["invalid"]` is not assignable to attribute `attr` of type `int`"
+CInitialized.attr = "invalid"
+```
+
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data
 descriptor. If it is a non-data descriptor or a normal attribute, the class-level attribute is used
 instead (see the [descriptor protocol tests] for data/non-data descriptor attributes):

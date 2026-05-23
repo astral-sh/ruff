@@ -2575,6 +2575,30 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Look up attributes stored in the namespace of a class object.
+    ///
+    /// Besides attributes present in the class MRO, this includes attributes assigned to
+    /// instances of its metaclass. For example, `cls.x = ...` in `Meta.__init__` stores `x`
+    /// on each class object constructed by `Meta`.
+    fn class_object_instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let class_attr = self.find_name_in_mro_with_policy(db, name, policy).expect(
+            "Calling `class_object_instance_member` on class literals and subclass-of types should always find an MRO",
+        );
+
+        if let Some(metaclass_instance) = self.to_meta_type(db).to_instance(db) {
+            metaclass_instance
+                .instance_member(db, name)
+                .or_fall_back_to(db, || class_attr)
+        } else {
+            class_attr
+        }
+    }
+
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
     /// For instance-like types, this goes through the classes MRO and discovers attribute assignments
     /// in methods, as well as class-body declarations that we consider to be evidence for the presence
@@ -3587,9 +3611,7 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
-                    "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
-                );
+                let class_attr_plain = self.class_object_instance_member(db, name_str, policy);
 
                 let self_instance = self
                     .to_instance(db)
