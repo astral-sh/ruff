@@ -300,13 +300,18 @@ impl StringParser {
             match &self.source.as_bytes()[self.cursor - 1] {
                 // If there are any curly braces inside a `F/TStringMiddle` token,
                 // then they were escaped (i.e. `{{` or `}}`). This means that
-                // we need increase the location by 2 instead of 1.
+                // the raw source contains a doubled brace, but the literal value only
+                // contains one brace.
                 b'{' => {
-                    self.offset += TextSize::from(1);
+                    if self.peek_byte() == Some(b'{') {
+                        self.next_byte();
+                    }
                     value.push('{');
                 }
                 b'}' => {
-                    self.offset += TextSize::from(1);
+                    if self.peek_byte() == Some(b'}') {
+                        self.next_byte();
+                    }
                     value.push('}');
                 }
                 // We can encounter a `\` as the last character in a `F/TStringMiddle`
