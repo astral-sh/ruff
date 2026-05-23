@@ -40,6 +40,7 @@ pub(crate) use self::match_pattern::{
     singleton_pattern_type, starred_sequence_pattern_type,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
+pub(crate) use self::set_theoretic::FiniteAlternativeCoverage;
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,

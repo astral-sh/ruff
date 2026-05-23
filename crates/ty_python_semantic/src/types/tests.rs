@@ -82,6 +82,33 @@ fn todo_types() {
 }
 
 #[test]
+fn finite_alternative_coverage_after_excluding() {
+    let db = setup_db();
+
+    let int = KnownClass::Int.to_instance(&db);
+    let str = KnownClass::Str.to_instance(&db);
+    let bytes = KnownClass::Bytes.to_instance(&db);
+    let subject = UnionType::from_elements(&db, [int, str, bytes]);
+
+    assert_eq!(
+        subject.finite_alternative_coverage_after_excluding(&db, str, str),
+        Some(FiniteAlternativeCoverage::Empty)
+    );
+    assert_eq!(
+        subject.finite_alternative_coverage_after_excluding(&db, str, int),
+        Some(FiniteAlternativeCoverage::Partial)
+    );
+    assert_eq!(
+        subject.finite_alternative_coverage_after_excluding(
+            &db,
+            str,
+            UnionType::from_elements(&db, [int, bytes])
+        ),
+        Some(FiniteAlternativeCoverage::Covered)
+    );
+}
+
+#[test]
 fn divergent_type() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));

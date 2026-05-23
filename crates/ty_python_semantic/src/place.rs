@@ -1155,7 +1155,8 @@ pub(crate) fn place_by_id<'db>(
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let mut inferred =
-                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None, None).place;
+                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None, None)
+                    .place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {

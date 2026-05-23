@@ -200,10 +200,11 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
-        Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+        CallableTypes, ClassLiteral, FiniteAlternativeCoverage, IntersectionBuilder,
+        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
+        definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -454,13 +455,13 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     }
 }
 
-/// Return the exactly represented types matched by supported simple patterns or a composition of
-/// OR-patterns and `as` wrappers made exclusively from those alternatives.
+/// Return the exact types matched by supported simple patterns or a composition of OR-patterns and
+/// `as` wrappers made exclusively from those alternatives.
 ///
 /// Ordinary nominal class patterns and singleton patterns have an exact excluded type in
 /// [`definite_match_pattern_type`]. Refutable or otherwise approximate patterns are intentionally
 /// rejected.
-fn supported_exact_pattern_types<'db>(
+fn exact_pattern_alternatives<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Vec<Type<'db>>> {
@@ -498,35 +499,21 @@ fn supported_exact_pattern_types<'db>(
     Some(types)
 }
 
-/// Prove that a supported exact pattern composition over a union of nominal instances remains
-/// ambiguous after earlier supported pattern compositions fall through.
+/// Analyze an exact pattern composition over a subject with finite alternatives.
 ///
-/// This avoids materializing a large intersection in the common event-dispatch shape. It only
-/// returns a result when both outcomes are witnessed using the same subtype and disjointness
-/// relations as the general intersection analysis:
+/// This avoids materializing a large residual intersection in common finite-domain dispatch shapes.
+/// It uses the same subtype and disjointness relations as the general intersection analysis:
 ///
-/// * one remaining union element can overlap the current pattern; and
-/// * one remaining union element is not a subtype of the current pattern.
-///
-/// Any case that could be statically true or false is handled by the general analysis below.
-fn prove_ambiguous_nominal_class_union_pattern_predicate<'db>(
+/// * no remaining alternative overlaps the current pattern: always false;
+/// * every remaining alternative is covered by the current pattern: always true unless guarded; or
+/// * at least one remaining alternative can match and one can fall through: ambiguous.
+fn analyze_finite_alternative_pattern_predicate<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Option<Truthiness> {
-    let Type::Union(subject_union) = subject_ty else {
-        return None;
-    };
-    if !subject_union
-        .elements(db)
-        .iter()
-        .all(|element| matches!(element, Type::NominalInstance(_)))
-    {
-        return None;
-    }
-
-    let current_types = supported_exact_pattern_types(db, predicate.kind(db))?;
-    let current_ty = UnionType::from_elements(db, current_types.iter().copied());
+    let current_ty =
+        UnionType::from_elements(db, exact_pattern_alternatives(db, predicate.kind(db))?);
 
     let mut previous_types = Vec::new();
     let mut previous_predicate = predicate;
@@ -537,41 +524,21 @@ fn prove_ambiguous_nominal_class_union_pattern_predicate<'db>(
             continue;
         }
 
-        let types = supported_exact_pattern_types(db, previous_predicate.kind(db))?;
-        previous_types.extend(types);
+        previous_types.extend(exact_pattern_alternatives(db, previous_predicate.kind(db))?);
     }
-    let previous_ty = UnionType::from_elements(db, previous_types.iter().copied());
+    let previous_ty = UnionType::from_elements(db, previous_types);
 
-    // Discard any alternative that was already completely handled by an earlier arm. If all
-    // alternatives were handled, this case can be statically unreachable; leave that result to
-    // the general analysis.
-    let remaining_current_types = current_types
-        .iter()
-        .copied()
-        .filter(|current_ty| !current_ty.is_subtype_of(db, previous_ty))
-        .collect::<Vec<_>>();
-    if remaining_current_types.is_empty() {
-        return None;
-    }
-
-    let mut can_match = false;
-    let mut can_fall_through = false;
-    for subject_element in subject_union.elements(db) {
-        if subject_element.is_subtype_of(db, previous_ty) {
-            continue;
+    match subject_ty.finite_alternative_coverage_after_excluding(db, previous_ty, current_ty)? {
+        FiniteAlternativeCoverage::Empty => Some(Truthiness::AlwaysFalse),
+        FiniteAlternativeCoverage::Covered => {
+            if predicate.guard(db).is_some() {
+                Some(Truthiness::Ambiguous)
+            } else {
+                Some(Truthiness::AlwaysTrue)
+            }
         }
-
-        can_match |= remaining_current_types
-            .iter()
-            .any(|current_ty| !subject_element.is_disjoint_from(db, *current_ty));
-        can_fall_through |= !subject_element.is_subtype_of(db, current_ty);
-
-        if can_match && can_fall_through {
-            return Some(Truthiness::Ambiguous);
-        }
+        FiniteAlternativeCoverage::Partial => Some(Truthiness::Ambiguous),
     }
-
-    None
 }
 
 /// Analyze a pattern predicate to determine its static truthiness.
@@ -595,7 +562,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     }
 
     if let Some(truthiness) =
-        prove_ambiguous_nominal_class_union_pattern_predicate(db, predicate, subject_ty)
+        analyze_finite_alternative_pattern_predicate(db, predicate, subject_ty)
     {
         return truthiness;
     }

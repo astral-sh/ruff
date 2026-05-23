@@ -15,6 +15,13 @@ pub(crate) mod builder;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FiniteAlternativeCoverage {
+    Empty,
+    Covered,
+    Partial,
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
@@ -37,6 +44,64 @@ pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for UnionType<'_> {}
+
+impl<'db> Type<'db> {
+    /// Return the exact finite alternatives represented by this type, if available.
+    ///
+    /// This represents a type-level finite domain, not necessarily a finite set of runtime values:
+    /// a nominal instance alternative like `A` can still have many inhabitants, but it is one exact
+    /// element in a finite union.
+    pub(crate) fn finite_alternatives(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+        match self {
+            Type::Never => Some(Vec::new()),
+            Type::Union(union) => {
+                let mut alternatives = Vec::new();
+                for element in union.elements(db) {
+                    match element.finite_alternatives(db) {
+                        Some(nested) => alternatives.extend(nested),
+                        None => alternatives.push(*element),
+                    }
+                }
+                Some(alternatives)
+            }
+            Type::Intersection(intersection) => intersection.finite_alternatives(db),
+            Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db)),
+            _ => None,
+        }
+    }
+
+    /// Classify how `target` covers this type's finite alternatives after excluding `excluded`.
+    pub(crate) fn finite_alternative_coverage_after_excluding(
+        self,
+        db: &'db dyn Db,
+        excluded: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<FiniteAlternativeCoverage> {
+        let alternatives = self.finite_alternatives(db)?;
+
+        let mut can_match = false;
+        let mut can_fall_through = false;
+
+        for alternative in alternatives {
+            if alternative.is_subtype_of(db, excluded) {
+                continue;
+            }
+
+            can_match |= !alternative.is_disjoint_from(db, target);
+            can_fall_through |= !alternative.is_subtype_of(db, target);
+
+            if can_match && can_fall_through {
+                return Some(FiniteAlternativeCoverage::Partial);
+            }
+        }
+
+        if can_match {
+            Some(FiniteAlternativeCoverage::Covered)
+        } else {
+            Some(FiniteAlternativeCoverage::Empty)
+        }
+    }
+}
 
 #[salsa::tracked]
 impl<'db> UnionType<'db> {

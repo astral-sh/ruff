@@ -1066,26 +1066,25 @@ fn benchmark_class_match_assignment_reachability(criterion: &mut Criterion) {
 
     setup_rayon();
 
-    let code = class_match_assignment_reachability_code(NUM_CLASSES, NUM_MATCH_BRANCHES, None);
-    criterion.bench_function("ty_micro[class_match_assignment_reachability]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::LargeInput,
+    for (name, wrapped_singleton_alternative) in [
+        ("ty_micro[class_match_assignment_reachability]", None),
+        (
+            "ty_micro[class_as_or_none_alternative_match_assignment_reachability]",
+            Some("None"),
+        ),
+        (
+            "ty_micro[class_as_or_false_alternative_match_assignment_reachability]",
+            Some("False"),
+        ),
+    ] {
+        let code = class_match_assignment_reachability_code(
+            NUM_CLASSES,
+            NUM_MATCH_BRANCHES,
+            wrapped_singleton_alternative,
         );
-    });
-
-    let as_or_none_alternative_code =
-        class_match_assignment_reachability_code(NUM_CLASSES, NUM_MATCH_BRANCHES, Some("None"));
-    criterion.bench_function(
-        "ty_micro[class_as_or_none_alternative_match_assignment_reachability]",
-        |b| {
+        criterion.bench_function(name, |b| {
             b.iter_batched_ref(
-                || setup_micro_case(&as_or_none_alternative_code),
+                || setup_micro_case(&code),
                 |case| {
                     let Case { db, .. } = case;
                     let result = db.check();
@@ -1093,25 +1092,8 @@ fn benchmark_class_match_assignment_reachability(criterion: &mut Criterion) {
                 },
                 BatchSize::LargeInput,
             );
-        },
-    );
-
-    let as_or_false_alternative_code =
-        class_match_assignment_reachability_code(NUM_CLASSES, NUM_MATCH_BRANCHES, Some("False"));
-    criterion.bench_function(
-        "ty_micro[class_as_or_false_alternative_match_assignment_reachability]",
-        |b| {
-            b.iter_batched_ref(
-                || setup_micro_case(&as_or_false_alternative_code),
-                |case| {
-                    let Case { db, .. } = case;
-                    let result = db.check();
-                    assert_eq!(result.len(), 0);
-                },
-                BatchSize::LargeInput,
-            );
-        },
-    );
+        });
+    }
 }
 
 /// Benchmark for narrowing through a long `isinstance` elif chain.
@@ -1672,31 +1654,31 @@ fn datetype(criterion: &mut Criterion) {
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
-    benchmark_class_match_assignment_reachability,
+    benchmark_many_string_assignments,
+    benchmark_many_tuple_assignments,
+    benchmark_tuple_implicit_instance_attributes,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
-    benchmark_gradual_vararg_call,
-    benchmark_large_isinstance_narrowing,
-    benchmark_large_union_narrowing,
-    benchmark_literal_equality_fallthrough_guarded_any,
-    benchmark_literal_match_fallthrough,
-    benchmark_literal_match_fallthrough_guarded_any,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
-    benchmark_many_string_assignments,
-    benchmark_many_tuple_assignments,
+    benchmark_gradual_vararg_call,
+    benchmark_vararg_parameter_type_accumulation,
+    benchmark_typevar_mapping_large_accumulation,
+    benchmark_typevar_mapping_small_accumulations,
+    benchmark_very_large_tuple,
+    benchmark_large_union_narrowing,
+    benchmark_large_isinstance_narrowing,
+    benchmark_literal_match_fallthrough,
+    benchmark_literal_match_fallthrough_guarded_any,
+    benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,
     benchmark_repeated_match_narrowed_loads,
-    benchmark_tuple_implicit_instance_attributes,
-    benchmark_typeis_narrowing,
-    benchmark_typevar_mapping_large_accumulation,
-    benchmark_typevar_mapping_small_accumulations,
-    benchmark_vararg_parameter_type_accumulation,
-    benchmark_very_large_tuple,
+    benchmark_class_match_assignment_reachability,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);
