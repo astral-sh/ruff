@@ -52,13 +52,13 @@ pub enum SpecialFormType {
     /// `typing_extensions.TypeForm`).
     TypeForm,
 
-    /// The special form `Callable`.
+    /// The special form `typing.Callable`.
     ///
-    /// While `typing.Callable` aliases `collections.abc.Callable`, we view both objects
-    /// as inhabiting the same special form type internally. Moreover, `Callable` requires
-    /// special handling for both type-expression parsing and `isinstance`/`issubclass`
-    /// narrowing.
-    Callable,
+    /// This is distinct from the `Callable` exported by the `collections.abc` module.
+    TypingCallable,
+
+    /// The symbol `collections.abc.Callable`
+    CollectionsAbcCallable,
 
     Any,
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
@@ -143,7 +143,8 @@ impl SpecialFormType {
             | Self::Type
             | Self::TypeForm
             | Self::TypingSelf
-            | Self::Callable
+            | Self::TypingCallable
+            | Self::CollectionsAbcCallable
             | Self::Concatenate
             | Self::Unpack
             | Self::TypeAlias
@@ -203,7 +204,9 @@ impl SpecialFormType {
             Self::Type => Some(KnownClass::Type.to_instance(db)),
             Self::TypeForm => Some(TypeFormType::from_type_expression(db, Type::any())),
             Self::Tuple => Some(Type::homogeneous_tuple(db, Type::unknown())),
-            Self::Callable => Some(Type::Callable(CallableType::unknown(db))),
+            Self::TypingCallable | Self::CollectionsAbcCallable => {
+                Some(Type::Callable(CallableType::unknown(db)))
+            }
             Self::LegacyStdlibAlias(alias) => Some(alias.aliased_class().to_instance(db)),
             _ => None,
         }
@@ -219,14 +222,16 @@ impl SpecialFormType {
         file: File,
         symbol_name: &str,
     ) -> Option<Self> {
-        let candidate = Self::from_name(symbol_name)?;
-        candidate
-            .check_module(file_to_module(db, file)?.known(db)?)
-            .then_some(candidate)
+        let module = file_to_module(db, file)?.known(db)?;
+        let candidate = Self::from_name(symbol_name, module)?;
+        candidate.check_module(module).then_some(candidate)
     }
 
-    /// Parse a `SpecialFormType` from its runtime symbol name.
-    fn from_name(name: &str) -> Option<Self> {
+    /// Parse a `SpecialFormType` from its runtime symbol name in the context of `module`.
+    ///
+    /// The module is needed to disambiguate symbols like `Callable`, which is exported by both
+    /// `typing` and `collections.abc` and inhabits a different `SpecialFormType` variant in each.
+    fn from_name(name: &str, module: KnownModule) -> Option<Self> {
         /// An enum that maps 1:1 with `SpecialFormType`, but which holds no associated data
         /// (and therefore can have `EnumString` derived on it).
         /// This is much more robust than having a manual `from_string` method that matches
@@ -293,7 +298,8 @@ impl SpecialFormType {
                     SpecialFormType::AlwaysFalsy => Self::AlwaysFalsy,
                     SpecialFormType::AlwaysTruthy => Self::AlwaysTruthy,
                     SpecialFormType::Annotated => Self::Annotated,
-                    SpecialFormType::Callable => Self::Callable,
+                    SpecialFormType::TypingCallable => Self::Callable,
+                    SpecialFormType::CollectionsAbcCallable => Self::Callable,
                     SpecialFormType::CallableTypeOf => Self::CallableTypeOf,
                     SpecialFormType::RegularCallableTypeOf => Self::RegularCallableTypeOf,
                     SpecialFormType::Concatenate => Self::Concatenate,
@@ -351,7 +357,10 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::AlwaysFalsy => Self::AlwaysFalsy,
                 SpecialFormTypeBuilder::AlwaysTruthy => Self::AlwaysTruthy,
                 SpecialFormTypeBuilder::Annotated => Self::Annotated,
-                SpecialFormTypeBuilder::Callable => Self::Callable,
+                SpecialFormTypeBuilder::Callable => match module {
+                    KnownModule::CollectionsAbc => Self::CollectionsAbcCallable,
+                    _ => Self::TypingCallable,
+                },
                 SpecialFormTypeBuilder::CallableTypeOf => Self::CallableTypeOf,
                 SpecialFormTypeBuilder::RegularCallableTypeOf => Self::RegularCallableTypeOf,
                 SpecialFormTypeBuilder::Concatenate => Self::Concatenate,
@@ -424,7 +433,7 @@ impl SpecialFormType {
             | Self::Tuple
             | Self::Type
             | Self::Generic
-            | Self::Callable => module.is_typing(),
+            | Self::TypingCallable => module.is_typing(),
 
             Self::Annotated
             | Self::Literal
@@ -454,6 +463,8 @@ impl SpecialFormType {
             | Self::TypeOf
             | Self::CallableTypeOf
             | Self::RegularCallableTypeOf => module.is_ty_extensions(),
+
+            Self::CollectionsAbcCallable => module == KnownModule::CollectionsAbc,
         }
     }
 
@@ -478,6 +489,7 @@ impl SpecialFormType {
                 | LegacyStdlibAlias::Deque
                 | LegacyStdlibAlias::OrderedDict
             )
+            | Self::CollectionsAbcCallable
             | Self::NamedTuple => true,
             Self::TypeForm => true,
 
@@ -512,7 +524,7 @@ impl SpecialFormType {
             | Self::TypeOf
             | Self::CallableTypeOf
             | Self::RegularCallableTypeOf
-            | Self::Callable
+            | Self::TypingCallable
             | Self::TypingSelf
             | Self::Concatenate
             | Self::Unpack
@@ -531,7 +543,8 @@ impl SpecialFormType {
         match self {
             Self::TypeQualifier(qualifier) => qualifier.is_valid_isinstance_target(),
 
-            Self::Callable
+            Self::TypingCallable
+            | Self::CollectionsAbcCallable
             | Self::LegacyStdlibAlias(_)
             | Self::Tuple
             | Self::Type
@@ -584,7 +597,7 @@ impl SpecialFormType {
             SpecialFormType::Type => "Type",
             SpecialFormType::TypeForm => "TypeForm",
             SpecialFormType::TypingSelf => "Self",
-            SpecialFormType::Callable => "Callable",
+            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => "Callable",
             SpecialFormType::Concatenate => "Concatenate",
             SpecialFormType::Unpack => "Unpack",
             SpecialFormType::TypeAlias => "TypeAlias",
@@ -631,7 +644,7 @@ impl SpecialFormType {
             | SpecialFormType::Type
             | SpecialFormType::TypeForm
             | SpecialFormType::TypingSelf
-            | SpecialFormType::Callable
+            | SpecialFormType::TypingCallable
             | SpecialFormType::Concatenate
             | SpecialFormType::Unpack
             | SpecialFormType::TypeAlias
@@ -646,6 +659,8 @@ impl SpecialFormType {
             }
 
             SpecialFormType::TypeQualifier(qualifier) => qualifier.definition_modules(),
+
+            SpecialFormType::CollectionsAbcCallable => &[KnownModule::CollectionsAbc],
 
             SpecialFormType::Unknown
             | SpecialFormType::AlwaysTruthy
@@ -792,7 +807,9 @@ impl SpecialFormType {
             SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
             SpecialFormType::TypeForm => Ok(TypeFormType::from_type_expression(db, Type::any())),
             SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
-            SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
+            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
+                Ok(Type::Callable(CallableType::unknown(db)))
+            }
             SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
             SpecialFormType::TypeQualifier(qualifier) => {
                 Err(InvalidTypeExpression::TypeQualifier(qualifier))

@@ -115,3 +115,19 @@ def f(x: object):
         # x has type `Top[(...) -> object]`, which should be assignable to `Callable[..., Any]`
         wrap(x)
 ```
+
+## `isinstance` parity for `typing.Callable` and `collections.abc.Callable`
+
+`typing.Callable` is a deprecated alias for `collections.abc.Callable`. Both should narrow
+identically when used as the second argument to `isinstance()`.
+
+```py
+import typing
+import collections.abc
+
+def f(x: object):
+    if isinstance(x, typing.Callable):
+        reveal_type(x)  # revealed: Top[(...) -> object]
+    if isinstance(x, collections.abc.Callable):
+        reveal_type(x)  # revealed: Top[(...) -> object]
+```

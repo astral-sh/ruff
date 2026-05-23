@@ -542,4 +542,64 @@ static_assert(
 )
 ```
 
+## `typing.Callable` and `collections.abc.Callable` parity
+
+`typing.Callable` is a deprecated alias for `collections.abc.Callable`. Internally we model them as
+distinct `SpecialFormType` variants so that we can give different runtime behavior to each (calling
+`typing.Callable()` raises `TypeError`; calling `collections.abc.Callable()` does not), but in a
+type expression the two should be interchangeable.
+
+### Bare form
+
+```py
+from typing import Any
+import typing
+import collections.abc
+
+def _(c1: typing.Callable, c2: collections.abc.Callable):
+    reveal_type(c1)  # revealed: (...) -> Unknown
+    reveal_type(c2)  # revealed: (...) -> Unknown
+```
+
+### Parameterized form
+
+```py
+import typing
+import collections.abc
+
+def _(c1: typing.Callable[[int], str], c2: collections.abc.Callable[[int], str]):
+    reveal_type(c1)  # revealed: (int, /) -> str
+    reveal_type(c2)  # revealed: (int, /) -> str
+```
+
+### Equivalence
+
+```py
+import typing
+import collections.abc
+from ty_extensions import is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(typing.Callable[[int], str], collections.abc.Callable[[int], str]))
+static_assert(is_equivalent_to(typing.Callable, collections.abc.Callable))
+```
+
+### Inside `type[...]`
+
+`type[Callable[...]]` is not a valid type expression (the argument to `type[...]` must be a class
+object), but both modules' `Callable` should produce the same diagnostic and resolved type.
+
+```py
+import typing
+import collections.abc
+
+def _(
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    c1: type[typing.Callable[[int], str]],
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    c2: type[collections.abc.Callable[[int], str]],
+):
+    reveal_type(c1)  # revealed: type[Unknown]
+    reveal_type(c2)  # revealed: type[Unknown]
+```
+
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
