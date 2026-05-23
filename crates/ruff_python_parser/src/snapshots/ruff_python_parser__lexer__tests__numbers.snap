@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
+assertion_line: 1961
 expression: lex_source(source)
 ---
 ## Tokens
@@ -62,20 +63,24 @@ expression: lex_source(source)
         73..109,
     ),
     (
-        Int,
-        110..113,
+        Complex,
+        110..147,
     ),
     (
         Int,
-        114..132,
+        148..151,
     ),
     (
         Int,
-        133..167,
+        152..170,
+    ),
+    (
+        Int,
+        171..205,
     ),
     (
         Newline,
-        167..167,
+        205..205,
     ),
 ]
 ```

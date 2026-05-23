@@ -437,20 +437,20 @@ impl<'src> Parser<'src> {
         (0.0, value)
     }
 
-    fn bump_string_value(&mut self) -> Box<str> {
+    fn bump_string_value(&mut self) -> &'src str {
         let range = self.current_token_range();
         let flags = self.tokens.current_flags().as_any_string_flags();
         let value_range = TextRange::new(
             range.start() + flags.opener_len(),
             range.end() - flags.closer_len(),
         );
-        let value = self.source[value_range].to_string().into_boxed_str();
+        let value = &self.source[value_range];
         self.bump(TokenKind::String);
         value
     }
 
-    fn bump_interpolated_string_middle_value(&mut self, kind: TokenKind) -> Box<str> {
-        let value = self.current_token_text().to_string().into_boxed_str();
+    fn bump_interpolated_string_middle_value(&mut self, kind: TokenKind) -> &'src str {
+        let value = self.current_token_text();
         self.bump(kind);
         value
     }
