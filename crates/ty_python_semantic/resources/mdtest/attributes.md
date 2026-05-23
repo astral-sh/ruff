@@ -1051,6 +1051,17 @@ reveal_type(CInitialized.attr)  # revealed: int
 CInitialized.attr = 2
 # error: [invalid-assignment] "Object of type `Literal["invalid"]` is not assignable to attribute `attr` of type `int`"
 CInitialized.attr = "invalid"
+
+class BroadInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        value: object = "initial value"
+        cls.attr = value
+
+class CDeclared(metaclass=BroadInitializingMeta):
+    attr: str
+
+# A class-body declaration is a contract for an attribute populated by metaclass initialization.
+reveal_type(CDeclared.attr)  # revealed: str
 ```
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data

@@ -2591,9 +2591,22 @@ impl<'db> Type<'db> {
         );
 
         if let Some(metaclass_instance) = self.to_meta_type(db).to_instance(db) {
-            metaclass_instance
-                .instance_member(db, name)
-                .or_fall_back_to(db, || class_attr)
+            let metaclass_attr = metaclass_instance.instance_member(db, name);
+
+            // A declaration on the class object is its contract for values populated by
+            // metaclass initialization, analogous to a declared instance attribute initialized
+            // in `__init__`. A bound class-body value can still be overwritten by the metaclass.
+            if matches!(
+                class_attr.place,
+                Place::Defined(DefinedPlace {
+                    origin: TypeOrigin::Declared,
+                    ..
+                })
+            ) {
+                class_attr.or_fall_back_to(db, || metaclass_attr)
+            } else {
+                metaclass_attr.or_fall_back_to(db, || class_attr)
+            }
         } else {
             class_attr
         }
