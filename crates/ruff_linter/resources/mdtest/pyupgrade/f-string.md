@@ -1,10 +1,9 @@
 # `f-string` (`UP032`)
 
-These tests cover the soundness fixes for
-[#15874](https://github.com/astral-sh/ruff/issues/15874): a `str.format` call is only converted when
-the resulting f-string behaves like the original. Conversions that may change runtime behavior are
-downgraded to an unsafe fix, and conversions that Python rejects (or that an f-string would interpret
-differently) are skipped entirely.
+Soundness fixes for [#15874](https://github.com/astral-sh/ruff/issues/15874): a `str.format` call is
+only converted when the f-string behaves like the original. Conversions that can change behavior
+become unsafe fixes; conversions that Python rejects, or that an f-string reads differently, are
+skipped.
 
 ```toml
 lint.select = ["UP032"]
@@ -12,18 +11,18 @@ lint.select = ["UP032"]
 
 ## Dropped arguments emit an unsafe fix
 
-`str.format` evaluates every argument, while an f-string only evaluates the ones it interpolates.
-When an unused argument can change behavior, the fix is downgraded to unsafe.
+An f-string only evaluates the arguments it interpolates, so dropping one that can change behavior is
+unsafe.
 
 <!-- snapshot-diagnostics -->
 
-A walrus binding referenced only by the dropped argument would raise `NameError` after conversion:
+A walrus referenced only by the dropped argument:
 
 ```py
 "{1}".format(x := 1, x)  # error: [f-string]
 ```
 
-A dropped argument with side effects — a call, or arithmetic that may raise:
+A dropped argument that calls a function or can raise:
 
 ```py
 "a".format(foo())  # error: [f-string]
@@ -32,9 +31,8 @@ A dropped argument with side effects — a call, or arithmetic that may raise:
 
 ## Format-time accessors with side-effecting arguments emit an unsafe fix
 
-`str.format` evaluates all arguments before formatting any of them, whereas an f-string interleaves
-evaluation and formatting. With a field accessor like `{[k]}` or `{.attr}`, that reordering is
-observable — for example, a `defaultdict` whose key is inserted by a later `len()` argument:
+`str.format` evaluates every argument before formatting; an f-string interleaves the two. With a
+`{[k]}` or `{.attr}` accessor the order is observable, so the fix is unsafe:
 
 <!-- snapshot-diagnostics -->
 
@@ -45,8 +43,8 @@ observable — for example, a `defaultdict` whose key is inserted by a later `le
 
 ## Arguments that need parentheses
 
-The fix wraps an argument whose unparenthesized form would be misparsed inside the f-string: a
-lambda's colon would start a format spec, and a leading `{` would read as an escaped brace.
+The argument is wrapped when its bare form would be misparsed: a lambda's colon starts a format spec,
+and a leading `{` reads as an escaped brace.
 
 <!-- snapshot-diagnostics -->
 
@@ -55,42 +53,36 @@ lambda's colon would start a format spec, and a leading `{` would read as an esc
 "{}".format({} | {})  # error: [f-string]
 ```
 
-## Skipped: rejected by Python or interpreted differently
+## Skipped: rejected by Python or read differently
 
-These all parse as `str.format` calls, but have no behavior-preserving f-string equivalent, so no
-diagnostic is emitted.
+These parse as `str.format` calls but have no behavior-preserving f-string, so nothing is emitted.
 
-A signed field index — `str.format` raises `KeyError`, even though it parses as an integer:
+A signed field index (`str.format` raises `KeyError`):
 
 ```py
 "{+0}".format(0)
 ```
 
-An attribute name that isn't an identifier — `"{. a}"` resolves via `getattr(x, " a")`, but
-`f"{x. a}"` would read `x.a`:
+A non-identifier attribute name (`"{. a}"` calls `getattr(x, " a")`, but `f"{x. a}"` would read
+`x.a`):
 
 ```py
 "{. a}".format(x)
 ```
 
-A string index whose quote collides with the only quote available inside the f-string:
+A string index whose quote collides with the f-string quote:
 
 ```py
 "{[']}".format(x)
 ```
 
-An unknown conversion specifier — Python raises `ValueError` at runtime:
+An unknown conversion specifier (`str.format` raises `ValueError`):
 
 ```py
 "{!?}".format(0)
 ```
 
-## Drive-by: a dropped leading empty literal leaves no orphan whitespace
-
-When an implicitly-concatenated string starts with an empty literal, dropping it must not leave the
-inter-literal whitespace behind (which previously produced invalid indentation):
-
-<!-- snapshot-diagnostics -->
+## Drive-by: dropping a leading empty literal leaves no orphan whitespace
 
 ```py
 "" "{}".format(x)  # error: [f-string]

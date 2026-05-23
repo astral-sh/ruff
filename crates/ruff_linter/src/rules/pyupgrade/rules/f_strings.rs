@@ -41,8 +41,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// The fix is marked as unsafe whenever conversion may change runtime behavior:
 ///
-/// - A walrus binding referenced only by the dropped argument
-///   (`"{1}".format(x := 1, x)` → `f"{x}"` raises `NameError`).
+/// - A walrus binding referenced only by the dropped argument, so the f-string
+///   raises `NameError` (`"{1}".format(x := 1, x)`).
 /// - An unreferenced argument with side effects, including calls and arithmetic
 ///   operations that may raise (`"a".format(foo())`, `"1".format(1 / 0)`).
 /// - A format-time accessor (`{[k]}`, `{.attr}`) combined with a side-effecting
@@ -155,6 +155,7 @@ impl<'a> FormatSummaryValues<'a> {
         Some(arg)
     }
 
+    /// Return the arguments that no field referenced (and would be dropped).
     fn unreferenced_args(&self) -> impl Iterator<Item = &'a Expr> + '_ {
         let positional = self
             .args
