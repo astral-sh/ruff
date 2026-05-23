@@ -11,7 +11,7 @@ use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachabilit
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, declaration_type,
+    UnionBuilder, UnionType, binding_type, declaration_type, is_rejected_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -1401,6 +1401,17 @@ fn place_from_bindings_impl<'db>(
              reachability_constraint,
          }| {
             let binding = match binding {
+                DefinitionState::Defined(binding)
+                    if is_rejected_dict_key_assignment(db, binding) =>
+                {
+                    // The enclosing write still invalidates prior child refinements, but its
+                    // rejected RHS cannot establish a new precise child binding. Treat this as a
+                    // deleted refinement so loads fall back to the committed parent type.
+                    deleted_reachability = deleted_reachability.or_else(|| {
+                        reachability_constraints.evaluate(db, predicates, reachability_constraint)
+                    });
+                    return None;
+                }
                 DefinitionState::Defined(binding) => binding,
                 DefinitionState::Undefined => {
                     return None;

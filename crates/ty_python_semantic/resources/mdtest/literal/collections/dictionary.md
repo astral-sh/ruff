@@ -245,6 +245,12 @@ def _(x: list[dict[str, float | str]]):
     # error: [invalid-argument-type]
     accepts_value(**x[0]["nested"])
 
+def _(x: dict[str, object], y: int):
+    # An invalid nested binding does not reject the dictionary assignment itself.
+    # error: [invalid-assignment]
+    x = {"a": (y := "bad")}
+    reveal_type(x["a"])  # revealed: int
+
 class Y:
     inner: dict[str, object]
 

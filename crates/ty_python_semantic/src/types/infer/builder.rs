@@ -4,7 +4,7 @@ use std::rc::Rc;
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
@@ -99,16 +99,15 @@ use crate::types::{
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+    infer_complete_scope_types, infer_scope_types, is_rejected_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
-    Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, DictKeyAssignmentKind,
-    DictKeyAssignmentPathSegmentRef, ExceptHandlerDefinitionKind, ForStmtDefinitionKind,
-    LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind, ParameterDefinitionNodeKind,
-    TargetKind, WithItemDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
+    ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
+    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -337,26 +336,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
 /// An expression cache shared across builders during multi-inference.
 type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
-
-/// Returns the type committed by an assignment if its right-hand side was rejected.
-///
-/// Synthesized descendant bindings can use RHS precision only when the enclosing assignment
-/// committed that RHS. Otherwise, they must project from the accepted binding type.
-#[salsa::tracked]
-fn rejected_assignment_binding_type<'db>(
-    db: &'db dyn Db,
-    assignment: Definition<'db>,
-) -> Option<Type<'db>> {
-    let module = parsed_module(db, assignment.file(db)).load(db);
-    let value = assignment.kind(db).value(&module)?;
-    let assignment_types = infer_definition_types(db, assignment);
-    let binding_ty = assignment_types.binding_type(assignment);
-
-    (!assignment_types
-        .expression_type(value)
-        .is_assignable_to(db, binding_ty))
-    .then_some(binding_ty)
-}
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
@@ -972,7 +951,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
-                self.infer_dict_key_assignment_definition(dict_key_assignment, definition);
+                self.infer_dict_key_assignment_definition(
+                    dict_key_assignment.key(self.module()),
+                    dict_key_assignment.value(self.module()),
+                    dict_key_assignment.assignment(),
+                    definition,
+                );
             }
             DefinitionKind::For(for_statement_definition) => {
                 self.infer_for_statement_definition(for_statement_definition, definition);
@@ -4740,37 +4724,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_dict_key_assignment_definition(
         &mut self,
-        dict_key_assignment: &DictKeyAssignmentKind<'db>,
+        key: &'ast ast::Expr,
+        value: &'ast ast::Expr,
+        assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        let assignment = dict_key_assignment.assignment();
-        let assignment_types = infer_definition_types(self.db(), assignment);
-        let key = dict_key_assignment.key(self.module());
-        let value = dict_key_assignment.value(self.module());
-        let value_ty = if let Some(mut collection_ty) =
-            rejected_assignment_binding_type(self.db(), assignment)
-        {
-            for path_segment in dict_key_assignment.path(self.module()) {
-                let key_ty = match path_segment {
-                    DictKeyAssignmentPathSegmentRef::Key(key) => {
-                        assignment_types.expression_type(key)
-                    }
-                    DictKeyAssignmentPathSegmentRef::Index(index) => Type::int_literal(index),
-                };
-                collection_ty = collection_ty
-                    .subscript(self.db(), key_ty, ExprContext::Load)
-                    .unwrap_or_else(|error| error.result_type());
-            }
-            collection_ty
-                .subscript(
-                    self.db(),
-                    assignment_types.expression_type(key),
-                    ExprContext::Load,
-                )
-                .unwrap_or_else(|error| error.result_type())
-        } else {
-            assignment_types.expression_type(value)
-        };
+        let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }
@@ -8448,13 +8407,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
                         match binding.binding {
-                            DefinitionState::Defined(definition) => {
+                            DefinitionState::Defined(definition)
+                                if !is_rejected_dict_key_assignment(db, definition) =>
+                            {
                                 let binding_ty = binding_type(db, definition);
                                 union = union.add(
                                     binding.narrowing_constraint.narrow(db, binding_ty, place),
                                 );
                             }
-                            DefinitionState::Undefined | DefinitionState::Deleted => {
+                            DefinitionState::Defined(_)
+                            | DefinitionState::Undefined
+                            | DefinitionState::Deleted => {
                                 union =
                                     union.add(binding.narrowing_constraint.narrow(db, ty, place));
                             }

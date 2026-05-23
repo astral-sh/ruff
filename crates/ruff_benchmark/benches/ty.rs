@@ -774,11 +774,11 @@ accepts_anything(
     });
 }
 
-/// Regression benchmark for recovering known key types from a rejected dictionary assignment.
+/// Regression benchmark for ignoring known key refinements from a rejected dictionary assignment.
 ///
 /// The `**x` call consumes every synthesized key binding. Resolving rejected descendants should
-/// remain linear rather than searching the root literal separately for each key.
-fn benchmark_rejected_dict_key_recovery(criterion: &mut Criterion) {
+/// remain linear rather than rechecking the root assignment separately for each key.
+fn benchmark_rejected_dict_key_refinements(criterion: &mut Criterion) {
     const NUM_KEYS: usize = 1000;
 
     setup_rayon();
@@ -796,7 +796,7 @@ x: dict[str, int] = {
     writeln!(&mut code, r#"    "k{}": object(),"#, NUM_KEYS - 1).ok();
     code.push_str("}\naccepts_kwargs(**x)\n");
 
-    criterion.bench_function("ty_micro[rejected_dict_key_recovery]", |b| {
+    criterion.bench_function("ty_micro[rejected_dict_key_refinements]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
@@ -1493,7 +1493,7 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_gradual_vararg_call,
-    benchmark_rejected_dict_key_recovery,
+    benchmark_rejected_dict_key_refinements,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,
