@@ -102,7 +102,14 @@ impl<'src> Cursor<'src> {
     }
 
     pub(super) fn eat_char(&mut self, c: char) -> bool {
-        if self.first() == c {
+        if c.is_ascii() {
+            if self.rest().as_bytes().first().copied() == Some(c as u8) {
+                self.bump();
+                true
+            } else {
+                false
+            }
+        } else if self.first() == c {
             self.bump();
             true
         } else {
