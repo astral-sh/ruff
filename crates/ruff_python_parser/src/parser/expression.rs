@@ -573,7 +573,9 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
-            let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
+            let value = self.tokens.take_value();
+            self.do_bump(TokenKind::Name);
+            let TokenValue::Name(name) = value else {
                 unreachable!();
             };
             return ast::Identifier {
