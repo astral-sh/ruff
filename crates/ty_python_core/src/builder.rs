@@ -3560,6 +3560,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 }
 
+fn return_expression_may_provide_collection_context(expression: &ast::Expr) -> bool {
+    match expression {
+        ast::Expr::Name(_) => false,
+        ast::Expr::List(list) => list
+            .elts
+            .iter()
+            .any(return_expression_may_provide_collection_context),
+        ast::Expr::Tuple(tuple) => tuple
+            .elts
+            .iter()
+            .any(return_expression_may_provide_collection_context),
+        _ => true,
+    }
+}
+
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.push_statement(CurrentStatement::default());
@@ -3574,8 +3589,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             .collection_uses
             .retain(|(_, use_expression)| {
                 match stmt {
-                    // A return involving the collection object.
-                    ruff_python_ast::Stmt::Return(_) => true,
+                    // Without an annotated return type, names in tuple or list displays are
+                    // only reads. Other return expressions can contain nested type context,
+                    // such as the parameter annotation in `return consume(items)`.
+                    ruff_python_ast::Stmt::Return(ast::StmtReturn { value, .. }) => {
+                        matches!(
+                            self.scopes[self.current_scope()].node(),
+                            NodeWithScopeKind::Function(function)
+                                if function.node(self.module).returns.is_some()
+                        ) || value
+                            .as_deref()
+                            .is_some_and(return_expression_may_provide_collection_context)
+                    }
 
                     // A subscript assignment on the collection object.
                     ruff_python_ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {

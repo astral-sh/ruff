@@ -1260,6 +1260,60 @@ y = 2
     }
 
     #[test]
+    fn simple_unannotated_returns_do_not_constrain_empty_collections() {
+        let TestCase { db, file } = test_case(
+            "
+def unannotated():
+    empty = []
+    return empty
+
+def tuple_return():
+    empty = []
+    other = []
+    return [other], empty
+
+def nested_context():
+    empty = []
+    return [consume(empty)]
+
+def annotated() -> list[int]:
+    empty = []
+    return empty
+",
+        );
+        let module = parsed_module(&db, file).load(&db);
+        let index = semantic_index(&db, file);
+        let count_constraints = |function: &ast::StmtFunctionDef| {
+            let assignment = function.body[0].as_assign_stmt().unwrap();
+            let collection = index
+                .try_definition(
+                    DefinitionNodeKey::from_assignment(assignment)
+                        .next()
+                        .unwrap(),
+                )
+                .unwrap();
+            index.constraining_collection_uses(collection).count()
+        };
+
+        assert_eq!(
+            count_constraints(module.syntax().body[0].as_function_def_stmt().unwrap()),
+            0
+        );
+        assert_eq!(
+            count_constraints(module.syntax().body[1].as_function_def_stmt().unwrap()),
+            0
+        );
+        assert_eq!(
+            count_constraints(module.syntax().body[2].as_function_def_stmt().unwrap()),
+            1
+        );
+        assert_eq!(
+            count_constraints(module.syntax().body[3].as_function_def_stmt().unwrap()),
+            1
+        );
+    }
+
+    #[test]
     fn function_parameter_symbols() {
         let TestCase { db, file } = test_case(
             "

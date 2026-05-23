@@ -841,6 +841,15 @@ def _() -> int:
 ```
 
 ```py
+def takes_list_int_in_return(x: list[int]): ...
+def returns_call_constraint(flag: bool):
+    x = []
+    if flag:
+        return takes_list_int_in_return(x)
+    reveal_type(x)  # revealed: list[int]
+```
+
+```py
 x7 = []
 x7[:] = [1, "2", 3.0]
 reveal_type(x7)  # revealed: list[int | str | float]
