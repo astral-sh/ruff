@@ -313,7 +313,7 @@ impl<'src> Lexer<'src> {
         // Handle indentation if this is a new, not all empty, logical line
         if !matches!(
             self.cursor.rest().as_bytes(),
-            [] | [b'\n', ..] | [b'\r', ..] | [b'#', ..]
+            [] | [b'\n' | b'\r' | b'#', ..]
         ) {
             self.state = State::NonEmptyLogicalLine;
 
@@ -327,7 +327,7 @@ impl<'src> Lexer<'src> {
     fn eat_ascii_line_ending(&mut self) -> bool {
         let count = match self.cursor.rest().as_bytes() {
             [b'\r', b'\n', ..] => 2,
-            [b'\r', ..] | [b'\n', ..] => 1,
+            [b'\r' | b'\n', ..] => 1,
             _ => return false,
         };
 
