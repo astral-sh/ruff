@@ -91,12 +91,6 @@ pub(crate) enum PreviousDefinitions {
     AreKept,
 }
 
-impl PreviousDefinitions {
-    pub(super) fn are_shadowed(self) -> bool {
-        matches!(self, PreviousDefinitions::AreShadowed)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum FutureDefinitions {
     ShadowThisOne,
@@ -119,9 +113,9 @@ impl Declarations {
         &mut self,
         declaration: ScopedDefinitionId,
         reachability_constraint: ScopedReachabilityConstraintId,
-        previous_definitions: PreviousDefinitions,
+        shadows_previous: PreviousDefinitions,
     ) {
-        if previous_definitions.are_shadowed() {
+        if matches!(shadows_previous, PreviousDefinitions::AreShadowed) {
             // The new declaration replaces all previous live declaration in this path.
             self.live_declarations.clear();
         }
@@ -229,7 +223,7 @@ pub struct LiveBinding {
     binding: ScopedDefinitionId,
     narrowing_constraint: ScopedNarrowingConstraint,
     reachability_constraint: ScopedReachabilityConstraintId,
-    future_definitions: FutureDefinitions,
+    can_be_shadowed: FutureDefinitions,
 }
 
 impl LiveBinding {
@@ -254,7 +248,7 @@ impl Bindings {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-            future_definitions: FutureDefinitions::ShadowThisOne,
+            can_be_shadowed: FutureDefinitions::ShadowThisOne,
         };
         Self {
             unbound_narrowing_constraint: None,
@@ -269,8 +263,8 @@ impl Bindings {
         reachability_constraint: ScopedReachabilityConstraintId,
         is_class_scope: bool,
         is_place_name: bool,
-        previous_definitions: PreviousDefinitions,
-        future_definitions: FutureDefinitions,
+        shadows_previous: PreviousDefinitions,
+        can_be_shadowed: FutureDefinitions,
     ) {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
@@ -279,10 +273,10 @@ impl Bindings {
         }
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
-        if previous_definitions.are_shadowed() {
+        if matches!(shadows_previous, PreviousDefinitions::AreShadowed) {
             self.live_bindings.retain(|binding| {
                 matches!(
-                    binding.future_definitions,
+                    binding.can_be_shadowed,
                     FutureDefinitions::DontShadowThisOne
                 )
             });
@@ -291,7 +285,7 @@ impl Bindings {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-            future_definitions,
+            can_be_shadowed,
         });
     }
 
@@ -349,7 +343,7 @@ impl Bindings {
         for zipped in a.merge_join_by(b, |a, b| a.binding.cmp(&b.binding)) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {
-                    debug_assert_eq!(a.future_definitions, b.future_definitions);
+                    debug_assert_eq!(a.can_be_shadowed, b.can_be_shadowed);
 
                     // If the same definition is visible through both paths, we OR the narrowing
                     // constraints: the type should be narrowed by whichever path was taken.
@@ -364,7 +358,7 @@ impl Bindings {
                         binding: a.binding,
                         narrowing_constraint,
                         reachability_constraint,
-                        future_definitions: a.future_definitions,
+                        can_be_shadowed: a.can_be_shadowed,
                     });
                 }
 
@@ -398,8 +392,8 @@ impl PlaceState {
         reachability_constraint: ScopedReachabilityConstraintId,
         is_class_scope: bool,
         is_place_name: bool,
-        previous_definitions: PreviousDefinitions,
-        future_definitions: FutureDefinitions,
+        shadows_previous: PreviousDefinitions,
+        can_be_shadowed: FutureDefinitions,
     ) {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
         self.bindings.record_binding(
@@ -407,8 +401,8 @@ impl PlaceState {
             reachability_constraint,
             is_class_scope,
             is_place_name,
-            previous_definitions,
-            future_definitions,
+            shadows_previous,
+            can_be_shadowed,
         );
     }
 

@@ -1064,8 +1064,8 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         place: ScopedPlaceId,
         binding: Definition<'db>,
-        previous_definitions: PreviousDefinitions,
-        future_definitions: FutureDefinitions,
+        shadows_previous: PreviousDefinitions,
+        can_be_shadowed: FutureDefinitions,
     ) {
         let bindings = match place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
@@ -1088,8 +1088,8 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
-            previous_definitions,
-            future_definitions,
+            shadows_previous,
+            can_be_shadowed,
         );
 
         let bindings = match place {
@@ -1107,7 +1107,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreKept,
-            future_definitions,
+            can_be_shadowed,
         );
     }
 

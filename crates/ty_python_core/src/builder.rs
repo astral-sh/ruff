@@ -124,13 +124,17 @@ struct ScopeInfo<'ast> {
     /// ```py
     /// def f():
     ///     def g():
-    ///         # When we pop `g`, this `x` goes in `f`'s set of unresolved nonlocals.
+    ///         # When we encounter the `nonlocal` statement, we add `x` to `f`'s collection of
+    ///         # unresolved nonlocals. (It would be ok to put it in `g`s collection, but we know
+    ///         # it can't resolve here in `g`.)
     ///         nonlocal x
     ///     def h():
     ///         # When we pop `h`, this binding of `x` will *not* resolve the nonlocal from `g`,
-    ///         # because that binding is not in `h`'s set of unresolved nonlocals.
+    ///         # because that binding is not in `h`'s set of unresolved nonlocals. (`h`'s set is
+    ///         # currently empty.)
     ///         x = 1
-    ///     # When we pop `f`, this binding of `x` will resolve the nonlocal from `g`.
+    ///     # When we pop `f`, this binding of `x` will resolve the nonlocal from `g`. Or if `f`
+    ///     # didn't have a binding for `x`, then we'd merge `x` into the caller's collection.
     ///     x = 1
     /// ```
     ///
@@ -161,14 +165,14 @@ enum NestedBindingLaziness {
 }
 
 impl NestedBindingLaziness {
-    const fn previous_definitions(self) -> PreviousDefinitions {
+    const fn shadows_previous(self) -> PreviousDefinitions {
         match self {
             Self::Eager => PreviousDefinitions::AreShadowed,
             Self::Lazy => PreviousDefinitions::AreKept,
         }
     }
 
-    const fn future_definitions(self) -> FutureDefinitions {
+    const fn can_be_shadowed(self) -> FutureDefinitions {
         match self {
             Self::Eager => FutureDefinitions::ShadowThisOne,
             Self::Lazy => FutureDefinitions::DontShadowThisOne,
@@ -658,13 +662,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///     inner()
     ///     inner2()
     /// ```
-    fn update_lazy_snapshots(&mut self, symbol: ScopedSymbolId, force: bool) {
+    fn update_lazy_snapshots(&mut self, symbol: ScopedSymbolId) {
         let current_scope = self.current_scope();
         let current_place_table = &self.place_tables[current_scope];
         let symbol = current_place_table.symbol(symbol);
         // Optimization: if this is the first binding of the symbol we've seen, there can't be any
         // lazy snapshots of it to update.
-        if !force && !symbol.is_reassigned() {
+        if !symbol.is_reassigned() {
             return;
         }
         for (key, snapshot_id) in &self.enclosing_snapshots {
@@ -964,6 +968,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         false
     }
 
+    /// Figure out whether bindings in `binding_scope` are eager vs lazy from the perspective of
+    /// `current_scope`. Class bodies are eagerly evaluated, so a nonlocal/global binding in a
+    /// class scope takes effect immediately in its caller. Function bodies are not eagerly
+    /// evaluated ("lazy"), and importantly, a class body *inside* a function body also becomes
+    /// lazy from the perspective of the function's callers.
     fn nested_binding_laziness(
         &self,
         current_scope: FileScopeId,
@@ -1166,12 +1175,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().record_binding(
             place,
             definition,
-            laziness.previous_definitions(),
-            laziness.future_definitions(),
+            laziness.shadows_previous(),
+            laziness.can_be_shadowed(),
         );
 
         if let Some(symbol_id) = place.as_symbol() {
-            self.update_lazy_snapshots(symbol_id, laziness == NestedBindingLaziness::Eager);
+            self.update_lazy_snapshots(symbol_id);
         }
     }
 
@@ -1648,7 +1657,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
             DefinitionCategory::Binding => {
                 // Loop-header bindings don't shadow prior bindings.
-                let previous_definitions = if is_loop_header {
+                let shadows_previous = if is_loop_header {
                     PreviousDefinitions::AreKept
                 } else {
                     PreviousDefinitions::AreShadowed
@@ -1656,7 +1665,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 use_def.record_binding(
                     place,
                     definition,
-                    previous_definitions,
+                    shadows_previous,
                     FutureDefinitions::ShadowThisOne,
                 );
                 if !is_loop_header {
@@ -1667,7 +1676,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         if category.is_binding() {
             if let Some(id) = place.as_symbol() {
-                self.update_lazy_snapshots(id, false);
+                self.update_lazy_snapshots(id);
             }
         }
 
