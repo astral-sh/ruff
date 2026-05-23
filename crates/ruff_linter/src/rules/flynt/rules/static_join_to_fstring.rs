@@ -83,12 +83,8 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             .filter_map(|expr| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                     let curr_flags = value.first_literal_flags();
-                    if flags.is_none() {
-                        flags = Some(curr_flags);
-                        any_raw = curr_flags.prefix().is_raw();
-                    } else if curr_flags.prefix().is_raw() {
-                        any_raw = true;
-                    }
+                    flags.get_or_insert(curr_flags);
+                    any_raw |= curr_flags.prefix().is_raw();
                     Some(value.to_str())
                 } else {
                     None
@@ -102,9 +98,8 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         // use non-raw representation. This handles cases where raw strings would create invalid
         // syntax or behavior changes.
         if any_raw && !content.is_empty() {
-            let needs_non_raw = content.contains(['\r', '\0']) || {
-                // Check if content contains characters that would break raw string syntax
-                let quote_char = flags.quote_str();
+            let quote_str = flags.quote_str();
+            let needs_non_raw = content.contains(['\r', '\0']) || content.contains(quote_str) || {
                 // A raw string cannot end with an odd number of backslashes if it's immediately
                 // followed by the quote delimiter, as that would be invalid syntax.
                 let mut trailing_backslashes = 0;
@@ -115,8 +110,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
                         break;
                     }
                 }
-                let ends_with_odd_backslashes = trailing_backslashes % 2 != 0;
-                content.contains(quote_char) || ends_with_odd_backslashes
+                trailing_backslashes % 2 != 0
             };
 
             if needs_non_raw {
