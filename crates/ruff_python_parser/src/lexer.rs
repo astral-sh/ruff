@@ -1247,18 +1247,29 @@ impl<'src> Lexer<'src> {
     /// the digits can be decorated with underscores
     /// like this: '`1_2_3_4`' == '1234'
     fn radix_run(&mut self, number: &mut LexedText, radix: Radix) {
-        loop {
-            if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
-                number.push(c);
+        let bytes = self.cursor.rest().as_bytes();
+        let mut consumed = 0;
+
+        while let Some(&byte) = bytes.get(consumed) {
+            if radix.is_digit(byte) {
+                number.push(char::from(byte));
             }
             // Number that contains `_` separators. Remove them from the parsed text.
-            else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
-                // Skip over `_`
-                self.cursor.bump();
+            else if byte == b'_'
+                && bytes
+                    .get(consumed + 1)
+                    .is_some_and(|&next| radix.is_digit(next))
+            {
                 number.skip_char();
             } else {
                 break;
             }
+
+            consumed += 1;
+        }
+
+        if consumed > 0 {
+            self.cursor.skip_bytes(consumed);
         }
     }
 
@@ -1816,12 +1827,12 @@ impl Radix {
         }
     }
 
-    const fn is_digit(self, c: char) -> bool {
+    const fn is_digit(self, byte: u8) -> bool {
         match self {
-            Radix::Binary => matches!(c, '0'..='1'),
-            Radix::Octal => matches!(c, '0'..='7'),
-            Radix::Decimal => c.is_ascii_digit(),
-            Radix::Hex => c.is_ascii_hexdigit(),
+            Radix::Binary => matches!(byte, b'0'..=b'1'),
+            Radix::Octal => matches!(byte, b'0'..=b'7'),
+            Radix::Decimal => byte.is_ascii_digit(),
+            Radix::Hex => byte.is_ascii_hexdigit(),
         }
     }
 }
@@ -2193,7 +2204,7 @@ def f(arg=%timeit a = b):
 
     #[test]
     fn test_numbers() {
-        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
+        let source = "0x2f 0x2_f 0x2_f_name 0x2_fπ 0o12 0o1_2 0b1101 0b11_01 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
         assert_snapshot!(lex_source(source));
     }
 
