@@ -260,6 +260,12 @@ class InitializingMeta[T](type):
 class Initialized(metaclass=InitializingMeta[int]): ...
 
 static_assert(has_member(Initialized, "initialized_attr"))
+
+def _(x: type[Initialized]):
+    static_assert(has_member(x, "initialized_attr"))
+
+def _[T: Initialized](x: type[T]):
+    static_assert(has_member(x, "initialized_attr"))
 ```
 
 ### `type[Any]` and `Any`

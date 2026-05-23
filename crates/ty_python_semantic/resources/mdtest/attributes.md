@@ -1045,6 +1045,7 @@ class CCreated(metaclass=InitializingMeta): ...
 reveal_type(CCreated.attr)  # revealed: int
 
 class CInitialized(metaclass=InitializingMeta):
+    # TODO: This should be an `invalid-assignment` error
     attr = "initial class value"
 
 reveal_type(CInitialized.attr)  # revealed: int
