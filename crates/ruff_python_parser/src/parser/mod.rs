@@ -395,10 +395,10 @@ impl<'src> Parser<'src> {
     fn bump_name(&mut self) -> Name {
         let range = self.current_token_range();
         let text = self.src_text(range);
-        let name = if text.is_ascii() {
-            Name::new(text)
-        } else {
+        let name = if self.tokens.current_flags().is_non_ascii_name() {
             text.nfkc().collect::<Name>()
+        } else {
+            Name::new(text)
         };
         self.bump(TokenKind::Name);
         name
