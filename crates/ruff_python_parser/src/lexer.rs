@@ -114,12 +114,12 @@ impl<'src> Lexer<'src> {
     }
 
     /// Returns the kind of the current token.
-    pub(crate) fn current_kind(&self) -> TokenKind {
+    pub(crate) const fn current_kind(&self) -> TokenKind {
         self.current_kind
     }
 
     /// Returns the range of the current token.
-    pub(crate) fn current_range(&self) -> TextRange {
+    pub(crate) const fn current_range(&self) -> TextRange {
         self.current_range
     }
 
@@ -130,7 +130,7 @@ impl<'src> Lexer<'src> {
     }
 
     /// Returns the flags for the current token.
-    pub(crate) fn current_flags(&self) -> TokenFlags {
+    pub(crate) const fn current_flags(&self) -> TokenFlags {
         self.current_flags
     }
 
@@ -655,14 +655,19 @@ impl<'src> Lexer<'src> {
             return self.lex_string(quote);
         }
 
-        let mut has_non_ascii = !first.is_ascii();
-        self.cursor.eat_while(|c| {
-            let is_continuation = is_identifier_continuation(c);
-            has_non_ascii |= is_continuation && !c.is_ascii();
-            is_continuation
-        });
+        // Keep track of whether the identifier is ASCII-only or not.
+        //
+        // This is important because Python applies NFKC normalization to
+        // identifiers: https://docs.python.org/3/reference/lexical_analysis.html#identifiers.
+        // The parser needs to do the same when cooking the name, but applying
+        // NFKC normalization unconditionally is extremely expensive. If we know
+        // an identifier is ASCII-only (by far the most common case), the parser
+        // can skip NFKC normalization.
+        let mut is_ascii = first.is_ascii();
+        self.cursor
+            .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
 
-        if has_non_ascii {
+        if !is_ascii {
             self.current_flags |= TokenFlags::NON_ASCII_NAME;
         }
 
@@ -1608,13 +1613,21 @@ fn is_unicode_identifier_start(c: char) -> bool {
 
 /// Checks if the character c is a valid continuation character as described
 /// in <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>.
-fn is_identifier_continuation(c: char) -> bool {
+///
+/// Additionally, this function also keeps track of whether or not the total
+/// identifier is ASCII-only or not by mutably altering a reference to a
+/// boolean value passed in.
+fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {
         matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
     } else {
-        is_xid_continue(c)
+        let is_continuation = is_xid_continue(c);
+        if is_continuation {
+            *identifier_is_ascii_only = false;
+        }
+        is_continuation
     }
 }
 
@@ -2187,8 +2200,8 @@ if first:
 
     #[test]
     fn test_non_ascii_name_flag() {
-        let output = lex("aβ = β\nascii", Mode::Module, TextSize::default());
-        assert!(output.errors.is_empty());
+        let output = lex("a€\naβ = β\nascii", Mode::Module, TextSize::default());
+        assert_eq!(output.errors.len(), 1);
 
         let flags = output
             .tokens
@@ -2197,7 +2210,7 @@ if first:
             .map(|token| token.flags.is_non_ascii_name())
             .collect::<Vec<_>>();
 
-        assert_eq!(flags, [true, true, false]);
+        assert_eq!(flags, [false, true, true, false]);
     }
 
     fn triple_quoted_eol(eol: &str) -> LexerOutput {
