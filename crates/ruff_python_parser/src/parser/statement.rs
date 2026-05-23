@@ -257,6 +257,7 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
+        stmts.shrink_to_fit();
         stmts
     }
 
@@ -737,6 +738,7 @@ impl<'src> Parser<'src> {
             // 2 + 2
             self.expect(TokenKind::Rpar);
         }
+        names.shrink_to_fit();
 
         ast::StmtImportFrom {
             module,
@@ -1251,6 +1253,7 @@ impl<'src> Parser<'src> {
             // ["a", "b"] = ["a", "b"]
             self.validate_assignment_target(target);
         }
+        targets.shrink_to_fit();
 
         ast::StmtAssign {
             targets,
@@ -1440,6 +1443,7 @@ impl<'src> Parser<'src> {
 
         if self.at(TokenKind::Else) {
             elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
+            elif_else_clauses.shrink_to_fit();
         }
 
         ast::StmtIf {
@@ -2397,12 +2401,12 @@ impl<'src> Parser<'src> {
         }
 
         let with_items = if with_item_kind.is_parenthesized() {
-            Some(
-                parsed_with_items
-                    .into_iter()
-                    .map(|parsed_with_item| parsed_with_item.item)
-                    .collect(),
-            )
+            let mut with_items: Vec<_> = parsed_with_items
+                .into_iter()
+                .map(|parsed_with_item| parsed_with_item.item)
+                .collect();
+            with_items.shrink_to_fit();
+            Some(with_items)
         } else {
             self.rewind(checkpoint);
 
@@ -2712,6 +2716,7 @@ impl<'src> Parser<'src> {
             cases.push(self.parse_match_case());
         }
 
+        cases.shrink_to_fit();
         cases
     }
 
@@ -2982,6 +2987,7 @@ impl<'src> Parser<'src> {
             // @x class Foo: ...
             self.expect(TokenKind::Newline);
         }
+        decorators.shrink_to_fit();
 
         match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
@@ -3524,6 +3530,9 @@ impl<'src> Parser<'src> {
         }
 
         parameters.range = self.node_range(start);
+        parameters.posonlyargs.shrink_to_fit();
+        parameters.args.shrink_to_fit();
+        parameters.kwonlyargs.shrink_to_fit();
 
         parameters
     }
@@ -3984,6 +3993,7 @@ impl<'src> Parser<'src> {
 
         self.recovery_context = saved_context;
 
+        clauses.shrink_to_fit();
         clauses
     }
 }

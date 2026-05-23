@@ -513,6 +513,7 @@ impl<'src> Parser<'src> {
         self.parse_list(recovery_context_kind, |parser| {
             statements.push(parser.parse_statement());
         });
+        statements.shrink_to_fit();
         statements
     }
 
@@ -572,6 +573,7 @@ impl<'src> Parser<'src> {
     ) -> Vec<T> {
         let mut elements = Vec::new();
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
+        elements.shrink_to_fit();
         elements
     }
 

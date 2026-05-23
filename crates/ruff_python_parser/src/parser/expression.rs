@@ -1003,6 +1003,7 @@ impl<'src> Parser<'src> {
             self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
                 slices.push(parser.parse_slice());
             });
+            slices.shrink_to_fit();
 
             slice = Expr::Tuple(ast::ExprTuple {
                 elts: slices,
@@ -1259,6 +1260,7 @@ impl<'src> Parser<'src> {
                 break;
             }
         }
+        values.shrink_to_fit();
 
         ast::ExprBoolOp {
             values,
@@ -1768,6 +1770,7 @@ impl<'src> Parser<'src> {
                 elements.push(element);
             },
         );
+        elements.shrink_to_fit();
 
         ast::InterpolatedStringElements::from(elements)
     }
@@ -2475,6 +2478,7 @@ impl<'src> Parser<'src> {
         if parenthesized.is_yes() {
             self.expect(TokenKind::Rpar);
         }
+        elts.shrink_to_fit();
 
         ast::ExprTuple {
             elts,
@@ -2504,6 +2508,7 @@ impl<'src> Parser<'src> {
         });
 
         self.expect(TokenKind::Rsqb);
+        elts.shrink_to_fit();
 
         ast::ExprList {
             elts,
@@ -2555,6 +2560,7 @@ impl<'src> Parser<'src> {
         });
 
         self.expect(TokenKind::Rbrace);
+        elts.shrink_to_fit();
 
         ast::ExprSet {
             range: self.node_range(start),
@@ -2598,6 +2604,7 @@ impl<'src> Parser<'src> {
         });
 
         self.expect(TokenKind::Rbrace);
+        items.shrink_to_fit();
 
         ast::ExprDict {
             range: self.node_range(start),
@@ -2623,6 +2630,7 @@ impl<'src> Parser<'src> {
             generators.push(self.parse_comprehension());
         }
 
+        generators.shrink_to_fit();
         generators
     }
 
@@ -2666,6 +2674,7 @@ impl<'src> Parser<'src> {
 
             ifs.push(parsed_expr.expr);
         }
+        ifs.shrink_to_fit();
 
         ast::Comprehension {
             range: self.node_range(start),
