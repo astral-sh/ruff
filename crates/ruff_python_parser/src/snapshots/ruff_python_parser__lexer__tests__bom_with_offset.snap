@@ -6,9 +6,7 @@ expression: "lex_source_with_offset(source, TextSize::new(7))"
 ```
 [
     (
-        Name(
-            Name("y"),
-        ),
+        Name,
         7..8,
     ),
     (
@@ -16,9 +14,7 @@ expression: "lex_source_with_offset(source, TextSize::new(7))"
         9..10,
     ),
     (
-        Name(
-            Name("z"),
-        ),
+        Name,
         11..12,
     ),
     (

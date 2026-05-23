@@ -13,9 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "\n# not a comment ",
-        ),
+        FStringMiddle,
         4..21,
         TokenFlags(
             DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
@@ -34,9 +32,7 @@ expression: lex_source(source)
         34..35,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         39..40,
     ),
     (
@@ -48,9 +44,7 @@ expression: lex_source(source)
         41..42,
     ),
     (
-        InterpolatedStringMiddle(
-            " # not a comment\n",
-        ),
+        FStringMiddle,
         42..59,
         TokenFlags(
             DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,

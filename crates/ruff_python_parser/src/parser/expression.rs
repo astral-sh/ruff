@@ -21,7 +21,6 @@ use crate::string::{
     InterpolatedStringKind, StringType, parse_interpolated_string_literal_element,
     parse_string_literal,
 };
-use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{
     InterpolatedStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError,
@@ -573,9 +572,7 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
-            let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
-                unreachable!();
-            };
+            let name = self.bump_name();
             return ast::Identifier {
                 id: name,
                 range,
@@ -651,9 +648,7 @@ impl<'src> Parser<'src> {
 
         let lhs = match self.current_token_kind() {
             TokenKind::Float => {
-                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
-                    unreachable!()
-                };
+                let value = self.bump_float();
 
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Float(value),
@@ -662,9 +657,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Complex => {
-                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
-                    unreachable!()
-                };
+                let (real, imag) = self.bump_complex();
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Complex { real, imag },
                     range: self.node_range(start),
@@ -672,9 +665,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
-                    unreachable!()
-                };
+                let value = self.bump_int();
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Int(value),
                     range: self.node_range(start),
@@ -1605,9 +1596,7 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
-        let TokenValue::String(value) = self.bump_value(TokenKind::String) else {
-            unreachable!()
-        };
+        let value = self.bump_string_value();
 
         match parse_string_literal(value, flags, range) {
             Ok(string) => string,
@@ -1724,11 +1713,7 @@ impl<'src> Parser<'src> {
                     ),
                     tok if tok == middle_token_kind => {
                         let range = parser.current_token_range();
-                        let TokenValue::InterpolatedStringMiddle(value) =
-                            parser.bump_value(middle_token_kind)
-                        else {
-                            unreachable!()
-                        };
+                        let value = parser.bump_interpolated_string_middle_value(middle_token_kind);
                         InterpolatedStringElement::Literal(
                             parse_interpolated_string_literal_element(value, flags, range)
                                 .unwrap_or_else(|lex_error| {
@@ -1863,9 +1848,7 @@ impl<'src> Parser<'src> {
                         TextRange::new(self.prev_token_end, conversion_flag_range.start()),
                     );
                 }
-                let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
-                    unreachable!();
-                };
+                let name = self.bump_name();
                 match &*name {
                     "s" => ConversionFlag::Str,
                     "r" => ConversionFlag::Repr,
@@ -3062,11 +3045,7 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
         let start = self.node_start();
 
-        let TokenValue::IpyEscapeCommand { value, kind } =
-            self.bump_value(TokenKind::IpyEscapeCommand)
-        else {
-            unreachable!()
-        };
+        let (value, kind) = self.bump_ipython_escape_command(false);
 
         if !matches!(kind, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
             // This should never occur as the lexer won't allow it.

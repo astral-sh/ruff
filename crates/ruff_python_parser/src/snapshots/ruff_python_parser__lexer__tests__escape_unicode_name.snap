@@ -6,9 +6,7 @@ expression: lex_source(source)
 ```
 [
     (
-        String(
-            "\\N{EN SPACE}",
-        ),
+        String,
         0..14,
         TokenFlags(
             DOUBLE_QUOTES,

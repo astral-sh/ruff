@@ -13,9 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "foo ",
-        ),
+        TStringMiddle,
         2..6,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -33,9 +31,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "bar ",
-        ),
+        FStringMiddle,
         9..13,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -46,9 +42,7 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         14..15,
     ),
     (
@@ -67,9 +61,7 @@ expression: lex_source(source)
         20..21,
     ),
     (
-        Name(
-            Name("wow"),
-        ),
+        Name,
         21..24,
     ),
     (
@@ -99,9 +91,7 @@ expression: lex_source(source)
         28..29,
     ),
     (
-        InterpolatedStringMiddle(
-            " baz",
-        ),
+        TStringMiddle,
         29..33,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -122,9 +112,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "foo ",
-        ),
+        FStringMiddle,
         37..41,
         TokenFlags(
             F_STRING,
@@ -142,9 +130,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "bar",
-        ),
+        TStringMiddle,
         44..47,
         TokenFlags(
             T_STRING,
@@ -162,9 +148,7 @@ expression: lex_source(source)
         48..49,
     ),
     (
-        Name(
-            Name("r"),
-        ),
+        Name,
         49..50,
     ),
     (
@@ -172,9 +156,7 @@ expression: lex_source(source)
         50..51,
     ),
     (
-        InterpolatedStringMiddle(
-            " some ",
-        ),
+        FStringMiddle,
         51..57,
         TokenFlags(
             F_STRING,
@@ -192,9 +174,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "another",
-        ),
+        FStringMiddle,
         60..67,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,

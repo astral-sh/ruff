@@ -13,9 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "\\0",
-        ),
+        FStringMiddle,
         2..4,
         TokenFlags(
             F_STRING,

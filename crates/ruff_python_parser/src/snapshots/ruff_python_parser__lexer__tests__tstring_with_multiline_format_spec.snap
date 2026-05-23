@@ -13,9 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "__",
-        ),
+        TStringMiddle,
         4..6,
         TokenFlags(
             TRIPLE_QUOTED_STRING | T_STRING,
@@ -30,9 +28,7 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         12..13,
     ),
     (
@@ -40,9 +36,7 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        InterpolatedStringMiddle(
-            "d\n",
-        ),
+        TStringMiddle,
         14..16,
         TokenFlags(
             TRIPLE_QUOTED_STRING | T_STRING,
@@ -53,9 +47,7 @@ expression: lex_source(source)
         16..17,
     ),
     (
-        InterpolatedStringMiddle(
-            "__",
-        ),
+        TStringMiddle,
         17..19,
         TokenFlags(
             TRIPLE_QUOTED_STRING | T_STRING,
@@ -80,9 +72,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "__",
-        ),
+        TStringMiddle,
         27..29,
         TokenFlags(
             TRIPLE_QUOTED_STRING | T_STRING,
@@ -97,9 +87,7 @@ expression: lex_source(source)
         30..31,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         35..36,
     ),
     (
@@ -107,9 +95,7 @@ expression: lex_source(source)
         36..37,
     ),
     (
-        InterpolatedStringMiddle(
-            "a\n        b\n          c\n",
-        ),
+        TStringMiddle,
         37..61,
         TokenFlags(
             TRIPLE_QUOTED_STRING | T_STRING,
@@ -120,9 +106,7 @@ expression: lex_source(source)
         61..62,
     ),
     (
-        InterpolatedStringMiddle(
-            "__",
-        ),
+        TStringMiddle,
         62..64,
         TokenFlags(
             TRIPLE_QUOTED_STRING | T_STRING,

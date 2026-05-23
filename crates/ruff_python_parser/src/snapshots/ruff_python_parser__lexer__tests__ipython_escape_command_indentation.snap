@@ -26,10 +26,7 @@ expression: lex_jupyter_source(source)
         9..13,
     ),
     (
-        IpyEscapeCommand {
-            value: "matplotlib         --inline",
-            kind: Magic,
-        },
+        IpyEscapeCommand,
         13..43,
     ),
     (

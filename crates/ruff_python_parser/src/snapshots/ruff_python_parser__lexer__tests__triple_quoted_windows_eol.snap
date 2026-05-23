@@ -6,9 +6,7 @@ expression: triple_quoted_eol(WINDOWS_EOL)
 ```
 [
     (
-        String(
-            "\r\n test string\r\n ",
-        ),
+        String,
         0..23,
         TokenFlags(
             DOUBLE_QUOTES | TRIPLE_QUOTED_STRING,

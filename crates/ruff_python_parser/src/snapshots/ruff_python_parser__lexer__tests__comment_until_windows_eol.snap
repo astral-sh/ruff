@@ -6,9 +6,7 @@ expression: comment_until_eol(WINDOWS_EOL)
 ```
 [
     (
-        Int(
-            123,
-        ),
+        Int,
         0..3,
     ),
     (
@@ -20,9 +18,7 @@ expression: comment_until_eol(WINDOWS_EOL)
         10..12,
     ),
     (
-        Int(
-            456,
-        ),
+        Int,
         12..15,
     ),
     (

@@ -6,9 +6,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
 ```
 [
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         0..1,
     ),
     (
@@ -28,9 +26,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
         6..7,
     ),
     (
-        Int(
-            1,
-        ),
+        Int,
         11..12,
     ),
     (
@@ -38,9 +34,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
         12..13,
     ),
     (
-        Int(
-            2,
-        ),
+        Int,
         13..14,
     ),
     (
@@ -56,9 +50,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
         16..17,
     ),
     (
-        Int(
-            3,
-        ),
+        Int,
         17..18,
     ),
     (
@@ -70,9 +62,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
         19..20,
     ),
     (
-        Int(
-            4,
-        ),
+        Int,
         20..21,
     ),
     (
@@ -100,9 +90,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
         27..28,
     ),
     (
-        Int(
-            5,
-        ),
+        Int,
         28..29,
     ),
     (
@@ -114,9 +102,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
         30..31,
     ),
     (
-        Int(
-            6,
-        ),
+        Int,
         31..32,
     ),
     (
@@ -124,9 +110,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
         32..33,
     ),
     (
-        Int(
-            7,
-        ),
+        Int,
         35..36,
     ),
     (

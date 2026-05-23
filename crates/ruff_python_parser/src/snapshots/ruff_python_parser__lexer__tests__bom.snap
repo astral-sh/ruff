@@ -6,9 +6,7 @@ expression: lex_source(source)
 ```
 [
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         3..4,
     ),
     (
@@ -16,9 +14,7 @@ expression: lex_source(source)
         5..6,
     ),
     (
-        Int(
-            1,
-        ),
+        Int,
         7..8,
     ),
     (

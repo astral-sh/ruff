@@ -5,7 +5,6 @@ use crate::Mode;
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
 use crate::string::InterpolatedStringKind;
-use crate::token::TokenValue;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -58,14 +57,6 @@ impl<'src> TokenSource<'src> {
     /// Returns the flags for the current token.
     pub(crate) fn current_flags(&self) -> TokenFlags {
         self.lexer.current_flags()
-    }
-
-    /// Calls the underlying [`take_value`] method on the lexer. Refer to its documentation
-    /// for more info.
-    ///
-    /// [`take_value`]: Lexer::take_value
-    pub(crate) fn take_value(&mut self) -> TokenValue {
-        self.lexer.take_value()
     }
 
     /// Calls the underlying [`re_lex_logical_token`] method on the lexer with the new lexer

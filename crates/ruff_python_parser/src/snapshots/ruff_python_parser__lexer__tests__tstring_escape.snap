@@ -13,9 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "\\",
-        ),
+        TStringMiddle,
         2..3,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -26,9 +24,7 @@ expression: lex_source(source)
         3..4,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         4..5,
     ),
     (
@@ -36,9 +32,7 @@ expression: lex_source(source)
         5..6,
     ),
     (
-        InterpolatedStringMiddle(
-            "\\\"\\",
-        ),
+        TStringMiddle,
         6..9,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,
@@ -49,9 +43,7 @@ expression: lex_source(source)
         9..10,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         10..11,
     ),
     (
@@ -63,9 +55,7 @@ expression: lex_source(source)
         12..13,
     ),
     (
-        InterpolatedStringMiddle(
-            " \\\"\\\"\\\n end",
-        ),
+        TStringMiddle,
         13..24,
         TokenFlags(
             DOUBLE_QUOTES | T_STRING,

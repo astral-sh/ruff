@@ -17,9 +17,7 @@ expression: lex_source(source)
         2..3,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         3..4,
     ),
     (
@@ -27,9 +25,7 @@ expression: lex_source(source)
         4..5,
     ),
     (
-        InterpolatedStringMiddle(
-            "=10",
-        ),
+        FStringMiddle,
         5..8,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -40,9 +36,7 @@ expression: lex_source(source)
         8..9,
     ),
     (
-        InterpolatedStringMiddle(
-            " ",
-        ),
+        FStringMiddle,
         9..10,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -57,9 +51,7 @@ expression: lex_source(source)
         11..12,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         12..13,
     ),
     (
@@ -67,9 +59,7 @@ expression: lex_source(source)
         13..15,
     ),
     (
-        Int(
-            10,
-        ),
+        Int,
         15..17,
     ),
     (
@@ -81,9 +71,7 @@ expression: lex_source(source)
         18..19,
     ),
     (
-        InterpolatedStringMiddle(
-            " ",
-        ),
+        FStringMiddle,
         19..20,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -94,9 +82,7 @@ expression: lex_source(source)
         20..21,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         21..22,
     ),
     (
@@ -108,9 +94,7 @@ expression: lex_source(source)
         23..24,
     ),
     (
-        Name(
-            Name("y"),
-        ),
+        Name,
         24..25,
     ),
     (
@@ -118,9 +102,7 @@ expression: lex_source(source)
         25..27,
     ),
     (
-        Int(
-            10,
-        ),
+        Int,
         27..29,
     ),
     (
@@ -132,9 +114,7 @@ expression: lex_source(source)
         30..31,
     ),
     (
-        InterpolatedStringMiddle(
-            " ",
-        ),
+        FStringMiddle,
         31..32,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -149,9 +129,7 @@ expression: lex_source(source)
         33..34,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         34..35,
     ),
     (
@@ -159,9 +137,7 @@ expression: lex_source(source)
         35..37,
     ),
     (
-        Int(
-            10,
-        ),
+        Int,
         37..39,
     ),
     (

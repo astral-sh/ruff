@@ -10,9 +10,7 @@ expression: double_dedent_with_eol(MAC_EOL)
         0..3,
     ),
     (
-        Name(
-            Name("foo"),
-        ),
+        Name,
         4..7,
     ),
     (
@@ -40,9 +38,7 @@ expression: double_dedent_with_eol(MAC_EOL)
         12..14,
     ),
     (
-        Name(
-            Name("x"),
-        ),
+        Name,
         15..16,
     ),
     (
@@ -66,9 +62,7 @@ expression: double_dedent_with_eol(MAC_EOL)
         21..27,
     ),
     (
-        Int(
-            99,
-        ),
+        Int,
         28..30,
     ),
     (

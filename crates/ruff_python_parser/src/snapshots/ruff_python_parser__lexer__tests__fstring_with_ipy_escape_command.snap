@@ -13,9 +13,7 @@ expression: lex_source(source)
         ),
     ),
     (
-        InterpolatedStringMiddle(
-            "foo ",
-        ),
+        FStringMiddle,
         2..6,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -30,9 +28,7 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        Name(
-            Name("pwd"),
-        ),
+        Name,
         8..11,
     ),
     (
@@ -40,9 +36,7 @@ expression: lex_source(source)
         11..12,
     ),
     (
-        InterpolatedStringMiddle(
-            " bar",
-        ),
+        FStringMiddle,
         12..16,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
