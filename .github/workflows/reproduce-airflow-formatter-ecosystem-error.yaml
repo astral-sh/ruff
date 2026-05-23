@@ -72,6 +72,7 @@ jobs:
         run: |
           git config user.email "ecosystem@astral.sh"
           git config user.name "Ecosystem Bot"
+          git update-ref refs/remotes/origin/main HEAD
 
           python - <<'PY'
           import asyncio
