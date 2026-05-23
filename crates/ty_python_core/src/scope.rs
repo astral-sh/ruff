@@ -450,7 +450,7 @@ impl NodeWithScopeKind {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum NodeWithScopeKey {
     Module,
     Class(NodeKey),

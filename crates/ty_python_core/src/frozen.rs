@@ -59,10 +59,6 @@ impl<K: Ord, V> FrozenMap<K, V> {
             .ok()
             .map(|index| &self.0[index].1)
     }
-
-    pub(crate) fn contains_key(&self, key: &K) -> bool {
-        self.get(key).is_some()
-    }
 }
 
 impl<K, V> Default for FrozenMap<K, V> {
@@ -107,6 +103,10 @@ impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
     }
 }
 
+/// Compact immutable key-value entries for Salsa ingredients.
+///
+/// Unlike [`FrozenMap`], this orders keys by their Salsa ingredient IDs rather than requiring
+/// `K: Ord`.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FrozenSalsaMap<K, V>(Box<[(K, V)]>);
 

@@ -275,16 +275,16 @@ pub struct SemanticIndex<'db> {
     scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
-    definitions_by_node: FrozenMap<DefinitionNodeKey, Definitions<'db>>,
+    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
-    expressions_by_node: FrozenMap<ExpressionNodeKey, Expression<'db>>,
+    expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 
     /// Map from a standalone statement to its [`Statement`] ingredient.
-    statements_by_node: FrozenMap<StatementNodeKey, Statement<'db>>,
+    statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
 
     /// Map from nodes that create a scope to the scope they create.
-    scopes_by_node: FrozenMap<NodeWithScopeKey, FileScopeId>,
+    scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
     /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,

@@ -5,7 +5,6 @@ use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
 use crate::Db;
-use crate::frozen::FrozenMap;
 use crate::scope::ScopeId;
 use crate::semantic_index;
 
@@ -29,7 +28,7 @@ pub use node_key::ExpressionNodeKey;
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub(crate) struct AstIds {
     /// Maps expressions which "use" a place (that is, [`ast::ExprName`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`]) to a use id.
-    uses_map: FrozenMap<ExpressionNodeKey, ScopedUseId>,
+    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIds {
@@ -113,7 +112,7 @@ impl AstIdsBuilder {
 
     pub(super) fn finish(self) -> AstIds {
         AstIds {
-            uses_map: FrozenMap::from(self.uses_map),
+            uses_map: self.uses_map,
         }
     }
 }
