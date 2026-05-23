@@ -289,11 +289,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 737..737,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 Assign(

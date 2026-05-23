@@ -8,6 +8,7 @@ use ruff_python_ast::{
     PythonVersion, Stmt, Suite, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use thin_vec::ThinVec;
 
 use crate::error::StarTupleKind;
 use crate::parser::expression::{EXPR_SET, ParsedExpr};
@@ -190,8 +191,8 @@ impl<'src> Parser<'src> {
     /// Matches the `simple_stmts` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_simple_statements(&mut self) -> Vec<Stmt> {
-        let mut stmts = vec![];
+    fn parse_simple_statements(&mut self) -> ThinVec<Stmt> {
+        let mut stmts = ThinVec::new();
         let mut progress = ParserProgress::default();
 
         loop {
@@ -1575,28 +1576,19 @@ impl<'src> Parser<'src> {
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
-            self.parse_body(Clause::Else)
+            Some(self.parse_body(Clause::Else))
         } else {
-            Suite {
-                range: self.missing_node_range(),
-                ..Suite::default()
-            }
+            None
         };
 
-        let (finalbody, has_finally) = if self.eat(TokenKind::Finally) {
+        let finalbody = if self.eat(TokenKind::Finally) {
             self.expect(TokenKind::Colon);
-            (self.parse_body(Clause::Finally), true)
+            Some(self.parse_body(Clause::Finally))
         } else {
-            (
-                Suite {
-                    range: self.missing_node_range(),
-                    ..Suite::default()
-                },
-                false,
-            )
+            None
         };
 
-        if !has_except && !has_finally {
+        if !has_except && finalbody.is_none() {
             // test_err try_stmt_missing_except_finally
             // try:
             //     pass
@@ -1612,7 +1604,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        if has_finally && self.at(TokenKind::Else) {
+        if finalbody.is_some() && self.at(TokenKind::Else) {
             // test_err try_stmt_invalid_order
             // try:
             //     pass
@@ -1897,12 +1889,9 @@ impl<'src> Parser<'src> {
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
-            self.parse_body(Clause::Else)
+            Some(self.parse_body(Clause::Else))
         } else {
-            Suite {
-                range: self.missing_node_range(),
-                ..Suite::default()
-            }
+            None
         };
 
         ast::StmtFor {
@@ -1950,12 +1939,9 @@ impl<'src> Parser<'src> {
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
-            self.parse_body(Clause::Else)
+            Some(self.parse_body(Clause::Else))
         } else {
-            Suite {
-                range: self.missing_node_range(),
-                ..Suite::default()
-            }
+            None
         };
 
         ast::StmtWhile {
@@ -3081,7 +3067,7 @@ impl<'src> Parser<'src> {
                         self.current_token_range()
                     },
                 );
-                Vec::new()
+                ThinVec::new()
             }
         } else {
             if self.at_simple_stmt() {
@@ -3093,7 +3079,7 @@ impl<'src> Parser<'src> {
                     ParseErrorType::OtherError("Expected a simple statement".to_string()),
                     self.current_token_range(),
                 );
-                Vec::new()
+                ThinVec::new()
             }
         };
 
@@ -3109,16 +3095,19 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at an `Indent` token.
-    fn parse_block(&mut self) -> Vec<Stmt> {
+    fn parse_block(&mut self) -> ThinVec<Stmt> {
         self.bump(TokenKind::Indent);
 
         let statements = if let Some(statements) = self.with_recursion(|parser| {
-            parser.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement)
+            parser.parse_list_into_thin_vec(
+                RecoveryContextKind::BlockStatements,
+                Self::parse_statement,
+            )
         }) {
             statements
         } else {
             self.report_recursion_limit_exceeded(self.current_token_range());
-            Vec::new()
+            ThinVec::new()
         };
 
         self.expect(TokenKind::Dedent);
@@ -3957,11 +3946,11 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Specialized [`Parser::parse_list_into_vec`] for parsing a sequence of clauses.
+    /// Specialized list parser for parsing a sequence of clauses.
     ///
     /// The difference is that the parser only continues parsing for as long as it sees the token
     /// indicating the start of the specific clause. This is different from
-    /// [`Parser::parse_list_into_vec`] that performs error recovery when the next token is not a
+    /// normal statement-list parsing, which performs error recovery when the next token is not a
     /// list terminator or the start of a list element.
     ///
     /// The special method is necessary because Python uses indentation over explicit delimiters to

@@ -30,23 +30,21 @@ Module(
                             ],
                         },
                         handlers: [],
-                        orelse: Suite {
-                            range: 13..13,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 22..31,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 27..31,
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: None,
+                        finalbody: Some(
+                            Suite {
+                                range: 22..31,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 27..31,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                         is_star: false,
                     },
                 ),

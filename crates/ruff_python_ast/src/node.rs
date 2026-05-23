@@ -606,57 +606,52 @@ impl<'a> AnyNodeRef<'a> {
 
     /// The last child of the last branch, if the node has multiple branches.
     pub fn last_child_in_body(&self) -> Option<AnyNodeRef<'a>> {
-        let body =
-            match self {
-                AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
-                | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
-                | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
-                | AnyNodeRef::MatchCase(MatchCase { body, .. })
-                | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
-                    body,
-                    ..
-                })
-                | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
-                AnyNodeRef::StmtIf(ast::StmtIf {
-                    body,
-                    elif_else_clauses,
-                    ..
-                }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
+        let body = match self {
+            AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
+            | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
+            | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
+            | AnyNodeRef::MatchCase(MatchCase { body, .. })
+            | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
+                body,
+                ..
+            })
+            | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
+            AnyNodeRef::StmtIf(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
 
-                AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
-                | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
-                    if orelse.is_empty() { body } else { orelse }
+            AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
+            | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
+                orelse.as_ref().unwrap_or(body)
+            }
+
+            AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
+                return cases.last().map(AnyNodeRef::from);
+            }
+
+            AnyNodeRef::StmtTry(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                if let Some(finalbody) = finalbody {
+                    finalbody
+                } else if let Some(orelse) = orelse {
+                    orelse
+                } else if handlers.is_empty() {
+                    body
+                } else {
+                    return handlers.last().map(AnyNodeRef::from);
                 }
+            }
 
-                AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
-                    return cases.last().map(AnyNodeRef::from);
-                }
-
-                AnyNodeRef::StmtTry(ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
-                    if finalbody.is_empty() {
-                        if orelse.is_empty() {
-                            if handlers.is_empty() {
-                                body
-                            } else {
-                                return handlers.last().map(AnyNodeRef::from);
-                            }
-                        } else {
-                            orelse
-                        }
-                    } else {
-                        finalbody
-                    }
-                }
-
-                // Not a node that contains an indented child node.
-                _ => return None,
-            };
+            // Not a node that contains an indented child node.
+            _ => return None,
+        };
 
         body.last().map(AnyNodeRef::from)
     }
@@ -706,7 +701,8 @@ impl<'a> AnyNodeRef<'a> {
         match body {
             AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
             | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
-                are_same_optional(*self, body.first()) || are_same_optional(*self, orelse.first())
+                are_same_optional(*self, body.first())
+                    || are_same_optional(*self, orelse.as_ref().and_then(|orelse| orelse.first()))
             }
 
             AnyNodeRef::StmtTry(ast::StmtTry {
@@ -716,8 +712,11 @@ impl<'a> AnyNodeRef<'a> {
                 ..
             }) => {
                 are_same_optional(*self, body.first())
-                    || are_same_optional(*self, orelse.first())
-                    || are_same_optional(*self, finalbody.first())
+                    || are_same_optional(*self, orelse.as_ref().and_then(|orelse| orelse.first()))
+                    || are_same_optional(
+                        *self,
+                        finalbody.as_ref().and_then(|finalbody| finalbody.first()),
+                    )
             }
 
             AnyNodeRef::StmtIf(ast::StmtIf { body, .. })
@@ -746,7 +745,7 @@ impl<'a> AnyNodeRef<'a> {
         match body {
             AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
             | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
-                are_same_optional(*self, orelse.first())
+                are_same_optional(*self, orelse.as_ref().and_then(|orelse| orelse.first()))
             }
 
             AnyNodeRef::StmtTry(ast::StmtTry {
@@ -756,8 +755,11 @@ impl<'a> AnyNodeRef<'a> {
                 ..
             }) => {
                 are_same_optional(*self, handlers.first())
-                    || are_same_optional(*self, orelse.first())
-                    || are_same_optional(*self, finalbody.first())
+                    || are_same_optional(*self, orelse.as_ref().and_then(|orelse| orelse.first()))
+                    || are_same_optional(
+                        *self,
+                        finalbody.as_ref().and_then(|finalbody| finalbody.first()),
+                    )
             }
 
             AnyNodeRef::StmtIf(ast::StmtIf {

@@ -492,7 +492,8 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
         }
         Stmt::For(ast::StmtFor { body, orelse, .. })
         | Stmt::While(ast::StmtWhile { body, orelse, .. })
-            if (is_only(body, child) || is_only(orelse, child)) =>
+            if (is_only(body, child)
+                || orelse.as_ref().is_some_and(|orelse| is_only(orelse, child))) =>
         {
             return true;
         }
@@ -514,8 +515,10 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
             finalbody,
             ..
         }) if (is_only(body, child)
-            || is_only(orelse, child)
-            || is_only(finalbody, child)
+            || orelse.as_ref().is_some_and(|orelse| is_only(orelse, child))
+            || finalbody
+                .as_ref()
+                .is_some_and(|finalbody| is_only(finalbody, child))
             || handlers.iter().any(|handler| match handler {
                 ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) => {
                     is_only(body, child)

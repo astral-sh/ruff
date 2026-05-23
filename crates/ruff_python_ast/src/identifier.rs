@@ -118,9 +118,7 @@ pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
         return None;
     };
 
-    if orelse.is_empty() {
-        return None;
-    }
+    orelse.as_ref()?;
 
     IdentifierTokenizer::starts_at(body.end(), source).next()
 }

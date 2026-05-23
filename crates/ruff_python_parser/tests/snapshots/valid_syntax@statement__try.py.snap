@@ -63,16 +63,8 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 28..28,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 28..28,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
+                        finalbody: None,
                         is_star: false,
                     },
                 ),
@@ -182,16 +174,8 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 106..106,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 106..106,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
+                        finalbody: None,
                         is_star: false,
                     },
                 ),
@@ -286,29 +270,27 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 167..167,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 176..184,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 181..184,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 181..184,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: None,
+                        finalbody: Some(
+                            Suite {
+                                range: 176..184,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 181..184,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 181..184,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                         is_star: false,
                     },
                 ),
@@ -362,29 +344,27 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 220..228,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 225..228,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 225..228,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        finalbody: Suite {
-                            range: 228..228,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 220..228,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 225..228,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 225..228,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        finalbody: None,
                         is_star: false,
                     },
                 ),
@@ -438,42 +418,46 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 264..272,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 269..272,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 269..272,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        finalbody: Suite {
-                            range: 281..289,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 286..289,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 286..289,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 264..272,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 269..272,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 269..272,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        finalbody: Some(
+                            Suite {
+                                range: 281..289,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 286..289,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 286..289,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                         is_star: false,
                     },
                 ),
@@ -500,29 +484,27 @@ Module(
                             ],
                         },
                         handlers: [],
-                        orelse: Suite {
-                            range: 303..303,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 312..320,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 317..320,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 317..320,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: None,
+                        finalbody: Some(
+                            Suite {
+                                range: 312..320,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 317..320,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 317..320,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                         is_star: false,
                     },
                 ),
@@ -549,42 +531,46 @@ Module(
                             ],
                         },
                         handlers: [],
-                        orelse: Suite {
-                            range: 340..348,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 345..348,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 345..348,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        finalbody: Suite {
-                            range: 357..365,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 362..365,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 362..365,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 340..348,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 345..348,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 345..348,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        finalbody: Some(
+                            Suite {
+                                range: 357..365,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 362..365,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 362..365,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                         is_star: false,
                     },
                 ),
@@ -688,16 +674,8 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 441..441,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 441..441,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
+                        finalbody: None,
                         is_star: true,
                     },
                 ),
@@ -1002,16 +980,8 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 577..577,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 577..577,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
+                        finalbody: None,
                         is_star: false,
                     },
                 ),
@@ -1529,16 +1499,8 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 831..831,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 831..831,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
+                        finalbody: None,
                         is_star: true,
                     },
                 ),
@@ -1943,16 +1905,8 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 1075..1075,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 1075..1075,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
+                        finalbody: None,
                         is_star: false,
                     },
                 ),
@@ -1988,23 +1942,21 @@ Module(
                                             ],
                                         },
                                         handlers: [],
-                                        orelse: Suite {
-                                            range: 1107..1107,
-                                            node_index: NodeIndex(None),
-                                            statements: [],
-                                        },
-                                        finalbody: Suite {
-                                            range: 1120..1133,
-                                            node_index: NodeIndex(None),
-                                            statements: [
-                                                Pass(
-                                                    StmtPass {
-                                                        node_index: NodeIndex(None),
-                                                        range: 1129..1133,
-                                                    },
-                                                ),
-                                            ],
-                                        },
+                                        orelse: None,
+                                        finalbody: Some(
+                                            Suite {
+                                                range: 1120..1133,
+                                                node_index: NodeIndex(None),
+                                                statements: [
+                                                    Pass(
+                                                        StmtPass {
+                                                            node_index: NodeIndex(None),
+                                                            range: 1129..1133,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
                                         is_star: false,
                                     },
                                 ),

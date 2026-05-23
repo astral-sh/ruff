@@ -96,7 +96,9 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
             Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
-                complexity += get_complexity_number(orelse);
+                if let Some(orelse) = orelse {
+                    complexity += get_complexity_number(orelse);
+                }
             }
             Stmt::With(ast::StmtWith { body, .. }) => {
                 complexity += get_complexity_number(body);
@@ -104,7 +106,9 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
             Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
-                complexity += get_complexity_number(orelse);
+                if let Some(orelse) = orelse {
+                    complexity += get_complexity_number(orelse);
+                }
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
@@ -137,11 +141,13 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 ..
             }) => {
                 complexity += get_complexity_number(body);
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     complexity += 1;
+                    complexity += get_complexity_number(orelse);
                 }
-                complexity += get_complexity_number(orelse);
-                complexity += get_complexity_number(finalbody);
+                if let Some(finalbody) = finalbody {
+                    complexity += get_complexity_number(finalbody);
+                }
                 for handler in handlers {
                     complexity += 1;
                     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {

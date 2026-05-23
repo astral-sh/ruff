@@ -517,7 +517,7 @@ fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
         Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
         Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-            if let Some(last_stmt) = orelse.last() {
+            if let Some(last_stmt) = orelse.as_ref().and_then(|orelse| orelse.last()) {
                 has_implicit_return(checker, last_stmt)
             } else {
                 true

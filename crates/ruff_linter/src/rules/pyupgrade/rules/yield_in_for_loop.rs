@@ -85,7 +85,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
     } = stmt_for;
 
     // If there is an else statement, don't rewrite.
-    if !orelse.is_empty() {
+    if orelse.is_some() {
         return;
     }
 

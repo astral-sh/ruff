@@ -106,10 +106,16 @@ fn has_nested_block(stmt: &Stmt) -> bool {
                     .any(|elif_else| elif_else.body.iter().any(is_nested_block))
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-            body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
+            body.iter().any(is_nested_block)
+                || orelse
+                    .as_ref()
+                    .is_some_and(|orelse| orelse.iter().any(is_nested_block))
         }
         Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-            body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
+            body.iter().any(is_nested_block)
+                || orelse
+                    .as_ref()
+                    .is_some_and(|orelse| orelse.iter().any(is_nested_block))
         }
         Stmt::Try(ast::StmtTry {
             body,
@@ -124,8 +130,12 @@ fn has_nested_block(stmt: &Stmt) -> bool {
                         body, ..
                     }) => body.iter().any(is_nested_block),
                 })
-                || orelse.iter().any(is_nested_block)
-                || finalbody.iter().any(is_nested_block)
+                || orelse
+                    .as_ref()
+                    .is_some_and(|orelse| orelse.iter().any(is_nested_block))
+                || finalbody
+                    .as_ref()
+                    .is_some_and(|finalbody| finalbody.iter().any(is_nested_block))
         }
         Stmt::With(ast::StmtWith { body, .. }) => body.iter().any(is_nested_block),
         _ => false,

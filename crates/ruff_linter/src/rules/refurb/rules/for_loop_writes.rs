@@ -141,7 +141,7 @@ fn for_loop_writes(
     scope_id: ScopeId,
     binding_names: &[&ExprName],
 ) {
-    if !for_stmt.orelse.is_empty() {
+    if for_stmt.orelse.is_some() {
         return;
     }
     let [Stmt::Expr(stmt_expr)] = for_stmt.body.as_slice() else {

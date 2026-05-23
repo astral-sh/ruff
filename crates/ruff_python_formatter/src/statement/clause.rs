@@ -57,15 +57,19 @@ impl<'a> ClauseHeader<'a> {
             | ClauseHeader::For(StmtFor { body, .. })
             | ClauseHeader::While(StmtWhile { body, .. })
             | ClauseHeader::With(StmtWith { body, .. })
-            | ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. })
-            | ClauseHeader::OrElse(
-                ElseClause::Try(StmtTry { orelse: body, .. })
-                | ElseClause::For(StmtFor { orelse: body, .. })
-                | ElseClause::While(StmtWhile { orelse: body, .. }),
-            )
-            | ClauseHeader::TryFinally(StmtTry {
-                finalbody: body, ..
-            }) => body.last().map(AnyNodeRef::from),
+            | ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. }) => {
+                body.last().map(AnyNodeRef::from)
+            }
+            ClauseHeader::OrElse(
+                ElseClause::Try(StmtTry { orelse, .. })
+                | ElseClause::For(StmtFor { orelse, .. })
+                | ElseClause::While(StmtWhile { orelse, .. }),
+            ) => orelse
+                .as_ref()
+                .and_then(|body| body.last().map(AnyNodeRef::from)),
+            ClauseHeader::TryFinally(StmtTry { finalbody, .. }) => finalbody
+                .as_ref()
+                .and_then(|body| body.last().map(AnyNodeRef::from)),
             ClauseHeader::Match(StmtMatch { cases, .. }) => cases
                 .last()
                 .and_then(|case| case.body.last().map(AnyNodeRef::from)),
@@ -301,14 +305,15 @@ impl<'a> ClauseHeader<'a> {
                 source,
             ),
             ClauseHeader::TryFinally(header) => {
-                let preceding_clause_end = if !header.orelse.is_empty() {
-                    header.orelse.end()
-                } else {
-                    header
-                        .handlers
-                        .last()
-                        .map_or_else(|| header.body.end(), Ranged::end)
-                };
+                let preceding_clause_end = header.orelse.as_ref().map_or_else(
+                    || {
+                        header
+                            .handlers
+                            .last()
+                            .map_or_else(|| header.body.end(), Ranged::end)
+                    },
+                    Ranged::end,
+                );
 
                 find_keyword(
                     StartPosition::LastStatement(preceding_clause_end),

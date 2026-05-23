@@ -594,8 +594,11 @@ impl<'a> FoldingRangeVisitor<'a> {
         parent: AnyNodeRef<'a>,
         keyword: TokenKind,
         previous_block_end: TextSize,
-        suite: &Suite,
+        suite: Option<&Suite>,
     ) {
+        let Some(suite) = suite else {
+            return;
+        };
         if suite.is_empty() {
             return;
         }
@@ -653,26 +656,22 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
             AnyNodeRef::StmtFor(for_stmt) => {
                 // Fold the for body separately from the else block.
                 self.add_suite_ranges(node, &for_stmt.body);
-                if !for_stmt.body.is_empty() {
-                    self.add_suite_ranges_after_keyword(
-                        node,
-                        TokenKind::Else,
-                        for_stmt.body.end(),
-                        &for_stmt.orelse,
-                    );
-                }
+                self.add_suite_ranges_after_keyword(
+                    node,
+                    TokenKind::Else,
+                    for_stmt.body.end(),
+                    for_stmt.orelse.as_ref(),
+                );
             }
             AnyNodeRef::StmtWhile(while_stmt) => {
                 // Fold the while body separately from the else block.
                 self.add_suite_ranges(node, &while_stmt.body);
-                if !while_stmt.body.is_empty() {
-                    self.add_suite_ranges_after_keyword(
-                        node,
-                        TokenKind::Else,
-                        while_stmt.body.end(),
-                        &while_stmt.orelse,
-                    );
-                }
+                self.add_suite_ranges_after_keyword(
+                    node,
+                    TokenKind::Else,
+                    while_stmt.body.end(),
+                    while_stmt.orelse.as_ref(),
+                );
             }
             AnyNodeRef::StmtWith(with_stmt) => {
                 self.add_suite_ranges(node, &with_stmt.body);
@@ -682,32 +681,33 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                 self.add_suite_ranges(node, &try_stmt.body);
                 // Exception handlers are folded via ExceptHandlerExceptHandler.
                 // Fold the else block if present.
-                if let Some(previous_block_end) = try_stmt
+                let previous_block_end = try_stmt
                     .handlers
                     .last()
                     .map(Ranged::end)
-                    .or_else(|| (!try_stmt.body.is_empty()).then(|| try_stmt.body.end()))
-                {
-                    self.add_suite_ranges_after_keyword(
-                        node,
-                        TokenKind::Else,
-                        previous_block_end,
-                        &try_stmt.orelse,
-                    );
-                }
+                    .unwrap_or_else(|| try_stmt.body.end());
+                self.add_suite_ranges_after_keyword(
+                    node,
+                    TokenKind::Else,
+                    previous_block_end,
+                    try_stmt.orelse.as_ref(),
+                );
                 // Fold the finally block if present.
-                if let Some(previous_block_end) = (!try_stmt.orelse.is_empty())
-                    .then(|| try_stmt.orelse.end())
-                    .or_else(|| try_stmt.handlers.last().map(Ranged::end))
-                    .or_else(|| (!try_stmt.body.is_empty()).then(|| try_stmt.body.end()))
-                {
-                    self.add_suite_ranges_after_keyword(
-                        node,
-                        TokenKind::Finally,
-                        previous_block_end,
-                        &try_stmt.finalbody,
-                    );
-                }
+                let previous_block_end = try_stmt.orelse.as_ref().map_or_else(
+                    || {
+                        try_stmt
+                            .handlers
+                            .last()
+                            .map_or_else(|| try_stmt.body.end(), Ranged::end)
+                    },
+                    Ranged::end,
+                );
+                self.add_suite_ranges_after_keyword(
+                    node,
+                    TokenKind::Finally,
+                    previous_block_end,
+                    try_stmt.finalbody.as_ref(),
+                );
             }
             AnyNodeRef::StmtMatch(match_stmt) => {
                 self.add_block_ranges(node, &match_stmt.cases);

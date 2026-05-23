@@ -190,11 +190,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
             Stmt::For(ast::StmtFor { body, orelse, .. })
             | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 1 + num_branches(body)
-                    + (if orelse.is_empty() {
-                        0
-                    } else {
-                        1 + num_branches(orelse)
-                    })
+                    + orelse.as_ref().map_or(0, |orelse| 1 + num_branches(orelse))
             }
             Stmt::Try(ast::StmtTry {
                 body,
@@ -206,16 +202,10 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                 // Count each `except` clause as a branch; the `else` and `finally` clauses also
                 // count, but the `try` clause itself does not.
                 num_branches(body)
-                    + (if orelse.is_empty() {
-                        0
-                    } else {
-                        1 + num_branches(orelse)
-                    })
-                    + (if finalbody.is_empty() {
-                        0
-                    } else {
-                        1 + num_branches(finalbody)
-                    })
+                    + orelse.as_ref().map_or(0, |orelse| 1 + num_branches(orelse))
+                    + finalbody
+                        .as_ref()
+                        .map_or(0, |finalbody| 1 + num_branches(finalbody))
                     + handlers
                         .iter()
                         .map(|handler| {

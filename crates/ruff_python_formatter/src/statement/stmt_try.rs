@@ -85,7 +85,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
                 ExceptHandlerKind::Regular
             };
             let last_suite_in_statement =
-                handler == handlers.last().unwrap() && orelse.is_empty() && finalbody.is_empty();
+                handler == handlers.last().unwrap() && orelse.is_none() && finalbody.is_none();
 
             write!(
                 f,
@@ -105,7 +105,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             CaseKind::Else,
             previous_node,
             dangling_comments,
-            finalbody.is_empty(),
+            finalbody.is_none(),
             f,
         )?;
 
@@ -132,8 +132,18 @@ fn format_case<'a>(
 ) -> FormatResult<(Option<&'a Stmt>, &'a [SourceComment])> {
     let body = match kind {
         CaseKind::Try => &try_statement.body,
-        CaseKind::Else => &try_statement.orelse,
-        CaseKind::Finally => &try_statement.finalbody,
+        CaseKind::Else => {
+            let Some(orelse) = &try_statement.orelse else {
+                return Ok((previous_node, dangling_comments));
+            };
+            orelse
+        }
+        CaseKind::Finally => {
+            let Some(finalbody) = &try_statement.finalbody else {
+                return Ok((previous_node, dangling_comments));
+            };
+            finalbody
+        }
     };
 
     Ok(if let Some(last) = body.last() {

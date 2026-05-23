@@ -435,8 +435,12 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                     }
                     self.leave_level(except_handler_saved);
                 }
-                self.visit_body(orelse);
-                self.visit_body(finalbody);
+                if let Some(orelse) = orelse {
+                    self.visit_body(orelse);
+                }
+                if let Some(finalbody) = finalbody {
+                    self.visit_body(finalbody);
+                }
 
                 // Already traversed as part of `enter_node`.
                 TraversalSignal::Skip

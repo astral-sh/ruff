@@ -63,7 +63,7 @@ impl AlwaysFixableViolation for ForLoopSetMutations {
 
 /// FURB142
 pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
-    if !for_stmt.orelse.is_empty() {
+    if for_stmt.orelse.is_some() {
         return;
     }
     let [Stmt::Expr(stmt_expr)] = for_stmt.body.as_slice() else {

@@ -9,16 +9,17 @@ pub fn suite<'a>(
     // TODO: refactor this to work without a parent, ie when `stmt` is at the top level
     let stmt = stmt.into();
     match parent.into() {
+        AnyNodeRef::Suite(suite) => EnclosingSuite::new(suite, stmt),
         AnyNodeRef::ModModule(ast::ModModule { body, .. }) => EnclosingSuite::new(body, stmt),
         AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. }) => {
             EnclosingSuite::new(body, stmt)
         }
         AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => EnclosingSuite::new(body, stmt),
-        AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. }) => [body, orelse]
-            .iter()
+        AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. }) => std::iter::once(body)
+            .chain(orelse.iter())
             .find_map(|suite| EnclosingSuite::new(suite, stmt)),
-        AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => [body, orelse]
-            .iter()
+        AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => std::iter::once(body)
+            .chain(orelse.iter())
             .find_map(|suite| EnclosingSuite::new(suite, stmt)),
         AnyNodeRef::StmtIf(ast::StmtIf {
             body,
@@ -39,8 +40,9 @@ pub fn suite<'a>(
             orelse,
             finalbody,
             ..
-        }) => [body, orelse, finalbody]
-            .into_iter()
+        }) => std::iter::once(body)
+            .chain(orelse.iter())
+            .chain(finalbody.iter())
             .chain(
                 handlers
                     .iter()

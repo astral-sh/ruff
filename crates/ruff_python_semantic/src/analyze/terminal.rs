@@ -59,7 +59,9 @@ impl Terminal {
 
                     terminal = terminal.and_then(Self::from_body(body, semantic));
 
-                    if !sometimes_breaks(body, semantic) {
+                    if !sometimes_breaks(body, semantic)
+                        && let Some(orelse) = orelse
+                    {
                         terminal = terminal.and_then(Self::from_body(orelse, semantic));
                     }
                 }
@@ -125,7 +127,9 @@ impl Terminal {
 
                     // If the `finally` block returns, the `try` block must also return. (Similarly,
                     // if the `finally` block raises, the `try` block must also raise.)
-                    terminal = terminal.and_then(Self::from_body(finalbody, semantic));
+                    if let Some(finalbody) = finalbody {
+                        terminal = terminal.and_then(Self::from_body(finalbody, semantic));
+                    }
 
                     let branch_terminal = Terminal::branches(handlers.iter().map(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
@@ -135,18 +139,18 @@ impl Terminal {
                         Self::from_body(body, semantic)
                     }));
 
-                    if orelse.is_empty() {
+                    if let Some(orelse) = orelse {
+                        // If there's an `else`, we won't fall through. If all the handlers and
+                        // the `else` block return, the `try` block also returns.
+                        terminal = terminal.and_then(
+                            branch_terminal.branch(Terminal::from_body(orelse, semantic)),
+                        );
+                    } else {
                         // If there's no `else`, we may fall through, so only mark that this can't
                         // be a non-returning function if any of the branches return.
                         if branch_terminal.has_any_return() {
                             terminal = terminal.and_then(Terminal::ConditionalReturn);
                         }
-                    } else {
-                        // If there's an `else`, we won't fall through. If all the handlers and
-                        // the `else` block return,, the `try` block also returns.
-                        terminal = terminal.and_then(
-                            branch_terminal.branch(Terminal::from_body(orelse, semantic)),
-                        );
                     }
                 }
                 Stmt::With(ast::StmtWith { body, .. }) => {
@@ -294,7 +298,10 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
                 if Terminal::from_body(body, semantic).has_any_return() {
                     return false;
                 }
-                if sometimes_breaks(orelse, semantic) {
+                if orelse
+                    .as_ref()
+                    .is_some_and(|orelse| sometimes_breaks(orelse, semantic))
+                {
                     return true;
                 }
             }
@@ -302,7 +309,10 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
                 if Terminal::from_body(body, semantic).has_any_return() {
                     return false;
                 }
-                if sometimes_breaks(orelse, semantic) {
+                if orelse
+                    .as_ref()
+                    .is_some_and(|orelse| sometimes_breaks(orelse, semantic))
+                {
                     return true;
                 }
             }
@@ -336,8 +346,12 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
                     }) = handler;
                     sometimes_breaks(body, semantic)
                 })
-                || sometimes_breaks(orelse, semantic)
-                || sometimes_breaks(finalbody, semantic)) =>
+                || orelse
+                    .as_ref()
+                    .is_some_and(|orelse| sometimes_breaks(orelse, semantic))
+                || finalbody
+                    .as_ref()
+                    .is_some_and(|finalbody| sometimes_breaks(finalbody, semantic))) =>
             {
                 return true;
             }

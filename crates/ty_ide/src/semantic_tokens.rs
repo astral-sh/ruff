@@ -877,7 +877,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 self.visit_expr(&for_stmt.iter);
                 self.visit_body(&for_stmt.body);
-                self.visit_body(&for_stmt.orelse);
+                if let Some(orelse) = &for_stmt.orelse {
+                    self.visit_body(orelse);
+                }
             }
             ast::Stmt::With(with_stmt) => {
                 for item in &with_stmt.items {
@@ -910,8 +912,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                         }
                     }
                 }
-                self.visit_body(&try_stmt.orelse);
-                self.visit_body(&try_stmt.finalbody);
+                if let Some(orelse) = &try_stmt.orelse {
+                    self.visit_body(orelse);
+                }
+                if let Some(finalbody) = &try_stmt.finalbody {
+                    self.visit_body(finalbody);
+                }
             }
             ast::Stmt::Expr(expr) => {
                 if expecting_docstring && expr.value.is_string_literal_expr() {

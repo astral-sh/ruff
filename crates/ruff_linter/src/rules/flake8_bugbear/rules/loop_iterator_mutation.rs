@@ -155,7 +155,9 @@ impl StatementVisitor<'_> for SkipsElseFinder {
             // Don't look inside nested loop bodies, but do check their
             // `else` clause — a `break` there targets the enclosing loop.
             Stmt::For(StmtFor { orelse, .. }) | Stmt::While(StmtWhile { orelse, .. }) => {
-                self.visit_body(orelse);
+                if let Some(orelse) = orelse {
+                    self.visit_body(orelse);
+                }
             }
             // Nested function/class bodies can't affect the enclosing
             // loop's control flow.
@@ -382,7 +384,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 // If the body may `break`, `return`, or `raise`, the `else`
                 // clause may not run, so its terminators must not clear
                 // mutations from the body.
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     if body_may_skip_else(body) {
                         self.enter_new_branch();
                         self.visit_body(orelse);
@@ -407,7 +409,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 self.loop_depth -= 1;
                 self.merge_branch_into(saved_branch);
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     if body_may_skip_else(body) {
                         self.enter_new_branch();
                         self.visit_body(orelse);
@@ -458,7 +460,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 self.visit_body(body);
                 self.merge_branch_into(saved_branch);
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     self.enter_new_branch();
                     self.visit_body(orelse);
                     self.merge_branch_into(saved_branch);
@@ -480,7 +482,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
 
                 // Give `finally` its own branch so siblings don't
                 // cross-clear through it.
-                if !finalbody.is_empty() {
+                if let Some(finalbody) = finalbody {
                     self.enter_new_branch();
                     self.visit_body(finalbody);
                     self.merge_branch_into(saved_branch);

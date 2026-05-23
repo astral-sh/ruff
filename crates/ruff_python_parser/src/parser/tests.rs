@@ -42,7 +42,41 @@ fn test_suite_ranges() {
         for_stmt.body.range(),
         TextRange::new(TextSize::new(11), TextSize::new(20))
     );
-    assert_eq!(for_stmt.orelse.range(), TextRange::empty(TextSize::new(20)));
+    assert!(for_stmt.orelse.is_none());
+
+    let parsed = parse_module("for x in y:\n    pass\nelse:\n    again()\n").unwrap();
+    let Stmt::For(for_stmt) = &parsed.suite()[0] else {
+        panic!("expected a for statement");
+    };
+    let Some(orelse) = &for_stmt.orelse else {
+        panic!("expected an else suite");
+    };
+    assert_eq!(
+        orelse.range(),
+        TextRange::new(TextSize::new(26), TextSize::new(38))
+    );
+
+    let parsed = parse_module("while test:\n    pass\nelse:\n    again()\n").unwrap();
+    let Stmt::While(while_stmt) = &parsed.suite()[0] else {
+        panic!("expected a while statement");
+    };
+    assert!(while_stmt.orelse.is_some());
+
+    let parsed =
+        parse_module("try:\n    pass\nexcept:\n    pass\nelse:\n    pass\nfinally:\n    pass\n")
+            .unwrap();
+    let Stmt::Try(try_stmt) = &parsed.suite()[0] else {
+        panic!("expected a try statement");
+    };
+    assert!(try_stmt.orelse.is_some());
+    assert!(try_stmt.finalbody.is_some());
+
+    let parsed = parse_module("try:\n    pass\nexcept:\n    pass\n").unwrap();
+    let Stmt::Try(try_stmt) = &parsed.suite()[0] else {
+        panic!("expected a try statement");
+    };
+    assert!(try_stmt.orelse.is_none());
+    assert!(try_stmt.finalbody.is_none());
 }
 
 #[test]

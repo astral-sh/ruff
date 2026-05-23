@@ -236,7 +236,9 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
             visitor.visit_expr(iter);
             visitor.visit_expr(target);
             visitor.visit_suite(body);
-            visitor.visit_suite(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_suite(orelse);
+            }
         }
         Stmt::While(ast::StmtWhile {
             test,
@@ -247,7 +249,9 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
         }) => {
             visitor.visit_expr(test);
             visitor.visit_suite(body);
-            visitor.visit_suite(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_suite(orelse);
+            }
         }
         Stmt::If(ast::StmtIf {
             test,
@@ -305,8 +309,12 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
             for except_handler in handlers {
                 visitor.visit_except_handler(except_handler);
             }
-            visitor.visit_suite(orelse);
-            visitor.visit_suite(finalbody);
+            if let Some(orelse) = orelse {
+                visitor.visit_suite(orelse);
+            }
+            if let Some(finalbody) = finalbody {
+                visitor.visit_suite(finalbody);
+            }
         }
         Stmt::Assert(ast::StmtAssert {
             test,

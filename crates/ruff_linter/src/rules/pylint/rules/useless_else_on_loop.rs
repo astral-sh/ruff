@@ -109,8 +109,12 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
             ..
         }) => {
             loop_exits_early(body)
-                || loop_exits_early(orelse)
-                || loop_exits_early(finalbody)
+                || orelse
+                    .as_ref()
+                    .is_some_and(|orelse| loop_exits_early(orelse))
+                || finalbody
+                    .as_ref()
+                    .is_some_and(|finalbody| loop_exits_early(finalbody))
                 || handlers.iter().any(|handler| match handler {
                     ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
@@ -118,7 +122,9 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
                 })
         }
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-            loop_exits_early(orelse)
+            orelse
+                .as_ref()
+                .is_some_and(|orelse| loop_exits_early(orelse))
         }
         Stmt::Break(_) => true,
         _ => false,

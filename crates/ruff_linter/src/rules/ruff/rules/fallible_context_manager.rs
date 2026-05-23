@@ -137,8 +137,12 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 for handler in handlers {
                     self.visit_except_handler_with_terminal(handler, terminal);
                 }
-                self.visit_body_with_terminal(orelse, terminal);
-                self.visit_body_with_terminal(finalbody, terminal);
+                if let Some(orelse) = orelse {
+                    self.visit_body_with_terminal(orelse, terminal);
+                }
+                if let Some(finalbody) = finalbody {
+                    self.visit_body_with_terminal(finalbody, terminal);
+                }
             }
 
             Stmt::With(ast::StmtWith { items, body, .. }) => {
@@ -176,7 +180,9 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 self.visit_expr(target);
                 let terminal = self.in_terminal_position;
                 self.visit_body_with_terminal(body, terminal);
-                self.visit_body_with_terminal(orelse, terminal);
+                if let Some(orelse) = orelse {
+                    self.visit_body_with_terminal(orelse, terminal);
+                }
             }
 
             Stmt::While(ast::StmtWhile {
@@ -185,7 +191,9 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 self.visit_expr(test);
                 let terminal = self.in_terminal_position;
                 self.visit_body_with_terminal(body, terminal);
-                self.visit_body_with_terminal(orelse, terminal);
+                if let Some(orelse) = orelse {
+                    self.visit_body_with_terminal(orelse, terminal);
+                }
             }
 
             Stmt::Match(ast::StmtMatch { subject, cases, .. }) => {

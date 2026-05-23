@@ -76,11 +76,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 22..22,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 For(
@@ -130,11 +126,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 44..44,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 For(
@@ -163,11 +155,7 @@ Module(
                             node_index: NodeIndex(None),
                             statements: [],
                         },
-                        orelse: Suite {
-                            range: 60..60,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 AnnAssign(

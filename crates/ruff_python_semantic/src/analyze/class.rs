@@ -199,7 +199,9 @@ where
                 Stmt::For(StmtFor { body, orelse, .. })
                 | Stmt::While(StmtWhile { body, orelse, .. }) => {
                     if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
+                        || orelse.as_ref().is_some_and(|orelse| {
+                            any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
+                        })
                     {
                         return true;
                     }
@@ -240,8 +242,12 @@ where
                     ..
                 }) => {
                     if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(finalbody, func, ClassMemberBoundness::PossiblyUnbound)
+                        || orelse.as_ref().is_some_and(|orelse| {
+                            any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
+                        })
+                        || finalbody.as_ref().is_some_and(|finalbody| {
+                            any_stmt_in_body(finalbody, func, ClassMemberBoundness::PossiblyUnbound)
+                        })
                         || handlers.iter().any(|ExceptHandler::ExceptHandler(it)| {
                             any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
                         })

@@ -77,11 +77,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 65..65,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 For(
@@ -148,11 +144,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 88..88,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 For(
@@ -226,11 +218,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 111..111,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
             ],

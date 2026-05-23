@@ -9118,7 +9118,7 @@ pub struct StmtFor {
     pub target: Box<Expr>,
     pub iter: Box<Expr>,
     pub body: crate::Suite,
-    pub orelse: crate::Suite,
+    pub orelse: Option<crate::Suite>,
 }
 
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
@@ -9130,7 +9130,7 @@ pub struct StmtWhile {
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub body: crate::Suite,
-    pub orelse: crate::Suite,
+    pub orelse: Option<crate::Suite>,
 }
 
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
@@ -9187,8 +9187,8 @@ pub struct StmtTry {
     pub range: ruff_text_size::TextRange,
     pub body: crate::Suite,
     pub handlers: Vec<ExceptHandler>,
-    pub orelse: crate::Suite,
-    pub finalbody: crate::Suite,
+    pub orelse: Option<crate::Suite>,
+    pub finalbody: Option<crate::Suite>,
     pub is_star: bool,
 }
 
@@ -10019,7 +10019,10 @@ impl StmtFor {
         visitor.visit_expr(target);
         visitor.visit_expr(iter);
         visitor.visit_suite(body);
-        visitor.visit_suite(orelse);
+
+        if let Some(orelse) = orelse {
+            visitor.visit_suite(orelse);
+        }
     }
 }
 
@@ -10037,7 +10040,10 @@ impl StmtWhile {
         } = self;
         visitor.visit_expr(test);
         visitor.visit_suite(body);
-        visitor.visit_suite(orelse);
+
+        if let Some(orelse) = orelse {
+            visitor.visit_suite(orelse);
+        }
     }
 }
 
@@ -10142,8 +10148,14 @@ impl StmtTry {
         for elm in handlers {
             visitor.visit_except_handler(elm);
         }
-        visitor.visit_suite(orelse);
-        visitor.visit_suite(finalbody);
+
+        if let Some(orelse) = orelse {
+            visitor.visit_suite(orelse);
+        }
+
+        if let Some(finalbody) = finalbody {
+            visitor.visit_suite(finalbody);
+        }
     }
 }
 

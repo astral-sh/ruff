@@ -64,13 +64,11 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                 ],
                 trailing_condition_comments,
                 body,
-                SuiteKind::other(orelse.is_empty()),
+                SuiteKind::other(orelse.is_none()),
             ),]
         )?;
 
-        if orelse.is_empty() {
-            debug_assert!(or_else_comments.is_empty());
-        } else {
+        if let Some(orelse) = orelse {
             // Split between leading comments before the `else` keyword and end of line comments at the end of
             // the `else:` line.
             let trailing_start =
@@ -88,6 +86,8 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                 )
                 .with_leading_comments(leading, body.last())]
             )?;
+        } else {
+            debug_assert!(or_else_comments.is_empty());
         }
 
         Ok(())

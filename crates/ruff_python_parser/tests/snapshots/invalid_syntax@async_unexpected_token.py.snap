@@ -75,11 +75,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 42..42,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 Assign(

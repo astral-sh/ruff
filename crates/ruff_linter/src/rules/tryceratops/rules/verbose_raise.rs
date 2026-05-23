@@ -101,7 +101,10 @@ impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
             Stmt::Try(ast::StmtTry {
                 body, finalbody, ..
             }) => {
-                for stmt in body.iter().chain(finalbody) {
+                for stmt in body
+                    .iter()
+                    .chain(finalbody.iter().flat_map(|finalbody| finalbody.iter()))
+                {
                     walk_stmt(self, stmt);
                 }
             }

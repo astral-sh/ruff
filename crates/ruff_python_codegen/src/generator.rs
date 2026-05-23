@@ -454,7 +454,7 @@ impl<'a> Generator<'a> {
                     self.p(":");
                 });
                 self.body(body);
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     statement!({
                         self.p("else:");
                     });
@@ -474,7 +474,7 @@ impl<'a> Generator<'a> {
                     self.p(":");
                 });
                 self.body(body);
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     statement!({
                         self.p("else:");
                     });
@@ -604,13 +604,13 @@ impl<'a> Generator<'a> {
                     });
                 }
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     statement!({
                         self.p("else:");
                     });
                     self.body(orelse);
                 }
-                if !finalbody.is_empty() {
+                if let Some(finalbody) = finalbody {
                     statement!({
                         self.p("finally:");
                     });

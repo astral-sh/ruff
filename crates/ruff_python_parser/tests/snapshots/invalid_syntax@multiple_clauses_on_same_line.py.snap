@@ -184,18 +184,20 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 113..117,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 113..117,
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 113..117,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 113..117,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                     },
                 ),
                 For(
@@ -231,18 +233,20 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 146..150,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 146..150,
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 146..150,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 146..150,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                     },
                 ),
                 Try(
@@ -292,30 +296,34 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 184..188,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 184..188,
-                                    },
-                                ),
-                            ],
-                        },
-                        finalbody: Suite {
-                            range: 198..202,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 198..202,
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 184..188,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 184..188,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        finalbody: Some(
+                            Suite {
+                                range: 198..202,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 198..202,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                         is_star: false,
                     },
                 ),
@@ -366,30 +374,34 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 238..242,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 238..242,
-                                    },
-                                ),
-                            ],
-                        },
-                        finalbody: Suite {
-                            range: 253..257,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 253..257,
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 238..242,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 238..242,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        finalbody: Some(
+                            Suite {
+                                range: 253..257,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 253..257,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                         is_star: false,
                     },
                 ),

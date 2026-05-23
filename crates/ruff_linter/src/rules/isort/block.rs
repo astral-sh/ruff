@@ -201,10 +201,12 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
                 }
                 self.finalize(None);
 
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
+                if let Some(orelse) = orelse {
+                    for stmt in orelse {
+                        self.visit_stmt(stmt);
+                    }
+                    self.finalize(None);
                 }
-                self.finalize(None);
             }
             Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 for stmt in body {
@@ -212,10 +214,12 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
                 }
                 self.finalize(None);
 
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
+                if let Some(orelse) = orelse {
+                    for stmt in orelse {
+                        self.visit_stmt(stmt);
+                    }
+                    self.finalize(None);
                 }
-                self.finalize(None);
             }
             Stmt::If(ast::StmtIf {
                 body,
@@ -258,15 +262,19 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
                 }
                 self.finalize(None);
 
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
+                if let Some(orelse) = orelse {
+                    for stmt in orelse {
+                        self.visit_stmt(stmt);
+                    }
+                    self.finalize(None);
                 }
-                self.finalize(None);
 
-                for stmt in finalbody {
-                    self.visit_stmt(stmt);
+                if let Some(finalbody) = finalbody {
+                    for stmt in finalbody {
+                        self.visit_stmt(stmt);
+                    }
+                    self.finalize(None);
                 }
-                self.finalize(None);
             }
             _ => {}
         }

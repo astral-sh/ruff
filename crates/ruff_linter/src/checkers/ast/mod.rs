@@ -913,7 +913,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             match parent {
                 Stmt::For(ast::StmtFor { orelse, .. })
                 | Stmt::While(ast::StmtWhile { orelse, .. })
-                    if !orelse.contains(child) =>
+                    if !orelse.as_ref().is_some_and(|orelse| orelse.contains(child)) =>
                 {
                     return true;
                 }
@@ -1459,12 +1459,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.set_branch(branch);
                 let flags_snapshot = self.semantic.flags;
                 self.semantic.flags |= SemanticModelFlags::ORELSE;
-                self.visit_body(orelse);
+                if let Some(orelse) = orelse {
+                    self.visit_body(orelse);
+                }
                 self.semantic.flags = flags_snapshot;
                 self.semantic.pop_branch();
 
                 self.semantic.push_branch();
-                self.visit_body(finalbody);
+                if let Some(finalbody) = finalbody {
+                    self.visit_body(finalbody);
+                }
                 self.semantic.pop_branch();
             }
             Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -1558,7 +1562,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(body);
                 let flags_snapshot = self.semantic.flags;
                 self.semantic.flags |= SemanticModelFlags::ORELSE;
-                self.visit_body(orelse);
+                if let Some(orelse) = orelse {
+                    self.visit_body(orelse);
+                }
                 self.semantic.flags = flags_snapshot;
             }
             Stmt::For(ast::StmtFor {
@@ -1575,7 +1581,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(body);
                 let flags_snapshot = self.semantic.flags;
                 self.semantic.flags |= SemanticModelFlags::ORELSE;
-                self.visit_body(orelse);
+                if let Some(orelse) = orelse {
+                    self.visit_body(orelse);
+                }
                 self.semantic.flags = flags_snapshot;
             }
             Stmt::If(

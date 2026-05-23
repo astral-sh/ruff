@@ -86,12 +86,16 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                 self.add_place_from_target(&node.target);
                 self.visit_expr(&node.iter);
                 self.visit_body(&node.body);
-                self.visit_body(&node.orelse);
+                if let Some(orelse) = &node.orelse {
+                    self.visit_body(orelse);
+                }
             }
             ast::Stmt::While(node) => {
                 self.visit_expr(&node.test);
                 self.visit_body(&node.body);
-                self.visit_body(&node.orelse);
+                if let Some(orelse) = &node.orelse {
+                    self.visit_body(orelse);
+                }
             }
             ast::Stmt::With(node) => {
                 for item in &node.items {
@@ -112,8 +116,12 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                     }
                     self.visit_body(&h.body);
                 }
-                self.visit_body(&node.orelse);
-                self.visit_body(&node.finalbody);
+                if let Some(orelse) = &node.orelse {
+                    self.visit_body(orelse);
+                }
+                if let Some(finalbody) = &node.finalbody {
+                    self.visit_body(finalbody);
+                }
             }
             ast::Stmt::Import(node) => {
                 for alias in &node.names {

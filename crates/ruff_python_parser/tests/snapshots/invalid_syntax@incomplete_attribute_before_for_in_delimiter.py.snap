@@ -345,11 +345,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 141..141,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
             ],

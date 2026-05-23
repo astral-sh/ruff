@@ -30,16 +30,8 @@ Module(
                             ],
                         },
                         handlers: [],
-                        orelse: Suite {
-                            range: 13..13,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 13..13,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
+                        finalbody: None,
                         is_star: false,
                     },
                 ),
@@ -60,23 +52,21 @@ Module(
                             ],
                         },
                         handlers: [],
-                        orelse: Suite {
-                            range: 33..42,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Pass(
-                                    StmtPass {
-                                        node_index: NodeIndex(None),
-                                        range: 38..42,
-                                    },
-                                ),
-                            ],
-                        },
-                        finalbody: Suite {
-                            range: 42..42,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 33..42,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Pass(
+                                        StmtPass {
+                                            node_index: NodeIndex(None),
+                                            range: 38..42,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        finalbody: None,
                         is_star: false,
                     },
                 ),

@@ -1730,7 +1730,11 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
+                orelse: orelse
+                    .iter()
+                    .flat_map(|suite| suite.iter())
+                    .map(Into::into)
+                    .collect(),
             }),
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -1741,7 +1745,11 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             }) => Self::While(StmtWhile {
                 test: test.into(),
                 body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
+                orelse: orelse
+                    .iter()
+                    .flat_map(|suite| suite.iter())
+                    .map(Into::into)
+                    .collect(),
             }),
             ast::Stmt::If(ast::StmtIf {
                 test,
@@ -1794,8 +1802,16 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             }) => Self::Try(StmtTry {
                 body: body.iter().map(Into::into).collect(),
                 handlers: handlers.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                finalbody: finalbody.iter().map(Into::into).collect(),
+                orelse: orelse
+                    .iter()
+                    .flat_map(|suite| suite.iter())
+                    .map(Into::into)
+                    .collect(),
+                finalbody: finalbody
+                    .iter()
+                    .flat_map(|suite| suite.iter())
+                    .map(Into::into)
+                    .collect(),
                 is_star: *is_star,
             }),
             ast::Stmt::Assert(ast::StmtAssert {

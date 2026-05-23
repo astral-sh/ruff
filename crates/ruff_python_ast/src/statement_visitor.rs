@@ -41,14 +41,18 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
         }
         Stmt::For(ast::StmtFor { body, orelse, .. }) => {
             visitor.visit_suite(body);
-            visitor.visit_suite(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_suite(orelse);
+            }
         }
         Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
             visitor.visit_suite(body);
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             visitor.visit_suite(body);
-            visitor.visit_suite(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_suite(orelse);
+            }
         }
         Stmt::If(ast::StmtIf {
             body,
@@ -79,8 +83,12 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             for except_handler in handlers {
                 visitor.visit_except_handler(except_handler);
             }
-            visitor.visit_suite(orelse);
-            visitor.visit_suite(finalbody);
+            if let Some(orelse) = orelse {
+                visitor.visit_suite(orelse);
+            }
+            if let Some(finalbody) = finalbody {
+                visitor.visit_suite(finalbody);
+            }
         }
         _ => {}
     }

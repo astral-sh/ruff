@@ -607,11 +607,7 @@ Module(
                             node_index: NodeIndex(None),
                             statements: [],
                         },
-                        orelse: Suite {
-                            range: 232..232,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 Expr(
@@ -685,11 +681,7 @@ Module(
                             node_index: NodeIndex(None),
                             statements: [],
                         },
-                        orelse: Suite {
-                            range: 252..252,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 Expr(

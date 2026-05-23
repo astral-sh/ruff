@@ -2955,7 +2955,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.record_negated_narrowing_constraint(predicate, predicate_id);
 
-                self.visit_body(orelse);
+                if let Some(orelse) = orelse {
+                    self.visit_body(orelse);
+                }
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
@@ -3051,7 +3053,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop);
-                self.visit_body(orelse);
+                if let Some(orelse) = orelse {
+                    self.visit_body(orelse);
+                }
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
@@ -3272,7 +3276,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_restore(post_try_block_state);
                 }
 
-                self.visit_body(orelse);
+                if let Some(orelse) = orelse {
+                    self.visit_body(orelse);
+                }
 
                 for post_except_state in post_except_states {
                     self.flow_merge(post_except_state);
@@ -3303,7 +3309,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     for snapshot in snapshots {
                         self.flow_merge(snapshot);
                     }
-                    self.visit_body(finalbody);
+                    if let Some(finalbody) = finalbody {
+                        self.visit_body(finalbody);
+                    }
                     if !self.flow_snapshot().is_always_unreachable() {
                         self.record_terminal_finally_entry();
                     }
@@ -3311,7 +3319,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     // Mixed normal and terminal entry states are still handled by the normal path
                     // only. See the corresponding TODO tests in `terminal_statements.md`.
-                    self.visit_body(finalbody);
+                    if let Some(finalbody) = finalbody {
+                        self.visit_body(finalbody);
+                    }
                 }
                 self.in_try = was_in_try;
             }

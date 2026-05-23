@@ -52,11 +52,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 13..13,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
             ],

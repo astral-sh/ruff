@@ -337,6 +337,7 @@ fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
     let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
         return None;
     };
+    let orelse = orelse.as_ref()?;
 
     // The `else` block has to contain a single `return True` or `return False`.
     let [
@@ -379,7 +380,7 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
     };
 
     // The loop itself shouldn't have an `else` block.
-    if !orelse.is_empty() {
+    if orelse.is_some() {
         return None;
     }
 

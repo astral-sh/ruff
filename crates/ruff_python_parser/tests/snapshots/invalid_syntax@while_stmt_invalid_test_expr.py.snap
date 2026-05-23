@@ -50,11 +50,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 13..13,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 While(
@@ -95,11 +91,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 32..32,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 While(
@@ -119,11 +111,7 @@ Module(
                             node_index: NodeIndex(None),
                             statements: [],
                         },
-                        orelse: Suite {
-                            range: 40..40,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 AnnAssign(
@@ -180,11 +168,7 @@ Module(
                             node_index: NodeIndex(None),
                             statements: [],
                         },
-                        orelse: Suite {
-                            range: 61..61,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 AnnAssign(

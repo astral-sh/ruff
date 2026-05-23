@@ -66,10 +66,14 @@ fn traverse_body(checker: &Checker, body: &[Stmt]) {
             }
             Stmt::Try(ast::StmtTry { body, orelse, .. }) => {
                 traverse_body(checker, body);
-                traverse_body(checker, orelse);
+                if let Some(orelse) = orelse {
+                    traverse_body(checker, orelse);
+                }
             }
             Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-                traverse_body(checker, orelse);
+                if let Some(orelse) = orelse {
+                    traverse_body(checker, orelse);
+                }
             }
             Stmt::With(ast::StmtWith { body, .. }) => {
                 traverse_body(checker, body);

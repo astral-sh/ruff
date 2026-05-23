@@ -335,12 +335,16 @@ pub(super) fn num_statements(stmts: &[Stmt]) -> usize {
             }
             Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                 count += num_statements(body);
-                count += num_statements(orelse);
+                if let Some(orelse) = orelse {
+                    count += num_statements(orelse);
+                }
             }
             Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 count += 1;
                 count += num_statements(body);
-                count += num_statements(orelse);
+                if let Some(orelse) = orelse {
+                    count += num_statements(orelse);
+                }
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 count += 1;
@@ -358,10 +362,10 @@ pub(super) fn num_statements(stmts: &[Stmt]) -> usize {
             }) => {
                 count += 1;
                 count += num_statements(body);
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     count += 1 + num_statements(orelse);
                 }
-                if !finalbody.is_empty() {
+                if let Some(finalbody) = finalbody {
                     // Unclear why, but follow Pylint's convention.
                     count += 2 + num_statements(finalbody);
                 }

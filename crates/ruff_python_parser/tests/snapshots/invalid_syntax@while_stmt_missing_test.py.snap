@@ -43,11 +43,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 11..11,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 While(
@@ -93,11 +89,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 29..29,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
             ],

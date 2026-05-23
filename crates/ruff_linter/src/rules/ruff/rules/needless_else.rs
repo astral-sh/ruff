@@ -218,7 +218,7 @@ impl<'a> AnyNodeWithOrElse<'a> {
             Self::For(_) | Self::While(_) | Self::Try(_) => {
                 let before_else = self.body_before_else();
                 let else_body = self.else_body()?;
-                if before_else.is_empty() || else_body.is_empty() {
+                if else_body.is_empty() {
                     return None;
                 }
 
@@ -269,7 +269,7 @@ impl<'a> AnyNodeWithOrElse<'a> {
         match self {
             Self::While(StmtWhile { orelse, .. })
             | Self::For(StmtFor { orelse, .. })
-            | Self::Try(StmtTry { orelse, .. }) => Some(orelse),
+            | Self::Try(StmtTry { orelse, .. }) => orelse.as_ref(),
 
             Self::If(StmtIf {
                 elif_else_clauses, ..

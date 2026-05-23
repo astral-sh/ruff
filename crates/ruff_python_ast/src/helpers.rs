@@ -656,7 +656,9 @@ where
                 any_over_expr(target, &mut *func)
                     || any_over_expr(iter, &mut *func)
                     || any_over_body(body, &mut *func)
-                    || any_over_body(orelse, &mut *func)
+                    || orelse
+                        .as_ref()
+                        .is_some_and(|orelse| any_over_body(orelse, &mut *func))
             }
             Stmt::While(ast::StmtWhile {
                 test,
@@ -667,7 +669,9 @@ where
             }) => {
                 any_over_expr(test, &mut *func)
                     || any_over_body(body, &mut *func)
-                    || any_over_body(orelse, &mut *func)
+                    || orelse
+                        .as_ref()
+                        .is_some_and(|orelse| any_over_body(orelse, &mut *func))
             }
             Stmt::If(ast::StmtIf {
                 test,
@@ -728,8 +732,12 @@ where
                             .is_some_and(|expr| any_over_expr(expr, &mut *func))
                             || any_over_body(body, &mut *func)
                     })
-                    || any_over_body(orelse, &mut *func)
-                    || any_over_body(finalbody, &mut *func)
+                    || orelse
+                        .as_ref()
+                        .is_some_and(|orelse| any_over_body(orelse, &mut *func))
+                    || finalbody
+                        .as_ref()
+                        .is_some_and(|finalbody| any_over_body(finalbody, &mut *func))
             }
             Stmt::Assert(ast::StmtAssert {
                 test,

@@ -153,7 +153,7 @@ fields = [
   { name = "target", type = "Expr" },
   { name = "iter", type = "Expr" },
   { name = "body", type = "Suite" },
-  { name = "orelse", type = "Suite" },
+  { name = "orelse", type = "Suite?" },
 ]
 
 [Stmt.nodes.StmtWhile]
@@ -162,7 +162,7 @@ and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile)."""
 fields = [
   { name = "test", type = "Expr" },
   { name = "body", type = "Suite" },
-  { name = "orelse", type = "Suite" },
+  { name = "orelse", type = "Suite?" },
 ]
 
 [Stmt.nodes.StmtIf]
@@ -202,8 +202,8 @@ and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)"""
 fields = [
   { name = "body", type = "Suite" },
   { name = "handlers", type = "ExceptHandler*" },
-  { name = "orelse", type = "Suite" },
-  { name = "finalbody", type = "Suite" },
+  { name = "orelse", type = "Suite?" },
+  { name = "finalbody", type = "Suite?" },
   { name = "is_star", type = "bool" },
 ]
 

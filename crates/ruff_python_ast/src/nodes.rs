@@ -14,6 +14,7 @@ use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
 use bitflags::bitflags;
+use thin_vec::ThinVec;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -3693,7 +3694,7 @@ impl<'a> IntoIterator for &'a TypeParams {
 pub struct Suite {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub statements: Vec<Stmt>,
+    pub statements: ThinVec<Stmt>,
 }
 
 impl Suite {
@@ -3703,7 +3704,7 @@ impl Suite {
 }
 
 impl Deref for Suite {
-    type Target = Vec<Stmt>;
+    type Target = ThinVec<Stmt>;
 
     fn deref(&self) -> &Self::Target {
         &self.statements
@@ -3724,6 +3725,12 @@ impl AsRef<[Stmt]> for Suite {
 
 impl From<Vec<Stmt>> for Suite {
     fn from(statements: Vec<Stmt>) -> Self {
+        ThinVec::from(statements).into()
+    }
+}
+
+impl From<ThinVec<Stmt>> for Suite {
+    fn from(statements: ThinVec<Stmt>) -> Self {
         let range = match (statements.first(), statements.last()) {
             (Some(first), Some(last)) => TextRange::new(first.start(), last.end()),
             _ => TextRange::default(),
@@ -3739,7 +3746,7 @@ impl From<Vec<Stmt>> for Suite {
 
 impl FromIterator<Stmt> for Suite {
     fn from_iter<T: IntoIterator<Item = Stmt>>(iter: T) -> Self {
-        Vec::from_iter(iter).into()
+        ThinVec::from_iter(iter).into()
     }
 }
 
@@ -3763,7 +3770,7 @@ impl<'a> IntoIterator for &'a mut Suite {
 
 impl IntoIterator for Suite {
     type Item = Stmt;
-    type IntoIter = std::vec::IntoIter<Stmt>;
+    type IntoIter = thin_vec::IntoIter<Stmt>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.statements.into_iter()
@@ -3967,12 +3974,12 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Suite>(), 40);
-        assert_eq!(std::mem::size_of::<Stmt>(), 160);
-        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 144);
-        assert_eq!(std::mem::size_of::<StmtClassDef>(), 136);
-        assert_eq!(std::mem::size_of::<StmtTry>(), 160);
-        assert_eq!(std::mem::size_of::<Mod>(), 56);
+        assert_eq!(std::mem::size_of::<Suite>(), 24);
+        assert_eq!(std::mem::size_of::<Stmt>(), 128);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 128);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 120);
+        assert_eq!(std::mem::size_of::<StmtTry>(), 112);
+        assert_eq!(std::mem::size_of::<Mod>(), 40);
         assert_eq!(std::mem::size_of::<Pattern>(), 104);
         assert_eq!(std::mem::size_of::<Expr>(), 80);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);

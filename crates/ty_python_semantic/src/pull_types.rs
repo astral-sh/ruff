@@ -61,7 +61,9 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
                 self.visit_target(&for_stmt.target);
                 self.visit_expr(&for_stmt.iter);
                 self.visit_body(&for_stmt.body);
-                self.visit_body(&for_stmt.orelse);
+                if let Some(orelse) = &for_stmt.orelse {
+                    self.visit_body(orelse);
+                }
                 return;
             }
             ast::Stmt::With(with_stmt) => {

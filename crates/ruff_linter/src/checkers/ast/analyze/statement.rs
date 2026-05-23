@@ -1225,7 +1225,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Stmt(stmt));
             }
             if checker.is_rule_enabled(Rule::UselessElseOnLoop) {
-                pylint::rules::useless_else_on_loop(checker, stmt, body, orelse);
+                if let Some(orelse) = orelse {
+                    pylint::rules::useless_else_on_loop(checker, stmt, body, orelse);
+                }
             }
             if checker.is_rule_enabled(Rule::TryExceptInLoop) {
                 perflint::rules::try_except_in_loop(checker, body);
@@ -1274,7 +1276,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::reuse_of_groupby_generator(checker, target, body, iter);
             }
             if checker.is_rule_enabled(Rule::UselessElseOnLoop) {
-                pylint::rules::useless_else_on_loop(checker, stmt, body, orelse);
+                if let Some(orelse) = orelse {
+                    pylint::rules::useless_else_on_loop(checker, stmt, body, orelse);
+                }
             }
             if checker.is_rule_enabled(Rule::RedefinedLoopName) {
                 pylint::rules::redefined_loop_name(checker, stmt);
@@ -1347,10 +1351,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::JumpStatementInFinally) {
-                flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
+                if let Some(finalbody) = finalbody {
+                    flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
+                }
             }
             if checker.is_rule_enabled(Rule::ContinueInFinally) {
-                if checker.target_version() <= PythonVersion::PY38 {
+                if checker.target_version() <= PythonVersion::PY38
+                    && let Some(finalbody) = finalbody
+                {
                     pylint::rules::continue_in_finally(checker, finalbody);
                 }
             }
@@ -1379,16 +1387,34 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::SuppressibleException) {
                 flake8_simplify::rules::suppressible_exception(
-                    checker, stmt, *is_star, body, handlers, orelse, finalbody,
+                    checker,
+                    stmt,
+                    *is_star,
+                    body,
+                    handlers,
+                    orelse.as_ref().map_or(&[], |orelse| orelse.as_slice()),
+                    finalbody
+                        .as_ref()
+                        .map_or(&[], |finalbody| finalbody.as_slice()),
                 );
             }
             if checker.is_rule_enabled(Rule::ReturnInTryExceptFinally) {
                 flake8_simplify::rules::return_in_try_except_finally(
-                    checker, body, handlers, finalbody,
+                    checker,
+                    body,
+                    handlers,
+                    finalbody
+                        .as_ref()
+                        .map_or(&[], |finalbody| finalbody.as_slice()),
                 );
             }
             if checker.is_rule_enabled(Rule::TryConsiderElse) {
-                tryceratops::rules::try_consider_else(checker, body, orelse, handlers);
+                tryceratops::rules::try_consider_else(
+                    checker,
+                    body,
+                    orelse.as_ref().map_or(&[], |orelse| orelse.as_slice()),
+                    handlers,
+                );
             }
             if checker.is_rule_enabled(Rule::VerboseRaise) {
                 tryceratops::rules::verbose_raise(checker, handlers);

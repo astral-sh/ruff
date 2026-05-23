@@ -34,14 +34,14 @@ node_lines = (
 nodes = []
 for node_line in node_lines:
     node = node_line.split("(")[1].split(")")[0].split("::")[-1].removeprefix("&'a ")
-    # `FString` has a custom implementation while the formatting for
-    # `FStringLiteralElement`, `FStringFormatSpec` and `FStringExpressionElement` are
-    # handled by the `FString` implementation.
+    # These nodes either have a custom implementation or are formatted as part of
+    # their containing node.
     if node in (
         "InterpolatedStringLiteralElement",
         "InterpolatedElement",
         "InterpolatedStringFormatSpec",
         "Identifier",
+        "Suite",
     ):
         continue
     nodes.append(node)

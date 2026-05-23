@@ -1775,8 +1775,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_body(body);
         }
 
-        self.infer_body(orelse);
-        self.infer_body(finalbody);
+        if let Some(orelse) = orelse {
+            self.infer_body(orelse);
+        }
+        if let Some(finalbody) = finalbody {
+            self.infer_body(finalbody);
+        }
     }
 
     fn infer_with_statement(&mut self, with_statement: &ast::StmtWith) {
@@ -4700,7 +4704,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         self.infer_body(body);
-        self.infer_body(orelse);
+        if let Some(orelse) = orelse {
+            self.infer_body(orelse);
+        }
     }
 
     fn infer_for_statement_definition(
@@ -4758,7 +4764,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         self.infer_body(body);
-        self.infer_body(orelse);
+        if let Some(orelse) = orelse {
+            self.infer_body(orelse);
+        }
     }
 
     fn infer_assert_statement(&mut self, assert: &ast::StmtAssert) {

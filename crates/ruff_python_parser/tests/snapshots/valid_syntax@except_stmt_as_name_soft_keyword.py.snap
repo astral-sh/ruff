@@ -160,16 +160,8 @@ Module(
                                 },
                             ),
                         ],
-                        orelse: Suite {
-                            range: 99..99,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
-                        finalbody: Suite {
-                            range: 99..99,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
+                        finalbody: None,
                         is_star: false,
                     },
                 ),

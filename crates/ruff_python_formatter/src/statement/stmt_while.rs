@@ -42,11 +42,11 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
                 ],
                 trailing_condition_comments,
                 body,
-                SuiteKind::other(orelse.is_empty()),
+                SuiteKind::other(orelse.is_none()),
             )]
         )?;
 
-        if !orelse.is_empty() {
+        if let Some(orelse) = orelse {
             // Split between leading comments before the `else` keyword and end of line comments at the end of
             // the `else:` line.
             let trailing_start =

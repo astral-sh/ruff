@@ -77,7 +77,9 @@ impl Violation for UselessFinally {
 
 /// RUF072
 pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
-    let finalbody = &try_stmt.finalbody;
+    let Some(finalbody) = &try_stmt.finalbody else {
+        return;
+    };
 
     if !is_stub_body(finalbody) {
         return;
@@ -118,7 +120,7 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
         return;
     }
 
-    let is_bare_try_finally = try_stmt.handlers.is_empty() && try_stmt.orelse.is_empty();
+    let is_bare_try_finally = try_stmt.handlers.is_empty() && try_stmt.orelse.is_none();
 
     if is_bare_try_finally {
         // bare `try/finally: pass` — unwrap the try body
@@ -158,7 +160,7 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
 /// Returns the end offset of the clause preceding `finally` and the last
 /// statement in that clause's body (used for comment indentation checks)
 fn preceding_clause_info(try_stmt: &StmtTry) -> (TextSize, Option<&Stmt>) {
-    if let Some(last) = try_stmt.orelse.last() {
+    if let Some(last) = try_stmt.orelse.as_ref().and_then(|orelse| orelse.last()) {
         return (last.end(), Some(last));
     }
     if let Some(handler) = try_stmt.handlers.last() {

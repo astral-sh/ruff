@@ -43,11 +43,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 16..16,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 While(
@@ -111,24 +107,26 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 53..61,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 58..61,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 58..61,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
+                        orelse: Some(
+                            Suite {
+                                range: 53..61,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 58..61,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 58..61,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                     },
                 ),
                 While(
@@ -226,72 +224,74 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 118..152,
-                            node_index: NodeIndex(None),
-                            statements: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 123..144,
-                                        value: Call(
-                                            ExprCall {
-                                                node_index: NodeIndex(None),
-                                                range: 123..144,
-                                                func: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 123..128,
-                                                        id: Name("print"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                arguments: Arguments {
-                                                    range: 128..144,
+                        orelse: Some(
+                            Suite {
+                                range: 118..152,
+                                node_index: NodeIndex(None),
+                                statements: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 123..144,
+                                            value: Call(
+                                                ExprCall {
                                                     node_index: NodeIndex(None),
-                                                    args: [
-                                                        StringLiteral(
-                                                            ExprStringLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 129..143,
-                                                                value: StringLiteralValue {
-                                                                    inner: Single(
-                                                                        StringLiteral {
-                                                                            range: 129..143,
-                                                                            node_index: NodeIndex(None),
-                                                                            value: "Olá, Mundo!",
-                                                                            flags: StringLiteralFlags {
-                                                                                quote_style: Single,
-                                                                                prefix: Empty,
-                                                                                triple_quoted: false,
-                                                                                unclosed: false,
+                                                    range: 123..144,
+                                                    func: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 123..128,
+                                                            id: Name("print"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 128..144,
+                                                        node_index: NodeIndex(None),
+                                                        args: [
+                                                            StringLiteral(
+                                                                ExprStringLiteral {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 129..143,
+                                                                    value: StringLiteralValue {
+                                                                        inner: Single(
+                                                                            StringLiteral {
+                                                                                range: 129..143,
+                                                                                node_index: NodeIndex(None),
+                                                                                value: "Olá, Mundo!",
+                                                                                flags: StringLiteralFlags {
+                                                                                    quote_style: Single,
+                                                                                    prefix: Empty,
+                                                                                    triple_quoted: false,
+                                                                                    unclosed: false,
+                                                                                },
                                                                             },
-                                                                        },
-                                                                    ),
+                                                                        ),
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
-                                                    ],
-                                                    keywords: [],
+                                                            ),
+                                                        ],
+                                                        keywords: [],
+                                                    },
                                                 },
-                                            },
-                                        ),
-                                    },
-                                ),
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 149..152,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 149..152,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
+                                            ),
+                                        },
+                                    ),
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 149..152,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 149..152,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                     },
                 ),
                 While(
@@ -338,11 +338,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 171..171,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 While(
@@ -406,11 +402,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 197..197,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 While(
@@ -476,11 +468,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 220..220,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 While(
@@ -519,11 +507,7 @@ Module(
                                 ),
                             ],
                         },
-                        orelse: Suite {
-                            range: 239..239,
-                            node_index: NodeIndex(None),
-                            statements: [],
-                        },
+                        orelse: None,
                     },
                 ),
                 If(
@@ -565,18 +549,20 @@ Module(
                                                 ),
                                             ],
                                         },
-                                        orelse: Suite {
-                                            range: 285..298,
-                                            node_index: NodeIndex(None),
-                                            statements: [
-                                                Pass(
-                                                    StmtPass {
-                                                        node_index: NodeIndex(None),
-                                                        range: 294..298,
-                                                    },
-                                                ),
-                                            ],
-                                        },
+                                        orelse: Some(
+                                            Suite {
+                                                range: 285..298,
+                                                node_index: NodeIndex(None),
+                                                statements: [
+                                                    Pass(
+                                                        StmtPass {
+                                                            node_index: NodeIndex(None),
+                                                            range: 294..298,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
                                     },
                                 ),
                             ],
