@@ -440,51 +440,13 @@ impl<'db> Conjunctions<'db> {
     }
 
     fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        const MIN_DEFERRED_DISTRIBUTION_ELEMENTS: usize = 16;
-
         if self.conjuncts.len() == 1 {
             return self.conjuncts[0];
         }
 
-        // Once IntersectionBuilder sees a union, it maintains one intersection per union
-        // element. For large unions, add non-union conjuncts first so their simplification work
-        // happens once before that state is distributed, instead of once per union element.
-        // Retain insertion order for small unions to avoid presentation churn for marginal wins.
-        let deferred_union = self.conjuncts.iter().find_map(|conjunct| {
-            let Type::Union(union) = conjunct else {
-                return None;
-            };
-            (union.elements(db).len() >= MIN_DEFERRED_DISTRIBUTION_ELEMENTS)
-                .then_some(Type::Union(*union))
-        });
-
-        let mut intersection = IntersectionBuilder::new(db);
-        if let Some(deferred_union) = deferred_union {
-            // A single-valued conjunct cannot partially reduce a union: it either survives or
-            // makes the entire conjunction impossible. Check that before materializing one
-            // `Never` intersection per union element, e.g. for `(A | B | C) & None`.
-            if self.conjuncts.iter().copied().any(|conjunct| {
-                conjunct != deferred_union
-                    && conjunct.is_single_valued(db)
-                    && deferred_union.is_disjoint_from(db, conjunct)
-            }) {
-                return Type::Never;
-            }
-
-            for &conjunct in self
-                .conjuncts
-                .iter()
-                .filter(|conjunct| !conjunct.is_union())
-                .chain(self.conjuncts.iter().filter(|conjunct| conjunct.is_union()))
-            {
-                intersection = intersection.add_positive(conjunct);
-            }
-        } else {
-            for conjunct in self.conjuncts {
-                intersection = intersection.add_positive(conjunct);
-            }
-        }
-        intersection.build()
+        IntersectionBuilder::new(db)
+            .positive_conjunction(self.conjuncts)
+            .build()
     }
 }
 

@@ -48,6 +48,8 @@ use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
+const MIN_DEFERRED_DISTRIBUTION_ELEMENTS: usize = 16;
+
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
 /// e.g.
@@ -1238,6 +1240,48 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
+    /// Adds a batch of positive elements that are known to form a single conjunction.
+    ///
+    /// Once `IntersectionBuilder` sees a union, it maintains one intersection per union
+    /// element. For large unions, add non-union conjuncts first so their simplification work
+    /// happens once before that state is distributed, instead of once per union element. Retain
+    /// insertion order for small unions to avoid presentation churn for marginal wins.
+    pub(crate) fn positive_conjunction(mut self, conjuncts: SmallVec<[Type<'db>; 2]>) -> Self {
+        let deferred_union = conjuncts.iter().find_map(|conjunct| {
+            let Type::Union(union) = conjunct else {
+                return None;
+            };
+            (union.elements(self.db).len() >= MIN_DEFERRED_DISTRIBUTION_ELEMENTS)
+                .then_some(Type::Union(*union))
+        });
+
+        if let Some(deferred_union) = deferred_union {
+            // A single-valued conjunct cannot partially reduce a union: it either survives or
+            // makes the entire conjunction impossible. Check that before materializing one
+            // `Never` intersection per union element, e.g. for `(A | B | C) & None`.
+            if conjuncts.iter().copied().any(|conjunct| {
+                conjunct != deferred_union
+                    && conjunct.is_single_valued(self.db)
+                    && deferred_union.is_disjoint_from(self.db, conjunct)
+            }) {
+                return self.add_positive(Type::Never);
+            }
+
+            for &conjunct in conjuncts
+                .iter()
+                .filter(|conjunct| !conjunct.is_union())
+                .chain(conjuncts.iter().filter(|conjunct| conjunct.is_union()))
+            {
+                self = self.add_positive(conjunct);
+            }
+        } else {
+            for conjunct in conjuncts {
+                self = self.add_positive(conjunct);
+            }
+        }
+        self
+    }
+
     pub(crate) fn build(self) -> Type<'db> {
         UnionType::from_elements(
             self.db,
@@ -1775,7 +1819,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, Type, UnionBuilder, UnionType,
+        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, MIN_DEFERRED_DISTRIBUTION_ELEMENTS,
+        Type, UnionBuilder, UnionType,
     };
 
     use crate::db::tests::{TestDb, setup_db};
@@ -1785,6 +1830,7 @@ mod tests {
     use crate::types::{KnownClass, KnownInstanceType, Truthiness};
 
     use ruff_db::system::DbWithWritableSystem as _;
+    use smallvec::smallvec;
     use ty_module_resolver::KnownModule;
 
     #[test]
@@ -1877,6 +1923,25 @@ mod tests {
 
         let intersection = IntersectionBuilder::new(&db).build();
         assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn positive_conjunction_short_circuits_disjoint_singleton_for_large_union() {
+        let db = setup_db();
+
+        let union = UnionType::from_elements(
+            &db,
+            (0_i64..)
+                .take(MIN_DEFERRED_DISTRIBUTION_ELEMENTS)
+                .map(Type::int_literal),
+        )
+        .expect_union();
+
+        let intersection = IntersectionBuilder::new(&db)
+            .positive_conjunction(smallvec![Type::Union(union), Type::none(&db)])
+            .build();
+
+        assert_eq!(intersection, Type::Never);
     }
 
     #[test]
