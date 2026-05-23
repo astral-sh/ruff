@@ -388,12 +388,13 @@ impl<'src> Parser<'src> {
 
     /// Take the token value from the underlying token source and bump the current token.
     ///
-    /// # Panics
-    ///
-    /// If the current token is not of the given kind.
+    /// The caller must have already established that the current token is of the given kind.
+    #[inline(always)]
     fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
+        debug_assert_eq!(self.current_token_kind(), kind);
+
         let value = self.tokens.take_value();
-        self.bump(kind);
+        self.do_bump(kind);
         value
     }
 
