@@ -581,7 +581,7 @@ impl<'src> Parser<'src> {
         }
 
         if self.current_token_kind().is_soft_keyword() {
-            let id = Name::new(self.src_text(range));
+            let id = self.intern_name(self.src_text(range), false);
             self.bump_soft_keyword_as_name();
             return ast::Identifier {
                 id,
@@ -615,7 +615,7 @@ impl<'src> Parser<'src> {
                 range,
             );
 
-            let id = Name::new(self.src_text(range));
+            let id = self.intern_name(self.src_text(range), false);
             self.bump_any();
             ast::Identifier {
                 id,

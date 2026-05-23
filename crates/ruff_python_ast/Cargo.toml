@@ -34,6 +34,7 @@ salsa = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+smol_str = { workspace = true }
 thiserror = { workspace = true }
 
 [features]
@@ -44,6 +45,7 @@ serde = [
     "ruff_text_size/serde",
     "dep:ruff_cache",
     "compact_str/serde",
+    "smol_str/serde",
 ]
 get-size = ["dep:get-size2", "ruff_text_size/get-size"]
 

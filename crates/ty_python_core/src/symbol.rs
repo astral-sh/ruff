@@ -227,7 +227,7 @@ pub(super) struct SymbolTableBuilder {
 
 impl SymbolTableBuilder {
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
-    pub(super) fn add(&mut self, mut symbol: Symbol) -> (ScopedSymbolId, bool) {
+    pub(super) fn add(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(symbol.name());
         let entry = self.table.map.entry(
             hash,
@@ -246,7 +246,6 @@ impl SymbolTableBuilder {
                 (id, false)
             }
             Entry::Vacant(entry) => {
-                symbol.name.shrink_to_fit();
                 let id = self.table.symbols.push(symbol);
                 entry.insert(id);
                 (id, true)

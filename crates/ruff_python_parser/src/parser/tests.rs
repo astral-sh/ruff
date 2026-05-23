@@ -1,4 +1,4 @@
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Expr, Stmt};
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
@@ -59,6 +59,56 @@ fn test_unicode_aliases() {
     let suite = parse_module(source).unwrap().into_suite();
 
     insta::assert_debug_snapshot!(suite);
+}
+
+#[test]
+fn test_repeated_raw_names_are_interned() {
+    let suite = parse_module(
+        "long_identifier_name_that_needs_heap_storage = \
+         long_identifier_name_that_needs_heap_storage",
+    )
+    .unwrap()
+    .into_suite();
+    let [Stmt::Assign(assign)] = suite.as_slice() else {
+        panic!("expected assignment");
+    };
+    let [Expr::Name(target)] = assign.targets.as_slice() else {
+        panic!("expected name target");
+    };
+    let Expr::Name(value) = assign.value.as_ref() else {
+        panic!("expected name value");
+    };
+
+    assert_eq!(target.id, value.id);
+    assert!(std::ptr::eq(
+        target.id.as_str().as_ptr(),
+        value.id.as_str().as_ptr()
+    ));
+}
+
+#[test]
+fn test_name_interning_uses_raw_name_before_nfkc_normalization() {
+    let suite = parse_module(
+        "long_identifier_name_that_ends_in_𝒞 = \
+         long_identifier_name_that_ends_in_C",
+    )
+    .unwrap()
+    .into_suite();
+    let [Stmt::Assign(assign)] = suite.as_slice() else {
+        panic!("expected assignment");
+    };
+    let [Expr::Name(target)] = assign.targets.as_slice() else {
+        panic!("expected name target");
+    };
+    let Expr::Name(value) = assign.value.as_ref() else {
+        panic!("expected name value");
+    };
+
+    assert_eq!(target.id, value.id);
+    assert!(!std::ptr::eq(
+        target.id.as_str().as_ptr(),
+        value.id.as_str().as_ptr()
+    ));
 }
 
 #[test]

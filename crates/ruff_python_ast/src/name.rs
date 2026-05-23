@@ -3,60 +3,82 @@ use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
+use smol_str::SmolStr;
+
 use crate::Expr;
 use crate::generated::ExprName;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
-#[cfg_attr(feature = "salsa", derive(salsa::Update))]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[cfg_attr(
     feature = "schemars",
     derive(schemars::JsonSchema),
     schemars(with = "String")
 )]
-pub struct Name(compact_str::CompactString);
+pub struct Name(SmolStr);
 
 impl Name {
     #[inline]
     pub fn empty() -> Self {
-        Self(compact_str::CompactString::default())
+        Self(SmolStr::default())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(compact_str::CompactString::new(name))
+        Self(SmolStr::new(name))
     }
 
     #[inline]
     pub const fn new_static(name: &'static str) -> Self {
-        Self(compact_str::CompactString::const_new(name))
-    }
-
-    pub fn shrink_to_fit(&mut self) {
-        self.0.shrink_to_fit();
+        Self(SmolStr::new_static(name))
     }
 
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
+}
 
-    pub fn push_str(&mut self, s: &str) {
-        self.0.push_str(s);
+#[cfg(feature = "cache")]
+impl ruff_cache::CacheKey for Name {
+    fn cache_key(&self, state: &mut ruff_cache::CacheKeyHasher) {
+        <str as ruff_cache::CacheKey>::cache_key(self.as_str(), state);
+    }
+}
+
+#[cfg(feature = "salsa")]
+#[expect(unsafe_code)]
+unsafe impl salsa::Update for Name {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        // SAFETY: `Name` owns all its data and its equality is value-based.
+        let old_value = unsafe { &mut *old_pointer };
+        if *old_value == new_value {
+            false
+        } else {
+            *old_value = new_value;
+            true
+        }
+    }
+}
+
+#[cfg(feature = "get-size")]
+impl get_size2::GetSize for Name {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(
+        &self,
+        mut tracker: T,
+    ) -> (usize, T) {
+        let size = if self.0.is_heap_allocated() && tracker.track(self.as_str().as_ptr()) {
+            self.as_str().len()
+        } else {
+            0
+        };
+
+        (size, tracker)
     }
 }
 
 impl Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Name({:?})", self.as_str())
-    }
-}
-
-impl std::fmt::Write for Name {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.0.push_str(s);
-        Ok(())
     }
 }
 
@@ -107,7 +129,10 @@ impl<'a> From<&'a String> for Name {
 impl<'a> From<Cow<'a, str>> for Name {
     #[inline]
     fn from(cow: Cow<'a, str>) -> Self {
-        Name(cow.into())
+        match cow {
+            Cow::Borrowed(s) => Self::from(s),
+            Cow::Owned(s) => Self::from(s),
+        }
     }
 }
 
@@ -121,14 +146,14 @@ impl From<Box<str>> for Name {
 impl From<compact_str::CompactString> for Name {
     #[inline]
     fn from(value: compact_str::CompactString) -> Self {
-        Self(value)
+        Self(SmolStr::new(value.as_str()))
     }
 }
 
 impl From<Name> for compact_str::CompactString {
     #[inline]
     fn from(name: Name) -> Self {
-        name.0
+        Self::new(name.as_str())
     }
 }
 
@@ -141,7 +166,7 @@ impl From<Name> for String {
 
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
-        Self(iter.into_iter().collect())
+        Self(iter.into_iter().collect::<SmolStr>())
     }
 }
 
