@@ -655,7 +655,16 @@ impl<'src> Lexer<'src> {
             return self.lex_string(quote);
         }
 
-        self.cursor.eat_while(is_identifier_continuation);
+        let mut has_non_ascii = !first.is_ascii();
+        self.cursor.eat_while(|c| {
+            let is_continuation = is_identifier_continuation(c);
+            has_non_ascii |= is_continuation && !c.is_ascii();
+            is_continuation
+        });
+
+        if has_non_ascii {
+            self.current_flags |= TokenFlags::NON_ASCII_NAME;
+        }
 
         let text = self.token_text();
 
@@ -2174,6 +2183,21 @@ if first:
         let source1 = "𝒞 = 500";
         let source2 = "C = 500";
         assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
+    }
+
+    #[test]
+    fn test_non_ascii_name_flag() {
+        let output = lex("aβ = β\nascii", Mode::Module, TextSize::default());
+        assert!(output.errors.is_empty());
+
+        let flags = output
+            .tokens
+            .iter()
+            .filter(|token| token.kind == TokenKind::Name)
+            .map(|token| token.flags.is_non_ascii_name())
+            .collect::<Vec<_>>();
+
+        assert_eq!(flags, [true, true, false]);
     }
 
     fn triple_quoted_eol(eol: &str) -> LexerOutput {
