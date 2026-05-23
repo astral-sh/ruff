@@ -89,6 +89,12 @@ def _(val: tuple[int] | tuple[str, str]):
         reveal_type(val)  # revealed: tuple[str, str]
     else:
         reveal_type(val)  # revealed: tuple[int]
+
+def _(val: tuple[int, ...]):
+    if val and len(val) == 2:
+        reveal_type(val)  # revealed: tuple[int, int]
+        fixed: tuple[int, int] = val
+        _ = val[2]  # error: [index-out-of-bounds]
 ```
 
 Types that define a precise `__len__` method can also be narrowed by an exact length comparison:
@@ -109,6 +115,55 @@ def _(value: LengthThree | LengthFour):
         reveal_type(value)  # revealed: LengthThree & ExactlySized[Literal[3]]
     else:
         reveal_type(value)  # revealed: LengthFour
+
+class TrueLength:
+    def __len__(self) -> Literal[True]:
+        return True
+
+class FalseLength:
+    def __len__(self) -> Literal[False]:
+        return False
+
+def _(value: TrueLength | FalseLength):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: TrueLength & ExactlySized[Literal[1, True]]
+    else:
+        reveal_type(value)  # revealed: FalseLength
+
+def _(value: LengthThree | list[int]):
+    if len(value) == 3:
+        reveal_type(value)  # revealed: (LengthThree & ExactlySized[Literal[3]]) | list[int]
+    else:
+        reveal_type(value)  # revealed: list[int]
+```
+
+A length check does not make the current length of an arbitrary mutable or stateful value
+persistent:
+
+```py
+class StatefulLength:
+    def __len__(self) -> int:
+        return 1
+
+class VaryingLength:
+    def __len__(self) -> Literal[0, 1]:
+        return 1
+
+def _(items: list[int]):
+    if len(items) == 3:
+        reveal_type(items)  # revealed: list[int]
+        items.clear()
+        reveal_type(len(items))  # revealed: int
+
+def _(value: StatefulLength):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: StatefulLength
+        reveal_type(len(value))  # revealed: int
+
+def _(value: VaryingLength):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: VaryingLength
+        reveal_type(len(value))  # revealed: Literal[0, 1]
 ```
 
 ## Unions of narrowable types

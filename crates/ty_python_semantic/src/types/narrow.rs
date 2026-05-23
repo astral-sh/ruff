@@ -1035,34 +1035,86 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Intersect a type with `ExactlySized[Literal[length]]`, materializing the exact tuple shape
-    /// when a tuple spec can represent the result directly.
+    /// Narrow a type using an equality or inequality comparison against an exact length.
+    ///
+    /// Exact tuples can be resized because their shape is immutable. Other types receive an
+    /// `ExactlySized` constraint only if their declared `len()` result is already a single
+    /// literal: the comparison may filter a fixed-length type, but must not make an observed
+    /// length persistent for mutable values or arbitrary stateful `__len__` implementations.
     fn narrow_type_by_exact_len(
         db: &'db dyn Db,
         ty: Type<'db>,
         length: usize,
         exactly_sized: Type<'db>,
+        constrain_with_equality: bool,
     ) -> Type<'db> {
-        match ty.resolve_type_alias(db) {
+        fn constrain<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            exactly_sized: Type<'db>,
+            constrain_with_equality: bool,
+        ) -> Type<'db> {
+            if constrain_with_equality {
+                IntersectionType::from_two_elements(db, ty, exactly_sized)
+            } else {
+                IntersectionBuilder::new(db)
+                    .add_positive(ty)
+                    .add_negative(exactly_sized)
+                    .build()
+            }
+        }
+
+        fn has_declared_fixed_length<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            ty.len(db).and_then(Type::as_int_literal).is_some()
+        }
+
+        let resolved = ty.resolve_type_alias(db);
+        let narrowed = match resolved {
             Type::Union(union) => UnionType::from_elements(
                 db,
                 union.elements(db).iter().map(|element| {
-                    Self::narrow_type_by_exact_len(db, *element, length, exactly_sized)
+                    Self::narrow_type_by_exact_len(
+                        db,
+                        *element,
+                        length,
+                        exactly_sized,
+                        constrain_with_equality,
+                    )
                 }),
             ),
+            Type::Intersection(intersection) => intersection.map_positive(db, |element| {
+                Self::narrow_type_by_exact_len(
+                    db,
+                    *element,
+                    length,
+                    exactly_sized,
+                    constrain_with_equality,
+                )
+            }),
             Type::NominalInstance(instance) => {
                 if let Some(tuple) = instance.own_tuple_spec(db) {
-                    tuple
-                        .resize(db, TupleLength::Fixed(length))
-                        .ok()
-                        .map(|tuple| Type::tuple(TupleType::new(db, &tuple)))
-                        .unwrap_or(Type::Never)
+                    let narrowed = if constrain_with_equality {
+                        tuple
+                            .resize(db, TupleLength::Fixed(length))
+                            .ok()
+                            .map(|tuple| Type::tuple(TupleType::new(db, &tuple)))
+                            .unwrap_or(Type::Never)
+                    } else {
+                        resolved
+                    };
+                    constrain(db, narrowed, exactly_sized, constrain_with_equality)
+                } else if has_declared_fixed_length(db, resolved) {
+                    constrain(db, resolved, exactly_sized, constrain_with_equality)
                 } else {
-                    IntersectionType::from_two_elements(db, ty, exactly_sized)
+                    resolved
                 }
             }
-            ty => IntersectionType::from_two_elements(db, ty, exactly_sized),
-        }
+            ty if has_declared_fixed_length(db, ty) => {
+                constrain(db, ty, exactly_sized, constrain_with_equality)
+            }
+            ty => ty,
+        };
+        if narrowed == resolved { ty } else { narrowed }
     }
 
     fn evaluate_simple_expr(
@@ -1527,18 +1579,30 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     return;
                 };
 
-                let exactly_sized = KnownClass::ExactlySized
-                    .to_specialized_instance(self.db, &[Type::int_literal(length_literal)]);
-                let narrowed = if constrain_with_equality {
-                    Self::narrow_type_by_exact_len(
+                let protocol_length = match length_literal {
+                    0 => UnionType::from_elements(
                         self.db,
-                        inference.expression_type(arg),
-                        length,
-                        exactly_sized,
-                    )
-                } else {
-                    exactly_sized.negate(self.db)
+                        [Type::int_literal(0), Type::bool_literal(false)],
+                    ),
+                    1 => UnionType::from_elements(
+                        self.db,
+                        [Type::int_literal(1), Type::bool_literal(true)],
+                    ),
+                    _ => Type::int_literal(length_literal),
                 };
+                let exactly_sized =
+                    KnownClass::ExactlySized.to_specialized_instance(self.db, &[protocol_length]);
+                let arg_type = inference.expression_type(arg);
+                let narrowed = Self::narrow_type_by_exact_len(
+                    self.db,
+                    arg_type,
+                    length,
+                    exactly_sized,
+                    constrain_with_equality,
+                );
+                if narrowed == arg_type {
+                    return;
+                }
                 let constraint = NarrowingConstraint::intersection(narrowed);
                 constraints
                     .entry(self.expect_place(&target))
