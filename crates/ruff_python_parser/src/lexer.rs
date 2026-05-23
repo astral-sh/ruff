@@ -823,6 +823,7 @@ impl<'src> Lexer<'src> {
     }
 
     /// Lex an f-string or t-string middle or end token.
+    #[inline(never)]
     fn lex_interpolated_string_middle_or_end(&mut self) -> Option<TokenKind> {
         // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
         let interpolated_string = self.interpolated_strings.current().unwrap();
