@@ -131,7 +131,7 @@ impl Indentations {
 
     pub(crate) fn rewind(&mut self, mut checkpoint: IndentationsCheckpoint) {
         self.stack.clear();
-        self.stack.append(&mut checkpoint.0)
+        self.stack.append(&mut checkpoint.0);
     }
 }
 
