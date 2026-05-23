@@ -856,6 +856,7 @@ impl TokenFlags {
     }
 
     /// Returns `true` if the token is a name containing at least one non-ASCII codepoint.
+    #[inline]
     pub const fn is_non_ascii_name(self) -> bool {
         self.intersects(TokenFlags::NON_ASCII_NAME)
     }
