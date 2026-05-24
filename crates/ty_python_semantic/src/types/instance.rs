@@ -574,15 +574,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
         let left_class = left.class(db);
         let right_class = right.class(db);
-        // Two different final classes cannot share a subclass, so their instances cannot
-        // overlap. For example, if both `A` and `B` are final, no runtime value can be both
-        // an `A` and a `B`.
-        if left_class.class_literal(db) != right_class.class_literal(db)
-            && left_class.is_final(db)
-            && right_class.is_final(db)
-        {
-            return self.always();
-        }
 
         let compare_tuple_specs = matches!(left.0, NominalInstanceInner::ExactTuple(_))
             || matches!(right.0, NominalInstanceInner::ExactTuple(_));
@@ -605,15 +596,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         result.or(db, self.constraints, || {
             ConstraintSet::from_bool(
                 self.constraints,
-                !left_class.could_coexist_in_mro_with_specialization_check(
-                    db,
-                    right_class,
-                    self.constraints,
-                    &|left, right| {
-                        self.check_specialization_pair_in_mro(db, left, right)
-                            .is_always_satisfied(db)
-                    },
-                ),
+                !self.classes_could_coexist_in_mro(db, left_class, right_class),
             )
         })
     }

@@ -14,12 +14,8 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
-use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
-};
-use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
-};
+use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::signatures::{CallableSignature, Parameters, ReturnCallableTypeVarScope};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
@@ -1355,28 +1351,6 @@ impl<'db> Specialization<'db> {
         )
     }
 
-    pub(crate) fn is_disjoint_from<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let checker = DisjointnessChecker::new(
-            constraints,
-            inferable,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &materialization_visitor,
-        );
-        checker.check_specialization_pair(db, self, other)
-    }
-
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -2472,7 +2446,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
 
         if let Type::TypeAlias(alias) = formal {
-            return self.infer_map_impl(alias.value_type(self.db), actual, polarity, f, seen);
+            return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
         }
 
         match (formal, actual) {

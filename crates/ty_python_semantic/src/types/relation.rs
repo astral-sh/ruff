@@ -2734,7 +2734,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                 .check_class_pair(db, class_b, class_a)
                                 .is_always_satisfied(db)
                         } else {
-                            class_a.could_exist_in_mro_of(db, class_b, self.constraints)
+                            self.class_could_exist_in_mro_of(db, class_a, class_b)
                         };
                         ConstraintSet::from_bool(self.constraints, !could_exist)
                     }
@@ -2748,11 +2748,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
-                            db,
-                            ClassType::Generic(alias_b),
-                            self.constraints,
-                        ),
+                        !self.class_could_exist_in_mro_of(db, class_a, ClassType::Generic(alias_b)),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }

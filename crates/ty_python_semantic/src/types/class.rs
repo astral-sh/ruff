@@ -1223,49 +1223,6 @@ impl<'db> ClassType<'db> {
             .find_map(|base| base.as_disjoint_base(db))
     }
 
-    /// Return `true` if this class could exist in the MRO of `other`.
-    pub(super) fn could_exist_in_mro_of(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> bool {
-        other
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .any(|class| match (self, class) {
-                (ClassType::NonGeneric(this_class), ClassType::NonGeneric(other_class)) => {
-                    this_class == other_class
-                }
-                (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
-                    if this_alias.origin(db) != other_alias.origin(db) {
-                        return false;
-                    }
-
-                    let this_specialization = this_alias.specialization(db);
-                    let other_specialization = other_alias.specialization(db);
-                    // Tuple element types do not impose runtime class-inheritance constraints:
-                    // `tuple[int]` and `tuple[str]` both have `tuple` as their runtime base.
-                    if this_specialization.tuple(db).is_some()
-                        && other_specialization.tuple(db).is_some()
-                    {
-                        return true;
-                    }
-
-                    !this_specialization
-                        .is_disjoint_from(
-                            db,
-                            other_specialization,
-                            constraints,
-                            InferableTypeVars::None,
-                        )
-                        .is_always_satisfied(db)
-                }
-                (ClassType::NonGeneric(_), ClassType::Generic(_))
-                | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
-            })
-    }
-
     /// Return `true` if this class could coexist in an MRO with `other`.
     ///
     /// For two given classes `A` and `B`, it is often possible to say for sure
@@ -1279,7 +1236,7 @@ impl<'db> ClassType<'db> {
     ) -> bool {
         // The ordinary class-MRO query has no surrounding disjointness traversal, so it creates
         // a checker here. Callers that already have a `DisjointnessChecker` use
-        // `could_coexist_in_mro_with_specialization_check` below to keep their active guard.
+        // `DisjointnessChecker::classes_could_coexist_in_mro` directly.
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -1292,143 +1249,8 @@ impl<'db> ClassType<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        self.could_coexist_in_mro_with_specialization_check(
-            db,
-            other,
-            constraints,
-            &|left, right| {
-                checker
-                    .check_specialization_pair_in_mro(db, left, right)
-                    .is_always_satisfied(db)
-            },
-        )
+        checker.classes_could_coexist_in_mro(db, self, other)
     }
-
-    /// Like [`ClassType::could_coexist_in_mro_with`], but lets callers provide the
-    /// specialization MRO-incompatibility check so recursive disjointness checks can reuse their
-    /// active cycle guards.
-    pub(super) fn could_coexist_in_mro_with_specialization_check(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
-        specializations_are_incompatible_in_mro: &impl Fn(
-            Specialization<'db>,
-            Specialization<'db>,
-        ) -> bool,
-    ) -> bool {
-        if self == other {
-            return true;
-        }
-
-        // If the two types are direct aliases of the same generic class, use ordinary
-        // specialization disjointness for that direct comparison. For example,
-        // `Covariant[FinalA]` and `Covariant[B]` can overlap through `Covariant[Never]`, even
-        // though no concrete subclass can have both `Covariant[FinalA]` and `Covariant[B]` as
-        // separate generic bases in its MRO.
-        if let Some((self_alias, other_alias)) = self
-            .into_generic_alias()
-            .zip(other.into_generic_alias())
-            .filter(|(self_alias, other_alias)| self_alias.origin(db) == other_alias.origin(db))
-        {
-            // As above, tuple element specs do not make two direct aliases incompatible as
-            // runtime classes.
-            let self_specialization = self_alias.specialization(db);
-            let other_specialization = other_alias.specialization(db);
-            if self_specialization.tuple(db).is_some() && other_specialization.tuple(db).is_some() {
-                return true;
-            }
-
-            return !self_specialization
-                .is_disjoint_from(
-                    db,
-                    other_specialization,
-                    constraints,
-                    InferableTypeVars::None,
-                )
-                .is_always_satisfied(db);
-        }
-
-        let other_generic_bases: Vec<_> = other
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .filter_map(ClassType::into_generic_alias)
-            .collect();
-
-        if self
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .filter_map(ClassType::into_generic_alias)
-            .any(|self_alias| {
-                other_generic_bases.iter().any(|other_alias| {
-                    self_alias.origin(db) == other_alias.origin(db)
-                        && specializations_are_incompatible_in_mro(
-                            self_alias.specialization(db),
-                            other_alias.specialization(db),
-                        )
-                })
-            })
-        {
-            return false;
-        }
-
-        if self.is_final(db) {
-            return other.could_exist_in_mro_of(db, self, constraints);
-        }
-
-        if other.is_final(db) {
-            return self.could_exist_in_mro_of(db, other, constraints);
-        }
-
-        // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
-        if self
-            .nearest_disjoint_base(db)
-            .is_some_and(|disjoint_base_1| {
-                other
-                    .nearest_disjoint_base(db)
-                    .is_some_and(|disjoint_base_2| {
-                        !disjoint_base_1.could_coexist_in_mro_with(db, &disjoint_base_2)
-                    })
-            })
-        {
-            return false;
-        }
-
-        // Check to see whether the metaclasses of `self` and `other` are disjoint.
-        // Avoid this check if the metaclass of either `self` or `other` is `type`,
-        // however, since we end up with infinite recursion in that case due to the fact
-        // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
-        // with any other arbitrary class, anyway).
-        let type_class = KnownClass::Type.to_class_literal(db);
-        let self_metaclass = self.metaclass(db);
-        if self_metaclass == type_class {
-            return true;
-        }
-        let other_metaclass = other.metaclass(db);
-        if other_metaclass == type_class {
-            return true;
-        }
-        let Some(self_metaclass_instance) = self_metaclass.to_instance(db) else {
-            return true;
-        };
-        let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
-            return true;
-        };
-        if self_metaclass_instance
-            .when_disjoint_from(
-                db,
-                other_metaclass_instance,
-                constraints,
-                InferableTypeVars::None,
-            )
-            .is_always_satisfied(db)
-        {
-            return false;
-        }
-
-        true
-    }
-
     /// Return a type representing "the set of all instances of the metaclass of this class".
     pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
         self
@@ -2075,6 +1897,165 @@ impl<'db> ClassType<'db> {
     /// For dynamic classes, this is the `type()` call expression.
     pub(super) fn definition_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).header_span(db)
+    }
+}
+
+impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    /// Return `true` if `class` could exist in the MRO of `other`.
+    pub(super) fn class_could_exist_in_mro_of(
+        &self,
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        other: ClassType<'db>,
+    ) -> bool {
+        other
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|other_class| self.class_mro_entry_matches(db, class, other_class))
+    }
+
+    /// Return `true` if two classes could coexist in an MRO.
+    pub(super) fn classes_could_coexist_in_mro(
+        &self,
+        db: &'db dyn Db,
+        left: ClassType<'db>,
+        right: ClassType<'db>,
+    ) -> bool {
+        if left == right {
+            return true;
+        }
+
+        // If the two types are direct aliases of the same generic class, use ordinary
+        // specialization disjointness for that direct comparison. For example,
+        // `Covariant[FinalA]` and `Covariant[B]` can overlap through `Covariant[Never]`, even
+        // though no concrete subclass can have both `Covariant[FinalA]` and `Covariant[B]` as
+        // separate generic bases in its MRO.
+        if let Some((left_alias, right_alias)) = left
+            .into_generic_alias()
+            .zip(right.into_generic_alias())
+            .filter(|(left_alias, right_alias)| left_alias.origin(db) == right_alias.origin(db))
+        {
+            return self.generic_specializations_can_overlap_as_runtime_classes(
+                db,
+                left_alias.specialization(db),
+                right_alias.specialization(db),
+            );
+        }
+
+        let right_generic_bases: Vec<_> = right
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .collect();
+
+        if left
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .any(|left_alias| {
+                right_generic_bases.iter().any(|right_alias| {
+                    left_alias.origin(db) == right_alias.origin(db)
+                        && self
+                            .check_specialization_pair_in_mro(
+                                db,
+                                left_alias.specialization(db),
+                                right_alias.specialization(db),
+                            )
+                            .is_always_satisfied(db)
+                })
+            })
+        {
+            return false;
+        }
+
+        if left.is_final(db) {
+            return self.class_could_exist_in_mro_of(db, right, left);
+        }
+
+        if right.is_final(db) {
+            return self.class_could_exist_in_mro_of(db, left, right);
+        }
+
+        // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
+        if left
+            .nearest_disjoint_base(db)
+            .is_some_and(|disjoint_base_1| {
+                right
+                    .nearest_disjoint_base(db)
+                    .is_some_and(|disjoint_base_2| {
+                        !disjoint_base_1.could_coexist_in_mro_with(db, &disjoint_base_2)
+                    })
+            })
+        {
+            return false;
+        }
+
+        // Check to see whether the metaclasses of `left` and `right` are disjoint.
+        // Avoid this check if the metaclass of either class is `type`,
+        // however, since we end up with infinite recursion in that case due to the fact
+        // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
+        // with any other arbitrary class, anyway).
+        let type_class = KnownClass::Type.to_class_literal(db);
+        let left_metaclass = left.metaclass(db);
+        if left_metaclass == type_class {
+            return true;
+        }
+        let right_metaclass = right.metaclass(db);
+        if right_metaclass == type_class {
+            return true;
+        }
+        let Some(left_metaclass_instance) = left_metaclass.to_instance(db) else {
+            return true;
+        };
+        let Some(right_metaclass_instance) = right_metaclass.to_instance(db) else {
+            return true;
+        };
+        if self
+            .check_type_pair(db, left_metaclass_instance, right_metaclass_instance)
+            .is_always_satisfied(db)
+        {
+            return false;
+        }
+
+        true
+    }
+
+    fn class_mro_entry_matches(
+        &self,
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        mro_entry: ClassType<'db>,
+    ) -> bool {
+        match (class, mro_entry) {
+            (ClassType::NonGeneric(class), ClassType::NonGeneric(mro_entry)) => class == mro_entry,
+            (ClassType::Generic(class_alias), ClassType::Generic(mro_entry_alias)) => {
+                class_alias.origin(db) == mro_entry_alias.origin(db)
+                    && self.generic_specializations_can_overlap_as_runtime_classes(
+                        db,
+                        class_alias.specialization(db),
+                        mro_entry_alias.specialization(db),
+                    )
+            }
+            (ClassType::NonGeneric(_), ClassType::Generic(_))
+            | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
+        }
+    }
+
+    fn generic_specializations_can_overlap_as_runtime_classes(
+        &self,
+        db: &'db dyn Db,
+        left: Specialization<'db>,
+        right: Specialization<'db>,
+    ) -> bool {
+        // Tuple element types do not impose runtime class-inheritance constraints:
+        // `tuple[int]` and `tuple[str]` both have `tuple` as their runtime base.
+        if left.tuple(db).is_some() && right.tuple(db).is_some() {
+            return true;
+        }
+
+        !self
+            .check_specialization_pair(db, left, right)
+            .is_always_satisfied(db)
     }
 }
 
