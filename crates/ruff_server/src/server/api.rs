@@ -8,10 +8,7 @@ use requests as request;
 
 use crate::{
     server::{
-        api::traits::{
-            BackgroundDocumentNotificationHandler, BackgroundDocumentRequestHandler,
-            SyncNotificationHandler,
-        },
+        api::traits::{BackgroundDocumentNotificationHandler, SyncNotificationHandler},
         schedule::Task,
     },
     session::{Client, Session},
@@ -33,10 +30,8 @@ use super::{Result, schedule::BackgroundSchedule};
 /// that is of type [`lsp_types::Url`].
 macro_rules! define_document_url {
     ($params:ident: &$p:ty) => {
-        fn document_url(
-            $params: &$p,
-        ) -> crate::server::Result<std::borrow::Cow<'_, lsp_types::Url>> {
-            Ok(std::borrow::Cow::Borrowed(&$params.text_document.uri))
+        fn document_url($params: &$p) -> std::borrow::Cow<'_, lsp_types::Url> {
+            std::borrow::Cow::Borrowed(&$params.text_document.uri)
         }
     };
 }
@@ -56,9 +51,9 @@ pub(super) fn request(req: server::Request) -> Task {
         request::CodeActions::METHOD => {
             background_request_task::<request::CodeActions>(req, BackgroundSchedule::Worker)
         }
-        request::CodeActionResolve::METHOD => {
-            background_request_task::<request::CodeActionResolve>(req, BackgroundSchedule::Worker)
-        }
+        request::CodeActionResolve::METHOD => background_session_request_task::<
+            request::CodeActionResolve,
+        >(req, BackgroundSchedule::Worker),
         request::DocumentDiagnostic::METHOD => {
             background_request_task::<request::DocumentDiagnostic>(req, BackgroundSchedule::Worker)
         }
@@ -169,14 +164,7 @@ where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     let (id, params) = cast_request::<R>(req)?;
-    let url = match R::document_url(&params) {
-        Ok(url) => url.into_owned(),
-        Err(error) => {
-            let result: Result<<<R as RequestHandler>::RequestType as Request>::Result> =
-                Err(error);
-            return Ok(Task::immediate(id, result));
-        }
-    };
+    let url = R::document_url(&params).into_owned();
 
     Ok(Task::background(schedule, move |session: &Session| {
         let cancellation_token = session
@@ -215,6 +203,56 @@ where
     }))
 }
 
+fn background_session_request_task<R: traits::BackgroundRequestHandler>(
+    req: server::Request,
+    schedule: BackgroundSchedule,
+) -> Result<Task>
+where
+    <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
+    R::BackgroundContext: UnwindSafe,
+{
+    let (id, params) = cast_request::<R>(req)?;
+
+    Ok(Task::background(schedule, move |session: &Session| {
+        let cancellation_token = session
+            .request_queue()
+            .incoming()
+            .cancellation_token(&id)
+            .expect("request should have been tested for cancellation before scheduling");
+
+        let context = match R::prepare(session, &params) {
+            Ok(Some(context)) => context,
+            Ok(None) => return Box::new(|_| {}),
+            Err(error) => {
+                return Box::new(move |client| {
+                    let result: Result<<<R as RequestHandler>::RequestType as Request>::Result> =
+                        Err(error);
+                    if let Err(err) = client.respond(&id, result) {
+                        tracing::error!("Failed to send response: {err}");
+                    }
+                });
+            }
+        };
+
+        Box::new(move |client| {
+            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+
+            if cancellation_token.is_cancelled() {
+                tracing::trace!(
+                    "Ignoring request id={id} method={} because it was cancelled",
+                    R::METHOD
+                );
+                return;
+            }
+
+            let result = std::panic::catch_unwind(|| R::run_with_context(context, client, params));
+
+            let response = request_result_to_response::<R>(result);
+            respond::<R>(&id, response, client);
+        })
+    }))
+}
+
 fn request_result_to_response<R>(
     result: std::result::Result<
         Result<<<R as RequestHandler>::RequestType as Request>::Result>,
@@ -222,7 +260,7 @@ fn request_result_to_response<R>(
     >,
 ) -> Result<<<R as RequestHandler>::RequestType as Request>::Result>
 where
-    R: BackgroundDocumentRequestHandler,
+    R: RequestHandler,
 {
     match result {
         Ok(response) => response,

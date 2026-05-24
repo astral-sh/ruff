@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 
@@ -12,7 +10,7 @@ use crate::server::Result;
 use crate::server::SupportedCodeAction;
 use crate::server::api::LSPResult;
 use crate::session::Client;
-use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities};
+use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities, Session};
 
 pub(crate) struct CodeActionResolve;
 
@@ -20,20 +18,28 @@ impl super::RequestHandler for CodeActionResolve {
     type RequestType = req::CodeActionResolveRequest;
 }
 
-impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> crate::server::Result<Cow<'_, types::Url>> {
+impl super::BackgroundRequestHandler for CodeActionResolve {
+    type BackgroundContext = DocumentSnapshot;
+
+    fn prepare(
+        session: &Session,
+        params: &types::CodeAction,
+    ) -> crate::server::Result<Option<Self::BackgroundContext>> {
         let data = params
             .data
             .clone()
-            .ok_or_else(|| anyhow::anyhow!("Code action is missing its document URI"))
-            .with_failure_code(ErrorCode::InvalidParams)?;
+            .ok_or_else(|| anyhow::anyhow!("Code action is missing Ruff's document URI payload"))
+            .with_failure_code(ErrorCode::InternalError)?;
         let uri: lsp_types::Url = serde_json::from_value(data)
-            .map_err(|err| anyhow::anyhow!("Code action has an invalid document URI: {err}"))
-            .with_failure_code(ErrorCode::InvalidParams)?;
-        Ok(Cow::Owned(uri))
+            .map_err(|err| {
+                anyhow::anyhow!("Code action has an invalid Ruff document URI payload: {err}")
+            })
+            .with_failure_code(ErrorCode::InternalError)?;
+        Ok(session.take_snapshot(uri))
     }
-    fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+
+    fn run_with_context(
+        snapshot: Self::BackgroundContext,
         _client: &Client,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {

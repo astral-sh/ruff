@@ -53,6 +53,26 @@ pub(super) trait SyncRequestHandler: RequestHandler {
 
 /// A request handler that can be run on a background thread.
 ///
+/// Unlike [`BackgroundDocumentRequestHandler`], this handler does not assume that it can derive a
+/// document URL from the LSP request parameters. Implementations are responsible for extracting
+/// any state they need from the [`Session`] during [`Self::prepare`].
+pub(super) trait BackgroundRequestHandler: RequestHandler {
+    type BackgroundContext: Send + 'static;
+
+    fn prepare(
+        session: &Session,
+        params: &<<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> crate::server::Result<Option<Self::BackgroundContext>>;
+
+    fn run_with_context(
+        context: Self::BackgroundContext,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+}
+
+/// A request handler that can be run on a background thread.
+///
 /// This handler is specific to requests that operate on a single document.
 pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     /// Returns the URL of the document that this request handler operates on.
@@ -62,7 +82,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     /// [`define_document_url`]: super::define_document_url
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> crate::server::Result<std::borrow::Cow<'_, lsp_types::Url>>;
+    ) -> std::borrow::Cow<'_, lsp_types::Url>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
