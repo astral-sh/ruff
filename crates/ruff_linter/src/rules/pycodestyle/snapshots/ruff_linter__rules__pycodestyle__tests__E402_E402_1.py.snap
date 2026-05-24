@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-assertion_line: 82
 ---
 E402 Module level import not at top of file
  --> E402_1.py:5:1
