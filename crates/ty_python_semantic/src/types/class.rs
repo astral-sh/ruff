@@ -1900,7 +1900,7 @@ impl<'db> ClassType<'db> {
     }
 }
 
-impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+impl<'db> DisjointnessChecker<'_, '_, 'db> {
     /// Return `true` if `class` could exist in the MRO of `other`.
     pub(super) fn class_could_exist_in_mro_of(
         &self,
