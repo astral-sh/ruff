@@ -80,7 +80,6 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                 });
                 items.push(ast::DictItem { key: None, value });
             }
-            items.shrink_to_fit();
             Expr::Dict(ast::ExprDict {
                 range,
                 node_index,

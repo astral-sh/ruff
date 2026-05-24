@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
+    self as ast, Arguments, DecoratorList, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
 };
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -12,7 +12,6 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-use thin_vec::ThinVec;
 
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -244,7 +243,7 @@ fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt
         })),
         body,
         type_params: None,
-        decorator_list: ThinVec::new(),
+        decorator_list: DecoratorList::new(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }

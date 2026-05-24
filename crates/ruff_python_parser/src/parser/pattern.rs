@@ -1,10 +1,10 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, Singleton,
+    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, PatternKeys,
+    Patterns, Singleton,
 };
 use ruff_text_size::{Ranged, TextSize};
-use thin_vec::ThinVec;
 
 use crate::ParseErrorType;
 use crate::parser::progress::ParserProgress;
@@ -132,7 +132,6 @@ impl Parser<'_> {
                 let pattern = self.parse_match_pattern_lhs(AllowStarPattern::No);
                 patterns.push(pattern);
             }
-            patterns.shrink_to_fit();
 
             lhs = Pattern::MatchOr(ast::PatternMatchOr {
                 range: self.node_range(start),
@@ -204,8 +203,8 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        let mut keys = ThinVec::new();
-        let mut patterns = ThinVec::new();
+        let mut keys = PatternKeys::new();
+        let mut patterns = Patterns::new();
         let mut rest = None;
 
         self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
@@ -274,8 +273,6 @@ impl Parser<'_> {
         });
 
         self.expect(TokenKind::Rbrace);
-        keys.shrink_to_fit();
-        patterns.shrink_to_fit();
 
         ast::PatternMatchMapping {
             range: self.node_range(start),
@@ -397,7 +394,6 @@ impl Parser<'_> {
         if let Some(parentheses) = parentheses {
             self.expect(parentheses.closing_kind());
         }
-        patterns.shrink_to_fit();
 
         ast::PatternMatchSequence {
             range: self.node_range(start),
@@ -707,7 +703,7 @@ impl Parser<'_> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut patterns = ThinVec::new();
+        let mut patterns = Patterns::new();
         let mut keywords = vec![];
         let mut has_seen_pattern = false;
         let mut has_seen_keyword_pattern = false;
@@ -768,8 +764,6 @@ impl Parser<'_> {
         );
 
         self.expect(TokenKind::Rpar);
-        patterns.shrink_to_fit();
-        keywords.shrink_to_fit();
 
         ast::PatternMatchClass {
             cls,

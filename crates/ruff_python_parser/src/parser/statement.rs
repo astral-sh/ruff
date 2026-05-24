@@ -4,11 +4,10 @@ use std::fmt::{Display, Write};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
-    PythonVersion, Stmt, Suite, WithItem,
+    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
+    Operator, PythonVersion, Stmt, Suite, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use thin_vec::ThinVec;
 
 use crate::error::StarTupleKind;
 use crate::parser::expression::{EXPR_SET, ParsedExpr};
@@ -119,9 +118,11 @@ impl<'src> Parser<'src> {
             TokenKind::For => Stmt::For(self.parse_for_statement(start)),
             TokenKind::While => Stmt::While(self.parse_while_statement()),
             TokenKind::Def => {
-                Stmt::FunctionDef(self.parse_function_definition(ThinVec::new(), start))
+                Stmt::FunctionDef(self.parse_function_definition(DecoratorList::new(), start))
             }
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(ThinVec::new(), start)),
+            TokenKind::Class => {
+                Stmt::ClassDef(self.parse_class_definition(DecoratorList::new(), start))
+            }
             TokenKind::Try => Stmt::Try(self.parse_try_statement()),
             TokenKind::With => Stmt::With(self.parse_with_statement(start)),
             TokenKind::At => self.parse_decorators(),
@@ -257,7 +258,6 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
-        stmts.shrink_to_fit();
         stmts
     }
 
@@ -738,7 +738,6 @@ impl<'src> Parser<'src> {
             // 2 + 2
             self.expect(TokenKind::Rpar);
         }
-        names.shrink_to_fit();
 
         ast::StmtImportFrom {
             module,
@@ -1253,7 +1252,6 @@ impl<'src> Parser<'src> {
             // ["a", "b"] = ["a", "b"]
             self.validate_assignment_target(target);
         }
-        targets.shrink_to_fit();
 
         ast::StmtAssign {
             targets,
@@ -1443,7 +1441,6 @@ impl<'src> Parser<'src> {
 
         if self.at(TokenKind::Else) {
             elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
-            elif_else_clauses.shrink_to_fit();
         }
 
         ast::StmtIf {
@@ -1973,7 +1970,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
         &mut self,
-        decorator_list: ThinVec<ast::Decorator>,
+        decorator_list: DecoratorList,
         start: TextSize,
     ) -> ast::StmtFunctionDef {
         self.bump(TokenKind::Def);
@@ -2101,7 +2098,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
-        decorator_list: ThinVec<ast::Decorator>,
+        decorator_list: DecoratorList,
         start: TextSize,
     ) -> ast::StmtClassDef {
         self.bump(TokenKind::Class);
@@ -2401,11 +2398,11 @@ impl<'src> Parser<'src> {
         }
 
         let with_items = if with_item_kind.is_parenthesized() {
-            let mut with_items: Vec<_> = parsed_with_items
+            let with_items: Vec<_> = parsed_with_items
                 .into_iter()
                 .map(|parsed_with_item| parsed_with_item.item)
                 .collect();
-            with_items.shrink_to_fit();
+
             Some(with_items)
         } else {
             self.rewind(checkpoint);
@@ -2716,7 +2713,6 @@ impl<'src> Parser<'src> {
             cases.push(self.parse_match_case());
         }
 
-        cases.shrink_to_fit();
         cases
     }
 
@@ -2808,7 +2804,7 @@ impl<'src> Parser<'src> {
             // async def foo(): ...
             TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: true,
-                ..self.parse_function_definition(ThinVec::new(), async_start)
+                ..self.parse_function_definition(DecoratorList::new(), async_start)
             }),
 
             // test_ok async_with_statement
@@ -2867,7 +2863,7 @@ impl<'src> Parser<'src> {
     fn parse_decorators(&mut self) -> Stmt {
         let start = self.node_start();
 
-        let mut decorators = ThinVec::new();
+        let mut decorators = DecoratorList::new();
         let mut progress = ParserProgress::default();
 
         // test_err decorator_missing_expression
@@ -2987,7 +2983,6 @@ impl<'src> Parser<'src> {
             // @x class Foo: ...
             self.expect(TokenKind::Newline);
         }
-        decorators.shrink_to_fit();
 
         match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
@@ -3094,9 +3089,12 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = if let Some(statements) = self
-            .with_recursion(|parser| parser.parse_statements(RecoveryContextKind::BlockStatements))
-        {
+        let statements = if let Some(statements) = self.with_recursion(|parser| {
+            parser.parse_list_into_thin_vec(
+                RecoveryContextKind::BlockStatements,
+                Parser::parse_statement,
+            )
+        }) {
             statements
         } else {
             self.report_recursion_limit_exceeded(self.current_token_range());
@@ -3530,9 +3528,6 @@ impl<'src> Parser<'src> {
         }
 
         parameters.range = self.node_range(start);
-        parameters.posonlyargs.shrink_to_fit();
-        parameters.args.shrink_to_fit();
-        parameters.kwonlyargs.shrink_to_fit();
 
         parameters
     }
@@ -3993,7 +3988,6 @@ impl<'src> Parser<'src> {
 
         self.recovery_context = saved_context;
 
-        clauses.shrink_to_fit();
         clauses
     }
 }

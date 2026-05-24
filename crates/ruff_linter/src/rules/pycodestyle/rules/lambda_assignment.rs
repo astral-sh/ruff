@@ -1,14 +1,13 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    self as ast, DecoratorList, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
     ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
-use thin_vec::ThinVec;
 
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -209,7 +208,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<ThinVec<_>>();
+                .collect::<ast::ParameterWithDefaults>();
             let new_args = parameters
                 .args
                 .iter()
@@ -223,7 +222,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<ThinVec<_>>();
+                .collect::<ast::ParameterWithDefaults>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
                 name: Identifier::new(name.to_string(), TextRange::default()),
@@ -233,7 +232,7 @@ fn function(
                     ..parameters
                 }),
                 body: ast::Suite::from([body]),
-                decorator_list: ThinVec::new(),
+                decorator_list: ast::DecoratorList::new(),
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
@@ -249,7 +248,7 @@ fn function(
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters),
         body: ast::Suite::from([body]),
-        decorator_list: ThinVec::new(),
+        decorator_list: DecoratorList::new(),
         returns: None,
         type_params: None,
         range: TextRange::default(),

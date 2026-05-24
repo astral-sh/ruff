@@ -3686,10 +3686,18 @@ impl<'a> IntoIterator for &'a TypeParams {
     }
 }
 
-/// A suite represents a [`ThinVec`] of [`Stmt`].
+/// A suite represents a sequence of [`Stmt`].
 ///
 /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
 pub type Suite = ThinVec<Stmt>;
+
+pub type DecoratorList = ThinVec<Decorator>;
+
+pub type Patterns = ThinVec<Pattern>;
+
+pub type PatternKeys = ThinVec<Expr>;
+
+pub type ParameterWithDefaults = ThinVec<ParameterWithDefault>;
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
