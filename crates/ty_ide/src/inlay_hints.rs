@@ -5291,10 +5291,10 @@ Source with applied edits:
         my_func(x="hello")
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:914:7
+           --> stdlib/typing_extensions.pyi:549:9
             |
-        914 | class str(Sequence[str]):
-            |       ^^^
+        549 |         LiteralString as LiteralString,
+            |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
             |
         info: Source
          --> main2.py:4:9

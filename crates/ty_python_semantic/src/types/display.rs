@@ -1221,14 +1221,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         string.display_with(self.db, self.settings.clone()),
                     )
                 }
-                // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
-                // which would mean users would be able to jump to the definition of `LiteralString` from the
-                // inlay hint, but that seems less useful than the definition of `str` for a variable that is
-                // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
-                // at runtime)
-                LiteralValueTypeKind::LiteralString => {
-                    f.with_type(self.ty).write_str("LiteralString")
-                }
+                LiteralValueTypeKind::LiteralString => f
+                    .with_type(Type::SpecialForm(SpecialFormType::LiteralString))
+                    .write_str("LiteralString"),
                 LiteralValueTypeKind::Bytes(bytes) => {
                     let escape =
                         AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
