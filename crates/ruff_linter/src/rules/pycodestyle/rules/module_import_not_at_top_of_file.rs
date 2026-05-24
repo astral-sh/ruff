@@ -41,6 +41,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Notebook behavior
 /// For Jupyter notebooks, this rule checks for imports that are not at the top of a *cell*.
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe as imports moved to the top of the file
+/// are placed above existing imports, in reverse order than they were in the
+/// file. Re-ordering imports is unsafe as it can change the execution order of
+/// the imported code.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.28")]
