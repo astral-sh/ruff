@@ -115,7 +115,7 @@ pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
 
         diagnostic.set_fix(Fix::unsafe_edits(
             Edit::range_deletion(removal_range),
-            vec![edit],
+            [edit],
         ));
     }
 }
