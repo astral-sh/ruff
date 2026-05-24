@@ -146,7 +146,7 @@ static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```py
 from typing import Any, Generic, Sequence, TypeVar, final
 from typing_extensions import Never, TypeAlias, disjoint_base
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import Intersection, is_disjoint_from, static_assert
 
 class A: ...
 class B: ...
@@ -154,15 +154,27 @@ class B: ...
 @final
 class FinalA: ...
 
+@final
+class FinalB: ...
+
+class Meta(type): ...
+class WithMeta(metaclass=Meta): ...
+
 @disjoint_base
 class DisjointA: ...
 
 T = TypeVar("T")
+U = TypeVar("U")
 T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
 U_co = TypeVar("U_co", covariant=True)
 
 class Invariant(Generic[T]):
     x: T
+
+class InvariantPair(Generic[T, U]):
+    x: T
+    y: U
 
 class InvSubA(Invariant[A]):
     pass
@@ -193,6 +205,16 @@ class CoSubFinalA(Covariant[FinalA]):
 class FinalCoSubA(Covariant[FinalA]):
     pass
 
+class Contravariant(Generic[T_contra]):
+    def set(self, value: T_contra) -> None:
+        raise NotImplementedError()
+
+class ContraSubFinalA(Contravariant[FinalA]):
+    pass
+
+class ContraSubFinalB(Contravariant[FinalB]):
+    pass
+
 class Left(Covariant[FinalA], Generic[T]):
     pass
 
@@ -213,8 +235,12 @@ static_assert(is_disjoint_from(InvSubA, Invariant[B]))
 static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
 static_assert(not is_disjoint_from(Invariant[FinalA], Invariant[FinalA]))
 static_assert(not is_disjoint_from(Invariant[DisjointA], Invariant[DisjointA]))
+static_assert(not is_disjoint_from(Invariant[Intersection[A, Any]], Invariant[B]))
+static_assert(is_disjoint_from(InvariantPair[FinalA, A], InvariantPair[FinalB, A]))
+static_assert(is_disjoint_from(InvariantPair[A, FinalA], InvariantPair[A, FinalB]))
 static_assert(not is_disjoint_from(type[Invariant[Any]], type[FinalInvSubInt]))
 static_assert(not is_disjoint_from(type[FinalInvSubInt], type[Invariant[Any]]))
+static_assert(not is_disjoint_from(WithMeta, A))
 
 static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
 static_assert(not is_disjoint_from(Covariant[A], CoSubB))
@@ -229,6 +255,7 @@ static_assert(is_disjoint_from(Covariant[FinalA], CoSubB))
 static_assert(is_disjoint_from(type[FinalCoSubA], type[Covariant[B]]))
 static_assert(is_disjoint_from(type[Covariant[B]], type[FinalCoSubA]))
 static_assert(is_disjoint_from(Left[int], Right[str]))
+static_assert(not is_disjoint_from(ContraSubFinalA, ContraSubFinalB))
 static_assert(not is_disjoint_from(PairLeft, PairRight))
 
 class RecursiveLeft(Covariant["type[RecursiveLeft]"]):
@@ -421,6 +448,13 @@ static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], 
 
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], int]))
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[int, ...]))
+
+class OneIntTuple(tuple[int]): ...
+class TwoIntsTuple(tuple[int, int]): ...
+class BothTupleSubclasses(OneIntTuple, TwoIntsTuple): ...
+
+# Tuple subclasses with incompatible inherited element specs can share a runtime subclass.
+static_assert(not is_disjoint_from(OneIntTuple, TwoIntsTuple))
 
 # TODO: should pass
 static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [static-assert-error]

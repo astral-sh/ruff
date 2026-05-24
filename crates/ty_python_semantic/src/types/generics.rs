@@ -1619,19 +1619,17 @@ fn specialization_variance<'db>(
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// Return `true` if a type can safely participate in specialization disjointness shortcuts.
     ///
-    /// Dynamic types and unresolved type variables are intentionally excluded. For example,
+    /// Gradual types and unresolved type variables are intentionally excluded. For example,
     /// `Any` might materialize to `int`, and an unconstrained `T` might specialize to the same
     /// type as another type variable, so treating either as definitive evidence of disjointness
     /// would make overload filtering and union simplification too eager.
     fn type_is_static_for_specialization_disjointness(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        if ty.is_dynamic()
-            || any_over_type(db, ty, true, |ty| {
-                matches!(
-                    ty,
-                    Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
-                )
-            })
-        {
+        if any_over_type(db, ty, true, |ty| {
+            matches!(
+                ty,
+                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+            )
+        }) {
             return false;
         }
 
@@ -1646,25 +1644,13 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// Return the constraints under which two invariant specialization arguments are disjoint.
     ///
     /// Besides direct type disjointness, fully static non-equivalent invariant arguments
-    /// make the enclosing specializations disjoint. Inferable type variables are handled
-    /// through their bounds or constraints.
+    /// make the enclosing specializations disjoint.
     fn invariant_specialization_pair_is_disjoint(
         &self,
         db: &'db dyn Db,
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if let Type::TypeVar(typevar) = left
-            && typevar.is_inferable(db, self.inferable)
-        {
-            return self.inferable_typevar_bound_is_disjoint(db, typevar, right);
-        }
-        if let Type::TypeVar(typevar) = right
-            && typevar.is_inferable(db, self.inferable)
-        {
-            return self.inferable_typevar_bound_is_disjoint(db, typevar, left);
-        }
-
         self.check_type_pair(db, left, right)
             .or(db, self.constraints, || {
                 // For fully static invariant arguments, any non-equivalent
@@ -1684,36 +1670,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             })
     }
 
-    /// Return whether the bound or constraints of an inferable type variable are disjoint
-    /// from another specialization argument.
-    fn inferable_typevar_bound_is_disjoint(
-        &self,
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-        other: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        match typevar.typevar(db).bound_or_constraints(db) {
-            // An unconstrained inferable type variable can still specialize to `other`.
-            None => self.never(),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                self.invariant_specialization_pair_is_disjoint(db, bound, other)
-            }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                .elements(db)
-                .iter()
-                .when_all(db, self.constraints, |constraint| {
-                    self.invariant_specialization_pair_is_disjoint(db, *constraint, other)
-                }),
-        }
-    }
-
     /// Return the constraints under which two generic specializations are incompatible as
     /// shared bases in a valid MRO.
     ///
     /// This is used when comparing generic aliases found in the MROs of two classes.
-    /// The check is intentionally conservative for tuple specializations, dynamic types,
-    /// and type variables, because those cases can recurse through class disjointness or
-    /// materialize to compatible bases.
+    /// The check is intentionally conservative for dynamic types and type variables, because
+    /// those cases can materialize or specialize to compatible bases.
     pub(super) fn check_specialization_pair_in_mro(
         &self,
         db: &'db dyn Db,
@@ -1721,18 +1683,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         right: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let generic_context = left.generic_context(db);
-        // Only specializations of the same generic class can make a shared MRO impossible.
-        // Different contexts mean different origins, such as `Box[int]` and `Wrapper[str]`.
-        if generic_context != right.generic_context(db) {
-            return self.always();
-        }
-
-        // Tuple aliases all have `tuple` as their runtime base. Treating element specs as MRO
-        // conflicts would be too strong, e.g. for bases written as `tuple[int]` and `tuple[str]`.
-        // It can also re-enter class disjointness through recursive tuple bases.
-        if left.tuple_inner(db).is_some() && right.tuple_inner(db).is_some() {
-            return self.never();
-        }
+        debug_assert_eq!(generic_context, right.generic_context(db));
 
         // For non-static arguments like `Any` or an unresolved `T`, stay conservative: they can
         // materialize or specialize to a type that makes the two bases compatible.
@@ -2396,24 +2347,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
-        // Expand aliases before the "no type variables" fast path and before disjointness
-        // filtering. Recursive aliases such as `JsonValue = dict[str, JsonValue] | str` need to
-        // be compared through their bodies, not through the alias wrapper.
-        if let Type::TypeAlias(alias) = formal {
-            return self.infer_map_impl(alias.value_type(self.db), actual, polarity, f, seen);
-        }
-
-        let preserve_actual_alias_for_typevar = matches!(
-            (formal, actual),
-            (Type::TypeVar(bound_typevar), Type::TypeAlias(_))
-                if bound_typevar.is_inferable(self.db, self.inferable)
-        );
-        if let Type::TypeAlias(alias) = actual
-            && !preserve_actual_alias_for_typevar
-        {
-            return self.infer_map_impl(formal, alias.value_type(self.db), polarity, f, seen);
-        }
-
         // Pairs with no type variables cannot contribute any mapping. Look through nested alias
         // values here so `list[Alias[T]]` still reaches structural inference.
         if !any_over_type(self.db, formal, true, |ty| matches!(ty, Type::TypeVar(_)))
@@ -2422,28 +2355,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
-        let (formal, actual) = if preserve_actual_alias_for_typevar {
-            (formal, actual)
-        } else {
-            // Remove the union elements from `actual` that are not related to `formal`, and vice
-            // versa.
-            //
-            // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
-            // specialize `T` to `int`, and so ignore the `None`.
-            let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
-            let filtered_formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
-            // Filtering is only an inference shortcut. If it removes every formal candidate, keep the
-            // original type so later matching still gets a chance to find a useful branch. This can
-            // happen around recursive aliases whose recursive branch is visited before a concrete
-            // branch, such as `JsonValue = dict[str, JsonValue] | list[JsonValue] | str`.
-            let formal = if filtered_formal.is_never() && !formal.is_never() {
-                formal
-            } else {
-                filtered_formal
-            };
-
-            (formal, actual)
-        };
+        // Remove the union elements from `actual` that are not related to `formal`, and vice
+        // versa.
+        //
+        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
+        // specialize `T` to `int`, and so ignore the `None`.
+        let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+        let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
         if let Type::TypeAlias(alias) = formal {
             return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
