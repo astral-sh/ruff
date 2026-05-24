@@ -1758,8 +1758,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
                 parenthesized: _,
             }) => {
-                self.visit_generators(GeneratorKind::Generator, generators);
-                self.visit_expr(elt);
+                self.visit_generator(elt, generators);
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -2465,15 +2464,11 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
-    /// generator expression, like a list or set comprehension.
+    /// list, set, or dict comprehension.
     fn visit_generators(&mut self, kind: GeneratorKind, generators: &'a [Comprehension]) {
-        let mut iterator = generators.iter();
-
-        let Some(generator) = iterator.next() else {
+        let Some(generator) = generators.first() else {
             unreachable!("Generator expression must contain at least one generator");
         };
-
-        let flags = self.semantic.flags;
 
         // Generators are compiled as nested functions. (This may change with PEP 709.)
         // As such, the `iter` of the first generator is evaluated in the outer scope, while all
@@ -2509,6 +2504,56 @@ impl<'a> Checker<'a> {
                 .iter()
                 .any(|comprehension| comprehension.is_async),
         });
+
+        self.visit_comprehensions(generators);
+    }
+
+    /// Visit a generator expression.
+    ///
+    /// A generator expression is evaluated when it is consumed, not when it is created, which can
+    /// happen after the surrounding scope has finished executing. We therefore defer its body and
+    /// non-first iterables, like a lambda body, so that forward references (for example, to an
+    /// enclosing class name) resolve against bindings introduced later. As in
+    /// [`Checker::visit_generators`], the first iterable is evaluated eagerly in the enclosing
+    /// scope, so it is not deferred.
+    ///
+    /// A generator that contains an assignment expression (`:=`) is the exception: per
+    /// [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target) the target binds in the
+    /// enclosing scope, so the binding must be created eagerly and the generator is visited in
+    /// full here.
+    fn visit_generator(&mut self, elt: &'a Expr, generators: &'a [Comprehension]) {
+        let Some(generator) = generators.first() else {
+            unreachable!("Generator expression must contain at least one generator");
+        };
+
+        self.visit_expr(&generator.iter);
+        self.semantic.push_scope(ScopeKind::Generator {
+            kind: GeneratorKind::Generator,
+            is_async: generators
+                .iter()
+                .any(|comprehension| comprehension.is_async),
+        });
+
+        if contains_assignment_expression(elt, generators) {
+            self.visit_comprehensions(generators);
+            self.visit_expr(elt);
+        } else {
+            self.visit.generators.push(self.semantic.snapshot());
+        }
+    }
+
+    /// Visit the parts of a comprehension that are evaluated in the generator scope: the first
+    /// generator's target and conditions, then every subsequent generator in full.
+    ///
+    /// The caller is responsible for visiting the first generator's iterable in the enclosing
+    /// scope before pushing the generator scope and calling this method.
+    fn visit_comprehensions(&mut self, generators: &'a [Comprehension]) {
+        let flags = self.semantic.flags;
+        let mut iterator = generators.iter();
+
+        let Some(generator) = iterator.next() else {
+            return;
+        };
 
         self.visit_expr(&generator.target);
         self.semantic.flags = flags;
@@ -3201,15 +3246,41 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
+    /// After initial traversal of the source tree, visit all deferred generator expressions. The
+    /// body and non-first iterables of a generator expression are deferred for the same reason as
+    /// lambda bodies: they are not evaluated until the generator is consumed, which can happen
+    /// after the surrounding scope has finished executing.
+    fn visit_deferred_generators(&mut self) {
+        let snapshot = self.semantic.snapshot();
+        while !self.visit.generators.is_empty() {
+            let generators = std::mem::take(&mut self.visit.generators);
+            for snapshot in generators {
+                self.semantic.restore(snapshot);
+
+                let Some(Expr::Generator(ast::ExprGenerator {
+                    elt, generators, ..
+                })) = self.semantic.current_expression()
+                else {
+                    unreachable!("Expected Expr::Generator");
+                };
+
+                self.visit_comprehensions(generators);
+                self.visit_expr(elt);
+            }
+        }
+        self.semantic.restore(snapshot);
+    }
+
     /// After initial traversal of the source tree has been completed,
     /// recursively visit all AST nodes that were deferred on the first pass.
-    /// This includes lambdas, functions, type parameters, and type annotations.
+    /// This includes lambdas, functions, generators, type parameters, and type annotations.
     fn visit_deferred(&mut self) {
         while !self.visit.is_empty() {
             self.visit_deferred_class_bases();
             self.visit_deferred_functions();
             self.visit_deferred_type_param_definitions();
             self.visit_deferred_lambdas();
+            self.visit_deferred_generators();
             self.visit_deferred_future_type_definitions();
             self.visit_deferred_string_type_definitions();
         }
@@ -3309,6 +3380,23 @@ impl<'a> ParsedAnnotationsCache<'a> {
     fn clear(&self) {
         self.by_offset.borrow_mut().clear();
     }
+}
+
+/// Returns `true` if the body or any iterable or condition of `generators` contains an assignment
+/// expression (`:=`).
+///
+/// Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), an assignment expression
+/// inside a generator binds its target in the enclosing scope rather than the generator scope.
+/// That binding has to be created eagerly, so a generator that contains one cannot be deferred.
+fn contains_assignment_expression(elt: &Expr, generators: &[Comprehension]) -> bool {
+    fn contains_named(expr: &Expr) -> bool {
+        helpers::any_over_expr(expr, Expr::is_named_expr)
+    }
+
+    contains_named(elt)
+        || generators.iter().any(|generator| {
+            contains_named(&generator.iter) || generator.ifs.iter().any(contains_named)
+        })
 }
 
 #[expect(clippy::too_many_arguments)]

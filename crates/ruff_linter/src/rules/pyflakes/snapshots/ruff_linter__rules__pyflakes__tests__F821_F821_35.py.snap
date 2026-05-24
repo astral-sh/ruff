@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821 Undefined name `Foo`
+  --> F821_35.py:14:39
+   |
+13 |     # F821: a list comprehension is evaluated eagerly in the class body.
+14 |     c = [(x, y) for x in BAR for y in Foo.BAZ]
+   |                                       ^^^
+15 |
+16 |     # F821: the first iterable of a generator is also evaluated eagerly.
+   |
+
+F821 Undefined name `Foo`
+  --> F821_35.py:17:21
+   |
+16 |     # F821: the first iterable of a generator is also evaluated eagerly.
+17 |     d = (x for x in Foo.BAZ)
+   |                     ^^^
+18 |
+19 |     # F821: a name that is never bound is still reported in a deferred generator body.
+   |
+
+F821 Undefined name `undefined`
+  --> F821_35.py:20:10
+   |
+19 |     # F821: a name that is never bound is still reported in a deferred generator body.
+20 |     e = (undefined for x in BAR)
+   |          ^^^^^^^^^
+21 |
+22 |     def method(self):
+   |
