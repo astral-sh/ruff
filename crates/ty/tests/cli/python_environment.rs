@@ -125,13 +125,13 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
             "pyproject.toml",
             r#"
             [tool.ty.environment]
-            python-version = "3.8"
+            python-version = "3.12"
             "#,
         ),
         (
             "test.py",
             r#"
-            aiter
+            PythonFinalizationError
             "#,
         ),
     ])?;
@@ -140,18 +140,18 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:2:1
       |
-    2 | aiter
-      | ^^^^^
+    2 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
       |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types
      --> pyproject.toml:3:18
       |
-    3 | python-version = "3.8"
-      |                  ^^^^^ Python version configuration
+    3 | python-version = "3.12"
+      |                  ^^^^^^ Python version configuration
       |
 
     Found 1 diagnostic
@@ -159,18 +159,18 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     ----- stderr -----
     "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @"
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:2:1
       |
-    2 | aiter
-      | ^^^^^
+    2 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
       |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.9 was assumed when resolving types because it was specified on the command line
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because it was specified on the command line
 
     Found 1 diagnostic
 
@@ -252,24 +252,24 @@ fn src_subdirectory_not_added_as_root_if_src_package_exists() -> anyhow::Result<
 #[test]
 fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     let cpython_case = CliTest::with_files([
-        ("pythons/Python3.8/bin/python", ""),
-        ("pythons/Python3.8/lib/python3.8/site-packages/foo.py", ""),
-        ("test.py", "aiter"),
+        ("pythons/Python3.12/bin/python", ""),
+        ("pythons/Python3.12/lib/python3.12/site-packages/foo.py", ""),
+        ("test.py", "PythonFinalizationError"),
     ])?;
 
-    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.8/bin/python"), @"
+    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.12/bin/python"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:1:1
       |
-    1 | aiter
-      | ^^^^^
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
       |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types because of the layout of your Python installation
-    info: The primary `site-packages` directory of your installation was found at `lib/python3.8/site-packages/`
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because of the layout of your Python installation
+    info: The primary `site-packages` directory of your installation was found at `lib/python3.12/site-packages/`
     info: No Python version was specified on the command line or in a configuration file
 
     Found 1 diagnostic
@@ -278,24 +278,24 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     ");
 
     let pypy_case = CliTest::with_files([
-        ("pythons/pypy3.8/bin/python", ""),
-        ("pythons/pypy3.8/lib/pypy3.8/site-packages/foo.py", ""),
-        ("test.py", "aiter"),
+        ("pythons/pypy3.12/bin/python", ""),
+        ("pythons/pypy3.12/lib/pypy3.12/site-packages/foo.py", ""),
+        ("test.py", "PythonFinalizationError"),
     ])?;
 
-    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.8/bin/python"), @"
+    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.12/bin/python"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:1:1
       |
-    1 | aiter
-      | ^^^^^
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
       |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types because of the layout of your Python installation
-    info: The primary `site-packages` directory of your installation was found at `lib/pypy3.8/site-packages/`
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because of the layout of your Python installation
+    info: The primary `site-packages` directory of your installation was found at `lib/pypy3.12/site-packages/`
     info: No Python version was specified on the command line or in a configuration file
 
     Found 1 diagnostic
@@ -768,7 +768,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         (
             "venv/pyvenv.cfg",
             r#"
-            version = 3.8
+            version = 3.12
             home = foo/bar/bin
             "#,
         ),
@@ -780,27 +780,27 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         if cfg!(target_os = "windows") {
             ("venv/Lib/site-packages/foo.py", "")
         } else {
-            ("venv/lib/python3.8/site-packages/foo.py", "")
+            ("venv/lib/python3.12/site-packages/foo.py", "")
         },
-        ("test.py", "aiter"),
+        ("test.py", "PythonFinalizationError"),
     ])?;
 
     assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:1:1
       |
-    1 | aiter
-      | ^^^^^
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
       |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types because of your virtual environment
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because of your virtual environment
      --> venv/pyvenv.cfg:2:11
       |
-    2 | version = 3.8
-      |           ^^^ Virtual environment metadata
+    2 | version = 3.12
+      |           ^^^^ Virtual environment metadata
       |
     info: No Python version was specified on the command line or in a configuration file
 
@@ -826,8 +826,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
             "venv/pyvenv.cfg",
             r#"home = foo/bar/bin
 
-
-            version = 3.8"#,
+            version = 3.12"#,
         ),
         if cfg!(target_os = "windows") {
             ("foo/bar/bin/python.exe", "")
@@ -837,27 +836,27 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
         if cfg!(target_os = "windows") {
             ("venv/Lib/site-packages/foo.py", "")
         } else {
-            ("venv/lib/python3.8/site-packages/foo.py", "")
+            ("venv/lib/python3.12/site-packages/foo.py", "")
         },
-        ("test.py", "aiter"),
+        ("test.py", "PythonFinalizationError"),
     ])?;
 
     assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:1:1
       |
-    1 | aiter
-      | ^^^^^
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
       |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types because of your virtual environment
-     --> venv/pyvenv.cfg:4:23
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because of your virtual environment
+     --> venv/pyvenv.cfg:3:23
       |
-    4 |             version = 3.8
-      |                       ^^^ Virtual environment metadata
+    3 |             version = 3.12
+      |                       ^^^^ Virtual environment metadata
       |
     info: No Python version was specified on the command line or in a configuration file
 
@@ -1218,10 +1217,19 @@ fn config_file_python_setting_directory_with_unsupported_python_version() -> any
     success: true
     exit_code: 0
     ----- stdout -----
-    All checks passed!
+    warning[unsupported-python-version]: Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.
+     --> venv/pyvenv.cfg:2:16
+      |
+    2 | version_info = 3.16.0
+      |                ^^^^^^
+      |
+    info: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.
+    info: Set `environment.python-version` explicitly to override the inferred version.
+    info: The version was inferred from your virtual environment metadata.
+    
+    Found 1 diagnostic
 
     ----- stderr -----
-    WARN Ignoring unsupported inferred Python version: 3.16
     ");
 
     Ok(())

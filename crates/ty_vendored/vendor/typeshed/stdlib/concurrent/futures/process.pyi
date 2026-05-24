@@ -305,7 +305,6 @@ class ProcessPoolExecutor(Executor):
                     start method. When given, we default to using 'spawn' if no
                     mp_context is supplied.
             """
-
         @overload
         def __init__(
             self,
@@ -346,7 +345,6 @@ class ProcessPoolExecutor(Executor):
                 initializer: A callable used to initialize worker processes.
                 initargs: A tuple of arguments to pass to the initializer.
             """
-
         @overload
         def __init__(
             self,

@@ -9,6 +9,63 @@ def get_int() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Gradual variadic parameters
+
+```py
+from typing import Any
+
+def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
+def accepts_only_gradual(*args: Any, **kwargs: Any) -> None: ...
+
+accepts_anything(1, "one", object(), keyword=object())
+accepts_anything("not an int")  # error: [invalid-argument-type]
+accepts_only_gradual(1, "one", keyword=object())
+accepts_only_gradual(**{1: "one"})  # error: [invalid-argument-type]
+```
+
+## Object variadic parameters
+
+`*args: object` and `**kwargs: object` can receive many unrelated argument types. Call binding
+should not build large unions to remember the exact values that were supplied to these broad sinks.
+
+```py
+class C0: ...
+class C1: ...
+class C2: ...
+class C3: ...
+class C4: ...
+class C5: ...
+class C6: ...
+class C7: ...
+class C8: ...
+class C9: ...
+
+def accepts_objects(*args: object, **kwargs: object) -> None: ...
+
+accepts_objects(
+    C0(),
+    C1(),
+    C2(),
+    C3(),
+    C4(),
+    C5(),
+    C6(),
+    C7(),
+    C8(),
+    C9(),
+    k0=C0(),
+    k1=C1(),
+    k2=C2(),
+    k3=C3(),
+    k4=C4(),
+    k5=C5(),
+    k6=C6(),
+    k7=C7(),
+    k8=C8(),
+    k9=C9(),
+)
+```
+
 ## Async
 
 ```py
@@ -790,13 +847,11 @@ Regression test for <https://github.com/astral-sh/ty/issues/2734>.
 
 ```py
 def f5(x: int | None = None, y: str = "") -> None: ...
-def f6(flag: bool) -> None:
-    args = () if flag else (1,)
+def f6(args: tuple[()] | tuple[int]) -> None:
     f5(*args)
 
 def f7(x: int | None = None, y: str = "") -> None: ...
-def f8(flag: bool) -> None:
-    args = () if flag else ("bad",)
+def f8(args: tuple[()] | tuple[str]) -> None:
     f7(*args)  # error: [invalid-argument-type]
 
 def f11(*args: int) -> None: ...
@@ -1171,6 +1226,13 @@ from ty_extensions import static_assert
 # error: [missing-argument] "No argument provided for required parameter `condition` of function `static_assert`"
 static_assert()
 
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(condition=False)
+
+# error: [static-assert-error] "Static assertion error: argument of type `Unknown` has an ambiguous static truthiness"
+# error: [invalid-syntax]
+static_assert(**)
+
 # error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"
 # error: [invalid-argument-type] "Argument to function `static_assert` is incorrect: Expected `LiteralString | None`, found `Literal[2]`"
 static_assert(True, 2, 3)
@@ -1347,6 +1409,37 @@ def f(**kwargs: int) -> None: ...
 f(**Foo1(a=1, b="b"))
 # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
 f(**Foo2(a=1))
+```
+
+### TypedDict union
+
+```py
+from typing_extensions import TypedDict
+
+class GoodA(TypedDict):
+    a: int
+    b: int
+
+class GoodB(TypedDict):
+    a: int
+    b: int
+
+class BadA(TypedDict):
+    a: int
+    b: str
+
+class BadB(TypedDict):
+    a: int
+    b: str
+
+def needs_known_keys(*, a: int, b: int, c: int) -> None: ...
+def takes_int_kwargs(**kwargs: int) -> None: ...
+def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
+    # error: [missing-argument] "No argument provided for required parameter `c` of function `needs_known_keys`"
+    needs_known_keys(**good)
+
+    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `str`"
+    takes_int_kwargs(**bad)
 ```
 
 ### Keys must be strings

@@ -8,12 +8,9 @@ use lsp_types::{
     NumberOrString, PublishDiagnosticsParams, Url,
 };
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::name::Name;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
-use ty_python_semantic::types::ide_support::{
-    UnreachableKind, unreachable_ranges, unused_bindings,
-};
+use ty_ide::{Hint, hints};
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
@@ -29,37 +26,10 @@ use crate::system::{AnySystemPath, file_to_url};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub(super) struct UnnecessaryHint {
-    range: TextRange,
-    kind: UnnecessaryHintKind,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-enum UnnecessaryHintKind {
-    UnusedBinding(Name),
-    UnreachableCode(UnreachableKind),
-}
-
-impl UnnecessaryHintKind {
-    fn message(&self) -> String {
-        match self {
-            Self::UnusedBinding(name) => format!("`{name}` is unused"),
-            Self::UnreachableCode(UnreachableKind::Unconditional) => {
-                "Code is always unreachable".to_owned()
-            }
-            Self::UnreachableCode(UnreachableKind::CurrentAnalysis) => {
-                "Code is unreachable\nThis may depend on your current environment and settings"
-                    .to_owned()
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 pub(super) struct Diagnostics {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
-    unnecessary_hints: Vec<UnnecessaryHint>,
+    unnecessary_hints: Vec<Hint>,
     encoding: PositionEncoding,
     file_or_notebook: File,
 }
@@ -70,7 +40,7 @@ impl Diagnostics {
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id_from_hash(
         diagnostics: &[ruff_db::diagnostic::Diagnostic],
-        unnecessary_hints: &[UnnecessaryHint],
+        unnecessary_hints: &[Hint],
     ) -> Option<String> {
         if diagnostics.is_empty() && unnecessary_hints.is_empty() {
             return None;
@@ -375,7 +345,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = collect_hints(db, file);
+    let unnecessary_hints = hints(db, file);
 
     Some(Diagnostics {
         items: diagnostics,
@@ -385,48 +355,11 @@ pub(super) fn compute_diagnostics(
     })
 }
 
-pub(super) fn collect_hints(db: &ProjectDatabase, file: File) -> Vec<UnnecessaryHint> {
-    if !db.project().should_check_file(db, file) {
-        return Vec::new();
-    }
-
-    let unreachable = unreachable_ranges(db, file);
-
-    let mut hints = unused_bindings(db, file)
-        .iter()
-        // Avoid a narrower unused-binding hint inside code that is already reported as unreachable.
-        .filter(|binding| {
-            unreachable.is_empty()
-                || !unreachable
-                    .iter()
-                    .any(|range| range.range.contains_range(binding.range))
-        })
-        .map(|binding| UnnecessaryHint {
-            range: binding.range,
-            kind: UnnecessaryHintKind::UnusedBinding(binding.name.clone()),
-        })
-        .collect::<Vec<_>>();
-
-    hints.extend(unreachable.iter().map(|range| UnnecessaryHint {
-        range: range.range,
-        kind: UnnecessaryHintKind::UnreachableCode(range.kind),
-    }));
-
-    hints.sort_unstable_by(|left, right| {
-        (left.range.start(), left.range.end(), &left.kind).cmp(&(
-            right.range.start(),
-            right.range.end(),
-            &right.kind,
-        ))
-    });
-    hints
-}
-
 pub(super) fn unnecessary_hints_to_lsp_diagnostics(
     db: &ProjectDatabase,
     file: File,
     encoding: PositionEncoding,
-    hints: &[UnnecessaryHint],
+    hints: &[Hint],
 ) -> Vec<Diagnostic> {
     hints
         .iter()
@@ -439,7 +372,7 @@ fn unnecessary_hint_to_lsp_diagnostic(
     db: &ProjectDatabase,
     file: File,
     encoding: PositionEncoding,
-    hint: &UnnecessaryHint,
+    hint: &Hint,
 ) -> Option<(Option<Url>, Diagnostic)> {
     let range = hint.range.to_lsp_range(db, file, encoding)?;
     let url = range.to_location().map(|location| location.uri);
@@ -452,7 +385,7 @@ fn unnecessary_hint_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: hint.kind.message(),
+            message: hint.message(),
             related_information: None,
             tags: Some(vec![DiagnosticTag::UNNECESSARY]),
             data: None,

@@ -156,10 +156,36 @@ squares: list[int | None] = [x**2 for x in range(10)]
 reveal_type(squares)  # revealed: list[int | None]
 ```
 
+## PEP 798 unpacking comprehensions
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+Unpacking comprehensions flatten the unpacked element type:
+
+```py
+list_of_lists: list[list[int]] = [[1], [2, 3]]
+sets: list[set[str]] = [{"a"}, {"b", "c"}]
+dicts: list[dict[str, int]] = [{"a": 1}, {"b": 2}]
+not_iterables: list[int] = [1, 2]
+
+reveal_type([*xs for xs in list_of_lists])  # revealed: list[int]
+reveal_type({*xs for xs in sets})  # revealed: set[str]
+reveal_type({**d for d in dicts})  # revealed: dict[str, int]
+
+[*value for value in not_iterables]  # error: [not-iterable] "Object of type `int` is not iterable"
+{*value for value in not_iterables}  # error: [not-iterable] "Object of type `int` is not iterable"
+{**value for value in not_iterables}  # error: [invalid-argument-type]
+```
+
+## Inference for comprehensions takes context
+
 Inference for comprehensions takes the type context into account:
 
 ```py
-from typing import Sequence
+from typing import Literal, Sequence, TypedDict
 
 # Without type context:
 reveal_type([x for x in [1, 2, 3]])  # revealed: list[int]

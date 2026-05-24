@@ -10,7 +10,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::place::PlaceAndQualifiers;
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
 use crate::types::mro::Mro;
@@ -114,6 +114,7 @@ fn synthesize_typed_dict_init<'db>(
         Parameter::keyword_only((*name).clone())
             .with_annotated_type(field.declared_ty)
             .with_default_type(field.declared_ty)
+            .with_definition(field.first_declaration())
     });
 
     let map_overload = Signature::new(
@@ -128,7 +129,9 @@ fn synthesize_typed_dict_init<'db>(
     );
 
     let keyword_field_params = keyword_fields.iter().map(|(name, field)| {
-        let param = Parameter::keyword_only((*name).clone()).with_annotated_type(field.declared_ty);
+        let param = Parameter::keyword_only((*name).clone())
+            .with_annotated_type(field.declared_ty)
+            .with_definition(field.first_declaration());
         if field.is_required() {
             param
         } else {
@@ -150,6 +153,7 @@ fn synthesize_typed_dict_init<'db>(
         db,
         CallableSignature::from_overloads([map_overload, keyword_overload]),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -159,20 +163,36 @@ fn synthesize_typed_dict_getitem<'db>(
     instance_ty: Type<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
-    let overloads = fields.iter().map(|(field_name, field)| {
-        let key_type = Type::string_literal(db, field_name);
-        let parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_type),
-        ];
-        Signature::new(Parameters::new(db, parameters), field.declared_ty)
-    });
+    let overloads = fields
+        .iter()
+        .map(|(field_name, field)| {
+            let key_type = Type::string_literal(db, field_name);
+            let parameters = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(key_type),
+            ];
+            Signature::new(Parameters::new(db, parameters), field.declared_ty)
+        })
+        .chain(std::iter::once(Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                ],
+            ),
+            Type::object(),
+        )));
 
     Type::Callable(CallableType::new(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -216,6 +236,7 @@ fn synthesize_typed_dict_setitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -255,6 +276,7 @@ fn synthesize_typed_dict_delitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -374,6 +396,7 @@ fn synthesize_typed_dict_get<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -392,6 +415,7 @@ fn synthesize_typed_dict_update<'db>(
         Parameter::keyword_only(field_name.clone())
             .with_annotated_type(ty)
             .with_default_type(ty)
+            .with_definition(field.first_declaration())
     });
 
     let update_patch_ty = if let Type::TypedDict(typed_dict) = instance_ty {
@@ -486,6 +510,7 @@ fn synthesize_typed_dict_pop<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -512,6 +537,7 @@ fn synthesize_typed_dict_setdefault<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -579,6 +605,7 @@ fn synthesize_typed_dict_merge<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 

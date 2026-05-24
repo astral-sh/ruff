@@ -75,8 +75,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
-  --> src/mdtest_snippet.py:13:9
+  --> src/mdtest_snippet.py:12:5
    |
+12 |     @overload
+   |     ---------
 13 |     def try_from1(cls, x: str) -> None: ...
    |         --------- Missing here
 14 |     @classmethod
@@ -94,8 +96,10 @@ error[invalid-overload]: Overloaded function `try_from2` does not use the `@clas
 28 |     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
    |         ^^^^^^^^^
    |
-  ::: src/mdtest_snippet.py:22:9
+  ::: src/mdtest_snippet.py:21:5
    |
+21 |     @overload
+   |     ---------
 22 |     def try_from2(cls, x: int) -> CheckClassMethod: ...
    |         --------- Missing here
    |

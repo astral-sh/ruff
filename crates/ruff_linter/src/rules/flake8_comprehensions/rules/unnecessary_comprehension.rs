@@ -52,10 +52,12 @@ use crate::rules::flake8_comprehensions::fixes;
 /// cannot consistently infer if the iterable type is a sequence or a mapping and cannot suggest
 /// the correct fix for mappings.
 ///
-/// ## Fix safety
-/// Due to the known problem with dictionary comprehensions, this fix is marked as unsafe.
+/// Additionally, rewriting comprehensions inside an object's `__len__` method may cause a
+/// `RecursionError`, as collection constructors can call back into `__len__`.
 ///
-/// Additionally, this fix may drop comments when rewriting the comprehension.
+/// ## Fix safety
+/// This rule's fix is always marked as unsafe because of the known problems described above and
+/// because comments may be dropped when rewriting the comprehension.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UnnecessaryComprehension {

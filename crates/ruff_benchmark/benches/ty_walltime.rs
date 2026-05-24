@@ -202,7 +202,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: SupportedPythonVersion::Py312,
     },
-    14150,
+    14250,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
@@ -231,7 +231,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: "2025-08-09",
         python_version: SupportedPythonVersion::Py311,
     },
-    1800,
+    1810,
 );
 
 #[track_caller]

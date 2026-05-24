@@ -3,16 +3,11 @@ SAX driver for the pyexpat C module.  This driver works with
 pyexpat.__version__ == '2.22'.
 """
 
-import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Mapping
-from typing import Any, Final, Literal, overload
-from typing_extensions import TypeAlias
+from typing import Any, Final, Literal, TypeAlias, overload
 from xml.sax import _Source, xmlreader
-from xml.sax.handler import _ContentHandlerProtocol
-
-if sys.version_info >= (3, 10):
-    from xml.sax.handler import LexicalHandler
+from xml.sax.handler import LexicalHandler, _ContentHandlerProtocol
 
 _BoolType: TypeAlias = Literal[0, 1] | bool
 
@@ -48,26 +43,25 @@ class ExpatParser(xmlreader.IncrementalParser, xmlreader.Locator):
     def setContentHandler(self, handler: _ContentHandlerProtocol) -> None: ...
     def getFeature(self, name: str) -> _BoolType: ...
     def setFeature(self, name: str, state: _BoolType) -> None: ...
-    if sys.version_info >= (3, 10):
-        @overload
-        def getProperty(self, name: Literal["http://xml.org/sax/properties/lexical-handler"]) -> LexicalHandler | None: ...
 
+    @overload
+    def getProperty(self, name: Literal["http://xml.org/sax/properties/lexical-handler"]) -> LexicalHandler | None: ...
     @overload
     def getProperty(self, name: Literal["http://www.python.org/sax/properties/interning-dict"]) -> dict[str, Any] | None: ...
     @overload
     def getProperty(self, name: Literal["http://xml.org/sax/properties/xml-string"]) -> bytes | None: ...
     @overload
     def getProperty(self, name: str) -> object: ...
-    if sys.version_info >= (3, 10):
-        @overload
-        def setProperty(self, name: Literal["http://xml.org/sax/properties/lexical-handler"], value: LexicalHandler) -> None: ...
 
+    @overload
+    def setProperty(self, name: Literal["http://xml.org/sax/properties/lexical-handler"], value: LexicalHandler) -> None: ...
     @overload
     def setProperty(
         self, name: Literal["http://www.python.org/sax/properties/interning-dict"], value: dict[str, Any]
     ) -> None: ...
     @overload
     def setProperty(self, name: str, value: object) -> None: ...
+
     def feed(self, data: str | ReadableBuffer, isFinal: bool = False) -> None: ...
     def flush(self) -> None: ...
     def close(self) -> None: ...

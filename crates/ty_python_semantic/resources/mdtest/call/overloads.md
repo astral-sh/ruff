@@ -559,6 +559,83 @@ def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
     reveal_type(f(*(my_enum_instance,)))  # revealed: MyEnumSubclass
 ```
 
+#### Enum complement inside union
+
+A narrowed enum complement inside a union should be expanded to the remaining enum literals:
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+class Red: ...
+class Green: ...
+class Blue: ...
+class NoColor: ...
+
+@overload
+def f(x: Literal[Color.RED]) -> Red: ...
+@overload
+def f(x: Literal[Color.GREEN]) -> Green: ...
+@overload
+def f(x: Literal[Color.BLUE]) -> Blue: ...
+@overload
+def f(x: None) -> NoColor: ...
+```
+
+```py
+from overloaded import Blue, Color, Green, NoColor, f
+
+def _(x: Color | None):
+    if x is Color.RED:
+        return
+
+    result: Green | Blue | NoColor = f(x)
+    result_from_star: Green | Blue | NoColor = f(*(x,))
+```
+
+#### Enum complement as a bound overload receiver
+
+A narrowed enum complement should also preserve literal alternatives during member lookup, so
+bound-method overload resolution can still discriminate on the receiver:
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    @overload
+    def label(self: Literal[Color.GREEN]) -> int: ...
+    @overload
+    def label(self: Literal[Color.BLUE]) -> str: ...
+```
+
+```py
+from typing import Literal
+
+from overloaded import Color
+
+def narrowed(color: Color):
+    if color is Color.RED:
+        return
+    reveal_type(color.label())  # revealed: int | str
+
+def explicit(color: Literal[Color.GREEN, Color.BLUE]):
+    reveal_type(color.label())  # revealed: int | str
+```
+
 ### Expanding PEP 695 type alias
 
 ```toml
@@ -956,10 +1033,11 @@ error[no-matching-overload]: No overload of function `f` matches arguments
    |
 info: Limit of argument type expansion reached at argument 9
 info: First overload defined here
- --> src/overloaded.pyi:8:5
+ --> src/overloaded.pyi:7:1
   |
-8 | def f() -> None: ...
-  |     ^^^^^^^^^^^
+7 | / @overload
+8 | | def f() -> None: ...
+  | |____________________^ First overload defined here
   |
 info: Possible overloads for function `f`:
 info:   () -> None
@@ -1721,20 +1799,54 @@ def _(args1: list[int], args2: list[Any]):
 
 reveal_type(f2())  # revealed: tuple[Any, ...]
 reveal_type(f2(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
-# TODO: Should be `tuple[Literal[1], Literal[2]]`
-reveal_type(f2(x1=1, x2=2))  # revealed: Unknown
-# TODO: Should be `tuple[Literal[2], Literal[1]]`
-reveal_type(f2(x2=1, x1=2))  # revealed: Unknown
+reveal_type(f2(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f2(x2=1, x1=2))  # revealed: tuple[Literal[2], Literal[1]]
 reveal_type(f2(1, 2, z=3))  # revealed: tuple[Any, ...]
 
 reveal_type(f3(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f3(1, 2, 3))  # revealed: tuple[Any, ...]
-# TODO: Should be `tuple[Literal[1], Literal[2]]`
-reveal_type(f3(x1=1, x2=2))  # revealed: Unknown
+reveal_type(f3(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f3(z=1))  # revealed: dict[str, Any]
 
 # error: [no-matching-overload]
 reveal_type(f3(1, 2, x=3))  # revealed: Unknown
+```
+
+### Varidic argument with generic iterable
+
+`overloaded.pyi`:
+
+```pyi
+from typing import TypeVar, overload
+from collections.abc import Iterable
+
+T = TypeVar("T")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+
+@overload
+def f(x: Iterable[T1], /) -> tuple[T1]: ...
+@overload
+def f(x: Iterable[T1], y: Iterable[T2], /) -> tuple[T1, T2]: ...
+@overload
+def f(x: Iterable[T1], y: Iterable[T2], z: Iterable[T3], /) -> tuple[T1, T2, T3]: ...
+@overload
+def f(*args: Iterable[T]) -> tuple[T, ...]: ...
+```
+
+```py
+from overloaded import f
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(lista: list[A], listb: list[B], listc: list[C]):
+    reveal_type(f(lista))  # revealed: tuple[A]
+    reveal_type(f(lista, listb))  # revealed: tuple[A, B]
+    reveal_type(f(lista, listb, listc))  # revealed: tuple[A, B, C]
+    reveal_type(f())  # revealed: tuple[Unknown, ...]
 ```
 
 ### Non-participating fully-static parameter

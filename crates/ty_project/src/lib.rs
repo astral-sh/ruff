@@ -3,7 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
-use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
+use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
 pub use db::tests::TestDb;
@@ -17,15 +17,14 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
-use std::collections::hash_set;
+use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
-use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy};
 use ty_python_semantic::lint::RuleSelection;
 
 mod db;
@@ -167,16 +166,22 @@ impl ProgressReporter for CollectReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata<Strategy: MisconfigurationStrategy>(
+    /// Create a project from resolved metadata and settings.
+    ///
+    /// Program-settings diagnostics are accepted separately so callers do not need to know how to
+    /// convert and merge them into the stored project settings diagnostics.
+    pub(crate) fn from_metadata(
         db: &dyn Db,
         metadata: ProjectMetadata,
-        strategy: &Strategy,
-    ) -> Result<Self, Strategy::Error<ToSettingsError>> {
-        let (settings, diagnostics) =
-            metadata
-                .options()
-                .to_settings(db, metadata.root(), strategy)?;
-
+        settings: Settings,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> Self {
+        let diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
@@ -185,7 +190,7 @@ impl Project {
 
         project.try_add_file_root(db);
 
-        Ok(project)
+        project
     }
 
     fn try_add_file_root(self, db: &dyn Db) {
@@ -215,18 +220,15 @@ impl Project {
         self.settings(db).to_rules()
     }
 
-    /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).
+    /// Returns whether `path` is part of the project and included (see `included_paths_list`).
     ///
     /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
-    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        matches!(
-            ProjectFilesFilter::from_project(db, self)
-                .is_file_included(path, GlobFilterCheckMode::Adhoc),
-            IncludeResult::Included { .. }
-        )
+    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> IncludeResult {
+        ProjectFilesFilter::from_project(db, self)
+            .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
     pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
@@ -237,39 +239,93 @@ impl Project {
         )
     }
 
-    pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
+    /// Reload the project after its metadata or settings have changed.
+    ///
+    /// Program-settings diagnostics are converted and merged here to keep reload behavior
+    /// consistent with initial project creation.
+    pub fn reload(
+        self,
+        db: &mut dyn Db,
+        metadata: ProjectMetadata,
+        settings: Option<Settings>,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> ProjectReloadResult {
         tracing::debug!("Reloading project");
+        let metadata_changed = &metadata != self.metadata(db);
+        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
 
-        self.reload_files(db);
-
-        if &metadata == self.metadata(db) {
-            return;
-        }
-
-        match metadata
-            .options()
-            .to_settings(db, metadata.root(), &FallibleStrategy)
+        let root_changed = metadata.root() != self.root(db);
+        let (settings_changed, files_changed) = if let Some(settings) = settings
+            && self.settings(db) != &settings
         {
-            Ok((settings, settings_diagnostics)) => {
-                if self.settings(db) != &settings {
-                    self.set_settings(db).to(Box::new(settings));
-                }
+            let files_changed = root_changed || settings.src() != self.settings(db).src();
+            self.set_settings(db).to(Box::new(settings));
+            (true, files_changed)
+        } else {
+            (false, root_changed)
+        };
 
-                if self.settings_diagnostics(db) != settings_diagnostics {
-                    self.set_settings_diagnostics(db).to(settings_diagnostics);
-                }
-            }
-            Err(error) => {
-                tracing::warn!(
-                    "Keeping old project configuration because loading the new settings failed with: {error}"
-                );
-                self.set_settings_diagnostics(db)
-                    .to(vec![error.into_diagnostic()]);
-            }
+        if self.settings_diagnostics(db) != settings_diagnostics {
+            self.set_settings_diagnostics(db).to(settings_diagnostics);
         }
 
-        self.set_metadata(db).to(Box::new(metadata));
-        self.try_add_file_root(db);
+        if files_changed {
+            // The project file set only depends on the project root, explicit check paths,
+            // force-exclude, and `src` settings. Check paths and force-exclude are updated
+            // through their own setters, so a config reload only needs to reindex when the
+            // root or resolved `src` settings changed.
+            self.reload_files(db);
+        }
+
+        if metadata_changed {
+            self.set_metadata(db).to(Box::new(metadata));
+            self.try_add_file_root(db);
+        }
+
+        if metadata_changed || settings_changed {
+            ProjectReloadResult::Changed { files_changed }
+        } else {
+            ProjectReloadResult::Unchanged
+        }
+    }
+
+    /// Replace stored settings diagnostics after recomputing program settings.
+    ///
+    /// This is used when a change affects [`ty_python_core::program::ProgramSettings`] without
+    /// reloading the full project.
+    pub(crate) fn update_settings_diagnostics(
+        self,
+        db: &mut dyn Db,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) {
+        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
+
+        if self.settings_diagnostics(db) != settings_diagnostics {
+            self.set_settings_diagnostics(db).to(settings_diagnostics);
+        }
+    }
+
+    fn settings_diagnostics_with_program_diagnostics(
+        db: &dyn Db,
+        mut settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> Vec<OptionDiagnostic> {
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(db)),
+        );
+        settings_diagnostics
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
@@ -534,6 +590,59 @@ impl Project {
         index.remove(file);
     }
 
+    /// Removes all indexed project files under `paths`.
+    ///
+    /// This is a no-op if the project files are still lazily indexed.
+    #[tracing::instrument(level = "debug", skip(self, db, paths))]
+    pub(crate) fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<SystemPath>,
+    {
+        let paths = deduplicate_nested_paths(
+            paths
+                .into_iter()
+                .map(|path| SystemPath::absolute(path, db.system().current_directory())),
+        )
+        .collect::<BTreeSet<_>>();
+
+        if paths.is_empty() {
+            return;
+        }
+
+        if self.file_set(db).is_lazy() {
+            return;
+        }
+
+        let files_to_remove = {
+            let files = self.files(db);
+            files
+                .iter()
+                .copied()
+                .filter(|file| {
+                    file.path(db).as_system_path().is_some_and(|file_path| {
+                        paths
+                            .range(..=file_path.to_path_buf())
+                            .next_back()
+                            .is_some_and(|path| file_path.starts_with(path))
+                    })
+                })
+                .collect::<Vec<_>>()
+        };
+
+        if files_to_remove.is_empty() {
+            return;
+        }
+
+        let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
+            return;
+        };
+
+        for file in files_to_remove {
+            index.remove(file);
+        }
+    }
+
     pub fn add_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
             "Adding file `{}` to project `{}`",
@@ -570,7 +679,7 @@ impl Project {
                         .entered();
                 let start = ruff_db::Instant::now();
 
-                let walker = ProjectFilesWalker::new(db);
+                let walker = ProjectFilesWalker::full();
                 let (files, diagnostics) = walker.collect_set(db);
 
                 tracing::info!(
@@ -600,6 +709,17 @@ impl Project {
             .map(OptionDiagnostic::to_diagnostic)
             .collect()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectReloadResult {
+    /// Neither project metadata nor settings changed.
+    Unchanged,
+    /// Project metadata or settings changed.
+    Changed {
+        /// Whether the indexed project files changed.
+        files_changed: bool,
+    },
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
@@ -745,9 +865,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ProjectMetadata;
     use crate::check_file_impl;
+    use crate::db::Db as _;
     use crate::db::tests::TestDb;
+    use crate::{IncludeResult, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -798,5 +919,23 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn explicit_nested_included_file_is_a_literal_match() {
+        let root = SystemPathBuf::from("/project");
+        let explicit_file = root.join("build/keep.txt");
+        let project = ProjectMetadata::new(Name::new_static("test"), root.clone());
+        let mut db = TestDb::new(project);
+        let project = db.project();
+
+        project.set_included_paths(&mut db, vec![root, explicit_file.clone()]);
+
+        assert_eq!(
+            project.is_file_included(&db, &explicit_file),
+            IncludeResult::Included {
+                literal_match: Some(true)
+            }
+        );
     }
 }

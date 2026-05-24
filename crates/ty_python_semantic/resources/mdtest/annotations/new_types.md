@@ -126,6 +126,17 @@ def g(_: Callable[[str], Foo]): ...
 g(Foo)  # error: [invalid-argument-type]
 ```
 
+## `NewType` pseudo-classes participate in PEP 604 unions
+
+```py
+from typing import NewType
+
+Foo = NewType("Foo", int)
+
+reveal_type(Foo | str)  # revealed: <types.UnionType special-form 'Foo | str'>
+reveal_type(str | Foo)  # revealed: <types.UnionType special-form 'str | Foo'>
+```
+
 ## `NewType` instances are `Callable` if the base type is
 
 ```py
@@ -658,32 +669,6 @@ def f(x: N):
             reveal_type(x)  # revealed: N
         case _:
             reveal_type(x)  # revealed: N
-```
-
-## We don't support `NewType` on Python 3.9
-
-We implement `typing.NewType` as a `KnownClass`, but in Python 3.9 it's actually a function, so all
-we get is the `Any` annotations from typeshed. However, `typing_extensions.NewType` is always a
-class. This could be improved in the future, but Python 3.9 is now end-of-life, so it's not
-high-priority.
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-from typing import NewType
-
-Foo = NewType("Foo", int)
-reveal_type(Foo)  # revealed: Any
-reveal_type(Foo(42))  # revealed: Any
-
-from typing_extensions import NewType
-
-Bar = NewType("Bar", int)
-reveal_type(Bar)  # revealed: <NewType pseudo-class 'Bar'>
-reveal_type(Bar(42))  # revealed: Bar
 ```
 
 ## The base of a `NewType` can't be a protocol class or a `TypedDict`

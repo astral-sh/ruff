@@ -1,8 +1,8 @@
 import sys
 from _typeshed import ReadOnlyBuffer, StrOrBytesPath
 from types import TracebackType
-from typing import Final, TypeVar, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Final, TypeAlias, TypeVar, final, overload, type_check_only
+from typing_extensions import Self
 
 if sys.platform != "win32":
     _T = TypeVar("_T")
@@ -28,10 +28,12 @@ if sys.platform != "win32":
         def __exit__(
             self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
         ) -> None: ...
+
         @overload
         def get(self, k: _KeyType, /) -> bytes | None: ...
         @overload
         def get(self, k: _KeyType, default: _T, /) -> bytes | _T: ...
+
         def keys(self) -> list[bytes]: ...
         def setdefault(self, k: _KeyType, default: _ValueType = b"", /) -> bytes: ...
         # This isn't true, but the class can't be instantiated. See #13024

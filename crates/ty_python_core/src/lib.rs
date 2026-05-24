@@ -2,6 +2,7 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
+use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
@@ -15,7 +16,7 @@ use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
 
 use crate::place::ScopedPlaceId;
-
+pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
@@ -29,7 +30,8 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator, UseDefMap,
+    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator,
+    ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 
@@ -49,6 +51,7 @@ pub mod rank;
 mod re_exports;
 pub mod reachability_constraints;
 pub mod scope;
+pub mod statement;
 pub mod symbol;
 pub mod unpack;
 mod use_def;
@@ -271,8 +274,20 @@ pub struct SemanticIndex<'db> {
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 
+    /// Map from a standalone statement to its [`Statement`] ingredient.
+    statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
+
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
+
+    /// Map from a lambda expression to its containing statement.
+    enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
+
+    // Map from a constraining use of a collection literal to its definition.
+    collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
+
+    // Map from a collection literal definition to statements containing a constraining use.
+    uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
@@ -300,6 +315,17 @@ pub struct SemanticIndex<'db> {
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,
+
+    /// Narrowing alias metadata for predicate leaf names.
+    /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
+    /// the alias Name node is mapped to its aliased expression for constraint-generation time.
+    narrowing_alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub struct NarrowingAliasPredicate<'db> {
+    /// Aliased expression, e.g., `x is None` in `is_none = x is None`.
+    pub expression: Expression<'db>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -310,6 +336,14 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn place_table(&self, scope_id: FileScopeId) -> &PlaceTable {
         &self.place_tables[scope_id]
+    }
+
+    /// Returns alias metadata for an alias Name node in a predicate, if one exists.
+    pub fn narrowing_alias_predicate(
+        &self,
+        key: impl Into<ExpressionNodeKey>,
+    ) -> Option<&NarrowingAliasPredicate<'db>> {
+        self.narrowing_alias_predicates.get(&key.into())
     }
 
     /// Returns the use-def map for a specific scope.
@@ -423,6 +457,31 @@ impl<'db> SemanticIndex<'db> {
             .map(|node_ref| self.expect_single_definition(node_ref))
     }
 
+    pub fn enclosing_lambda_statement(&self, lambda: ExpressionNodeKey) -> Option<Statement<'db>> {
+        self.enclosing_lambda_statements.get(&lambda).copied()
+    }
+
+    /// If this is a potentially constraining use of an unconstrained collection literal, returns
+    /// its definition.
+    pub fn unconstrained_collection_binding(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        self.collections_by_use.get(&collection_use.into()).copied()
+    }
+
+    /// Returns all potentially constraining uses of the given unnannotated collection literal.
+    pub fn constraining_collection_uses(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> impl Iterator<Item = (Statement<'db>, ExpressionNodeKey)> {
+        self.uses_by_collection
+            .get(&collection_def)
+            .into_iter()
+            .flatten()
+            .copied()
+    }
+
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
         self.ancestor_scopes(scope_id).any(|(scope_id, _)| {
             self.use_def_map(scope_id)
@@ -472,6 +531,15 @@ impl<'db> SemanticIndex<'db> {
         &self.definitions_by_node[&definition_key.into()]
     }
 
+    /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_node`, if any.
+    pub fn try_definitions(
+        &self,
+        definition_node: ast::AnyNodeRef<'_>,
+    ) -> Option<&Definitions<'db>> {
+        let definition_key = DefinitionNodeKey::from_node_ref(definition_node);
+        self.definitions_by_node.get(&definition_key)
+    }
+
     /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
     ///
     /// ## Panics
@@ -498,6 +566,18 @@ impl<'db> SemanticIndex<'db> {
         definitions[0]
     }
 
+    pub fn try_definition(
+        &self,
+        definition_key: impl Into<DefinitionNodeKey>,
+    ) -> Option<Definition<'db>> {
+        self.definitions_by_node
+            .get(&definition_key.into())?
+            .iter()
+            .copied()
+            .exactly_one()
+            .ok()
+    }
+
     /// Returns the [`Expression`] ingredient for an expression node.
     /// Panics if we have no expression ingredient for that node. We can only call this method for
     /// standalone-inferable expressions, which we call `add_standalone_expression` for in
@@ -519,6 +599,13 @@ impl<'db> SemanticIndex<'db> {
     pub fn is_standalone_expression(&self, expression_key: impl Into<ExpressionNodeKey>) -> bool {
         self.expressions_by_node
             .contains_key(&expression_key.into())
+    }
+
+    pub fn try_statement(
+        &self,
+        statement_key: impl Into<StatementNodeKey>,
+    ) -> Option<Statement<'db>> {
+        self.statements_by_node.get(&statement_key.into()).copied()
     }
 
     /// Returns the id of the scope that `node` creates.
@@ -922,7 +1009,9 @@ mod tests {
     use crate::{
         ast_ids::{HasScopedUseId, ScopedUseId},
         db::tests::{TestDb, TestDbBuilder},
-        definition::DefinitionKind,
+        definition::{
+            DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+        },
     };
 
     impl UseDefMap<'_> {
@@ -1209,14 +1298,14 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
-            DefinitionKind::VariadicPositionalParameter(_)
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicPositionalParameter(_))
         ));
         let kwargs_binding = use_def
             .first_public_binding(function_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
-            DefinitionKind::VariadicKeywordParameter(_)
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(_))
         ));
     }
 
@@ -1239,7 +1328,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let lambda_table = index.place_table(lambda_scope_id);
         assert_eq!(
             names(lambda_table),
-            vec!["a", "b", "c", "d", "args", "kwargs"],
+            vec!["a", "b", "c", "args", "d", "kwargs"],
         );
 
         let use_def = index.use_def_map(lambda_scope_id);
@@ -1247,21 +1336,36 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
-            assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
+            assert!(matches!(
+                binding.kind(&db),
+                DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                    index: _,
+                    lambda: _,
+                    parameter: ParameterDefinitionNodeKind::Parameter(_)
+                })
+            ));
         }
         let args_binding = use_def
             .first_public_binding(lambda_table.symbol_id("args").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
-            DefinitionKind::VariadicPositionalParameter(_)
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                index: 3,
+                lambda: _,
+                parameter: ParameterDefinitionNodeKind::VariadicPositionalParameter(_)
+            })
         ));
         let kwargs_binding = use_def
             .first_public_binding(lambda_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
-            DefinitionKind::VariadicKeywordParameter(_)
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                index: 5,
+                lambda: _,
+                parameter: ParameterDefinitionNodeKind::VariadicKeywordParameter(_)
+            })
         ));
     }
 

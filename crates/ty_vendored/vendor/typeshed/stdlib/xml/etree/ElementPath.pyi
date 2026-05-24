@@ -1,7 +1,6 @@
 from collections.abc import Callable, Generator, Iterable
 from re import Pattern
-from typing import Any, Final, Literal, TypeVar, overload
-from typing_extensions import TypeAlias
+from typing import Any, Final, Literal, TypeAlias, TypeVar, overload
 from xml.etree.ElementTree import Element
 
 xpath_tokenizer_re: Final[Pattern[str]]
@@ -33,8 +32,10 @@ def iterfind(  # type: ignore[overload-overlap]
 ) -> None: ...
 @overload
 def iterfind(elem: Element[Any], path: str, namespaces: dict[str, str] | None = None) -> Generator[Element]: ...
+
 def find(elem: Element[Any], path: str, namespaces: dict[str, str] | None = None) -> Element | None: ...
 def findall(elem: Element[Any], path: str, namespaces: dict[str, str] | None = None) -> list[Element]: ...
+
 @overload
 def findtext(elem: Element[Any], path: str, default: None = None, namespaces: dict[str, str] | None = None) -> str | None: ...
 @overload

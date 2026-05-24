@@ -5,6 +5,9 @@
 #     "rich",
 #     "watchfiles>=1.1.0",
 # ]
+#
+# [tool.uv]
+# exclude-newer = "7 days"
 # ///
 
 from __future__ import annotations
@@ -77,6 +80,7 @@ class MDTestRunner:
                 os.environ,
                 CLI_COLOR="1",
                 CARGO_PROFILE_DEV_OPT_LEVEL="0" if self.filters else "1",
+                CARGO_PROFILE_DEV_DEBUG="line-tables-only",
             ),
             stderr=subprocess.STDOUT,
             text=True,

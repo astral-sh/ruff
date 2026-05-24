@@ -407,6 +407,7 @@ class FTP_TLS(FTP):
             *,
             encoding: str = "utf-8",
         ) -> None: ...
+
         ssl_version: int
         keyfile: StrOrBytesPath | None
         certfile: StrOrBytesPath | None

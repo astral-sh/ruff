@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use ruff_db::{
-    diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity},
-    parsed::parsed_module,
+    diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
@@ -9,15 +8,14 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use crate::attribute_assignments;
 use crate::{
-    TypeQualifiers,
+    Db, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type,
+        StaticClassLiteral, Type, TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -26,16 +24,16 @@ use crate::{
         context::InferContext,
         definition_expression_type,
         diagnostic::{
-            ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
-            INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS, INVALID_GENERIC_CLASS,
-            INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_PROTOCOL,
-            INVALID_TYPED_DICT_HEADER, IncompatibleBases, SUBCLASS_OF_FINAL_CLASS,
-            UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
-            report_conflicting_metaclass_from_bases, report_duplicate_bases,
-            report_instance_layout_conflict, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference,
+            ABSTRACT_METHOD_IN_FINAL_CLASS, AbstractMethodAnnotationPolicy, CONFLICTING_METACLASS,
+            CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE,
+            INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS,
+            INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
+            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
+            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
+            report_duplicate_bases, report_instance_layout_conflict,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
@@ -50,9 +48,11 @@ use crate::{
         overrides,
         tuple::Tuple,
         typevar::TypeVarInstance,
+        variance::VarianceInferable,
         visitor::find_over_type,
     },
 };
+use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
 use ty_python_core::{SemanticIndex, definition::DefinitionKind, scope::ScopeId};
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
@@ -222,6 +222,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
     let expanded_base_entries =
         expanded_class_base_entries(db, class.known(db), class_node, class_definition);
+    let check_explicit_base_variance = context.is_lint_enabled(&INVALID_GENERIC_CLASS);
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
         let base_class = entry.ty();
@@ -312,7 +313,30 @@ pub(crate) fn check_static_class_definitions<'db>(
                 continue;
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
-            Type::GenericAlias(class) => ClassType::Generic(class),
+            Type::GenericAlias(base_alias) => {
+                if check_explicit_base_variance
+                    && let Some(node) = source_node
+                    && let Some(generic_context) = class.generic_context(db)
+                    && let Some(typevar) = generic_context.variables(db).find(|typevar| {
+                        let Some(declared_variance) = typevar.typevar(db).explicit_variance(db)
+                        else {
+                            return false;
+                        };
+                        declared_variance != TypeVarVariance::Invariant
+                            && declared_variance.join(base_alias.variance_of(db, *typevar))
+                                != declared_variance
+                    })
+                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Variance of type variable `{}` is incompatible with base class `{}`",
+                        typevar.typevar(db).name(db),
+                        base_alias.origin(db).name(db),
+                    ));
+                }
+
+                ClassType::Generic(base_alias)
+            }
             _ => continue,
         };
 
@@ -382,6 +406,26 @@ pub(crate) fn check_static_class_definitions<'db>(
                 node,
                 base_is_frozen,
             );
+        }
+
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class)
+            && let Some(node) = source_node
+        {
+            // Suppress the diagnostic if the child class manually overrides all comparison
+            // methods, since the user has explicitly fixed the LSP violation.
+            if !class.has_own_comparison_methods(db)
+                && let Some(builder) = context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, node)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Class `{}` inherits from dataclass `{}` which has `order=True`",
+                    class.name(db),
+                    ordered_base_class.name(db),
+                ));
+                diagnostic.info(
+                    "Comparison of instances of the child class with instances \
+                    of the parent class will raise `TypeError` at runtime",
+                );
+            }
         }
     }
 
@@ -860,7 +904,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         // that precede them in the type parameter list.
         if let Some(generic_context) = class
             .pep695_generic_context(db)
-            .or(class.legacy_generic_context(db))
+            .or_else(|| class.legacy_generic_context(db))
         {
             let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
 
@@ -1051,6 +1095,27 @@ pub(crate) fn check_static_class_definitions<'db>(
     class.validate_members(context);
 }
 
+fn ordered_dataclass_base_class<'db>(
+    db: &'db dyn Db,
+    base_class: ClassType<'db>,
+) -> Option<ClassType<'db>> {
+    for ancestor in base_class.iter_mro(db).filter_map(ClassBase::into_class) {
+        let Some((ancestor_literal, _)) = ancestor.static_class_literal(db) else {
+            continue;
+        };
+
+        if ancestor_literal.is_ordered_dataclass(db) {
+            return Some(ancestor);
+        }
+
+        if ancestor_literal.has_own_comparison_methods(db) {
+            return None;
+        }
+    }
+
+    None
+}
+
 /// Check that a `@final` class does not have unimplemented abstract methods.
 ///
 /// A final class cannot be subclassed, so if it inherits abstract methods without
@@ -1094,6 +1159,23 @@ fn check_final_class_abstract_methods<'db>(
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Final class `{class_name}` has unimplemented abstract methods",
     ));
+
+    let definition_types = infer_definition_types(db, class.definition(db));
+
+    if let Some(class_node) = class.body_scope(db).node(db).as_class()
+        && let Some(decorator) = class_node
+            .node(context.module())
+            .decorator_list
+            .iter()
+            .find(|decorator| {
+                definition_types
+                    .expression_type(&decorator.expression)
+                    .as_function_literal()
+                    .is_some_and(|function| function.is_known(db, KnownFunction::Final))
+            })
+    {
+        diagnostic.annotate(context.secondary(decorator));
+    }
 
     let num_abstract_methods = abstract_methods.len();
 
@@ -1139,19 +1221,25 @@ fn check_final_class_abstract_methods<'db>(
         kind,
     } = abstract_method;
 
-    let module = parsed_module(db, definition.file(db)).load(db);
-    let span = Span::from(definition.focus_range(db, &module));
     let defining_class_name = defining_class.name(db);
 
-    let mut secondary_annotation = Annotation::secondary(span);
-    secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
-        secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
-    } else {
-        secondary_annotation.message(format_args!(
-            "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
-        ))
-    };
-    diagnostic.annotate(secondary_annotation);
+    if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
+        let policy = if kind.is_explicit() {
+            AbstractMethodAnnotationPolicy::ExcludeVerboseBody
+        } else {
+            AbstractMethodAnnotationPolicy::AlwaysIncludeBody
+        };
+        let secondary_span = abstract_method_span(db, function, policy);
+        let mut secondary_annotation = Annotation::secondary(secondary_span);
+        secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
+            secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
+        } else {
+            secondary_annotation.message(format_args!(
+                "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
+            ))
+        };
+        diagnostic.annotate(secondary_annotation);
+    }
 
     if !kind.is_explicit() {
         let mut sub = SubDiagnostic::new(

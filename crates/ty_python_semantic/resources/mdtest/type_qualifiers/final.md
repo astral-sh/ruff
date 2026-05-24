@@ -100,6 +100,18 @@ reveal_type(C().FINAL_D)  # revealed: Literal[1]
 reveal_type(C().FINAL_E)  # revealed: int
 ```
 
+### Recursive bare `Final` instance attribute
+
+```py
+from __future__ import annotations
+
+from typing import Final
+
+class ScopeChain:
+    def __init__(self, parent: ScopeChain | None = None) -> None:
+        self.depth: Final = 1 if parent is None else parent.depth + 1
+```
+
 ## Not modifiable
 
 ### Names

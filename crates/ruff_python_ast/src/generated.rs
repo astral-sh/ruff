@@ -8955,7 +8955,7 @@ impl AnyNodeRef<'_> {
 pub struct ModModule {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
@@ -8977,12 +8977,12 @@ pub struct StmtFunctionDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
-    pub decorator_list: Vec<crate::Decorator>,
+    pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
     pub type_params: Option<Box<crate::TypeParams>>,
     pub parameters: Box<crate::Parameters>,
     pub returns: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
@@ -8991,11 +8991,11 @@ pub struct StmtFunctionDef {
 pub struct StmtClassDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub decorator_list: Vec<crate::Decorator>,
+    pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
     pub type_params: Option<Box<crate::TypeParams>>,
     pub arguments: Option<Box<crate::Arguments>>,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
@@ -9072,8 +9072,8 @@ pub struct StmtFor {
     pub is_async: bool,
     pub target: Box<Expr>,
     pub iter: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
+    pub orelse: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
@@ -9084,8 +9084,8 @@ pub struct StmtWhile {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
+    pub orelse: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
@@ -9095,7 +9095,7 @@ pub struct StmtIf {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
     pub elif_else_clauses: Vec<crate::ElifElseClause>,
 }
 
@@ -9110,7 +9110,7 @@ pub struct StmtWith {
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub items: Vec<crate::WithItem>,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
@@ -9140,10 +9140,10 @@ pub struct StmtRaise {
 pub struct StmtTry {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
     pub handlers: Vec<ExceptHandler>,
-    pub orelse: Vec<Stmt>,
-    pub finalbody: Vec<Stmt>,
+    pub orelse: thin_vec::ThinVec<Stmt>,
+    pub finalbody: thin_vec::ThinVec<Stmt>,
     pub is_star: bool,
 }
 
@@ -9399,7 +9399,7 @@ pub struct ExprSetComp {
 pub struct ExprDictComp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub key: Box<Expr>,
+    pub key: Option<Box<Expr>>,
     pub value: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
 }
@@ -9672,8 +9672,8 @@ pub struct PatternMatchSequence {
 pub struct PatternMatchMapping {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub keys: Vec<Expr>,
-    pub patterns: Vec<Pattern>,
+    pub keys: thin_vec::ThinVec<Expr>,
+    pub patterns: thin_vec::ThinVec<Pattern>,
     pub rest: Option<crate::Identifier>,
 }
 
@@ -10416,7 +10416,11 @@ impl ExprDictComp {
             range: _,
             node_index: _,
         } = self;
-        visitor.visit_expr(key);
+
+        if let Some(key) = key {
+            visitor.visit_expr(key);
+        }
+
         visitor.visit_expr(value);
 
         for elm in generators {

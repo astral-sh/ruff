@@ -494,6 +494,7 @@ When the owner is a union type, `super()` is built separately for each branch, a
 super objects are combined into a union.
 
 ```py
+from typing import Literal
 from ty_extensions import reveal_mro
 
 class A: ...
@@ -514,9 +515,7 @@ def f(x: C | D):
     # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
-def f(flag: bool):
-    x = "" if flag else "hello"
-    reveal_type(x)  # revealed: Literal["", "hello"]
+def f(x: Literal["", "hello"]):
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 
 def f(x: int | str):
@@ -812,6 +811,6 @@ class MyProtocol(Protocol, Generic[_T_co]):
         # Accessing parent's __class_getitem__ through super()
         reveal_type(super())  # revealed: <super: <class 'MyProtocol'>, type[Self@__class_getitem__]>
         parent_method = super().__class_getitem__
-        reveal_type(parent_method)  # revealed: @Todo(super in generic class)
+        reveal_type(parent_method)  # revealed: (item: Unknown, /) -> type[Self@__class_getitem__]
         return parent_method(item)
 ```

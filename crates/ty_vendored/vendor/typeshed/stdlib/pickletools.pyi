@@ -12,8 +12,7 @@ dis(pickle, out=None, memo=None, indentlevel=4)
 
 import sys
 from collections.abc import Callable, Iterator, MutableMapping
-from typing import IO, Any, Final
-from typing_extensions import TypeAlias
+from typing import IO, Any, Final, TypeAlias
 
 __all__ = ["dis", "genops", "optimize"]
 

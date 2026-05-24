@@ -37,6 +37,7 @@ impl<'db> ScopeId<'db> {
                 | NodeWithScopeKind::ListComprehension(_)
                 | NodeWithScopeKind::SetComprehension(_)
                 | NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::GeneratorExpression(_)
         )
     }
 

@@ -2196,6 +2196,51 @@ static_assert(is_subtype_of(RegularCallableTypeOf[overload_ab], RegularCallableT
 static_assert(is_subtype_of(RegularCallableTypeOf[overload_ba], RegularCallableTypeOf[overload_ab]))
 ```
 
+#### Overloaded callable with many arity-incompatible overloads
+
+When an overloaded source callable has many overloads with different arities, overloads whose
+positional parameter count is less than the target's should be quickly rejected without expensive
+per-parameter type comparisons.
+
+`many_overloads.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def many(a: int) -> int: ...
+@overload
+def many(a: int, b: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int, d: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int, d: int, e: int) -> int: ...
+```
+
+```py
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from many_overloads import many
+
+def two_args(a: int, b: int) -> int:
+    return 0
+
+def five_args(a: int, b: int, c: int, d: int, e: int) -> int:
+    return 0
+
+def six_args(a: int, b: int, c: int, d: int, e: int, f: int) -> int:
+    return 0
+
+def variadic_args(*args: int) -> int:
+    return 0
+
+static_assert(is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[two_args]))
+static_assert(is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[five_args]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[six_args]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[variadic_args]))
+```
+
 ### Generic callables
 
 A generic callable can be considered equivalent to an intersection of all of its possible

@@ -232,38 +232,77 @@ preserving the original rule name.
 
 #### Rule testing: fixtures and snapshots
 
-To test rules, Ruff uses snapshots of Ruff's output for a given file (fixture). Generally, there
-will be one file per rule (e.g., `E402.py`), and each file will contain all necessary examples of
-both violations and non-violations. `cargo insta review` will generate a snapshot file containing
-Ruff's output for each fixture, which you can then commit alongside your changes.
+To test rules, Ruff uses the mdtest framework, initially developed for ty. Mdtests are written as
+Markdown files with Python code and TOML configuration blocks alongside prose
+descriptions. Generally, there will be one directory per linter (e.g. `flake8-bandit` for the `S`
+rules) with nested files for each rule (e.g. `unsafe-markup-use.md` for `S704`). Within these
+files, you can define additional Markdown sections to group related tests and their settings
+together.
 
-Once you've completed the code for the rule itself, you can define tests with the following steps:
+You can see [the ty_test
+README](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/README.md) for a full description
+of the options supported by mdtest, but in general, you should use `# error` comments to assert that
+a particular rule fires on a given line. You can instead use `# snapshot` comments to also generate
+an inline snapshot of the resulting diagnostic. You can automatically accept these snapshot changes
+by setting the `MDTEST_UPDATE_SNAPSHOTS=1` environment variable when running your tests. Prefer
+using `# error` for the bulk of your assertions because it helps to keep the tests short, but
+`# snapshot` can be used to capture details of the diagnostic or suggested fix, when applicable.
 
-1. Add a Python file to `crates/ruff_linter/resources/test/fixtures/[linter]` that contains the code you
-    want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
-    examples of both violations and non-violations.
+For example, a minimal mdtest for `module-import-not-at-top-of-file` (`E402`) would look something
+like this:
 
-1. Run Ruff locally against your file and verify the output is as expected. Once you're satisfied
-    with the output (you see the violations you expect, and no others), proceed to the next step.
-    For example, if you're adding a new rule named `E402`, you would run:
+````markdown
+<!-- crates/ruff_linter/resources/mdtest/pycodestyle/module-import-not-at-top-of-file.md -->
 
-    ```shell
-    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
-    ```
+# `module-import-not-at-top-of-file` (`E402`)
 
-    **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
-    you activate it by adding `--select ${rule_code}` to the command.
+## Basic examples
 
-1. Add the test to the relevant `crates/ruff_linter/src/rules/[linter]/mod.rs` file. If you're contributing
-    a rule to a pre-existing set, you should be able to find a similar example to pattern-match
-    against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
-    e.g., `crates/ruff_linter/src/rules/flake8_bugbear/mod.rs`)
+```toml
+lint.select = ["E402"]
+```
 
-1. Run `cargo test`. Your test will fail, but you'll be prompted to follow-up
-    with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
-    then commit the snapshot file alongside the rest of your changes.
+This is an example of code flagged by the rule:
 
-1. Run `cargo test` again to ensure that your test passes.
+```py
+a = 1
+import os  # snapshot: module-import-not-at-top-of-file
+```
+
+```snapshot
+error[E402]: Module level import not at top of file
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | import os  # snapshot: module-import-not-at-top-of-file
+  | ^^^^^^^^^
+  |
+```
+
+Additional cases can just use `# error` since the diagnostics should look the same:
+
+```py
+b = 2
+import something_else  # error: [module-import-not-at-top-of-file]
+```
+
+## More complicated configuration
+
+If any of your tests require special configuration options, you can define additional TOML code
+blocks. These blocks accept all of the configuration options that Ruff itself does:
+
+
+```toml
+target-version = "py310"
+
+[lint]
+select = ["E"]
+
+[lint.pycodestyle]
+max-line-length = 100
+```
+````
+
+Mdtests are run as part of a normal `cargo test` invocation as part of the `ruff_mdtest` crate.
 
 ### Example: Adding an auto-fix
 
@@ -483,13 +522,8 @@ Commit each step of this process separately for easier review.
     1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
-1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
-    [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repositories and follow
-    the release instructions in those repositories. `ruff-lsp` should always be updated
-    before `ruff-vscode`.
-
-    This step is generally not required for a patch release, but should always be done
-    for a minor release.
+1. Update the [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repository by following
+    the [release instructions](https://github.com/astral-sh/ruff-vscode/blob/main/CONTRIBUTING.md#release) there.
 
 ## Ecosystem CI
 

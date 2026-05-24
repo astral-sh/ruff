@@ -845,6 +845,23 @@ foo = lambda: call(argument_one,)(extra_argument_one, extra_argument_twooooooooo
 foo = lambda: call(argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
 
 foo = lambda: callllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll(argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee)(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/24807
+def foo():
+    subprocess.check_call(f"rm -rf {' '.join(map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove))}", shell=True)
+
+def bar():
+    lambda x=" ".join(
+        map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove)
+    ): ...
+
+value = f"prefix {
+    ' '.join(map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove))
+} suffix"
+
+# This can also be triggered in nested, interned elements within `BestFitting` elements
+def foo():
+    subprocess.check_call(f"rm -rf {' '.join(map(lambda object_name: max(candidate_paths, key=lambda candidate: os.path.join(dest_path, object_name, candidate)), objects_to_remove))}", shell=True)
 ```
 
 ## Output
@@ -1769,6 +1786,35 @@ foo = lambda: (
         extra_argument_threeeeeeeee,
     )
 )
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/24807
+def foo():
+    subprocess.check_call(
+        f"rm -rf {' '.join(map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove))}",
+        shell=True,
+    )
+
+
+def bar():
+    lambda x=" ".join(map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove)): (
+        ...
+    )
+
+
+value = f"prefix {
+    ' '.join(
+        map(lambda object_name: os.path.join(dest_path, object_name), objects_to_remove)
+    )
+} suffix"
+
+
+# This can also be triggered in nested, interned elements within `BestFitting` elements
+def foo():
+    subprocess.check_call(
+        f"rm -rf {' '.join(map(lambda object_name: max(candidate_paths, key=lambda candidate: os.path.join(dest_path, object_name, candidate)), objects_to_remove))}",
+        shell=True,
+    )
 ```
 
 

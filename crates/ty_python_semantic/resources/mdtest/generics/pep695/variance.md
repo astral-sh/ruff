@@ -361,6 +361,54 @@ static_assert(not is_equivalent_to(D[Any], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
+## Only specialized types of generic class instances influence variance
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+If a generic class definition refers to a specialized instance of itself, only the specialized types
+of that instance affect its variance.
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+
+class Bivariant[T]:
+    def takes_int_self(self, value: Bivariant[int]): ...
+
+static_assert(is_subtype_of(Bivariant[int], Bivariant[object]))
+static_assert(is_subtype_of(Bivariant[object], Bivariant[int]))
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def takes_int_self(self, value: Covariant[int]): ...
+
+static_assert(is_subtype_of(Covariant[int], Covariant[object]))
+static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
+
+class Contravariant[T]:
+    def send(self, value: T): ...
+    def takes_int_self(self, value: Contravariant[int]): ...
+
+static_assert(is_subtype_of(Contravariant[object], Contravariant[int]))
+static_assert(not is_subtype_of(Contravariant[int], Contravariant[object]))
+```
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def add[S](self: Covariant[S], other: list[S]) -> Covariant[S]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Covariant[int], Covariant[object]))
+static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
+```
+
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,

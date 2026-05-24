@@ -73,7 +73,7 @@ from _typeshed import ReadableBuffer
 from collections.abc import Callable, Set as AbstractSet
 from typing import Protocol, type_check_only
 
-if sys.version_info >= (3, 11):
+if sys.version_info >= (3, 15):
     __all__ = (
         "md5",
         "sha1",
@@ -92,8 +92,31 @@ if sys.version_info >= (3, 11):
         "new",
         "algorithms_guaranteed",
         "algorithms_available",
-        "pbkdf2_hmac",
         "file_digest",
+        "pbkdf2_hmac",
+        "scrypt",
+    )
+elif sys.version_info >= (3, 11):
+    __all__ = (
+        "md5",
+        "sha1",
+        "sha224",
+        "sha256",
+        "sha384",
+        "sha512",
+        "blake2b",
+        "blake2s",
+        "sha3_224",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "shake_128",
+        "shake_256",
+        "new",
+        "algorithms_guaranteed",
+        "algorithms_available",
+        "file_digest",
+        "pbkdf2_hmac",
     )
 else:
     __all__ = (

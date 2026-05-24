@@ -1,13 +1,6 @@
-"""Script to generate `crates/ruff_python_stdlib/src/builtin_modules.rs`.
+"""Script to generate `crates/ruff_python_stdlib/src/sys/builtin_modules.rs`.
 
-This script requires the following executables to be callable via a subprocess:
-- `python3.7`
-- `python3.8`
-- `python3.9`
-- `python3.10`
-- `python3.11`
-- `python3.12`
-- `python3.13`
+This script requires `uvx` to be available on PATH.
 """
 
 from __future__ import annotations
@@ -17,28 +10,17 @@ import subprocess
 import textwrap
 from functools import partial
 from pathlib import Path
+from typing import Final
 
 MODULE_CRATE = "ruff_python_stdlib"
 MODULE_PATH = Path("crates") / MODULE_CRATE / "src" / "sys" / "builtin_modules.rs"
-
-type Version = tuple[int, int]
-
-PYTHON_VERSIONS: list[Version] = [
-    (3, 7),
-    (3, 8),
-    (3, 9),
-    (3, 10),
-    (3, 11),
-    (3, 12),
-    (3, 13),
-]
+PYTHON_VERSIONS: Final = range(8, 16)  # Python 3.8 through 3.15
 
 
-def builtin_modules_on_version(major_version: int, minor_version: int) -> set[str]:
-    executable = f"python{major_version}.{minor_version}"
+def run(command: list[str]) -> str:
     try:
         proc = subprocess.run(
-            [executable, "-c", "import sys; print(sys.builtin_module_names)"],
+            command,
             check=True,
             text=True,
             capture_output=True,
@@ -47,13 +29,31 @@ def builtin_modules_on_version(major_version: int, minor_version: int) -> set[st
         print(e.stdout)
         print(e.stderr)
         raise
-    return set(eval(proc.stdout))
+    return proc.stdout
 
 
-def generate_module(
-    script_destination: Path, crate_name: str, python_versions: list[Version]
-) -> None:
-    with script_destination.open("w") as f:
+def builtin_modules_on_version(minor_version: int) -> set[str]:
+    command_1 = [
+        "uv",
+        "--managed-python",
+        "python",
+        "install",
+        f"python3.{minor_version}",
+        "--upgrade",
+    ]
+    run(command_1)
+    command_2 = [
+        "uvx",
+        "--managed-python",
+        f"python3.{minor_version}",
+        "-c",
+        "import sys; print(sys.builtin_module_names)",
+    ]
+    return set(eval(run(command_2)))
+
+
+def generate_module() -> None:
+    with MODULE_PATH.open("w") as f:
         print = partial(builtins.print, file=f)
 
         print(
@@ -70,7 +70,7 @@ def generate_module(
                 /// modules.
                 ///
                 /// [builtin module]: https://docs.python.org/3/library/sys.html#sys.builtin_module_names
-                #[expect(clippy::unnested_or_patterns)]
+                #[allow(clippy::unnested_or_patterns)]
                 pub fn is_builtin_module(minor_version: u8, module: &str) -> bool {
                     matches!((minor_version, module),
                 """,
@@ -78,8 +78,8 @@ def generate_module(
         )
 
         modules_by_version = {
-            minor_version: builtin_modules_on_version(major_version, minor_version)
-            for major_version, minor_version in python_versions
+            minor_version: builtin_modules_on_version(minor_version)
+            for minor_version in PYTHON_VERSIONS
         }
 
         # First, add a case for the modules that are in all versions.
@@ -93,7 +93,7 @@ def generate_module(
         print(")")
 
         # Next, add any version-specific modules.
-        for _major_version, minor_version in python_versions:
+        for minor_version in PYTHON_VERSIONS:
             version_modules = set.difference(
                 modules_by_version[minor_version],
                 ubiquitous_modules,
@@ -109,8 +109,8 @@ def generate_module(
 
         print(")}")
 
-    subprocess.run(["cargo", "fmt", "--package", crate_name], check=True)
+    subprocess.run(["cargo", "fmt", "--package", MODULE_CRATE], check=True)
 
 
 if __name__ == "__main__":
-    generate_module(MODULE_PATH, MODULE_CRATE, PYTHON_VERSIONS)
+    generate_module()

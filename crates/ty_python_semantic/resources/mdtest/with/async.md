@@ -102,17 +102,18 @@ async def main():
 
 ## Context expression with possibly-unbound union variants
 
+<!-- snapshot-diagnostics -->
+
 ```py
-async def _(flag: bool):
-    class Manager1:
-        def __aenter__(self) -> str:
-            return "foo"
+class Manager1:
+    def __aenter__(self) -> str:
+        return "foo"
 
-        def __aexit__(self, exc_type, exc_value, traceback): ...
+    def __aexit__(self, exc_type, exc_value, traceback): ...
 
-    class NotAContextManager: ...
-    context_expr = Manager1() if flag else NotAContextManager()
+class NotAContextManager: ...
 
+async def _(context_expr: Manager1 | NotAContextManager):
     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` are possibly missing"
     async with context_expr as f:
         reveal_type(f)  # revealed: str

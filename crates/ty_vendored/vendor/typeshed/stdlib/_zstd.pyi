@@ -3,8 +3,8 @@
 from _typeshed import ReadableBuffer
 from collections.abc import Mapping
 from compression.zstd import CompressionParameter, DecompressionParameter
-from typing import Final, Literal, final
-from typing_extensions import Self, TypeAlias
+from typing import Final, Literal, TypeAlias, final
+from typing_extensions import Self
 
 ZSTD_CLEVEL_DEFAULT: Final = 3
 ZSTD_DStreamOutSize: Final = 131072
@@ -193,7 +193,7 @@ class ZstdDict:
     by multiple ZstdCompressor or ZstdDecompressor objects.
     """
 
-    def __new__(cls, dict_content: bytes, /, *, is_raw: bool = False) -> Self: ...
+    def __new__(cls, dict_content: ReadableBuffer, /, *, is_raw: bool = False) -> Self: ...
     def __len__(self, /) -> int:
         """Return len(self)."""
 

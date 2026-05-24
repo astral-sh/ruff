@@ -1,22 +1,26 @@
+use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
 
 use camino::Utf8Path;
 use colored::Colorize;
 use similar::{ChangeTag, TextDiff};
 
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
+use ruff_db::Db;
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::files::File;
+use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_db::source::line_index;
 use ruff_diagnostics::Applicability;
-use ruff_source_file::OneIndexed;
+use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::matcher::Failure;
-use crate::parser::BacktickOffsets;
+use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap, MarkdownTest};
 
 /// Filter which tests to run in mdtest.
 ///
 /// Only tests whose names contain this filter string will be executed.
-pub const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 
 /// If set to a value other than "0", updates the content of inline snapshots.
 const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
@@ -31,8 +35,122 @@ mod diagnostic;
 pub mod matcher;
 pub mod parser;
 
+/// Run `path` as a markdown test suite with given `title`.
+///
+/// Panic on test failure, and print failure details.
+pub fn run<C>(
+    absolute_fixture_path: &Utf8Path,
+    relative_fixture_path: &Utf8Path,
+    source: &str,
+    test_name: &str,
+    crate_name: &str,
+    suite: &parser::MarkdownTestSuite<'_, C>,
+    mut run_test: impl FnMut(
+        &parser::MarkdownTest<'_, '_, C>,
+        &mut String,
+        OutputFormat,
+    ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures>,
+) -> anyhow::Result<()> {
+    let output_format = output_format();
+
+    let mut markdown_edits = vec![];
+
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
+    let mut any_failures = false;
+    let mut assertion = String::new();
+    for test in suite.tests() {
+        if filter
+            .as_ref()
+            .is_some_and(|f| !(test.uncontracted_name().contains(f) || test.name() == *f))
+        {
+            continue;
+        }
+
+        // Buffer any immediate output from the test to emit after the header has been printed.
+        let mut test_assertion = String::new();
+        let result = run_test(&test, &mut test_assertion, output_format);
+
+        let this_test_failed = result.is_err();
+        any_failures = any_failures || this_test_failed;
+
+        if this_test_failed && output_format.is_cli() {
+            let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
+        }
+
+        match result {
+            Ok((_, edits)) => markdown_edits.extend(edits),
+            Err(failures) => {
+                let md_index = LineIndex::from_source_text(source);
+
+                for test_failures in failures {
+                    let source_map =
+                        EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
+
+                    for (relative_line_number, failures) in test_failures.by_line.iter() {
+                        let file = relative_fixture_path.as_str();
+
+                        let absolute_line_number =
+                            match source_map.to_absolute_line_number(relative_line_number) {
+                                Ok(line_number) => line_number,
+                                Err(last_line_number) => {
+                                    output_format.write_error(
+                                        &mut assertion,
+                                        file,
+                                        last_line_number,
+                                        &Failure::new(
+                                            "Found a trailing assertion comment \
+                                            (e.g., `# revealed:` or `# error:`) \
+                                            not followed by any statement.",
+                                        ),
+                                    );
+
+                                    continue;
+                                }
+                            };
+
+                        for failure in failures {
+                            output_format.write_error(
+                                &mut assertion,
+                                file,
+                                absolute_line_number,
+                                failure,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        if this_test_failed && output_format.is_cli() {
+            assertion.push_str(&test_assertion);
+
+            let escaped_test_name = test.name().replace('\'', "\\'");
+            let _ = writeln!(
+                assertion,
+                "\nTo rerun this specific test, \
+                set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
+            );
+            let _ = writeln!(
+                assertion,
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p {crate_name} \
+                --test mdtest -- {test_name}",
+            );
+
+            let _ = writeln!(assertion, "\n{}", "-".repeat(50));
+        }
+    }
+
+    if !markdown_edits.is_empty() {
+        try_apply_markdown_edits(absolute_fixture_path, source, markdown_edits);
+    }
+
+    assert!(!any_failures, "{}", &assertion);
+
+    Ok(())
+}
+
 /// Determine the output format from the `MDTEST_GITHUB_ANNOTATIONS_FORMAT` environment variable.
-pub fn output_format() -> OutputFormat {
+fn output_format() -> OutputFormat {
     if std::env::var(MDTEST_GITHUB_ANNOTATIONS_FORMAT).is_ok() {
         OutputFormat::GitHub
     } else {
@@ -52,7 +170,7 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-    pub const fn is_cli(self) -> bool {
+    const fn is_cli(self) -> bool {
         matches!(self, OutputFormat::Cli)
     }
 
@@ -202,24 +320,20 @@ pub(crate) fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagn
         .context(0)
 }
 
-pub fn render_diagnostic(
-    resolver: &dyn FileResolver,
-    tool_name: &'static str,
-    diagnostic: &Diagnostic,
-) -> String {
+pub fn render_diagnostic(db: &dyn Db, tool_name: &'static str, diagnostic: &Diagnostic) -> String {
     diagnostic
-        .display(resolver, &diagnostic_display_config(tool_name))
+        .display(&db, &diagnostic_display_config(tool_name))
         .to_string()
 }
 
 pub(crate) fn render_diagnostics(
-    resolver: &dyn FileResolver,
+    db: &dyn Db,
     tool_name: &'static str,
     diagnostics: &[Diagnostic],
 ) -> String {
     let mut rendered = String::new();
     for diag in diagnostics {
-        writeln!(rendered, "{}", render_diagnostic(resolver, tool_name, diag)).unwrap();
+        writeln!(rendered, "{}", render_diagnostic(db, tool_name, diag)).unwrap();
     }
 
     rendered.trim_end_matches('\n').to_string()
@@ -240,7 +354,7 @@ pub(crate) fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str
 }
 
 pub fn validate_inline_snapshot(
-    db: &dyn ruff_db::Db,
+    db: &dyn Db,
     tool_name: &'static str,
     test_file: &TestFile<'_>,
     inline_diagnostics: &[Diagnostic],
@@ -301,7 +415,7 @@ pub fn validate_inline_snapshot(
             continue;
         };
 
-        let actual = apply_snapshot_filters(&render_diagnostics(&db, tool_name, block_diagnostics))
+        let actual = apply_snapshot_filters(&render_diagnostics(db, tool_name, block_diagnostics))
             .into_owned();
 
         let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
@@ -382,7 +496,7 @@ fn render_diff(f: &mut dyn std::fmt::Write, expected: &str, actual: &str) -> std
     Ok(())
 }
 
-pub fn try_apply_markdown_edits(
+fn try_apply_markdown_edits(
     absolute_fixture_path: &Utf8Path,
     source: &str,
     mut edits: Vec<MarkdownEdit>,
@@ -403,7 +517,7 @@ pub fn try_apply_markdown_edits(
 }
 
 pub fn create_diagnostic_snapshot<'d, C>(
-    resolver: &dyn FileResolver,
+    db: &dyn Db,
     tool_name: &'static str,
     relative_fixture_path: &Utf8Path,
     test: &parser::MarkdownTest<'_, '_, C>,
@@ -445,12 +559,7 @@ pub fn create_diagnostic_snapshot<'d, C>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(
-            snapshot,
-            "{}",
-            render_diagnostic(resolver, tool_name, diagnostic)
-        )
-        .unwrap();
+        write!(snapshot, "{}", render_diagnostic(db, tool_name, diagnostic)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot
@@ -460,6 +569,157 @@ pub fn create_diagnostic_snapshot<'d, C>(
 pub struct MarkdownEdit {
     pub(crate) range: TextRange,
     pub(crate) replacement: String,
+}
+
+/// Run a function over an embedded test file, catching any panics that occur in the process.
+///
+/// If no panic occurs, the result of the function is returned as an `Ok()` variant.
+///
+/// If a panic occurs, a nicely formatted [`FileFailures`] is returned as an `Err()` variant to
+/// be formatted into a diagnostic message by callers.
+pub fn attempt_test<'a, T, F>(
+    test_fn: F,
+    test_file: &'a TestFile<'a>,
+) -> Result<T, AttemptTestError<'a>>
+where
+    F: FnOnce(File) -> T + std::panic::UnwindSafe,
+{
+    catch_unwind(|| test_fn(test_file.file)).map_err(|info| AttemptTestError { info, test_file })
+}
+
+pub struct AttemptTestError<'a> {
+    pub info: PanicError,
+    test_file: &'a TestFile<'a>,
+}
+
+impl AttemptTestError<'_> {
+    pub fn into_file_failures(
+        self,
+        db: &dyn Db,
+        action: &str,
+        clarification: Option<&str>,
+    ) -> FileFailures {
+        let info = self.info;
+
+        let mut by_line = matcher::FailuresByLine::default();
+        let mut messages = vec![];
+        match info.location {
+            Some(location) => messages.push(Failure::new(format_args!(
+                "Attempting to {action} caused a panic at {location}"
+            ))),
+            None => messages.push(Failure::new(format_args!(
+                "Attempting to {action} caused a panic at an unknown location",
+            ))),
+        }
+        if let Some(clarification) = clarification {
+            messages.push(Failure::new(clarification));
+        }
+        messages.push(Failure::new(""));
+        messages.push(Failure::new(info.payload));
+        messages.push(Failure::new(""));
+
+        if let Some(backtrace) = info.backtrace {
+            match backtrace.status() {
+                BacktraceStatus::Disabled => {
+                    let msg = "run with `RUST_BACKTRACE=1` environment variable to \
+                         a backtrace";
+                    messages.push(Failure::new(msg));
+                }
+                BacktraceStatus::Captured => {
+                    messages.extend(backtrace.to_string().split('\n').map(Failure::new));
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(backtrace) = info.salsa_backtrace {
+            salsa::attach(db, || {
+                messages.extend(format!("{backtrace:#}").split('\n').map(Failure::new));
+            });
+        }
+
+        by_line.push(OneIndexed::from_zero_indexed(0), messages);
+
+        FileFailures {
+            backtick_offsets: self.test_file.to_code_block_backtick_offsets(),
+            by_line,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestOutcome {
+    Success,
+    Skipped,
+}
+
+pub fn check_panic<C>(test: &MarkdownTest<'_, '_, C>, panic_info: Option<PanicError>) {
+    match panic_info {
+        Some(panic_info) => {
+            let expected_message = test
+                .should_expect_panic()
+                .expect("panic_info is only set when `should_expect_panic` is `Ok`");
+
+            if let Some(expected_message) = expected_message {
+                let message = panic_info.payload.to_string();
+                assert!(
+                    message.contains(expected_message),
+                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                    test.name(),
+                );
+            }
+        }
+        None => {
+            if let Ok(message) = test.should_expect_panic() {
+                if let Some(message) = message {
+                    panic!(
+                        "Test `{}` is expected to panic with `{message}`, but it didn't.",
+                        test.name()
+                    );
+                }
+                panic!("Test `{}` is expected to panic but it didn't.", test.name());
+            }
+        }
+    }
+}
+
+pub fn snapshot_diagnostics<C>(
+    test: &MarkdownTest<'_, '_, C>,
+    db: &dyn Db,
+    tool_name: &'static str,
+    relative_fixture_path: &Utf8Path,
+    snapshot_path: &Utf8Path,
+    diagnostics: &[Diagnostic],
+    mut snapshot_filter: impl FnMut(&Diagnostic) -> bool,
+) {
+    if test.should_snapshot_diagnostics() {
+        assert!(
+            !diagnostics.is_empty(),
+            "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
+            test.name()
+        );
+
+        let snapshot = crate::create_diagnostic_snapshot(
+            db,
+            tool_name,
+            relative_fixture_path,
+            test,
+            diagnostics
+                .iter()
+                .filter(|diagnostic| snapshot_filter(diagnostic)),
+        );
+
+        let name = test.name().replace(' ', "_").replace(':', "__");
+        insta::with_settings!(
+            {
+                snapshot_path => snapshot_path,
+                input_file => name.clone(),
+                filters => vec![(r"\\", "/")],
+                prepend_module_to_snapshot => false,
+            },
+            { insta::assert_snapshot!(name, snapshot) }
+        );
+    }
 }
 
 #[cfg(test)]

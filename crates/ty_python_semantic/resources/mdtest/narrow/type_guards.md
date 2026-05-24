@@ -343,17 +343,14 @@ def _(a: Foo | Bar):
     reveal_type(c)  # revealed: TypeIs[Bar @ a]
 
     if b:
-        # TODO should be `Foo`
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Foo
     else:
         reveal_type(a)  # revealed: Foo | Bar
 
     if c:
-        # TODO should be `Bar`
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Bar
     else:
-        # TODO should be `Foo & ~Bar`
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Foo & ~Bar
 ```
 
 Further writes to the narrowed place invalidate the narrowing:
