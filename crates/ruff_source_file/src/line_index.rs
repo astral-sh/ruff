@@ -172,10 +172,16 @@ impl LineIndex {
     /// If the UTF-8 byte offset is out of bounds of `text`.
     pub fn source_location(
         &self,
-        offset: TextSize,
+        mut offset: TextSize,
         text: &str,
         encoding: PositionEncoding,
     ) -> SourceLocation {
+        // Clamp the offset to the text length to prevent out-of-bounds slicing panics
+        let max_len = text.text_len();
+        if offset > max_len {
+            offset = max_len;
+        }
+
         let line = self.line_index(offset);
         let line_start = self.line_start(line, text);
 
@@ -967,6 +973,25 @@ mod tests {
             LineColumn {
                 line: OneIndexed::from_zero_indexed(1),
                 column: OneIndexed::from_zero_indexed(5)
+            }
+        );
+    }
+
+    #[test]
+    fn out_of_bounds_source_location_clamp() {
+        let contents = "x = 1";
+        let index = LineIndex::from_source_text(contents);
+
+        // This offset (10) is explicitly larger than the content length (5).
+        // Previously, this would trigger an out-of-bounds string slicing panic.
+        let loc = index.source_location(TextSize::from(10), contents, PositionEncoding::Utf32);
+        
+        // It should gracefully clamp to the end of the text segment.
+        assert_eq!(
+            loc,
+            SourceLocation {
+                line: OneIndexed::from_zero_indexed(0),
+                character_offset: OneIndexed::from_zero_indexed(5)
             }
         );
     }
