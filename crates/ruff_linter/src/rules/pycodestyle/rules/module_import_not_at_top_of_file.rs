@@ -4,10 +4,9 @@ use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{Edit, Fix, FixAvailability, Violation};
-
 use crate::checkers::ast::Checker;
 use crate::preview::is_import_float_to_top_enabled;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for imports that are not at the top of the file.
