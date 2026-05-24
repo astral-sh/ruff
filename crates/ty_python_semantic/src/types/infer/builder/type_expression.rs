@@ -2229,7 +2229,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.type_expression_context()
                     ));
                     diag.info("`typing.Concatenate` is only valid:");
-                    diag.info(" - as the first argument to `typing.Callable`");
+                    diag.info(" - as the first argument to `Callable`");
                     diag.info(" - as a type argument for a `ParamSpec` parameter");
                 }
 

@@ -227,6 +227,33 @@ impl SpecialFormType {
         candidate.check_module(module).then_some(candidate)
     }
 
+    /// Given the special form we resolved (`self`) and the module the user actually
+    /// imported the symbol from (`import_module`), return the variant that matches the
+    /// import path — or `self` if there's no better match.
+    ///
+    /// This exists because typeshed defines `collections.abc.Callable` as
+    /// `from typing import Callable as Callable`. Following the alias chain to the
+    /// definition site lands on `SpecialFormType::TypingCallable` for *both*
+    /// `from typing import Callable` and `from collections.abc import Callable`,
+    /// erasing the distinction. This method substitutes `CollectionsAbcCallable` in
+    /// the latter case, restoring it.
+    ///
+    /// Called at module-attribute resolution — the one boundary where the import-path
+    /// module is still observable.
+    pub(super) fn rewrap_for_import_module(self, name: &str, import_module: KnownModule) -> Self {
+        let Some(candidate) = Self::from_name(name, import_module) else {
+            return self;
+        };
+        if candidate != self
+            && candidate.name() == self.name()
+            && candidate.check_module(import_module)
+        {
+            candidate
+        } else {
+            self
+        }
+    }
+
     /// Parse a `SpecialFormType` from its runtime symbol name in the context of `module`.
     ///
     /// The module is needed to disambiguate symbols like `Callable`, which is exported by both

@@ -3136,7 +3136,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
                 f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
-                    .write_str("typing.Callable")?;
+                    .write_str("Callable")?;
                 f.write_str(" special-form '")?;
                 callable.display(self.db).fmt_detailed(f)?;
                 f.write_str("'>")

@@ -131,3 +131,59 @@ def f(x: object):
     if isinstance(x, collections.abc.Callable):
         reveal_type(x)  # revealed: Top[(...) -> object]
 ```
+
+## Class-pattern diagnostics distinguish `typing.Callable` from `collections.abc.Callable`
+
+`Callable` is a special form, not a class, so it cannot be used as the class in a class pattern. The
+resulting `invalid-match-pattern` diagnostic should name the symbol by the module it was imported
+from, not the module its definition site happens to live in.
+
+### `from collections.abc import Callable`
+
+```py
+from collections.abc import Callable
+
+def _(subj: int | Callable[..., str]) -> None:
+    match subj:
+        # TODO: Should be valid.
+        # error: [invalid-match-pattern] "`<special-form 'collections.abc.Callable'>` cannot be used in a class pattern because it is not a type"
+        case Callable(): ...
+        case _: ...
+```
+
+### `import collections.abc; collections.abc.Callable()`
+
+```py
+import collections.abc
+
+def _(subj: int | collections.abc.Callable[..., str]) -> None:
+    match subj:
+        # TODO: Should be valid.
+        # error: [invalid-match-pattern] "`<special-form 'collections.abc.Callable'>` cannot be used in a class pattern because it is not a type"
+        case collections.abc.Callable(): ...
+        case _: ...
+```
+
+### `from typing import Callable`
+
+```py
+from typing import Callable
+
+def _(subj: int | Callable[..., str]) -> None:
+    match subj:
+        # error: [invalid-match-pattern] "`<special-form 'typing.Callable'>` cannot be used in a class pattern because it is not a type"
+        case Callable(): ...
+        case _: ...
+```
+
+### `import typing; typing.Callable()`
+
+```py
+import typing
+
+def _(subj: int | typing.Callable[..., str]) -> None:
+    match subj:
+        # error: [invalid-match-pattern] "`<special-form 'typing.Callable'>` cannot be used in a class pattern because it is not a type"
+        case typing.Callable(): ...
+        case _: ...
+```

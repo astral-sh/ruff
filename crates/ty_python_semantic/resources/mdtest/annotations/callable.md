@@ -81,7 +81,7 @@ Using a parameter list:
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int, str]]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -89,7 +89,7 @@ def _(c: Callable[[int, str]]):
 Or, an ellipsis:
 
 ```py
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[...]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -99,7 +99,7 @@ Or something else that's invalid in a type expression generally:
 ```py
 # fmt: off
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
@@ -129,7 +129,7 @@ which argument corresponds to either the parameters or the return type.
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int], str, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -182,7 +182,7 @@ from typing import Callable
 # fmt: off
 
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             [int],
             [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
             [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
