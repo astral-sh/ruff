@@ -333,7 +333,7 @@ pub(crate) const fn is_incorrect_dict_iterator_comprehension_enabled(
 }
 
 // https://github.com/astral-sh/ruff/pull/22212
-pub(crate) const fn is_import_float_to_top_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_e402_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 

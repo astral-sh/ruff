@@ -5,7 +5,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_import_float_to_top_enabled;
+use crate::preview::is_e402_fix_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -79,7 +79,7 @@ pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
             stmt.range(),
         );
 
-        if !is_import_float_to_top_enabled(checker.settings()) {
+        if !is_e402_fix_enabled(checker.settings()) {
             return;
         }
 
