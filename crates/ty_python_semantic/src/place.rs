@@ -1404,12 +1404,8 @@ fn place_from_bindings_impl<'db>(
                 DefinitionState::Defined(binding)
                     if is_discarded_dict_key_assignment(db, binding) =>
                 {
-                    // The enclosing write still invalidates prior child refinements, but its
-                    // RHS cannot establish a new precise child binding. Treat this as a deleted
-                    // refinement so loads fall back to the committed parent type.
-                    deleted_reachability = deleted_reachability.or_else(|| {
-                        reachability_constraints.evaluate(db, predicates, reachability_constraint)
-                    });
+                    // The enclosing write already invalidated earlier child refinements. This
+                    // rejected synthesized binding must not establish new RHS-derived precision.
                     return None;
                 }
                 DefinitionState::Defined(binding) => binding,

@@ -231,6 +231,15 @@ def _(x: dict[str, dict[str, float | str]]):
     # error: [invalid-argument-type]
     f1(**x["kwargs"])
 
+def _(x: dict[str, dict[str, float | str]]):
+    x["kwargs"] = {"nested": 1}
+    reveal_type(x["kwargs"]["nested"])  # revealed: Literal[1]
+
+    # A rejected replacement also invalidates a prior known-key type.
+    # error: [invalid-assignment]
+    x["kwargs"] = {"nested": {"a": 1}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+
 def accepts_value(**kwargs: object): ...
 def _(x: dict[str, dict[str, float | str]]):
     # error: [invalid-assignment]
