@@ -35,6 +35,7 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
+thin-vec = { workspace = true }
 
 [features]
 schemars = ["dep:schemars", "dep:serde_json"]
@@ -44,6 +45,7 @@ serde = [
     "ruff_text_size/serde",
     "dep:ruff_cache",
     "compact_str/serde",
+    "thin-vec/serde",
 ]
 get-size = ["dep:get-size2", "ruff_text_size/get-size"]
 

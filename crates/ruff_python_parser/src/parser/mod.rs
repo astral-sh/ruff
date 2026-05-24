@@ -4,6 +4,7 @@ use bitflags::bitflags;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use thin_vec::ThinVec;
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
@@ -181,10 +182,9 @@ impl<'src> Parser<'src> {
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
     fn parse_module(&mut self) -> ModModule {
-        let body = self.parse_list_into_vec(
-            RecoveryContextKind::ModuleStatements,
-            Parser::parse_statement,
-        );
+        let body = self.parse_list_into_thin_vec(RecoveryContextKind::ModuleStatements, |p| {
+            p.parse_statement()
+        });
 
         self.bump(TokenKind::EndOfFile);
 
@@ -510,25 +510,20 @@ impl<'src> Parser<'src> {
         &self.source[ranged.range()]
     }
 
-    /// Parses a list of elements into a vector where each element is parsed using
+    /// Parses a list of elements into a thin vector where each element is parsed using
     /// the given `parse_element` function.
-    fn parse_list_into_vec<T>(
+    fn parse_list_into_thin_vec<T>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
         parse_element: impl Fn(&mut Parser<'src>) -> T,
-    ) -> Vec<T> {
-        let mut elements = Vec::new();
+    ) -> ThinVec<T> {
+        let mut elements = ThinVec::new();
         self.parse_list(recovery_context_kind, |p| elements.push(parse_element(p)));
         elements
     }
 
     /// Parses a list of elements where each element is parsed using the given
     /// `parse_element` function.
-    ///
-    /// The difference between this function and `parse_list_into_vec` is that
-    /// this function does not return the parsed elements. Instead, it is the
-    /// caller's responsibility to handle the parsed elements. This is the reason
-    /// that the `parse_element` parameter is bound to [`FnMut`] instead of [`Fn`].
     fn parse_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
