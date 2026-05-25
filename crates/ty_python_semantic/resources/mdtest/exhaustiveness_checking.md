@@ -192,6 +192,74 @@ def match_non_exhaustive(x: Color):
             assert_never(x)  # error: [type-assertion-failure]
 ```
 
+## Checks on enum literal subsets
+
+```py
+from enum import Enum
+from typing import Literal, assert_never
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+    ORANGE = 4
+
+def match_exhaustive_literal_or_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN | Color.BLUE:
+            pass
+        case _:
+            assert_never(v)
+
+def match_exhaustive_literal_or_non_enum_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN | Color.BLUE | int():
+            pass
+        case _:
+            assert_never(v)
+
+def match_exhaustive_literal_grouped_or_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case (Color.RED | Color.GREEN) | Color.BLUE:
+            pass
+        case _:
+            assert_never(v)
+
+def match_exhaustive_literal_or_as_pattern(v: Literal[Color.RED, Color.GREEN]) -> None:
+    match v:
+        case (Color.RED | Color.GREEN) as selected:
+            pass
+        case _:
+            assert_never(v)
+
+def match_overlapping_or_arm_is_reachable(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED:
+            pass
+        case Color.RED | Color.GREEN | Color.BLUE:
+            assert_never(v)  # error: [type-assertion-failure]
+
+def match_class_pattern_arm_is_reachable(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN:
+            pass
+        case Color():
+            assert_never(v)  # error: [type-assertion-failure]
+
+def match_mixed_or_arm_is_reachable(v: Literal[Color.RED]) -> None:
+    match v:
+        case Color.BLUE | Color():
+            assert_never(v)  # error: [type-assertion-failure]
+
+def match_non_exhaustive_literal_or_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN:
+            pass
+        case _:
+            # this diagnostic is correct: inferred type of `v` is `Literal[Color.BLUE]`
+            assert_never(v)  # error: [type-assertion-failure]
+```
+
 ## `isinstance` checks
 
 ```toml
