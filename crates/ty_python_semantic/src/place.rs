@@ -1392,7 +1392,8 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
-    let mut only_loop_header_bindings = true;
+    // special handling for synthetic loop header definitions and nested bindings definitions
+    let mut only_non_shadowing_bindings = true;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1487,8 +1488,11 @@ fn place_from_bindings_impl<'db>(
                 if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
+            } else if matches!(binding.kind(db), DefinitionKind::NestedBindings(_)) {
+                // Nested bindings definitions similar to loop header definitions, synthetic
+                // bindings with special shadowing behavior. They can also coexist with `UNBOUND`.
             } else {
-                only_loop_header_bindings = false;
+                only_non_shadowing_bindings = false;
             }
 
             first_definition.get_or_insert(binding);
@@ -1518,9 +1522,9 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
-                Some(Truthiness::AlwaysTrue) if only_loop_header_bindings => {
-                    // Loop header definitions don't shadow prior bindings, so UNBOUND can still be
-                    // definitely-visible alongside a loop header binding. See "Use with loop
+                Some(Truthiness::AlwaysTrue) if only_non_shadowing_bindings => {
+                    // Loop header and nested binding definitions don't shadow prior bindings, so
+                    // UNBOUND can still be definitely-visible alongside them. See "Use with loop
                     // header and also `UNBOUND` definitely visible" in `while_loop.md`.
                     Definedness::PossiblyUndefined
                 }

@@ -27,12 +27,13 @@ use crate::ast_ids::node_key::ExpressionNodeKey;
 use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
-    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
-    DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
-    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
-    ImportFromSubmoduleDefinitionNodeRef, LambdaParameterDefinitionNodeRef,
-    LoopHeaderDefinitionNodeRef, LoopStmtRef, MatchPatternDefinitionNodeRef,
-    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
+    DefinitionNodeKey, DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef,
+    ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
+    ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
+    LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
+    MatchPatternDefinitionNodeRef, NestedBindingsDefinitionKind, ParameterDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::member::MemberExprBuilder;
@@ -131,16 +132,22 @@ struct ScopeInfo<'ast> {
 
 type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclaration; 1]>>;
 
-#[derive(Copy, Clone)]
-struct NestedDeclaration {
-    kind: GlobalOrNonlocal,
-    file_scope_id: FileScopeId,
-    range: TextRange,
-    is_bound: bool,
+#[derive(Copy, Clone, Debug, get_size2::GetSize)]
+pub struct NestedDeclaration {
+    pub kind: GlobalOrNonlocal,
+    pub file_scope_id: FileScopeId,
+    pub range: TextRange,
+    pub is_bound: bool,
 }
 
-#[derive(Copy, Clone)]
-enum GlobalOrNonlocal {
+impl NestedDeclaration {
+    pub fn is_global(&self) -> bool {
+        matches!(self.kind, GlobalOrNonlocal::Global)
+    }
+}
+
+#[derive(Copy, Clone, Debug, get_size2::GetSize)]
+pub enum GlobalOrNonlocal {
     Global,
     Nonlocal,
 }
@@ -1587,6 +1594,43 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         get_loop_header::specify(self.db, loop_token, loop_header);
     }
 
+    fn synthesize_nested_binding_definitions(
+        &mut self,
+        nested_bindings: NestedGlobalOrNonlocalDeclarations,
+    ) {
+        for (name, mut declarations) in nested_bindings {
+            // Filter down to only the declarations with `is_bound: true`. If there are none left,
+            // skip synthesizing a definition for this symbol. (The reason we track these at all is
+            // that we reuse some of the same machinery to report semantic syntax errors for
+            // invalid `nonlocal`s, and those don't necessarily need a binding.)
+            declarations.retain(|d| d.is_bound);
+            declarations.shrink_to_fit();
+            if declarations.is_empty() {
+                continue;
+            }
+
+            let place: ScopedPlaceId = self.add_symbol(name.clone()).into();
+            let definition = Definition::new(
+                self.db,
+                self.file,
+                self.current_scope(),
+                place,
+                DefinitionKind::NestedBindings(NestedBindingsDefinitionKind {
+                    name,
+                    nested_declarations: declarations,
+                }),
+                false,
+            );
+
+            self.invalidate_narrowing_aliases_for(place);
+            self.current_use_def_map_mut().record_binding(
+                place,
+                definition,
+                PreviousDefinitions::AreKept,
+            );
+        }
+    }
+
     fn record_expression_narrowing_constraint(
         &mut self,
         predicate_node: &'ast ast::Expr,
@@ -2460,7 +2504,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_decorator(decorator);
                 }
 
-                self.with_type_params(
+                let nested_bindings = self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
                     type_params.as_deref(),
                     |builder| {
@@ -2488,6 +2532,44 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         builder.pop_scope()
                     },
                 );
+
+                // The nested bindings returned by `pop_scope` are exactly the ones that are
+                // potentially visible at this point. That is, they include `global` and `nonlocal`
+                // declarations in the popped functions body and any nested bodies, but they omit
+                // the ones that resolved to the popped body. Synthesize a definition to record
+                // them. This definition type has special shadowing behavior, so it doesn't shadow
+                // prior bindings, and it remains visible after subsequent bindings. This
+                // represents the fact that the nested function could be called at any time.
+                //
+                // NOTE: This is deliberately somewhat unsound. For example, bindings from parent
+                // functions and sibling functions can also be visible at any point, depending on
+                // when different functions get invoked. However, we really want examples like this
+                // to do what users expect, so we accept the unsoundness here:
+                //
+                //     def f():
+                //         x = 1
+                //         def g():
+                //             nonlocal x
+                //             x = 2
+                //         def h():
+                //             nonlocal x
+                //             x = 3
+                //             # Technically `g` could get called at any time, including right
+                //             # here. But inferring `Literal[2, 3]` here would be confusing.
+                //             reveal_type(x)  # revealed: Literal[3]
+                //          x = 4
+                //          # On the other hand, users probably want to see 2 and 3 here, because
+                //          # they're nested within this scope? Hopefully it's not too confusing.
+                //          reveal_type(x)  # revealed: Literal[2, 3, 4]
+                //
+                // In other cases it can also be unsound that we only consider nested bindings to
+                // be visible after their function definition, when in practice they could be
+                // visible "before" (because nested functions can escape their lexical scope and
+                // get called more than once). For more discussion of all these behaviors, see the
+                // mdtest case "Visibility of `nonlocal` bindings from nested and sibling scopes"
+                // and its `global` counterpart.
+                self.synthesize_nested_binding_definitions(nested_bindings);
+
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
                 for default in parameters
@@ -2518,7 +2600,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_decorator(decorator);
                 }
 
-                self.with_type_params(
+                let nested_bindings = self.with_type_params(
                     NodeWithScopeRef::ClassTypeParameters(class),
                     class.type_params.as_deref(),
                     |builder| {
@@ -2532,6 +2614,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         builder.pop_scope()
                     },
                 );
+
+                // We currently treat nested `global` and `nonlocal` bindings from class bodies the
+                // same way as ones from function bodies above. That's correct in the common case
+                // where they actually come from a function within the class. But when they appear
+                // directly within a class body, this isn't quite correct, because these synthetic
+                // definitions behave lazily, while class bodies are actually evaluated eagerly.
+                self.synthesize_nested_binding_definitions(nested_bindings);
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
                 let symbol = self.add_symbol(class.name.id.clone());

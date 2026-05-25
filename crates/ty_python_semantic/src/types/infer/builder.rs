@@ -106,7 +106,7 @@ use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
+    NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -1043,6 +1043,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::LoopHeader(loop_header) => {
                 self.infer_loop_header_definition(loop_header, definition);
+            }
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                self.infer_nested_bindings_definition(nested_bindings, definition);
             }
         }
     }
@@ -2076,6 +2079,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union.add_in_place(narrowed_ty);
         }
 
+        self.bindings.insert(definition, union.build());
+    }
+
+    fn infer_nested_bindings_definition(
+        &mut self,
+        nested_bindings_kind: &NestedBindingsDefinitionKind,
+        definition: Definition<'db>,
+    ) {
+        let db = self.db();
+        let scope_id = definition.scope(db).file_scope_id(db);
+        let symbol_id = definition
+            .place(db)
+            .as_symbol()
+            .expect("nested bindings definition should be a symbol");
+        // At the point where a nested bindings definition is synthesized, we don't necessarily
+        // know whether the current scope will see globals or nonlocal bindings. Consider this
+        // example:
+        //
+        //     def outer():
+        //         def inner1():
+        //             global x
+        //             x = 1
+        //         def inner1():
+        //             nonlocal x
+        //             x = 2
+        //         # Nested bindings of both kinds are potentially visible here, but we can't
+        //         # actually use both kinds in the same scope. If `print(x)` comes next, we should
+        //         # only see 2. But if `global x; print(x)` comes next, we should only see 1.
+        //         ...
+        //
+        // At this point in type inference, though, we have everything we need to know to answer
+        // this question. We can ask whether `x` was (eventually) declared `global` in its scope.
+        // If so, or if this is the module scope itself, we respect the nested `global` bindings
+        // that were recorded. If not, we respect the nested `nonlocal` ones.
+        let this_scope_sees_global_bindings = scope_id.is_global()
+            || self
+                .index
+                .place_table(scope_id)
+                .symbol(symbol_id)
+                .is_global();
+        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+        for declaration in &nested_bindings_kind.nested_declarations {
+            assert!(
+                declaration.is_bound,
+                "nested declarations without bindings shouldn't be recorded here",
+            );
+            if declaration.is_global() != this_scope_sees_global_bindings {
+                // Skip nested declarations/bindings of the type that we don't see in this scope.
+                continue;
+            }
+            let nested_place_table = self.index.place_table(declaration.file_scope_id);
+            let nested_symbol_id = nested_place_table
+                .symbol_id(&nested_bindings_kind.name)
+                .unwrap();
+            let use_def = self.index.use_def_map(declaration.file_scope_id);
+            let Some(ty) =
+                place_from_bindings(db, use_def.reachable_bindings(nested_symbol_id.into()))
+                    .place
+                    .raw_type()
+            else {
+                continue;
+            };
+            union.add_in_place(ty);
+        }
         self.bindings.insert(definition, union.build());
     }
 
