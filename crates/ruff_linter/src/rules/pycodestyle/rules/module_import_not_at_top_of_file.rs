@@ -89,6 +89,11 @@ pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
             return;
         }
 
+        // Support for fixing notebooks is not yet implemented.
+        if checker.cell_offsets().is_some() {
+            return;
+        }
+
         let indexer = checker.indexer();
         let locator = checker.locator();
 
@@ -105,15 +110,9 @@ pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
         // Include comments but not the trailing newline (so we don't insert an extra newline).
         let text_range = TextRange::new(range.start(), locator.line_end(range.end()));
 
-        let edit = checker.importer().add_at_start(
-            checker.source()[text_range].trim_whitespace(),
-            // TODO(PR): this doesn't seem to fully work -- the imports end up
-            // in one of the cells above where they should, though no longer in
-            // the first cell in the file.
-            checker
-                .cell_offsets()
-                .and_then(|cell_offsets| cell_offsets.containing_range(text_range.start())),
-        );
+        let edit = checker
+            .importer()
+            .add_at_start(checker.source()[text_range].trim_whitespace(), None);
 
         // Include comments *and* the trailing newline, so that we do remove the whole line.
         let removal_range =
