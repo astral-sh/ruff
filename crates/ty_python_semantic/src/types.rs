@@ -6353,7 +6353,17 @@ impl<'db> Type<'db> {
                 )),
             },
 
-            Self::TypeAlias(alias) => alias.value_type(db).definition(db),
+            Self::TypeAlias(alias) => {
+                // Salsa cycle normalization can make `value_type(alias)` return
+                // `Type::TypeAlias(alias)` itself for self-referential aliases
+                // (e.g. `type T = T | None`). Guard against the resulting infinite recursion.
+                let value = alias.value_type(db);
+                if matches!(value, Type::TypeAlias(inner) if inner == *alias) {
+                    Some(TypeDefinition::TypeAlias(alias.definition(db)))
+                } else {
+                    value.definition(db)
+                }
+            }
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
 
             Self::PropertyInstance(property) => property

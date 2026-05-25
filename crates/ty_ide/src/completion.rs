@@ -2721,7 +2721,15 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => return None,
             Type::TypeAlias(alias) => {
-                visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                let value = alias.value_type(db);
+                // Salsa cycle normalization can make `value_type(alias)` return
+                // `Type::TypeAlias(alias)` itself for self-referential aliases
+                // (e.g. `type T = T | None`). Treat such opaque self-loops as instance-like.
+                if matches!(value, Type::TypeAlias(inner) if inner == alias) {
+                    CompletionKind::Struct
+                } else {
+                    visitor.visit(ty, || imp(db, value, visitor))?
+                }
             }
         })
     }
