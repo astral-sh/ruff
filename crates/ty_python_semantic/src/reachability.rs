@@ -365,7 +365,7 @@ fn enum_literal_subject_names<'db>(
     Some((enum_class?, names))
 }
 
-/// Return the canonical enum-member name matched by a value pattern.
+/// Return the canonical enum-member name matched by a single value pattern.
 ///
 /// This recognizes patterns like `case Color.RED:` only when the pattern expression is
 /// single-valued and belongs to the expected enum class. Enum aliases are resolved to their
@@ -387,6 +387,52 @@ fn enum_member_pattern_name<'db>(
     Some(canonical_name.clone())
 }
 
+struct EnumMemberPatternCoverage {
+    /// Enum members that this pattern definitely matches.
+    definitely_matched: FxHashSet<Name>,
+    /// Whether the collected coverage is known to represent every possible matching enum member.
+    is_exact: bool,
+}
+
+/// Returns enum-member coverage evidence for a pattern.
+///
+/// This recognizes patterns like `case Color.RED | Color.GREEN` when the pattern
+/// belongs to the expected enum class. Enum aliases are resolved to their canonical member names
+/// before returning. A pattern with additional alternatives such as `Color.GREEN | Color()`
+/// produces only a lower bound: it definitely matches `Color.GREEN`, but can match other members.
+fn enum_member_pattern_coverage<'db>(
+    db: &'db dyn Db,
+    enum_class: ClassLiteral<'db>,
+    kind: &PatternPredicateKind<'db>,
+) -> EnumMemberPatternCoverage {
+    let mut coverage = EnumMemberPatternCoverage {
+        definitely_matched: FxHashSet::default(),
+        is_exact: true,
+    };
+    match kind {
+        PatternPredicateKind::Or(alts) => {
+            for alt in alts {
+                let alt_coverage = enum_member_pattern_coverage(db, enum_class, alt);
+                coverage
+                    .definitely_matched
+                    .extend(alt_coverage.definitely_matched);
+                coverage.is_exact &= alt_coverage.is_exact;
+            }
+        }
+        PatternPredicateKind::As(Some(inner), _) => {
+            return enum_member_pattern_coverage(db, enum_class, inner);
+        }
+        _ => {
+            if let Some(name) = enum_member_pattern_name(db, enum_class, kind) {
+                coverage.definitely_matched.insert(name);
+            } else {
+                coverage.is_exact = false;
+            }
+        }
+    }
+    coverage
+}
+
 /// Determine the static truthiness of a `match` case over a union of enum literals.
 ///
 /// The analysis removes enum members already matched by earlier unguarded cases, then decides
@@ -398,7 +444,11 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     subject_ty: Type<'db>,
 ) -> Option<Truthiness> {
     let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
-    let current_name = enum_member_pattern_name(db, enum_class, predicate.kind(db))?;
+    let current_coverage = enum_member_pattern_coverage(db, enum_class, predicate.kind(db));
+    let current_names = &current_coverage.definitely_matched;
+    if current_names.is_empty() {
+        return None;
+    }
 
     let mut previous_predicate = predicate;
     while let Some(previous) = previous_predicate.previous_predicate(db) {
@@ -408,22 +458,31 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
             continue;
         }
 
-        let previous_name = enum_member_pattern_name(db, enum_class, previous_predicate.kind(db))?;
-        remaining_names.remove(&previous_name);
+        let previous_coverage =
+            enum_member_pattern_coverage(db, enum_class, previous_predicate.kind(db));
+        for previous_name in previous_coverage.definitely_matched {
+            remaining_names.remove(&previous_name);
+        }
     }
 
-    if !remaining_names.contains(&current_name) {
+    if remaining_names.is_empty() {
         return Some(Truthiness::AlwaysFalse);
     }
 
-    if remaining_names.len() == 1 {
+    if remaining_names.is_subset(current_names) {
         if predicate.guard(db).is_some() {
             Some(Truthiness::Ambiguous)
         } else {
             Some(Truthiness::AlwaysTrue)
         }
+    } else if current_coverage.is_exact {
+        if remaining_names.is_disjoint(current_names) {
+            Some(Truthiness::AlwaysFalse)
+        } else {
+            Some(Truthiness::Ambiguous)
+        }
     } else {
-        Some(Truthiness::Ambiguous)
+        None
     }
 }
 
