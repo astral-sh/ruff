@@ -68,6 +68,8 @@ impl<'db> BoundMethodType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        let function = self.function(db);
+
         CallableType::new(
             db,
             self.bound_signatures(db),

@@ -999,7 +999,7 @@ impl<'db> Signature<'db> {
         }
 
         // A specialized receiver can make generic receiver annotations concrete enough to compare.
-        if let Some(self_specialization) = self_type.class_specialization(db) {
+        if let Some((_, self_specialization)) = self_type.class_specialization(db) {
             expected_self_ty =
                 expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
 
