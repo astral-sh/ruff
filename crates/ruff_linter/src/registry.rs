@@ -212,6 +212,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [pyspark](https://pypi.org/project/pyspark/)
+    #[prefix = "PSP"]
+    Pyspark,
 }
 
 pub trait RuleNamespace: Sized {
