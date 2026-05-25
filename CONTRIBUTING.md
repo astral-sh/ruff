@@ -90,6 +90,7 @@ Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
+cargo fmt --check  # Check Rust formatting
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
 uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
