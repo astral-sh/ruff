@@ -170,7 +170,4 @@ help: Move module level imports to top of file
    -     value2,  # comment-late_paren4
    -     value3,
    - )
-26 |
-27 |
-28 | # Prevent F403
 note: This is an unsafe fix and may change runtime behavior

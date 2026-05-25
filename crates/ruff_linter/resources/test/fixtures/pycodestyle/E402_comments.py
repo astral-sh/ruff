@@ -23,7 +23,3 @@ from late_paren4 import (
     value2,  # comment-late_paren4
     value3,
 )
-
-
-# Prevent F403
-os, last, late, value, value1, value2, value3
