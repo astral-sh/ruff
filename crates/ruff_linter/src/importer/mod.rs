@@ -81,7 +81,9 @@ impl<'a> Importer<'a> {
         }
     }
 
-    /// Add a statement to the start of the file.
+    /// Add a statement to the start of the file, potentially limited to a text range.
+    ///
+    /// The latter is useful for operating within notebooks.
     pub(crate) fn add_at_start(&self, text: &str, within_range: Option<TextRange>) -> Edit {
         // Check if there are any future imports that we need to respect
         if let Some(last_future_import) = self.find_last_future_import(within_range) {
