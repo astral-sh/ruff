@@ -987,21 +987,39 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }),
 
             // Annotation unions retain type aliases so recursive aliases can be represented.
-            // Normalize direct alias elements together before checking the union so reductions
-            // that depend on multiple elements, such as all members of an enum, are visible.
+            // Unpack direct alias elements and rebuild before checking, so reductions that
+            // depend on multiple elements—such as a union of literal-enum aliases collapsing
+            // to the enum itself—are visible. If the rebuild produces the same union (the
+            // aliases were already unpacked or are recursive), don't recurse into ourselves;
+            // skipping that early return would let `with_recursion_guard` fall back to the
+            // trivial satisfiable result and mask real assignability failures.
             (_, Type::Union(union))
                 if union
                     .elements(db)
                     .iter()
                     .any(|element| matches!(element, Type::TypeAlias(_))) =>
             {
-                self.with_recursion_guard(source, target, || {
-                    self.check_type_pair(
-                        db,
-                        source,
-                        UnionType::from_elements(db, union.elements(db).iter().copied()),
-                    )
-                })
+                let unpacked = UnionType::from_elements(
+                    db,
+                    union.elements(db).iter().map(|elem| match *elem {
+                        Type::TypeAlias(alias) => alias.value_type(db),
+                        other => other,
+                    }),
+                );
+                if unpacked != target {
+                    self.with_recursion_guard(source, target, || {
+                        self.check_type_pair(db, source, unpacked)
+                    })
+                } else {
+                    // No progress from unpacking; treat this as a standard union target and
+                    // check each element individually.
+                    union
+                        .elements(db)
+                        .iter()
+                        .when_any(db, self.constraints, |&elem_ty| {
+                            self.check_type_pair(db, source, elem_ty)
+                        })
+                }
             }
 
             (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
