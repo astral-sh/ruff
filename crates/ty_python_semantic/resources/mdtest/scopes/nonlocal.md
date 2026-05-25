@@ -281,6 +281,22 @@ def f():
             x = "goodbye"  # error: [invalid-assignment]
 ```
 
+## `nonlocal` declarations in class scopes are also validated
+
+```py
+class C:
+    nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
+
+def f():
+    class C:
+        nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
+
+def g():
+    x = 1
+    class C:
+        nonlocal x  # ok
+```
+
 ## `nonlocal` uses the closest binding
 
 ```py

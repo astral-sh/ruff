@@ -267,6 +267,15 @@ def f():
     x: str = "foo"  # error: [invalid-syntax] "annotated name `x` can't be global"
 ```
 
+However, `global` keywords are allowed (but useless) in the global scope, and it's not an error to
+annotate the variable after that.
+
+```py
+global y
+
+y: int = 42
+```
+
 ## Global declarations affect the inferred type of the binding
 
 Even if the `global` declaration isn't used in an assignment, we conservatively assume it could be:

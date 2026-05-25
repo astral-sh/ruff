@@ -18,6 +18,7 @@ use ruff_python_parser::semantic_errors::{
     SemanticSyntaxErrorKind, YieldOutsideFunctionKind,
 };
 use ruff_text_size::{Ranged, TextRange};
+use smallvec::SmallVec;
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::HasTrackedScope;
@@ -103,6 +104,45 @@ struct ScopeInfo<'ast> {
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    /// `global` and `nonlocal` declarations from scopes nested under this one. This is used for:
+    ///
+    /// 1. Visibility of nested writes. A nested function that binds a variable might affect the
+    ///    inferred type of that variable in an outer scope. After each nested scope is closed, we
+    ///    install synthetic definitions to refer to visible nested writes, which we read from this
+    ///    map. (Note that *which kind* of nested writes is visible isn't necessarily known at that
+    ///    point; we stash both kinds and decide which one to use at inference time.)
+    /// 2. Semantic syntax errors for invalid `nonlocal` declarations. A `nonlocal` declaration is
+    ///    required to resolve to a local variable, and that variable must not be declared `global`
+    ///    or defined in the global scope. (This is why we track all `nonlocal` declarations, even
+    ///    if there's no binding in their scope.)
+    ///
+    /// When we're trying to figure out what scope a `nonlocal` declaration resolves to, we have to
+    /// remember that the definition of a local variable can come after a nested function that
+    /// mentions it. Similarly, when we're trying to figure out whether `global` bindings from a
+    /// nested scopes are visible in the current scope, we have to remember that a `global`
+    /// declaration can also come after nested function definitions. We build up these maps as we
+    /// encounter each `global` and `nonlocal` keyword, but we generally need to wait until scopes
+    /// are popped (or later, at inference time) to analyze them.
+    nested_global_or_nonlocal_declarations: NestedGlobalOrNonlocalDeclarations,
+    /// Text ranges for `global` and `nonlocal` declarations in this scope, which we use to
+    /// populate `nested_global_or_nonlocal_declarations` when we reach end of scope.
+    this_scope_global_or_nonlocal_declarations: FxHashMap<Name, TextRange>,
+}
+
+type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclaration; 1]>>;
+
+#[derive(Copy, Clone)]
+struct NestedDeclaration {
+    kind: GlobalOrNonlocal,
+    file_scope_id: FileScopeId,
+    range: TextRange,
+    is_bound: bool,
+}
+
+#[derive(Copy, Clone)]
+enum GlobalOrNonlocal {
+    Global,
+    Nonlocal,
 }
 
 #[derive(Clone)]
@@ -422,6 +462,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             file_scope_id,
             current_loop: None,
             narrowing_aliases: saved_aliases,
+            nested_global_or_nonlocal_declarations: FxHashMap::default(),
+            this_scope_global_or_nonlocal_declarations: FxHashMap::default(),
         });
     }
 
@@ -720,12 +762,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn pop_scope(&mut self) -> FileScopeId {
+    /// Returns the `NestedGlobalOrNonlocalDeclarations` that are still visible to the enclosing
+    /// scope, including those contributed by `global` and `nonlocal` keywords in the popped scope,
+    /// but excluding nested `nonlocal`s that resolved to the popped scope.
+    fn pop_scope(&mut self) -> NestedGlobalOrNonlocalDeclarations {
         self.try_node_context_stack_manager.exit_scope();
 
         let ScopeInfo {
             file_scope_id: popped_scope_id,
             narrowing_aliases,
+            mut nested_global_or_nonlocal_declarations,
+            this_scope_global_or_nonlocal_declarations,
             ..
         } = self
             .scope_stack
@@ -737,6 +784,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let popped_scope = &mut self.scopes[popped_scope_id];
         popped_scope.extend_descendants(children_end);
+        let popped_scope_kind = popped_scope.kind();
 
         if popped_scope.is_eager() {
             self.record_eager_snapshots(popped_scope_id);
@@ -744,7 +792,120 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_lazy_snapshots(popped_scope_id);
         }
 
-        popped_scope_id
+        // If we've popped the module scope, there is no enclosing scope that needs our nested
+        // bindings. Short-circuit here and return an empty map.
+        if popped_scope_kind.is_module() {
+            debug_assert!(self.scope_stack.is_empty());
+            return FxHashMap::default();
+        }
+
+        // For each symbol in the (non-module) scope we just popped:
+        // 1. If the popped scope is function-like (not a class body), see whether it resolves any
+        //    `nonlocal` declarations (legally or illegally) from further nested scopes.
+        // 2. See whether it contributes any nested `global` or `nonlocal` declarations to the
+        //    enclosing scope.
+        for symbol in self.place_tables[popped_scope_id].symbols() {
+            // Filter out any nested `nonlocal` declaration that resolve in the popped scope.
+            // Typically these resolve to a defined (bound or declared) symbol, but they can also
+            // resolve (illegally) to an unbound `global` declaration. Remove any resolved
+            // declarations from the `nested_global_or_nonlocal_declarations` map, both so that we
+            // don't try to resolve them again, and so that synthetic nested binding definitions we
+            // install in enclosing scopes don't see them. (Note that this doesn't affect any
+            // synthetic nested binding definitions installed in the popped scope, which have
+            // already recorded these declarations.)
+            if popped_scope_kind.is_function_like()
+                && (symbol.is_local() || symbol.is_global())
+                && let Some(nested_declarations) =
+                    nested_global_or_nonlocal_declarations.get_mut(symbol.name())
+            {
+                nested_declarations.retain(|declaration| {
+                    if matches!(declaration.kind, GlobalOrNonlocal::Nonlocal) {
+                        // It's a syntax error for a `nonlocal` declaration to resolve to a
+                        // `global` statement in an enclosing scope.
+                        if symbol.is_global() {
+                            self.report_semantic_error(SemanticSyntaxError {
+                                kind: SemanticSyntaxErrorKind::NonlocalWithoutBinding(
+                                    symbol.name().to_string(),
+                                ),
+                                range: declaration.range,
+                                python_version: self.python_version,
+                            });
+                        }
+                        // This `nonlocal` is resolved.
+                        false
+                    } else {
+                        // Nested `global` declarations never "resolve" per se. This is both
+                        // because we already know they refer to the global scope, and also because
+                        // they can "pass through" intervening scopes where they're not visible to
+                        // containing scopes where they're visible again.
+                        true
+                    }
+                });
+            }
+
+            // Add in any `global` and `nonlocal` declarations from this (non-module) scope.
+            if symbol.is_global() || symbol.is_nonlocal() {
+                let kind = if symbol.is_global() {
+                    GlobalOrNonlocal::Global
+                } else {
+                    GlobalOrNonlocal::Nonlocal
+                };
+                nested_global_or_nonlocal_declarations
+                    .entry(symbol.name().clone())
+                    .or_default()
+                    .push(NestedDeclaration {
+                        kind,
+                        file_scope_id: popped_scope_id,
+                        range: *this_scope_global_or_nonlocal_declarations
+                            .get(symbol.name())
+                            .expect("should have recorded a TextRange"),
+                        // This `is_bound` flag is why we wait until now to record these,
+                        // rather than doing it when we encounter the keywords.
+                        is_bound: symbol.is_bound(),
+                    });
+            }
+        }
+
+        // If the enclosing scope is the module scope, it's a semantic syntax error error to have
+        // any remaining unresolved `nonlocal` declarations.
+        if self.scope_stack.len() == 1 {
+            debug_assert!(
+                self.scopes[self.scope_stack[0].file_scope_id]
+                    .kind()
+                    .is_module(),
+                "the last remaining scope is the module scope",
+            );
+            for (name, nested_declarations) in &nested_global_or_nonlocal_declarations {
+                for declaration in nested_declarations {
+                    if matches!(declaration.kind, GlobalOrNonlocal::Nonlocal) {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NonlocalWithoutBinding(name.to_string()),
+                            range: declaration.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Now we've updated `nested_global_or_nonlocal_declarations` based on what happened in the
+        // popped scope (resolutions and new declarations). Merge the whole map with the caller's
+        // own `nested_global_or_nonlocal_declarations` here. Note that we'll *also* return it
+        // immediately below, so that the caller can synthesize nested bindings definitions that
+        // only respect the bindings within the popped scope, rather than in all the nested scopes
+        // they've encountered so far.
+        if !popped_scope_kind.is_module() {
+            for (name, declarations) in &nested_global_or_nonlocal_declarations {
+                self.current_scope_info_mut()
+                    .nested_global_or_nonlocal_declarations
+                    .entry(name.clone())
+                    .or_default()
+                    .extend_from_slice(declarations);
+            }
+        }
+
+        // Here's the return described above.
+        nested_global_or_nonlocal_declarations
     }
 
     fn current_place_table(&self) -> &PlaceTableBuilder {
@@ -1869,12 +2030,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         statement
     }
 
-    fn with_type_params(
+    fn with_type_params<T>(
         &mut self,
         with_scope: NodeWithScopeRef,
         type_params: Option<&'ast ast::TypeParams>,
-        nested: impl FnOnce(&mut Self) -> FileScopeId,
-    ) -> FileScopeId {
+        nested: impl FnOnce(&mut Self) -> T,
+    ) -> T {
         if let Some(type_params) = type_params {
             self.push_scope(with_scope);
 
@@ -3343,7 +3504,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.mark_unreachable();
             }
             ast::Stmt::Global(ast::StmtGlobal {
-                range: _,
+                range,
                 node_index: _,
                 names,
             }) => {
@@ -3372,15 +3533,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             range: name.range,
                             python_version: self.python_version,
                         });
+                        // Never mark a symbol both global and nonlocal, even in this error case.
+                        continue;
+                    }
+                    // Check whether this is the module scope, where `global` has no effect.
+                    let scope_id = self.current_scope();
+                    if scope_id.is_global() {
+                        // It's important that we don't `mark_global` here, because we error on
+                        // type annotations on places that are marked global, but it's actually
+                        // legal to write `global x; x: int = 42` at the module level.
+                        continue;
+                    }
+                    // Assuming none of the rules above are violated, repeated `global`
+                    // declarations are allowed and ignored.
+                    if symbol.is_global() {
+                        continue;
                     }
                     self.current_place_table_mut()
                         .symbol_mut(symbol_id)
                         .mark_global();
+                    self.current_scope_info_mut()
+                        .this_scope_global_or_nonlocal_declarations
+                        .insert(name.id.clone(), *range);
                 }
                 walk_stmt(self, stmt);
             }
             ast::Stmt::Nonlocal(ast::StmtNonlocal {
-                range: _,
+                range,
                 node_index: _,
                 names,
             }) => {
@@ -3407,19 +3586,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             range: name.range,
                             python_version: self.python_version,
                         });
+                        // Never mark a symbol both global and nonlocal, even in this error case.
+                        continue;
                     }
-                    // The variable is required to exist in an enclosing scope, but that definition
-                    // might come later. For example, this is example legal, but we can't check
-                    // that here, because we haven't gotten to `x = 1`:
-                    // ```py
-                    // def f():
-                    //     def g():
-                    //         nonlocal x
-                    //     x = 1
-                    // ```
+                    // Check whether this is the module scope, where `nonlocal` isn't allowed.
+                    let scope_id = self.current_scope();
+                    if scope_id.is_global() {
+                        // The SemanticSyntaxChecker will report an error for this.
+                        continue;
+                    }
+                    // Assuming none of the rules above are violated, repeated `nonlocal`
+                    // declarations are allowed and ignored.
+                    if symbol.is_nonlocal() {
+                        continue;
+                    }
                     self.current_place_table_mut()
                         .symbol_mut(symbol_id)
                         .mark_nonlocal();
+                    self.current_scope_info_mut()
+                        .this_scope_global_or_nonlocal_declarations
+                        .insert(name.id.clone(), *range);
                 }
                 walk_stmt(self, stmt);
             }
