@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.15.14
+
+Released on 2026-05-21.
+
+### Preview features
+
+- \[`airflow`\] Implement `airflow-task-implicit-multiple-outputs` (`AIR202`) ([#25152](https://github.com/astral-sh/ruff/pull/25152))
+- \[`flake8-use-pathlib`\] Mark `PTH101` fix as unsafe when first argument is a class attribute annotated as `int` ([#25086](https://github.com/astral-sh/ruff/pull/25086))
+- \[`pylint`\] Implement `too-many-try-statements` (`W0717`) ([#23970](https://github.com/astral-sh/ruff/pull/23970))
+- \[`ruff`\] Add `incorrect-decorator-order` (`RUF074`) ([#23461](https://github.com/astral-sh/ruff/pull/23461))
+- \[`ruff`\] Add `fallible-context-manager` (`RUF075`) ([#22844](https://github.com/astral-sh/ruff/pull/22844))
+
+### Bug fixes
+
+- Fix lambda formatting in interpolated string expressions ([#25144](https://github.com/astral-sh/ruff/pull/25144))
+- Treat generic `frozenset` annotations as immutable ([#25251](https://github.com/astral-sh/ruff/pull/25251))
+- \[`flake8-type-checking`\] Avoid `strict` behavior when `future-annotations` are enabled (`TC001`, `TC002`, `TC003`) ([#25035](https://github.com/astral-sh/ruff/pull/25035))
+- \[`pylint`\] Avoid false positives in `else` clause (`PLR1733`) ([#25177](https://github.com/astral-sh/ruff/pull/25177))
+
+### Rule changes
+
+- \[`flake8-comprehensions`\] Skip `C417` for lambdas with positional-only parameters ([#25272](https://github.com/astral-sh/ruff/pull/25272))
+- \[`flake8-simplify`\] Preserve f-string source verbatim in `SIM101` fix ([#25061](https://github.com/astral-sh/ruff/pull/25061))
+
+### Performance
+
+- Avoid unnecessary parser lookahead for operators ([#25290](https://github.com/astral-sh/ruff/pull/25290))
+
+### Documentation
+
+- Update code example setting Neovim LSP log level ([#25284](https://github.com/astral-sh/ruff/pull/25284))
+
+### Other changes
+
+- Add full PEP 798 support ([#25104](https://github.com/astral-sh/ruff/pull/25104))
+- Add a parser recursion limit ([#24810](https://github.com/astral-sh/ruff/pull/24810))
+- Update various `ruff_python_stdlib` APIs ([#25273](https://github.com/astral-sh/ruff/pull/25273))
+
+### Contributors
+
+- [@ocaballeror](https://github.com/ocaballeror)
+- [@lerebear](https://github.com/lerebear)
+- [@samuelcolvin](https://github.com/samuelcolvin)
+- [@baltasarblanco](https://github.com/baltasarblanco)
+- [@aconal-com](https://github.com/aconal-com)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@JelleZijlstra](https://github.com/JelleZijlstra)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@ntBre](https://github.com/ntBre)
+- [@adityasingh2400](https://github.com/adityasingh2400)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@Dev-iL](https://github.com/Dev-iL)
+- [@neutrinoceros](https://github.com/neutrinoceros)
+- [@shivamtiwari3](https://github.com/shivamtiwari3)
+- [@Dev-X25874](https://github.com/Dev-X25874)
+
 ## 0.15.13
 
 Released on 2026-05-14.

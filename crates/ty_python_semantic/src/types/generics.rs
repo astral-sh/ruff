@@ -677,7 +677,12 @@ impl<'db> GenericContext<'db> {
                         );
                         let signatures =
                             signatures.with_inherited_generic_context(db, generic_context);
-                        let replacement = CallableType::new(db, signatures, callable.kind(db));
+                        let replacement = CallableType::new(
+                            db,
+                            signatures,
+                            callable.kind(db),
+                            callable.provenance(db),
+                        );
 
                         Some((callable, replacement))
                     })
@@ -822,6 +827,16 @@ impl<'db> GenericContext<'db> {
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types: Vec<Type> = self.variables(db).map(Type::TypeVar).collect();
+        self.specialize(db, types)
+    }
+
+    /// Returns a specialization of this generic context where each typevar is mapped to the same type.
+    pub(crate) fn repeat_specialization(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Specialization<'db> {
+        let types: Vec<Type> = self.variables(db).map(|_| ty).collect();
         self.specialize(db, types)
     }
 
@@ -2470,6 +2485,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
                 let _ = self.add_type_mappings_from_owned_constraint_set(formal, when, &mut f);
+                return Ok(());
+            }
+
+            (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
+                let when =
+                    actual.when_constraint_set_assignable_to(self.db, formal, self.constraints);
+                // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
+                // for now, matching the protocol constraint-set path in the nominal-instance
+                // arm above.
+                let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                 return Ok(());
             }
 

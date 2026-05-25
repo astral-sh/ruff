@@ -109,6 +109,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_collection_literal(
             KnownClass::Dict,
+            None,
             &items,
             &mut infer_elt_ty,
             call_expression_tcx,

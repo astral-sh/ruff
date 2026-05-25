@@ -896,6 +896,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
+    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
+        match self {
+            Type::Divergent(divergent) => Some(divergent),
+            _ => None,
+        }
+    }
+
     /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
     /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
@@ -1014,7 +1021,7 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        if cycle.iteration() <= 1 {
+        if cycle.iteration() <= crate::TAINTED_CYCLES {
             self
         } else {
             // The current type is unioned to the previous type. Unioning in the reverse order can
@@ -1206,12 +1213,20 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         expected_class: StaticClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, Some(expected_class))
+        self.nominal_class(db)?
+            .static_class_literal(db)
+            .filter(|(class_literal, _)| *class_literal == expected_class)
+            .and_then(|(_, specialization)| specialization)
     }
 
-    /// If this type is a class instance, returns its specialization.
-    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, None)
+    /// If this type is a class instance, returns the class and its specialization.
+    pub(crate) fn class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
+        self.nominal_class(db)?
+            .static_class_literal(db)
+            .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
     }
 
     /// If this type is a class instance, returns its class.
@@ -1229,23 +1244,9 @@ impl<'db> Type<'db> {
                 };
                 bound.nominal_class(db)
             }
+            Type::LiteralValue(literal) => literal.fallback_instance(db).nominal_class(db),
             _ => None,
         }
-    }
-
-    fn specialization_of_optional(
-        self,
-        db: &'db dyn Db,
-        expected_class: Option<StaticClassLiteral<'_>>,
-    ) -> Option<Specialization<'db>> {
-        let class_type = self.nominal_class(db)?;
-
-        let (class_literal, specialization) = class_type.static_class_literal(db)?;
-        if expected_class.is_some_and(|expected_class| expected_class != class_literal) {
-            return None;
-        }
-
-        specialization
     }
 
     /// Returns `true` if this type may contain preferred type mappings when provided as type context
@@ -2083,7 +2084,7 @@ impl<'db> Type<'db> {
         f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
-        let Some(specialization) = self.class_specialization(db) else {
+        let Some((_, specialization)) = self.class_specialization(db) else {
             match self {
                 Type::Union(union) => {
                     for element in union.elements(db) {
@@ -3531,15 +3532,8 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => {
                 // Enum members can be accessed through enum instances and other enum members,
                 // e.g. `answer.YES` or `Answer.YES.NO`.
-                let enum_class = match self {
-                    Type::LiteralValue(literal) => literal
-                        .as_enum()
-                        .map(|enum_literal| enum_literal.enum_class(db)),
-                    Type::NominalInstance(instance) => Some(instance.class_literal(db)),
-                    _ => None,
-                };
-
-                if let Some(enum_class) = enum_class
+                if let Some(enum_class) =
+                    self.nominal_class(db).map(|class| class.class_literal(db))
                     && let Some(metadata) = enum_metadata(db, enum_class)
                     && let Some(resolved_name) = metadata.resolve_member(&name)
                 {

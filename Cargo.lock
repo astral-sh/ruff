@@ -1275,6 +1275,7 @@ dependencies = [
  "indexmap",
  "ordermap",
  "smallvec",
+ "thin-vec",
 ]
 
 [[package]]
@@ -2917,7 +2918,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.15.13"
+version = "0.15.14"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3178,7 +3179,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.15.13"
+version = "0.15.14"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3333,6 +3334,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "thin-vec",
  "thiserror 2.0.18",
 ]
 
@@ -3450,6 +3452,7 @@ dependencies = [
  "serde",
  "serde_json",
  "static_assertions",
+ "thin-vec",
  "unicode-ident",
  "unicode-normalization",
  "unicode_names2",
@@ -3569,7 +3572,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.15.13"
+version = "0.15.14"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -4163,9 +4166,12 @@ dependencies = [
 
 [[package]]
 name = "thin-vec"
-version = "0.2.14"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "144f754d318415ac792f9d69fc87abbbfc043ce2ef041c60f16ad828f638717d"
+checksum = "259cdf8ed4e4aca6f1e9d011e10bd53f524a2d0637d7b28450f6c64ac298c4c6"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "thiserror"
@@ -4609,6 +4615,7 @@ dependencies = [
  "crossbeam",
  "get-size2",
  "globset",
+ "ignore",
  "insta",
  "notify",
  "ordermap",

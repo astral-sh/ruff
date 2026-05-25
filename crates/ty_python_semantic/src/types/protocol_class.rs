@@ -546,7 +546,12 @@ impl<'db> ProtocolMemberKind<'db> {
                 let normalized =
                     curr.signatures(db)
                         .cycle_normalized(db, prev.signatures(db), cycle);
-                Self::Method(CallableType::new(db, normalized, curr.kind(db)))
+                Self::Method(CallableType::new(
+                    db,
+                    normalized,
+                    curr.kind(db),
+                    curr.provenance(db),
+                ))
             }
             (Self::Property(curr), Self::Property(prev)) => {
                 let getter = match (curr.getter(db), prev.getter(db)) {
@@ -1095,6 +1100,7 @@ fn protocol_bind_self<'db>(
         db,
         callable.signatures(db).bind_self(db, self_type),
         CallableTypeKind::Regular,
+        callable.provenance(db),
     )
 }
 

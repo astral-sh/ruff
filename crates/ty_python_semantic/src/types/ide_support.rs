@@ -1825,7 +1825,14 @@ mod resolve_definition {
                     definitions.extend(
                         find_symbol_in_scope(db, scope, component)
                             .into_iter()
-                            .map(ResolvedDefinition::Definition),
+                            .flat_map(|definition| {
+                                resolve_definition(
+                                    db,
+                                    definition,
+                                    Some(component),
+                                    ImportAliasResolution::ResolveAliases,
+                                )
+                            }),
                     );
                 } else {
                     // We're in the middle of the path, look for scopes that match the current component

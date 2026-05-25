@@ -252,12 +252,12 @@ def test(cond: bool):
 ## Union with some variants implementing `__bool__` incorrectly
 
 ```py
-def test(cond: bool):
-    class NotBoolable:
-        __bool__: None = None
+from typing import Literal
 
-    a = 10 if cond else NotBoolable()
+class NotBoolable:
+    __bool__: None = None
 
+def test(a: Literal[10] | NotBoolable):
     # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `Literal[10] | NotBoolable`"
     if a:
         pass

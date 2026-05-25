@@ -1,9 +1,9 @@
 ## Narrowing for `bool(..)` checks
 
 ```py
-def _(flag: bool):
+from typing import Literal
 
-    x = 1 if flag else None
+def _(x: Literal[1] | None):
 
     # valid invocation, positive
     reveal_type(x)  # revealed: Literal[1] | None

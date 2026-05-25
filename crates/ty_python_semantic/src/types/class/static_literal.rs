@@ -24,7 +24,7 @@ use crate::{
         Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
         TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
-        callable::CallableTypeKind,
+        callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
             FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
@@ -129,6 +129,14 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
+    /// Returns `true` if this class is decorated with `@dataclass(order=True)`.
+    pub(crate) fn is_ordered_dataclass(self, db: &'db dyn Db) -> bool {
+        self.find_dataclass_decorator_position(db).is_some()
+            && self
+                .dataclass_params(db)
+                .is_some_and(|params| params.flags(db).contains(DataclassFlags::ORDER))
+    }
+
     /// Returns a new [`StaticClassLiteral`] with the given dataclass params, preserving all other fields.
     pub(crate) fn with_dataclass_params(
         self,
@@ -157,6 +165,14 @@ impl<'db> StaticClassLiteral<'db> {
         ["__lt__", "__le__", "__gt__", "__ge__"]
             .iter()
             .any(|method| !class_member(db, body_scope, method).is_undefined())
+    }
+
+    #[salsa::tracked]
+    pub(crate) fn has_own_comparison_methods(self, db: &'db dyn Db) -> bool {
+        let body_scope = self.body_scope(db);
+        ["__lt__", "__le__", "__gt__", "__ge__"]
+            .iter()
+            .all(|method| !class_member(db, body_scope, method).is_undefined())
     }
 
     /// Returns `true` if any class in this class's MRO (excluding `object`) defines an ordering
@@ -535,25 +551,23 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(|decorator| decorator.known(db))
     }
 
-    /// Iterate through the decorators on this class, returning the position of the first one
-    /// that matches the given predicate.
-    pub(super) fn find_decorator_position(
-        self,
-        db: &'db dyn Db,
-        predicate: impl Fn(Type<'db>) -> bool,
-    ) -> Option<usize> {
-        self.decorators(db)
-            .iter()
-            .position(|decorator| predicate(*decorator))
-    }
-
     /// Iterate through the decorators on this class, returning the index of the first one
     /// that is either `@dataclass` or `@dataclass(...)`.
     pub(crate) fn find_dataclass_decorator_position(self, db: &'db dyn Db) -> Option<usize> {
-        self.find_decorator_position(db, |ty| match ty {
-            Type::FunctionLiteral(function) => function.is_known(db, KnownFunction::Dataclass),
-            Type::DataclassDecorator(_) => true,
-            _ => false,
+        let module = parsed_module(db, self.file(db)).load(db);
+        let class_stmt = self.node(db, &module);
+        let class_definition =
+            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+
+        class_stmt.decorator_list.iter().position(|decorator| {
+            let decorator_callable = decorator
+                .expression
+                .as_call_expr()
+                .map_or(&decorator.expression, |call| &call.func);
+
+            definition_expression_type(db, class_definition, decorator_callable)
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
         })
     }
 
@@ -744,7 +758,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
-    fn has_dataclass_param(
+    pub(crate) fn has_dataclass_param(
         self,
         db: &'db dyn Db,
         field_policy: CodeGeneratorKind<'db>,
@@ -966,6 +980,7 @@ impl<'db> StaticClassLiteral<'db> {
                     db,
                     callable_ty.signatures(db),
                     CallableTypeKind::FunctionLike,
+                    callable_ty.provenance(db),
                 )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
@@ -1191,7 +1206,12 @@ impl<'db> StaticClassLiteral<'db> {
                         )
                     }),
                 );
-                CallableType::new(db, signatures, CallableTypeKind::FunctionLike)
+                CallableType::new(
+                    db,
+                    signatures,
+                    CallableTypeKind::FunctionLike,
+                    CallableFunctionProvenance::None,
+                )
             });
 
             return Some(synthesized_callables.into_type(db));
@@ -1601,6 +1621,7 @@ impl<'db> StaticClassLiteral<'db> {
             db,
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::FunctionLike,
+            CallableFunctionProvenance::None,
         )))
     }
 
