@@ -425,6 +425,9 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
 ) -> Option<Truthiness> {
     let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
     let current_names = enum_member_pattern_names(db, enum_class, predicate.kind(db));
+    if current_names.is_empty() {
+        return None;
+    }
 
     let mut previous_predicate = predicate;
     while let Some(previous) = previous_predicate.previous_predicate(db) {
@@ -440,7 +443,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
         }
     }
 
-    if !remaining_names.is_superset(&current_names) {
+    if remaining_names.is_disjoint(&current_names) {
         return Some(Truthiness::AlwaysFalse);
     }
 

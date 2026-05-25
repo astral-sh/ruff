@@ -225,6 +225,21 @@ def match_exhaustive_literal_grouped_or_pattern(v: Literal[Color.RED, Color.GREE
         case _:
             assert_never(v)
 
+def match_overlapping_or_arm_is_reachable(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED:
+            pass
+        case Color.RED | Color.GREEN | Color.BLUE:
+            assert_never(v)  # error: [type-assertion-failure]
+
+def match_class_pattern_arm_is_reachable(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN:
+            pass
+        case Color():
+            assert_never(v)  # error: [type-assertion-failure]
+
+
 def match_non_exhaustive_literal_or_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
     match v:
         case Color.RED | Color.GREEN:
