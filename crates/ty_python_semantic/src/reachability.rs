@@ -405,7 +405,9 @@ fn enum_member_pattern_names<'db>(
             }
             Some(names)
         }
-        _ => Some(FxHashSet::from_iter([enum_member_pattern_name(db, enum_class, kind)?])),
+        _ => Some(FxHashSet::from_iter([enum_member_pattern_name(
+            db, enum_class, kind,
+        )?])),
     }
 }
 
@@ -430,7 +432,8 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
             continue;
         }
 
-        let previous_names = enum_member_pattern_names(db, enum_class, previous_predicate.kind(db))?;
+        let previous_names =
+            enum_member_pattern_names(db, enum_class, previous_predicate.kind(db))?;
         for previous_name in previous_names {
             remaining_names.remove(&previous_name);
         }
