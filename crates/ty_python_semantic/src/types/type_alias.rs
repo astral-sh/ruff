@@ -50,6 +50,20 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
+    ///
+    /// Salsa-tracked separately from [`raw_value_type`]: the latter caches the unspecialized
+    /// RHS, but a recursive `is_redundant_with -> has_relation_to -> unwrap alias -> value_type`
+    /// chain re-enters `value_type` at a specialized `(alias, spec)` key, which is a distinct
+    /// Salsa query from `raw_value_type`. Without tracking here, every call would re-run
+    /// `apply_function_specialization` with a fresh `ApplyTypeMappingVisitor`, leaving the
+    /// recursive chain unguarded and driving the redundancy cycle into oscillation.
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_function_specialization(db, self.raw_value_type(db))
     }

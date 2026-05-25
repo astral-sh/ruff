@@ -686,8 +686,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 // suffix.
                 let mut elements = self.iter_all_elements();
                 let prefix: Vec<_> = elements.by_ref().take(prefix).collect();
-                let variable =
-                    UnionType::from_elements_leave_aliases(db, elements.by_ref().take(variable));
+                let variable = UnionType::from_elements(db, elements.by_ref().take(variable));
                 let suffix = elements.by_ref().take(suffix);
                 Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
@@ -1067,7 +1066,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // For example, `tuple[I0, *tuple[I1, ...], I2]` unpacked as
                 // `[a, b, *c]` means `b` could be `I1` (variable non-empty) or
                 // `I2` (variable empty, suffix shifts left), so it should be `I1 | I2`.
-                let variable = UnionType::from_elements_leave_aliases(
+                let variable = UnionType::from_elements(
                     db,
                     self.iter_prefix_elements()
                         .skip(prefix_length)
@@ -1177,7 +1176,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
                 // large enough that it lands in the variable-length portion. It might also be
                 // small enough to land in the suffix.
                 let index_past_prefix = index - self.prefix_elements().len() + 1;
-                Ok(UnionType::from_elements_leave_aliases(
+                Ok(UnionType::from_elements(
                     db,
                     std::iter::once(self.variable()).chain(
                         self.suffix_elements()
@@ -1200,7 +1199,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
                 // large enough that it lands in the variable-length portion. It might also be
                 // small enough to land in the prefix.
                 let index_past_suffix = index_from_end - self.suffix_elements().len() + 1;
-                Ok(UnionType::from_elements_leave_aliases(
+                Ok(UnionType::from_elements(
                     db,
                     (self.prefix_elements().iter().rev().copied())
                         .take(index_past_suffix)
@@ -1307,7 +1306,7 @@ impl<T> Tuple<T> {
 
 impl<'db> Tuple<Type<'db>> {
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements_leave_aliases(db, self.all_elements())
+        UnionType::from_elements(db, self.all_elements())
     }
 
     /// Resizes this tuple to a different length, if possible. If this tuple cannot satisfy the
@@ -1745,7 +1744,7 @@ impl<'db> TupleSpecBuilder<'db> {
                 },
                 TupleSpec::Variable(right),
             ) => {
-                let variable = UnionType::from_elements_leave_aliases(
+                let variable = UnionType::from_elements(
                     db,
                     left_suffix
                         .iter()
@@ -1790,7 +1789,7 @@ impl<'db> TupleSpecBuilder<'db> {
                 if our_elements.len() == new_elements.len() =>
             {
                 for (existing, new) in our_elements.iter_mut().zip(new_elements.all_elements()) {
-                    *existing = UnionType::from_elements_leave_aliases(db, [*existing, *new]);
+                    *existing = UnionType::from_elements(db, [*existing, *new]);
                 }
                 self
             }
@@ -1803,10 +1802,8 @@ impl<'db> TupleSpecBuilder<'db> {
             // would actually lead to more precise inference, so it's probably not worth the
             // complexity.
             _ => {
-                let unioned = UnionType::from_elements_leave_aliases(
-                    db,
-                    self.all_elements().chain(other.all_elements()),
-                );
+                let unioned =
+                    UnionType::from_elements(db, self.all_elements().chain(other.all_elements()));
                 TupleSpecBuilder::Variable {
                     prefix: vec![],
                     variable: unioned,

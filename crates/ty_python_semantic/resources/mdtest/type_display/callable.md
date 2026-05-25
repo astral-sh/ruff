@@ -101,16 +101,16 @@ reveal_type(Foo().f)  # revealed: bound method Foo.f(x: Scalar | Array1d) -> Non
 
 type ArrayNd = Scalar | list[ArrayNd] | tuple[ArrayNd]
 
-def g(x: Scalar | ArrayNd) -> None:
+def g(x: ArrayNd) -> None:
     pass
 
-reveal_type(g)  # revealed: def g(x: Scalar | ArrayNd) -> None
+reveal_type(g)  # revealed: def g(x: ArrayNd) -> None
 
 class Bar:
-    def g(self, x: Scalar | ArrayNd) -> None:
+    def g(self, x: ArrayNd) -> None:
         pass
 
-reveal_type(Bar().g)  # revealed: bound method Bar.g(x: Scalar | ArrayNd) -> None
+reveal_type(Bar().g)  # revealed: bound method Bar.g(x: ArrayNd) -> None
 
 type GenericArray1d[T] = list[T] | tuple[T]
 

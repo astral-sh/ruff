@@ -273,7 +273,7 @@ def _[T](
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
-    reveal_type(c)  # revealed: int
+    reveal_type(c)  # revealed: Positive[int]
 ```
 
 ## Invalid uses

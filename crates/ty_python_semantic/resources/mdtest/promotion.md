@@ -224,7 +224,7 @@ def get_aliased_segment() -> Segment:
     return (0, 1)
 
 aliased_segments = [get_aliased_segment(), (1, 2), (3, 4, 5)]
-reveal_type(aliased_segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+reveal_type(aliased_segments)  # revealed: list[Segment | tuple[int, int, int]]
 aliased_segments.append((6, 7, 8, 9))  # error: [invalid-argument-type]
 
 def get_newtype_segment() -> NewTypeSegment:
@@ -449,7 +449,7 @@ x11: list[Literal[1] | Literal[2] | Literal[3]] = [1, 2, 3]
 reveal_type(x11)  # revealed: list[Literal[1, 2, 3]]
 
 x12: Y[Y[Literal[1]]] = [[1]]
-reveal_type(x12)  # revealed: list[Y[Literal[1]]]
+reveal_type(x12)  # revealed: Y[Y[Literal[1]]]
 
 x13: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
 reveal_type(x13)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
@@ -661,7 +661,7 @@ def _(x: tuple[Literal["hello"]]):
 type X = Literal["hello"]
 
 x4: X = "hello"
-reveal_type(x4)  # revealed: Literal["hello"]
+reveal_type(x4)  # revealed: X
 reveal_type([x4])  # revealed: list[X]
 
 class MyEnum(Enum):
@@ -717,8 +717,8 @@ def _(flag: bool):
 type X = Literal[b"bar"]
 
 def _(x1: X | None, x2: X):
-    reveal_type([x1, x2])  # revealed: list[Literal[b"bar"] | None]
-    reveal_type([x1 or x2])  # revealed: list[Literal[b"bar"]]
+    reveal_type([x1, x2])  # revealed: list[X | None]
+    reveal_type([x1 or x2])  # revealed: list[X]
 ```
 
 ## Negative intersection elements are removed

@@ -187,9 +187,7 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        let mut builder = UnionBuilder::new(db)
-            .unpack_aliases(false)
-            .recursively_defined(union.recursively_defined(db));
+        let mut builder = UnionBuilder::new(db).recursively_defined(union.recursively_defined(db));
 
         for element in other_union_elements {
             builder = builder.add(element);

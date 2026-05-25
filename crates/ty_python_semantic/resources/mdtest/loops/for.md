@@ -368,7 +368,7 @@ class C:
 
     def f(self) -> None:
         for item in self.values:
-            reveal_type(item)  # revealed: A | B
+            reveal_type(item)  # revealed: U
             # error: [unresolved-attribute] "Attribute `do_b_thing` is not defined on `A` in union `U`"
             item.do_b_thing()
 ```

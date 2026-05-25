@@ -66,8 +66,8 @@ from typing import Literal
 type C[T] = T
 
 def _(a: C[int], b: C[Literal[5]]):
-    reveal_type(a)  # revealed: int
-    reveal_type(b)  # revealed: Literal[5]
+    reveal_type(a)  # revealed: C[int]
+    reveal_type(b)  # revealed: C[Literal[5]]
 ```
 
 The specialization must match the generic types:
@@ -113,7 +113,7 @@ def _(l: List[int][int]):
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):
-    reveal_type(d)  # revealed: Unknown
+    reveal_type(d)  # revealed: DoubleSpecialization[int]
 
 type Tuple = tuple[int, str]
 
@@ -193,11 +193,11 @@ reveal_type(BoundedByUnion[int | str])  # revealed: <type alias 'BoundedByUnion[
 type TupleOfIntAndStr[T: int, U: str] = tuple[T, U]
 
 def _(x: TupleOfIntAndStr[int, str]):
-    reveal_type(x)  # revealed: tuple[int, str]
+    reveal_type(x)  # revealed: TupleOfIntAndStr[int, str]
 
 # error: [invalid-type-arguments] "Type `int` is not assignable to upper bound `str` of type variable `U@TupleOfIntAndStr`"
 def _(x: TupleOfIntAndStr[int, int]):
-    reveal_type(x)  # revealed: tuple[int, Unknown]
+    reveal_type(x)  # revealed: TupleOfIntAndStr[int, Unknown]
 ```
 
 If the type variable is constrained, the specialized type must satisfy those constraints:
@@ -223,11 +223,11 @@ reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[Unknown]'
 type TupleOfIntOrStr[T: (int, str), U: (int, str)] = tuple[T, U]
 
 def _(x: TupleOfIntOrStr[int, str]):
-    reveal_type(x)  # revealed: tuple[int, str]
+    reveal_type(x)  # revealed: TupleOfIntOrStr[int, str]
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `U@TupleOfIntOrStr`"
 def _(x: TupleOfIntOrStr[int, object]):
-    reveal_type(x)  # revealed: tuple[int, Unknown]
+    reveal_type(x)  # revealed: TupleOfIntOrStr[int, Unknown]
 ```
 
 If the type variable has a default, it can be omitted:
@@ -245,7 +245,7 @@ If the type alias is not specialized explicitly, it is implicitly specialized to
 type G[T] = list[T]
 
 def _(g: G):
-    reveal_type(g)  # revealed: list[Unknown]
+    reveal_type(g)  # revealed: G
 ```
 
 Unless a type default was provided:
@@ -254,7 +254,7 @@ Unless a type default was provided:
 type G[T = int] = list[T]
 
 def _(g: G):
-    reveal_type(g)  # revealed: list[int]
+    reveal_type(g)  # revealed: G
 ```
 
 Bare generic aliases used inside another specialized alias are also specialized with their defaults:
@@ -264,7 +264,7 @@ type Defaulted[T = int] = T
 type Outer[U] = Defaulted
 
 def _(x: Outer[str]):
-    reveal_type(x)  # revealed: int
+    reveal_type(x)  # revealed: Outer[str]
     y: int = x
 ```
 
@@ -387,7 +387,7 @@ r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
-        reveal_type(x[0])  # revealed: int | list[RecursiveList[int]]
+        reveal_type(x[0])  # revealed: RecursiveList[int]
     if isinstance(x, list) and isinstance(x[0], list):
         reveal_type(x[0])  # revealed: list[RecursiveList[int]]
 ```
@@ -422,7 +422,7 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
+# error: [invalid-assignment] "Object of type `list[DivergentList[int] | list[DivergentList[int] | int]]` is not assignable to `DivergentList[int]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):

@@ -232,23 +232,23 @@ def _(
     bytes_or_falsy: bytes | AlwaysFalsy,
     falsy_or_bytes: AlwaysFalsy | bytes,
 ):
-    reveal_type(strings_or_truthy)  # revealed: Literal[""] | AlwaysTruthy
-    reveal_type(truthy_or_strings)  # revealed: AlwaysTruthy | Literal[""]
+    reveal_type(strings_or_truthy)  # revealed: strings | AlwaysTruthy
+    reveal_type(truthy_or_strings)  # revealed: AlwaysTruthy | strings
 
-    reveal_type(strings_or_falsy)  # revealed: Literal["foo"] | AlwaysFalsy
-    reveal_type(falsy_or_strings)  # revealed: AlwaysFalsy | Literal["foo"]
+    reveal_type(strings_or_falsy)  # revealed: strings | AlwaysFalsy
+    reveal_type(falsy_or_strings)  # revealed: AlwaysFalsy | strings
 
-    reveal_type(ints_or_truthy)  # revealed: Literal[0] | AlwaysTruthy
-    reveal_type(truthy_or_ints)  # revealed: AlwaysTruthy | Literal[0]
+    reveal_type(ints_or_truthy)  # revealed: ints | AlwaysTruthy
+    reveal_type(truthy_or_ints)  # revealed: AlwaysTruthy | ints
 
-    reveal_type(ints_or_falsy)  # revealed: Literal[1] | AlwaysFalsy
-    reveal_type(falsy_or_ints)  # revealed: AlwaysFalsy | Literal[1]
+    reveal_type(ints_or_falsy)  # revealed: ints | AlwaysFalsy
+    reveal_type(falsy_or_ints)  # revealed: AlwaysFalsy | ints
 
-    reveal_type(bytes_or_truthy)  # revealed: Literal[b""] | AlwaysTruthy
-    reveal_type(truthy_or_bytes)  # revealed: AlwaysTruthy | Literal[b""]
+    reveal_type(bytes_or_truthy)  # revealed: bytes | AlwaysTruthy
+    reveal_type(truthy_or_bytes)  # revealed: AlwaysTruthy | bytes
 
-    reveal_type(bytes_or_falsy)  # revealed: Literal[b"foo"] | AlwaysFalsy
-    reveal_type(falsy_or_bytes)  # revealed: AlwaysFalsy | Literal[b"foo"]
+    reveal_type(bytes_or_falsy)  # revealed: bytes | AlwaysFalsy
+    reveal_type(falsy_or_bytes)  # revealed: AlwaysFalsy | bytes
 
 type SA = Union[Literal[""], AlwaysTruthy, Literal["foo"]]
 static_assert(is_equivalent_to(SA, Literal[""] | AlwaysTruthy))
@@ -286,8 +286,8 @@ type SC = SA | SB
 type SD = SB | SA
 
 def _(c: SC, d: SD):
-    reveal_type(c)  # revealed: Literal[""]
-    reveal_type(d)  # revealed: Literal[""]
+    reveal_type(c)  # revealed: SC
+    reveal_type(d)  # revealed: SD
 
 type IA = Literal[0]
 type IB = Intersection[Literal[0], Any]
@@ -295,8 +295,8 @@ type IC = IA | IB
 type ID = IB | IA
 
 def _(c: IC, d: ID):
-    reveal_type(c)  # revealed: Literal[0]
-    reveal_type(d)  # revealed: Literal[0]
+    reveal_type(c)  # revealed: IC
+    reveal_type(d)  # revealed: ID
 
 type BA = Literal[b""]
 type BB = Intersection[Literal[b""], Any]
@@ -304,8 +304,8 @@ type BC = BA | BB
 type BD = BB | BA
 
 def _(c: BC, d: BD):
-    reveal_type(c)  # revealed: Literal[b""]
-    reveal_type(d)  # revealed: Literal[b""]
+    reveal_type(c)  # revealed: BC
+    reveal_type(d)  # revealed: BD
 ```
 
 ## Unions of tuples
