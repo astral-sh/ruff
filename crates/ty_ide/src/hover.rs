@@ -4,24 +4,17 @@ use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::{Ranged, TextSize};
-use std::any::Any;
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_core::definition;
-use ty_python_semantic::types::ide_support::{
-    resolved_call_signature, type_alias_hover, typed_dict_key_hover,
-};
-use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarKind, TypeVarVariance};
+use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
+use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
-
-    // covering_node(root, range);
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -80,7 +73,8 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
-        contents.push(match ty {
+        let mut docstring: Option<String> = None;
+        let inferred_type_hover_content = match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar
                 .bind_pep695(db)
                 .map_or(HoverContent::Type(ty, None, qualifiers, None), |typevar| {
@@ -92,36 +86,32 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                     )
                 }),
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
-                dbg!("Here - known instance", alias);
-                HoverContent::Type(Type::TypeAlias(alias), None, qualifiers, None)
-            }
-            Type::TypeAlias(alias) => {
-                dbg!("Here - known alias", alias);
-                HoverContent::Type(alias.value_type(db), None, qualifiers, None)
+                let value_type = alias.value_type(db);
+
+                docstring = value_type
+                    .definition(db)
+                    .and_then(|x| x.definition().and_then(|d| d.docstring(db)));
+
+                HoverContent::Type(value_type, None, qualifiers, Some(Type::TypeAlias(alias)))
             }
             Type::TypeVar(typevar) => {
-                dbg!("Here - direct typevar");
                 HoverContent::Type(ty, Some(typevar.variance(db)), qualifiers, None)
             }
-            Type::NominalInstance(wot) => {
-                dbg!("Here - known instance", wot);
-                dbg!(wot.class_name(db));
-                dbg!(ty.type_id());
-                dbg!(ty.definition(db)?.definition()?.name(db));
-                dbg!(ty.definition(db)?.definition()?);
+            Type::TypeAlias(alias) => {
+                let value_type = alias.value_type(db);
 
-                HoverContent::Type(ty, None, qualifiers, None)
+                docstring = value_type
+                    .definition(db)
+                    .and_then(|x| x.definition().and_then(|d| d.docstring(db)));
+
+                HoverContent::Type(value_type, None, qualifiers, Some(ty))
             }
-            typea => {
-                dbg!("Here - other", typea);
-
-                let definition = typea.definition(db)?;
-
-                dbg!(definition.definition()?.name(db));
-
-                HoverContent::Type(ty, None, qualifiers, None)
-            }
-        });
+            _ => HoverContent::Type(ty, None, qualifiers, None),
+        };
+        contents.push(inferred_type_hover_content);
+        if let Some(docstring) = docstring {
+            contents.push(HoverContent::Docstring(Docstring::new(docstring)));
+        }
     }
     contents.extend(docs);
 
@@ -201,7 +191,7 @@ pub enum HoverContent<'db> {
         Type<'db>,
         Option<TypeVarVariance>,
         TypeQualifiers,
-        Option<String>,
+        Option<Type<'db>>,
     ),
     TypedDictKey {
         owner: String,
@@ -249,7 +239,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
             HoverContent::Signature(signature) => {
                 self.kind.fenced_code_block(&signature, "python").fmt(f)
             }
-            HoverContent::Type(ty, variance, qualifiers, alias) => {
+            HoverContent::Type(ty, variance, qualifiers, alias_ty) => {
                 let variance = match variance {
                     Some(TypeVarVariance::Covariant) => " (covariant)",
                     Some(TypeVarVariance::Contravariant) => " (contravariant)",
@@ -269,15 +259,22 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     format!(" ({})", names.join(", "))
                 };
 
-                let alias_prefix = match alias {
-                    Some(alias_name) => format!("{} = ", alias_name),
+                let alias_prefix = match alias_ty {
+                    Some(alias_name) => format!("{} = ", alias_name.display(self.db).to_string()),
                     _ => String::from(""),
+                };
+
+                let alias_type = match alias_ty {
+                    Some(Type::TypeAlias(_)) => "(type alias) ",
+                    _ => "",
                 };
 
                 let (ty_string, syntax) = self.ty_string_and_syntax(ty);
                 self.kind
                     .fenced_code_block(
-                        format!("{alias_prefix}{ty_string}{variance}{qualifier_suffix}"),
+                        format!(
+                            "{alias_type}{alias_prefix}{ty_string}{variance}{qualifier_suffix}"
+                        ),
                         syntax,
                     )
                     .fmt(f)
@@ -5245,10 +5242,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Box
+        (type alias) Box = int | None
         ---------------------------------------------
         ```python
-        Box
+        (type alias) Box = int | None
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -5270,12 +5267,23 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
-        Wrapper
+        assert_snapshot!(test.hover(), @"
+        (type alias) Wrapper = list[Unknown]
+        ---------------------------------------------
+        Built-in mutable sequence.
+
+        If no argument is given, the constructor creates a new empty list.
+        The argument must be an iterable if specified.
+
         ---------------------------------------------
         ```python
-        Wrapper
+        (type alias) Wrapper = list[Unknown]
         ```
+        ---
+        Built-in mutable sequence.<HB>
+        <HB>
+        If no argument is given, the constructor creates a new empty list.<HB>
+        The argument must be an iterable if specified.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:6
@@ -6065,16 +6073,14 @@ except <CURSOR># Trigger completion/hover here
     }
 
     #[test]
-    fn hover_implicit_type_alias() {
+    fn hover_pep695_type_alias_usage() {
         let test = hover_test(
             r#"
 
 class MyType:
     """Awesome docs"""
 
-
-
-U = MyType
+type U = MyType
 
 class CoolType(str):
     u: U<CURSOR>
@@ -6084,180 +6090,63 @@ class CoolType(str):
         );
 
         assert_snapshot!(test.hover(), @"
-        U = MyType
+        (type alias) U = MyType
         ---------------------------------------------
         Awesome docs
 
         ---------------------------------------------
         ```python
-        U = MyType
+        (type alias) U = MyType
         ```
         ---
         Awesome docs
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:11:8
-           |
-        10 | class CoolType(str):
-        11 |     u: U
-           |        ^- Cursor offset
-           |        |
-           |        source
-           |
+         --> main.py:9:8
+          |
+        9 |     u: U
+          |        ^- Cursor offset
+          |        |
+          |        source
+          |
         ");
     }
 
-    //     #[test]
-    //     fn hover_implicit_type_alias_pep_695() {
-    //         let test = hover_test(
-    //             r#"
+    #[test]
+    fn hover_pep695_type_alias_name() {
+        let test = hover_test(
+            r#"
 
-    // class MyType:
-    //     """Awesome docs"""
+class MyType:
+    """Awesome docs"""
 
-    // type U = MyType
+type U<CURSOR> = MyType
 
-    // class CoolType(str):
-    //     u: U<CURSOR>
+        "#,
+        );
 
-    //         "#,
-    //         );
+        assert_snapshot!(test.hover(), @"
+        (type alias) U = MyType
+        ---------------------------------------------
+        Awesome docs
 
-    //         assert_snapshot!(test.hover(), @"
-    //         U = MyType
-    //         ---------------------------------------------
-    //         Awesome docs
-
-    //         ---------------------------------------------
-    //         ```python
-    //         U = MyType
-    //         ```
-    //         ---
-    //         Awesome docs
-    //         ---------------------------------------------
-    //         info[hover]: Hovered content is
-    //          --> main.py:9:8
-    //           |
-    //         8 | class CoolType(str):
-    //         9 |     u: U
-    //           |        ^- Cursor offset
-    //           |        |
-    //           |        source
-    //           |
-    //         ");
-    //     }
-
-    //     #[test]
-    //     fn hover_implicit_type_alias_pep_695_field_name() {
-    //         let test = hover_test(
-    //             r#"
-
-    // class MyType:
-    //     """Awesome docs"""
-
-    // type U = MyType
-
-    // class CoolType(str):
-    //     u<CURSOR>: U
-
-    //         "#,
-    //         );
-
-    //         assert_snapshot!(test.hover(), @"
-    //         u = MyType
-    //         ---------------------------------------------
-    //         Awesome docs
-
-    //         ---------------------------------------------
-    //         ```python
-    //         U = MyType
-    //         ```
-    //         ---
-    //         Awesome docs
-    //         ---------------------------------------------
-    //         info[hover]: Hovered content is
-    //          --> main.py:9:8
-    //           |
-    //         8 | class CoolType(str):
-    //         9 |     u: U
-    //           |        ^- Cursor offset
-    //           |        |
-    //           |        source
-    //           |
-    //         ");
-    //     }
-
-    //     #[test]
-    //     fn hover_implicit_type_alias_pep_695_definition() {
-    //         let test = hover_test(
-    //             r#"
-
-    // class MyType:
-    //     """Awesome docs"""
-
-    // type U<CURSOR> = MyType
-    //         "#,
-    //         );
-
-    //         assert_snapshot!(test.hover(), @"
-    //         u = MyType
-    //         ---------------------------------------------
-    //         Awesome docs
-
-    //         ---------------------------------------------
-    //         ```python
-    //         U = MyType
-    //         ```
-    //         ---
-    //         Awesome docs
-    //         ---------------------------------------------
-    //         info[hover]: Hovered content is
-    //          --> main.py:9:8
-    //           |
-    //         8 | class CoolType(str):
-    //         9 |     u: U
-    //           |        ^- Cursor offset
-    //           |        |
-    //           |        source
-    //           |
-    //         ");
-    //     }
-
-    //     #[test]
-    //     fn hover_implicit_type_alias_definition() {
-    //         let test = hover_test(
-    //             r#"
-
-    // class MyType:
-    //     """Awesome docs"""
-
-    // U<CURSOR> = MyType
-    //         "#,
-    //         );
-
-    //         assert_snapshot!(test.hover(), @"
-    //         U = MyType
-    //         ---------------------------------------------
-    //         Awesome docs
-
-    //         ---------------------------------------------
-    //         ```python
-    //         U = MyType
-    //         ```
-    //         ---
-    //         Awesome docs
-    //         ---------------------------------------------
-    //         info[hover]: Hovered content is
-    //          --> main.py:9:8
-    //           |
-    //         8 | class CoolType(str):
-    //         9 |     u: U
-    //           |        ^- Cursor offset
-    //           |        |
-    //           |        source
-    //           |
-    //         ");
-    //     }
+        ---------------------------------------------
+        ```python
+        (type alias) U = MyType
+        ```
+        ---
+        Awesome docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:6
+          |
+        6 | type U = MyType
+          |      ^- Cursor offset
+          |      |
+          |      source
+          |
+        ");
+    }
 
     impl CursorTest {
         fn hover(&self) -> String {
