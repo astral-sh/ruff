@@ -98,6 +98,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                 HoverContent::Type(ty, Some(typevar.variance(db)), qualifiers, None)
             }
             Type::TypeAlias(alias) => {
+                dbg!(&goto_target);
                 let value_type = alias.value_type(db);
 
                 docstring = value_type
@@ -260,8 +261,8 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                 };
 
                 let alias_prefix = match alias_ty {
-                    Some(alias_name) => format!("{} = ", alias_name.display(self.db).to_string()),
-                    _ => String::from(""),
+                    Some(alias_name) => format!("{} = ", alias_name.display(self.db)),
+                    _ => String::new(),
                 };
 
                 let alias_type = match alias_ty {
