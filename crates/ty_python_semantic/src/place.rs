@@ -1400,9 +1400,9 @@ fn nested_scope_binding_target_is_visible(
             };
             let symbol = place_table.symbol(symbol_id);
 
-            !scope.file_scope_id(db).is_global()
-                && !symbol.is_global()
-                && !(scope.scope(db).kind().is_class() && symbol.is_local())
+            !(scope.file_scope_id(db).is_global()
+                || symbol.is_global()
+                || (scope.scope(db).kind().is_class() && symbol.is_local()))
         }
     }
 }
