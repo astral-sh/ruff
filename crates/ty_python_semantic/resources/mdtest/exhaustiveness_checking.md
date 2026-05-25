@@ -239,7 +239,6 @@ def match_class_pattern_arm_is_reachable(v: Literal[Color.RED, Color.GREEN, Colo
         case Color():
             assert_never(v)  # error: [type-assertion-failure]
 
-
 def match_non_exhaustive_literal_or_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
     match v:
         case Color.RED | Color.GREEN:
