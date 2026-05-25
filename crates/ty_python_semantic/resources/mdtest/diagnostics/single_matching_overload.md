@@ -37,7 +37,7 @@ class Other:
 
 class Base:
     @overload
-    def f(self: Other, x: bytes) -> bytes: ...
+    def f(self: Other, x: bytes) -> bytes: ...  # error: [invalid-overload]
     @overload
     def f(self, x: int) -> int: ...
     @overload

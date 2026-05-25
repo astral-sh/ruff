@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -20,7 +20,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/single_match
  5 | 
  6 | class Base:
  7 |     @overload
- 8 |     def f(self: Other, x: bytes) -> bytes: ...
+ 8 |     def f(self: Other, x: bytes) -> bytes: ...  # error: [invalid-overload]
  9 |     @overload
 10 |     def f(self, x: int) -> int: ...
 11 |     @overload
@@ -36,6 +36,24 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/single_match
 ```
 
 # Diagnostics
+
+```
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+  --> src/mdtest_snippet.py:8:9
+   |
+ 8 |     def f(self: Other, x: bytes) -> bytes: ...  # error: [invalid-overload]
+   |         ^
+ 9 |     @overload
+10 |     def f(self, x: int) -> int: ...
+11 |     @overload
+12 |     def f(self, x: str, y: int) -> str: ...
+13 |     def f(
+   |         - Implementation defined here
+   |
+info: Implementation signature `(self, x: bytes | int | str, y: int = 0) -> bytes | int | str` is not assignable to overload signature `(self: Other, x: bytes) -> bytes`
+info: parameter `self` has an incompatible type: `Other` is not assignable to `Base`
+
+```
 
 ```
 error[invalid-argument-type]: Argument to bound method `Base.f` is incorrect
