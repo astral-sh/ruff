@@ -365,7 +365,7 @@ fn enum_literal_subject_names<'db>(
     Some((enum_class?, names))
 }
 
-/// Return the canonical enum-member name matched by a value pattern.
+/// Return the canonical enum-member name matched by a single value pattern.
 ///
 /// This recognizes patterns like `case Color.RED:` only when the pattern expression is
 /// single-valued and belongs to the expected enum class. Enum aliases are resolved to their
@@ -387,6 +387,28 @@ fn enum_member_pattern_name<'db>(
     Some(canonical_name.clone())
 }
 
+/// Returns the set of canonical enum-member names matched by a pattern.
+///
+/// This recognizes patterns like `case Color.RED | Color.GREEN` when the pattern
+/// belongs to the expected enum class. Enum aliases are resolved to their canonical member names
+/// before returning.
+fn enum_member_pattern_names<'db>(
+    db: &'db dyn Db,
+    enum_class: ClassLiteral<'db>,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<FxHashSet<Name>> {
+    match kind {
+        PatternPredicateKind::Or(alts) => {
+            let mut names = FxHashSet::default();
+            for alt in alts {
+                names.extend(enum_member_pattern_names(db, enum_class, alt)?);
+            }
+            Some(names)
+        }
+        _ => Some(FxHashSet::from_iter([enum_member_pattern_name(db, enum_class, kind)?])),
+    }
+}
+
 /// Determine the static truthiness of a `match` case over a union of enum literals.
 ///
 /// The analysis removes enum members already matched by earlier unguarded cases, then decides
@@ -398,7 +420,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     subject_ty: Type<'db>,
 ) -> Option<Truthiness> {
     let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
-    let current_name = enum_member_pattern_name(db, enum_class, predicate.kind(db))?;
+    let current_names = enum_member_pattern_names(db, enum_class, predicate.kind(db))?;
 
     let mut previous_predicate = predicate;
     while let Some(previous) = previous_predicate.previous_predicate(db) {
@@ -408,15 +430,17 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
             continue;
         }
 
-        let previous_name = enum_member_pattern_name(db, enum_class, previous_predicate.kind(db))?;
-        remaining_names.remove(&previous_name);
+        let previous_names = enum_member_pattern_names(db, enum_class, previous_predicate.kind(db))?;
+        for previous_name in previous_names {
+            remaining_names.remove(&previous_name);
+        }
     }
 
-    if !remaining_names.contains(&current_name) {
+    if !remaining_names.is_superset(&current_names) {
         return Some(Truthiness::AlwaysFalse);
     }
 
-    if remaining_names.len() == 1 {
+    if remaining_names.is_subset(&current_names) {
         if predicate.guard(db).is_some() {
             Some(Truthiness::Ambiguous)
         } else {
