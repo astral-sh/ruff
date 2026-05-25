@@ -211,7 +211,6 @@ def match_exhaustive_literal_or_pattern(v: Literal[Color.RED, Color.GREEN, Color
         case _:
             assert_never(v)
 
-
 def match_exhaustive_literal_or_non_enum_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
     match v:
         case Color.RED | Color.GREEN | Color.BLUE | int():
