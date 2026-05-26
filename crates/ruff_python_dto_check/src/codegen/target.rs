@@ -55,6 +55,14 @@ pub struct TargetSpec {
     /// Tenant filter column name on the target model (`TenantId`).
     #[serde(default = "default_tenant_column")]
     pub tenant_column: String,
+    /// Filesystem root of the source jinja templates (e.g.
+    /// `/home/user/WoA/templates`). When set, the list/detail view emitters
+    /// resolve the contract's `output` template path under this root and
+    /// extract real columns; otherwise they emit a faithful skeleton. Project
+    /// specific, so it lives in the spec / config — never hardcoded in the
+    /// crate.
+    #[serde(default)]
+    pub templates_root: Option<String>,
     /// Which handler kinds this target can emit end-to-end. Kinds not listed
     /// emit a documented stub (so the engine is general but honest about
     /// coverage). Stored as the kind's `snake_case` string.
@@ -168,9 +176,21 @@ impl TargetSpec {
             models_root: "crate::models".to_string(),
             models,
             tenant_column: "TenantId".to_string(),
+            templates_root: None,
             emit_kinds: vec![
                 HandlerKind::ListForTenant.as_str().to_string(),
                 HandlerKind::SoftDelete.as_str().to_string(),
+                HandlerKind::DetailForTenant.as_str().to_string(),
+                HandlerKind::TemplateGet.as_str().to_string(),
+                HandlerKind::GetRedirectShortcut.as_str().to_string(),
+                HandlerKind::ToggleBoolField.as_str().to_string(),
+                HandlerKind::CsrfFormPostEngineCall.as_str().to_string(),
+                HandlerKind::FormGetPost.as_str().to_string(),
+                HandlerKind::AjaxJson.as_str().to_string(),
+                HandlerKind::DownloadBlob.as_str().to_string(),
+                HandlerKind::PdfRender.as_str().to_string(),
+                HandlerKind::SaAdminView.as_str().to_string(),
+                HandlerKind::SignedLinkAction.as_str().to_string(),
             ],
         }
     }
@@ -208,6 +228,7 @@ mod toml_lite {
         let mut id = String::new();
         let mut models_root = "crate::models".to_string();
         let mut tenant_column = "TenantId".to_string();
+        let mut templates_root: Option<String> = None;
         let mut emit_kinds: Vec<String> = Vec::new();
         let mut models: BTreeMap<String, ModelMapping> = BTreeMap::new();
 
@@ -243,6 +264,7 @@ mod toml_lite {
                 (None, "id") => id = unquote(value),
                 (None, "models_root") => models_root = unquote(value),
                 (None, "tenant_column") => tenant_column = unquote(value),
+                (None, "templates_root") => templates_root = Some(unquote(value)),
                 (None, "emit_kinds") => emit_kinds = parse_array(value),
                 _ => {}
             }
@@ -253,6 +275,7 @@ mod toml_lite {
             models_root,
             models,
             tenant_column,
+            templates_root,
             emit_kinds,
         }
     }

@@ -13,8 +13,8 @@ use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 
 use crate::calibrate::{Diagnostic, calibrate, calibration_report};
-use crate::codegen::{Emitted, emit};
 use crate::codegen::target::TargetSpec;
+use crate::codegen::{Emitted, emit};
 use crate::contract::{Provenance, RouteContract, build_contract, contract_to_json};
 use crate::extractors::body::{ExtractionProfile, extract_body};
 use crate::extractors::routes::detect_route;
@@ -79,8 +79,7 @@ fn build_route_output(
     spec: &TargetSpec,
 ) -> RouteOutput {
     let facts = extract_body(func, profile);
-    let line_start =
-        u32::try_from(line_index.line_index(func.range().start()).get()).unwrap_or(0);
+    let line_start = u32::try_from(line_index.line_index(func.range().start()).get()).unwrap_or(0);
     let line_end = u32::try_from(line_index.line_index(func.range().end()).get()).unwrap_or(0);
     let provenance = Provenance {
         file: source_file.to_string(),
@@ -155,7 +154,10 @@ pub fn run_codegen_tree(
             )
             .with_context(|| format!("writing contract for {}", ro.contract.id))?;
             // Handler.
-            std::fs::write(handlers_dir.join(&ro.emitted.handler_file), &ro.emitted.handler_rs)?;
+            std::fs::write(
+                handlers_dir.join(&ro.emitted.handler_file),
+                &ro.emitted.handler_rs,
+            )?;
             // View.
             if let (Some(view), Some(file)) = (&ro.emitted.view_html, &ro.emitted.view_file) {
                 std::fs::write(views_dir.join(file), view)?;
@@ -185,8 +187,6 @@ pub struct CodegenSummary {
 
 /// Resolve a family name from a relative path using the harvest config's
 /// `family_from_filename` rule, falling back to the file stem.
-pub fn family_resolver_from_config(
-    config: &crate::config::Config,
-) -> impl Fn(&str) -> String + '_ {
+pub fn family_resolver_from_config(config: &crate::config::Config) -> impl Fn(&str) -> String + '_ {
     move |rel: &str| resolve_family(rel, config)
 }

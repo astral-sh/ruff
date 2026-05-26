@@ -221,9 +221,7 @@ fn match_or_numeric(expr: &str) -> Option<(String, String)> {
     let (obj, rest) = expr.split_once(" or ")?;
     let rest = rest.trim();
     if !rest.is_empty()
-        && rest
-            .chars()
-            .all(|c| c.is_ascii_digit() || c == '.')
+        && rest.chars().all(|c| c.is_ascii_digit() || c == '.')
         && rest.chars().any(|c| c.is_ascii_digit())
     {
         Some((obj.trim().to_string(), rest.to_string()))

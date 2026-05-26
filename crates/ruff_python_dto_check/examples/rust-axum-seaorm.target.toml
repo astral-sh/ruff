@@ -16,10 +16,16 @@ id = "rust-axum-seaorm"
 models_root = "crate::models"
 tenant_column = "TenantId"
 
+# Filesystem root of the canonical jinja templates. When set, the list/detail
+# view emitters resolve the contract's template path under this root and emit
+# real columns (header + cell expr translated to askama); otherwise they emit a
+# faithful skeleton. Project-specific — never hardcoded in the crate. Example:
+# templates_root = "/home/user/WoA/templates"
+
 # Kinds this target emits end-to-end. Kinds not listed get a documented stub
-# (never `todo!()` in a compiled path). The other 10 WoA kinds slot in here as
-# their recipes land.
-emit_kinds = ["list_for_tenant", "soft_delete"]
+# (never `todo!()` in a compiled path). All 12 emergent kinds are emitted; the
+# minimal TOML reader expects this array on a single line.
+emit_kinds = ["list_for_tenant", "detail_for_tenant", "template_get", "soft_delete", "toggle_bool_field", "get_redirect_shortcut", "csrf_form_post_engine_call", "form_get_post", "ajax_json", "download_blob", "pdf_render", "sa_admin_view", "signed_link_action"]
 
 # --- model mappings ---------------------------------------------------------
 # Flat WoA core models (single-segment module_path).

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Gerät{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ d.display_name }}</h1>
+  <dl>
+    <dt>Hostname</dt><dd>{{ d.hostname }}</dd>
+    <dt>Standort</dt><dd>{{ d.standort or '–' }}</dd>
+  </dl>
+</div>
+{% endblock %}
