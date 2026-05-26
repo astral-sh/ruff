@@ -955,10 +955,12 @@ impl<'db> Signature<'db> {
     /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
     /// If a signature has no positional first parameter, we conservatively keep it.
     pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
             return true;
         }
 
+        // Without a first parameter, there is no receiver annotation to check.
         let Some(first_parameter) = self.parameters.get(0) else {
             return true;
         };
@@ -968,7 +970,8 @@ impl<'db> Signature<'db> {
             return true;
         }
 
-        // Only explicit receiver annotations constrain which overload is exposed.
+        // Inferred receiver annotations describe the method owner, rather than constraining which
+        // overload is exposed for a bound receiver. Only explicit receiver annotations can prune.
         if first_parameter.inferred_annotation {
             return true;
         }
@@ -987,6 +990,7 @@ impl<'db> Signature<'db> {
         // participates in receiver-specific overload pruning.
         expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
 
+        // `Self` binding can make the receiver annotation trivially compatible.
         if accepts_any_or_exact_self(expected_self_ty) {
             return true;
         }
@@ -996,6 +1000,7 @@ impl<'db> Signature<'db> {
             expected_self_ty =
                 expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
 
+            // Specialization can also make the receiver annotation trivially compatible.
             if accepts_any_or_exact_self(expected_self_ty) {
                 return true;
             }
