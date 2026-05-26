@@ -19,14 +19,20 @@ impl super::RequestHandler for CodeActionResolve {
 }
 
 impl super::BackgroundRequestHandler for CodeActionResolve {
-    type Snapshot = Option<DocumentSnapshot>;
+    type Snapshot = std::result::Result<DocumentSnapshot, String>;
 
     fn snapshot(session: &Session, action: &types::CodeAction) -> Self::Snapshot {
-        action
+        let data = action
             .data
             .clone()
-            .and_then(|data| serde_json::from_value(data).ok())
-            .and_then(|uri| session.take_snapshot(uri))
+            .ok_or_else(|| "it doesn't contain Ruff's document URI payload".to_string())?;
+
+        let uri: lsp_types::Url = serde_json::from_value(data)
+            .map_err(|err| format!("its Ruff document URI payload is invalid: {err}"))?;
+
+        session
+            .take_snapshot(uri.clone())
+            .ok_or_else(|| format!("document `{uri}` isn't open"))
     }
 
     fn run_with_snapshot(
@@ -34,8 +40,12 @@ impl super::BackgroundRequestHandler for CodeActionResolve {
         _client: &Client,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
-        let Some(snapshot) = snapshot else {
-            return Ok(action);
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                tracing::warn!("Returning code action unchanged because {err}.");
+                return Ok(action);
+            }
         };
 
         let query = snapshot.query();
