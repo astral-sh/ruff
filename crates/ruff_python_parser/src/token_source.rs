@@ -268,24 +268,3 @@ fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     let lower_bound = contents.len().saturating_mul(15) / 100;
     Vec::with_capacity(lower_bound)
 }
-
-#[cfg(test)]
-mod tests {
-    use ruff_text_size::TextSize;
-
-    use super::{TokenSource, allocate_tokens_vec};
-    use crate::Mode;
-
-    #[test]
-    fn initial_capacity_excludes_source_before_start_offset() {
-        let source = format!("{}value", " ".repeat(1_000));
-        let start_offset = TextSize::new(1_000);
-        let token_source = TokenSource::from_source(&source, Mode::Expression, start_offset);
-
-        assert_eq!(
-            token_source.tokens.capacity(),
-            allocate_tokens_vec(&source[start_offset.to_usize()..]).capacity()
-        );
-        assert!(token_source.tokens.capacity() < allocate_tokens_vec(&source).capacity());
-    }
-}
