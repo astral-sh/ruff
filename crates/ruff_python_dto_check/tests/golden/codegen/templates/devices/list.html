@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Geräte{% endblock %}
+{% block content %}
+<div class="card"><div class="table-responsive"><table class="table table-sm mb-0">
+<thead><tr><th style="width:30px"></th><th>Gerät</th><th>Kunde</th><th>S/N</th><th>Standort</th><th>Aktiv</th></tr></thead>
+<tbody>{% for d in items %}
+<tr class="clickable-row">
+  <td><i class="bi"></i></td>
+  <td><strong>{{ d.display_name }}</strong></td>
+  <td>{{ d.customer.display_name if d.customer else '–' }}</td>
+  <td class="small"><code>{{ d.seriennummer }}</code></td>
+  <td class="small">{{ d.standort or '–' }}</td>
+  <td>{{ 'Ja' if d.aktiv else 'Nein' }}</td>
+</tr>{% else %}<tr><td colspan="6" class="text-center text-muted py-4">Keine Geräte.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

@@ -1,0 +1,46 @@
+# Target spec for the `rust-axum-seaorm` emitter.
+#
+# A target spec maps a classified RouteContract to source. Adding a new
+# framework/language is a new target spec, not new Rust in the crate; adding a
+# new handler-kind to an existing target is an `emit_kinds` entry plus an
+# emitter recipe.
+#
+# CRITICAL — model path correctness (the systematic Sonnet-draft bug):
+#   Flat models live at  crate::models::<module>::Model         (one segment)
+#   ERP models live at   crate::models::erp::<k>::<inner>::Model (genuinely nested)
+# The drafts doubled flat paths to `crate::models::customer::customer::Model`.
+# `module_path` below is the fragment AFTER `models_root` and BEFORE `::Model`,
+# so a flat model is `customer` (NOT `customer::customer`).
+
+id = "rust-axum-seaorm"
+models_root = "crate::models"
+tenant_column = "TenantId"
+
+# Filesystem root of the canonical jinja templates. When set, the list/detail
+# view emitters resolve the contract's template path under this root and emit
+# real columns (header + cell expr translated to askama); otherwise they emit a
+# faithful skeleton. Project-specific — never hardcoded in the crate. Example:
+# templates_root = "/home/user/WoA/templates"
+
+# Kinds this target emits end-to-end. Kinds not listed get a documented stub
+# (never `todo!()` in a compiled path). All 12 emergent kinds are emitted; the
+# minimal TOML reader expects this array on a single line.
+emit_kinds = ["list_for_tenant", "detail_for_tenant", "template_get", "soft_delete", "toggle_bool_field", "get_redirect_shortcut", "csrf_form_post_engine_call", "form_get_post", "ajax_json", "download_blob", "pdf_render", "sa_admin_view", "signed_link_action"]
+
+# --- model mappings ---------------------------------------------------------
+# Flat WoA core models (single-segment module_path).
+[models.Customer]
+module_path = "customer"
+
+[models.Device]
+module_path = "device"
+
+[models.WorkOrder]
+module_path = "work_order"
+
+# ERP models are genuinely nested.
+[models.ErpCashJournal]
+module_path = "erp::k6_cash::cash_journal"
+
+[models.ErpPurchaseOrder]
+module_path = "erp::k11_purchase::purchase_order"
