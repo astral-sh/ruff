@@ -246,6 +246,7 @@ class BaseWithNoMatchingReceiver[T]:
 
 def takes_str_callback(cb: Callable[[], str]) -> None: ...
 def no_matching_receiver(y: BaseWithNoMatchingReceiver[int]) -> None:
+    reveal_type(y.g)  # revealed: Overload[]
     takes_str_callback(y.g)  # error: [invalid-argument-type]
 ```
 
