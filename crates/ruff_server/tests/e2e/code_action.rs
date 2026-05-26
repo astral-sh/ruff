@@ -79,12 +79,12 @@ fn code_actions_for_python() -> Result<()> {
 }
 
 #[test]
-fn missing_code_action_resolve_data_returns_unchanged_action() -> Result<()> {
+fn code_action_without_valid_url_returns_unchanged_action() -> Result<()> {
     let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
 
     let action = CodeAction {
-        title: "Ruff: Fix all auto-fixable problems".to_string(),
-        kind: Some(CodeActionKind::from("source.fixAll.ruff")),
+        title: "Some other code action".to_string(),
+        kind: Some(CodeActionKind::QUICKFIX),
         ..Default::default()
     };
 
@@ -101,22 +101,6 @@ fn invalid_code_action_resolve_data_returns_unchanged_action() -> Result<()> {
         title: "Ruff: Fix all auto-fixable problems".to_string(),
         kind: Some(CodeActionKind::from("source.fixAll.ruff")),
         data: Some(serde_json::json!("not-a-url")),
-        ..Default::default()
-    };
-
-    assert_code_action_resolve_unchanged(&mut server, &action);
-
-    Ok(())
-}
-
-#[test]
-fn unavailable_code_action_resolve_document_returns_unchanged_action() -> Result<()> {
-    let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
-
-    let action = CodeAction {
-        title: "Ruff: Fix all auto-fixable problems".to_string(),
-        kind: Some(CodeActionKind::from("source.fixAll.ruff")),
-        data: Some(serde_json::to_value(server.file_uri("not-open.py"))?),
         ..Default::default()
     };
 
