@@ -2539,6 +2539,28 @@ watermelon
         );
     }
 
+    #[test]
+    fn diagnostics_without_primary_spans_sort_by_concise_message() {
+        let env = TestEnvironment::new();
+        let mut diagnostics = [
+            Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, "checking mod.py"),
+            Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, "checking main.py"),
+        ];
+
+        diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(&env.db)
+                .cmp(&right.rendering_sort_key(&env.db))
+        });
+
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(Diagnostic::primary_message)
+                .collect::<Vec<_>>(),
+            ["checking main.py", "checking mod.py"]
+        );
+    }
+
     /// A small harness for setting up an environment specifically for testing
     /// diagnostic rendering.
     pub(super) struct TestEnvironment {
