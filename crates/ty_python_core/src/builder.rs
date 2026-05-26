@@ -806,6 +806,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return FxHashMap::default();
         }
 
+        // In the common case where we don't have any nested `global` or `nonlocal` declarations at
+        // all, short-circuit so that we don't walk the place table for no reason.
+        if nested_global_or_nonlocal_declarations.is_empty()
+            && this_scope_global_or_nonlocal_declarations.is_empty()
+        {
+            return FxHashMap::default();
+        }
+
         // For each symbol in the (non-module) scope we just popped:
         // 1. If the popped scope is function-like (not a class body), see whether it resolves any
         //    `nonlocal` declarations (legally or illegally) from further nested scopes.
