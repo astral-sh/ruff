@@ -319,8 +319,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     && let Some(generic_context) = class.generic_context(db)
                     && let Some((typevar, declared_variance, required_variance)) =
                         generic_context.variables(db).find_map(|typevar| {
-                            let declared_variance =
-                                typevar.typevar(db).explicit_variance(db)?;
+                            let declared_variance = typevar.typevar(db).explicit_variance(db)?;
                             if declared_variance == TypeVarVariance::Invariant {
                                 return None;
                             }
