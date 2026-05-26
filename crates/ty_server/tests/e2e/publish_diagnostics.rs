@@ -482,6 +482,36 @@ def foo() -> str:
     Ok(())
 }
 
+/// JupyterLab presents notebook virtual documents to language servers as simple text files:
+/// <https://github.com/jupyterlab/jupyterlab/blob/f51404192bf6d0ff79187c884f21e1f91b928146/packages/lsp/src/virtual/document.ts#L308-L314>
+#[test]
+fn on_did_open_ipynb_file_with_python_language() -> Result<()> {
+    let foo = SystemPath::new("src/foo.ipynb");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let [diagnostic] = diagnostics.diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:#?}");
+    };
+
+    insta::assert_snapshot!(
+        diagnostic.message,
+        @"Return type does not match returned value: expected `str`, found `Literal[42]`"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn changing_language_of_file_without_extension() -> Result<()> {
     let foo = SystemPath::new("src/foo");
