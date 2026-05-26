@@ -7,11 +7,15 @@ use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_string_annotation};
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
+use ruff_python_ast::visitor::{
+    Visitor,
+    source_order::{self, SourceOrderVisitor},
+    walk_annotation, walk_expr, walk_keyword, walk_pattern, walk_stmt,
+};
 use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
@@ -74,6 +78,73 @@ use super::place::PlaceExprRef;
 
 mod except_handlers;
 mod loop_bindings_visitor;
+
+struct StringAnnotationUseVisitor<'source, 'names> {
+    source: &'source SourceText,
+    names: &'names mut Vec<Name>,
+    parse_nested_string_annotations: bool,
+}
+
+impl StringAnnotationUseVisitor<'_, '_> {
+    fn visit_string_annotation(&mut self, string_expr: &ast::ExprStringLiteral) {
+        let Some(string_literal) = string_expr.as_single_part_string() else {
+            return;
+        };
+
+        if string_literal.flags.prefix().is_raw()
+            || &self.source[string_literal.content_range()] != string_literal.as_str()
+        {
+            return;
+        }
+
+        let Ok(parsed) = parsed_string_annotation(self.source.as_str(), string_literal) else {
+            return;
+        };
+
+        self.visit_expr(parsed.expr());
+    }
+
+    fn visit_subscript(&mut self, subscript: &ast::ExprSubscript) {
+        self.visit_expr(&subscript.value);
+
+        if dotted_name_last_segment(&subscript.value) == Some("Literal") {
+            // String arguments to `Literal` are values, not forward annotations.
+            self.with_parse_nested_string_annotations(false, |visitor| {
+                visitor.visit_expr(&subscript.slice);
+            });
+            return;
+        }
+
+        self.visit_expr(&subscript.slice);
+    }
+
+    fn with_parse_nested_string_annotations(&mut self, parse: bool, visit: impl FnOnce(&mut Self)) {
+        let previous = std::mem::replace(&mut self.parse_nested_string_annotations, parse);
+        visit(self);
+        self.parse_nested_string_annotations = previous;
+    }
+}
+
+impl<'ast> source_order::SourceOrderVisitor<'ast> for StringAnnotationUseVisitor<'_, '_> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        match expr {
+            ast::Expr::Name(name) => self.names.push(name.id.clone()),
+            ast::Expr::StringLiteral(string) if self.parse_nested_string_annotations => {
+                self.visit_string_annotation(string);
+            }
+            ast::Expr::Subscript(subscript) => self.visit_subscript(subscript),
+            _ => source_order::walk_expr(self, expr),
+        }
+    }
+}
+
+fn dotted_name_last_segment(expr: &ast::Expr) -> Option<&str> {
+    match expr {
+        ast::Expr::Name(name) => Some(name.id.as_str()),
+        ast::Expr::Attribute(attribute) => Some(attribute.attr.id.as_str()),
+        _ => None,
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 struct Loop {
@@ -1398,6 +1469,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
+    }
+
+    fn record_symbol_usage_only(&mut self, name: &Name) {
+        let Some(symbol_id) = self.current_place_table().symbol_id(name) else {
+            return;
+        };
+
+        self.mark_symbol_used(symbol_id);
+        self.current_use_def_map_mut()
+            .mark_symbol_bindings_used(symbol_id);
+    }
+
+    fn record_string_annotation_uses(&mut self, string: &ast::ExprStringLiteral) {
+        let source = source_text(self.db, self.file);
+        let mut names = Vec::new();
+
+        StringAnnotationUseVisitor {
+            source: &source,
+            names: &mut names,
+            parse_nested_string_annotations: true,
+        }
+        .visit_string_annotation(string);
+
+        for name in names {
+            self.record_symbol_usage_only(&name);
+        }
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -3214,7 +3311,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
-                self.visit_expr(&node.annotation);
+                self.visit_annotation(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                     if self.is_method_or_eagerly_executed_in_method().is_some() {
@@ -4233,6 +4330,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 }
 
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
+    fn visit_annotation(&mut self, expr: &'ast ast::Expr) {
+        if let ast::Expr::StringLiteral(string) = expr {
+            self.record_string_annotation_uses(string);
+        }
+
+        walk_annotation(self, expr);
+    }
+
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.push_statement(CurrentStatement::default());
         self.visit_stmt_impl(stmt);
