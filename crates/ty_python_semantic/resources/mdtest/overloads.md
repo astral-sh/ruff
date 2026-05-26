@@ -275,9 +275,8 @@ def union_receiver(reader: Reader[int | str]):
 ## Method type variables inferred from `self`
 
 Binding an overload whose explicit receiver introduces a method type variable should infer that
-variable from the concrete receiver and apply it to the remainder of the signature. At present,
-receiver matching retains the overload, but does not yet apply the inferred `S = str`
-specialization.
+variable from the concrete receiver and apply it to the remainder of the signature. Receiver
+specialization therefore turns `S` into `str` in the bound overload below.
 
 ```toml
 [environment]
@@ -295,16 +294,15 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
-# TODO: revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
-reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
 ```
 
 ## Structural protocol receivers
 
 Checking a generic protocol receiver requires solving all uses of its type variable together. Here
 `get()` would require `int` to be assignable to `T`, while `put()` would require `T` to be
-assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`. At present, the incompatible overload
-is retained because structural receiver specialization is not yet supported.
+assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`. The incompatible explicit
+protocol-receiver overload is therefore removed.
 
 ```py
 from typing import Callable, Protocol, TypeVar, overload
@@ -330,8 +328,215 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
     def put(self, x: str) -> None: ...
 
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
-# TODO: error: [invalid-assignment]
-bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method
+bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method  # error: [invalid-assignment]
+```
+
+## Structural receiver constraints preserve later inference
+
+Binding retains the receiver constraint without defaulting a type variable that only appears in a
+remaining parameter. That variable is still inferred when the bound method is used as a callback.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Callable, Protocol, TypeVar, overload
+
+ProviderT = TypeVar("ProviderT")
+ReceiverT = TypeVar("ReceiverT")
+ValueT = TypeVar("ValueT", default=int)
+
+class Provider(Protocol[ProviderT]):
+    def get(self) -> ProviderT: ...
+    def put(self, value: ProviderT) -> None: ...
+
+class BaseWithPartiallyInferredProtocolSelf:
+    @overload
+    def method(self: Provider[ReceiverT], value: ValueT) -> tuple[ReceiverT, ValueT]: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+class PartialProtocolSelfImplementation(BaseWithPartiallyInferredProtocolSelf):
+    def get(self) -> str:
+        return ""
+
+    def put(self, value: str) -> None: ...
+
+accepted_partial_protocol_receiver: Callable[[str], tuple[str, str]] = PartialProtocolSelfImplementation().method
+```
+
+## Covariant structural receiver inference remains widenable
+
+A covariant protocol receiver constrains a method type variable from below. Binding must not prevent
+a later argument, callback check, or return context from selecting a wider valid specialization.
+
+```py
+from typing import Callable, Protocol, TypeVar, overload
+
+ProviderT_co = TypeVar("ProviderT_co", covariant=True)
+ReceiverT = TypeVar("ReceiverT")
+
+class CovariantProvider(Protocol[ProviderT_co]):
+    def get(self) -> ProviderT_co: ...
+
+class BaseWithCovariantProtocolSelf:
+    @overload
+    def method(self: CovariantProvider[ReceiverT], value: ReceiverT) -> ReceiverT: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+class CovariantProtocolSelfImplementation(BaseWithCovariantProtocolSelf):
+    def get(self) -> str | bytes:
+        return ""
+
+accepted_covariant_protocol_receiver: Callable[[object], object] = CovariantProtocolSelfImplementation().method
+invalid_covariant_protocol_receiver: Callable[[int], int] = (  # error: [invalid-assignment]
+    CovariantProtocolSelfImplementation().method
+)
+reveal_type(CovariantProtocolSelfImplementation().method(1))  # revealed: str | bytes | Literal[1]
+
+class BaseWithContextualCovariantProtocolSelf:
+    def method(
+        self: CovariantProvider[ReceiverT],
+    ) -> list[ReceiverT]:
+        return []
+
+class ContextualCovariantProtocolSelfImplementation(BaseWithContextualCovariantProtocolSelf):
+    def get(self) -> str | bytes:
+        return "value"
+
+contextual_covariant_protocol_receiver: list[object] = ContextualCovariantProtocolSelfImplementation().method()
+```
+
+## Structural receiver constraints preserve multiple solutions
+
+A structural receiver can satisfy a generic protocol receiver with more than one valid
+specialization. Binding keeps that receiver obligation on the generic overload rather than selecting
+either `int` or `str` before the bound method is used.
+
+```py
+from typing import Callable, Protocol, TypeVar, overload
+
+PathT = TypeVar("PathT")
+
+class ProtocolPathSelf(Protocol[PathT]):
+    def get(self) -> list[PathT]: ...
+
+class BaseWithProtocolPathSelf:
+    @overload
+    def method(self: ProtocolPathSelf[PathT]) -> PathT: ...
+    @overload
+    def method(self) -> bytes: ...
+    def method(self) -> object:
+        return b""
+
+class ProtocolPathSelfImplementation(BaseWithProtocolPathSelf):
+    @overload
+    def get(self) -> list[int]: ...
+    @overload
+    def get(self) -> list[str]: ...
+    def get(self) -> list[int] | list[str]:
+        return [1]
+
+path_method = ProtocolPathSelfImplementation().method
+good_projected_path_receiver: Callable[[], int | str] = path_method
+reveal_type(path_method)  # revealed: Overload[[PathT]() -> PathT, () -> bytes]
+bad_projected_path_receiver: Callable[[], None] = path_method  # error: [invalid-assignment]
+```
+
+## Structural receiver constraints remain correlated with call arguments
+
+When a retained receiver obligation has multiple valid paths, argument inference must solve against
+the same path. It must not merge receiver solutions into `int | str` before checking `value`.
+
+```py
+from typing import Protocol, TypeVar, overload
+
+CorrelatedT = TypeVar("CorrelatedT")
+
+class CorrelatedReceiver(Protocol[CorrelatedT]):
+    def get(self) -> list[CorrelatedT]: ...
+
+class BaseWithCorrelatedReceiver:
+    def method(self: CorrelatedReceiver[CorrelatedT], value: CorrelatedT) -> CorrelatedT:
+        return value
+
+class CorrelatedReceiverImplementation(BaseWithCorrelatedReceiver):
+    @overload
+    def get(self) -> list[int]: ...
+    @overload
+    def get(self) -> list[str]: ...
+    def get(self) -> list[int] | list[str]:
+        return [1]
+
+reveal_type(CorrelatedReceiverImplementation().method(1))  # revealed: int
+reveal_type(CorrelatedReceiverImplementation().method("x"))  # revealed: str
+CorrelatedReceiverImplementation().method(b"x")  # error: [invalid-argument-type]
+```
+
+## Generic iterable overload inference remains precise
+
+Inferring through a generic `Iterable` overload must preserve the element specialization when the
+actual argument includes `None`. This is reduced from a `pandas-stubs` ecosystem regression.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar, assert_type, overload
+
+class NDFrame: ...
+
+class Series[T](NDFrame):
+    value: T
+
+class DataFrame(NDFrame): ...
+
+ElementT = TypeVar("ElementT")
+
+@overload
+def concat(objs: Iterable[Series[ElementT] | None]) -> Series[ElementT]: ...
+@overload
+def concat(objs: Iterable[NDFrame | None]) -> DataFrame: ...
+def concat(objs: object) -> NDFrame:
+    return NDFrame()
+
+series: Series[int] = Series()
+assert_type(concat([None, series]), Series[int])
+```
+
+## Narrowed structural path-like values satisfy overloads
+
+When a union is narrowed through `PathLike`, a structural intersection that remains in the narrowed
+type must still satisfy a `PathLike` overload. This is reduced from an `xarray` ecosystem
+regression.
+
+```py
+import os.path
+from os import PathLike
+from typing import Protocol
+
+class ReadBuffer(Protocol):
+    def read(self) -> bytes: ...
+
+class Store: ...
+
+def normalized(value: str | ReadBuffer | Store) -> str | ReadBuffer | Store:
+    return value
+
+def accepts_path(value: str | ReadBuffer | Store) -> None:
+    value = normalized(value)
+    if isinstance(value, str | PathLike):
+        os.path.splitext(value)
 ```
 
 ## Constructor

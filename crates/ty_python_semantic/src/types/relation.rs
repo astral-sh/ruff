@@ -757,6 +757,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    pub(super) fn with_relation(&self, relation: TypeRelation) -> Self {
+        Self {
+            relation,
+            ..self.clone()
+        }
+    }
+
     pub(super) fn into_error_context(self) -> ErrorContextTree<'db> {
         self.context_tree
     }
