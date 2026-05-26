@@ -1254,6 +1254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some((class_literal, _)) = object_ty.class_specialization(db)
         {
             let identity_instance = Type::instance(db, class_literal.identity_specialization(db));
+            let collection_generic_context = class_literal.generic_context(db);
 
             let ast_arguments = [
                 ArgOrKeyword::Arg(&target.slice),
@@ -1278,7 +1279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .bindings(db)
                     .match_parameters(db, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
-                    .with_generic_context(db, class_literal.generic_context(db));
+                    .with_generic_context(db, collection_generic_context);
 
                 let call_result = self.speculate().infer_and_check_argument_types(
                     ArgumentsIter::synthesized(&ast_arguments),
@@ -1304,8 +1305,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         // Record the constraints on the receiver's generic context formed by
                         // the arguments to this dunder call.
-                        let constraints =
-                            identity_instance.apply_specialization(db, call_specialization);
+                        let Some(constraints) = self.collection_use_constraint_from_specialization(
+                            identity_instance,
+                            collection_generic_context,
+                            call_specialization,
+                        ) else {
+                            continue;
+                        };
 
                         self.collection_use_constraints
                             .entry(collection_def)
