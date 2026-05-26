@@ -7,7 +7,7 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::callable::walk_callable_type;
+use crate::types::callable::{CallableTypeKind, walk_callable_type};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -1808,6 +1808,19 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 pub(crate) type TypeVarAssignment<'db> = (BoundTypeVarIdentity<'db>, TypeVarVariance, Type<'db>);
 
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
+    fn should_preserve_inherited_source_typevars(
+        &self,
+        actual_callable: CallableType<'db>,
+    ) -> bool {
+        // Only function-like callables can borrow inherited typevars from an enclosing generic
+        // owner. Other callables should keep existentially quantifying their signature-local
+        // typevars during callable inference.
+        matches!(
+            actual_callable.kind(self.db),
+            CallableTypeKind::FunctionLike
+        )
+    }
+
     pub(crate) fn new(
         db: &'db dyn Db,
         constraints: &'c ConstraintSetBuilder<'db>,
@@ -1957,9 +1970,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         for actual_callable in actual_callables.as_slice() {
             if formal_is_single_paramspec {
-                let when = actual_callable
-                    .signatures(self.db)
-                    .when_constraint_set_assignable_to(self.db, formal_signature, self.constraints);
+                let when = if self.should_preserve_inherited_source_typevars(*actual_callable) {
+                    actual_callable
+                        .signatures(self.db)
+                        .when_constraint_set_assignable_to_preserving_source_inherited(
+                            self.db,
+                            formal_signature,
+                            self.constraints,
+                        )
+                } else {
+                    actual_callable
+                        .signatures(self.db)
+                        .when_constraint_set_assignable_to(
+                            self.db,
+                            formal_signature,
+                            self.constraints,
+                        )
+                };
                 self.add_type_mappings_from_constraint_set(formal, when, &mut *f)?;
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
@@ -1967,11 +1994,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // overloads, and only report an error if none of them are satisfiable.
                 let mut any_satisfiable = false;
                 for actual_signature in &actual_callable.signatures(self.db).overloads {
-                    let when = actual_signature.when_constraint_set_assignable_to_signatures(
-                        self.db,
-                        formal_signature,
-                        self.constraints,
-                    );
+                    let when = if self.should_preserve_inherited_source_typevars(*actual_callable) {
+                        actual_signature
+                            .when_constraint_set_assignable_to_signatures_preserving_source_inherited(
+                                self.db,
+                                formal_signature,
+                                self.constraints,
+                            )
+                    } else {
+                        actual_signature.when_constraint_set_assignable_to_signatures(
+                            self.db,
+                            formal_signature,
+                            self.constraints,
+                        )
+                    };
                     if self
                         .add_type_mappings_from_constraint_set(formal, when, &mut *f)
                         .is_ok()
