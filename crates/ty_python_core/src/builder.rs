@@ -2515,6 +2515,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_decorator(decorator);
                 }
 
+                // Evaluate default args before we visit the body. If the default expression ends
+                // up looking at locally bound variables, `nonlocal` or `global` assignments in the
+                // body shouldn't affect their inferred values. For example:
+                // ```
+                // x = 1
+                // def f(y=reveal_type(x)):  # Literal[1]
+                //     global x
+                //     x = 2
+                // reveal_type(x)  # Literal[1, 2]
+                // ```
+                for default in parameters
+                    .iter_non_variadic_params()
+                    .filter_map(|param| param.default.as_deref())
+                {
+                    self.visit_expr(default);
+                }
+
                 let nested_bindings = self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
                     type_params.as_deref(),
@@ -2581,14 +2598,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // and its `global` counterpart.
                 self.synthesize_nested_binding_definitions(nested_bindings);
 
-                // The default value of the parameters needs to be evaluated in the
-                // enclosing scope.
-                for default in parameters
-                    .iter_non_variadic_params()
-                    .filter_map(|param| param.default.as_deref())
-                {
-                    self.visit_expr(default);
-                }
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
