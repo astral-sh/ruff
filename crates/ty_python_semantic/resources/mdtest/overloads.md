@@ -274,9 +274,9 @@ def union_receiver(reader: Reader[int | str]):
 ## Method type variables inferred from `self`
 
 Binding an overload whose explicit receiver introduces a method type variable should infer that
-variable from the concrete receiver and apply it to the remainder of the signature. This behavior is
-intentionally deferred on this branch: receiver matching retains the overload, but does not yet
-apply the inferred `S = str` specialization.
+variable from the concrete receiver and apply it to the remainder of the signature. At present,
+receiver matching retains the overload, but does not yet apply the inferred `S = str`
+specialization.
 
 ```toml
 [environment]
@@ -302,8 +302,8 @@ reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -
 
 Checking a generic protocol receiver requires solving all uses of its type variable together. Here
 `get()` would require `int` to be assignable to `T`, while `put()` would require `T` to be
-assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`. Structural receiver specialization is
-deferred on this branch, so the incompatible overload is currently retained.
+assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`. At present, the incompatible overload
+is retained because structural receiver specialization is not yet supported.
 
 ```py
 from typing import Callable, Protocol, TypeVar, overload
