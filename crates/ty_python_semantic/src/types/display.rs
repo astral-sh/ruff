@@ -1221,6 +1221,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         string.display_with(self.db, self.settings.clone()),
                     )
                 }
+                // We used to return `str` as the type here because that feels generally more useful.
+                // However, the inoncistency between the type shown in the inlay hint and its hover, and the
+                // inconsistency to what's shown when hovering the backed inlay hint of a `LiteralString`
+                // convinvced us that we should change the type to `LiteralString`.
                 LiteralValueTypeKind::LiteralString => f
                     .with_type(Type::SpecialForm(SpecialFormType::LiteralString))
                     .write_str("LiteralString"),
