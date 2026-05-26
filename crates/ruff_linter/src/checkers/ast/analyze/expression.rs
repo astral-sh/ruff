@@ -8,7 +8,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::{
-    is_future_required_preview_generics_enabled, is_up006_future_annotations_fix_enabled,
+    is_future_required_preview_generics_enabled, is_pie810_any_genexp_enabled,
+    is_up006_future_annotations_fix_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{
@@ -805,7 +806,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryRangeStart) {
                 flake8_pie::rules::unnecessary_range_start(checker, call);
             }
-            if checker.is_rule_enabled(Rule::MultipleStartsEndsWith) {
+            if checker.is_rule_enabled(Rule::MultipleStartsEndsWith)
+                && is_pie810_any_genexp_enabled(checker.settings())
+            {
                 flake8_pie::rules::multiple_starts_ends_with_any(checker, call);
             }
             if checker.is_rule_enabled(Rule::ExecBuiltin) {

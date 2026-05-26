@@ -162,3 +162,103 @@ help: Merge into a single `startswith` call
 85 |
 86 |
 note: This is an unsafe fix and may change runtime behavior
+
+PIE810 [*] Call `startswith` once with a `tuple`
+  --> PIE810.py:92:4
+   |
+90 | # safe to fold; anything else is not (str.startswith rejects non-tuple).
+91 | msg = "Hello, world!"
+92 | if any(msg.startswith(p) for p in ("Hello", "Hi")):  # Error
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+93 |     print("greet")
+   |
+help: Merge into a single `startswith` call
+89 | # same anti-pattern this rule catches for chained `or`. Tuple/list literals are
+90 | # safe to fold; anything else is not (str.startswith rejects non-tuple).
+91 | msg = "Hello, world!"
+   - if any(msg.startswith(p) for p in ("Hello", "Hi")):  # Error
+92 + if msg.startswith(("Hello", "Hi")):  # Error
+93 |     print("greet")
+94 |
+95 | if any(msg.endswith(p) for p in ("!", "?")):  # Error
+note: This is an unsafe fix and may change runtime behavior
+
+PIE810 [*] Call `endswith` once with a `tuple`
+  --> PIE810.py:95:4
+   |
+93 |     print("greet")
+94 |
+95 | if any(msg.endswith(p) for p in ("!", "?")):  # Error
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+96 |     print("punct")
+   |
+help: Merge into a single `endswith` call
+92 | if any(msg.startswith(p) for p in ("Hello", "Hi")):  # Error
+93 |     print("greet")
+94 |
+   - if any(msg.endswith(p) for p in ("!", "?")):  # Error
+95 + if msg.endswith(("!", "?")):  # Error
+96 |     print("punct")
+97 |
+98 | if any(msg.startswith(p) for p in ["a", "b", "c"]):  # Error (list literal also folded to tuple)
+note: This is an unsafe fix and may change runtime behavior
+
+PIE810 [*] Call `startswith` once with a `tuple`
+  --> PIE810.py:98:4
+   |
+96 |     print("punct")
+97 |
+98 | if any(msg.startswith(p) for p in ["a", "b", "c"]):  # Error (list literal also folded to tuple)
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+99 |     print("yes")
+   |
+help: Merge into a single `startswith` call
+95  | if any(msg.endswith(p) for p in ("!", "?")):  # Error
+96  |     print("punct")
+97  |
+    - if any(msg.startswith(p) for p in ["a", "b", "c"]):  # Error (list literal also folded to tuple)
+98  + if msg.startswith(("a", "b", "c")):  # Error (list literal also folded to tuple)
+99  |     print("yes")
+100 |
+101 | if any([msg.startswith(p) for p in ("x", "y")]):  # Error (list comprehension form)
+note: This is an unsafe fix and may change runtime behavior
+
+PIE810 [*] Call `startswith` once with a `tuple`
+   --> PIE810.py:101:4
+    |
+ 99 |     print("yes")
+100 |
+101 | if any([msg.startswith(p) for p in ("x", "y")]):  # Error (list comprehension form)
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+102 |     print("yes")
+    |
+help: Merge into a single `startswith` call
+98  | if any(msg.startswith(p) for p in ["a", "b", "c"]):  # Error (list literal also folded to tuple)
+99  |     print("yes")
+100 |
+    - if any([msg.startswith(p) for p in ("x", "y")]):  # Error (list comprehension form)
+101 + if msg.startswith(("x", "y")):  # Error (list comprehension form)
+102 |     print("yes")
+103 |
+104 | if any(msg.startswith(p) for p in (("a", "b"), "c")):  # Error (nested tuple element is flattened)
+note: This is an unsafe fix and may change runtime behavior
+
+PIE810 [*] Call `startswith` once with a `tuple`
+   --> PIE810.py:104:4
+    |
+102 |     print("yes")
+103 |
+104 | if any(msg.startswith(p) for p in (("a", "b"), "c")):  # Error (nested tuple element is flattened)
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+105 |     print("yes")
+    |
+help: Merge into a single `startswith` call
+101 | if any([msg.startswith(p) for p in ("x", "y")]):  # Error (list comprehension form)
+102 |     print("yes")
+103 |
+    - if any(msg.startswith(p) for p in (("a", "b"), "c")):  # Error (nested tuple element is flattened)
+104 + if msg.startswith(("a", "b", "c")):  # Error (nested tuple element is flattened)
+105 |     print("yes")
+106 |
+107 | prefixes = ("a", "b")
+note: This is an unsafe fix and may change runtime behavior

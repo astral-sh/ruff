@@ -37,6 +37,37 @@ use crate::{Edit, Fix};
 ///     print("Greetings!")
 /// ```
 ///
+/// ## Preview
+/// When [preview] is enabled, the equivalent `any(...)` form is also flagged:
+///
+/// ```python
+/// any(msg.startswith(p) for p in ("x", "y"))
+/// ```
+///
+/// is rewritten to:
+///
+/// ```python
+/// msg.startswith(("x", "y"))
+/// ```
+///
+/// To avoid changing semantics, the `any(...)` rewrite only fires when all of:
+///
+/// - the call is the builtin `any(...)` — `all(...)` is intentionally left
+///   alone since `all(s.startswith(p) for p in xs)` and
+///   `s.startswith(tuple(xs))` differ when `xs` is empty;
+/// - the single argument is a generator expression or list comprehension
+///   with exactly one non-`async` clause and no `if` filter;
+/// - the element is `<receiver>.startswith(<target>)` (or `endswith`) with
+///   exactly the loop variable as its only positional argument;
+/// - the receiver is a bare name — `obj.field.startswith(...)` or
+///   `f().startswith(...)` is left alone since the latter would change the
+///   number of `f()` calls (N lazy under `any` short-circuiting → 1 eager);
+/// - the iterable is a tuple or list literal — bare-name iterables can't be
+///   proven to be a tuple at runtime, and `str.startswith` rejects lists
+///   and sets at runtime.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
+///
 /// ## Fix safety
 /// This rule's fix is unsafe, as in some cases, it will be unable to determine
 /// whether the argument to an existing `.startswith` or `.endswith` call is a
@@ -45,11 +76,12 @@ use crate::{Edit, Fix};
 /// the rule will suggest `msg.startswith((x, y))`, which will error at
 /// runtime.
 ///
-/// For the `any(s.startswith(p) for p in (...))` form, the fix is also unsafe
-/// because elements of the iterable are evaluated eagerly when assembled into
-/// the tuple — if the iterable contains side-effecting expressions, those
-/// side effects originally executed lazily as `any` short-circuited; after
-/// the fix they all run before `startswith` is called.
+/// For the `any(s.startswith(p) for p in (...))` form (enabled in preview),
+/// the fix is also unsafe because elements of the iterable are evaluated
+/// eagerly when assembled into the tuple. If the iterable contains
+/// side-effecting expressions, those side effects originally executed lazily
+/// as `any` short-circuited; after the fix they all run before `startswith`
+/// is called.
 ///
 /// ## References
 /// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
@@ -347,9 +379,22 @@ pub(crate) fn multiple_starts_ends_with_any(checker: &Checker, call: &ast::ExprC
         call.range(),
     );
 
-    // Build `<receiver>.<attr>((<elts...>))`.
+    // Build `<receiver>.<attr>((<elts...>))`. Flatten nested tuple elements so
+    // that e.g. `any(s.startswith(p) for p in (("a", "b"), "c"))` collapses to
+    // `s.startswith(("a", "b", "c"))`, matching the `BoolOp` path's behavior
+    // for `s.startswith(("a", "b")) or s.startswith("c")`.
     let tuple_arg = Expr::Tuple(ast::ExprTuple {
-        elts: elts.to_vec(),
+        elts: elts
+            .iter()
+            .flat_map(|value| {
+                if let Expr::Tuple(tuple) = value {
+                    Left(tuple.iter())
+                } else {
+                    Right(iter::once(value))
+                }
+            })
+            .cloned()
+            .collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
