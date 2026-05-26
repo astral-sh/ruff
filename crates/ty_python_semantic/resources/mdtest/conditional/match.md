@@ -51,8 +51,9 @@ def sequence_star_pattern_is_not_exhaustive_for_text(paths: Sequence[str]) -> No
             raise ValueError
 
     # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but sequence
-    # patterns explicitly do not match them.
-    reveal_type(paths)  # revealed: str
+    # patterns explicitly do not match them. Empty `bytes` and `bytearray`
+    # values can also inhabit `Sequence[str]`.
+    reveal_type(paths)  # revealed: str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
 
 def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
     match paths:

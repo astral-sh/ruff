@@ -2802,12 +2802,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     LiteralValueTypeKind::Bool(_) => {
                         KnownClass::Bool.when_subclass_of(db, instance.class(db), self.constraints)
                     }
-                    LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::String(_) => {
-                        KnownClass::Str.when_subclass_of(db, instance.class(db), self.constraints)
-                    }
-                    LiteralValueTypeKind::Bytes(_) => {
-                        KnownClass::Bytes.when_subclass_of(db, instance.class(db), self.constraints)
-                    }
+                    LiteralValueTypeKind::LiteralString => self
+                        .as_relation_checker(TypeRelation::Subtyping)
+                        .check_type_pair(
+                            db,
+                            Type::string_literal(db, ""),
+                            Type::NominalInstance(instance),
+                        ),
+                    LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => self
+                        .as_relation_checker(TypeRelation::Subtyping)
+                        .check_type_pair(
+                            db,
+                            Type::LiteralValue(literal),
+                            Type::NominalInstance(instance),
+                        ),
                     LiteralValueTypeKind::Enum(enum_literal) => self
                         .as_relation_checker(TypeRelation::Subtyping)
                         .check_type_pair(

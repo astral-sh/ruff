@@ -159,12 +159,12 @@ from collections.abc import Sequence
 def test_match_star(x: Sequence[int] | int) -> None:
     match x:
         case [*rest]:
-            reveal_type(x)  # revealed: (Sequence[int] & ~bytes & ~bytearray) | (int & Sequence[object])
+            reveal_type(x)  # revealed: (Sequence[int] & ~str & ~bytes & ~bytearray) | (int & Sequence[object])
         case _:
             # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but
-            # sequence patterns explicitly do not match them. `bytes` and
-            # `bytearray` are possible inhabitants of `Sequence[int]`.
-            reveal_type(x)  # revealed: (int & ~Sequence[object]) | bytes | bytearray
+            # sequence patterns explicitly do not match them. The empty string,
+            # `bytes`, and `bytearray` are possible inhabitants of `Sequence[int]`.
+            reveal_type(x)  # revealed: (int & ~Sequence[object]) | (Sequence[int] & str) | bytes | bytearray
 
 def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
     match x:

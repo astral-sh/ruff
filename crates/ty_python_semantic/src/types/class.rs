@@ -40,7 +40,7 @@ use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable,
+    VarianceInferable, any_over_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -55,6 +55,7 @@ use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
+use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::definition::Definition;
 use ty_python_core::{place_table, use_def_map};
 
@@ -1060,6 +1061,61 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns generic MRO origins whose element specialization does not constrain empty values
+    /// of this class.
+    pub(crate) fn empty_sequence_mro_generic_origins(
+        self,
+        db: &'db dyn Db,
+    ) -> Vec<StaticClassLiteral<'db>> {
+        let mut origins = Vec::new();
+        let extend_known_class_origins =
+            |known_class: KnownClass, origins: &mut Vec<StaticClassLiteral<'db>>| {
+                origins.extend(
+                    known_class
+                        .to_class_literal(db)
+                        .to_class_type(db)
+                        .into_iter()
+                        .flat_map(|class| class.iter_mro(db))
+                        .filter_map(ClassBase::into_class)
+                        .filter_map(ClassType::into_generic_alias)
+                        .map(|alias| alias.origin(db)),
+                );
+            };
+
+        let has_empty_tuple_inhabitant = Type::instance(db, self)
+            .as_nominal_instance()
+            .is_some_and(|instance| {
+                instance.tuple_spec(db).is_some_and(|tuple| {
+                    instance.own_tuple_spec(db).is_none() || tuple.len().minimum() == 0
+                })
+            });
+
+        if has_empty_tuple_inhabitant {
+            extend_known_class_origins(KnownClass::Tuple, &mut origins);
+        }
+
+        for base in self.iter_mro(db).filter_map(ClassBase::into_class) {
+            let is_empty_sequence_builtin =
+                matches!(
+                    base.known(db),
+                    Some(KnownClass::Str | KnownClass::Bytes | KnownClass::Bytearray)
+                ) || (matches!(base.name(db).as_str(), "range" | "memoryview")
+                    && file_to_module(db, base.class_literal(db).file(db))
+                        .is_some_and(|module| module.is_known(db, KnownModule::Builtins)));
+
+            if is_empty_sequence_builtin {
+                origins.extend(
+                    base.iter_mro(db)
+                        .filter_map(ClassBase::into_class)
+                        .filter_map(ClassType::into_generic_alias)
+                        .map(|alias| alias.origin(db)),
+                );
+            }
+        }
+
+        origins
+    }
+
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.class_literal(db).is_final(db)
@@ -1251,6 +1307,7 @@ impl<'db> ClassType<'db> {
         );
         checker.classes_could_coexist_in_mro(db, self, other)
     }
+
     /// Return a type representing "the set of all instances of the metaclass of this class".
     pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
         self
@@ -1942,6 +1999,17 @@ impl<'db> DisjointnessChecker<'_, '_, 'db> {
             );
         }
 
+        // Empty tuples and empty-capable sequence builtins have no element constraint. Do not
+        // treat generic bases that they contribute (such as `Sequence[...]`) as independent
+        // constraints.
+        let mut empty_sequence_mro_generic_origins = left.empty_sequence_mro_generic_origins(db);
+        empty_sequence_mro_generic_origins.extend(right.empty_sequence_mro_generic_origins(db));
+
+        let left_covariantly_variable_origins =
+            Self::covariantly_variable_mro_generic_origins(db, left);
+        let right_covariantly_variable_origins =
+            Self::covariantly_variable_mro_generic_origins(db, right);
+
         let right_generic_bases: Vec<_> = right
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -1954,14 +2022,28 @@ impl<'db> DisjointnessChecker<'_, '_, 'db> {
             .filter_map(ClassType::into_generic_alias)
             .any(|left_alias| {
                 right_generic_bases.iter().any(|right_alias| {
-                    left_alias.origin(db) == right_alias.origin(db)
-                        && self
-                            .check_specialization_pair_in_mro(
+                    let origin = left_alias.origin(db);
+                    origin == right_alias.origin(db)
+                        && !empty_sequence_mro_generic_origins.contains(&origin)
+                        && if left_covariantly_variable_origins.contains(&origin)
+                            && right_covariantly_variable_origins.contains(&origin)
+                        {
+                            // Retain covariant overlap while still rejecting invariant
+                            // specialization conflicts on this inherited generic base.
+                            self.check_specialization_pair(
                                 db,
                                 left_alias.specialization(db),
                                 right_alias.specialization(db),
                             )
                             .is_always_satisfied(db)
+                        } else {
+                            self.check_specialization_pair_in_mro(
+                                db,
+                                left_alias.specialization(db),
+                                right_alias.specialization(db),
+                            )
+                            .is_always_satisfied(db)
+                        }
                 })
             })
         {
@@ -2018,6 +2100,38 @@ impl<'db> DisjointnessChecker<'_, '_, 'db> {
         }
 
         true
+    }
+
+    fn covariantly_variable_mro_generic_origins(
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+    ) -> Vec<StaticClassLiteral<'db>> {
+        if Type::instance(db, class)
+            .as_nominal_instance()
+            .is_some_and(|instance| instance.own_tuple_spec(db).is_some())
+        {
+            return Vec::new();
+        }
+
+        let Some(alias) = class.into_generic_alias() else {
+            return Vec::new();
+        };
+
+        alias
+            .origin(db)
+            .identity_specialization(db)
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .filter(|base| {
+                base.specialization(db).types(db).iter().copied().any(|ty| {
+                    any_over_type(db, ty, true, |ty| {
+                        matches!(ty, Type::TypeVar(typevar) if typevar.variance(db).is_covariant())
+                    })
+                })
+            })
+            .map(|base| base.origin(db))
+            .collect()
     }
 
     fn class_mro_entry_matches(

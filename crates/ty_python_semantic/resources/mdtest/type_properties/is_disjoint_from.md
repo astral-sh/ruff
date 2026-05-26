@@ -144,8 +144,8 @@ static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ## Generic specializations and generic bases
 
 ```py
-from typing import Any, Generic, Sequence, TypeVar, final
-from typing_extensions import Never, TypeAlias, disjoint_base
+from typing import AbstractSet, Any, Generic, Literal, Sequence, TypeVar, final
+from typing_extensions import LiteralString, Never, TypeAlias, disjoint_base
 from ty_extensions import Intersection, is_disjoint_from, static_assert
 
 class A: ...
@@ -186,6 +186,15 @@ class FinalInvSubInt(Invariant[int]):
 class Covariant(Generic[T_co]):
     def get(self) -> T_co:
         raise NotImplementedError()
+
+class DerivedCovariant(Covariant[T_co], Generic[T_co]):
+    pass
+
+class Mixed(Generic[T, U_co]):
+    pass
+
+class DerivedMixed(Mixed[T, U_co], Generic[T, U_co]):
+    pass
 
 class CoSubB(Covariant[B]):
     pass
@@ -243,6 +252,9 @@ static_assert(not is_disjoint_from(type[FinalInvSubInt], type[Invariant[Any]]))
 static_assert(not is_disjoint_from(WithMeta, A))
 
 static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
+static_assert(not is_disjoint_from(DerivedCovariant[FinalA], Covariant[FinalB]))
+static_assert(not is_disjoint_from(frozenset[int], AbstractSet[str]))
+static_assert(is_disjoint_from(DerivedMixed[int, FinalA], Mixed[str, FinalB]))
 static_assert(not is_disjoint_from(Covariant[A], CoSubB))
 static_assert(not is_disjoint_from(Covariant[A], CoSubNever))
 static_assert(not is_disjoint_from(CoSubNever, Covariant[A]))
@@ -267,8 +279,22 @@ class RecursiveRight(Covariant["type[RecursiveRight]"]):
 static_assert(not is_disjoint_from(type[RecursiveLeft], type[RecursiveRight]))
 
 static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
-static_assert(is_disjoint_from(str, Sequence[int]))
+static_assert(not is_disjoint_from(Literal[""], Sequence[int]))
+static_assert(is_disjoint_from(Literal["x"], Sequence[int]))
+static_assert(not is_disjoint_from(str, Sequence[int]))
 static_assert(not is_disjoint_from(str, Sequence[str]))
+static_assert(not is_disjoint_from(LiteralString, Sequence[int]))
+static_assert(not is_disjoint_from(Literal[b""], Sequence[str]))
+static_assert(is_disjoint_from(Literal[b"x"], Sequence[str]))
+static_assert(not is_disjoint_from(bytes, Sequence[str]))
+static_assert(not is_disjoint_from(bytearray, Sequence[str]))
+static_assert(not is_disjoint_from(range, Sequence[str]))
+static_assert(not is_disjoint_from(memoryview, Sequence[str]))
+
+# Empty values satisfy both inherited sequence specializations.
+class StrInts(str, Sequence[int]): ...
+class BytesStr(bytes, Sequence[str]): ...
+class BytearrayStr(bytearray, Sequence[str]): ...
 ```
 
 ## Generic type aliases
@@ -430,6 +456,8 @@ static_assert(is_disjoint_from(I, J))
 ## Tuple types
 
 ```py
+from collections.abc import Sequence
+from typing import Generic, TypeVar
 from typing_extensions import Literal, Never
 from ty_extensions import TypeOf, is_disjoint_from, static_assert
 
@@ -455,6 +483,32 @@ class BothTupleSubclasses(OneIntTuple, TwoIntsTuple): ...
 
 # Tuple subclasses with incompatible inherited element specs can share a runtime subclass.
 static_assert(not is_disjoint_from(OneIntTuple, TwoIntsTuple))
+
+class IntTuples(tuple[int, ...]): ...
+class StrTuples(tuple[str, ...]): ...
+
+# Variadic tuple subclasses with disjoint element types can both contain the empty tuple.
+static_assert(not is_disjoint_from(IntTuples, StrTuples))
+
+class StrSequence(Sequence[str]): ...
+
+static_assert(not is_disjoint_from(IntTuples, StrSequence))
+static_assert(not is_disjoint_from(tuple[str, ...], Sequence[int]))
+static_assert(not is_disjoint_from(tuple[()], Sequence[int]))
+static_assert(is_disjoint_from(tuple[str], Sequence[int]))
+
+# Both class definitions are valid because their only shared instances may be empty tuples.
+class BothVariadicTuples(IntTuples, StrTuples): ...
+class BothTupleSequence(IntTuples, StrSequence): ...
+
+T = TypeVar("T")
+
+class Invariant(Generic[T]): ...
+class IntInvariantTuples(tuple[int, ...], Invariant[int]): ...
+class StrInvariantTuples(tuple[str, ...], Invariant[str]): ...
+
+# Generic bases unrelated to `tuple` can still make tuple subclasses disjoint.
+static_assert(is_disjoint_from(IntInvariantTuples, StrInvariantTuples))
 
 # TODO: should pass
 static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [static-assert-error]
