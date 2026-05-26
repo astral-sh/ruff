@@ -138,6 +138,16 @@ class Foo3:
 foo3 = Foo3()
 reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
 reveal_type(foo3.takes_self_or_int(1))  # revealed: int
+```
+
+## Explicit receiver annotations
+
+Binding a method filters overloads that explicitly annotate `self` with a type that cannot accept
+the bound receiver. The `Child`-specific overload is therefore unavailable when accessing the method
+through `Base`, but is retained for `Child`.
+
+```py
+from typing import overload
 
 class Base:
     @overload
@@ -153,13 +163,18 @@ reveal_type(Base().narrowed)  # revealed: bound method Base.narrowed(x: int) -> 
 reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
 
+## Specialized generic receivers
+
+An explicit receiver annotation can also select overloads based on a generic class specialization.
+The following examples require Python 3.12 syntax for type parameters.
+
 ```toml
 [environment]
 python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Callable, Generic, Protocol, TypeVar, overload
+from typing import overload
 
 class Box[T]:
     # Use the class type parameter so specializations remain meaningful.
@@ -174,6 +189,20 @@ class Box[T]:
 
 reveal_type(Box[int]().specialized)  # revealed: bound method Box[int].specialized(x: int) -> int
 reveal_type(Box[str]().specialized)  # revealed: Overload[(x: str) -> str, (x: int) -> int]
+```
+
+## Nominal receiver mismatches
+
+`BaseForAny[Any]` has a dynamic type argument, but it is not necessarily an instance of its subclass
+`ChildForAny`. Binding `g` must still remove the overload restricted to that subclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, overload
 
 class BaseForAny[T]:
     value: T
@@ -192,6 +221,19 @@ def takes_base_any(base: BaseForAny[Any]) -> None:
     reveal_type(base.g)  # revealed: bound method BaseForAny[Any].g() -> int
     reveal_type(base.g())  # revealed: int
     accepts_bytes_callback(base.g)  # error: [invalid-argument-type]
+```
+
+## No matching explicit receiver
+
+When none of the explicitly annotated receivers accept the bound object, no overload is exposed.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, overload
 
 class BaseWithNoMatchingReceiver[T]:
     value: T
@@ -206,6 +248,15 @@ class BaseWithNoMatchingReceiver[T]:
 def takes_str_callback(cb: Callable[[], str]) -> None: ...
 def no_matching_receiver(y: BaseWithNoMatchingReceiver[int]) -> None:
     takes_str_callback(y.g)  # error: [invalid-argument-type]
+```
+
+## Union receivers
+
+A receiver specialized with a union is not specifically a `Reader[int]` or a `Reader[str]`, so
+neither restricted overload is exposed.
+
+```py
+from typing import Generic, TypeVar, overload
 
 T_co = TypeVar("T_co", covariant=True)
 
@@ -219,6 +270,22 @@ class Reader(Generic[T_co]):
 
 def union_receiver(reader: Reader[int | str]):
     reveal_type(reader.get)  # revealed: Overload[]
+```
+
+## Method type variables inferred from `self`
+
+Binding an overload whose explicit receiver introduces a method type variable should infer that
+variable from the concrete receiver and apply it to the remainder of the signature. This behavior is
+intentionally deferred on this branch: receiver matching retains the overload, but does not yet
+apply the inferred `S = str` specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import overload
 
 class ReceiverGeneric[T]:
     @overload
@@ -228,12 +295,19 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
-# TODO: Binding this method to `ReceiverGeneric[str]` should infer `S = str` from
-# its explicit receiver annotation and apply that specialization to the remaining
-# parameter and return type. We currently only use the receiver to keep or discard
-# an overload, so the retained overload still exposes unspecialized `S`.
 # TODO: revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
 reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+```
+
+## Structural protocol receivers
+
+Checking a generic protocol receiver requires solving all uses of its type variable together. Here
+`get()` would require `int` to be assignable to `T`, while `put()` would require `T` to be
+assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`. Structural receiver specialization is
+deferred on this branch, so the incompatible overload is currently retained.
+
+```py
+from typing import Callable, Protocol, TypeVar, overload
 
 ProtocolSelfT = TypeVar("ProtocolSelfT")
 
@@ -256,11 +330,6 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
     def put(self, x: str) -> None: ...
 
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
-# TODO: `ProtocolSelfImplementation` cannot satisfy `ProtocolSelf[T]` for any `T`:
-# `get()` requires `int` to be assignable to `T`, while `put()` requires `T` to
-# be assignable to `str`. The explicit protocol-receiver overload should therefore
-# be removed, leaving only `() -> bytes`. We currently do not infer and reject
-# this generic structural receiver overload.
 # TODO: error: [invalid-assignment]
 bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method
 ```
