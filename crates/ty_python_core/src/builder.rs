@@ -55,7 +55,7 @@ use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedDefinitionId,
+    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, PreviousDefinitions, ScopedDefinitionId,
     ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
 use crate::{Db, Statement, StatementNodeKey};
@@ -1417,7 +1417,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     PreviousDefinitions::AreShadowed
                 };
-                use_def.record_binding(place, definition, previous_definitions);
+                use_def.record_binding(
+                    place,
+                    definition,
+                    previous_definitions,
+                    FutureDefinitions::ShadowThisOne,
+                );
                 if !is_loop_header {
                     self.delete_associated_bindings(place);
                 }
@@ -1626,7 +1631,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.current_use_def_map_mut().record_binding(
                 place,
                 definition,
+                // Nested bindings definitions are like loop headers in that they don't shadow
+                // prior bindings, but they're different in that they *also* don't get shadowed by
+                // bindings that come later. The idea is that nested functions can be called at any
+                // time, so these bindings are effectively always visible after their function
+                // definitions.
                 PreviousDefinitions::AreKept,
+                FutureDefinitions::DontShadowThisOne,
             );
         }
     }
