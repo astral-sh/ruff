@@ -455,7 +455,7 @@ fn emit_soft_delete(contract: &RouteContract, spec: &TargetSpec) -> Emitted {
             let column = mapping.column_path(&spec.models_root);
             let model_use = format!("crate::models::{}", mapping.module_path);
             let primary_param = params.first().copied().unwrap_or("id");
-            let param_sig = param_signature(&params);
+            let param_sig = param_signature(&contract.inputs.path_params);
 
             let scope_filter = if contract.data.tenant_scoped
                 || contract.guards.iter().any(|g| g.contains("get_owned"))
@@ -553,13 +553,37 @@ fn emit_soft_delete(contract: &RouteContract, spec: &TargetSpec) -> Emitted {
     }
 }
 
-fn param_signature(params: &[&str]) -> String {
-    match params.len() {
-        0 => String::new(),
-        1 => format!("    Path({}): Path<i32>,\n", params[0]),
+/// Map a Flask path converter to the Rust extractor type. Flask's DEFAULT
+/// converter (a bare `<id>`) is `string`, so anything that isn't explicitly
+/// `int`/`float` extracts as `String` — `string`, `path`, `uuid`, and bare
+/// params alike (uuid stays `String`; no uuid dependency in the target).
+fn flask_conv_to_rust(converter: Option<&str>) -> &'static str {
+    match converter {
+        Some("int") => "i32",
+        Some("float") => "f64",
+        _ => "String",
+    }
+}
+
+fn param_signature(params: &[crate::contract::PathParam]) -> String {
+    match params {
+        [] => String::new(),
+        [p] => format!(
+            "    Path({}): Path<{}>,\n",
+            p.name,
+            flask_conv_to_rust(p.converter.as_deref())
+        ),
         _ => {
-            let names = params.join(", ");
-            let tys = vec!["i32"; params.len()].join(", ");
+            let names = params
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let tys = params
+                .iter()
+                .map(|p| flask_conv_to_rust(p.converter.as_deref()))
+                .collect::<Vec<_>>()
+                .join(", ");
             format!("    Path(({names})): Path<({tys})>,\n")
         }
     }
@@ -597,7 +621,7 @@ fn emit_detail_for_tenant(contract: &RouteContract, spec: &TargetSpec) -> Emitte
     let axum = axum_path(&contract.path);
     let template_doc = template_path_of(contract);
     let params: Vec<&str> = path_param_names(contract);
-    let param_sig = param_signature(&params);
+    let param_sig = param_signature(&contract.inputs.path_params);
     let primary_param = params.first().copied().unwrap_or("id");
 
     let (referenced_models, model_block) = match primary_model(contract, spec) {
@@ -747,7 +771,7 @@ fn emit_toggle_bool_field(contract: &RouteContract, spec: &TargetSpec) -> Emitte
     let fn_name = &contract.function;
     let axum = axum_path(&contract.path);
     let params = path_param_names(contract);
-    let param_sig = param_signature(&params);
+    let param_sig = param_signature(&contract.inputs.path_params);
     let primary_param = params.first().copied().unwrap_or("id");
     let redirect_target = redirect_target_of(contract);
 
@@ -859,8 +883,7 @@ fn emit_get_redirect_shortcut(contract: &RouteContract, _spec: &TargetSpec) -> E
 fn emit_csrf_form_post(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
     let fn_name = &contract.function;
     let axum = axum_path(&contract.path);
-    let params = path_param_names(contract);
-    let param_sig = param_signature(&params);
+    let param_sig = param_signature(&contract.inputs.path_params);
     let redirect_target = redirect_target_of(contract);
     let form_struct = format!("{}Form", snake_to_pascal(fn_name));
     let form_dto = dto::emit_form_dto(&form_struct, &contract.inputs.form_fields);
@@ -916,9 +939,8 @@ fn emit_form_get_post(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
     let tmpl_path = format!("form_get_post/{fn_name}.html");
     let axum = axum_path(&contract.path);
     let template_doc = template_path_of(contract);
-    let params = path_param_names(contract);
-    let get_param_sig = param_signature(&params);
-    let post_param_sig = param_signature(&params);
+    let get_param_sig = param_signature(&contract.inputs.path_params);
+    let post_param_sig = param_signature(&contract.inputs.path_params);
     let form_struct = format!("{}Form", snake_to_pascal(fn_name));
     let form_dto = dto::emit_form_dto(&form_struct, &contract.inputs.form_fields);
     let redirect_target = redirect_target_of(contract);
@@ -996,8 +1018,7 @@ fn emit_form_get_post(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
 fn emit_ajax_json(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
     let fn_name = &contract.function;
     let axum = axum_path(&contract.path);
-    let params = path_param_names(contract);
-    let param_sig = param_signature(&params);
+    let param_sig = param_signature(&contract.inputs.path_params);
     let resp_struct = format!("{}Response", snake_to_pascal(fn_name));
     let shape = match &contract.output {
         OutputKind::Json { shape } => shape.clone(),
@@ -1058,8 +1079,7 @@ fn emit_ajax_json(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
 fn emit_download_blob(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
     let fn_name = &contract.function;
     let axum = axum_path(&contract.path);
-    let params = path_param_names(contract);
-    let param_sig = param_signature(&params);
+    let param_sig = param_signature(&contract.inputs.path_params);
     let mime = match &contract.output {
         OutputKind::Blob { mime } if !mime.is_empty() => mime.clone(),
         _ => "application/octet-stream".to_string(),
@@ -1115,8 +1135,7 @@ fn emit_download_blob(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
 fn emit_pdf_render(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
     let fn_name = &contract.function;
     let axum = axum_path(&contract.path);
-    let params = path_param_names(contract);
-    let param_sig = param_signature(&params);
+    let param_sig = param_signature(&contract.inputs.path_params);
     let doc_kind = match &contract.output {
         OutputKind::Pdf { doc_kind } if !doc_kind.is_empty() => doc_kind.clone(),
         _ => "document".to_string(),
@@ -1180,8 +1199,7 @@ fn emit_sa_admin_view(contract: &RouteContract, spec: &TargetSpec) -> Emitted {
     let tmpl_path = format!("sa_admin_view/{fn_name}.html");
     let axum = axum_path(&contract.path);
     let template_doc = template_path_of(contract);
-    let params = path_param_names(contract);
-    let param_sig = param_signature(&params);
+    let param_sig = param_signature(&contract.inputs.path_params);
     // SA-prefixed functions gate on superadmin; admin-required ones on either.
     let gate = if fn_name.starts_with("sa_") {
         "    if !user.is_superadmin {\n        return Err(WoaError::Forbidden);\n    }\n"
@@ -1254,8 +1272,7 @@ fn emit_sa_admin_view(contract: &RouteContract, spec: &TargetSpec) -> Emitted {
 fn emit_signed_link_action(contract: &RouteContract, _spec: &TargetSpec) -> Emitted {
     let fn_name = &contract.function;
     let axum = axum_path(&contract.path);
-    let params = path_param_names(contract);
-    let param_sig = param_signature(&params);
+    let param_sig = param_signature(&contract.inputs.path_params);
     // Signed-link actions use a separate token auth stack, NOT CurrentUser; the
     // token arrives via a query param (`?t=`) or a path param.
     let header = kind_header(contract, &template_path_of(contract));
@@ -1465,4 +1482,39 @@ fn kind_header(contract: &RouteContract, template_doc: &str) -> String {
         template = template_doc,
         reason = contract.classification_reason,
     )
+}
+
+#[cfg(test)]
+mod path_sig_tests {
+    use super::{flask_conv_to_rust, param_signature};
+    use crate::contract::PathParam;
+
+    fn pp(name: &str, conv: Option<&str>) -> PathParam {
+        PathParam {
+            name: name.to_string(),
+            converter: conv.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn converter_maps_to_rust_type() {
+        assert_eq!(flask_conv_to_rust(Some("int")), "i32");
+        assert_eq!(flask_conv_to_rust(Some("float")), "f64");
+        assert_eq!(flask_conv_to_rust(Some("string")), "String");
+        assert_eq!(flask_conv_to_rust(Some("path")), "String");
+        assert_eq!(flask_conv_to_rust(Some("uuid")), "String");
+        // Flask's default converter is `string`, so a bare param is String.
+        assert_eq!(flask_conv_to_rust(None), "String");
+    }
+
+    #[test]
+    fn signature_honors_converters() {
+        assert!(param_signature(&[pp("id", Some("int"))]).contains("Path<i32>"));
+        assert!(param_signature(&[pp("slug", Some("string"))]).contains("Path<String>"));
+        assert!(param_signature(&[pp("key", None)]).contains("Path<String>"));
+        assert!(
+            param_signature(&[pp("wid", Some("int")), pp("slug", None)])
+                .contains("Path<(i32, String)>")
+        );
+    }
 }

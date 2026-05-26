@@ -244,6 +244,14 @@ impl Walker<'_> {
                         self.walk_stmt(s);
                     }
                 }
+                // else/finally commonly carry the return + side-effects;
+                // skipping them mis-classifies OutputKind (Codex P2).
+                for s in &t.orelse {
+                    self.walk_stmt(s);
+                }
+                for s in &t.finalbody {
+                    self.walk_stmt(s);
+                }
             }
             _ => {}
         }

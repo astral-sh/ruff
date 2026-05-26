@@ -281,11 +281,19 @@ mod toml_lite {
     }
 
     fn strip_comment(line: &str) -> &str {
-        // Only strip `#` outside of quotes — our values never contain `#`.
-        match line.find('#') {
-            Some(i) if !line[..i].contains('"') => &line[..i],
-            _ => line,
+        // Strip the first `#` that is outside a quoted string. Scanning with a
+        // string-state toggle handles `id = "x" # comment` correctly — the
+        // earlier "no quote before #" heuristic kept the comment in the value
+        // for every quoted field (Codex P1).
+        let mut in_string = false;
+        for (i, c) in line.char_indices() {
+            match c {
+                '"' => in_string = !in_string,
+                '#' if !in_string => return &line[..i],
+                _ => {}
+            }
         }
+        line
     }
 
     fn unquote(v: &str) -> String {
@@ -307,5 +315,24 @@ mod toml_lite {
             .map(|s| unquote(s.trim()))
             .filter(|s| !s.is_empty())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod comment_tests {
+    use super::toml_lite::parse_target;
+
+    #[test]
+    fn inline_comment_after_quoted_value_is_stripped() {
+        // Codex P1: `id = "x" # comment` must parse id == "x", not
+        // `x" # comment`. A `#` inside the quoted value stays part of it.
+        let spec = parse_target(concat!(
+            "id = \"rust-axum-seaorm\" # trailing comment\n",
+            "models_root = \"crate::models\"\n",
+            "tenant_column = \"Ten#ant\"\n",
+        ));
+        assert_eq!(spec.id, "rust-axum-seaorm");
+        assert_eq!(spec.models_root, "crate::models");
+        assert_eq!(spec.tenant_column, "Ten#ant");
     }
 }
