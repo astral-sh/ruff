@@ -1927,6 +1927,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 continue;
             }
 
+            // TODO: This is a temporary heuristic that attempts to not overzealously select Never
+            // or object as a solution. Our constraint set representation currently requires every
+            // constraint to have both a lower and upper bound, using Never and object as the
+            // "default" if that bound is not actually provided. That means we cannot distinguish
+            // between "no lower bound" and "an explicit lower bound of Never". We plan to rework
+            // the constraint set representation to treat lower and upper bounds separately, which
+            // would allow us to distinguish those two cases; at that point, we would not need this
+            // heuristic anymore.
             if let Some(mapped_ty) = self
                 .types
                 .get_mut(identity)
