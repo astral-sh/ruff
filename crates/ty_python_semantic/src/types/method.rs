@@ -86,6 +86,19 @@ impl<'db> BoundMethodType<'db> {
         let typing_self_type = self.typing_self_type(db);
 
         let [signature] = function_signature.overloads.as_slice() else {
+            if !function_signature
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return CallableSignature::from_overloads(
+                    function_signature
+                        .overloads
+                        .iter()
+                        .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+                );
+            }
+
             let self_instance = self.self_instance(db);
             return CallableSignature::from_overloads(
                 function_signature
