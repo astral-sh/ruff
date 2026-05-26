@@ -2540,11 +2540,16 @@ watermelon
     }
 
     #[test]
-    fn diagnostics_without_primary_spans_sort_by_concise_message() {
-        let env = TestEnvironment::new();
+    fn diagnostics_with_equal_locations_sort_by_concise_message() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
         let mut diagnostics = [
-            Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, "checking mod.py"),
-            Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, "checking main.py"),
+            env.invalid_syntax("checking mod.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+            env.invalid_syntax("checking main.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
         ];
 
         diagnostics.sort_by(|left, right| {
