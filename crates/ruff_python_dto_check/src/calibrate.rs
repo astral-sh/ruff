@@ -151,10 +151,7 @@ fn check_form_field_gap(contract: &RouteContract, emitted: &Emitted, out: &mut V
     }
     // The emitter doesn't yet produce a form DTO; if it referenced no form
     // fields, every read is a gap the target spec must cover.
-    let covered = emitted
-        .handler_rs
-        .contains("form")
-        || emitted.handler_rs.contains("Form");
+    let covered = emitted.handler_rs.contains("form") || emitted.handler_rs.contains("Form");
     if !covered {
         out.push(Diagnostic {
             rule: "form-field-gap",

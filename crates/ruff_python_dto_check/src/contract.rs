@@ -168,8 +168,15 @@ pub fn build_contract(
     let id = format!("{id_prefix}.{function}");
 
     let methods_up = methods_upper(methods);
-    let (handler_kind, classification_reason) =
-        classify(&methods_up, &inputs, &data, &facts.output, &guards, function, &id);
+    let (handler_kind, classification_reason) = classify(
+        &methods_up,
+        &inputs,
+        &data,
+        &facts.output,
+        &guards,
+        function,
+        &id,
+    );
 
     RouteContract {
         id,
@@ -332,10 +339,7 @@ fn classify(
 
     // 7. Form GET+POST.
     if is_form && renders {
-        return (
-            HandlerKind::FormGetPost,
-            "GET+POST with render".to_string(),
-        );
+        return (HandlerKind::FormGetPost, "GET+POST with render".to_string());
     }
 
     // 8. List for tenant.
