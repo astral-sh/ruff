@@ -228,6 +228,10 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
+# TODO: Binding this method to `ReceiverGeneric[str]` should infer `S = str` from
+# its explicit receiver annotation and apply that specialization to the remaining
+# parameter and return type. We currently only use the receiver to keep or discard
+# an overload, so the retained overload still exposes unspecialized `S`.
 # TODO: revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
 reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
 
@@ -252,6 +256,11 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
     def put(self, x: str) -> None: ...
 
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
+# TODO: `ProtocolSelfImplementation` cannot satisfy `ProtocolSelf[T]` for any `T`:
+# `get()` requires `int` to be assignable to `T`, while `put()` requires `T` to
+# be assignable to `str`. The explicit protocol-receiver overload should therefore
+# be removed, leaving only `() -> bytes`. We currently do not infer and reject
+# this generic structural receiver overload.
 # TODO: error: [invalid-assignment]
 bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method
 ```
