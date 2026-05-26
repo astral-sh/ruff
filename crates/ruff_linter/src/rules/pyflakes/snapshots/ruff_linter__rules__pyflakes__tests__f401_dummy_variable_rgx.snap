@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+--- Linter settings ---
+-linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
++linter.dummy_variable_rgx = ^z$
+
+--- Summary ---
+Removed: 1
+Added: 0
+
+--- Removed ---
+F401 [*] `os` imported but unused
+ --> F401_dummy_variable_rgx.py:1:14
+  |
+1 | import os as z
+  |              ^
+  |
+help: Remove unused import: `os`
+  - import os as z

@@ -634,6 +634,20 @@ mod tests {
     }
 
     #[test]
+    fn f401_dummy_variable_rgx() -> Result<()> {
+        assert_diagnostics_diff!(
+            "f401_dummy_variable_rgx",
+            Path::new("pyflakes/F401_dummy_variable_rgx.py"),
+            &LinterSettings::for_rule(Rule::UnusedImport),
+            &LinterSettings {
+                dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
+                ..LinterSettings::for_rule(Rule::UnusedImport)
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
     fn init() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/__init__.py"),
