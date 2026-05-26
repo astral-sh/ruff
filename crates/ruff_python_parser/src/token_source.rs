@@ -260,11 +260,20 @@ pub(crate) struct TokenSourceCheckpoint {
     tokens_position: usize,
 }
 
-/// Allocates a [`Vec`] with an approximated capacity to fit all tokens
-/// of `contents`.
-///
-/// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
+/// Allocates a token buffer with a capacity intended to skip early grows.
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
-    let lower_bound = contents.len().saturating_mul(15) / 100;
-    Vec::with_capacity(lower_bound)
+    // In sampled ruff-ecosystem projects, about three quarters of Python files contain at least
+    // one token per eight source bytes. Intentionally underestimate the final token count to avoid
+    // over-reserving for token-sparse files.
+    const BYTES_PER_PREALLOCATED_TOKEN: usize = 8;
+    const MIN_INITIAL_CAPACITY: usize = 128;
+
+    let capacity_hint = contents.len() / BYTES_PER_PREALLOCATED_TOKEN;
+    if capacity_hint < MIN_INITIAL_CAPACITY {
+        return Vec::new();
+    }
+
+    // Stay on a power-of-two bucket so that later geometric growth does not preserve an
+    // arbitrary capacity offset.
+    Vec::with_capacity(1 << capacity_hint.ilog2())
 }
