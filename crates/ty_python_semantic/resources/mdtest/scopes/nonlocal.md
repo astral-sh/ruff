@@ -178,12 +178,12 @@ def a():
                 # already potentially visible. The rules for this are subtle and in fact
                 # intentionally unsound. See "Visibility of `global` and `nonlocal` bindings from
                 # nested and sibling scopes" below for the details.
-                reveal_type(x)  # revealed: Literal[3, 4, 2]
+                reveal_type(x)  # revealed: Literal[2, 4, 3]
                 x = 4
                 reveal_type(x)  # revealed: Literal[4]
 
                 def e():
-                    reveal_type(x)  # revealed: Literal[4, 3, 2]
+                    reveal_type(x)  # revealed: Literal[2, 4, 3]
 ```
 
 ## Local variable bindings "look ahead" to any assignment in the current scope
