@@ -317,21 +317,33 @@ pub(crate) fn check_static_class_definitions<'db>(
                 if check_explicit_base_variance
                     && let Some(node) = source_node
                     && let Some(generic_context) = class.generic_context(db)
-                    && let Some(typevar) = generic_context.variables(db).find(|typevar| {
-                        let Some(declared_variance) = typevar.typevar(db).explicit_variance(db)
-                        else {
-                            return false;
-                        };
-                        declared_variance != TypeVarVariance::Invariant
-                            && declared_variance.join(base_alias.variance_of(db, *typevar))
-                                != declared_variance
-                    })
+                    && let Some((typevar, declared_variance, required_variance)) =
+                        generic_context.variables(db).find_map(|typevar| {
+                            let declared_variance =
+                                typevar.typevar(db).explicit_variance(db)?;
+                            if declared_variance == TypeVarVariance::Invariant {
+                                return None;
+                            }
+                            let required_variance = base_alias.variance_of(db, typevar);
+                            if declared_variance.join(required_variance) != declared_variance {
+                                Some((typevar, declared_variance, required_variance))
+                            } else {
+                                None
+                            }
+                        })
                     && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node)
                 {
-                    builder.into_diagnostic(format_args!(
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Variance of type variable `{}` is incompatible with base class `{}`",
                         typevar.typevar(db).name(db),
                         base_alias.origin(db).name(db),
+                    ));
+                    diagnostic.help(format_args!(
+                        "Type variable `{}` is declared as {}, but base class `{}` requires it to be {}",
+                        typevar.typevar(db).name(db),
+                        declared_variance.as_str(),
+                        base_alias.origin(db).name(db),
+                        required_variance.as_str(),
                     ));
                 }
 
