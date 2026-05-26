@@ -2096,6 +2096,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_symbol()
             .expect("nested bindings definition should be a symbol");
         let symbol = self.index.place_table(scope_id).symbol(symbol_id);
+
+        // Like loop-header definitions, synthetic nested bindings are an approximation point for
+        // recursive control-flow analysis. In very complex scopes, computing the exact type can
+        // recursively force inference through the nested function and back into the enclosing
+        // scope.
+        const MAX_EXACT_NESTED_BINDINGS_REACHABILITY_NODES: usize = 2048;
+        let use_def = self.index.use_def_map(scope_id);
+        if use_def.reachability_constraints().used_interiors().len()
+            > MAX_EXACT_NESTED_BINDINGS_REACHABILITY_NODES
+        {
+            self.bindings.insert(definition, Type::unknown());
+            return;
+        }
+
         // At the point where a nested bindings definition is synthesized, we don't necessarily
         // know whether the current scope will see globals or nonlocal bindings. Consider this
         // example:
