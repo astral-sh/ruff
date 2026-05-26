@@ -47,12 +47,17 @@ def f():
 
     class C:
         x = 2
-
         def g():
             nonlocal x
             x = 3
-
         reveal_type(x)  # revealed: Literal[2]
+
+    class D:
+        def g():
+            nonlocal x
+            x = 3
+        # With no local binding in the class body, the function-scoped `x` is visible.
+        reveal_type(x)  # revealed: Literal[3, 1]
 ```
 
 ## Reads respect annotation-only declarations

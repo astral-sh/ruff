@@ -2088,11 +2088,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
-        let scope_id = definition.scope(db).file_scope_id(db);
+        let scope = definition.scope(db);
+        let scope_id = scope.file_scope_id(db);
         let symbol_id = definition
             .place(db)
             .as_symbol()
             .expect("nested bindings definition should be a symbol");
+        let symbol = self.index.place_table(scope_id).symbol(symbol_id);
         // At the point where a nested bindings definition is synthesized, we don't necessarily
         // know whether the current scope will see globals or nonlocal bindings. Consider this
         // example:
@@ -2113,20 +2115,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // this question. We can ask whether `x` was (eventually) declared `global` in its scope.
         // If so, or if this is the module scope itself, we respect the nested `global` bindings
         // that were recorded. If not, we respect the nested `nonlocal` ones.
-        let this_scope_sees_global_bindings = scope_id.is_global()
-            || self
-                .index
-                .place_table(scope_id)
-                .symbol(symbol_id)
-                .is_global();
+        let this_scope_sees_global_bindings = scope_id.is_global() || symbol.is_global();
+        // If a function body binds `x`, it's interested in nested `nonlocal` bindings of `x` too,
+        // because those resolve to the same variable. But if a *class* body binds `x`, it does
+        // *not* want to consider nested bindings of `x`, because those do *not* resolve to the
+        // same variable.
+        let this_scope_sees_nonlocal_bindings = !(this_scope_sees_global_bindings
+            || (scope.scope(db).kind().is_class() && symbol.is_local()));
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
         for declaration in &nested_bindings_kind.nested_declarations {
             assert!(
                 declaration.is_bound,
                 "nested declarations without bindings shouldn't be recorded here",
             );
-            if declaration.is_global() != this_scope_sees_global_bindings {
-                // Skip nested declarations/bindings of the type that we don't see in this scope.
+            let declaration_is_visible = if declaration.is_global() {
+                this_scope_sees_global_bindings
+            } else {
+                this_scope_sees_nonlocal_bindings
+            };
+            if !declaration_is_visible {
                 continue;
             }
             let nested_place_table = self.index.place_table(declaration.file_scope_id);
