@@ -294,7 +294,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             Tuple::Fixed(target) => {
                 let equal_length = source_tuple.0.len() == target.0.len();
 
-                if !equal_length && self.relation.is_assignability() {
+                if !equal_length && self.uses_gradual_assignability() {
                     self.provide_context(|| ErrorContext::TupleLengthMismatch {
                         source_len: source_tuple.0.len(),
                         target_len: target_tuple.len(),
@@ -390,7 +390,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // (or any other dynamic type), then the `...` is the _gradual choice_ of all
                 // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
                 // length.
-                if !self.relation.is_assignability() || !source.variable().is_dynamic() {
+                if !self.uses_gradual_assignability() || !source.variable().is_dynamic() {
                     return self.never();
                 }
 
@@ -462,7 +462,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.relation.is_assignability() || !source.variable().is_dynamic()
+                            if !self.uses_gradual_assignability() || !source.variable().is_dynamic()
                             {
                                 return self.never();
                             }
@@ -500,7 +500,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.relation.is_assignability() || !source.variable().is_dynamic()
+                            if !self.uses_gradual_assignability() || !source.variable().is_dynamic()
                             {
                                 return self.never();
                             }

@@ -304,11 +304,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    target_class.is_object(db) || self.relation.is_assignability(),
+                    target_class.is_object(db) || self.uses_gradual_assignability(),
                 )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                ConstraintSet::from_bool(self.constraints, self.uses_gradual_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,

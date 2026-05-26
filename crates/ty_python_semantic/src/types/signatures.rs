@@ -18,6 +18,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
+use crate::types::call::{Argument, CallArguments};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -38,8 +39,9 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, UnionBuilder, VarianceInferable, infer_complete_scope_types,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -54,7 +56,6 @@ pub(super) enum ReturnCallableTypeVarScope {
     /// Move the type variables to the returned `Callable`'s generic context.
     Public,
 }
-
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
 /// This is very similar to `definition_expression_type`, but knows that `TypeInferenceBuilder`
@@ -511,22 +512,6 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
-}
-
-/// Whether one callable signature's parameters are compatible with another's.
-pub(crate) enum ParameterConsistency<'db> {
-    /// The parameters are compatible.
-    Consistent,
-    /// The parameters are incompatible, with context explaining the incompatibility.
-    Inconsistent(ErrorContextTree<'db>),
-}
-
-/// Whether one callable signature's return type is compatible with another's.
-pub(crate) enum ReturnTypeConsistency<'db> {
-    /// The return types are compatible.
-    Consistent,
-    /// The return types are incompatible, with context explaining the incompatibility.
-    Inconsistent(ErrorContextTree<'db>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -1123,81 +1108,771 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn is_non_generic(&self) -> bool {
-        self.generic_context.is_none()
-    }
-
-    /// Return whether this non-generic implementation accepts the arguments of a non-generic
-    /// overload, and the relation error context if it does not.
+    /// Return the type variables that can be inferred during implementation-consistency checks.
     ///
-    /// This is a deliberately narrow first pass for overload implementation consistency. Generic
-    /// signatures need additional type-variable-domain handling and should be left to the full
-    /// implementation.
-    pub(crate) fn non_generic_implementation_parameters_consistency_with(
+    /// Function-local type variables, including function-local `ParamSpec`s, are inferable.
+    /// Class-level type variables remain universally quantified so that every specialization
+    /// accepted by an overload is accepted by the implementation.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// class C[T]:
+    ///     @overload
+    ///     def f[U](self, value: U) -> U: ...
+    ///     def f[U](self, value: U) -> U:
+    ///         return value
+    /// ```
+    fn implementation_consistency_inferable_typevars(
         &self,
         db: &'db dyn Db,
-        overload: &Self,
-    ) -> ParameterConsistency<'db> {
-        debug_assert!(self.is_non_generic());
-        debug_assert!(overload.is_non_generic());
+    ) -> InferableTypeVars<'db> {
+        let Some(generic_context) = self.generic_context else {
+            return InferableTypeVars::None;
+        };
 
-        let implementation = self.clone().with_return_type(Type::unknown());
-        let overload = overload.clone().with_return_type(Type::unknown());
-        let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let checker = TypeRelationChecker::constraint_set_assignability_with_context(
-            &constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &materialization_visitor,
-        );
+        let Some(definition) = self.definition else {
+            return generic_context.inferable_typevars(db);
+        };
 
-        let is_consistent = checker
-            .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db);
-
-        if is_consistent {
-            ParameterConsistency::Consistent
-        } else {
-            ParameterConsistency::Inconsistent(checker.into_error_context())
-        }
+        let typevars = generic_context
+            .variables(db)
+            .filter(|bound_typevar| {
+                bound_typevar.binding_context(db).definition() == Some(definition)
+            })
+            .map(|bound_typevar| bound_typevar.identity(db))
+            .collect::<FxOrderSet<_>>();
+        InferableTypeVars::from_typevars(db, typevars)
     }
 
-    /// Return whether a non-generic overload return type is assignable to a non-generic
-    /// implementation return type, and the relation error context if it is not.
-    pub(crate) fn non_generic_implementation_return_type_consistency_with(
+    fn parameter_typevars(
+        &self,
+        db: &'db dyn Db,
+        normalize_implicit_receiver: bool,
+        include_normalized_self: bool,
+    ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+        let Some(generic_context) = self.generic_context else {
+            return FxHashSet::default();
+        };
+
+        generic_context
+            .variables(db)
+            .filter(|typevar| {
+                // `typing.Self` is determined by the receiver's class. Keep it inferable for
+                // relating overload and implementation returns, but not while preserving the
+                // synthetic-call return type below; the normalized receiver argument is `Unknown`.
+                if include_normalized_self && typevar.typevar(db).is_self(db) {
+                    return true;
+                }
+
+                self.parameters()
+                    .iter()
+                    .enumerate()
+                    .any(|(index, parameter)| {
+                        !(index == 0 && normalize_implicit_receiver)
+                            && parameter
+                                .annotated_type()
+                                .references_typevar(db, typevar.typevar(db).identity(db))
+                    })
+            })
+            .map(|typevar| typevar.identity(db))
+            .collect()
+    }
+
+    fn implementation_consistency_parameter_inferable_typevars(
+        &self,
+        db: &'db dyn Db,
+        normalize_implicit_receiver: bool,
+    ) -> InferableTypeVars<'db> {
+        let parameter_typevars = self.parameter_typevars(db, normalize_implicit_receiver, true);
+        let typevars = self
+            .implementation_consistency_inferable_typevars(db)
+            .iter(db)
+            .filter(|typevar| parameter_typevars.contains(typevar))
+            .collect::<FxOrderSet<_>>();
+        InferableTypeVars::from_typevars(db, typevars)
+    }
+
+    /// Return the `ParamSpec` variables in this signature's generic context.
+    ///
+    /// Implementation-consistency checks use this when overload `ParamSpec`s have been
+    /// gradualized against a gradual implementation parameter list. Otherwise, overload
+    /// `ParamSpec`s remain part of the overload's universal parameter domain.
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    /// from typing import ParamSpec, TypeVar, overload
+    ///
+    /// P = ParamSpec("P")
+    /// R = TypeVar("R")
+    ///
+    /// @overload
+    /// def decorate(func: Callable[P, R]) -> Callable[P, R]: ...
+    /// def decorate(func: Callable[..., object]) -> Callable[..., object]:
+    ///     return func
+    /// ```
+    fn paramspec_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+        let Some(generic_context) = self.generic_context else {
+            return InferableTypeVars::None;
+        };
+
+        let typevars = generic_context
+            .variables(db)
+            .filter(|bound_typevar| bound_typevar.is_paramspec(db))
+            .map(|bound_typevar| bound_typevar.identity(db))
+            .collect::<FxOrderSet<_>>();
+        InferableTypeVars::from_typevars(db, typevars)
+    }
+
+    /// Build the constraint set for this implementation accepting one overload parameter domain.
+    ///
+    /// The comparison ignores return types and normalizes the receiver when requested so a method
+    /// overload and its implementation are compared on their explicit call arguments.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// class C:
+    ///     @overload
+    ///     def f(self, value: int) -> int: ...
+    ///     def f(self, value: object) -> object:
+    ///         return value
+    /// ```
+    fn when_implementation_parameters_compatible_with<'c>(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        normalize_implicit_receiver: bool,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_inferable = self.implementation_consistency_inferable_typevars(db);
+        self.when_implementation_parameters_compatible_with_unreduced(
+            db,
+            other,
+            constraints,
+            normalize_implicit_receiver,
+            InferableTypeVars::None,
+        )
+        .reduce_inferable(db, constraints, source_inferable.iter(db))
+    }
+
+    /// Return `true` if this implementation accepts every argument shape accepted by an overload.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def f(x: int) -> int: ...
+    /// def f(x: object) -> object:
+    ///     return x
+    /// ```
+    pub(crate) fn is_overload_implementation_parameters_consistent_with(
         &self,
         db: &'db dyn Db,
         overload: &Self,
-    ) -> ReturnTypeConsistency<'db> {
-        debug_assert!(self.is_non_generic());
-        debug_assert!(overload.is_non_generic());
+        normalize_implicit_receiver: bool,
+    ) -> bool {
+        let self_ = self.clone().with_return_type(Type::unknown());
+        let inferable = self_.implementation_consistency_inferable_typevars(db);
+
+        overload
+            .parameter_domain_variants(db, self_.parameters.is_gradual())
+            .iter()
+            .all(|overload| {
+                let constraints = ConstraintSetBuilder::new();
+                self_
+                    .when_implementation_parameters_compatible_with(
+                        db,
+                        overload,
+                        &constraints,
+                        normalize_implicit_receiver,
+                    )
+                    .satisfied_by_all_typevars(db, &constraints, inferable)
+            })
+    }
+
+    pub(crate) fn overload_implementation_parameters_error_context_with(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+        normalize_implicit_receiver: bool,
+    ) -> ErrorContextTree<'db> {
+        let self_ = self.clone().with_return_type(Type::unknown());
+        let inferable = self_.implementation_consistency_inferable_typevars(db);
+
+        for overload in overload.parameter_domain_variants(db, self_.parameters.is_gradual()) {
+            let constraints = ConstraintSetBuilder::new();
+            let relation_visitor = HasRelationToVisitor::default(&constraints);
+            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+            let signature_relation_visitor = SignatureRelationVisitor::default();
+            let materialization_visitor = ApplyTypeMappingVisitor::default();
+            let checker =
+                TypeRelationChecker::constraint_set_assignability_for_parameter_domain_coverage(
+                    &constraints,
+                    &relation_visitor,
+                    &disjointness_visitor,
+                    &signature_relation_visitor,
+                    &materialization_visitor,
+                )
+                .with_error_context();
+            let result = self_.with_normalized_implementation_pair(
+                &overload,
+                normalize_implicit_receiver,
+                |self_, overload| {
+                    checker.check_signature_pair_with_typevars(
+                        db,
+                        self_,
+                        overload,
+                        self_.implementation_consistency_inferable_typevars(db),
+                        InferableTypeVars::None,
+                    )
+                },
+            );
+            if !result.satisfied_by_all_typevars(db, &constraints, inferable) {
+                return checker.into_error_context();
+            }
+        }
+
+        ErrorContextTree::disabled()
+    }
+
+    /// Return concrete signatures that cover the parameter domain accepted by this overload.
+    ///
+    /// Bounded type variables in contravariant parameter-domain positions use their upper bound,
+    /// while bounded type variables in covariant or invariant positions stay generic so the
+    /// implementation is checked against every valid specialization. Constrained type variables
+    /// expand to one variant per constraint while preserving repeated-use correlations, and
+    /// `ParamSpec`s stay correlated unless the implementation itself has gradual parameters.
+    ///
+    /// ```python
+    /// from typing import TypeVar, overload
+    ///
+    /// AnyStr = TypeVar("AnyStr", str, bytes)
+    ///
+    /// @overload
+    /// def concat(value: AnyStr, other: AnyStr) -> AnyStr: ...
+    /// def concat(value: str | bytes, other: str | bytes) -> str | bytes:
+    ///     return value + other
+    /// ```
+    fn parameter_domain_variants(
+        &self,
+        db: &'db dyn Db,
+        gradualize_paramspec: bool,
+    ) -> SmallVec<[Self; 1]> {
+        let signature = self.clone().with_return_type(Type::unknown());
+
+        let Some(generic_context) = self.generic_context else {
+            return smallvec_inline![signature];
+        };
+
+        let mut typevar_choices = Vec::with_capacity(generic_context.len(db));
+        let mut has_typevar_domain = false;
+
+        for bound_typevar in generic_context.variables(db) {
+            let choices: SmallVec<[Type<'db>; 2]> = if bound_typevar.is_paramspec(db) {
+                if gradualize_paramspec {
+                    has_typevar_domain = true;
+                    std::iter::once(Type::paramspec_value_callable(
+                        db,
+                        Parameters::gradual_form(),
+                    ))
+                    .collect()
+                } else {
+                    std::iter::once(Type::TypeVar(bound_typevar)).collect()
+                }
+            } else {
+                has_typevar_domain = true;
+                match bound_typevar.typevar(db).require_bound_or_constraints(db) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        if self
+                            .parameter_domain_variance_of(db, bound_typevar)
+                            .is_contravariant()
+                        {
+                            std::iter::once(bound).collect()
+                        } else {
+                            std::iter::once(Type::TypeVar(bound_typevar)).collect()
+                        }
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        constraints.elements(db).iter().copied().collect()
+                    }
+                }
+            };
+            typevar_choices.push(choices);
+        }
+
+        if !has_typevar_domain {
+            return smallvec_inline![signature];
+        }
+
+        typevar_choices
+            .into_iter()
+            .multi_cartesian_product()
+            .map(|types| {
+                let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+                    generic_context,
+                    types: &types,
+                    skip: None,
+                });
+                let visitor = ApplyTypeMappingVisitor::default();
+                let parameters = if gradualize_paramspec
+                    && let Some((prefix, _)) = self.parameters.as_paramspec_with_prefix()
+                {
+                    let prefix = prefix
+                        .iter()
+                        .map(|param| {
+                            param.apply_type_mapping_impl(
+                                db,
+                                &mapping,
+                                TypeContext::default(),
+                                &visitor,
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    if prefix.is_empty() {
+                        Parameters::gradual_form()
+                    } else {
+                        Parameters::concatenate(db, prefix, ConcatenateTail::Gradual)
+                    }
+                } else {
+                    self.parameters.apply_type_mapping_impl(
+                        db,
+                        &mapping,
+                        TypeContext::default(),
+                        &visitor,
+                    )
+                };
+
+                Self {
+                    generic_context: Some(
+                        mapping.update_signature_generic_context(db, generic_context),
+                    ),
+                    definition: self.definition,
+                    parameters,
+                    return_ty: Type::unknown(),
+                }
+            })
+            .collect()
+    }
+
+    /// Return the variance of a type variable across this signature's parameter domain.
+    ///
+    /// A bounded type variable in an invariant parameter position cannot be replaced by its bound
+    /// when expanding overload domains, because repeated uses must stay correlated.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// class Box[T]: ...
+    ///
+    /// @overload
+    /// def f[T](left: Box[T], right: Box[T]) -> T: ...
+    /// def f(left: Box[object], right: Box[object]) -> object: ...
+    /// ```
+    fn parameter_domain_variance_of(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> TypeVarVariance {
+        let mut variance = TypeVarVariance::Bivariant;
+
+        let mut visit_parameter = |parameter: &Parameter<'db>| {
+            if parameter.form == ParameterForm::Value {
+                variance = variance.join(
+                    parameter
+                        .annotated_type()
+                        .with_polarity(TypeVarVariance::Contravariant)
+                        .variance_of(db, typevar),
+                );
+            }
+        };
+
+        if let Some((prefix_parameters, paramspec)) = self.parameters.as_paramspec_with_prefix() {
+            for parameter in prefix_parameters {
+                visit_parameter(parameter);
+            }
+            variance = variance.join(
+                Type::TypeVar(paramspec)
+                    .with_polarity(TypeVarVariance::Contravariant)
+                    .variance_of(db, typevar),
+            );
+        } else {
+            for parameter in &self.parameters {
+                visit_parameter(parameter);
+            }
+        }
+
+        variance
+    }
+
+    /// Return `true` if one overload return type is assignable to this implementation return type.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def f(x: int) -> int: ...
+    /// def f(x: int) -> object:
+    ///     return x
+    /// ```
+    pub(crate) fn is_overload_implementation_return_consistent_with(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+        normalize_implicit_receiver: bool,
+    ) -> bool {
+        let implementation_return_ty = self
+            .return_type_for_argument_types_of(db, overload, normalize_implicit_receiver)
+            .unwrap_or(self.return_ty);
+
+        self.is_overload_return_type_assignable_for_implementation_parameters(
+            db,
+            overload,
+            implementation_return_ty,
+            normalize_implicit_receiver,
+        )
+    }
+
+    pub(crate) fn overload_implementation_return_error_context_with(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+        normalize_implicit_receiver: bool,
+    ) -> ErrorContextTree<'db> {
+        let implementation_return_ty = self
+            .return_type_for_argument_types_of(db, overload, normalize_implicit_receiver)
+            .unwrap_or(self.return_ty);
+
+        overload
+            .return_ty
+            .assignability_error_context(db, implementation_return_ty)
+    }
+
+    /// Return whether an overload return is assignable to the implementation return.
+    ///
+    /// The synthetic call can still leave equivalent overload and implementation type variables
+    /// with different identities. When the parameter relation is satisfiable, use those constraints
+    /// to relate generic return types while checking the synthetic-call return type.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def f[T](x: T) -> T: ...
+    /// def f[T](x: T) -> T:
+    ///     return x
+    /// ```
+    fn is_overload_return_type_assignable_for_implementation_parameters(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+        implementation_return_ty: Type<'db>,
+        normalize_implicit_receiver: bool,
+    ) -> bool {
+        let implementation_inferable = self.implementation_consistency_inferable_typevars(db);
+        let implementation_parameter_inferable = self
+            .implementation_consistency_parameter_inferable_typevars(
+                db,
+                normalize_implicit_receiver,
+            );
+        let return_inferable =
+            implementation_parameter_inferable.merge(db, overload.paramspec_typevars(db));
+        let parameter_inferable = if normalize_implicit_receiver {
+            return_inferable.merge(db, self.inferable_typevars(db))
+        } else {
+            return_inferable
+        };
 
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let checker = TypeRelationChecker::assignability_with_context(
+        let parameter_constraints = self
+            .clone()
+            .with_return_type(Type::unknown())
+            .when_implementation_parameters_compatible_with_unreduced(
+                db,
+                &overload.clone().with_return_type(Type::unknown()),
+                &constraints,
+                normalize_implicit_receiver,
+                overload.paramspec_typevars(db),
+            );
+        let receiver_constraints = if normalize_implicit_receiver {
+            self.parameters()
+                .iter()
+                .next()
+                .zip(overload.parameters().iter().next())
+                .map_or_else(
+                    || ConstraintSet::from_bool(&constraints, true),
+                    |(implementation_receiver, overload_receiver)| {
+                        overload_receiver.annotated_type().has_relation_to(
+                            db,
+                            implementation_receiver.annotated_type(),
+                            &constraints,
+                            parameter_inferable,
+                            TypeRelation::ConstraintSetAssignability,
+                        )
+                    },
+                )
+        } else {
+            ConstraintSet::from_bool(&constraints, true)
+        };
+        let parameter_constraints =
+            parameter_constraints.and(db, &constraints, || receiver_constraints);
+
+        let parameter_constraints_satisfied = parameter_constraints
+            .reduce_inferable(db, &constraints, parameter_inferable.iter(db))
+            .satisfied_by_all_typevars(db, &constraints, InferableTypeVars::None);
+
+        if !parameter_constraints_satisfied {
+            // Keep return diagnostics independent when parameter compatibility has already failed.
+            return overload
+                .return_ty
+                .when_assignable_to(
+                    db,
+                    implementation_return_ty,
+                    &constraints,
+                    implementation_inferable,
+                )
+                .satisfied_by_all_typevars(db, &constraints, implementation_inferable);
+        }
+
+        let explicit_receiver_can_inform_return = normalize_implicit_receiver
+            && overload
+                .parameters()
+                .iter()
+                .next()
+                .is_some_and(|parameter| !parameter.inferred_annotation);
+        // Explicit receiver overloads, like `self: C[int]`, can specialize class TypeVars for the
+        // return check. Implicit receivers must leave class TypeVars universal.
+        let return_check_inferable = if explicit_receiver_can_inform_return {
+            parameter_inferable
+        } else {
+            return_inferable
+        };
+
+        let parameter_constraints_for_return =
+            if normalize_implicit_receiver && !explicit_receiver_can_inform_return {
+                let return_typevars = return_inferable.iter(db).collect::<FxHashSet<_>>();
+                let receiver_only_typevars = self
+                    .inferable_typevars(db)
+                    .iter(db)
+                    .filter(|typevar| !return_typevars.contains(typevar))
+                    .collect::<Vec<_>>();
+                parameter_constraints.reduce_inferable(db, &constraints, receiver_only_typevars)
+            } else {
+                parameter_constraints
+            };
+
+        let return_constraints = overload.return_ty.when_assignable_to(
+            db,
+            implementation_return_ty,
             &constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &materialization_visitor,
+            return_check_inferable,
         );
 
-        let is_consistent = checker
-            .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db);
+        let combined_constraints = parameter_constraints_for_return
+            .and(db, &constraints, || return_constraints)
+            .reduce_inferable(db, &constraints, return_check_inferable.iter(db));
+        combined_constraints.satisfied_by_all_typevars(db, &constraints, InferableTypeVars::None)
+    }
 
-        if is_consistent {
-            ReturnTypeConsistency::Consistent
+    /// Build unreduced parameter constraints for relating generic implementation returns.
+    ///
+    /// Unlike [`Self::when_implementation_parameters_compatible_with`], this keeps
+    /// implementation-local type variables in the constraint set until return constraints have been
+    /// conjoined with the parameter relation.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def f(x: int) -> int: ...
+    /// def f[T](x: T) -> T:
+    ///     return x
+    /// ```
+    fn when_implementation_parameters_compatible_with_unreduced<'c>(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        normalize_implicit_receiver: bool,
+        target_inferable: InferableTypeVars<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker =
+            TypeRelationChecker::constraint_set_assignability_for_parameter_domain_coverage(
+                constraints,
+                &relation_visitor,
+                &disjointness_visitor,
+                &signature_relation_visitor,
+                &materialization_visitor,
+            );
+        self.with_normalized_implementation_pair(
+            other,
+            normalize_implicit_receiver,
+            |self_, other| {
+                checker.check_signature_pair_with_typevars_unreduced(
+                    db,
+                    self_,
+                    other,
+                    self_.implementation_consistency_inferable_typevars(db),
+                    target_inferable,
+                )
+            },
+        )
+    }
+
+    /// Return the implementation return type for a synthetic call shaped like the overload.
+    ///
+    /// This lets overload consistency compare the actual return type selected by a generic
+    /// implementation for the overload's argument types.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def f(x: int) -> int: ...
+    /// def f[T](x: T) -> T:
+    ///     return x
+    /// ```
+    fn return_type_for_argument_types_of(
+        &self,
+        db: &'db dyn Db,
+        overload: &Self,
+        normalize_implicit_receiver: bool,
+    ) -> Option<Type<'db>> {
+        let arguments = overload.call_arguments_for_parameters(normalize_implicit_receiver);
+
+        // Only overload argument types may specialize the implementation. The overload return type
+        // must not provide expected context here, because that can solve implementation-local type
+        // variables that are not determined by the implementation's parameters.
+        let constraints = ConstraintSetBuilder::new();
+        let bindings = Type::single_callable(db, self.clone())
+            .bindings(db)
+            .match_parameters(db, &arguments)
+            .check_types(db, &constraints, &arguments, TypeContext::default(), &[])
+            .ok()?;
+        let binding = bindings.single_element()?;
+        let (_, binding) = binding.matching_overloads().exactly_one().ok()?;
+
+        let Some(specialization) = binding.specialization() else {
+            return Some(binding.return_type());
+        };
+
+        Some(self.return_ty.apply_specialization(
+            db,
+            self.specialization_preserving_return_only_typevars(
+                db,
+                specialization,
+                normalize_implicit_receiver,
+            ),
+        ))
+    }
+
+    fn specialization_preserving_return_only_typevars(
+        &self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        normalize_implicit_receiver: bool,
+    ) -> Specialization<'db> {
+        let parameter_typevars = self.parameter_typevars(db, normalize_implicit_receiver, false);
+        let generic_context = specialization.generic_context(db);
+        let types = generic_context
+            .variables(db)
+            .zip(specialization.types(db).iter())
+            .map(|(typevar, ty)| {
+                if ty.is_unknown() && !parameter_typevars.contains(&typevar.identity(db)) {
+                    Type::TypeVar(typevar)
+                } else {
+                    *ty
+                }
+            })
+            .collect::<Box<_>>();
+
+        Specialization::new(
+            db,
+            generic_context,
+            types,
+            specialization.materialization_kind(db),
+            None,
+        )
+    }
+
+    /// Build a synthetic positional call from this signature's parameters.
+    ///
+    /// A positional call is sufficient for selecting the generic implementation return type;
+    /// parameter compatibility independently checks accepted argument forms.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def f(x: int, y: int) -> int: ...
+    /// def f(x: object, y: object) -> object:
+    ///     return x
+    /// ```
+    fn call_arguments_for_parameters<'a>(
+        &'a self,
+        normalize_implicit_receiver: bool,
+    ) -> CallArguments<'a, 'db> {
+        self.parameters()
+            .iter()
+            .enumerate()
+            .map(|(index, parameter)| {
+                let argument = match parameter.kind() {
+                    ParameterKind::PositionalOnly { .. }
+                    | ParameterKind::PositionalOrKeyword { .. }
+                    | ParameterKind::Variadic { .. } => Argument::Positional,
+                    ParameterKind::KeywordOnly { name, .. } => Argument::Keyword(name.as_str()),
+                    ParameterKind::KeywordVariadic { .. } => {
+                        Argument::Keyword("__ty_synthetic_keyword")
+                    }
+                };
+                let annotated_type = if index == 0 && normalize_implicit_receiver {
+                    Type::unknown()
+                } else {
+                    parameter.annotated_type()
+                };
+
+                (argument, Some(annotated_type))
+            })
+            .collect()
+    }
+
+    /// Return a copy with the first parameter rewritten to have type `ty`.
+    ///
+    /// This normalizes implicit or gradual method receiver types before comparing an overload with
+    /// its implementation while preserving the receiver's original call shape.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// class C:
+    ///     @overload
+    ///     def f(self, x: int) -> int: ...
+    ///     def f(self, x: object) -> object:
+    ///         return x
+    /// ```
+    fn with_first_parameter_type(mut self, ty: Type<'db>) -> Self {
+        if let Some(first) = self.parameters.value.first_mut() {
+            *first = first.clone().with_annotated_type(ty);
+        }
+        self
+    }
+
+    fn with_normalized_implementation_pair<R>(
+        &self,
+        other: &Self,
+        normalize_implicit_receiver: bool,
+        f: impl FnOnce(&Self, &Self) -> R,
+    ) -> R {
+        if normalize_implicit_receiver {
+            let self_ = self.clone().with_first_parameter_type(Type::unknown());
+            let other = other.clone().with_first_parameter_type(Type::unknown());
+            f(&self_, &other)
         } else {
-            ReturnTypeConsistency::Inconsistent(checker.into_error_context())
+            f(self, other)
         }
     }
 
@@ -1622,6 +2297,67 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        self.check_signature_pair_with_typevars(
+            db,
+            source,
+            target,
+            source.inferable_typevars(db),
+            target.inferable_typevars(db),
+        )
+    }
+
+    /// Check two signatures using caller-supplied inferable type variables.
+    ///
+    /// Most callers infer type variables from the signatures themselves. Overload implementation
+    /// consistency needs a narrower set so that implementation-local type variables can be
+    /// inferred while unrelated class type variables remain universally quantified.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// class Box[T]:
+    ///     @overload
+    ///     def get(self, default: T) -> T: ...
+    ///     def get(self, default: object) -> object:
+    ///         return default
+    /// ```
+    fn check_signature_pair_with_typevars(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        source_inferable: InferableTypeVars<'db>,
+        target_inferable: InferableTypeVars<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let when = self.check_signature_pair_with_typevars_unreduced(
+            db,
+            source,
+            target,
+            source_inferable,
+            target_inferable,
+        );
+
+        // But the caller does not need to consider those extra typevars. Whatever constraint set
+        // we produce, we reduce it back down to the inferable set that the caller asked about.
+        // If we introduced new inferable typevars, those will be existentially quantified away
+        // before returning.
+        when.reduce_inferable(
+            db,
+            self.constraints,
+            source_inferable.iter(db).chain(target_inferable.iter(db)),
+        )
+    }
+
+    /// Check two signatures using caller-supplied inferable type variables, without reducing them
+    /// out of the resulting constraint set.
+    fn check_signature_pair_with_typevars_unreduced(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        source_inferable: InferableTypeVars<'db>,
+        target_inferable: InferableTypeVars<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         // If either signature is generic, their typevars should also be considered inferable when
         // checking whether one signature is a subtype/etc of the other, since we only need to find
         // one specialization that causes the check to succeed.
@@ -1634,26 +2370,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
         //         # inferable, even though other uses of T in the function body are non-inferable.
         //         return t
-        let source_inferable = source.inferable_typevars(db);
-        let target_inferable = target.inferable_typevars(db);
         let inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let checker = self.with_inferable_typevars(inferable);
-        let when = checker.with_signature_recursion_guard(source, target, || {
+        checker.with_signature_recursion_guard(source, target, || {
             checker.check_signature_pair_inner(db, source, target)
-        });
-
-        // But the caller does not need to consider those extra typevars. Whatever constraint set
-        // we produce, we reduce it back down to the inferable set that the caller asked about.
-        // If we introduced new inferable typevars, those will be existentially quantified away
-        // before returning.
-        when.reduce_inferable(
-            db,
-            self.constraints,
-            source_inferable.iter(db).chain(target_inferable.iter(db)),
-        )
+        })
     }
 
     fn with_signature_recursion_guard(
@@ -1794,6 +2518,49 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                target_name: Option<&Name>,
                                target_index: usize| {
             match (target_ty, source_ty) {
+                // Keep dynamic source parameters gradual when checking parameter-domain
+                // coverage. Otherwise, checking an overload implementation like:
+                //
+                // ```python
+                // class C[T]:
+                //     @overload
+                //     def __init__(self, value: T) -> None: ...
+                //     def __init__(self, value: Any) -> None: ...
+                // ```
+                //
+                // would turn `T` against `Any` into a constraint on the non-inferable class
+                // typevar instead of accepting the implementation's dynamic parameter.
+                (Type::TypeVar(bound_typevar), Type::Dynamic(_))
+                | (Type::Dynamic(_), Type::TypeVar(bound_typevar))
+                    if self.is_checking_parameter_domain_coverage()
+                        && !bound_typevar.is_inferable(db, self.inferable) =>
+                {
+                    return true;
+                }
+                // If a gradual source parameter already covers the target parameter, do not
+                // record constraints that only come from nested dynamic types:
+                //
+                // ```python
+                // @overload
+                // def compose[B](
+                //     f1: Callable[[B], object],
+                //     f2: Callable[[object], B],
+                //     /,
+                // ) -> object: ...
+                // def compose(*functions: Callable[[Any], Any]) -> object: ...
+                // ```
+                //
+                // The source parameter is gradual enough to accept both target arguments. If we
+                // record separate constraints for the two nested `Any`s, the repeated
+                // non-inferable target typevar `B` can make the source signature look artificially
+                // narrow.
+                _ if self.is_checking_parameter_domain_coverage()
+                    && source_ty.has_dynamic(db)
+                    && target_ty.has_typevar_or_typevar_instance(db)
+                    && target_ty.is_assignable_to(db, source_ty) =>
+                {
+                    return true;
+                }
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
                 // position.
@@ -1827,6 +2594,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             !result
                 .intersect(db, self.constraints, constraint_set)
                 .is_never_satisfied(db)
+        };
+        let is_required_value_parameter = |parameter: &Parameter<'db>| {
+            matches!(
+                parameter.kind(),
+                ParameterKind::PositionalOnly {
+                    default_type: None,
+                    ..
+                } | ParameterKind::PositionalOrKeyword {
+                    default_type: None,
+                    ..
+                } | ParameterKind::KeywordOnly {
+                    default_type: None,
+                    ..
+                }
+            )
         };
 
         if self.relation.is_constraint_set_assignability() {
@@ -2076,6 +2858,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `P`
                 (None, Some(([], target_bound_typevar))) => {
+                    if self.is_checking_parameter_domain_coverage()
+                        && source.parameters.is_gradual()
+                    {
+                        return result;
+                    }
+
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
@@ -2100,6 +2888,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
                 (None, Some((target_prefix_params, target_bound_typevar))) => {
+                    if self.is_checking_parameter_domain_coverage()
+                        && source.parameters.is_gradual()
+                    {
+                        return result;
+                    }
+
                     // Loop over self parameters and target_prefix_params in a similar manner to the
                     // above loop
                     let mut parameters = ParametersZip {
@@ -2239,6 +3033,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: callable without ParamSpec
                 (Some(([], source_bound_typevar)), None) => {
+                    if self.is_checking_parameter_domain_coverage()
+                        && target.parameters.is_gradual()
+                    {
+                        return result;
+                    }
+
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
@@ -2263,6 +3063,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `Concatenate[<prefix_params>, P]`
                 // other: callable without ParamSpec
                 (Some((source_prefix_params, source_bound_typevar)), None) => {
+                    if self.is_checking_parameter_domain_coverage()
+                        && target.parameters.is_gradual()
+                    {
+                        return result;
+                    }
+
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
@@ -2432,6 +3238,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         ) {
                             return result;
                         }
+                    }
+
+                    if self.is_checking_parameter_domain_coverage()
+                        && source_prefix_params
+                            .iter()
+                            .skip(target_prefix_params.len())
+                            .any(is_required_value_parameter)
+                    {
+                        return self.never();
                     }
                 }
 
