@@ -44,7 +44,7 @@ pub struct GlobalConfigArgs {
     /// or a TOML `<KEY> = <VALUE>` pair
     /// (such as you might find in a `ruff.toml` configuration file)
     /// overriding a specific configuration option
-    /// (e.g., `--config "lint.line-length = 100"` or `--config "format.quote-style = 'single'"`).
+    /// (e.g., `--config "line-length = 100"` or `--config "format.quote-style = 'single'"`).
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
