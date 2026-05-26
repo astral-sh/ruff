@@ -977,6 +977,36 @@ mod tests {
     }
 
     #[test]
+    fn skips_imports_used_only_in_stringified_annotations() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+            from typing import List
+
+            x: """List['Path']""" = []
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_imports_used_only_as_literal_string_values() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+            from typing import Literal
+
+            x: """Literal["Path"]""" = "Path"
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["Path"]);
+        Ok(())
+    }
+
+    #[test]
     fn skips_imports_used_in_type_aliases() -> anyhow::Result<()> {
         let names = UnusedImportTest::new().names(
             r#"
