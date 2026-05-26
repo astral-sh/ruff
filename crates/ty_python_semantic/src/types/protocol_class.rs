@@ -6,6 +6,12 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
+use crate::types::attribute_write::{
+    AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
+    FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, attribute_write_requirement,
+    descriptor_setter_returns_never, instance_attribute_write_member_requirement,
+};
+use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::{TypeContext, UpcastPolicy};
@@ -19,7 +25,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
         KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
+        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionType,
+        VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -412,8 +419,30 @@ impl<'db> ProtocolInterface<'db> {
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.members(db)
-            // TODO do we need to switch on member kind?
-            .map(|member| member.ty().variance_of(db, typevar))
+            .map(|member| match member.kind {
+                ProtocolMemberKind::Method(method) => {
+                    Type::Callable(method).variance_of(db, typevar)
+                }
+                ProtocolMemberKind::Property(property) => property_get_type(db, property)
+                    .into_iter()
+                    .map(|get_type| get_type.variance_of(db, typevar))
+                    .chain(
+                        property_set_type(db, property)
+                            .map(|set_type| set_type.variance_of(db, typevar).flip()),
+                    )
+                    .collect(),
+                ProtocolMemberKind::Other(ty)
+                    if member.qualifiers.contains(TypeQualifiers::FINAL) =>
+                {
+                    ty.variance_of(db, typevar)
+                }
+                ProtocolMemberKind::Other(ty) => [
+                    ty.variance_of(db, typevar),
+                    ty.variance_of(db, typevar).flip(),
+                ]
+                .into_iter()
+                .collect(),
+            })
             .collect()
     }
 }
@@ -674,7 +703,240 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     }
 }
 
+fn property_get_type<'db>(
+    db: &'db dyn Db,
+    property: PropertyInstanceType<'db>,
+) -> Option<Type<'db>> {
+    property
+        .getter(db)?
+        .try_call(db, &CallArguments::positional([Type::any()]))
+        .ok()
+        .map(|bindings| bindings.return_type(db))
+}
+
+fn property_set_type<'db>(
+    db: &'db dyn Db,
+    property: PropertyInstanceType<'db>,
+) -> Option<Type<'db>> {
+    let mut set_types = Vec::new();
+    for callable in &property.setter(db)?.try_upcast_to_callable(db)? {
+        for signature in callable.signatures(db) {
+            set_types.push(signature.parameters().get_positional(1)?.annotated_type());
+        }
+    }
+    Some(UnionType::from_elements(db, set_types))
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    fn check_property_write(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        member_name: &str,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let requirement = attribute_write_requirement(db, ty, member_name);
+        self.check_property_write_requirement(db, &requirement, member_name, value_ty)
+    }
+
+    fn check_property_write_requirement(
+        &self,
+        db: &'db dyn Db,
+        requirement: &AttributeWriteRequirement<'db>,
+        member_name: &str,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match requirement {
+            AttributeWriteRequirement::All { element_tys, .. } => {
+                let mut result = self.always();
+                for element_ty in *element_tys {
+                    let requirement = attribute_write_requirement(db, *element_ty, member_name);
+                    let element_result = self.check_property_write_requirement(
+                        db,
+                        &requirement,
+                        member_name,
+                        value_ty,
+                    );
+                    result = result.and(db, self.constraints, || element_result);
+                    if result.is_never_satisfied(db) {
+                        break;
+                    }
+                }
+                result
+            }
+            AttributeWriteRequirement::Any { intersection, .. } => {
+                let mut result = self.never();
+                for element_ty in intersection.positive(db) {
+                    let requirement = attribute_write_requirement(db, *element_ty, member_name);
+                    let element_result = self.check_property_write_requirement(
+                        db,
+                        &requirement,
+                        member_name,
+                        value_ty,
+                    );
+                    result = result.or(db, self.constraints, || element_result);
+                    if result.is_always_satisfied(db) {
+                        break;
+                    }
+                }
+                result
+            }
+            AttributeWriteRequirement::Unconstrained => self.always(),
+            AttributeWriteRequirement::CannotAssign => self.never(),
+            AttributeWriteRequirement::Module(Some(write_ty)) => {
+                self.check_type_pair(db, value_ty, *write_ty)
+            }
+            AttributeWriteRequirement::Module(None) => self.never(),
+            AttributeWriteRequirement::Instance(object_ty) => {
+                self.check_instance_property_write(db, *object_ty, member_name, value_ty)
+            }
+            AttributeWriteRequirement::Class { object_ty, member } => {
+                self.check_class_property_write(db, *object_ty, member, value_ty)
+            }
+        }
+    }
+
+    fn check_instance_property_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        member_name: &str,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let setattr_result = object_ty.try_call_dunder_with_policy(
+            db,
+            "__setattr__",
+            &mut CallArguments::positional([Type::string_literal(db, member_name), value_ty]),
+            TypeContext::default(),
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+        if match &setattr_result {
+            Ok(bindings) => bindings.return_type(db).is_never(),
+            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+        } {
+            return self.never();
+        }
+
+        let member = instance_attribute_write_member_requirement(db, object_ty, member_name);
+        match &member {
+            InstanceAttributeWriteMember::ClassVar => self.never(),
+            InstanceAttributeWriteMember::Explicit { member, fallback } => {
+                let member_result =
+                    self.check_explicit_property_write(db, object_ty, member, value_ty);
+                if let Some(fallback) = fallback {
+                    let fallback_result =
+                        self.check_fallback_property_write(db, fallback, value_ty);
+                    member_result.and(db, self.constraints, || fallback_result)
+                } else {
+                    member_result
+                }
+            }
+            InstanceAttributeWriteMember::Instance(fallback) => {
+                self.check_fallback_property_write(db, fallback, value_ty)
+            }
+            InstanceAttributeWriteMember::SetAttr => ConstraintSet::from_bool(
+                self.constraints,
+                matches!(
+                    setattr_result,
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
+                ),
+            ),
+        }
+    }
+
+    fn check_class_property_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        member: &ClassAttributeWriteMember<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match member {
+            ClassAttributeWriteMember::Explicit { member, fallback } => {
+                let member_result =
+                    self.check_explicit_property_write(db, object_ty, member, value_ty);
+                if member_result.is_never_satisfied(db) {
+                    return member_result;
+                }
+                if let Some(fallback) = fallback {
+                    let fallback_result =
+                        self.check_fallback_property_write(db, fallback, value_ty);
+                    member_result.and(db, self.constraints, || fallback_result)
+                } else {
+                    member_result
+                }
+            }
+            ClassAttributeWriteMember::ClassAttribute(fallback) => {
+                self.check_fallback_property_write(db, fallback, value_ty)
+            }
+            ClassAttributeWriteMember::Unresolved { .. } => self.never(),
+        }
+    }
+
+    fn check_explicit_property_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        requirement: &ExplicitAttributeWriteRequirement<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if requirement.qualifiers().contains(TypeQualifiers::FINAL) {
+            return self.never();
+        }
+        match requirement {
+            ExplicitAttributeWriteRequirement::Descriptor {
+                descriptor_ty,
+                setter_ty,
+                ..
+            } => {
+                if descriptor_setter_returns_never(
+                    db,
+                    *descriptor_ty,
+                    *setter_ty,
+                    object_ty,
+                    value_ty,
+                ) {
+                    return self.never();
+                }
+                if let Some(property) = descriptor_ty.as_property_instance()
+                    && let Some(set_type) = property_set_type(db, property)
+                {
+                    return self.check_type_pair(db, value_ty, set_type);
+                }
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    setter_ty
+                        .try_call(
+                            db,
+                            &CallArguments::positional([*descriptor_ty, object_ty, value_ty]),
+                        )
+                        .is_ok(),
+                )
+            }
+            ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
+                self.check_type_pair(db, value_ty, *ty)
+            }
+        }
+    }
+
+    fn check_fallback_property_write(
+        &self,
+        db: &'db dyn Db,
+        requirement: &FallbackAttributeWriteRequirement<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match requirement {
+            FallbackAttributeWriteRequirement::AssignableTo { ty, qualifiers, .. } => {
+                if qualifiers.contains(TypeQualifiers::FINAL) {
+                    self.never()
+                } else {
+                    self.check_type_pair(db, value_ty, *ty)
+                }
+            }
+            FallbackAttributeWriteRequirement::PossiblyMissing => self.always(),
+        }
+    }
+
     /// Return `true` if `other` contains an attribute/method/property that satisfies
     /// the part of the interface defined by this protocol member.
     pub(super) fn type_satisfies_protocol_member(
@@ -742,23 +1004,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                     })
             }
-            // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => {
-                let is_defined = matches!(
-                    ty.member(db, member.name).place,
-                    Place::Defined(DefinedPlace {
+            ProtocolMemberKind::Property(property) => {
+                let read_result = if let Some(required_type) = property_get_type(db, *property) {
+                    let Place::Defined(DefinedPlace {
+                        ty: attribute_type,
                         definedness: Definedness::AlwaysDefined,
                         ..
-                    })
-                );
-                if !is_defined {
-                    self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
-                        member_name: member.name.into(),
-                        ty,
-                    });
-                    return self.never();
-                }
-                ConstraintSet::from_bool(self.constraints, true)
+                    }) = ty.member(db, member.name).place
+                    else {
+                        self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
+                            member_name: member.name.into(),
+                            ty,
+                        });
+                        return self.never();
+                    };
+                    self.check_type_pair(db, attribute_type, required_type)
+                } else {
+                    self.always()
+                };
+                read_result.and(db, self.constraints, || {
+                    property_set_type(db, *property).when_none_or(
+                        db,
+                        self.constraints,
+                        |value_type| self.check_property_write(db, ty, member.name, value_type),
+                    )
+                })
             }
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Defined(DefinedPlace {
@@ -773,11 +1043,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     });
                     return self.never();
                 };
-                self.check_type_pair(db, *member_type, attribute_type).and(
-                    db,
-                    self.constraints,
-                    || self.check_type_pair(db, attribute_type, *member_type),
-                )
+                let read_result = self.check_type_pair(db, attribute_type, *member_type);
+
+                if member.qualifiers.contains(TypeQualifiers::FINAL) {
+                    read_result
+                } else if member.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                    let Place::Defined(DefinedPlace {
+                        ty: meta_attribute_type,
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }) = ty.to_meta_type(db).member(db, member.name).place
+                    else {
+                        return self.never();
+                    };
+                    read_result.and(db, self.constraints, || {
+                        self.check_type_pair(db, meta_attribute_type, *member_type)
+                    })
+                } else {
+                    read_result.and(db, self.constraints, || {
+                        self.check_property_write(db, ty, member.name, *member_type)
+                    })
+                }
             }
         };
         if result.is_never_satisfied(db) {
@@ -822,15 +1108,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.never()
                         }
 
-                        // A property member can only be a subtype of an attribute member
-                        // if the property is readable *and* writable.
-                        //
-                        // TODO: this should also consider the types of the members on both sides.
-                        (ProtocolMemberKind::Property(property), ProtocolMemberKind::Other(_)) => {
-                            ConstraintSet::from_bool(
+                        // A property can satisfy a mutable attribute only if it supports
+                        // compatible reads and writes.
+                        (
+                            ProtocolMemberKind::Property(source_property),
+                            ProtocolMemberKind::Other(target_type),
+                        ) => {
+                            let read_result = property_get_type(db, source_property).when_some_and(
+                                db,
                                 self.constraints,
-                                property.getter(db).is_some() && property.setter(db).is_some(),
-                            )
+                                |source_get_type| {
+                                    self.check_type_pair(db, source_get_type, target_type)
+                                },
+                            );
+                            if target_member.qualifiers.contains(TypeQualifiers::FINAL) {
+                                read_result
+                            } else {
+                                read_result.and(db, self.constraints, || {
+                                    property_set_type(db, source_property).when_some_and(
+                                        db,
+                                        self.constraints,
+                                        |source_set_type| {
+                                            self.check_type_pair(db, target_type, source_set_type)
+                                        },
+                                    )
+                                })
+                            }
                         }
 
                         // A `@property` member can never be a subtype of a method member, as it is not necessarily
@@ -868,20 +1171,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (
                             ProtocolMemberKind::Other(source_type),
                             ProtocolMemberKind::Other(target_type),
-                        ) => self.check_type_pair(db, source_type, target_type).and(
-                            db,
-                            self.constraints,
-                            || self.check_type_pair(db, target_type, source_type),
-                        ),
+                        ) => {
+                            let read_result = self.check_type_pair(db, source_type, target_type);
+                            if target_member.qualifiers.contains(TypeQualifiers::FINAL) {
+                                read_result
+                            } else if source_member.qualifiers.contains(TypeQualifiers::FINAL) {
+                                self.never()
+                            } else {
+                                read_result.and(db, self.constraints, || {
+                                    self.check_type_pair(db, target_type, source_type)
+                                })
+                            }
+                        }
 
-                        // TODO: finish assignability/subtyping between two `@property` members,
-                        // and between a `@property` member and a member of a different kind.
                         (
                             ProtocolMemberKind::Property(_)
                             | ProtocolMemberKind::Method(_)
                             | ProtocolMemberKind::Other(_),
                             ProtocolMemberKind::Property(_),
-                        ) => self.always(),
+                        ) => self.type_satisfies_protocol_member(db, source_type, &target_member),
                     }
                 });
                 if result.is_never_satisfied(db) {
@@ -895,6 +1203,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    pub(super) fn protocol_property_write_is_definitely_missing_from_ty(
+        &self,
+        db: &'db dyn Db,
+        member: &ProtocolMember<'_, 'db>,
+        ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let ProtocolMemberKind::Property(required_property) = member.kind else {
+            return self.never();
+        };
+        if required_property.setter(db).is_none() {
+            return self.never();
+        }
+
+        let Place::Defined(DefinedPlace {
+            ty: Type::PropertyInstance(actual_property),
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = ty.class_member(db, member.name().into()).place
+        else {
+            return self.never();
+        };
+
+        ConstraintSet::from_bool(self.constraints, actual_property.setter(db).is_none())
+    }
+
     pub(super) fn protocol_member_has_disjoint_type_from_ty(
         &self,
         db: &'db dyn Db,
@@ -902,8 +1235,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match &member.kind {
-            // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => self.never(),
+            ProtocolMemberKind::Property(property) => property_get_type(db, *property)
+                .when_some_and(db, self.constraints, |property_type| {
+                    self.check_type_pair(db, ty, property_type)
+                }),
+            // TODO: implement disjointness for method members
+            ProtocolMemberKind::Method(_) => self.never(),
             ProtocolMemberKind::Other(other_type) => self.check_type_pair(db, ty, *other_type),
         }
     }

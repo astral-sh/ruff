@@ -18,7 +18,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
-use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
+use ty_module_resolver::{ModuleName, resolve_module};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
@@ -38,6 +38,12 @@ use crate::place::{
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
+use crate::types::attribute_write::{
+    AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
+    FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, assignment_attribute_members,
+    attribute_write_requirement, descriptor_setter_returns_never,
+    instance_attribute_write_member_requirement,
+};
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -2294,25 +2300,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Returns `true` if `property_ty` is a property whose setter returns `Never`/`NoReturn`
-    /// when called for an assignment to `object_ty` with `value_ty`.
-    fn property_setter_returns_never(
-        &self,
-        property_ty: Type<'db>,
-        object_ty: Type<'db>,
-        value_ty: Type<'db>,
-    ) -> bool {
-        let db = self.db();
-        property_ty.as_property_instance().is_some_and(|property| {
-            property.setter(db).is_some_and(|setter| {
-                match setter.try_call(db, &CallArguments::positional([object_ty, value_ty])) {
-                    Ok(result) => result.return_type(db).is_never(),
-                    Err(err) => err.return_type(db).is_never(),
-                }
-            })
-        })
-    }
-
     /// Returns `true` if `property_ty` is a property whose deleter returns `Never`/`NoReturn`
     /// when called for deletion on `object_ty`.
     fn property_deleter_returns_never(&self, property_ty: Type<'db>, object_ty: Type<'db>) -> bool {
@@ -2340,726 +2327,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
-        let db = self.db();
-
-        // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
-        let ensure_assignable_to =
-            |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
-                let assignable = value_ty.is_assignable_to(db, attr_ty);
-                if !assignable && emit_diagnostics {
-                    report_invalid_attribute_assignment(
-                        &builder.context,
-                        target.into(),
-                        attr_ty,
-                        value_ty,
-                        attribute,
-                    );
-                }
-                assignable
-            };
-
-        // For dataclass fields with converters, the write type is the converter's
-        // input type (the type of the first positional parameter), not the field's
-        // declared type.
-        let effective_write_type = |attr_ty: Type<'db>| -> Type<'db> {
-            if let Type::NominalInstance(instance) = object_ty {
-                if let Some(converter_ty) = instance
-                    .class(db)
-                    .converter_input_type_for_field(db, attribute)
-                {
-                    return converter_ty;
-                }
-            }
-            attr_ty
+        let requirement = attribute_write_requirement(self.db(), object_ty, attribute);
+        let mut evaluator = AssignmentAttributeWriteEvaluator {
+            builder: self,
+            target,
+            object_ty,
+            attribute,
+            infer_value_ty: MultiInferenceGuard::new(infer_value_ty),
         };
-
-        match object_ty {
-            Type::Union(union) => {
-                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
-
-                // Perform loud inference without type context, as there may be multiple
-                // equally applicable type contexts for each union member.
-                let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
-
-                if union.elements(self.db()).iter().all(|elem| {
-                    self.validate_attribute_assignment(
-                        target,
-                        *elem,
-                        attribute,
-                        &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
-                        false,
-                    )
-                }) {
-                    if emit_diagnostics {
-                        self.validate_final_attribute_assignment(target, object_ty, attribute);
-                    }
-                    true
-                } else {
-                    // TODO: This is not a very helpful error message, as it does not include the underlying reason
-                    // why the assignment is invalid. This would be a good use case for sub-diagnostics.
-                    if emit_diagnostics
-                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Object of type `{}` is not assignable \
-                                 to attribute `{attribute}` on type `{}`",
-                            value_ty.display(self.db()),
-                            object_ty.display(self.db()),
-                        ));
-                    }
-
-                    false
-                }
-            }
-
-            Type::Intersection(intersection) => {
-                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
-
-                // TODO: Handle negative intersection elements
-                if intersection.positive(db).iter().any(|elem| {
-                    self.validate_attribute_assignment(
-                        target,
-                        *elem,
-                        attribute,
-                        &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
-                        false,
-                    )
-                }) {
-                    // Perform loud inference using the narrowed type context.
-                    infer_value_ty.infer_loud(self, infer_value_ty.last_tcx());
-                    if emit_diagnostics {
-                        self.validate_final_attribute_assignment(target, object_ty, attribute);
-                    }
-                    true
-                } else {
-                    // Otherwise, perform loud inference without type context, as we failed to
-                    // narrow to any given intersection element.
-                    let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
-
-                    if emit_diagnostics
-                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                    {
-                        // TODO: same here, see above
-                        builder.into_diagnostic(format_args!(
-                            "Object of type `{}` is not assignable \
-                                 to attribute `{attribute}` on type `{}`",
-                            value_ty.display(self.db()),
-                            object_ty.display(self.db()),
-                        ));
-                    }
-
-                    false
-                }
-            }
-
-            Type::EnumComplement(complement) => self.validate_attribute_assignment(
-                target,
-                complement.remaining_literal_union(db),
-                attribute,
-                infer_value_ty,
-                emit_diagnostics,
-            ),
-
-            Type::TypeAlias(alias) => self.validate_attribute_assignment(
-                target,
-                alias.value_type(self.db()),
-                attribute,
-                infer_value_ty,
-                emit_diagnostics,
-            ),
-
-            // Super instances do not allow attribute assignment
-            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
-                infer_value_ty(self, TypeContext::default());
-
-                if emit_diagnostics
-                    && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to attribute `{attribute}` on type `{}`",
-                        object_ty.display(self.db()),
-                    ));
-                }
-
-                false
-            }
-            Type::BoundSuper(_) => {
-                infer_value_ty(self, TypeContext::default());
-
-                if emit_diagnostics
-                    && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to attribute `{attribute}` on type `{}`",
-                        object_ty.display(self.db()),
-                    ));
-                }
-                false
-            }
-
-            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
-                infer_value_ty(self, TypeContext::default());
-                true
-            }
-
-            Type::NominalInstance(..)
-            | Type::ProtocolInstance(_)
-            | Type::LiteralValue(..)
-            | Type::SpecialForm(..)
-            | Type::KnownInstance(..)
-            | Type::PropertyInstance(..)
-            | Type::FunctionLiteral(..)
-            | Type::Callable(..)
-            | Type::BoundMethod(_)
-            | Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::TypeVar(..)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_)
-            | Type::TypedDict(_)
-            | Type::NewTypeInstance(_) => {
-                // We may infer the value type multiple times with distinct type context during
-                // attribute resolution.
-                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
-
-                // Perform loud inference without type context, as we may encounter multiple equally
-                // applicable type contexts during attribute resolution.
-                let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
-
-                // Infer `__setattr__` once upfront. We use this result for:
-                // 1. Checking if it returns `Never` (indicating an immutable class)
-                // 2. As a fallback when no explicit attribute is found
-                //
-                // TODO: We could re-infer `value_ty` with type context here.
-                let setattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
-                    db,
-                    "__setattr__",
-                    &mut CallArguments::positional([Type::string_literal(db, attribute), value_ty]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                );
-
-                // Check if `__setattr__` returns `Never` (indicating an immutable class).
-                // If so, block all attribute assignments regardless of explicit attributes.
-                let setattr_returns_never = match &setattr_dunder_call_result {
-                    Ok(result) => result.return_type(db).is_never(),
-                    Err(err) => err.return_type(db).is_some_and(|ty| ty.is_never()),
-                };
-
-                if setattr_returns_never {
-                    if emit_diagnostics {
-                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                        {
-                            let is_setattr_synthesized = match object_ty.class_member_with_policy(
-                                db,
-                                "__setattr__".into(),
-                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                            ) {
-                                PlaceAndQualifiers {
-                                    place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
-                                    qualifiers: _,
-                                } => attr_ty.is_callable_type(),
-                                _ => false,
-                            };
-
-                            let member_exists =
-                                !object_ty.member(db, attribute).place.is_undefined();
-
-                            let msg = if !member_exists {
-                                format!(
-                                    "Cannot assign to unresolved attribute `{attribute}` on type `{}`",
-                                    object_ty.display(db)
-                                )
-                            } else if is_setattr_synthesized {
-                                format!(
-                                    "Property `{attribute}` defined in `{}` is read-only",
-                                    object_ty.display(db)
-                                )
-                            } else {
-                                format!(
-                                    "Cannot assign to attribute `{attribute}` on type `{}` \
-                                     whose `__setattr__` method returns `Never`/`NoReturn`",
-                                    object_ty.display(db)
-                                )
-                            };
-
-                            builder.into_diagnostic(msg);
-                        }
-                    }
-                    return false;
-                }
-
-                // Now check for explicit attributes (class member or instance member).
-                // If an explicit attribute exists, validate against its type.
-                // Only fall back to `__setattr__` when no explicit attribute is found.
-                let Some((meta_attr, fallback_attr)) =
-                    self.assignment_attribute_members(object_ty, attribute)
-                else {
-                    infer_value_ty.infer_loud(self, TypeContext::default());
-                    return true;
-                };
-
-                match meta_attr {
-                    meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
-                        if emit_diagnostics
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Cannot assign to ClassVar `{attribute}` \
-                                from an instance of type `{ty}`",
-                                ty = object_ty.display(self.db()),
-                            ));
-                        }
-                        false
-                    }
-                    PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
-                            }),
-                        qualifiers,
-                    } => {
-                        // Resolve `Self` type variables to the concrete instance type.
-                        let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
-
-                        if emit_diagnostics
-                            && self.invalid_assignment_to_final_attribute(
-                                object_ty, target, attribute, qualifiers,
-                            )
-                        {
-                            return false;
-                        }
-
-                        let assignable_to_meta_attr = if let Place::Defined(DefinedPlace {
-                            ty: meta_dunder_set,
-                            ..
-                        }) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
-                        {
-                            // TODO: We could use the annotated parameter type of `__set__` as
-                            // type context here.
-                            let dunder_set_result = meta_dunder_set.try_call(
-                                db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
-                            );
-
-                            if self.property_setter_returns_never(meta_attr_ty, object_ty, value_ty)
-                            {
-                                if emit_diagnostics
-                                    && let Some(builder) =
-                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot assign to attribute `{attribute}` on type `{}` \
-                                         whose `__set__` method returns `Never`/`NoReturn`",
-                                        object_ty.display(db),
-                                    ));
-                                }
-                                return false;
-                            }
-
-                            if emit_diagnostics
-                                && let Err(dunder_set_failure) = dunder_set_result.as_ref()
-                            {
-                                report_bad_dunder_set_call(
-                                    &self.context,
-                                    dunder_set_failure,
-                                    attribute,
-                                    object_ty,
-                                    target,
-                                );
-                            }
-
-                            dunder_set_result.is_ok()
-                        } else {
-                            let write_ty = effective_write_type(meta_attr_ty);
-                            let value_ty =
-                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
-
-                            ensure_assignable_to(self, value_ty, write_ty)
-                        };
-
-                        let assignable_to_instance_attribute =
-                            if let Some(fallback_attr) = fallback_attr {
-                                let (assignable, boundness) = if let PlaceAndQualifiers {
-                                    place:
-                                        Place::Defined(DefinedPlace {
-                                            ty: instance_attr_ty,
-                                            definedness: instance_attr_boundness,
-                                            ..
-                                        }),
-                                    qualifiers,
-                                } = fallback_attr
-                                {
-                                    // Bind `Self` via MRO matching.
-                                    let instance_attr_ty =
-                                        instance_attr_ty.bind_self_typevars(db, object_ty);
-                                    let write_ty = effective_write_type(instance_attr_ty);
-                                    let value_ty = infer_value_ty
-                                        .infer_silent(self, TypeContext::new(Some(write_ty)));
-                                    if emit_diagnostics
-                                        && self.invalid_assignment_to_final_attribute(
-                                            object_ty, target, attribute, qualifiers,
-                                        )
-                                    {
-                                        return false;
-                                    }
-
-                                    (
-                                        ensure_assignable_to(self, value_ty, write_ty),
-                                        instance_attr_boundness,
-                                    )
-                                } else {
-                                    (true, Definedness::PossiblyUndefined)
-                                };
-
-                                if boundness == Definedness::PossiblyUndefined {
-                                    report_possibly_missing_attribute(
-                                        &self.context,
-                                        target,
-                                        attribute,
-                                        object_ty,
-                                    );
-                                }
-
-                                assignable
-                            } else {
-                                true
-                            };
-
-                        assignable_to_meta_attr && assignable_to_instance_attribute
-                    }
-
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        ..
-                    } => {
-                        if let Some(PlaceAndQualifiers {
-                            place:
-                                Place::Defined(DefinedPlace {
-                                    ty: instance_attr_ty,
-                                    definedness: instance_attr_boundness,
-                                    ..
-                                }),
-                            qualifiers,
-                        }) = fallback_attr
-                        {
-                            // Bind `Self` via MRO matching.
-                            let instance_attr_ty =
-                                instance_attr_ty.bind_self_typevars(db, object_ty);
-                            let write_ty = effective_write_type(instance_attr_ty);
-                            let value_ty =
-                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
-                            if emit_diagnostics
-                                && self.invalid_assignment_to_final_attribute(
-                                    object_ty, target, attribute, qualifiers,
-                                )
-                            {
-                                return false;
-                            }
-
-                            if instance_attr_boundness == Definedness::PossiblyUndefined {
-                                report_possibly_missing_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            ensure_assignable_to(self, value_ty, write_ty)
-                        } else {
-                            // No explicit attribute found. Use `__setattr__` (already inferred
-                            // above) as a fallback for dynamic attribute assignment.
-                            match setattr_dunder_call_result {
-                                // If __setattr__ succeeded, allow the assignment.
-                                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                                Err(CallDunderError::CallError(..)) => {
-                                    if emit_diagnostics
-                                        && let Some(builder) =
-                                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Cannot assign object of type `{}` to attribute \
-                                            `{attribute}` on type `{}` with \
-                                            custom `__setattr__` method.",
-                                            value_ty.display(db),
-                                            object_ty.display(db)
-                                        ));
-                                    }
-                                    false
-                                }
-                                Err(CallDunderError::MethodNotAvailable) => {
-                                    if emit_diagnostics
-                                        && let Some(builder) =
-                                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Unresolved attribute `{}` on type `{}`",
-                                            attribute,
-                                            object_ty.display(db)
-                                        ));
-                                    }
-                                    false
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                let Some((meta_attr, fallback_attr)) =
-                    self.assignment_attribute_members(object_ty, attribute)
-                else {
-                    infer_value_ty(self, TypeContext::default());
-                    return true;
-                };
-                let Some(class_attr_self_ty) = object_ty.to_instance(db) else {
-                    infer_value_ty(self, TypeContext::default());
-                    return true;
-                };
-
-                match meta_attr {
-                    PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
-                            }),
-                        qualifiers,
-                    } => {
-                        if emit_diagnostics
-                            && self.invalid_assignment_to_final_attribute(
-                                object_ty, target, attribute, qualifiers,
-                            )
-                        {
-                            infer_value_ty(self, TypeContext::default());
-                            return false;
-                        }
-
-                        // We may infer the value type multiple times with distinct type context during
-                        // attribute resolution.
-                        let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
-
-                        // Perform loud inference without type context, as we may encounter multiple equally
-                        // applicable type contexts during attribute resolution.
-                        let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
-
-                        let assignable_to_meta_attr = if let Place::Defined(DefinedPlace {
-                            ty: meta_dunder_set,
-                            ..
-                        }) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
-                        {
-                            // TODO: We could use the annotated parameter type of `__set__` as
-                            // type context here.
-                            let dunder_set_result = meta_dunder_set.try_call(
-                                db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
-                            );
-
-                            if self.property_setter_returns_never(meta_attr_ty, object_ty, value_ty)
-                            {
-                                if emit_diagnostics
-                                    && let Some(builder) =
-                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot assign to attribute `{attribute}` on type `{}` \
-                                         whose `__set__` method returns `Never`/`NoReturn`",
-                                        object_ty.display(db),
-                                    ));
-                                }
-                                return false;
-                            }
-
-                            if emit_diagnostics
-                                && let Err(dunder_set_failure) = dunder_set_result.as_ref()
-                            {
-                                report_bad_dunder_set_call(
-                                    &self.context,
-                                    dunder_set_failure,
-                                    attribute,
-                                    object_ty,
-                                    target,
-                                );
-                            }
-
-                            dunder_set_result.is_ok()
-                        } else {
-                            let value_ty = infer_value_ty
-                                .infer_silent(self, TypeContext::new(Some(meta_attr_ty)));
-                            ensure_assignable_to(self, value_ty, meta_attr_ty)
-                        };
-
-                        let assignable_to_class_attr = if let Some(fallback_attr) = fallback_attr {
-                            let (assignable, boundness) = if let PlaceAndQualifiers {
-                                place:
-                                    Place::Defined(DefinedPlace {
-                                        ty: class_attr_ty,
-                                        definedness: class_attr_boundness,
-                                        ..
-                                    }),
-                                ..
-                            } = fallback_attr
-                            {
-                                let class_attr_ty =
-                                    class_attr_ty.bind_self_typevars(db, class_attr_self_ty);
-                                let value_ty = infer_value_ty
-                                    .infer_silent(self, TypeContext::new(Some(class_attr_ty)));
-                                (
-                                    ensure_assignable_to(self, value_ty, class_attr_ty),
-                                    class_attr_boundness,
-                                )
-                            } else {
-                                (true, Definedness::PossiblyUndefined)
-                            };
-
-                            if boundness == Definedness::PossiblyUndefined {
-                                report_possibly_missing_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            assignable
-                        } else {
-                            true
-                        };
-
-                        assignable_to_meta_attr && assignable_to_class_attr
-                    }
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        ..
-                    } => {
-                        if let Some(PlaceAndQualifiers {
-                            place:
-                                Place::Defined(DefinedPlace {
-                                    ty: class_attr_ty,
-                                    definedness: class_attr_boundness,
-                                    ..
-                                }),
-                            qualifiers,
-                        }) = fallback_attr
-                        {
-                            let class_attr_ty =
-                                class_attr_ty.bind_self_typevars(db, class_attr_self_ty);
-                            let value_ty =
-                                infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
-                            if emit_diagnostics
-                                && self.invalid_assignment_to_final_attribute(
-                                    object_ty, target, attribute, qualifiers,
-                                )
-                            {
-                                return false;
-                            }
-
-                            if class_attr_boundness == Definedness::PossiblyUndefined {
-                                report_possibly_missing_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            ensure_assignable_to(self, value_ty, class_attr_ty)
-                        } else {
-                            infer_value_ty(self, TypeContext::default());
-
-                            let attribute_is_bound_on_instance =
-                                object_ty.to_instance(self.db()).is_some_and(|instance| {
-                                    !instance
-                                        .instance_member(self.db(), attribute)
-                                        .place
-                                        .is_undefined()
-                                });
-
-                            // Attribute is declared or bound on instance. Forbid access from the class object
-                            if emit_diagnostics {
-                                if attribute_is_bound_on_instance {
-                                    if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Cannot assign to instance attribute \
-                                             `{attribute}` from the class object `{ty}`",
-                                            ty = object_ty.display(self.db()),
-                                        ));
-                                    }
-                                } else {
-                                    if let Some(builder) =
-                                        self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Unresolved attribute `{}` on type `{}`.",
-                                            attribute,
-                                            object_ty.display(db)
-                                        ));
-                                    }
-                                }
-                            }
-
-                            false
-                        }
-                    }
-                }
-            }
-
-            Type::ModuleLiteral(module) => {
-                let sym = if module
-                    .module(db)
-                    .known(db)
-                    .is_some_and(KnownModule::is_builtins)
-                {
-                    builtins_symbol(db, attribute)
-                } else {
-                    module.static_member(db, attribute)
-                };
-                if let Place::Defined(DefinedPlace { ty: attr_ty, .. }) = sym.place {
-                    let value_ty = infer_value_ty(self, TypeContext::new(Some(attr_ty)));
-
-                    let assignable = value_ty.is_assignable_to(db, attr_ty);
-                    if assignable {
-                        true
-                    } else {
-                        if emit_diagnostics {
-                            report_invalid_attribute_assignment(
-                                &self.context,
-                                target.into(),
-                                attr_ty,
-                                value_ty,
-                                attribute,
-                            );
-                        }
-                        false
-                    }
-                } else {
-                    infer_value_ty(self, TypeContext::default());
-
-                    if emit_diagnostics
-                        && let Some(builder) =
-                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Unresolved attribute `{}` on type `{}`.",
-                            attribute,
-                            object_ty.display(db)
-                        ));
-                    }
-
-                    false
-                }
-            }
-        }
+        evaluator.evaluate(&requirement, emit_diagnostics)
     }
 
     fn validate_attribute_deletion(
@@ -3209,8 +2485,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ..
                         }),
                     ..
-                }) = self
-                    .assignment_attribute_members(object_ty, attribute)
+                }) = assignment_attribute_members(db, object_ty, attribute)
                     .map(|(meta_attr, _)| meta_attr)
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
@@ -3263,64 +2538,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
         }
-    }
-
-    fn assignment_attribute_members(
-        &self,
-        object_ty: Type<'db>,
-        attribute: &str,
-    ) -> Option<(PlaceAndQualifiers<'db>, Option<PlaceAndQualifiers<'db>>)> {
-        let db = self.db();
-        let meta_attr = object_ty.class_member(db, attribute.into());
-        let needs_fallback = matches!(
-            meta_attr.place,
-            Place::Defined(DefinedPlace {
-                definedness: Definedness::PossiblyUndefined,
-                ..
-            }) | Place::Undefined
-        );
-        let fallback_attr = if needs_fallback {
-            Some(match object_ty {
-                Type::NominalInstance(..)
-                | Type::ProtocolInstance(_)
-                | Type::LiteralValue(..)
-                | Type::SpecialForm(..)
-                | Type::KnownInstance(..)
-                | Type::PropertyInstance(..)
-                | Type::FunctionLiteral(..)
-                | Type::Callable(..)
-                | Type::BoundMethod(_)
-                | Type::KnownBoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::EnumComplement(_)
-                | Type::TypeVar(..)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                    object_ty.find_name_in_mro(db, attribute).expect(
-                        "called on Type::ClassLiteral, Type::GenericAlias, or Type::SubclassOf",
-                    )
-                }
-                Type::Union(..)
-                | Type::Intersection(..)
-                | Type::TypeAlias(..)
-                | Type::Dynamic(..)
-                | Type::Divergent(_)
-                | Type::Never
-                | Type::ModuleLiteral(..)
-                | Type::BoundSuper(..) => return None,
-            })
-        } else {
-            None
-        };
-
-        Some((meta_attr, fallback_attr))
     }
 
     #[expect(clippy::type_complexity)]
@@ -10272,6 +9489,610 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
             self.finalized,
             "dropped `MultiInferenceGuard` without calling `infer_loud`"
         );
+    }
+}
+
+enum AssignmentAttributeWriteDiagnostic<'db> {
+    InvalidCompositeAssignment {
+        object_ty: Type<'db>,
+        value_ty: Type<'db>,
+    },
+    CannotAssign,
+    CannotAssignToClassVar,
+    TerminalSetAttr {
+        member_exists: bool,
+        is_setattr_synthesized: bool,
+    },
+    TerminalDescriptor,
+    BadDunderSet(CallError<'db>),
+    PossiblyMissing,
+    BadSetAttr {
+        value_ty: Type<'db>,
+    },
+    Unresolved {
+        with_period: bool,
+    },
+    CannotAssignToInstanceAttribute,
+}
+
+#[derive(Clone, Copy)]
+enum ContextualInference {
+    Commit,
+    Speculate,
+}
+
+struct AssignmentAttributeWriteEvaluator<'a, 'db, 'ast, 'infer> {
+    builder: &'a mut TypeInferenceBuilder<'db, 'ast>,
+    target: &'a ast::ExprAttribute,
+    object_ty: Type<'db>,
+    attribute: &'a str,
+    infer_value_ty: MultiInferenceGuard<'db, 'ast, 'infer>,
+}
+
+impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
+    fn infer_value(&mut self, tcx: TypeContext<'db>, emit_diagnostics: bool) -> Type<'db> {
+        if emit_diagnostics {
+            self.infer_value_ty.infer_loud(self.builder, tcx)
+        } else {
+            self.infer_value_ty.infer_silent(self.builder, tcx)
+        }
+    }
+
+    fn commit_last_speculative_context(&mut self, emit_diagnostics: bool) -> Type<'db> {
+        self.infer_value(self.infer_value_ty.last_tcx(), emit_diagnostics)
+    }
+
+    fn evaluate(
+        &mut self,
+        requirement: &AttributeWriteRequirement<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        match requirement {
+            AttributeWriteRequirement::All {
+                object_ty,
+                element_tys,
+            } => {
+                let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                let mut valid = true;
+                for element_ty in *element_tys {
+                    let requirement =
+                        attribute_write_requirement(self.builder.db(), *element_ty, self.attribute);
+                    if !self.evaluate(&requirement, false) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if valid {
+                    self.validate_composite_final_assignment(*object_ty, emit_diagnostics);
+                    true
+                } else {
+                    if emit_diagnostics {
+                        self.report(
+                            AssignmentAttributeWriteDiagnostic::InvalidCompositeAssignment {
+                                object_ty: *object_ty,
+                                value_ty,
+                            },
+                        );
+                    }
+                    false
+                }
+            }
+            AttributeWriteRequirement::Any {
+                object_ty,
+                intersection,
+            } => {
+                let mut valid = false;
+                for element_ty in intersection.positive(self.builder.db()) {
+                    let requirement =
+                        attribute_write_requirement(self.builder.db(), *element_ty, self.attribute);
+                    if self.evaluate(&requirement, false) {
+                        valid = true;
+                        break;
+                    }
+                }
+                if valid {
+                    self.commit_last_speculative_context(emit_diagnostics);
+                    self.validate_composite_final_assignment(*object_ty, emit_diagnostics);
+                    true
+                } else {
+                    let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                    if emit_diagnostics {
+                        self.report(
+                            AssignmentAttributeWriteDiagnostic::InvalidCompositeAssignment {
+                                object_ty: *object_ty,
+                                value_ty,
+                            },
+                        );
+                    }
+                    false
+                }
+            }
+            AttributeWriteRequirement::Unconstrained => {
+                self.infer_value(TypeContext::default(), emit_diagnostics);
+                true
+            }
+            AttributeWriteRequirement::CannotAssign => {
+                self.infer_value(TypeContext::default(), emit_diagnostics);
+                if emit_diagnostics {
+                    self.report(AssignmentAttributeWriteDiagnostic::CannotAssign);
+                }
+                false
+            }
+            AttributeWriteRequirement::Module(write_ty) => {
+                if let Some(write_ty) = write_ty {
+                    let value_ty =
+                        self.infer_value(TypeContext::new(Some(*write_ty)), emit_diagnostics);
+                    self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
+                } else {
+                    self.infer_value(TypeContext::default(), emit_diagnostics);
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::Unresolved {
+                            with_period: true,
+                        });
+                    }
+                    false
+                }
+            }
+            AttributeWriteRequirement::Instance(object_ty) => {
+                self.evaluate_instance(*object_ty, emit_diagnostics)
+            }
+            AttributeWriteRequirement::Class { object_ty, member } => {
+                self.evaluate_class(*object_ty, member, emit_diagnostics)
+            }
+        }
+    }
+
+    fn check_type_pair(
+        &mut self,
+        value_ty: Type<'db>,
+        target_ty: Type<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        let db = self.builder.db();
+        let assignable = value_ty.is_assignable_to(db, target_ty);
+        if !assignable && emit_diagnostics {
+            report_invalid_attribute_assignment(
+                &self.builder.context,
+                self.target.into(),
+                target_ty,
+                value_ty,
+                self.attribute,
+            );
+        }
+        assignable
+    }
+
+    fn final_assignment_is_valid(
+        &mut self,
+        object_ty: Type<'db>,
+        qualifiers: TypeQualifiers,
+        emit_diagnostics: bool,
+    ) -> bool {
+        !(emit_diagnostics
+            && self.builder.invalid_assignment_to_final_attribute(
+                object_ty,
+                self.target,
+                self.attribute,
+                qualifiers,
+            ))
+    }
+
+    fn validate_composite_final_assignment(
+        &mut self,
+        object_ty: Type<'db>,
+        emit_diagnostics: bool,
+    ) {
+        if emit_diagnostics {
+            self.builder.validate_final_attribute_assignment(
+                self.target,
+                object_ty,
+                self.attribute,
+            );
+        }
+    }
+
+    fn evaluate_instance(&mut self, object_ty: Type<'db>, emit_diagnostics: bool) -> bool {
+        let db = self.builder.db();
+        let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+
+        // A terminal `__setattr__` blocks even explicitly declared attributes.
+        let setattr_result = object_ty.try_call_dunder_with_policy(
+            db,
+            "__setattr__",
+            &mut CallArguments::positional([Type::string_literal(db, self.attribute), value_ty]),
+            TypeContext::default(),
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+        let setattr_returns_never = match &setattr_result {
+            Ok(bindings) => bindings.return_type(db).is_never(),
+            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+        };
+        if setattr_returns_never {
+            if emit_diagnostics {
+                let is_setattr_synthesized = match object_ty.class_member_with_policy(
+                    db,
+                    "__setattr__".into(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                ) {
+                    PlaceAndQualifiers {
+                        place: Place::Defined(DefinedPlace { ty, .. }),
+                        ..
+                    } => ty.is_callable_type(),
+                    _ => false,
+                };
+                let member_exists = !object_ty.member(db, self.attribute).place.is_undefined();
+                self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
+                    member_exists,
+                    is_setattr_synthesized,
+                });
+            }
+            return false;
+        }
+
+        let member = instance_attribute_write_member_requirement(db, object_ty, self.attribute);
+        match &member {
+            InstanceAttributeWriteMember::ClassVar => {
+                if emit_diagnostics {
+                    self.report(AssignmentAttributeWriteDiagnostic::CannotAssignToClassVar);
+                }
+                false
+            }
+            InstanceAttributeWriteMember::Explicit { member, fallback } => {
+                if !self.final_assignment_is_valid(object_ty, member.qualifiers(), emit_diagnostics)
+                {
+                    return false;
+                }
+                let member_valid =
+                    self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
+                if let Some(fallback) = fallback {
+                    let fallback_valid =
+                        self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics);
+                    member_valid && fallback_valid
+                } else {
+                    member_valid
+                }
+            }
+            InstanceAttributeWriteMember::Instance(fallback) => {
+                self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics)
+            }
+            InstanceAttributeWriteMember::SetAttr => match setattr_result {
+                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
+                Err(CallDunderError::CallError(..)) => {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty });
+                    }
+                    false
+                }
+                Err(CallDunderError::MethodNotAvailable) => {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::Unresolved {
+                            with_period: false,
+                        });
+                    }
+                    false
+                }
+            },
+        }
+    }
+
+    fn evaluate_class(
+        &mut self,
+        object_ty: Type<'db>,
+        member: &ClassAttributeWriteMember<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        match member {
+            ClassAttributeWriteMember::Explicit { member, fallback } => {
+                if !self.final_assignment_is_valid(object_ty, member.qualifiers(), emit_diagnostics)
+                {
+                    self.infer_value(TypeContext::default(), emit_diagnostics);
+                    return false;
+                }
+                let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                let member_valid =
+                    self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
+                if let Some(fallback) = fallback {
+                    let fallback_valid = self.evaluate_class_fallback(
+                        object_ty,
+                        fallback,
+                        emit_diagnostics,
+                        ContextualInference::Speculate,
+                    );
+                    member_valid && fallback_valid
+                } else {
+                    member_valid
+                }
+            }
+            ClassAttributeWriteMember::ClassAttribute(fallback) => self.evaluate_class_fallback(
+                object_ty,
+                fallback,
+                emit_diagnostics,
+                ContextualInference::Commit,
+            ),
+            ClassAttributeWriteMember::Unresolved {
+                has_instance_attribute,
+            } => {
+                self.infer_value(TypeContext::default(), emit_diagnostics);
+                if emit_diagnostics {
+                    self.report(if *has_instance_attribute {
+                        AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute
+                    } else {
+                        AssignmentAttributeWriteDiagnostic::Unresolved { with_period: true }
+                    });
+                }
+                false
+            }
+        }
+    }
+
+    fn evaluate_explicit_member(
+        &mut self,
+        object_ty: Type<'db>,
+        requirement: &ExplicitAttributeWriteRequirement<'db>,
+        value_ty: Type<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        match requirement {
+            ExplicitAttributeWriteRequirement::Descriptor {
+                descriptor_ty,
+                setter_ty,
+                ..
+            } => {
+                let db = self.builder.db();
+                let result = setter_ty.try_call(
+                    db,
+                    &CallArguments::positional([*descriptor_ty, object_ty, value_ty]),
+                );
+                if descriptor_setter_returns_never(
+                    db,
+                    *descriptor_ty,
+                    *setter_ty,
+                    object_ty,
+                    value_ty,
+                ) {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
+                    }
+                    false
+                } else {
+                    match result {
+                        Ok(_) => true,
+                        Err(error) => {
+                            if emit_diagnostics {
+                                self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet(
+                                    error,
+                                ));
+                            }
+                            false
+                        }
+                    }
+                }
+            }
+            ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
+                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                self.check_type_pair(value_ty, *ty, emit_diagnostics)
+            }
+        }
+    }
+
+    fn evaluate_instance_fallback(
+        &mut self,
+        object_ty: Type<'db>,
+        requirement: &FallbackAttributeWriteRequirement<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        match requirement {
+            FallbackAttributeWriteRequirement::AssignableTo {
+                ty,
+                qualifiers,
+                possibly_missing,
+            } => {
+                if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
+                    return false;
+                }
+                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
+                if *possibly_missing {
+                    self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
+                }
+                valid
+            }
+            FallbackAttributeWriteRequirement::PossiblyMissing => {
+                self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
+                true
+            }
+        }
+    }
+
+    fn evaluate_class_fallback(
+        &mut self,
+        object_ty: Type<'db>,
+        requirement: &FallbackAttributeWriteRequirement<'db>,
+        emit_diagnostics: bool,
+        inference: ContextualInference,
+    ) -> bool {
+        match requirement {
+            FallbackAttributeWriteRequirement::AssignableTo {
+                ty,
+                qualifiers,
+                possibly_missing,
+            } => {
+                let value_ty = self.infer_value(
+                    TypeContext::new(Some(*ty)),
+                    matches!(inference, ContextualInference::Commit) && emit_diagnostics,
+                );
+                if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
+                    return false;
+                }
+                let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
+                if *possibly_missing {
+                    self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
+                }
+                valid
+            }
+            FallbackAttributeWriteRequirement::PossiblyMissing => {
+                self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
+                true
+            }
+        }
+    }
+
+    fn report(&mut self, diagnostic: AssignmentAttributeWriteDiagnostic<'db>) {
+        let db = self.builder.db();
+        match diagnostic {
+            AssignmentAttributeWriteDiagnostic::InvalidCompositeAssignment {
+                object_ty,
+                value_ty,
+            } => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&INVALID_ASSIGNMENT, self.target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Object of type `{}` is not assignable to attribute `{}` on type `{}`",
+                        value_ty.display(db),
+                        self.attribute,
+                        object_ty.display(db),
+                    ));
+                }
+            }
+            AssignmentAttributeWriteDiagnostic::CannotAssign => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&INVALID_ASSIGNMENT, self.target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to attribute `{}` on type `{}`",
+                        self.attribute,
+                        self.object_ty.display(db),
+                    ));
+                }
+            }
+            AssignmentAttributeWriteDiagnostic::CannotAssignToClassVar => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&INVALID_ATTRIBUTE_ACCESS, self.target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to ClassVar `{}` from an instance of type `{}`",
+                        self.attribute,
+                        self.object_ty.display(db),
+                    ));
+                }
+            }
+            AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
+                member_exists,
+                is_setattr_synthesized,
+            } => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&INVALID_ASSIGNMENT, self.target)
+                {
+                    let message = if !member_exists {
+                        format!(
+                            "Cannot assign to unresolved attribute `{}` on type `{}`",
+                            self.attribute,
+                            self.object_ty.display(db)
+                        )
+                    } else if is_setattr_synthesized {
+                        format!(
+                            "Property `{}` defined in `{}` is read-only",
+                            self.attribute,
+                            self.object_ty.display(db)
+                        )
+                    } else {
+                        format!(
+                            "Cannot assign to attribute `{}` on type `{}` whose `__setattr__` method returns `Never`/`NoReturn`",
+                            self.attribute,
+                            self.object_ty.display(db)
+                        )
+                    };
+                    builder.into_diagnostic(message);
+                }
+            }
+            AssignmentAttributeWriteDiagnostic::TerminalDescriptor => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&INVALID_ASSIGNMENT, self.target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to attribute `{}` on type `{}` whose `__set__` method returns `Never`/`NoReturn`",
+                        self.attribute,
+                        self.object_ty.display(db),
+                    ));
+                }
+            }
+            AssignmentAttributeWriteDiagnostic::BadDunderSet(failure) => {
+                report_bad_dunder_set_call(
+                    &self.builder.context,
+                    &failure,
+                    self.attribute,
+                    self.object_ty,
+                    self.target,
+                );
+            }
+            AssignmentAttributeWriteDiagnostic::PossiblyMissing => {
+                report_possibly_missing_attribute(
+                    &self.builder.context,
+                    self.target,
+                    self.attribute,
+                    self.object_ty,
+                );
+            }
+            AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty } => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&UNRESOLVED_ATTRIBUTE, self.target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign object of type `{}` to attribute `{}` on type `{}` with custom `__setattr__` method.",
+                        value_ty.display(db),
+                        self.attribute,
+                        self.object_ty.display(db)
+                    ));
+                }
+            }
+            AssignmentAttributeWriteDiagnostic::Unresolved { with_period } => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&UNRESOLVED_ATTRIBUTE, self.target)
+                {
+                    if with_period {
+                        builder.into_diagnostic(format_args!(
+                            "Unresolved attribute `{}` on type `{}`.",
+                            self.attribute,
+                            self.object_ty.display(db)
+                        ));
+                    } else {
+                        builder.into_diagnostic(format_args!(
+                            "Unresolved attribute `{}` on type `{}`",
+                            self.attribute,
+                            self.object_ty.display(db)
+                        ));
+                    }
+                }
+            }
+            AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&INVALID_ATTRIBUTE_ACCESS, self.target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to instance attribute `{}` from the class object `{}`",
+                        self.attribute,
+                        self.object_ty.display(db)
+                    ));
+                }
+            }
+        }
     }
 }
 

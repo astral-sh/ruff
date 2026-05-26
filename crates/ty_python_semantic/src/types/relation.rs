@@ -2228,6 +2228,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     .ignore_possibly_undefined()
                     .when_none_or(db, self.constraints, |attribute_type| {
                         self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
+                            .or(db, self.constraints, || {
+                                self.protocol_property_write_is_definitely_missing_from_ty(
+                                    db, &member, other,
+                                )
+                            })
                     })
             })
     }
