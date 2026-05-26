@@ -1,24 +1,15 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
-use lsp_server::ErrorCode;
 use lsp_types::{CodeAction, CodeActionKind, request::CodeActionResolveRequest};
 
-use crate::{AwaitResponseError, TestServerBuilder};
+use crate::TestServerBuilder;
 
-fn assert_code_action_resolve_internal_error(
-    server: &mut crate::TestServer,
-    action: CodeAction,
-    expected_message: &str,
-) {
-    let request_id = server.send_request::<CodeActionResolveRequest>(action);
-
-    let error = match server.try_await_response::<CodeActionResolveRequest>(&request_id, None) {
-        Err(AwaitResponseError::RequestFailed(error)) => error,
-        result => panic!("Expected an InternalError response, got {result:?}"),
-    };
-
-    assert_eq!(error.code, ErrorCode::InternalError as i32);
-    assert_eq!(error.message, expected_message);
+fn assert_code_action_resolve_unchanged(server: &mut crate::TestServer, action: &CodeAction) {
+    let request_id = server.send_request::<CodeActionResolveRequest>(action.clone());
+    assert_eq!(
+        &server.await_response::<CodeActionResolveRequest>(&request_id),
+        action
+    );
 }
 
 #[test]
@@ -88,7 +79,7 @@ fn code_actions_for_python() -> Result<()> {
 }
 
 #[test]
-fn missing_code_action_resolve_data_returns_internal_error() -> Result<()> {
+fn missing_code_action_resolve_data_returns_unchanged_action() -> Result<()> {
     let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
 
     let action = CodeAction {
@@ -97,17 +88,13 @@ fn missing_code_action_resolve_data_returns_internal_error() -> Result<()> {
         ..Default::default()
     };
 
-    assert_code_action_resolve_internal_error(
-        &mut server,
-        action,
-        "Code action is missing Ruff's document URI payload",
-    );
+    assert_code_action_resolve_unchanged(&mut server, &action);
 
     Ok(())
 }
 
 #[test]
-fn invalid_code_action_resolve_data_returns_internal_error() -> Result<()> {
+fn invalid_code_action_resolve_data_returns_unchanged_action() -> Result<()> {
     let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
 
     let action = CodeAction {
@@ -117,20 +104,23 @@ fn invalid_code_action_resolve_data_returns_internal_error() -> Result<()> {
         ..Default::default()
     };
 
-    let request_id = server.send_request::<CodeActionResolveRequest>(action);
+    assert_code_action_resolve_unchanged(&mut server, &action);
 
-    let error = match server.try_await_response::<CodeActionResolveRequest>(&request_id, None) {
-        Err(AwaitResponseError::RequestFailed(error)) => error,
-        result => panic!("Expected an InternalError response, got {result:?}"),
+    Ok(())
+}
+
+#[test]
+fn unavailable_code_action_resolve_document_returns_unchanged_action() -> Result<()> {
+    let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
+
+    let action = CodeAction {
+        title: "Ruff: Fix all auto-fixable problems".to_string(),
+        kind: Some(CodeActionKind::from("source.fixAll.ruff")),
+        data: Some(serde_json::to_value(server.file_uri("not-open.py"))?),
+        ..Default::default()
     };
 
-    assert_eq!(error.code, ErrorCode::InternalError as i32);
-    assert_json_snapshot!(error, @r#"
-    {
-      "code": -32603,
-      "message": "Code action has an invalid Ruff document URI payload: relative URL without a base: \"not-a-url\""
-    }
-    "#);
+    assert_code_action_resolve_unchanged(&mut server, &action);
 
     Ok(())
 }

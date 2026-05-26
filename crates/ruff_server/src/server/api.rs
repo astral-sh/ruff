@@ -51,9 +51,9 @@ pub(super) fn request(req: server::Request) -> Task {
         request::CodeActions::METHOD => {
             background_request_task::<request::CodeActions>(req, BackgroundSchedule::Worker)
         }
-        request::CodeActionResolve::METHOD => background_session_request_task::<
-            request::CodeActionResolve,
-        >(req, BackgroundSchedule::Worker),
+        request::CodeActionResolve::METHOD => {
+            background_request_task::<request::CodeActionResolve>(req, BackgroundSchedule::Worker)
+        }
         request::DocumentDiagnostic::METHOD => {
             background_request_task::<request::DocumentDiagnostic>(req, BackgroundSchedule::Worker)
         }
@@ -156,15 +156,15 @@ where
     }))
 }
 
-fn background_request_task<R: traits::BackgroundDocumentRequestHandler>(
+fn background_request_task<R: traits::BackgroundRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
 ) -> Result<Task>
 where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
+    R::Snapshot: UnwindSafe,
 {
     let (id, params) = cast_request::<R>(req)?;
-    let url = R::document_url(&params).into_owned();
 
     Ok(Task::background(schedule, move |session: &Session| {
         let cancellation_token = session
@@ -173,10 +173,7 @@ where
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
 
-        let Some(snapshot) = session.take_snapshot(url.clone()) else {
-            tracing::warn!("Ignoring request because snapshot for path `{url:?}` doesn't exist.");
-            return Box::new(|_| {});
-        };
+        let snapshot = R::snapshot(session, &params);
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -196,57 +193,6 @@ where
 
             let result =
                 std::panic::catch_unwind(|| R::run_with_snapshot(snapshot, client, params));
-
-            let response = request_result_to_response::<R>(result);
-            respond::<R>(&id, response, client);
-        })
-    }))
-}
-
-fn background_session_request_task<R: traits::BackgroundRequestHandler>(
-    req: server::Request,
-    schedule: BackgroundSchedule,
-) -> Result<Task>
-where
-    <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
-    R::BackgroundContext: UnwindSafe,
-{
-    let (id, params) = cast_request::<R>(req)?;
-
-    Ok(Task::background(schedule, move |session: &Session| {
-        let cancellation_token = session
-            .request_queue()
-            .incoming()
-            .cancellation_token(&id)
-            .expect("request should have been tested for cancellation before scheduling");
-
-        let context = match R::prepare(session, &params) {
-            Ok(Some(context)) => context,
-            Ok(None) => return Box::new(|_| {}),
-            Err(error) => {
-                return Box::new(move |client| {
-                    let result: Result<<<R as RequestHandler>::RequestType as Request>::Result> =
-                        Err(error);
-                    if let Err(err) = client.respond(&id, result) {
-                        tracing::error!("Failed to send response: {err}");
-                    }
-                });
-            }
-        };
-
-        Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
-
-            if cancellation_token.is_cancelled() {
-                tracing::trace!(
-                    "Ignoring request id={id} method={} because it was cancelled",
-                    R::METHOD
-                );
-                return;
-            }
-
-            let result = std::panic::catch_unwind(|| R::run_with_context(context, client, params));
-
             let response = request_result_to_response::<R>(result);
             respond::<R>(&id, response, client);
         })

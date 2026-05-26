@@ -19,30 +19,25 @@ impl super::RequestHandler for CodeActionResolve {
 }
 
 impl super::BackgroundRequestHandler for CodeActionResolve {
-    type BackgroundContext = DocumentSnapshot;
+    type Snapshot = Option<DocumentSnapshot>;
 
-    fn prepare(
-        session: &Session,
-        params: &types::CodeAction,
-    ) -> crate::server::Result<Option<Self::BackgroundContext>> {
-        let data = params
+    fn snapshot(session: &Session, action: &types::CodeAction) -> Self::Snapshot {
+        action
             .data
             .clone()
-            .ok_or_else(|| anyhow::anyhow!("Code action is missing Ruff's document URI payload"))
-            .with_failure_code(ErrorCode::InternalError)?;
-        let uri: lsp_types::Url = serde_json::from_value(data)
-            .map_err(|err| {
-                anyhow::anyhow!("Code action has an invalid Ruff document URI payload: {err}")
-            })
-            .with_failure_code(ErrorCode::InternalError)?;
-        Ok(session.take_snapshot(uri))
+            .and_then(|data| serde_json::from_value(data).ok())
+            .and_then(|uri| session.take_snapshot(uri))
     }
 
-    fn run_with_context(
-        snapshot: Self::BackgroundContext,
+    fn run_with_snapshot(
+        snapshot: Self::Snapshot,
         _client: &Client,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
+        let Some(snapshot) = snapshot else {
+            return Ok(action);
+        };
+
         let query = snapshot.query();
 
         let code_actions = SupportedCodeAction::from_kind(

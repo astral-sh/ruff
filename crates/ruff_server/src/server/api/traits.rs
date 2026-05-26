@@ -55,17 +55,17 @@ pub(super) trait SyncRequestHandler: RequestHandler {
 ///
 /// Unlike [`BackgroundDocumentRequestHandler`], this handler does not assume that it can derive a
 /// document URL from the LSP request parameters. Implementations are responsible for extracting
-/// any state they need from the [`Session`] during [`Self::prepare`].
+/// any state they need from the [`Session`] during [`Self::snapshot`].
 pub(super) trait BackgroundRequestHandler: RequestHandler {
-    type BackgroundContext: Send + 'static;
+    type Snapshot: Send + 'static;
 
-    fn prepare(
+    fn snapshot(
         session: &Session,
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> crate::server::Result<Option<Self::BackgroundContext>>;
+    ) -> Self::Snapshot;
 
-    fn run_with_context(
-        context: Self::BackgroundContext,
+    fn run_with_snapshot(
+        snapshot: Self::Snapshot,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
@@ -74,7 +74,9 @@ pub(super) trait BackgroundRequestHandler: RequestHandler {
 /// A request handler that can be run on a background thread.
 ///
 /// This handler is specific to requests that operate on a single document.
-pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
+pub(super) trait BackgroundDocumentRequestHandler:
+    BackgroundRequestHandler<Snapshot = std::result::Result<DocumentSnapshot, lsp_types::Url>>
+{
     /// Returns the URL of the document that this request handler operates on.
     ///
     /// This method can be implemented automatically using the [`define_document_url`] macro.
@@ -85,10 +87,33 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     ) -> std::borrow::Cow<'_, lsp_types::Url>;
 
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+}
+
+impl<T> BackgroundRequestHandler for T
+where
+    T: BackgroundDocumentRequestHandler,
+{
+    type Snapshot = std::result::Result<DocumentSnapshot, lsp_types::Url>;
+
+    fn snapshot(
+        session: &Session,
+        params: &<<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> Self::Snapshot {
+        let url = Self::document_url(params).into_owned();
+        session.take_snapshot(url.clone()).ok_or(url)
+    }
+
+    fn run_with_snapshot(
+        snapshot: Self::Snapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result> {
+        <T as BackgroundDocumentRequestHandler>::run_with_snapshot(snapshot, client, params)
+    }
 }
 
 /// A supertrait for any server notification handler.
