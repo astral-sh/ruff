@@ -1183,15 +1183,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                     let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
-                    if enclosing_symbol.is_nonlocal() {
-                        // The variable is `nonlocal` in this ancestor scope. Keep going.
-                        continue;
-                    }
                     if enclosing_symbol.is_global() {
                         // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
                         // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that
                         // here and just bail out of this loop.
                         break;
+                    }
+                    if !enclosing_symbol.is_local() {
+                        // The variable is either explicitly `nonlocal` or just a free read in this
+                        // ancestor scope. Keep going.
+                        continue;
                     }
                     // We found the closest definition. Note that (as in `infer_place_load`) this does
                     // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
