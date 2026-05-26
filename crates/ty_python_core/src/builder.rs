@@ -66,6 +66,7 @@ use super::place::PlaceExprRef;
 
 mod except_handlers;
 mod loop_bindings_visitor;
+mod walrus;
 
 #[derive(Clone, Debug, Default)]
 struct Loop {
@@ -170,6 +171,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
     in_try: bool,
+    comprehension_iterable_nesting: u32,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -251,6 +253,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
+            comprehension_iterable_nesting: 0,
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: FxHashMap::default(),
             alias_predicates: FxHashMap::default(),
@@ -368,6 +371,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         false
+    }
+
+    fn in_comprehension_iterable(&self) -> bool {
+        self.comprehension_iterable_nesting > 0
+    }
+
+    fn with_comprehension_iterable_context(&mut self, visit: impl FnOnce(&mut Self)) {
+        self.comprehension_iterable_nesting += 1;
+        visit(self);
+        self.comprehension_iterable_nesting -= 1;
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -1953,7 +1966,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
         let value = self.add_standalone_expression(&generator.iter);
-        self.visit_expr(&generator.iter);
+        self.with_comprehension_iterable_context(|builder| builder.visit_expr(&generator.iter));
 
         // Clear the assignment stack before entering the comprehension scope.
         // If the comprehension appears inside an assignment target (e.g., error-recovered
@@ -1978,7 +1991,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for generator in generators_iter {
             let value = self.add_standalone_expression(&generator.iter);
-            self.visit_expr(&generator.iter);
+            self.with_comprehension_iterable_context(|builder| builder.visit_expr(&generator.iter));
 
             self.add_unpackable_assignment(
                 &Unpackable::Comprehension {
@@ -3777,17 +3790,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Named(node) => {
-                // TODO walrus in comprehensions is implicitly nonlocal
-                self.visit_expr(&node.value);
-
-                // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
-                if node.target.is_name_expr() {
-                    self.push_assignment(node.into());
-                    self.visit_expr(&node.target);
-                    self.pop_assignment();
-                } else {
-                    self.visit_expr(&node.target);
-                }
+                self.visit_named_expression(node);
             }
             ast::Expr::Lambda(lambda) => {
                 self.current_statement_mut()
@@ -4178,6 +4181,18 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             error.kind,
             SemanticSyntaxErrorKind::YieldOutsideFunction(YieldOutsideFunctionKind::Await)
         ) {
+            return;
+        }
+
+        // Assignment expressions anywhere in an iterable expression are prohibited, including
+        // inside nested comprehensions. Prefer that enclosing-context diagnostic over a rebound
+        // diagnostic from the nested comprehension.
+        if self.in_comprehension_iterable()
+            && matches!(
+                error.kind,
+                SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            )
+        {
             return;
         }
 
