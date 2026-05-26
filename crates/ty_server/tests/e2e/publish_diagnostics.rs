@@ -482,7 +482,7 @@ def foo() -> str:
     Ok(())
 }
 
-/// JupyterLab presents notebook virtual documents to language servers as simple text files:
+/// `JupyterLab` presents notebook virtual documents to language servers as simple text files:
 /// <https://github.com/jupyterlab/jupyterlab/blob/f51404192bf6d0ff79187c884f21e1f91b928146/packages/lsp/src/virtual/document.ts#L308-L314>
 #[test]
 fn on_did_open_ipynb_file_with_python_language() -> Result<()> {
