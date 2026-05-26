@@ -29,3 +29,24 @@ def uses_walrus(items):
     # generator is evaluated eagerly and `seen` is visible afterward.
     matches = (x for x in items if (seen := x) > 1)
     return seen, matches
+
+
+def generator_uses_exception_name():
+    # No F821: the generator is consumed before the except block ends, so `e` is
+    # still bound.
+    try:
+        pass
+    except Exception as e:
+        if any(s in str(e) for s in ("a", "b")):
+            pass
+
+
+GENERATOR_USES_DELETED_NAME = ["x", "y"]
+GENERATOR_USES_DELETED_NAME_DEFAULTS = {"x": 1, "y": 2}
+GENERATOR_USES_DELETED_NAME_REPR = ", ".join(
+    # No F821: the checker visits this generator eagerly, before
+    # `GENERATOR_USES_DELETED_NAME_DEFAULTS` is deleted below.
+    f"{n}={GENERATOR_USES_DELETED_NAME_DEFAULTS[n]!r}"
+    for n in GENERATOR_USES_DELETED_NAME
+)
+del GENERATOR_USES_DELETED_NAME_DEFAULTS

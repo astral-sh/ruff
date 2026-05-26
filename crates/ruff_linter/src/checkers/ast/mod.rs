@@ -2511,20 +2511,26 @@ impl<'a> Checker<'a> {
     /// Visit a generator expression.
     ///
     /// A generator expression is evaluated when it is consumed, not when it is created, which can
-    /// happen after the surrounding scope has finished executing. We therefore defer its body and
-    /// non-first iterables, like a lambda body, so that forward references (for example, to an
-    /// enclosing class name) resolve against bindings introduced later. As in
-    /// [`Checker::visit_generators`], the first iterable is evaluated eagerly in the enclosing
-    /// scope, so it is not deferred.
+    /// happen after the surrounding scope has finished executing. When the immediately enclosing
+    /// scope is a class body, we defer the generator's body and non-first iterables, like a
+    /// lambda body, so that forward references (for example, to the class name) resolve against
+    /// bindings introduced later. As in [`Checker::visit_generators`], the first iterable is
+    /// evaluated eagerly in the enclosing scope, so it is not deferred.
     ///
-    /// A generator that contains an assignment expression (`:=`) is the exception: per
+    /// In a function or module scope we visit the generator eagerly. The deferred pass runs
+    /// after the surrounding statements, so names bound in positions that the checker rebinds at
+    /// end-of-scope (an `except ... as e:` handler) or removes (a later `del`) would no longer
+    /// resolve, turning valid references into F821 false positives.
+    ///
+    /// A generator that contains an assignment expression (`:=`) is also visited eagerly: per
     /// [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target) the target binds in the
-    /// enclosing scope, so the binding must be created eagerly and the generator is visited in
-    /// full here.
+    /// enclosing scope, so the binding must be created before the surrounding code is analyzed.
     fn visit_generator(&mut self, elt: &'a Expr, generators: &'a [Comprehension]) {
         let Some(generator) = generators.first() else {
             unreachable!("Generator expression must contain at least one generator");
         };
+
+        let in_class_scope = self.semantic.current_scope().kind.is_class();
 
         self.visit_expr(&generator.iter);
         self.semantic.push_scope(ScopeKind::Generator {
@@ -2534,7 +2540,7 @@ impl<'a> Checker<'a> {
                 .any(|comprehension| comprehension.is_async),
         });
 
-        if contains_assignment_expression(elt, generators) {
+        if !in_class_scope || contains_assignment_expression(elt, generators) {
             self.visit_comprehensions(generators);
             self.visit_expr(elt);
         } else {

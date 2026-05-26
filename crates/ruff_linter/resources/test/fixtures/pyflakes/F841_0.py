@@ -187,3 +187,12 @@ class NonlocalDunderClass:
     def foo():
         nonlocal __class__
         __class__ = 1
+
+
+# OK, `e` is used inside a generator expression in the except handler body.
+def except_name_used_in_generator():
+    try:
+        pass
+    except Exception as e:
+        if any(s in str(e) for s in ("a", "b")):
+            pass
