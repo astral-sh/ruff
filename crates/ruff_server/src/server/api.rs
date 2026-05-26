@@ -8,10 +8,7 @@ use requests as request;
 
 use crate::{
     server::{
-        api::traits::{
-            BackgroundDocumentNotificationHandler, BackgroundDocumentRequestHandler,
-            SyncNotificationHandler,
-        },
+        api::traits::{BackgroundDocumentNotificationHandler, SyncNotificationHandler},
         schedule::Task,
     },
     session::{Client, Session},
@@ -26,8 +23,8 @@ use self::traits::{NotificationHandler, RequestHandler};
 
 use super::{Result, schedule::BackgroundSchedule};
 
-/// Defines the `document_url` method for implementers of [`Notification`] and [`Request`], given
-/// the request or notification parameter type.
+/// Defines the `document_url` method for implementers of [`Request`], given the request parameter
+/// type.
 ///
 /// This would only work if the parameter type has a `text_document` field with a `uri` field
 /// that is of type [`lsp_types::Url`].
@@ -159,12 +156,13 @@ where
     }))
 }
 
-fn background_request_task<R: traits::BackgroundDocumentRequestHandler>(
+fn background_request_task<R: traits::BackgroundRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
 ) -> Result<Task>
 where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
+    R::Snapshot: UnwindSafe,
 {
     let (id, params) = cast_request::<R>(req)?;
 
@@ -175,12 +173,7 @@ where
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
 
-        let url = R::document_url(&params).into_owned();
-
-        let Some(snapshot) = session.take_snapshot(R::document_url(&params).into_owned()) else {
-            tracing::warn!("Ignoring request because snapshot for path `{url:?}` doesn't exist.");
-            return Box::new(|_| {});
-        };
+        let snapshot = R::snapshot(session, &params);
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -200,7 +193,6 @@ where
 
             let result =
                 std::panic::catch_unwind(|| R::run_with_snapshot(snapshot, client, params));
-
             let response = request_result_to_response::<R>(result);
             respond::<R>(&id, response, client);
         })
@@ -214,7 +206,7 @@ fn request_result_to_response<R>(
     >,
 ) -> Result<<<R as RequestHandler>::RequestType as Request>::Result>
 where
-    R: BackgroundDocumentRequestHandler,
+    R: RequestHandler,
 {
     match result {
         Ok(response) => response,

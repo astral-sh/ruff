@@ -21,11 +21,22 @@ impl super::RequestHandler for Format {
 
 impl super::BackgroundDocumentRequestHandler for Format {
     super::define_document_url!(params: &types::DocumentFormattingParams);
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         client: &Client,
         _params: types::DocumentFormattingParams,
     ) -> Result<super::FormatResponse> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(url) => {
+                tracing::warn!(
+                    "Returning no formatting edits because document `{url}` isn't open."
+                );
+                return Ok(None);
+            }
+        };
+
         format_document(&snapshot, client)
     }
 }
