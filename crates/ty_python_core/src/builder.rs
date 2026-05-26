@@ -1628,10 +1628,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.file,
                 self.current_scope(),
                 place,
-                DefinitionKind::NestedBindings(NestedBindingsDefinitionKind {
+                DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
                     name,
                     nested_declarations: declarations,
-                }),
+                })),
                 false,
             );
 

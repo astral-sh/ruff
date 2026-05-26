@@ -867,7 +867,8 @@ pub enum DefinitionKind<'db> {
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
     LoopHeader(LoopHeaderDefinitionKind<'db>),
-    NestedBindings(NestedBindingsDefinitionKind),
+    // Boxing here helps avoid growing the memory footprint of this enum.
+    NestedBindings(Box<NestedBindingsDefinitionKind>),
 }
 
 impl<'db> DefinitionKind<'db> {
