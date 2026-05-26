@@ -249,6 +249,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
+    comprehension_iterable_nesting: u32,
     context: &'a LintContext<'a>,
 }
 
@@ -299,6 +300,7 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
+            comprehension_iterable_nesting: 0,
             context,
         }
     }
@@ -789,7 +791,9 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(ReturnInGenerator, error.range);
                 }
             }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable
+            | SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension
+            | SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::LazyImportNotAllowed { .. }
             | SemanticSyntaxErrorKind::LazyImportStar
             | SemanticSyntaxErrorKind::LazyFutureImport
@@ -876,6 +880,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             }
         }
         false
+    }
+
+    fn in_comprehension_iterable(&self) -> bool {
+        self.comprehension_iterable_nesting > 0
     }
 
     fn in_module_scope(&self) -> bool {
@@ -2464,6 +2472,12 @@ impl<'a> Checker<'a> {
         analyze::module(python_ast, self);
     }
 
+    fn visit_comprehension_iterable(&mut self, expr: &'a Expr) {
+        self.comprehension_iterable_nesting += 1;
+        self.visit_expr(expr);
+        self.comprehension_iterable_nesting -= 1;
+    }
+
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
     fn visit_generators(&mut self, kind: GeneratorKind, generators: &'a [Comprehension]) {
@@ -2502,7 +2516,7 @@ impl<'a> Checker<'a> {
         // Following Python's scoping rules, the `T` in `x=T` is thus evaluated in the outer scope,
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
-        self.visit_expr(&generator.iter);
+        self.visit_comprehension_iterable(&generator.iter);
         self.semantic.push_scope(ScopeKind::Generator {
             kind,
             is_async: generators
@@ -2518,7 +2532,7 @@ impl<'a> Checker<'a> {
         }
 
         for generator in iterator {
-            self.visit_expr(&generator.iter);
+            self.visit_comprehension_iterable(&generator.iter);
 
             self.visit_expr(&generator.target);
             self.semantic.flags = flags;
