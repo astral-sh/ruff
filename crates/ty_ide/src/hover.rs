@@ -98,7 +98,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                 HoverContent::Type(ty, Some(typevar.variance(db)), qualifiers, None)
             }
             Type::TypeAlias(alias) => {
-                dbg!(&goto_target);
                 let value_type = alias.value_type(db);
 
                 docstring = value_type
