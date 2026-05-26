@@ -714,8 +714,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Records snapshots of the place states visible from the current lazy scope.
     fn record_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
-        let popped_scope = &self.scopes[popped_scope_id];
-
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
@@ -723,10 +721,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
-                // PEP 695 type-alias scopes still need use tracking for module and class bindings, so
-                // record a usage-only edge without changing type-inference snapshots.
-                if popped_scope.kind() == ScopeKind::TypeAlias
-                    && nested_symbol.is_used()
+                // Public module/class bindings are not snapshotted below, but they still need
+                // usage tracking when a lazy nested scope references them.
+                if nested_symbol.is_used()
                     && (enclosing_scope_kind.is_module() || enclosing_scope_kind.is_class())
                 {
                     let nested_name = nested_symbol.name();

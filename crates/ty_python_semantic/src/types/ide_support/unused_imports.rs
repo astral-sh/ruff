@@ -993,6 +993,21 @@ mod tests {
     }
 
     #[test]
+    fn skips_import_used_in_lazy_type_alias_expression() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            import re
+            from typing import Annotated
+
+            type X = Annotated[int, lambda: re.compile("x")]
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
     fn skips_class_scope_import_used_in_type_alias() -> anyhow::Result<()> {
         let names = UnusedImportTest::new().names(
             r#"
