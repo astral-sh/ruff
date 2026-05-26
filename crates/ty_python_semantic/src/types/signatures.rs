@@ -968,6 +968,11 @@ impl<'db> Signature<'db> {
             return true;
         }
 
+        // Only explicit receiver annotations constrain which overload is exposed.
+        if first_parameter.inferred_annotation {
+            return true;
+        }
+
         let mut expected_self_ty = first_parameter.annotated_type();
         let accepts_any_or_exact_self =
             |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
@@ -1005,6 +1010,12 @@ impl<'db> Signature<'db> {
                 self.inferable_typevars(db),
             )
             .is_always_satisfied(db)
+    }
+
+    pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
+        self.parameters
+            .get(0)
+            .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
