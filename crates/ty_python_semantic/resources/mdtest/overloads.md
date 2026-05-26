@@ -166,7 +166,6 @@ reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) ->
 ## Specialized generic receivers
 
 An explicit receiver annotation can also select overloads based on a generic class specialization.
-The following examples require Python 3.12 syntax for type parameters.
 
 ```toml
 [environment]
