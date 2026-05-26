@@ -8,7 +8,10 @@
 //! crate. Ruff and ty continue to work unchanged.
 
 pub mod bundle;
+pub mod calibrate;
+pub mod codegen;
 pub mod config;
+pub mod contract;
 pub mod emit;
 pub mod extractors;
 pub mod matcher;

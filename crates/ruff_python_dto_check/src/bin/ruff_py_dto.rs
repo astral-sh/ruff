@@ -58,6 +58,24 @@ enum Command {
         /// Python file to read.
         file: PathBuf,
     },
+    /// Generate target source (handlers + views + contracts + calibration)
+    /// from a Python tree into a draft directory.
+    Codegen {
+        /// Path to the harvest/extraction JSON config file (drives family
+        /// grouping + route detection).
+        #[arg(long)]
+        config: PathBuf,
+        /// Path to the target spec (TOML or JSON). Omit for the built-in
+        /// `rust-axum-seaorm` target.
+        #[arg(long)]
+        target: Option<PathBuf>,
+        /// Root directory of the Python tree (overrides the config root).
+        #[arg(long)]
+        root: Option<PathBuf>,
+        /// Output draft directory.
+        #[arg(long, default_value = "ruff-py-dto-codegen")]
+        out: PathBuf,
+    },
     /// Write the JSON Schema to <path> or stdout.
     Schema {
         /// Output path (default: stdout).
@@ -72,8 +90,54 @@ fn main() -> Result<()> {
         Command::Harvest { config, out, root } => run_harvest(&config, &out, root.as_deref()),
         Command::Preflight { root, out } => run_preflight(&root, out.as_deref()),
         Command::HarvestOne { config, rel, file } => run_harvest_one(&config, &rel, &file),
+        Command::Codegen {
+            config,
+            target,
+            root,
+            out,
+        } => run_codegen(&config, target.as_deref(), root.as_deref(), &out),
         Command::Schema { out } => run_schema(out.as_deref()),
     }
+}
+
+fn run_codegen(
+    config_path: &std::path::Path,
+    target_path: Option<&std::path::Path>,
+    root_override: Option<&std::path::Path>,
+    out: &std::path::Path,
+) -> Result<()> {
+    use ruff_python_dto_check::codegen::pipeline::{family_resolver_from_config, run_codegen_tree};
+    use ruff_python_dto_check::codegen::target::TargetSpec;
+    use ruff_python_dto_check::config::Config;
+    use ruff_python_dto_check::extractors::body::ExtractionProfile;
+
+    let cfg = Config::from_path(config_path).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let spec = match target_path {
+        Some(p) => TargetSpec::from_path(p)?,
+        None => TargetSpec::rust_axum_seaorm(),
+    };
+    let profile = ExtractionProfile::default();
+
+    let root_str = root_override
+        .and_then(|p| p.to_str())
+        .or(cfg.root.as_deref())
+        .unwrap_or(".");
+    let root = std::path::Path::new(root_str);
+
+    let resolver = family_resolver_from_config(&cfg);
+    let summary = run_codegen_tree(root, out, &profile, &spec, &resolver)?;
+
+    #[expect(clippy::print_stdout, reason = "codegen summary line by design")]
+    {
+        println!(
+            "codegen: {} routes, {} views, {} diagnostics → {}",
+            summary.routes,
+            summary.views,
+            summary.diagnostics,
+            out.display()
+        );
+    }
+    Ok(())
 }
 
 fn run_harvest(
