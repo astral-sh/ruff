@@ -22,6 +22,8 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
+    let keyword_argument = keyword_argument_hover_contents(db, &model, &goto_target);
+
     let typed_dict_key = match &goto_target {
         GotoTarget::Expression(ast::ExprRef::Subscript(subscript))
         | GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
@@ -30,7 +32,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         _ => None,
     };
 
-    let docs = if typed_dict_key.is_some() {
+    let docs = if keyword_argument.is_some() || typed_dict_key.is_some() {
         None
     } else if let GotoTarget::Call { call, .. } = goto_target {
         resolved_call_signature(&model, call)
@@ -59,7 +61,9 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     };
 
     let mut contents = Vec::new();
-    if let Some(signature) = goto_target.call_signature(&model) {
+    if let Some(keyword_argument) = keyword_argument {
+        contents.extend(keyword_argument);
+    } else if let Some(signature) = goto_target.call_signature(&model) {
         contents.push(HoverContent::Signature(signature));
     } else if let Some(typed_dict_key) = typed_dict_key {
         contents.push(HoverContent::TypedDictKey {
@@ -102,6 +106,82 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         range: FileRange::new(file, goto_target.range()),
         value: Hover { contents },
     })
+}
+
+fn keyword_argument_hover_contents<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    goto_target: &GotoTarget<'_>,
+) -> Option<Vec<HoverContent<'db>>> {
+    let GotoTarget::KeywordArgument {
+        keyword,
+        call_expression,
+    } = goto_target
+    else {
+        return None;
+    };
+
+    let name = keyword.arg.as_ref()?.as_str();
+    let signature = resolved_call_signature(model, call_expression)?;
+    let argument_index = call_expression
+        .arguments
+        .iter_source_order()
+        .position(|argument| {
+            matches!(argument, ast::ArgOrKeyword::Keyword(candidate) if candidate.range == keyword.range)
+        })?;
+    let argument_mapping = signature
+        .argument_to_parameter_mapping
+        .get(argument_index)?;
+    if !argument_mapping.matched {
+        return None;
+    }
+
+    let parameter_index = signature
+        .argument_to_displayed_parameter_mapping
+        .get(argument_index)
+        .copied()
+        .flatten()?;
+    let parameter = signature.parameters.get(parameter_index)?;
+
+    if !parameter.is_keyword_variadic && parameter.name != name {
+        return None;
+    }
+
+    let mut contents = vec![HoverContent::Parameter(parameter_hover_label(
+        &parameter.label,
+        parameter.is_keyword_variadic,
+    ))];
+    if let Some(documentation) = signature
+        .definition
+        .and_then(|definition| docstring_for_call_definition(db, definition))
+        .and_then(|docstring| documentation_for_parameter(&docstring, &parameter.name))
+    {
+        contents.push(HoverContent::Docstring(documentation));
+    }
+
+    Some(contents)
+}
+
+fn parameter_hover_label(label: &str, is_keyword_variadic: bool) -> String {
+    let kind = if is_keyword_variadic {
+        "variadic keyword parameter"
+    } else {
+        "parameter"
+    };
+
+    format!("({kind}) {label}")
+}
+
+fn documentation_for_parameter(docstring: &Docstring, name: &str) -> Option<Docstring> {
+    let parameter_documentation = docstring.parameter_documentation();
+    parameter_documentation
+        .get(name)
+        .or_else(|| {
+            name.strip_prefix("**")
+                .and_then(|name| parameter_documentation.get(name))
+        })
+        .cloned()
+        .map(Docstring::new)
 }
 
 pub struct Hover<'db> {
@@ -166,6 +246,7 @@ impl fmt::Display for DisplayHover<'_, '_> {
 #[derive(Debug, Clone)]
 pub enum HoverContent<'db> {
     Signature(String),
+    Parameter(String),
     Type(Type<'db>, Option<TypeVarVariance>, TypeQualifiers),
     TypedDictKey {
         owner: String,
@@ -212,6 +293,9 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
         match self.content {
             HoverContent::Signature(signature) => {
                 self.kind.fenced_code_block(&signature, "python").fmt(f)
+            }
+            HoverContent::Parameter(parameter) => {
+                self.kind.fenced_code_block(parameter, "python").fmt(f)
             }
             HoverContent::Type(ty, variance, qualifiers) => {
                 let variance = match variance {
@@ -1912,13 +1996,17 @@ mod tests {
             "#,
         );
 
-        // TODO: This should reveal `int` because the user hovers over the parameter and not the value.
         assert_snapshot!(test.hover(), @"
-        Literal[123]
+        (parameter) ab: int
+        ---------------------------------------------
+        a nice little integer
+
         ---------------------------------------------
         ```python
-        Literal[123]
+        (parameter) ab: int
         ```
+        ---
+        a nice little integer
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:10:6
@@ -1928,6 +2016,250 @@ mod tests {
            |      ||
            |      |Cursor offset
            |      source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_without_documentation() {
+        let test = hover_test(
+            r#"
+            def test(ab: int):
+                return 0
+
+            test(a<CURSOR>b=123)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) ab: int
+        ---------------------------------------------
+        ```python
+        (parameter) ab: int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:6
+          |
+        5 | test(ab=123)
+          |      ^-
+          |      ||
+          |      |Cursor offset
+          |      source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_only_parameter() {
+        let test = hover_test(
+            r#"
+            def test(*, ab: int):
+                """my cool test
+
+                Args:
+                    ab: a keyword-only integer
+                """
+                return 0
+
+            test(a<CURSOR>b=123)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) ab: int
+        ---------------------------------------------
+        a keyword-only integer
+
+        ---------------------------------------------
+        ```python
+        (parameter) ab: int
+        ```
+        ---
+        a keyword-only integer
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:6
+           |
+        10 | test(ab=123)
+           |      ^-
+           |      ||
+           |      |Cursor offset
+           |      source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_variadic_parameter() {
+        let test = hover_test(
+            r#"
+            def test(**settings: int):
+                """my cool test
+
+                Args:
+                    settings: extra integer settings
+                """
+                return 0
+
+            test(de<CURSOR>bug=123)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (variadic keyword parameter) **settings: int
+        ---------------------------------------------
+        extra integer settings
+
+        ---------------------------------------------
+        ```python
+        (variadic keyword parameter) **settings: int
+        ```
+        ---
+        extra integer settings
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:6
+           |
+        10 | test(debug=123)
+           |      ^^-^^
+           |      | |
+           |      | Cursor offset
+           |      source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_overload_implementation_parameter_docs() {
+        let test = hover_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def choose(*, fallback: int) -> int: ...
+
+            @overload
+            def choose(*, fallback: str) -> str: ...
+
+            def choose(*, fallback: int | str) -> int | str:
+                """Choose a value.
+
+                Args:
+                    fallback: Returned when parsing fails.
+                """
+                return fallback
+
+            choose(fall<CURSOR>back=0)
+            "#,
+        );
+
+        // The parameter label comes from the resolved `int` overload, while
+        // the parameter documentation comes from the implementation docstring.
+        assert_snapshot!(test.hover(), @"
+        (parameter) fallback: int
+        ---------------------------------------------
+        Returned when parsing fails.
+
+        ---------------------------------------------
+        ```python
+        (parameter) fallback: int
+        ```
+        ---
+        Returned when parsing fails.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:18:8
+           |
+        18 | choose(fallback=0)
+           |        ^^^^-^^^
+           |        |   |
+           |        |   Cursor offset
+           |        source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_overload_docstring_blocks_implementation_parameter_docs() {
+        let test = hover_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def choose(*, fallback: int) -> int:
+                """Integer overload."""
+
+            @overload
+            def choose(*, fallback: str) -> str: ...
+
+            def choose(*, fallback: int | str) -> int | str:
+                """Choose a value.
+
+                Args:
+                    fallback: Returned when parsing fails.
+                """
+                return fallback
+
+            choose(fall<CURSOR>back=0)
+            "#,
+        );
+
+        // The selected overload has a docstring, so we stop there and do not
+        // merge in the  `fallback` documentation from the implementation
+        // docstring. We may want to improve this behaviour in the future.
+        assert_snapshot!(test.hover(), @"
+        (parameter) fallback: int
+        ---------------------------------------------
+        ```python
+        (parameter) fallback: int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:19:8
+           |
+        19 | choose(fallback=0)
+           |        ^^^^-^^^
+           |        |   |
+           |        |   Cursor offset
+           |        source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_argument_value_keeps_value_type() {
+        let test = hover_test(
+            r#"
+            value = 123
+
+            def test(ab: int):
+                """my cool test
+
+                Args:
+                    ab: a nice little integer
+                """
+                return 0
+
+            test(ab=va<CURSOR>lue)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Literal[123]
+        ---------------------------------------------
+        ```python
+        Literal[123]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:9
+           |
+        12 | test(ab=value)
+           |         ^^-^^
+           |         | |
+           |         | Cursor offset
+           |         source
            |
         ");
     }
