@@ -1419,7 +1419,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .mark_used(live_binding.narrowing_constraint());
             }
         }
-
         // The `LoopHeader` needs to be visible to uses within the loop body that we've already
         // walked, but all our Salsa state is generally immutable. `specify` is how we work around
         // that. See this section of the Salsa docs:
@@ -2231,7 +2230,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
-
+        self.enclosing_lambda_statements.shrink_to_fit();
         self.imported_modules.shrink_to_fit();
         self.scope_ids_by_scope.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
@@ -3618,10 +3617,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // context the lambda is being inferred with, and so any statement
         // containing a lambda must be inferable as a standalone statement
         // to avoid large scope-level cycles.
-        for lambda in current_statement.lambda_expressions {
-            self.enclosing_lambda_statements
-                .insert(lambda.into(), standalone_statement);
-        }
+        self.enclosing_lambda_statements.extend(
+            current_statement
+                .lambda_expressions
+                .into_iter()
+                .map(|lambda| (lambda.into(), standalone_statement)),
+        );
 
         // The inferred element type of collection literal depends on uses of
         // the collection in its containing scope, and so each use must be part
