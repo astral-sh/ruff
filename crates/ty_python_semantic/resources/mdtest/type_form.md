@@ -16,7 +16,6 @@ When an expression appears in a `TypeForm` context, valid type-expression syntax
 ordinary runtime type of the expression object.
 
 ```py
-from typing import assert_type
 from typing_extensions import TypeForm
 
 def accepts_str(form: TypeForm[str]) -> None: ...
@@ -37,11 +36,11 @@ accepts_union(int | str)
 def returns_union() -> TypeForm[int | str]:
     return int | str
 
-assert_type(string_form, TypeForm[str])
-assert_type(union_form, TypeForm[int | str])
-assert_type(list_form, TypeForm[list[int]])
-assert_type(quoted, TypeForm[str])
-assert_type(aliased, TypeForm[str])
+reveal_type(string_form)  # revealed: TypeForm[str]
+reveal_type(union_form)  # revealed: TypeForm[int | str]
+reveal_type(list_form)  # revealed: TypeForm[list[int]]
+reveal_type(quoted)  # revealed: TypeForm[str]
+reveal_type(aliased)  # revealed: TypeForm[str]
 ```
 
 ## Contextual typing in containers
@@ -293,14 +292,13 @@ argument. The argument is checked using the same type-expression rules as contex
 inference.
 
 ```py
-from typing import assert_type
 from typing_extensions import TypeForm
 
 constructed = TypeForm("list[int]")
-assert_type(constructed, TypeForm[list[int]])
+reveal_type(constructed)  # revealed: TypeForm[list[int]]
 
 constructed_class = TypeForm(int)
-assert_type(constructed_class, TypeForm[int])
+reveal_type(constructed_class)  # revealed: TypeForm[int]
 
 TypeForm("type(1)")  # error: [invalid-type-form]
 TypeForm()  # error: [invalid-type-form]
@@ -315,18 +313,17 @@ When `TypeForm` appears in a generic parameter or return annotation, the type ar
 inferred from the type expression passed by the caller or returned by the function.
 
 ```py
-from typing import assert_type
 from typing_extensions import TypeForm
 
 def construct[T](form: TypeForm[T]) -> T:
     raise NotImplementedError
 
-assert_type(construct(int), int)
-assert_type(construct(list[int]), list[int])
-assert_type(construct(int | str), int | str)
+reveal_type(construct(int))  # revealed: int
+reveal_type(construct(list[int]))  # revealed: list[int]
+reveal_type(construct(int | str))  # revealed: int | str
 
 def use_runtime_type(form: type[int]) -> None:
-    assert_type(construct(form), int)
+    reveal_type(construct(form))  # revealed: int
 
 def return_form() -> TypeForm[int | str]:
     return int | str
@@ -336,7 +333,7 @@ type Alias[T] = TypeForm[T]
 def construct_alias[T](form: Alias[T]) -> T:
     raise NotImplementedError
 
-assert_type(construct_alias(int), int)
+reveal_type(construct_alias(int))  # revealed: int
 ```
 
 ## Overload resolution
@@ -344,7 +341,7 @@ assert_type(construct_alias(int), int)
 Overload matching interprets a type expression using each `TypeForm` parameter context.
 
 ```py
-from typing import assert_type, overload
+from typing import overload
 from typing_extensions import TypeForm
 
 @overload
@@ -354,8 +351,8 @@ def foo(form: TypeForm[str]) -> str: ...
 def foo(form: TypeForm[int] | TypeForm[str]) -> int | str:
     raise NotImplementedError
 
-assert_type(foo(int), int)
-assert_type(foo(str), str)
+reveal_type(foo(int))  # revealed: int
+reveal_type(foo(str))  # revealed: str
 foo(float)  # error: [no-matching-overload]
 ```
 
@@ -366,12 +363,12 @@ narrow the form to `type[T]`, but only when that narrowing is sound for the orig
 argument.
 
 ```py
-from typing import Any, assert_type
+from typing import Any
 from typing_extensions import TypeForm, TypeIs
 
 def as_type[T](form: TypeForm[T]) -> type[T] | None:
     if isinstance(form, type):
-        assert_type(form, type[T])
+        reveal_type(form)  # revealed: type[T@as_type]
         return form
     return None
 
@@ -385,7 +382,7 @@ def reject_broad_runtime_type_narrowing(
 
 class A: ...
 
-assert_type(as_type(A), type[A] | None)
+reveal_type(as_type(A))  # revealed: type[A] | None
 ```
 
 ## Availability from `typing`
