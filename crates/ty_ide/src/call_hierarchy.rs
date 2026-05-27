@@ -14,6 +14,7 @@ use crate::references::{contains_identifier, has_any_external_visible_definition
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::CoveringNode;
+use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
@@ -763,14 +764,6 @@ impl<'a> CallSitesFinder<'a, '_> {
             call_site_range,
         });
     }
-}
-
-/// `__call__`, `__init__`, etc. — names that Python invokes implicitly through
-/// arbitrary receivers, so a textual attribute-name match against the target
-/// would be unsound: `obj.fbank(...)` triggers `fbank.__call__` even though
-/// the textual attribute is `fbank`, not `__call__`.
-fn is_dunder(name: &str) -> bool {
-    name.len() >= 4 && name.starts_with("__") && name.ends_with("__")
 }
 
 /// Returns `true` when `attribute` is the immediate callee of an enclosing
