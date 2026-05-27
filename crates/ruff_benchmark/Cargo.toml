@@ -110,6 +110,8 @@ ignored = [
     "ruff_python_formatter",
     "ruff_python_parser",
     "ruff_python_trivia",
+    "ruff_text_size",
     "mimalloc",
-    "tikv-jemallocator"
+    "tikv-jemallocator",
+    "ty_ide"
 ]
