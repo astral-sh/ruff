@@ -84,7 +84,8 @@ repos:
           - mdformat-footnote==0.1.3
         exclude: |
           (?x)^(
-            docs/formatter/black\.md
+            \.agents/skills/.*
+            | docs/formatter/black\.md
             | docs/\w+\.md
           )$
         priority: 0
@@ -109,7 +110,8 @@ repos:
       - id: markdownlint-fix
         exclude: |
           (?x)^(
-            docs/formatter/black\.md
+            \.agents/skills/.*
+            | docs/formatter/black\.md
             | docs/\w+\.md
           )$
         priority: 1
