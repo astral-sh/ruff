@@ -97,9 +97,9 @@ use crate::types::{
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SentinelInstance,
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+    TypeContext, TypeFormType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
+    binding_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -137,7 +137,6 @@ mod post_inference;
 mod subscript;
 mod type_call;
 mod type_expression;
-mod type_form;
 mod typed_dict;
 mod typevar;
 
@@ -5655,6 +5654,96 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         types.expression_type(expression)
     }
 
+    /// In a `TypeForm` context, keep the ordinary value interpretation if it is
+    /// already acceptable.
+    ///
+    /// For example, `value` in `x: TypeForm[str] = value` might already have type
+    /// `TypeForm[str]`, and `1` in `x: TypeForm[str] | int = 1` satisfies the
+    /// ordinary `int` arm. In those cases, use ordinary expression inference.
+    /// Otherwise, reinterpret the expression as a type expression, as in
+    /// `x: TypeForm[int | str] = int | str`, and wrap it in `TypeForm[...]`.
+    fn infer_type_form_contextual_expression(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let target = tcx.annotation?;
+        let non_type_form_fallback = match target.resolve_type_alias(self.db()) {
+            Type::TypeForm(_) => None,
+            Type::Union(union)
+                if union.elements(self.db()).iter().any(|element| {
+                    matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
+                }) =>
+            {
+                Some(target.filter_union(self.db(), |element| {
+                    !matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
+                }))
+            }
+            _ => return None,
+        };
+
+        // Suppress contextual `TypeForm` evaluation only if ordinary inference already
+        // produces a type-form value or satisfies the non-`TypeForm` arm of the union.
+        let value_ty = self
+            .speculate()
+            .infer_maybe_standalone_expression(expression, TypeContext::default());
+        if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
+            || self.contains_type_form_value(expression, value_ty)
+            || non_type_form_fallback
+                .is_some_and(|alternative| value_ty.is_assignable_to(self.db(), alternative))
+        {
+            return None;
+        }
+
+        // If interpreting the root as a type expression yields no usable type,
+        // try ordinary contextual inference. This lets existing bidirectional
+        // inference propagate `TypeForm` through conditionals, calls, and `await`.
+        if self
+            .speculate()
+            .infer_type_expression_no_store(expression)
+            .is_unknown()
+        {
+            let contextual_ty = self
+                .speculate()
+                .infer_value_expression_impl(expression, tcx);
+            // TODO: Remove this exception once `Unpack` produces a precise type instead of a
+            // dynamic placeholder in ordinary expression inference.
+            if contextual_ty.is_assignable_to(self.db(), target)
+                && contextual_ty != Type::Dynamic(DynamicType::TodoUnpack)
+            {
+                return None;
+            }
+        }
+
+        Some(TypeFormType::from_type_expression(
+            self.db(),
+            self.infer_type_expression_no_store(expression),
+        ))
+    }
+
+    fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
+        match ty.resolve_type_alias(self.db()) {
+            Type::TypeForm(_) | Type::SubclassOf(_) => true,
+            // A bare class object is valid type-expression syntax and should still be
+            // interpreted as a `TypeForm`. Preserve its ordinary value type only when
+            // it was produced by an expression that is not itself a type expression.
+            Type::ClassLiteral(_) => self
+                .speculate()
+                .infer_type_expression_no_store(expression)
+                .is_unknown(),
+            Type::NominalInstance(instance)
+                if instance.has_known_class(self.db(), KnownClass::Type) =>
+            {
+                true
+            }
+            Type::Union(union) => union
+                .elements(self.db())
+                .iter()
+                .any(|element| self.contains_type_form_value(expression, *element)),
+            _ => false,
+        }
+    }
+
     /// Infer the type of an expression.
     fn infer_expression_impl(
         &mut self,
@@ -7710,7 +7799,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if callable_type == Type::SpecialForm(SpecialFormType::TypeForm) {
-            return self.infer_type_form_call_expression(call_expression);
+            if let [argument] = &*arguments.args
+                && arguments.keywords.is_empty()
+                && !matches!(argument, ast::Expr::Starred(_))
+            {
+                return TypeFormType::from_type_expression(
+                    self.db(),
+                    self.infer_type_expression(argument),
+                );
+            }
+
+            for argument in &*arguments.args {
+                self.infer_expression(argument, TypeContext::default());
+            }
+            for keyword in &*arguments.keywords {
+                self.infer_expression(&keyword.value, TypeContext::default());
+            }
+
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_FORM, call_expression)
+            {
+                builder.into_diagnostic(
+                    "`TypeForm()` expects exactly one positional-only type-expression argument",
+                );
+            }
+
+            return Type::unknown();
         }
 
         if callable_type.is_notimplemented(self.db()) {
