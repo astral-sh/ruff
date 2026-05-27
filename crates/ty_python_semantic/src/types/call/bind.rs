@@ -238,6 +238,106 @@ impl<'db> CallableItem<'db> {
     }
 }
 
+/// One checked overload, as it appears at the call site.
+///
+/// Checking a bound method call needs to include the implicit receiver. For example, when the user
+/// writes `child.choose(1)`, overload resolution checks a signature such as
+/// `choose(self: Child, child_value: int)` against both `child` and `1`. IDE features should show
+/// and reason about only what the user wrote: `choose(child_value: int)` and the mapping from `1`
+/// to `child_value`.
+///
+/// This type provides that call-site view while retaining the original checked binding privately
+/// for information such as inferred specializations and matching errors.
+#[derive(Debug)]
+pub(crate) struct CallSiteBinding<'a, 'db> {
+    /// The signature visible at the written call site.
+    ///
+    /// For a bound method, this omits the implicit receiver parameter. For a constructor, this may
+    /// use the effective constructed return type.
+    signature: Signature<'db>,
+
+    /// The checked semantic binding from which this call-site view is derived.
+    ///
+    /// Its signature is not necessarily equal to `self.signature`: it retains implicit arguments
+    /// needed during call matching. Keep this private so consumers cannot combine its semantic
+    /// signature with the source-coordinate argument matches below.
+    semantic_binding: &'a Binding<'db>,
+
+    /// Argument matches in written-call coordinates.
+    ///
+    /// Unlike `semantic_binding.argument_matches()`, this excludes an implicit bound receiver and
+    /// refers to parameter indexes in `self.signature`.
+    argument_matches: Vec<MatchedArgument<'db>>,
+}
+
+impl<'a, 'db> CallSiteBinding<'a, 'db> {
+    fn new(db: &'db dyn Db, item: &CallableItem<'db>, binding: &'a Binding<'db>) -> Self {
+        let callable = item.callable();
+        let mut signature = binding.signature.clone();
+        let mut argument_matches = binding.argument_matches().to_vec();
+
+        if let Some(bound_type) = callable.bound_type {
+            let displayed_signature = signature.bind_self(db, Some(bound_type));
+            let parameter_offset =
+                usize::from(signature.parameters().len() != displayed_signature.parameters().len());
+
+            // Matching includes the implicit receiver as its first argument. `bind_self` removes
+            // an ordinary receiver parameter, but leaves a leading `*args` parameter visible.
+            argument_matches = argument_matches
+                .into_iter()
+                .skip(1)
+                .map(|mut argument_match| {
+                    argument_match.parameters = argument_match
+                        .parameters
+                        .into_iter()
+                        .filter_map(|parameter_index| parameter_index.checked_sub(parameter_offset))
+                        .collect();
+                    argument_match
+                })
+                .collect();
+            signature = displayed_signature;
+        }
+
+        if matches!(item, CallableItem::Constructor(_)) {
+            signature = signature.with_return_type(item.return_type(db));
+        }
+
+        Self {
+            signature,
+            semantic_binding: binding,
+            argument_matches,
+        }
+    }
+
+    pub(crate) fn signature(&self) -> &Signature<'db> {
+        &self.signature
+    }
+
+    pub(crate) fn into_signature(self) -> Signature<'db> {
+        self.signature
+    }
+
+    pub(crate) fn argument_matches(&self) -> &[MatchedArgument<'db>] {
+        &self.argument_matches
+    }
+
+    pub(crate) fn specialization(&self) -> Option<Specialization<'db>> {
+        self.semantic_binding.specialization()
+    }
+
+    pub(crate) fn matches_call(&self) -> bool {
+        !self
+            .semantic_binding
+            .has_errors_affecting_overload_resolution()
+    }
+
+    pub(crate) fn into_signature_and_argument_matches(
+        self,
+    ) -> (Signature<'db>, Vec<MatchedArgument<'db>>) {
+        (self.signature, self.argument_matches)
+    }
+}
+
 /// A single element in a union of callables.
 /// This could be a single callable or an intersection of callables.
 /// If there are multiple items, they form an intersection.
@@ -652,6 +752,40 @@ impl<'db> Bindings<'db> {
         self.elements
             .iter_mut()
             .flat_map(BindingsElement::callables_mut)
+    }
+
+    /// Returns call-site views of all checked overload bindings.
+    ///
+    /// Unlike the underlying semantic bindings, each view expresses its signature and argument
+    /// mapping in terms of arguments written at the call site.
+    pub(crate) fn call_site_bindings<'a>(
+        &'a self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = CallSiteBinding<'a, 'db>> + 'a
+    where
+        'db: 'a,
+    {
+        self.iter_callable_items().flat_map(move |item| {
+            item.callable()
+                .overloads()
+                .iter()
+                .map(move |overload| CallSiteBinding::new(db, item, overload))
+        })
+    }
+
+    /// Returns call-site views of overload bindings matched by semantic call checking.
+    pub(crate) fn matching_call_site_bindings<'a>(
+        &'a self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = CallSiteBinding<'a, 'db>> + 'a
+    where
+        'db: 'a,
+    {
+        self.iter_callable_items().flat_map(move |item| {
+            item.callable()
+                .matching_overloads()
+                .map(move |(_, overload)| CallSiteBinding::new(db, item, overload))
+        })
     }
 
     fn iter_callable_items(&self) -> impl Iterator<Item = &CallableItem<'db>> {

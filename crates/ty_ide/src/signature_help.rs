@@ -354,6 +354,40 @@ mod tests {
     }
 
     #[test]
+    fn signature_help_bound_method_overload_self_type() {
+        let test = cursor_test(
+            r#"
+        def f(string: str):
+            string.removesuffix("suffix"<CURSOR>)
+        "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (suffix: str, /) -> str
+        ---------------------------------------------
+
+        -------------- active parameter -------------
+        suffix: str
+        ---------------------------------------------
+
+        =============== other signature =============
+        (suffix: LiteralString, /) -> LiteralString
+        ---------------------------------------------
+        Return a str with the given suffix string removed if present.
+
+        If the string ends with the suffix string and that suffix is not empty,
+        return string[:-len(suffix)]. Otherwise, return a copy of the original
+        string.
+
+        -------------- active parameter -------------
+        suffix: LiteralString
+        ---------------------------------------------
+        ");
+    }
+
+    #[test]
     fn signature_help_nested_function_calls() {
         let test = cursor_test(
             r#"
@@ -576,21 +610,21 @@ def ab(a: str):
         assert_snapshot!(test.signature_help_render(), @"
 
         ============== active signature =============
-        (a: int) -> Unknown
-        ---------------------------------------------
-        the int overload
-
-        -------------- active parameter -------------
-        a: int
-        ---------------------------------------------
-
-        =============== other signature =============
         (a: str) -> Unknown
         ---------------------------------------------
         the str overload
 
         -------------- active parameter -------------
         a: str
+        ---------------------------------------------
+
+        =============== other signature =============
+        (a: int) -> Unknown
+        ---------------------------------------------
+        the int overload
+
+        -------------- active parameter -------------
+        a: int
         ---------------------------------------------
         ");
     }

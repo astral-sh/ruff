@@ -1445,6 +1445,87 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn hover_bound_method_overload_self_type() {
+        let string = hover_test(
+            r#"
+        def f(string: str):
+            string.removesuf<CURSOR>fix("suffix")
+        "#,
+        );
+
+        assert_snapshot!(string.hover(), @r#"
+        def removesuffix(suffix: str, /) -> str
+        ---------------------------------------------
+        Return a str with the given suffix string removed if present.
+
+        If the string ends with the suffix string and that suffix is not empty,
+        return string[:-len(suffix)]. Otherwise, return a copy of the original
+        string.
+
+        ---------------------------------------------
+        ```python
+        def removesuffix(suffix: str, /) -> str
+        ```
+        ---
+        Return a str with the given suffix string removed if present.<HB>
+        <HB>
+        If the string ends with the suffix string and that suffix is not empty,<HB>
+        return string[:-len(suffix)]. Otherwise, return a copy of the original<HB>
+        string.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:12
+          |
+        3 |     string.removesuffix("suffix")
+          |            ^^^^^^^^^-^^
+          |            |        |
+          |            |        Cursor offset
+          |            source
+          |
+        "#);
+
+        let literal_string = hover_test(
+            r#"
+            from typing_extensions import LiteralString
+
+            def f(string: LiteralString):
+                string.removesuf<CURSOR>fix("suffix")
+            "#,
+        );
+
+        assert_snapshot!(literal_string.hover(), @r#"
+        def removesuffix(suffix: LiteralString, /) -> LiteralString
+        ---------------------------------------------
+        Return a str with the given suffix string removed if present.
+
+        If the string ends with the suffix string and that suffix is not empty,
+        return string[:-len(suffix)]. Otherwise, return a copy of the original
+        string.
+
+        ---------------------------------------------
+        ```python
+        def removesuffix(suffix: LiteralString, /) -> LiteralString
+        ```
+        ---
+        Return a str with the given suffix string removed if present.<HB>
+        <HB>
+        If the string ends with the suffix string and that suffix is not empty,<HB>
+        return string[:-len(suffix)]. Otherwise, return a copy of the original<HB>
+        string.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:12
+          |
+        5 |     string.removesuffix("suffix")
+          |            ^^^^^^^^^-^^
+          |            |        |
+          |            |        Cursor offset
+          |            source
+          |
+        "#);
+    }
+
     /// When the resolved overload has no docstring and neither does the
     /// implementation, we fall back to showing a sibling overload's docstring.
     #[test]
@@ -6070,7 +6151,9 @@ except <CURSOR># Trigger completion/hover here
         fn hover(&self) -> String {
             use std::fmt::Write;
 
-            let Some(hover) = hover(&self.db, self.cursor.file, self.cursor.offset) else {
+            let Some(hover) = salsa::attach(&self.db, || {
+                hover(&self.db, self.cursor.file, self.cursor.offset)
+            }) else {
                 return "Hover provided no content".to_string();
             };
 

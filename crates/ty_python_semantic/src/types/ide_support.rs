@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::reachability::is_range_reachable;
+use crate::types::call::bind::CallSiteBinding;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
@@ -580,6 +581,9 @@ pub struct CallSignatureDetails<'db> {
     /// Mapping from argument indices to displayed parameter indices. This accounts for
     /// displayed signatures that synthesize parameters, like bare `ParamSpec` signatures.
     pub argument_to_displayed_parameter_mapping: Vec<Option<usize>>,
+
+    /// Whether full semantic call matching kept this displayed signature as a valid candidate.
+    matches_call: bool,
 }
 
 /// A single displayed parameter in a callable signature for IDE support.
@@ -605,10 +609,12 @@ pub struct CallSignatureParameter<'db> {
 }
 
 impl<'db> CallSignatureDetails<'db> {
-    fn from_binding(db: &'db dyn Db, binding: &crate::types::call::Binding<'db>) -> Self {
-        let argument_to_parameter_mapping = binding.argument_matches().to_vec();
+    fn from_call_site_binding(db: &'db dyn Db, binding: CallSiteBinding<'_, 'db>) -> Self {
         let specialization = binding.specialization();
-        let signature = binding.signature.clone();
+        let matches_call = binding.matches_call();
+        let (signature, argument_to_parameter_mapping) =
+            binding.into_signature_and_argument_matches();
+
         let display_details = signature.display(db).to_string_parts();
         let (parameters, parameter_to_displayed_parameter_mapping) =
             displayed_parameters_for_signature(db, &signature, &display_details, specialization);
@@ -631,6 +637,7 @@ impl<'db> CallSignatureDetails<'db> {
             parameters,
             argument_to_parameter_mapping,
             argument_to_displayed_parameter_mapping,
+            matches_call,
         }
     }
 }
@@ -747,76 +754,26 @@ pub fn call_signature_details<'db>(
     };
 
     let db = model.db();
+    let bindings = full_type_bindings_for_call(model, func_type, call_expr);
 
-    // Use into_callable to handle all the complex type conversions
-    if let Some(callable_type) = func_type
-        .try_upcast_to_callable(db)
-        .map(|callables| callables.into_type(db))
-    {
-        // Use from_arguments_typed so that check_types can infer TypeVar
-        // specializations from the actual argument types at this call site.
-        let call_arguments =
-            CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-                splatted_value
-                    .inferred_type(model)
-                    .unwrap_or(Type::unknown())
-            });
-        let mut bindings = callable_type
-            .bindings(db)
-            .match_parameters(db, &call_arguments);
-
-        // Run type checking to resolve TypeVar bindings from argument types.
-        // For example, calling `dict[str, int].get("a")` resolves the `_KT`
-        // TypeVar to `str`. We ignore errors since we still want signature
-        // details even if the call has type errors.
-        let constraints = ConstraintSetBuilder::new();
-        let _ = bindings.check_types_impl(
-            db,
-            &constraints,
-            &call_arguments,
-            TypeContext::default(),
-            &[],
-        );
-
-        // Extract signature details from all callable bindings
-        bindings
-            .iter_flat()
-            .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(db, binding))
-            .collect()
-    } else {
-        // Type is not callable, return empty signatures
-        vec![]
-    }
+    bindings
+        .call_site_bindings(db)
+        .map(|binding| CallSignatureDetails::from_call_site_binding(db, binding))
+        .collect()
 }
 
-/// Resolve overloads for a callable type using call arguments,
+/// Resolve overloads for a callee type using call arguments,
 /// returning the single matching signature if exactly one matches.
 fn resolve_single_overload<'db>(
     model: &SemanticModel<'db>,
-    callable_type: Type<'db>,
+    func_type: Type<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<Signature<'db>> {
     let db = model.db();
-    let bindings = callable_type.bindings(db);
-
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
-    });
-
-    let constraints = ConstraintSetBuilder::new();
+    let bindings = type_checked_bindings_for_call(model, func_type, call_expr).ok()?;
     let mut resolved: Vec<_> = bindings
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
-        .iter()
-        .flat_map(super::call::bind::Bindings::iter_flat)
-        .flat_map(|binding| {
-            binding
-                .matching_overloads()
-                .map(|(_, overload)| overload.signature.clone())
-        })
+        .matching_call_site_bindings(db)
+        .map(CallSiteBinding::into_signature)
         .collect();
 
     if resolved.len() != 1 {
@@ -834,16 +791,15 @@ pub enum CallArgumentForm {
     Type,
 }
 
-/// Fully binds and type-checks a call expression against the given callee type.
+/// Matches and type-checks a call expression against the original callee type.
 ///
-/// This is the expensive path for call-argument form analysis: it matches call-site arguments to
-/// parameters, checks argument types, and preserves the resulting bindings even when the call is
-/// invalid so IDE features can inspect the best available binding information.
-fn full_type_bindings_for_call<'db>(
+/// In particular, this does not first convert a bound method into its callable representation:
+/// the implicit receiver remains in the binding operation and can constrain overload selection.
+fn type_checked_bindings_for_call<'db>(
     model: &SemanticModel<'db>,
     func_type: Type<'db>,
     call_expr: &ast::ExprCall,
-) -> crate::types::call::Bindings<'db> {
+) -> Result<crate::types::call::Bindings<'db>, CallError<'db>> {
     let db = model.db();
     let call_arguments =
         CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
@@ -863,19 +819,28 @@ fn full_type_bindings_for_call<'db>(
             TypeContext::default(),
             &[],
         )
+}
+
+/// Fully binds and type-checks a call expression, retaining failed bindings for IDE fallback.
+fn full_type_bindings_for_call<'db>(
+    model: &SemanticModel<'db>,
+    func_type: Type<'db>,
+    call_expr: &ast::ExprCall,
+) -> crate::types::call::Bindings<'db> {
+    type_checked_bindings_for_call(model, func_type, call_expr)
         .unwrap_or_else(|CallError(_, bindings)| *bindings)
 }
 
-/// Returns the form for a single argument from a successful binding.
-fn argument_form_from_successful_binding(
-    binding: &crate::types::call::Binding<'_>,
+/// Returns the form for a single argument from an overload that matches the call.
+fn argument_form_from_matching_binding(
+    binding: &CallSiteBinding<'_, '_>,
     argument_index: usize,
 ) -> CallArgumentForm {
     if let Some(argument_match) = binding.argument_matches().get(argument_index)
         && argument_match.matched
         && let [parameter_index] = argument_match.parameters.as_slice()
     {
-        return match binding.signature.parameters()[*parameter_index].form {
+        return match binding.signature().parameters()[*parameter_index].form {
             ParameterForm::Value => CallArgumentForm::Value,
             ParameterForm::Type => CallArgumentForm::Type,
         };
@@ -915,15 +880,12 @@ pub fn call_argument_forms(
 
     let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
 
-    // If any bindings are successful, limit analysis to those bindings.
-    let successful_bindings: Vec<_> = bindings
-        .iter_flat()
-        .flatten()
-        .filter(|binding| binding.errors().is_empty())
-        .collect();
+    // If any overloads match the call, limit analysis to those overloads. Other diagnostics on a
+    // matching overload do not change whether its parameters receive values or type expressions.
+    let matching_bindings: Vec<_> = bindings.matching_call_site_bindings(model.db()).collect();
 
-    let Some((first_binding, remaining_bindings)) = successful_bindings.split_first() else {
-        // If no binding succeeds, fall back to the merged non-conflicting forms from the full
+    let Some((first_binding, remaining_bindings)) = matching_bindings.split_first() else {
+        // If no overload matches, fall back to the merged non-conflicting forms from the full
         // binding result so callers still get the best conservative answer available.
         for (arg_index, form) in bindings.non_conflicting_argument_forms().enumerate() {
             let Some(argument_form) = argument_forms.get_mut(arg_index) else {
@@ -937,16 +899,17 @@ pub fn call_argument_forms(
         return argument_forms;
     };
 
-    // If all successful bindings agree on the argument form, use the agreed-upon form; otherwise,
+    // If all matching overloads agree on the argument form, use the agreed-upon form; otherwise,
     // fall back to `CallArgumentForm::Unknown`.
     for (arg_index, resolved_argument_form) in argument_forms.iter_mut().enumerate() {
-        let argument_form = argument_form_from_successful_binding(first_binding, arg_index);
+        let argument_form = argument_form_from_matching_binding(first_binding, arg_index);
         if argument_form == CallArgumentForm::Unknown {
             continue;
         }
-        if remaining_bindings.iter().all(|binding| {
-            argument_form_from_successful_binding(binding, arg_index) == argument_form
-        }) {
+        if remaining_bindings
+            .iter()
+            .all(|binding| argument_form_from_matching_binding(binding, arg_index) == argument_form)
+        {
             *resolved_argument_form = argument_form;
         }
     }
@@ -972,16 +935,14 @@ pub fn call_type_simplified_by_overloads(
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
 
-    let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
-
     // If the callable is trivial this analysis is useless, bail out
-    if let Some(binding) = callable_type.bindings(db).single_element()
+    if let Some(binding) = func_type.bindings(db).single_element()
         && binding.overloads().len() < 2
     {
         return None;
     }
 
-    let signature = resolve_single_overload(model, callable_type, call_expr)?;
+    let signature = resolve_single_overload(model, func_type, call_expr)?;
     Some(
         signature
             .display_with(db, DisplaySettings::default().multiline())
@@ -1094,14 +1055,27 @@ fn promote_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
 }
 
 /// Find the active signature index from `CallSignatureDetails`.
-/// The active signature is the first signature where all arguments present in the call
-/// have valid mappings to parameters (i.e., none of the mappings are None).
+///
+/// Prefer the first signature selected by semantic call matching. If matching fails for every
+/// candidate, fall back to the best source-argument-to-parameter mapping for incomplete or
+/// invalid calls.
 pub fn find_active_signature_from_details(
     signature_details: &[CallSignatureDetails],
 ) -> Option<usize> {
     let first = signature_details.first()?;
 
-    // If there are no arguments in the mapping, just return the first signature.
+    // When full call resolution succeeds, prefer its first matching overload. This accounts for
+    // constraints on implicit receiver arguments, which do not appear in the displayed argument
+    // mapping, as well as ordinary argument-type overload resolution.
+    if let Some(index) = signature_details
+        .iter()
+        .position(|details| details.matches_call)
+    {
+        return Some(index);
+    }
+
+    // When the call is incomplete or invalid, fall back to source argument mapping so signature
+    // help can still identify the best active candidate while the user is editing.
     if first.argument_to_parameter_mapping.is_empty() {
         return Some(0);
     }
@@ -1144,27 +1118,12 @@ pub fn resolved_call_signature<'db>(
 ) -> Option<CallSignatureDetails<'db>> {
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
-    let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
-
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
-    });
-
-    // Extract the `Bindings` regardless of whether type checking succeeded or failed.
-    let constraints = ConstraintSetBuilder::new();
-    let bindings = callable_type
-        .bindings(db)
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
-        .unwrap_or_else(|CallError(_, bindings)| *bindings);
+    let bindings = full_type_bindings_for_call(model, func_type, call_expr);
 
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
-        .iter_flat()
-        .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
-        .map(|binding| CallSignatureDetails::from_binding(db, binding))
+        .matching_call_site_bindings(db)
+        .map(|binding| CallSignatureDetails::from_call_site_binding(db, binding))
         .collect();
 
     if !type_checked_details.is_empty() {
@@ -1176,9 +1135,8 @@ pub fn resolved_call_signature<'db>(
     // `matching_overloads()` returns empty. Fall back to arity-based matching
     // across all overloads to pick the best candidate for showing hints.
     let all_details: Vec<_> = bindings
-        .iter_flat()
-        .flatten()
-        .map(|binding| CallSignatureDetails::from_binding(db, binding))
+        .call_site_bindings(db)
+        .map(|binding| CallSignatureDetails::from_call_site_binding(db, binding))
         .collect();
 
     if all_details.is_empty() {
@@ -2174,7 +2132,7 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
             .map(|overload| display_sig(&overload.signature));
     }
 
-    if let Some(signature) = resolve_single_overload(model, callable_type, call_expr) {
+    if let Some(signature) = resolve_single_overload(model, function_ty, call_expr) {
         return Some(display_sig(&signature));
     }
 
