@@ -1781,7 +1781,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 let chars: FxHashSet<char> = value.value(db).chars().collect();
 
                 let spec = match chars.len() {
-                    0 => Type::Never,
                     1 => Type::single_char_string_literal(db, *chars.iter().next().unwrap()),
                     _ => {
                         // Optimisation: since we know this union will only include string-literal types,
@@ -1839,7 +1838,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .collect();
 
                 let spec = match ints.len() {
-                    0 => Type::Never,
                     1 => Type::int_literal(*ints.iter().next().unwrap()),
                     _ => {
                         let union_elements: Box<[Type<'db>]> =
@@ -2815,13 +2813,27 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     LiteralValueTypeKind::Bool(_) => {
                         KnownClass::Bool.when_subclass_of(db, instance.class(db), self.constraints)
                     }
-                    LiteralValueTypeKind::LiteralString => self
-                        .as_relation_checker(TypeRelation::Subtyping)
-                        .check_type_pair(
-                            db,
-                            Type::string_literal(db, ""),
-                            Type::NominalInstance(instance),
-                        ),
+                    LiteralValueTypeKind::LiteralString => {
+                        let target_class = instance.class(db);
+                        if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
+                            && sequence_class
+                                .iter_mro(db, None)
+                                .filter_map(ClassBase::into_class)
+                                .map(|class| class.class_literal(db))
+                                .contains(&target_class.class_literal(db))
+                        {
+                            // `LiteralString` can still overlap with a specialized sequence:
+                            // `"a"` is both `LiteralString` and `Sequence[Literal["a"]]`.
+                            // Use `str` here to preserve that possible overlap.
+                            return self.check_type_pair(
+                                db,
+                                KnownClass::Str.to_instance(db),
+                                Type::NominalInstance(instance),
+                            );
+                        }
+
+                        KnownClass::Str.when_subclass_of(db, target_class, self.constraints)
+                    }
                     LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => self
                         .as_relation_checker(TypeRelation::Subtyping)
                         .check_type_pair(
