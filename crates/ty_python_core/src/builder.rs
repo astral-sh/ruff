@@ -66,7 +66,6 @@ use super::place::PlaceExprRef;
 
 mod except_handlers;
 mod loop_bindings_visitor;
-mod walrus;
 
 #[derive(Clone, Debug, Default)]
 struct Loop {
@@ -172,8 +171,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     semantic_checker: SemanticSyntaxChecker,
     in_try: bool,
     comprehension_iterable_nesting: u32,
-    /// Iteration targets already bound in each active comprehension scope.
-    active_comprehension_targets: Vec<FxHashSet<Name>>,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -256,7 +253,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
             comprehension_iterable_nesting: 0,
-            active_comprehension_targets: Vec::new(),
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: FxHashMap::default(),
             alias_predicates: FxHashMap::default(),
@@ -374,10 +370,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         false
-    }
-
-    fn in_comprehension_iterable(&self) -> bool {
-        self.comprehension_iterable_nesting > 0
     }
 
     fn with_comprehension_iterable_context(&mut self, visit: impl FnOnce(&mut Self)) {
@@ -1978,7 +1970,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_assignments = std::mem::take(&mut self.current_assignments);
 
         self.push_scope(scope);
-        self.active_comprehension_targets.push(FxHashSet::default());
 
         self.add_unpackable_assignment(
             &Unpackable::Comprehension {
@@ -1988,7 +1979,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             &generator.target,
             value,
         );
-        self.mark_comprehension_target_active(&generator.target);
 
         for if_expr in &generator.ifs {
             self.visit_comprehension_filter(if_expr);
@@ -2006,7 +1996,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 &generator.target,
                 value,
             );
-            self.mark_comprehension_target_active(&generator.target);
 
             for if_expr in &generator.ifs {
                 self.visit_comprehension_filter(if_expr);
@@ -2014,9 +2003,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         visit_outer_elt(self);
-        self.active_comprehension_targets
-            .pop()
-            .expect("comprehension target state should match comprehension scopes");
         self.pop_scope();
 
         self.current_assignments = saved_assignments;
@@ -2229,7 +2215,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
-        assert!(self.active_comprehension_targets.is_empty());
 
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
@@ -3800,7 +3785,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Named(node) => {
-                self.visit_named_expression(node);
+                // TODO walrus in comprehensions is implicitly nonlocal
+                self.visit_expr(&node.value);
+
+                // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
+                if node.target.is_name_expr() {
+                    self.push_assignment(node.into());
+                    self.visit_expr(&node.target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(&node.target);
+                }
             }
             ast::Expr::Lambda(lambda) => {
                 self.current_statement_mut()

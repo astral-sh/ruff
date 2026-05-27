@@ -6,4 +6,6 @@
 [[a for a in [] if (x := 1) for x in []] for x in []]
 
 class C:
+    [(x := y) for y in range(3)]
+    [x for x in [1] if (y := x) for y in [1]]
     [[a for a in [] if (x := 1) for x in []] for x in []]

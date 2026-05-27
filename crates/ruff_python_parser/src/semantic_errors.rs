@@ -1156,6 +1156,42 @@ impl SemanticSyntaxChecker {
                 range,
             );
         }
+
+        self.check_class_body_comprehension_expr(expr, ctx);
+    }
+
+    /// Add a [`SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension`] if `expr`
+    /// contains a named expression owned by a comprehension nested in a class body.
+    fn check_class_body_comprehension_expr<Ctx: SemanticSyntaxContext>(
+        &self,
+        expr: &Expr,
+        ctx: &Ctx,
+    ) {
+        if !ctx.in_class_body_comprehension() {
+            return;
+        }
+
+        let mut visitor = ClassBodyComprehensionNamedExpressionVisitor::default();
+        visitor.visit_expr(expr);
+
+        for (range, target_range) in visitor.named_expressions {
+            if self
+                .rebound_comprehension_variable_ranges
+                .contains(&target_range)
+            {
+                continue;
+            }
+
+            // test_err named_expression_in_class_body_comprehension
+            // class C:
+            //     [(x := y) for y in range(3)]
+            //     [x for x in [1] if (y := x) for y in [1]]
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension,
+                range,
+            );
+        }
     }
 
     fn check_generator_filters<Ctx: SemanticSyntaxContext>(
@@ -2038,6 +2074,35 @@ fn comprehension_target_names(comprehensions: &[ast::Comprehension]) -> FxHashSe
         add_comprehension_target_names(&comprehension.target, &mut names);
     }
     names
+}
+
+/// Finds named expressions owned by one comprehension for the class-body restriction.
+#[derive(Default)]
+struct ClassBodyComprehensionNamedExpressionVisitor {
+    named_expressions: Vec<(TextRange, TextRange)>,
+}
+
+impl Visitor<'_> for ClassBodyComprehensionNamedExpressionVisitor {
+    fn visit_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                // Defaults execute in the enclosing comprehension; the lambda body does not.
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
+                }
+                return;
+            }
+            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::Generator(_) => {
+                // A nested comprehension is checked when traversal reaches that comprehension.
+                return;
+            }
+            Expr::Named(ast::ExprNamed { target, range, .. }) if target.is_name_expr() => {
+                self.named_expressions.push((*range, target.range()));
+            }
+            _ => {}
+        }
+        walk_expr(self, expr);
+    }
 }
 
 /// Searches for named expressions (`x := y`) rebinding one of the active iteration variables in a
