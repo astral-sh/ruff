@@ -255,6 +255,10 @@ class D:
     # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
     [[(outer := 1) for _ in [0]] for outer in [0]]
 
+    # A later nested target does not hide an already-active outer target in an earlier filter.
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [[a for a in [] if (x := 1) for x in []] for x in []]
+
     # Lambda bodies own their walrus targets.
     [(lambda: (local := 1))() for local in [0]]
 

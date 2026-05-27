@@ -1121,6 +1121,7 @@ impl SemanticSyntaxChecker {
                 targets: comprehension_target_names(comprehensions),
                 rebound_variables: Vec::new(),
                 descend_into_nested_comprehensions: true,
+                preserve_outer_targets_until_nested_binding: ctx.in_class_body_comprehension(),
             };
             visitor.visit_expr(expr);
             visitor.rebound_variables
@@ -1197,6 +1198,7 @@ impl SemanticSyntaxChecker {
                 targets: later_targets,
                 rebound_variables: Vec::new(),
                 descend_into_nested_comprehensions: false,
+                preserve_outer_targets_until_nested_binding: false,
             };
             visitor.visit_expr(expr);
             visitor.rebound_variables
@@ -2036,23 +2038,55 @@ struct ReboundComprehensionVisitor {
     rebound_variables: Vec<(ast::name::Name, TextRange)>,
     /// Active-target conflicts cross nested comprehensions; later-loop conflicts do not.
     descend_into_nested_comprehensions: bool,
+    /// In class bodies, no later-loop diagnostic replaces an outer active-target diagnostic.
+    preserve_outer_targets_until_nested_binding: bool,
 }
 
 impl ReboundComprehensionVisitor {
+    fn with_shadowed_targets(
+        &mut self,
+        shadowing_targets: &FxHashSet<ast::name::Name>,
+        visit: impl FnOnce(&mut Self),
+    ) {
+        let shadowed_targets = shadowing_targets
+            .iter()
+            .filter(|target| self.targets.remove(*target))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        visit(self);
+
+        self.targets.extend(shadowed_targets);
+    }
+
     fn visit_nested_comprehension(
         &mut self,
         generators: &[ast::Comprehension],
-        visit_body_and_filters: impl FnOnce(&mut Self),
+        visit_body: impl FnOnce(&mut Self),
     ) {
-        // The nested comprehension's own check reports conflicts against its targets.
-        let shadowed_targets = comprehension_target_names(generators)
-            .into_iter()
-            .filter(|target| self.targets.remove(target))
-            .collect::<Vec<_>>();
+        let all_targets = comprehension_target_names(generators);
+        self.with_shadowed_targets(&all_targets, visit_body);
 
-        visit_body_and_filters(self);
-
-        self.targets.extend(shadowed_targets);
+        if self.preserve_outer_targets_until_nested_binding {
+            let mut active_targets = FxHashSet::default();
+            for generator in generators {
+                add_comprehension_target_names(&generator.target, &mut active_targets);
+                self.with_shadowed_targets(&active_targets, |visitor| {
+                    for if_expr in &generator.ifs {
+                        visitor.visit_expr(if_expr);
+                    }
+                });
+            }
+        } else {
+            // The nested comprehension's own check reports conflicts against its targets.
+            self.with_shadowed_targets(&all_targets, |visitor| {
+                for generator in generators {
+                    for if_expr in &generator.ifs {
+                        visitor.visit_expr(if_expr);
+                    }
+                }
+            });
+        }
     }
 }
 
@@ -2080,11 +2114,6 @@ impl Visitor<'_> for ReboundComprehensionVisitor {
                 }
                 self.visit_nested_comprehension(generators, |visitor| {
                     visitor.visit_expr(elt);
-                    for generator in generators {
-                        for if_expr in &generator.ifs {
-                            visitor.visit_expr(if_expr);
-                        }
-                    }
                 });
                 return;
             }
@@ -2102,11 +2131,6 @@ impl Visitor<'_> for ReboundComprehensionVisitor {
                         visitor.visit_expr(key);
                     }
                     visitor.visit_expr(value);
-                    for generator in generators {
-                        for if_expr in &generator.ifs {
-                            visitor.visit_expr(if_expr);
-                        }
-                    }
                 });
                 return;
             }
