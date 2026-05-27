@@ -33,6 +33,7 @@ mod commands;
 mod completions;
 mod configuration;
 mod folding_range;
+mod implementation;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -1351,7 +1352,6 @@ impl TestServerBuilder {
     }
 
     /// Set custom client capabilities (overrides any previously set capabilities)
-    #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
         self.client_capabilities = capabilities;
         self

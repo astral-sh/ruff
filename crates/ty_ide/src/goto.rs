@@ -246,7 +246,7 @@ pub(crate) enum GotoTarget<'a> {
 pub(crate) struct Definitions<'db>(Vec<ResolvedDefinition<'db>>);
 
 impl<'db> Definitions<'db> {
-    fn new(mut resolved: Vec<ResolvedDefinition<'db>>) -> Self {
+    pub(crate) fn new(mut resolved: Vec<ResolvedDefinition<'db>>) -> Self {
         for index in (1..resolved.len()).rev() {
             if resolved[..index].contains(&resolved[index]) {
                 resolved.remove(index);

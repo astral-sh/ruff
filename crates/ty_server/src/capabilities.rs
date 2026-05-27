@@ -21,6 +21,7 @@ bitflags::bitflags! {
         const TYPE_DEFINITION_LINK_SUPPORT = 1 << 3;
         const DEFINITION_LINK_SUPPORT = 1 << 4;
         const DECLARATION_LINK_SUPPORT = 1 << 5;
+        const IMPLEMENTATION_LINK_SUPPORT = 1 << 19;
         const PREFER_MARKDOWN_IN_HOVER = 1 << 6;
         const MULTILINE_SEMANTIC_TOKENS = 1 << 7;
         const SIGNATURE_LABEL_OFFSET_SUPPORT = 1 << 8;
@@ -112,6 +113,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports definition links in goto declaration.
     pub(crate) const fn supports_declaration_link(self) -> bool {
         self.contains(Self::DECLARATION_LINK_SUPPORT)
+    }
+
+    /// Returns `true` if the client supports definition links in goto implementation.
+    pub(crate) const fn supports_implementation_link(self) -> bool {
+        self.contains(Self::IMPLEMENTATION_LINK_SUPPORT)
     }
 
     /// Returns `true` if the client prefers markdown in hover responses.
@@ -261,6 +267,13 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::DECLARATION_LINK_SUPPORT;
+        }
+
+        if text_document
+            .and_then(|text_document| text_document.implementation?.link_support)
+            .unwrap_or_default()
+        {
+            flags |= Self::IMPLEMENTATION_LINK_SUPPORT;
         }
 
         if text_document
@@ -431,6 +444,7 @@ pub(crate) fn server_capabilities(
         type_definition_provider: Some(true.into()),
         definition_provider: Some(true.into()),
         declaration_provider: Some(true.into()),
+        implementation_provider: Some(true.into()),
         references_provider: Some(true.into()),
         rename_provider: Some(server_rename_options().into()),
         document_highlight_provider: Some(true.into()),
