@@ -3,7 +3,8 @@
 //! We don't assume that we will get the diagnostics in source order.
 
 use ruff_db::diagnostic::Diagnostic;
-use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_source_file::OneIndexed;
+use ruff_text_size::TextRange;
 use std::ops::{Deref, Range};
 
 /// All diagnostics for one embedded Python file, sorted and grouped by start line number.
@@ -20,7 +21,7 @@ pub(crate) struct SortedDiagnostics<'a> {
 impl<'a> SortedDiagnostics<'a> {
     pub(crate) fn new(
         diagnostics: impl IntoIterator<Item = &'a Diagnostic>,
-        line_index: &LineIndex,
+        line_start: &dyn Fn(TextRange) -> OneIndexed,
     ) -> Self {
         let mut diagnostics: Vec<_> = diagnostics
             .into_iter()
@@ -28,9 +29,8 @@ impl<'a> SortedDiagnostics<'a> {
                 line_number: diagnostic
                     .primary_span()
                     .and_then(|span| span.range())
-                    .map_or(OneIndexed::from_zero_indexed(0), |range| {
-                        line_index.line_index(range.start())
-                    }),
+                    .map(line_start)
+                    .unwrap_or_else(|| OneIndexed::from_zero_indexed(0)),
                 diagnostic,
             })
             .collect();
@@ -176,7 +176,9 @@ mod tests {
             })
             .collect();
 
-        let sorted = super::SortedDiagnostics::new(diagnostics.iter(), &lines);
+        let sorted = super::SortedDiagnostics::new(diagnostics.iter(), &|diagnostic_range| {
+            lines.line_index(diagnostic_range.start())
+        });
         let grouped = sorted.iter_lines().collect::<Vec<_>>();
 
         let [line1, line2] = &grouped[..] else {
