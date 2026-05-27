@@ -49,7 +49,7 @@ reveal_type(aliased)  # revealed: TypeForm[str]
 typed dictionary.
 
 ```py
-from typing import Annotated, Literal, TypedDict
+from typing import Annotated, Any, Literal, LiteralString, Never, Self, TypedDict
 from typing_extensions import TypeForm
 
 class Config(TypedDict):
@@ -71,6 +71,19 @@ stored_annotated_forms_ok: tuple[TypeForm[int], ...] = stored_annotated_forms
 type StoredAlias = str
 stored_alias_forms = (StoredAlias,)
 stored_alias_forms_ok: tuple[TypeForm[str], ...] = stored_alias_forms
+
+stored_special_forms = (Never, LiteralString)
+stored_special_forms_ok: tuple[TypeForm[Any], ...] = stored_special_forms
+
+class WithSelf:
+    contextual_self_forms: tuple[TypeForm[Self], ...] = (Self,)
+    stored_self_forms = (Self,)
+
+    # TODO: This should be accepted; retain `Self`'s class binding through containers.
+    stored_self_forms_ok: tuple[TypeForm[Self], ...] = stored_self_forms  # error: [invalid-assignment]
+
+module_self_forms = (Self,)
+invalid_module_self_forms: tuple[TypeForm[Any], ...] = module_self_forms  # error: [invalid-assignment]
 
 bad_forms: list[TypeForm[int]] = [str]  # error: [invalid-assignment]
 bad_config: Config = {"form": str}  # error: [invalid-argument-type]
@@ -326,6 +339,7 @@ When `TypeForm` appears in a generic parameter or return annotation, the type ar
 inferred from the type expression passed by the caller or returned by the function.
 
 ```py
+from typing import LiteralString
 from typing_extensions import TypeForm
 
 def construct[T](form: TypeForm[T]) -> T:
@@ -341,6 +355,9 @@ def first[T](forms: tuple[TypeForm[T], ...]) -> T:
     raise NotImplementedError
 
 reveal_type(first(stored_union_forms))  # revealed: int | str
+
+stored_special_forms = (LiteralString,)
+reveal_type(first(stored_special_forms))  # revealed: LiteralString
 
 def use_runtime_type(form: type[int]) -> None:
     reveal_type(construct(form))  # revealed: int

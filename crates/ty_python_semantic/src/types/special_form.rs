@@ -185,6 +185,30 @@ impl SpecialFormType {
         self.class().to_instance(db)
     }
 
+    /// Return the type denoted by this retained special-form value when it is valid without
+    /// parameters or a surrounding inference scope.
+    pub(crate) fn type_form_argument(self, db: &dyn Db) -> Option<Type<'_>> {
+        match self {
+            Self::Never | Self::NoReturn => Some(Type::Never),
+            Self::LiteralString => Some(Type::literal_string()),
+            Self::Any => Some(Type::any()),
+            Self::Unknown => Some(Type::unknown()),
+            Self::AlwaysTruthy => Some(Type::AlwaysTruthy),
+            Self::AlwaysFalsy => Some(Type::AlwaysFalsy),
+            Self::NamedTuple => Some(IntersectionType::from_two_elements(
+                db,
+                Type::homogeneous_tuple(db, Type::object()),
+                KnownClass::NamedTupleLike.to_instance(db),
+            )),
+            Self::Type => Some(KnownClass::Type.to_instance(db)),
+            Self::TypeForm => Some(TypeFormType::from_type_expression(db, Type::any())),
+            Self::Tuple => Some(Type::homogeneous_tuple(db, Type::unknown())),
+            Self::Callable => Some(Type::Callable(CallableType::unknown(db))),
+            Self::LegacyStdlibAlias(alias) => Some(alias.aliased_class().to_instance(db)),
+            _ => None,
+        }
+    }
+
     /// Return `true` if this symbol is an instance of `class`.
     pub(super) fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
         self.class().is_subclass_of(db, class)

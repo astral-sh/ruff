@@ -1579,7 +1579,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::unknown()
                     }
                 }
-
                 KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::Annotated(_)
