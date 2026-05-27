@@ -4146,6 +4146,21 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         false
     }
 
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            match self.scopes[scope_info.file_scope_id].kind() {
+                ScopeKind::Comprehension => {}
+                ScopeKind::Class => return true,
+                ScopeKind::Module
+                | ScopeKind::TypeParams
+                | ScopeKind::Function
+                | ScopeKind::Lambda
+                | ScopeKind::TypeAlias => return false,
+            }
+        }
+        false
+    }
+
     fn in_module_scope(&self) -> bool {
         self.scope_stack.len() == 1
     }
