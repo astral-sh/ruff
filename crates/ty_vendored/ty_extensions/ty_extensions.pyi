@@ -209,19 +209,20 @@ def is_singleton(ty: TypeForm[object]) -> bool:
 def is_single_valued(ty: TypeForm[object]) -> bool:
     """Returns `True` if `ty` is non-empty and all inhabitants compare equal to each other."""
 
-def generic_context(ty: Any) -> GenericContext | None:
-    """Returns the generic context of a type as a tuple of typevars.
+def generic_context(input: Any) -> GenericContext | None:
+    """Returns the generic context of the input (a class, a function, a method, a type alias, ..)
+    as a tuple of typevars.
 
-    Returns `None` if the type is not generic.
+    Returns `None` if the input is not generic.
     """
 
-def into_callable(ty: Any) -> Any:
+def into_callable(value: Any) -> Any:
     """Converts a value into a `Callable`, if possible.
 
     This is the value equivalent of `CallableTypeOf`, which operates on types.
     """
 
-def into_regular_callable(ty: Any) -> Any:
+def into_regular_callable(value: Any) -> Any:
     """Converts a value into a regular `Callable`, if possible.
 
     This is the value equivalent of `RegularCallableTypeOf`, which operates on types.
