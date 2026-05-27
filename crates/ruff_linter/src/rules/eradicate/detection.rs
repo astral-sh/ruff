@@ -79,6 +79,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     let line = line
         .trim_start_matches(|char| char == '#' || is_python_whitespace(char))
         .trim_end();
+    let line = strip_trailing_noqa(line);
 
     // Fast path: if none of the indicators are present, the line is not code.
     if !CODE_INDICATORS.is_match(line) {
@@ -124,6 +125,18 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
 
     // Finally, compile the source code.
     parse_module(line).is_ok()
+}
+
+fn strip_trailing_noqa(line: &str) -> &str {
+    let Some((prefix, suffix)) = line.rsplit_once('#') else {
+        return line;
+    };
+
+    if suffix.trim_start().to_ascii_lowercase().starts_with("noqa") {
+        prefix.trim_end()
+    } else {
+        line
+    }
 }
 
 #[cfg(test)]
@@ -222,6 +235,8 @@ mod tests {
         assert!(comment_contains_code("# case 1:", &[]));
         assert!(comment_contains_code("#case 1:", &[]));
         assert!(comment_contains_code("# try:", &[]));
+        assert!(comment_contains_code("# )  # noqa: ERA001", &[]));
+        assert!(comment_contains_code("# \t(  # noqa: ERA001", &[]));
 
         assert!(!comment_contains_code("# this is = to that :(", &[]));
         assert!(!comment_contains_code("#else", &[]));
