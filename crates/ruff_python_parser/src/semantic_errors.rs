@@ -1134,10 +1134,10 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn check_rebound_variables<Ctx: SemanticSyntaxContext>(
+    fn check_rebound_variables<'a, Ctx: SemanticSyntaxContext>(
         expr: &Expr,
-        targets: FxHashSet<ast::name::Name>,
-        direct_targets: FxHashSet<ast::name::Name>,
+        targets: FxHashSet<&'a ast::name::Name>,
+        direct_targets: FxHashSet<&'a ast::name::Name>,
         ctx: &Ctx,
     ) {
         let mut visitor = ReboundComprehensionVisitor {
@@ -1147,6 +1147,8 @@ impl SemanticSyntaxChecker {
         };
         visitor.visit_expr(expr);
 
+        // TODO(brent): With multiple diagnostic ranges, mark both the named expression target
+        // (currently reported) and the comprehension target it rebinds.
         for range in visitor.ranges {
             // test_err rebound_comprehension_variable
             // [(a := 0) for a in range(0)]
@@ -1957,31 +1959,14 @@ pub enum WriteToDebugKind {
     Delete(PythonVersion),
 }
 
-fn comprehension_target_names(comprehensions: &[ast::Comprehension]) -> FxHashSet<ast::name::Name> {
-    let mut visitor = ComprehensionTargetNameVisitor::default();
+fn comprehension_target_names(
+    comprehensions: &[ast::Comprehension],
+) -> FxHashSet<&ast::name::Name> {
+    let mut visitor = helpers::StoredNameFinder::default();
     for comprehension in comprehensions {
         visitor.visit_expr(&comprehension.target);
     }
-    visitor.names
-}
-
-#[derive(Default)]
-struct ComprehensionTargetNameVisitor {
-    names: FxHashSet<ast::name::Name>,
-}
-
-impl Visitor<'_> for ComprehensionTargetNameVisitor {
-    fn visit_expr(&mut self, expr: &Expr) {
-        if let Expr::Name(ast::ExprName {
-            id,
-            ctx: ExprContext::Store,
-            ..
-        }) = expr
-        {
-            self.names.insert(id.clone());
-        }
-        walk_expr(self, expr);
-    }
+    visitor.names.into_values().map(|name| &name.id).collect()
 }
 
 #[derive(Default)]
@@ -2028,15 +2013,17 @@ impl Visitor<'_> for ClassBodyNamedExpressionVisitor {
     }
 }
 
-struct ReboundComprehensionVisitor {
+/// Searches for named expressions (`x := y`) rebinding a comprehension or generator expression's
+/// iteration variables.
+struct ReboundComprehensionVisitor<'a> {
     /// Targets that apply inside nested comprehensions.
-    targets: FxHashSet<ast::name::Name>,
+    targets: FxHashSet<&'a ast::name::Name>,
     /// Targets from later filter clauses, which do not apply inside nested comprehensions.
-    direct_targets: FxHashSet<ast::name::Name>,
+    direct_targets: FxHashSet<&'a ast::name::Name>,
     ranges: Vec<TextRange>,
 }
 
-impl Visitor<'_> for ReboundComprehensionVisitor {
+impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
