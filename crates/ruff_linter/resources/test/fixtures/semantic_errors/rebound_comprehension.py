@@ -2,3 +2,4 @@
 [x for x in [1] if (y := x) for y in [1]]
 [[x for x in [0] if (x := 1)] for x in [0]]
 [x for x in (lambda: (y := [1]))()]
+[x for x in [0] if [(y := z) for z in [1]] for y in [2]]

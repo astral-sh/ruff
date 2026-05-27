@@ -213,6 +213,8 @@ reveal_type(i)  # revealed: Unknown
 # error: [invalid-syntax] "comprehension inner loop cannot rebind assignment expression target `y`"
 [x for x in [1] if (y := x) for y in [1]]
 
+[x for x in [0] if [(y := z) for z in [1]] for y in [2]]
+
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 [[x for x in [0] if (x := 1)] for x in [0]]
 

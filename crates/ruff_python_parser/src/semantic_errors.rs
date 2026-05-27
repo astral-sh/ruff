@@ -1120,6 +1120,7 @@ impl SemanticSyntaxChecker {
             let mut visitor = ReboundComprehensionVisitor {
                 targets: comprehension_target_names(comprehensions),
                 rebound_variables: Vec::new(),
+                descend_into_nested_comprehensions: true,
             };
             visitor.visit_expr(expr);
             visitor.rebound_variables
@@ -1195,6 +1196,7 @@ impl SemanticSyntaxChecker {
             let mut visitor = ReboundComprehensionVisitor {
                 targets: later_targets,
                 rebound_variables: Vec::new(),
+                descend_into_nested_comprehensions: false,
             };
             visitor.visit_expr(expr);
             visitor.rebound_variables
@@ -2032,6 +2034,8 @@ fn comprehension_target_names(comprehensions: &[ast::Comprehension]) -> FxHashSe
 struct ReboundComprehensionVisitor {
     targets: FxHashSet<ast::name::Name>,
     rebound_variables: Vec<(ast::name::Name, TextRange)>,
+    /// Active-target conflicts cross nested comprehensions; later-loop conflicts do not.
+    descend_into_nested_comprehensions: bool,
 }
 
 impl ReboundComprehensionVisitor {
@@ -2071,6 +2075,9 @@ impl Visitor<'_> for ReboundComprehensionVisitor {
             | Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
             }) => {
+                if !self.descend_into_nested_comprehensions {
+                    return;
+                }
                 self.visit_nested_comprehension(generators, |visitor| {
                     visitor.visit_expr(elt);
                     for generator in generators {
@@ -2087,6 +2094,9 @@ impl Visitor<'_> for ReboundComprehensionVisitor {
                 generators,
                 ..
             }) => {
+                if !self.descend_into_nested_comprehensions {
+                    return;
+                }
                 self.visit_nested_comprehension(generators, |visitor| {
                     if let Some(key) = key {
                         visitor.visit_expr(key);
