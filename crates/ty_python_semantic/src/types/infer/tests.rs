@@ -478,6 +478,110 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn full_scope_collection_implicit_attribute_cycle_is_entrypoint_independent() -> anyhow::Result<()>
+{
+    fn write_files(db: &mut TestDb) -> anyhow::Result<()> {
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            import collections
+            from fnmatch import fnmatch
+
+            class SubprocessCmdLineCacheEntry:
+                arguments: list | None = None
+
+            class SubprocessCmdLine:
+                _CACHE: dict[str, SubprocessCmdLineCacheEntry] = {}
+                BINARIES_DENYLIST = {"md5"}
+
+                @staticmethod
+                def _add_new_cache_entry(arguments):
+                    cache_entry = SubprocessCmdLineCacheEntry()
+                    cache_entry.arguments = arguments
+                    return cache_entry
+
+                def __init__(self) -> None:
+                    self._cache_entry = SubprocessCmdLine._CACHE.get("")
+                    if self._cache_entry:
+                        self.arguments = self._cache_entry.arguments
+                    else:
+                        self.arguments = []
+                        tokens = [""]
+                        self.binary = tokens[0]
+                        self.arguments = tokens[1:]
+                        self.scrub_arguments()
+                        self._cache_entry = SubprocessCmdLine._add_new_cache_entry(self.arguments)
+
+                def scrub_arguments(self):
+                    if self.binary and self.binary.lower() in self.BINARIES_DENYLIST:
+                        self.arguments = ["?" for _ in self.arguments]
+                        return
+                    new_args = []
+                    deque_args = collections.deque(self.arguments)
+                    if deque_args:
+                        current = deque_args[0]
+                        fnmatch(current, "*password*")
+                        new_args.extend([current, "?"])
+                    self.arguments = new_args
+            "#,
+        )?;
+        db.write_dedented(
+            "/src/main.py",
+            r#"
+            from mod import SubprocessCmdLine
+
+            x = y = SubprocessCmdLine().arguments
+            "#,
+        )?;
+        Ok(())
+    }
+
+    fn x_type(db: &TestDb) -> String {
+        let file_main = system_path_to_file(db, "/src/main.py").unwrap();
+        global_symbol(db, file_main, "x")
+            .place
+            .expect_type()
+            .display(db)
+            .to_string()
+    }
+
+    fn infer_new_args_type(db: &TestDb) {
+        let file = system_path_to_file(db, "/src/mod.py").unwrap();
+        let module = parsed_module(db, file).load(db);
+        let index = semantic_index(db, file);
+        let mut file_scope_id = FileScopeId::global();
+        let mut scope = file_scope_id.to_scope_id(db, file);
+
+        for expected_scope_name in ["SubprocessCmdLine", "scrub_arguments"] {
+            (file_scope_id, scope) = index
+                .child_scopes(file_scope_id)
+                .map(|(file_scope_id, _)| (file_scope_id, file_scope_id.to_scope_id(db, file)))
+                .find(|(_, scope)| scope.name(db, &module) == expected_scope_name)
+                .unwrap();
+        }
+
+        let _ = symbol(db, scope, "new_args", ConsideredDefinitions::EndOfScope)
+            .place
+            .expect_type();
+    }
+
+    let mut direct = setup_db();
+    write_files(&mut direct)?;
+    let direct_x_type = x_type(&direct);
+
+    let mut primed = setup_db();
+    write_files(&mut primed)?;
+    // Inferring the full-scope collection before the implicit attribute used to change which
+    // Salsa query headed their shared cycle, producing a different `arguments` type.
+    infer_new_args_type(&primed);
+    let primed_x_type = x_type(&primed);
+
+    assert_eq!(direct_x_type, primed_x_type);
+    assert!(!direct_x_type.contains("_T@deque"));
+    Ok(())
+}
+
 /// This test verifies that changing a class's declaration in a non-meaningful way (e.g. by adding a comment)
 /// doesn't trigger type inference for expressions that depend on the class's members.
 #[test]

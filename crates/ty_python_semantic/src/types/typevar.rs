@@ -908,6 +908,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
+            TypeMapping::ReplaceOutOfScopeTypevars(in_scope_typevars) => {
+                if in_scope_typevars.contains(db, self) {
+                    Type::TypeVar(self)
+                } else {
+                    Type::unknown()
+                }
+            }
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
             }
