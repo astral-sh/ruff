@@ -194,6 +194,89 @@ mod tests {
     }
 
     #[test]
+    fn implementation_typevar_bound_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                def speak(self): ...
+
+            class Dog(Animal):
+                def speak(self): ...
+
+            def f[T: Animal](animal: T):
+                animal.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:9:12
+          |
+        9 |     animal.speak()
+          |            ^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:3:9
+          |
+        3 |     def speak(self): ...
+          |         -----
+        4 |
+        5 | class Dog(Animal):
+        6 |     def speak(self): ...
+          |         -----
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_subclass_through_import_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "base.py",
+                r#"
+                class Base:
+                    def me<CURSOR>thod(self): ...
+                "#,
+            )
+            .source(
+                "aliases.py",
+                r#"
+                from base import Base as B
+                "#,
+            )
+            .source(
+                "child.py",
+                r#"
+                from aliases import B
+
+                class Child(B):
+                    def method(self): ...
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> base.py:3:9
+          |
+        3 |     def method(self): ...
+          |         ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> base.py:3:9
+          |
+        3 |     def method(self): ...
+          |         ------
+          |
+         ::: child.py:5:9
+          |
+        5 |     def method(self): ...
+          |         ------
+          |
+        ");
+    }
+
+    #[test]
     fn implementation_method_declaration_root() {
         let test = cursor_test(
             r#"

@@ -10,7 +10,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
-    KnownUnion, SubclassOfInner, Type, TypeContext,
+    KnownUnion, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -556,6 +556,15 @@ fn collect_implementation_root_classes<'db>(
                 }
             }
         }
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                collect_implementation_root_classes(db, bound, seen, roots);
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                collect_implementation_root_classes(db, constraints.as_type(db), seen, roots);
+            }
+            None => {}
+        },
         ty => {
             let root = match ty {
                 Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
@@ -2218,11 +2227,14 @@ fn direct_subtypes<'db>(
             continue;
         }
 
-        // Skip files that don't contain the class name. This avoids expensive
-        // semantic analysis for files that can't possibly contain a subclass
-        // of the target. We can't do this when looking for subtypes of
-        // `object` since `object` can be implicit.
-        if !target_is_object && !source_text(db, file).contains(target_name.as_str()) {
+        // Keep the cheap name-based prefilter for non-first-party modules, which includes the
+        // vendored stdlib. First-party modules may inherit through local import aliases, e.g.
+        // `from a import Base as B; class Child(B): ...`, so they need semantic analysis even
+        // when they do not mention the target class's original name.
+        if is_non_first_party
+            && !target_is_object
+            && !source_text(db, file).contains(target_name.as_str())
+        {
             continue;
         }
 
