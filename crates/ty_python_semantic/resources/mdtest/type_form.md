@@ -44,6 +44,26 @@ assert_type(quoted, TypeForm[str])
 assert_type(aliased, TypeForm[str])
 ```
 
+## Contextual typing in containers
+
+`TypeForm` interpretation is also applied when the expected type is nested inside a container or
+typed dictionary.
+
+```py
+from typing import Literal, TypedDict
+from typing_extensions import TypeForm
+
+class Config(TypedDict):
+    form: TypeForm[int]
+
+forms: list[TypeForm[int]] = [int, Literal[1]]
+pair: tuple[TypeForm[int], TypeForm[str]] = (int, str)
+config: Config = {"form": int}
+
+bad_forms: list[TypeForm[int]] = [str]  # error: [invalid-assignment]
+bad_config: Config = {"form": str}  # error: [invalid-argument-type]
+```
+
 `TypeForm` is covariant in its type argument:
 
 ```py
@@ -209,6 +229,26 @@ def construct_alias[T](form: Alias[T]) -> T:
     raise NotImplementedError
 
 assert_type(construct_alias(int), int)
+```
+
+## Overload resolution
+
+Overload matching interprets a type expression using each `TypeForm` parameter context.
+
+```py
+from typing import assert_type, overload
+from typing_extensions import TypeForm
+
+@overload
+def foo(form: TypeForm[int]) -> int: ...
+@overload
+def foo(form: TypeForm[str]) -> str: ...
+def foo(form: TypeForm[int] | TypeForm[str]) -> int | str:
+    raise NotImplementedError
+
+assert_type(foo(int), int)
+assert_type(foo(str), str)
+foo(float)  # error: [no-matching-overload]
 ```
 
 ## Narrowing to runtime classes
