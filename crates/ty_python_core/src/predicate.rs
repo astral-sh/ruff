@@ -14,6 +14,7 @@ use ruff_python_ast::{Singleton, name::Name};
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
+use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 
@@ -109,6 +110,19 @@ pub struct CallableAndCallExpr<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub struct DeferredWalrusReachabilityPredicate {
+    pub file: File,
+    pub file_scope: FileScopeId,
+    pub reachability: ScopedReachabilityConstraintId,
+}
+
+impl DeferredWalrusReachabilityPredicate {
+    pub fn scope(self, db: &dyn Db) -> ScopeId<'_> {
+        self.file_scope.to_scope_id(db, self.file)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
     /// These predicates are recorded for statements with call expressions. As part of
@@ -129,6 +143,7 @@ pub enum PredicateNode<'db> {
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
+    DeferredWalrusReachability(DeferredWalrusReachabilityPredicate),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
@@ -257,6 +272,15 @@ impl<'db> From<StarImportPlaceholderPredicate<'db>> for PredicateOrLiteral<'db> 
     fn from(predicate: StarImportPlaceholderPredicate<'db>) -> Self {
         PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::StarImportPlaceholder(predicate),
+            is_positive: true,
+        })
+    }
+}
+
+impl From<DeferredWalrusReachabilityPredicate> for PredicateOrLiteral<'_> {
+    fn from(predicate: DeferredWalrusReachabilityPredicate) -> Self {
+        PredicateOrLiteral::Predicate(Predicate {
+            node: PredicateNode::DeferredWalrusReachability(predicate),
             is_positive: true,
         })
     }
