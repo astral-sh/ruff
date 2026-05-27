@@ -179,12 +179,21 @@ win when it satisfies the non-`TypeForm` arm. Otherwise, ty tries the `TypeForm`
 from typing import Literal
 from typing_extensions import TypeForm
 
-ordinary_none: TypeForm[str] | None = None
+ordinary_string: TypeForm[str] | str = "str"
+reveal_type(ordinary_string)  # revealed: Literal["str"]
+
+ordinary_none: TypeForm[None] | None = None
+reveal_type(ordinary_none)  # revealed: None
+
 ordinary_int: TypeForm[str] | int = 1
 
 quoted_form: TypeForm[str] | None = "str"
+reveal_type(quoted_form)  # revealed: TypeForm[str]
+
 union_form: TypeForm[str | None] | None = str | None
+
 literal_form: TypeForm[None] | None = Literal[None]
+reveal_type(literal_form)  # revealed: TypeForm[None]
 ```
 
 ## Invalid type-form expressions
@@ -193,8 +202,11 @@ A bare `TypeForm` is equivalent to `TypeForm[Any]`, but the assigned expression 
 valid type expression.
 
 ```py
-from typing import ClassVar
+from typing import ClassVar, Final, Literal, Optional, Self, TypeVarTuple, Unpack
 from typing_extensions import TypeForm
+
+Ts = TypeVarTuple("Ts")
+var = 1
 
 def accepts_type_form(x: TypeForm) -> None: ...
 
@@ -202,8 +214,17 @@ accepts_type_form(int)
 accepts_type_form("int")
 accepts_type_form("not a type")  # error: [invalid-syntax-in-forward-annotation]
 
+bad_call: TypeForm = tuple()  # error: [invalid-type-form]
 bad_tuple: TypeForm = (1, 2)  # error: [invalid-type-form]
+bad_literal: TypeForm = 1  # error: [invalid-type-form]
+bad_self: TypeForm = Self  # error: [invalid-type-form]
+bad_literal_var: TypeForm = Literal[var]  # error: [invalid-type-form]
+bad_literal_f_string: TypeForm = Literal[f""]  # error: [invalid-type-form]
 bad_qualifier: TypeForm = ClassVar[int]  # error: [invalid-type-form]
+bad_final: TypeForm = Final[int]  # error: [invalid-type-form]
+bad_unpack: TypeForm = Unpack[Ts]  # error: [invalid-type-form]
+bad_optional: TypeForm = Optional  # error: [invalid-type-form]
+bad_quoted_operator: TypeForm = "int + str"  # error: [invalid-type-form]
 ```
 
 ## Explicit construction
@@ -218,6 +239,9 @@ from typing_extensions import TypeForm
 
 constructed = TypeForm("list[int]")
 assert_type(constructed, TypeForm[list[int]])
+
+constructed_class = TypeForm(int)
+assert_type(constructed_class, TypeForm[int])
 
 TypeForm("type(1)")  # error: [invalid-type-form]
 TypeForm()  # error: [invalid-type-form]
