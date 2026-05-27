@@ -792,6 +792,10 @@ impl<'db> SymbolVisitor<'db> {
             remap.push(Some(new_id));
             new.push(symbol);
         }
+
+        new.shrink_to_fit();
+        self.all_names.shrink_to_fit();
+
         FlatSymbols {
             symbols: new,
             all_names: self.all_origin.map(|_| self.all_names),
