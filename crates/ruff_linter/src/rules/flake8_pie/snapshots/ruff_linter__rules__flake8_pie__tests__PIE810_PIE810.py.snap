@@ -159,6 +159,4 @@ help: Merge into a single `startswith` call
    -     if x.startswith("a") or x.startswith("b") or re.match(r"a\.b", x):
 83 +     if x.startswith(("a", "b")) or re.match(r"a\.b", x):
 84 |         print("yes")
-85 |
-86 |
 note: This is an unsafe fix and may change runtime behavior

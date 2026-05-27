@@ -3,10 +3,11 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 
+use ruff_python_ast::{
+    self as ast, Arguments, AtomicNodeIndex, BoolOp, Expr, ExprContext, Identifier,
+};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::{Ranged, TextRange};
-
-use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -37,37 +38,6 @@ use crate::{Edit, Fix};
 ///     print("Greetings!")
 /// ```
 ///
-/// ## Preview
-/// When [preview] is enabled, the equivalent `any(...)` form is also flagged:
-///
-/// ```python
-/// any(msg.startswith(p) for p in ("x", "y"))
-/// ```
-///
-/// is rewritten to:
-///
-/// ```python
-/// msg.startswith(("x", "y"))
-/// ```
-///
-/// To avoid changing semantics, the `any(...)` rewrite only fires when all of:
-///
-/// - the call is the builtin `any(...)` — `all(...)` is intentionally left
-///   alone since `all(s.startswith(p) for p in xs)` and
-///   `s.startswith(tuple(xs))` differ when `xs` is empty;
-/// - the single argument is a generator expression or list comprehension
-///   with exactly one non-`async` clause and no `if` filter;
-/// - the element is `<receiver>.startswith(<target>)` (or `endswith`) with
-///   exactly the loop variable as its only positional argument;
-/// - the receiver is a bare name — `obj.field.startswith(...)` or
-///   `f().startswith(...)` is left alone since the latter would change the
-///   number of `f()` calls (N lazy under `any` short-circuiting → 1 eager);
-/// - the iterable is a tuple or list literal — bare-name iterables can't be
-///   proven to be a tuple at runtime, and `str.startswith` rejects lists
-///   and sets at runtime.
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
-///
 /// ## Fix safety
 /// This rule's fix is unsafe, as in some cases, it will be unable to determine
 /// whether the argument to an existing `.startswith` or `.endswith` call is a
@@ -75,13 +45,6 @@ use crate::{Edit, Fix};
 /// or `y` is a tuple, and the semantic model is unable to detect it as such,
 /// the rule will suggest `msg.startswith((x, y))`, which will error at
 /// runtime.
-///
-/// For the `any(s.startswith(p) for p in (...))` form (enabled in preview),
-/// the fix is also unsafe because elements of the iterable are evaluated
-/// eagerly when assembled into the tuple. If the iterable contains
-/// side-effecting expressions, those side effects originally executed lazily
-/// as `any` short-circuited; after the fix they all run before `startswith`
-/// is called.
 ///
 /// ## References
 /// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
@@ -105,172 +68,247 @@ impl AlwaysFixableViolation for MultipleStartsEndsWith {
     }
 }
 
-/// PIE810
+/// A matched `<name>.startswith(<arg>)` (or `endswith`) call.
+struct StartsEndsWithCall<'a> {
+    receiver_name: &'a str,
+    attr: &'a str,
+    arg: &'a Expr,
+}
+
+/// Returns `Some(...)` if `expr` is a call of the form
+/// `<bare_name>.startswith(<arg>)` or `<bare_name>.endswith(<arg>)` with
+/// exactly one positional argument and no keyword arguments.
+fn match_starts_ends_with_call(expr: &Expr) -> Option<StartsEndsWithCall<'_>> {
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
+        return None;
+    };
+    if !arguments.keywords.is_empty() {
+        return None;
+    }
+    let [arg] = &*arguments.args else {
+        return None;
+    };
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+        return None;
+    };
+    let attr = attr.as_str();
+    if attr != "startswith" && attr != "endswith" {
+        return None;
+    }
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+        return None;
+    };
+    Some(StartsEndsWithCall {
+        receiver_name: id.as_str(),
+        attr,
+        arg,
+    })
+}
+
+/// Build `<receiver_name>.<attr>((<elements>...))`, flattening any tuple
+/// literal element into the outer tuple so the result mirrors the shape
+/// `str.startswith` / `str.endswith` actually accept.
+fn build_starts_ends_with_tuple_call<'a>(
+    receiver_name: &str,
+    attr: &str,
+    elements: impl IntoIterator<Item = &'a Expr>,
+) -> Expr {
+    let elts: Vec<Expr> = elements
+        .into_iter()
+        .flat_map(|value| {
+            if let Expr::Tuple(tuple) = value {
+                Left(tuple.iter())
+            } else {
+                Right(iter::once(value))
+            }
+        })
+        .cloned()
+        .collect();
+    let tuple_arg = Expr::Tuple(ast::ExprTuple {
+        elts,
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+        node_index: AtomicNodeIndex::NONE,
+        parenthesized: true,
+    });
+    Expr::Call(ast::ExprCall {
+        func: Box::new(Expr::Attribute(ast::ExprAttribute {
+            value: Box::new(Expr::Name(ast::ExprName {
+                id: receiver_name.into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+            })),
+            attr: Identifier::new(attr.to_string(), TextRange::default()),
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+        })),
+        arguments: Arguments {
+            args: Box::from([tuple_arg]),
+            keywords: Box::from([]),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+        },
+        range: TextRange::default(),
+        node_index: AtomicNodeIndex::NONE,
+    })
+}
+
+/// PIE810 — `<x>.startswith(a) or <x>.startswith(b)` form.
 pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::Or,
         values,
-        range: _,
-        node_index: _,
+        ..
     }) = expr
     else {
         return;
     };
 
-    let mut duplicates = BTreeMap::new();
+    let mut duplicates: BTreeMap<(&str, &str), Vec<(usize, &Expr)>> = BTreeMap::new();
     for (index, call) in values.iter().enumerate() {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                    node_index: _,
-                },
-            range: _,
-            node_index: _,
-        }) = &call
-        else {
+        let Some(matched) = match_starts_ends_with_call(call) else {
             continue;
         };
-
-        if !keywords.is_empty() {
+        // Skip `msg.startswith(x) or msg.startswith(y)` when one of the args
+        // is already known to be a tuple — folding to `msg.startswith((x, y))`
+        // would TypeError if `y` is a tuple.
+        if is_bound_to_tuple(matched.arg, checker.semantic()) {
             continue;
         }
-
-        let [arg] = &**args else {
-            continue;
-        };
-
-        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
-            continue;
-        };
-        if attr != "startswith" && attr != "endswith" {
-            continue;
-        }
-
-        let Expr::Name(ast::ExprName { id: arg_name, .. }) = value.as_ref() else {
-            continue;
-        };
-
-        // If the argument is bound to a tuple, skip it, since we don't want to suggest
-        // `startswith((x, y))` where `x` or `y` are tuples. (Tuple literals are okay, since we
-        // inline them below.)
-        if is_bound_to_tuple(arg, checker.semantic()) {
-            continue;
-        }
-
         duplicates
-            .entry((attr.as_str(), arg_name.as_str()))
-            .or_insert_with(Vec::new)
-            .push(index);
+            .entry((matched.attr, matched.receiver_name))
+            .or_default()
+            .push((index, matched.arg));
     }
 
-    // Generate a `Diagnostic` for each duplicate.
-    for ((attr_name, arg_name), indices) in duplicates {
-        if indices.len() > 1 {
-            let mut diagnostic = checker.report_diagnostic(
-                MultipleStartsEndsWith {
-                    attr: attr_name.to_string(),
-                },
-                expr.range(),
-            );
-            let words: Vec<&Expr> = indices
-                .iter()
-                .map(|index| &values[*index])
-                .map(|expr| {
-                    let Expr::Call(ast::ExprCall {
-                        func: _,
-                        arguments:
-                            Arguments {
-                                args,
-                                keywords: _,
-                                range: _,
-                                node_index: _,
-                            },
-                        range: _,
-                        node_index: _,
-                    }) = expr
-                    else {
-                        unreachable!(
-                            "{}",
-                            format!("Indices should only contain `{attr_name}` calls")
-                        )
-                    };
-                    args.first()
-                        .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
-                })
-                .collect();
-
-            let node = Expr::Tuple(ast::ExprTuple {
-                elts: words
-                    .iter()
-                    .flat_map(|value| {
-                        if let Expr::Tuple(tuple) = value {
-                            Left(tuple.iter())
-                        } else {
-                            Right(iter::once(*value))
-                        }
-                    })
-                    .cloned()
-                    .collect(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                parenthesized: true,
-            });
-            let node1 = Expr::Name(ast::ExprName {
-                id: arg_name.into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
-            let node2 = Expr::Attribute(ast::ExprAttribute {
-                value: Box::new(node1),
-                attr: Identifier::new(attr_name.to_string(), TextRange::default()),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
-            let node3 = Expr::Call(ast::ExprCall {
-                func: Box::new(node2),
-                arguments: Arguments {
-                    args: Box::from([node]),
-                    keywords: Box::from([]),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                },
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
-            let call = node3;
-
-            // Generate the combined `BoolOp`.
-            let mut call = Some(call);
-            let node = Expr::BoolOp(ast::ExprBoolOp {
-                op: BoolOp::Or,
-                values: values
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, elt)| {
-                        if indices.contains(&index) {
-                            std::mem::take(&mut call)
-                        } else {
-                            Some(elt.clone())
-                        }
-                    })
-                    .collect(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
-            let bool_op = node;
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().expr(&bool_op),
-                expr.range(),
-            )));
+    for ((attr, receiver_name), entries) in duplicates {
+        if entries.len() <= 1 {
+            continue;
         }
+        let mut diagnostic = checker.report_diagnostic(
+            MultipleStartsEndsWith {
+                attr: attr.to_string(),
+            },
+            expr.range(),
+        );
+
+        let new_call = build_starts_ends_with_tuple_call(
+            receiver_name,
+            attr,
+            entries.iter().map(|(_, arg)| *arg),
+        );
+
+        // Regenerate the `or` chain with the folded call replacing the duplicates.
+        let folded_indices: Vec<usize> = entries.iter().map(|(i, _)| *i).collect();
+        let mut new_call = Some(new_call);
+        let bool_op = Expr::BoolOp(ast::ExprBoolOp {
+            op: BoolOp::Or,
+            values: values
+                .iter()
+                .enumerate()
+                .filter_map(|(index, elt)| {
+                    if folded_indices.contains(&index) {
+                        new_call.take()
+                    } else {
+                        Some(elt.clone())
+                    }
+                })
+                .collect(),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+        });
+
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker.generator().expr(&bool_op),
+            expr.range(),
+        )));
     }
+}
+
+/// PIE810 — `any(<x>.startswith(p) for p in (...))` form.
+pub(crate) fn multiple_starts_ends_with_any(checker: &Checker, call: &ast::ExprCall) {
+    if !checker.semantic().match_builtin_expr(&call.func, "any") {
+        return;
+    }
+    if !call.arguments.keywords.is_empty() {
+        return;
+    }
+    let [first_arg] = &*call.arguments.args else {
+        return;
+    };
+
+    let (element, generators) = match first_arg {
+        Expr::Generator(ast::ExprGenerator {
+            elt, generators, ..
+        }) => (elt.as_ref(), generators),
+        Expr::ListComp(ast::ExprListComp {
+            elt, generators, ..
+        }) => (elt.as_ref(), generators),
+        Expr::SetComp(ast::ExprSetComp {
+            elt, generators, ..
+        }) => (elt.as_ref(), generators),
+        _ => return,
+    };
+
+    let [comprehension] = generators.as_slice() else {
+        return;
+    };
+    if comprehension.is_async || !comprehension.ifs.is_empty() {
+        return;
+    }
+    let Expr::Name(target_name) = &comprehension.target else {
+        return;
+    };
+
+    let Some(matched) = match_starts_ends_with_call(element) else {
+        return;
+    };
+    let Expr::Name(arg_name) = matched.arg else {
+        return;
+    };
+    if arg_name.id != target_name.id {
+        return;
+    }
+
+    // Only fold a literal tuple, list, or set iterable: bare names can't be
+    // proven to be a tuple at runtime, and other expressions could yield
+    // non-strings or have side effects.
+    let elts = match &comprehension.iter {
+        Expr::Tuple(tuple) => &*tuple.elts,
+        Expr::List(list) => &*list.elts,
+        Expr::Set(set) => &*set.elts,
+        _ => return,
+    };
+
+    // Mirror the `BoolOp` path's `is_bound_to_tuple` guard: if any iterable
+    // element is a name that resolves to a tuple, folding would produce a
+    // nested-tuple argument that `str.startswith` rejects at runtime.
+    if elts
+        .iter()
+        .any(|elt| is_bound_to_tuple(elt, checker.semantic()))
+    {
+        return;
+    }
+
+    let mut diagnostic = checker.report_diagnostic(
+        MultipleStartsEndsWith {
+            attr: matched.attr.to_string(),
+        },
+        call.range(),
+    );
+
+    let replacement_call =
+        build_starts_ends_with_tuple_call(matched.receiver_name, matched.attr, elts.iter());
+
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().expr(&replacement_call),
+        call.range(),
+    )));
 }
 
 /// Returns `true` if the expression definitively resolves to a tuple (e.g., `x` in `x = (1, 2)`).
@@ -286,140 +324,4 @@ fn is_bound_to_tuple(arg: &Expr, semantic: &SemanticModel) -> bool {
     let binding = semantic.binding(binding_id);
 
     analyze::typing::is_tuple(binding, semantic)
-}
-
-/// PIE810 — `any(s.startswith(p) for p in (...))` form.
-///
-/// `str.startswith` and `str.endswith` already accept a tuple of prefixes /
-/// suffixes, so a generator-style `any(...)` over a literal iterable is just
-/// a wordier form of a single call with a tuple argument.
-pub(crate) fn multiple_starts_ends_with_any(checker: &Checker, call: &ast::ExprCall) {
-    // Must be the builtin `any(...)` with exactly one positional argument.
-    if !checker.semantic().match_builtin_expr(&call.func, "any") {
-        return;
-    }
-    if !call.arguments.keywords.is_empty() {
-        return;
-    }
-    let [first_arg] = &*call.arguments.args else {
-        return;
-    };
-
-    // Pull the comprehension element + generators out of either a generator
-    // expression or a list comprehension. Set comprehensions are not folded:
-    // `any({...})` is unidiomatic enough that we'd rather not encourage it
-    // by autofixing it.
-    let (element, generators) = match first_arg {
-        Expr::Generator(genexp) => (&*genexp.elt, &genexp.generators),
-        Expr::ListComp(lc) => (&*lc.elt, &lc.generators),
-        _ => return,
-    };
-
-    // Only single-clause comprehensions with no filter are safe to flatten.
-    let [comp] = generators.as_slice() else {
-        return;
-    };
-    if comp.is_async || !comp.ifs.is_empty() {
-        return;
-    }
-    let Expr::Name(target_name) = &comp.target else {
-        return;
-    };
-
-    // The element must be `<receiver>.startswith(<target>)` (or `endswith`)
-    // with exactly the loop variable as its only positional argument.
-    let Expr::Call(inner_call) = element else {
-        return;
-    };
-    if !inner_call.arguments.keywords.is_empty() {
-        return;
-    }
-    let [inner_arg] = &*inner_call.arguments.args else {
-        return;
-    };
-    let Expr::Name(arg_name) = inner_arg else {
-        return;
-    };
-    if arg_name.id != target_name.id {
-        return;
-    }
-    let Expr::Attribute(ast::ExprAttribute {
-        value: receiver,
-        attr,
-        ..
-    }) = &*inner_call.func
-    else {
-        return;
-    };
-    // Match the `BoolOp` path: only fire when the receiver is a bare name.
-    // This keeps the rule's surface area consistent across forms and avoids
-    // folding `any(f().startswith(p) for p in (...))`, which would silently
-    // change the number of `f()` calls (N lazy calls under `any` → 1 call).
-    if !matches!(receiver.as_ref(), Expr::Name(_)) {
-        return;
-    }
-    let attr_name = attr.as_str();
-    if attr_name != "startswith" && attr_name != "endswith" {
-        return;
-    }
-
-    // Only fold a literal tuple or list iterable; for anything else (e.g. a
-    // bare name) we can't be sure the value is a tuple at runtime, and
-    // `str.startswith` rejects lists / sets / iterators with `TypeError`.
-    let elts = match &comp.iter {
-        Expr::Tuple(t) => &*t.elts,
-        Expr::List(l) => &*l.elts,
-        _ => return,
-    };
-
-    let mut diagnostic = checker.report_diagnostic(
-        MultipleStartsEndsWith {
-            attr: attr_name.to_string(),
-        },
-        call.range(),
-    );
-
-    // Build `<receiver>.<attr>((<elts...>))`. Flatten nested tuple elements so
-    // that e.g. `any(s.startswith(p) for p in (("a", "b"), "c"))` collapses to
-    // `s.startswith(("a", "b", "c"))`, matching the `BoolOp` path's behavior
-    // for `s.startswith(("a", "b")) or s.startswith("c")`.
-    let tuple_arg = Expr::Tuple(ast::ExprTuple {
-        elts: elts
-            .iter()
-            .flat_map(|value| {
-                if let Expr::Tuple(tuple) = value {
-                    Left(tuple.iter())
-                } else {
-                    Right(iter::once(value))
-                }
-            })
-            .cloned()
-            .collect(),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        parenthesized: true,
-    });
-    let replacement_call = Expr::Call(ast::ExprCall {
-        func: Box::new(Expr::Attribute(ast::ExprAttribute {
-            value: receiver.clone(),
-            attr: Identifier::new(attr_name.to_string(), TextRange::default()),
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })),
-        arguments: Arguments {
-            args: Box::from([tuple_arg]),
-            keywords: Box::from([]),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        },
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    });
-
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        checker.generator().expr(&replacement_call),
-        call.range(),
-    )));
 }
