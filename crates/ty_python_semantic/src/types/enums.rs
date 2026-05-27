@@ -594,6 +594,9 @@ pub(crate) fn enum_metadata<'db>(
                 }
                 members.insert(name.clone(), *ty);
             }
+            members.shrink_to_fit();
+            aliases.shrink_to_fit();
+
             return Some(EnumMetadata {
                 members,
                 aliases,

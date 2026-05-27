@@ -232,11 +232,13 @@ pub(crate) enum InferableTypeVars<'db> {
 impl<'db> InferableTypeVars<'db> {
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
-        typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
+        mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
     ) -> Self {
         if typevars.is_empty() {
             return InferableTypeVars::None;
         }
+
+        typevars.shrink_to_fit();
         Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
     }
 }
@@ -370,13 +372,13 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
-        Self::new_internal(
-            db,
-            type_params
-                .into_iter()
-                .map(|variable| (variable.identity(db), variable))
-                .collect::<FxOrderMap<_, _>>(),
-        )
+        let mut type_params = type_params
+            .into_iter()
+            .map(|variable| (variable.identity(db), variable))
+            .collect::<FxOrderMap<_, _>>();
+
+        type_params.shrink_to_fit();
+        Self::new_internal(db, type_params)
     }
 
     /// Merge this generic context with another, returning a new generic context that

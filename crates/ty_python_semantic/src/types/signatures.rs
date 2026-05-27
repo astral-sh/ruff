@@ -170,9 +170,9 @@ impl<'db> CallableSignature<'db> {
     where
         I: IntoIterator<Item = Signature<'db>>,
     {
-        Self {
-            overloads: overloads.into_iter().collect(),
-        }
+        let mut overloads: SmallVec<_> = overloads.into_iter().collect();
+        overloads.shrink_to_fit();
+        Self { overloads }
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
@@ -3152,6 +3152,8 @@ impl<'db> Parameters<'db> {
                 _ => {}
             }
         }
+
+        value.shrink_to_fit();
 
         Parameters { value, kind }
     }
