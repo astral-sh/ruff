@@ -935,6 +935,22 @@ def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
 ```
 
 ```snapshot
+error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `bytes`, found `None`
+   |
+info: Method defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __call__(self, x: bytes) -> bytes:
+   |         ^^^^^^^^       -------- Parameter declared here
+   |
+info: Union variant `BytesCaller` is incompatible with this call site
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+
+
 error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
   --> src/mdtest_snippet.py:21:7
    |
@@ -949,22 +965,6 @@ info: Method defined here
   |
 info: Intersection element `IntCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & StrCaller`
-info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
-
-
-error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is incorrect
-  --> src/mdtest_snippet.py:21:7
-   |
-21 |     f(None)
-   |       ^^^^ Expected `bytes`, found `None`
-   |
-info: Method defined here
-  --> src/mdtest_snippet.py:13:9
-   |
-13 |     def __call__(self, x: bytes) -> bytes:
-   |         ^^^^^^^^       -------- Parameter declared here
-   |
-info: Union variant `BytesCaller` is incompatible with this call site
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 
 
