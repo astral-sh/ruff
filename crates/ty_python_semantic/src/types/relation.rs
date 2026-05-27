@@ -1041,6 +1041,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target_typeform.type_argument(db),
                 ),
 
+            (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
+                if source_instance.is_type_form_value() =>
+            {
+                source_instance.type_form_argument(db).when_some_and(
+                    db,
+                    self.constraints,
+                    |source_argument| {
+                        self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
+                    },
+                )
+            }
+
             (Type::GenericAlias(_), Type::NominalInstance(target_instance))
                 if target_instance.has_known_class(db, KnownClass::GenericAlias) =>
             {

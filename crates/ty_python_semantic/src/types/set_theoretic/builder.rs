@@ -1343,9 +1343,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // A runtime class value of `TypeForm[T]` has type `type[T]`.
         match new_positive {
             Type::TypeForm(typeform) => {
-                if let Some(narrowed) =
-                    SubclassOfType::try_from_instance(db, typeform.type_argument(db))
-                    && self.positive.swap_remove(&KnownClass::Type.to_instance(db))
+                if let Some(narrowed) = SubclassOfType::try_from_instance(
+                    db,
+                    typeform.type_argument(db).resolve_type_alias(db),
+                ) && self.positive.swap_remove(&KnownClass::Type.to_instance(db))
                 {
                     new_positive = narrowed;
                 }
@@ -1356,10 +1357,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         .iter()
                         .enumerate()
                         .find_map(|(index, positive)| match positive {
-                            Type::TypeForm(typeform) => {
-                                SubclassOfType::try_from_instance(db, typeform.type_argument(db))
-                                    .map(|narrowed| (index, narrowed))
-                            }
+                            Type::TypeForm(typeform) => SubclassOfType::try_from_instance(
+                                db,
+                                typeform.type_argument(db).resolve_type_alias(db),
+                            )
+                            .map(|narrowed| (index, narrowed)),
                             _ => None,
                         })
                 {

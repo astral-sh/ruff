@@ -49,7 +49,7 @@ reveal_type(aliased)  # revealed: TypeForm[str]
 typed dictionary.
 
 ```py
-from typing import Literal, TypedDict
+from typing import Annotated, Literal, TypedDict
 from typing_extensions import TypeForm
 
 class Config(TypedDict):
@@ -58,6 +58,19 @@ class Config(TypedDict):
 forms: list[TypeForm[int]] = [int, Literal[1]]
 pair: tuple[TypeForm[int], TypeForm[str]] = (int, str)
 config: Config = {"form": int}
+
+stored_union_forms = (int | str,)
+stored_union_forms_ok: tuple[TypeForm[int | str], ...] = stored_union_forms
+
+stored_literal_forms = (Literal[1],)
+stored_literal_forms_ok: tuple[TypeForm[Literal[1]], ...] = stored_literal_forms
+
+stored_annotated_forms = (Annotated[int, "metadata"],)
+stored_annotated_forms_ok: tuple[TypeForm[int], ...] = stored_annotated_forms
+
+type StoredAlias = str
+stored_alias_forms = (StoredAlias,)
+stored_alias_forms_ok: tuple[TypeForm[str], ...] = stored_alias_forms
 
 bad_forms: list[TypeForm[int]] = [str]  # error: [invalid-assignment]
 bad_config: Config = {"form": str}  # error: [invalid-argument-type]
@@ -322,6 +335,13 @@ reveal_type(construct(int))  # revealed: int
 reveal_type(construct(list[int]))  # revealed: list[int]
 reveal_type(construct(int | str))  # revealed: int | str
 
+stored_union_forms = (int | str,)
+
+def first[T](forms: tuple[TypeForm[T], ...]) -> T:
+    raise NotImplementedError
+
+reveal_type(first(stored_union_forms))  # revealed: int | str
+
 def use_runtime_type(form: type[int]) -> None:
     reveal_type(construct(form))  # revealed: int
 
@@ -369,6 +389,13 @@ from typing_extensions import TypeForm, TypeIs
 def as_type[T](form: TypeForm[T]) -> type[T] | None:
     if isinstance(form, type):
         reveal_type(form)  # revealed: type[T@as_type]
+        return form
+    return None
+
+type StringAlias = str
+
+def as_aliased_type(form: TypeForm[StringAlias]) -> type[str] | None:
+    if isinstance(form, type):
         return form
     return None
 
