@@ -36,6 +36,9 @@ pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the module docstring boundary (i.e. seen any statement in the
     /// module).
     seen_module_docstring_boundary: bool,
+
+    /// Walrus targets already diagnosed as rebinding an active comprehension iteration variable.
+    rebound_comprehension_variable_ranges: FxHashSet<TextRange>,
 }
 
 impl SemanticSyntaxChecker {
@@ -867,8 +870,8 @@ impl SemanticSyntaxChecker {
             | Expr::SetComp(ast::ExprSetComp {
                 elt, generators, ..
             }) => {
-                Self::check_generator_expr(elt, generators, ctx);
-                Self::check_generator_filters(generators, ctx);
+                self.check_generator_expr(elt, generators, ctx);
+                self.check_generator_filters(generators, ctx);
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
@@ -885,10 +888,10 @@ impl SemanticSyntaxChecker {
                 ..
             }) => {
                 if let Some(key) = key {
-                    Self::check_generator_expr(key, generators, ctx);
+                    self.check_generator_expr(key, generators, ctx);
                 }
-                Self::check_generator_expr(value, generators, ctx);
-                Self::check_generator_filters(generators, ctx);
+                self.check_generator_expr(value, generators, ctx);
+                self.check_generator_filters(generators, ctx);
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
@@ -901,8 +904,8 @@ impl SemanticSyntaxChecker {
             Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
             }) => {
-                Self::check_generator_expr(elt, generators, ctx);
-                Self::check_generator_filters(generators, ctx);
+                self.check_generator_expr(elt, generators, ctx);
+                self.check_generator_filters(generators, ctx);
                 // Note that `await_outside_async_function` is not called here because generators
                 // are evaluated lazily. See the note in the function for more details.
             }
@@ -1108,6 +1111,7 @@ impl SemanticSyntaxChecker {
     /// Add a [`SemanticSyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an
     /// iteration variable in `generators`.
     fn check_generator_expr<Ctx: SemanticSyntaxContext>(
+        &mut self,
         expr: &Expr,
         comprehensions: &[ast::Comprehension],
         ctx: &Ctx,
@@ -1121,7 +1125,6 @@ impl SemanticSyntaxChecker {
                 targets: comprehension_target_names(comprehensions),
                 rebound_variables: Vec::new(),
                 descend_into_nested_comprehensions: true,
-                preserve_outer_targets_until_nested_binding: ctx.in_class_body_comprehension(),
             };
             visitor.visit_expr(expr);
             visitor.rebound_variables
@@ -1146,6 +1149,7 @@ impl SemanticSyntaxChecker {
             // test_ok non_rebound_comprehension_variable
             // [a := 0 for x in range(0)]
             // [x for x in range(3) if (lambda: (x := 1))()]
+            self.rebound_comprehension_variable_ranges.insert(range);
             Self::add_error(
                 ctx,
                 SemanticSyntaxErrorKind::ReboundComprehensionVariable,
@@ -1155,6 +1159,7 @@ impl SemanticSyntaxChecker {
     }
 
     fn check_generator_filters<Ctx: SemanticSyntaxContext>(
+        &mut self,
         generators: &[ast::Comprehension],
         ctx: &Ctx,
     ) {
@@ -1163,8 +1168,9 @@ impl SemanticSyntaxChecker {
             let active_generators = &generators[..=index];
             let later_generators = &generators[index + 1..];
             for if_expr in &generator.ifs {
-                Self::check_generator_expr(if_expr, active_generators, ctx);
+                self.check_generator_expr(if_expr, active_generators, ctx);
                 Self::check_later_generator_targets(
+                    &self.rebound_comprehension_variable_ranges,
                     if_expr,
                     active_generators,
                     later_generators,
@@ -1177,6 +1183,7 @@ impl SemanticSyntaxChecker {
     /// Add an error if a named expression in `expr` is rebound by an inner loop that has not
     /// started executing when the filter runs.
     fn check_later_generator_targets<Ctx: SemanticSyntaxContext>(
+        rebound_comprehension_variable_ranges: &FxHashSet<TextRange>,
         expr: &Expr,
         active_generators: &[ast::Comprehension],
         later_generators: &[ast::Comprehension],
@@ -1198,13 +1205,15 @@ impl SemanticSyntaxChecker {
                 targets: later_targets,
                 rebound_variables: Vec::new(),
                 descend_into_nested_comprehensions: false,
-                preserve_outer_targets_until_nested_binding: false,
             };
             visitor.visit_expr(expr);
             visitor.rebound_variables
         };
 
         for (name, range) in rebound_variables {
+            if rebound_comprehension_variable_ranges.contains(&range) {
+                continue;
+            }
             Self::add_error(
                 ctx,
                 SemanticSyntaxErrorKind::ComprehensionInnerLoopRebindsNamedExpressionTarget(name),
@@ -2038,8 +2047,6 @@ struct ReboundComprehensionVisitor {
     rebound_variables: Vec<(ast::name::Name, TextRange)>,
     /// Active-target conflicts cross nested comprehensions; later-loop conflicts do not.
     descend_into_nested_comprehensions: bool,
-    /// In class bodies, no later-loop diagnostic replaces an outer active-target diagnostic.
-    preserve_outer_targets_until_nested_binding: bool,
 }
 
 impl ReboundComprehensionVisitor {
@@ -2067,23 +2074,14 @@ impl ReboundComprehensionVisitor {
         let all_targets = comprehension_target_names(generators);
         self.with_shadowed_targets(&all_targets, visit_body);
 
-        if self.preserve_outer_targets_until_nested_binding {
-            let mut active_targets = FxHashSet::default();
-            for generator in generators {
-                add_comprehension_target_names(&generator.target, &mut active_targets);
-                self.with_shadowed_targets(&active_targets, |visitor| {
-                    for if_expr in &generator.ifs {
-                        visitor.visit_expr(if_expr);
-                    }
-                });
-            }
-        } else {
-            // The nested comprehension's own check reports conflicts against its targets.
-            self.with_shadowed_targets(&all_targets, |visitor| {
-                for generator in generators {
-                    for if_expr in &generator.ifs {
-                        visitor.visit_expr(if_expr);
-                    }
+        // The nested check owns conflicts with targets that are already bound; a target in a
+        // later clause does not hide an active enclosing target from an earlier filter.
+        let mut active_targets = FxHashSet::default();
+        for generator in generators {
+            add_comprehension_target_names(&generator.target, &mut active_targets);
+            self.with_shadowed_targets(&active_targets, |visitor| {
+                for if_expr in &generator.ifs {
+                    visitor.visit_expr(if_expr);
                 }
             });
         }

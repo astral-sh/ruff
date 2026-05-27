@@ -219,6 +219,9 @@ reveal_type(i)  # revealed: Unknown
 [[x for x in [0] if (x := 1)] for x in [0]]
 
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[[a for a in [] if (x := 1) for x in []] for x in []]
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 [(x := 1).bit_length() for x in [0]]
 # error: [unresolved-reference]
 reveal_type(x)  # revealed: Unknown

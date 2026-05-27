@@ -3,6 +3,7 @@
 [[x for x in [0] if (x := 1)] for x in [0]]
 [x for x in (lambda: (y := [1]))()]
 [x for x in [0] if [(y := z) for z in [1]] for y in [2]]
+[[a for a in [] if (x := 1) for x in []] for x in []]
 
 class C:
     [[a for a in [] if (x := 1) for x in []] for x in []]
