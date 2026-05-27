@@ -36,13 +36,6 @@ pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the module docstring boundary (i.e. seen any statement in the
     /// module).
     seen_module_docstring_boundary: bool,
-
-    /// Walrus targets already reported as invalid in a comprehension.
-    ///
-    /// CPython reports the first applicable comprehension-walrus restriction. A walrus can be
-    /// found by multiple checks, including an enclosing comprehension before its nested
-    /// comprehension is visited, so only the first error should be reported.
-    reported_comprehension_walrus_targets: FxHashSet<TextRange>,
 }
 
 impl SemanticSyntaxChecker {
@@ -826,6 +819,7 @@ impl SemanticSyntaxChecker {
     pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         // check for errors
         self.check_stmt(stmt, ctx);
+        ComprehensionNamedExpressionVisitor::check_stmt(stmt, ctx);
 
         // update internal state
         match stmt {
@@ -868,15 +862,8 @@ impl SemanticSyntaxChecker {
     /// Check `expr` for semantic syntax errors and update the checker's internal state.
     pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
-            Expr::ListComp(ast::ExprListComp {
-                elt, generators, ..
-            })
-            | Expr::SetComp(ast::ExprSetComp {
-                elt, generators, ..
-            }) => {
-                self.check_generator_expr(elt, generators, ctx);
-                self.check_generator_filters(generators, ctx);
-                self.check_generator_iterables(generators, ctx);
+            Expr::ListComp(ast::ExprListComp { generators, .. })
+            | Expr::SetComp(ast::ExprSetComp { generators, .. }) => {
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
@@ -886,18 +873,7 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
-            Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                ..
-            }) => {
-                if let Some(key) = key {
-                    self.check_generator_expr(key, generators, ctx);
-                }
-                self.check_generator_expr(value, generators, ctx);
-                self.check_generator_filters(generators, ctx);
-                self.check_generator_iterables(generators, ctx);
+            Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
@@ -907,12 +883,7 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
-            Expr::Generator(ast::ExprGenerator {
-                elt, generators, ..
-            }) => {
-                self.check_generator_expr(elt, generators, ctx);
-                self.check_generator_filters(generators, ctx);
-                self.check_generator_iterables(generators, ctx);
+            Expr::Generator(_) => {
                 // Note that `await_outside_async_function` is not called here because generators
                 // are evaluated lazily. See the note in the function for more details.
             }
@@ -1099,180 +1070,6 @@ impl SemanticSyntaxChecker {
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind),
             expr.range(),
         );
-    }
-
-    fn add_comprehension_walrus_error<Ctx: SemanticSyntaxContext>(
-        &mut self,
-        ctx: &Ctx,
-        kind: SemanticSyntaxErrorKind,
-        range: TextRange,
-        target_range: TextRange,
-    ) {
-        if self
-            .reported_comprehension_walrus_targets
-            .insert(target_range)
-        {
-            Self::add_error(ctx, kind, range);
-        }
-    }
-
-    /// Add a [`SemanticSyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an
-    /// iteration variable in `generators`.
-    fn check_generator_expr<Ctx: SemanticSyntaxContext>(
-        &mut self,
-        expr: &Expr,
-        comprehensions: &[ast::Comprehension],
-        ctx: &Ctx,
-    ) {
-        let rebound_variables = {
-            let mut visitor = ReboundComprehensionVisitor {
-                targets: comprehension_target_names(comprehensions),
-                rebound_variables: Vec::new(),
-                descend_into_nested_comprehensions: true,
-            };
-            visitor.visit_expr(expr);
-            visitor.rebound_variables
-        };
-
-        // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
-        // and the name expr being rebound
-        for (_, range) in rebound_variables {
-            // test_err rebound_comprehension_variable
-            // [(a := 0) for a in range(0)]
-            // {(a := 0) for a in range(0)}
-            // {(a := 0): val for a in range(0)}
-            // {key: (a := 0) for a in range(0)}
-            // ((a := 0) for a in range(0))
-            // [[(a := 0)] for a in range(0)]
-            // [(a := 0) for b in range (0) for a in range(0)]
-            // [(a := 0) for a in range (0) for b in range(0)]
-            // [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
-            // [a for a in range(0) if (a := 0)]
-            // [(a := 0) for (a, b) in [(0, 1)]]
-
-            // test_ok non_rebound_comprehension_variable
-            // [a := 0 for x in range(0)]
-            // [x for x in range(3) if (lambda: (x := 1))()]
-            self.add_comprehension_walrus_error(
-                ctx,
-                SemanticSyntaxErrorKind::ReboundComprehensionVariable,
-                range,
-                range,
-            );
-        }
-
-        self.check_class_body_comprehension_expr(expr, ctx);
-    }
-
-    /// Add a [`SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension`] if `expr`
-    /// contains a named expression owned by a comprehension nested in a class body.
-    fn check_class_body_comprehension_expr<Ctx: SemanticSyntaxContext>(
-        &mut self,
-        expr: &Expr,
-        ctx: &Ctx,
-    ) {
-        if !ctx.in_class_body_comprehension() {
-            return;
-        }
-
-        let mut visitor = ClassBodyComprehensionNamedExpressionVisitor::default();
-        visitor.visit_expr(expr);
-
-        for (range, target_range) in visitor.named_expressions {
-            // test_err named_expression_in_class_body_comprehension
-            // class C:
-            //     [(x := y) for y in range(3)]
-            //     [x for x in [1] if (y := x) for y in [1]]
-            self.add_comprehension_walrus_error(
-                ctx,
-                SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension,
-                range,
-                target_range,
-            );
-        }
-    }
-
-    fn check_generator_iterables<Ctx: SemanticSyntaxContext>(
-        &mut self,
-        generators: &[ast::Comprehension],
-        ctx: &Ctx,
-    ) {
-        for generator in generators {
-            let mut visitor = ComprehensionIterableNamedExpressionVisitor::default();
-            visitor.visit_expr(&generator.iter);
-
-            for (range, target_range) in visitor.named_expressions {
-                // test_err named_expression_in_comprehension_iterable
-                // [x for x in (y := range(3))]
-                // [a for a in [(b := 1) for b in [1]]]
-                // xs = [1]
-                // [x for x in xs if [z for z in (x := xs)]]
-                self.add_comprehension_walrus_error(
-                    ctx,
-                    SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable,
-                    range,
-                    target_range,
-                );
-            }
-        }
-    }
-
-    fn check_generator_filters<Ctx: SemanticSyntaxContext>(
-        &mut self,
-        generators: &[ast::Comprehension],
-        ctx: &Ctx,
-    ) {
-        for (index, generator) in generators.iter().enumerate() {
-            // Filters execute before subsequent generators bind their targets.
-            let active_generators = &generators[..=index];
-            let later_generators = &generators[index + 1..];
-            for if_expr in &generator.ifs {
-                self.check_generator_expr(if_expr, active_generators, ctx);
-                self.check_later_generator_targets(
-                    if_expr,
-                    active_generators,
-                    later_generators,
-                    ctx,
-                );
-            }
-        }
-    }
-
-    /// Add an error if a named expression in `expr` is rebound by an inner loop that has not
-    /// started executing when the filter runs.
-    fn check_later_generator_targets<Ctx: SemanticSyntaxContext>(
-        &mut self,
-        expr: &Expr,
-        active_generators: &[ast::Comprehension],
-        later_generators: &[ast::Comprehension],
-        ctx: &Ctx,
-    ) {
-        if later_generators.is_empty() || ctx.in_class_body_comprehension() {
-            return;
-        }
-
-        let active_targets = comprehension_target_names(active_generators);
-        let mut later_targets = comprehension_target_names(later_generators);
-        later_targets.retain(|target| !active_targets.contains(target));
-
-        let rebound_variables = {
-            let mut visitor = ReboundComprehensionVisitor {
-                targets: later_targets,
-                rebound_variables: Vec::new(),
-                descend_into_nested_comprehensions: false,
-            };
-            visitor.visit_expr(expr);
-            visitor.rebound_variables
-        };
-
-        for (name, range) in rebound_variables {
-            self.add_comprehension_walrus_error(
-                ctx,
-                SemanticSyntaxErrorKind::ComprehensionInnerLoopRebindsNamedExpressionTarget(name),
-                range,
-                range,
-            );
-        }
     }
 
     fn async_comprehension_in_sync_comprehension<Ctx: SemanticSyntaxContext>(
@@ -2093,110 +1890,164 @@ fn comprehension_target_names(comprehensions: &[ast::Comprehension]) -> FxHashSe
     names
 }
 
-/// Finds named expressions anywhere within a comprehension iterable clause.
-#[derive(Default)]
-struct ComprehensionIterableNamedExpressionVisitor {
-    named_expressions: Vec<(TextRange, TextRange)>,
+/// Validates named expressions in comprehensions while visiting each named expression once.
+struct ComprehensionNamedExpressionVisitor<'a, Ctx> {
+    ctx: &'a Ctx,
+    active_targets: Vec<FxHashSet<ast::name::Name>>,
+    later_targets: FxHashSet<ast::name::Name>,
+    comprehension_depth: usize,
+    in_iterable: bool,
+    in_class_body: bool,
 }
 
-impl Visitor<'_> for ComprehensionIterableNamedExpressionVisitor {
-    fn visit_expr(&mut self, expr: &Expr) {
-        if let Expr::Named(ast::ExprNamed { target, range, .. }) = expr
-            && target.is_name_expr()
-        {
-            self.named_expressions.push((*range, target.range()));
-        }
-        walk_expr(self, expr);
+impl<'a, Ctx: SemanticSyntaxContext> ComprehensionNamedExpressionVisitor<'a, Ctx> {
+    fn check_stmt(stmt: &'a Stmt, ctx: &'a Ctx) {
+        let mut visitor = Self {
+            ctx,
+            active_targets: Vec::new(),
+            later_targets: FxHashSet::default(),
+            comprehension_depth: 0,
+            in_iterable: false,
+            in_class_body: ctx.in_class_body_comprehension(),
+        };
+
+        // Nested statements are checked when the parent traversal reaches them with their own
+        // semantic context.
+        walk_stmt(&mut visitor, stmt);
     }
-}
 
-/// Finds named expressions owned by one comprehension for the class-body restriction.
-#[derive(Default)]
-struct ClassBodyComprehensionNamedExpressionVisitor {
-    named_expressions: Vec<(TextRange, TextRange)>,
-}
-
-impl Visitor<'_> for ClassBodyComprehensionNamedExpressionVisitor {
-    fn visit_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
-                // Defaults execute in the enclosing comprehension; the lambda body does not.
-                if let Some(parameters) = parameters {
-                    self.visit_parameters(parameters);
-                }
-                return;
-            }
-            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::Generator(_) => {
-                // A nested comprehension is checked when traversal reaches that comprehension.
-                return;
-            }
-            Expr::Named(ast::ExprNamed { target, range, .. }) if target.is_name_expr() => {
-                self.named_expressions.push((*range, target.range()));
-            }
-            _ => {}
-        }
-        walk_expr(self, expr);
-    }
-}
-
-/// Searches for named expressions (`x := y`) rebinding one of the active iteration variables in a
-/// comprehension or generator expression.
-struct ReboundComprehensionVisitor {
-    targets: FxHashSet<ast::name::Name>,
-    rebound_variables: Vec<(ast::name::Name, TextRange)>,
-    /// Active-target conflicts cross nested comprehensions; later-loop conflicts do not.
-    descend_into_nested_comprehensions: bool,
-}
-
-impl ReboundComprehensionVisitor {
-    fn with_shadowed_targets(
+    fn visit_comprehension(
         &mut self,
-        shadowing_targets: &FxHashSet<ast::name::Name>,
-        visit: impl FnOnce(&mut Self),
+        generators: &'a [ast::Comprehension],
+        visit_result: impl FnOnce(&mut Self),
     ) {
-        let shadowed_targets = shadowing_targets
+        let active_targets_len = self.active_targets.len();
+        let outer_later_targets = std::mem::take(&mut self.later_targets);
+        self.comprehension_depth += 1;
+
+        for (index, generator) in generators.iter().enumerate() {
+            let previous_in_iterable = self.in_iterable;
+            self.in_iterable = true;
+            self.visit_expr(&generator.iter);
+            self.in_iterable = previous_in_iterable;
+
+            let mut targets = FxHashSet::default();
+            add_comprehension_target_names(&generator.target, &mut targets);
+            self.active_targets.push(targets);
+
+            let later_targets = comprehension_target_names(&generators[index + 1..]);
+            self.later_targets = later_targets;
+            for if_expr in &generator.ifs {
+                self.visit_expr(if_expr);
+            }
+        }
+
+        self.later_targets.clear();
+        visit_result(self);
+
+        self.comprehension_depth -= 1;
+        self.active_targets.truncate(active_targets_len);
+        self.later_targets = outer_later_targets;
+    }
+
+    fn visit_lambda_body(&mut self, body: &'a Expr) {
+        let active_targets = std::mem::take(&mut self.active_targets);
+        let later_targets = std::mem::take(&mut self.later_targets);
+        let comprehension_depth = std::mem::replace(&mut self.comprehension_depth, 0);
+        let in_class_body = std::mem::replace(&mut self.in_class_body, false);
+
+        self.visit_expr(body);
+
+        self.active_targets = active_targets;
+        self.later_targets = later_targets;
+        self.comprehension_depth = comprehension_depth;
+        self.in_class_body = in_class_body;
+    }
+
+    fn check_named_expression(&self, named: &ast::ExprNamed) {
+        let Expr::Name(target) = &*named.target else {
+            return;
+        };
+
+        if self.in_iterable {
+            // test_err named_expression_in_comprehension_iterable
+            // [x for x in (y := range(3))]
+            // [a for a in [(b := 1) for b in [1]]]
+            // xs = [1]
+            // [x for x in xs if [z for z in (x := xs)]]
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable,
+                named.range,
+            );
+            return;
+        }
+
+        if self.comprehension_depth == 0 {
+            return;
+        }
+
+        if self
+            .active_targets
             .iter()
-            .filter(|target| self.targets.remove(*target))
-            .cloned()
-            .collect::<Vec<_>>();
+            .any(|targets| targets.contains(&target.id))
+        {
+            // test_err rebound_comprehension_variable
+            // [(a := 0) for a in range(0)]
+            // {(a := 0) for a in range(0)}
+            // {(a := 0): val for a in range(0)}
+            // {key: (a := 0) for a in range(0)}
+            // ((a := 0) for a in range(0))
+            // [[(a := 0)] for a in range(0)]
+            // [(a := 0) for b in range (0) for a in range(0)]
+            // [(a := 0) for a in range (0) for b in range(0)]
+            // [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+            // [a for a in range(0) if (a := 0)]
+            // [(a := 0) for (a, b) in [(0, 1)]]
 
-        visit(self);
+            // test_ok non_rebound_comprehension_variable
+            // [a := 0 for x in range(0)]
+            // [x for x in range(3) if (lambda: (x := 1))()]
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::ReboundComprehensionVariable,
+                target.range,
+            );
+            return;
+        }
 
-        self.targets.extend(shadowed_targets);
-    }
+        if self.in_class_body {
+            // test_err named_expression_in_class_body_comprehension
+            // class C:
+            //     [(x := y) for y in range(3)]
+            //     [x for x in [1] if (y := x) for y in [1]]
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension,
+                named.range,
+            );
+            return;
+        }
 
-    fn visit_nested_comprehension(
-        &mut self,
-        generators: &[ast::Comprehension],
-        visit_body: impl FnOnce(&mut Self),
-    ) {
-        let all_targets = comprehension_target_names(generators);
-        self.with_shadowed_targets(&all_targets, visit_body);
-
-        // The nested check owns conflicts with targets that are already bound; a target in a
-        // later clause does not hide an active enclosing target from an earlier filter.
-        let mut active_targets = FxHashSet::default();
-        for generator in generators {
-            add_comprehension_target_names(&generator.target, &mut active_targets);
-            self.with_shadowed_targets(&active_targets, |visitor| {
-                for if_expr in &generator.ifs {
-                    visitor.visit_expr(if_expr);
-                }
-            });
+        if self.later_targets.contains(&target.id) {
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::ComprehensionInnerLoopRebindsNamedExpressionTarget(
+                    target.id.clone(),
+                ),
+                target.range,
+            );
         }
     }
 }
 
-impl Visitor<'_> for ReboundComprehensionVisitor {
-    fn visit_expr(&mut self, expr: &Expr) {
+impl<'a, Ctx: SemanticSyntaxContext> Visitor<'a> for ComprehensionNamedExpressionVisitor<'a, Ctx> {
+    fn visit_stmt(&mut self, _stmt: &'a Stmt) {
+        // Each statement gets its own visitor from `SemanticSyntaxChecker::visit_stmt`.
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
-                // Defaults run in the enclosing scope; the lambda body owns its local bindings.
-                if let Some(parameters) = parameters {
-                    self.visit_parameters(parameters);
-                }
-                return;
-            }
             Expr::ListComp(ast::ExprListComp {
                 elt, generators, ..
             })
@@ -2206,13 +2057,7 @@ impl Visitor<'_> for ReboundComprehensionVisitor {
             | Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
             }) => {
-                if !self.descend_into_nested_comprehensions {
-                    return;
-                }
-                self.visit_nested_comprehension(generators, |visitor| {
-                    visitor.visit_expr(elt);
-                });
-                return;
+                self.visit_comprehension(generators, |visitor| visitor.visit_expr(elt));
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -2220,27 +2065,27 @@ impl Visitor<'_> for ReboundComprehensionVisitor {
                 generators,
                 ..
             }) => {
-                if !self.descend_into_nested_comprehensions {
-                    return;
-                }
-                self.visit_nested_comprehension(generators, |visitor| {
+                self.visit_comprehension(generators, |visitor| {
                     if let Some(key) = key {
                         visitor.visit_expr(key);
                     }
                     visitor.visit_expr(value);
                 });
-                return;
             }
-            Expr::Named(ast::ExprNamed { target, .. }) => {
-                if let Expr::Name(ast::ExprName { id, range, .. }) = &**target
-                    && self.targets.contains(id)
-                {
-                    self.rebound_variables.push((id.clone(), *range));
+            Expr::Lambda(ast::ExprLambda {
+                parameters, body, ..
+            }) => {
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
                 }
+                self.visit_lambda_body(body);
             }
-            _ => {}
+            Expr::Named(named) => {
+                self.check_named_expression(named);
+                walk_expr(self, expr);
+            }
+            _ => walk_expr(self, expr),
         }
-        walk_expr(self, expr);
     }
 }
 
