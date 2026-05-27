@@ -266,7 +266,7 @@ mod place_state;
 
 pub use place_state::LiveBinding;
 pub(super) use place_state::PreviousDefinitions;
-pub(crate) use place_state::ScopedDefinitionId;
+pub use place_state::ScopedDefinitionId;
 
 /// Uniquely identifies an interned [`Bindings`] entry in [`UseDefMap::interned_bindings`].
 #[newtype_index]
@@ -863,6 +863,8 @@ impl<'map, 'db> DeclarationsIterator<'map, 'db> {
 #[derive(Debug, Clone)]
 pub struct DeclarationWithConstraint<'db> {
     pub declaration: DefinitionState<'db>,
+    /// Stable declaration order within the containing scope.
+    pub declaration_order: ScopedDefinitionId,
     pub reachability_constraint: ScopedReachabilityConstraintId,
 }
 
@@ -877,6 +879,7 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
              }| {
                 DeclarationWithConstraint {
                     declaration: self.all_definitions[*declaration],
+                    declaration_order: *declaration,
                     reachability_constraint: *reachability_constraint,
                 }
             },
@@ -1000,6 +1003,10 @@ impl<'db> UseDefMapBuilder<'db> {
         def_id
     }
 
+    pub(super) fn definition(&self, def_id: ScopedDefinitionId) -> DefinitionState<'db> {
+        self.all_definitions[def_id]
+    }
+
     pub(super) fn mark_unreachable(&mut self) {
         self.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 
@@ -1099,6 +1106,13 @@ impl<'db> UseDefMapBuilder<'db> {
             place.is_symbol(),
             PreviousDefinitions::AreKept,
         );
+    }
+
+    pub(crate) fn bindings_at_use(
+        &self,
+        use_id: ScopedUseId,
+    ) -> impl Iterator<Item = &LiveBinding> {
+        self.bindings_by_use[use_id].iter()
     }
 
     pub(super) fn add_predicate(

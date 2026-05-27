@@ -60,8 +60,8 @@ import builtins
 import sys
 from _typeshed import Unused
 from enum import Enum
-from typing import Final, NoReturn
-from typing_extensions import LiteralString, TypeAlias
+from typing import Final, NoReturn, TypeAlias
+from typing_extensions import LiteralString
 
 _FieldsType: TypeAlias = tuple[int, int, int, int, int, int]
 

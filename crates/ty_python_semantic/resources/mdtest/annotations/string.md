@@ -169,6 +169,7 @@ class Foo:
         self.x: "int" | "str" = 42
 
 d = {}
+# error: [invalid-type-form]
 d[0]: "int" | "str" = 42
 
 # error: [unsupported-operator]

@@ -198,29 +198,33 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Type, TypeContext,
-        UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
+        TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
+        infer_narrowing_constraint,
     },
 };
+use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    SemanticIndex, Truthiness, UseDefMap,
+    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     place::ScopedPlaceId,
     place_table,
     predicate::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        Predicates,
+        Predicates, ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
 
-fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
+fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
     let ty = match singleton {
-        ruff_python_ast::Singleton::None => Type::none(db),
-        ruff_python_ast::Singleton::True => Type::bool_literal(true),
-        ruff_python_ast::Singleton::False => Type::bool_literal(false),
+        ast::Singleton::None => Type::none(db),
+        ast::Singleton::True => Type::bool_literal(true),
+        ast::Singleton::False => Type::bool_literal(false),
     };
     debug_assert!(ty.is_singleton(db));
     ty
@@ -309,6 +313,179 @@ fn type_excluded_by_previous_patterns<'db>(
     builder.build()
 }
 
+/// Return the enum class and canonical member names represented by an enum-literal subject type.
+///
+/// This succeeds only when the subject is a single enum literal, a union of enum literals from the
+/// same enum class, or an alias to either form. Enum aliases are normalized to the canonical member
+/// name so previous `match` cases can be compared by member identity.
+fn enum_literal_subject_names<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
+    fn add_enum_literal<'db>(
+        db: &'db dyn Db,
+        enum_class: &mut Option<ClassLiteral<'db>>,
+        names: &mut FxHashSet<Name>,
+        ty: Type<'db>,
+    ) -> Option<()> {
+        let enum_literal = ty.as_enum_literal()?;
+        let class = enum_literal.enum_class(db);
+
+        if let Some(existing_class) = *enum_class {
+            if existing_class != class {
+                return None;
+            }
+        } else {
+            *enum_class = Some(class);
+        }
+
+        let metadata = enum_metadata(db, class)?;
+        let name = enum_literal.name(db);
+        let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+        names.insert(canonical_name.clone());
+        Some(())
+    }
+
+    let mut enum_class = None;
+    let mut names = FxHashSet::default();
+
+    match subject_ty {
+        Type::LiteralValue(_) => {
+            add_enum_literal(db, &mut enum_class, &mut names, subject_ty)?;
+        }
+        Type::Union(union) => {
+            for element in union.elements(db) {
+                add_enum_literal(db, &mut enum_class, &mut names, *element)?;
+            }
+        }
+        Type::TypeAlias(alias) => return enum_literal_subject_names(db, alias.value_type(db)),
+        _ => return None,
+    }
+
+    Some((enum_class?, names))
+}
+
+/// Return the canonical enum-member name matched by a single value pattern.
+///
+/// This recognizes patterns like `case Color.RED:` only when the pattern expression is
+/// single-valued and belongs to the expected enum class. Enum aliases are resolved to their
+/// canonical member names before returning.
+fn enum_member_pattern_name<'db>(
+    db: &'db dyn Db,
+    enum_class: ClassLiteral<'db>,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<Name> {
+    let value_ty = pattern_kind_to_type(db, kind);
+    let enum_literal = value_ty.as_enum_literal()?;
+    if enum_literal.enum_class(db) != enum_class {
+        return None;
+    }
+
+    let metadata = enum_metadata(db, enum_class)?;
+    let name = enum_literal.name(db);
+    let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+    Some(canonical_name.clone())
+}
+
+struct EnumMemberPatternCoverage {
+    /// Enum members that this pattern definitely matches.
+    definitely_matched: FxHashSet<Name>,
+    /// Whether the collected coverage is known to represent every possible matching enum member.
+    is_exact: bool,
+}
+
+/// Returns enum-member coverage evidence for a pattern.
+///
+/// This recognizes patterns like `case Color.RED | Color.GREEN` when the pattern
+/// belongs to the expected enum class. Enum aliases are resolved to their canonical member names
+/// before returning. A pattern with additional alternatives such as `Color.GREEN | Color()`
+/// produces only a lower bound: it definitely matches `Color.GREEN`, but can match other members.
+fn enum_member_pattern_coverage<'db>(
+    db: &'db dyn Db,
+    enum_class: ClassLiteral<'db>,
+    kind: &PatternPredicateKind<'db>,
+) -> EnumMemberPatternCoverage {
+    let mut coverage = EnumMemberPatternCoverage {
+        definitely_matched: FxHashSet::default(),
+        is_exact: true,
+    };
+    match kind {
+        PatternPredicateKind::Or(alts) => {
+            for alt in alts {
+                let alt_coverage = enum_member_pattern_coverage(db, enum_class, alt);
+                coverage
+                    .definitely_matched
+                    .extend(alt_coverage.definitely_matched);
+                coverage.is_exact &= alt_coverage.is_exact;
+            }
+        }
+        PatternPredicateKind::As(Some(inner), _) => {
+            return enum_member_pattern_coverage(db, enum_class, inner);
+        }
+        _ => {
+            if let Some(name) = enum_member_pattern_name(db, enum_class, kind) {
+                coverage.definitely_matched.insert(name);
+            } else {
+                coverage.is_exact = false;
+            }
+        }
+    }
+    coverage
+}
+
+/// Determine the static truthiness of a `match` case over a union of enum literals.
+///
+/// The analysis removes enum members already matched by earlier unguarded cases, then decides
+/// whether the current case is impossible, exhaustive, or still ambiguous. Guarded cases remain
+/// ambiguous because the guard can reject an otherwise matching enum member.
+fn analyze_enum_literal_union_pattern_predicate<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
+) -> Option<Truthiness> {
+    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
+    let current_coverage = enum_member_pattern_coverage(db, enum_class, predicate.kind(db));
+    let current_names = &current_coverage.definitely_matched;
+    if current_names.is_empty() {
+        return None;
+    }
+
+    let mut previous_predicate = predicate;
+    while let Some(previous) = previous_predicate.previous_predicate(db) {
+        previous_predicate = *previous;
+
+        if previous_predicate.guard(db).is_some() {
+            continue;
+        }
+
+        let previous_coverage =
+            enum_member_pattern_coverage(db, enum_class, previous_predicate.kind(db));
+        for previous_name in previous_coverage.definitely_matched {
+            remaining_names.remove(&previous_name);
+        }
+    }
+
+    if remaining_names.is_empty() {
+        return Some(Truthiness::AlwaysFalse);
+    }
+
+    if remaining_names.is_subset(current_names) {
+        if predicate.guard(db).is_some() {
+            Some(Truthiness::Ambiguous)
+        } else {
+            Some(Truthiness::AlwaysTrue)
+        }
+    } else if current_coverage.is_exact {
+        if remaining_names.is_disjoint(current_names) {
+            Some(Truthiness::AlwaysFalse)
+        } else {
+            Some(Truthiness::Ambiguous)
+        }
+    } else {
+        None
+    }
+}
+
 /// Analyze a pattern predicate to determine its static truthiness.
 ///
 /// This is a Salsa tracked function to enable memoization. Without memoization, for a match
@@ -321,6 +498,12 @@ fn type_excluded_by_previous_patterns<'db>(
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
     let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+
+    if let Some(truthiness) =
+        analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
+    {
+        return truthiness;
+    }
 
     let narrowed_subject = IntersectionBuilder::new(db)
         .add_positive(subject_ty)
@@ -419,7 +602,16 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        narrow_by_constraint_inner(db, self, predicates, id, base_ty, place, None)
+        let mut projector = NarrowingProjector::new(db, self, predicates, place);
+        let projected_root = projector.project(id);
+        let mut context = ProjectedNarrowingContext {
+            db,
+            base_ty,
+            graph: &projector.graph,
+            joins: projector.graph.joins(projected_root),
+            join_cache: FxHashMap::default(),
+        };
+        context.narrow(projected_root, None)
     }
 
     /// Analyze the statically known reachability for a given constraint.
@@ -462,130 +654,349 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     }
 }
 
-/// Inner recursive helper that accumulates narrowing constraints along each TDD path.
-fn narrow_by_constraint_inner<'db>(
+fn apply_accumulated_narrowing<'db>(
     db: &'db dyn Db,
-    constraints: &ReachabilityConstraints,
-    predicates: &Predicates<'db>,
-    id: ScopedReachabilityConstraintId,
     base_ty: Type<'db>,
-    place: ScopedPlaceId,
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
-    type Id = ScopedReachabilityConstraintId;
+    match accumulated {
+        Some(constraint) => NarrowingConstraint::intersection(base_ty)
+            .merge_constraint_and(constraint)
+            .evaluate_constraint_type(db),
+        None => base_ty,
+    }
+}
 
-    match id {
-        Id::ALWAYS_TRUE | Id::AMBIGUOUS => {
-            // Apply all accumulated narrowing constraints to the base type
-            match accumulated {
-                Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                    .merge_constraint_and(constraint)
-                    .evaluate_constraint_type(db),
-                None => base_ty,
+/// Identifier for a node in a projected narrowing graph.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct ProjectedNarrowingNodeId(usize);
+
+impl ProjectedNarrowingNodeId {
+    /// Terminal node for paths that remain reachable.
+    const ALWAYS_TRUE: Self = Self(usize::MAX);
+    /// Terminal node for paths that are statically unreachable.
+    const ALWAYS_FALSE: Self = Self(usize::MAX - 1);
+
+    fn is_terminal(self) -> bool {
+        self == Self::ALWAYS_TRUE || self == Self::ALWAYS_FALSE
+    }
+}
+
+/// Interior node in a projected narrowing graph.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct ProjectedNarrowingNode {
+    atom: ScopedPredicateId,
+    if_true: ProjectedNarrowingNodeId,
+    if_false: ProjectedNarrowingNodeId,
+}
+
+/// Reduced reachability graph containing only predicates relevant to one place.
+#[derive(Default)]
+struct ProjectedNarrowingGraph<'db> {
+    nodes: Vec<ProjectedNarrowingNode>,
+    node_cache: FxHashMap<ProjectedNarrowingNode, ProjectedNarrowingNodeId>,
+    or_cache:
+        FxHashMap<(ProjectedNarrowingNodeId, ProjectedNarrowingNodeId), ProjectedNarrowingNodeId>,
+    predicate_constraints_cache: FxHashMap<
+        ScopedPredicateId,
+        (
+            Option<NarrowingConstraint<'db>>,
+            Option<NarrowingConstraint<'db>>,
+        ),
+    >,
+}
+
+impl ProjectedNarrowingGraph<'_> {
+    /// Returns an interior projected node by ID.
+    fn node(&self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingNode {
+        self.nodes[id.0]
+    }
+
+    /// Interns a projected node, collapsing nodes with identical branches.
+    fn add_node(&mut self, node: ProjectedNarrowingNode) -> ProjectedNarrowingNodeId {
+        if node.if_true == node.if_false {
+            return node.if_true;
+        }
+
+        if let Some(cached) = self.node_cache.get(&node) {
+            return *cached;
+        }
+
+        let id = ProjectedNarrowingNodeId(self.nodes.len());
+        self.nodes.push(node);
+        self.node_cache.insert(node, id);
+        id
+    }
+
+    /// Returns the projected nodes that join multiple incoming paths.
+    ///
+    /// Projection interns equivalent subgraphs into a DAG. Caching each join lets narrowing
+    /// evaluate a shared suffix once and apply each incoming prefix constraint afterward.
+    fn joins(&self, root: ProjectedNarrowingNodeId) -> Vec<bool> {
+        let mut referenced = vec![false; self.nodes.len()];
+        let mut joins = vec![false; self.nodes.len()];
+        let mut visited = vec![false; self.nodes.len()];
+        let mut pending = vec![root];
+
+        while let Some(id) = pending.pop() {
+            if id.is_terminal() || std::mem::replace(&mut visited[id.0], true) {
+                continue;
+            }
+
+            let node = self.node(id);
+            for next in [node.if_true, node.if_false] {
+                if !next.is_terminal() {
+                    if std::mem::replace(&mut referenced[next.0], true) {
+                        joins[next.0] = true;
+                    }
+                    pending.push(next);
+                }
             }
         }
-        Id::ALWAYS_FALSE => Type::Never,
-        _ => {
-            let node = constraints.get_interior_node(id);
-            let predicate = predicates[node.atom()];
 
-            // `IsNonTerminalCall` predicates don't narrow any variable; they only
-            // affect reachability. Evaluate the predicate to determine which
-            // path(s) are reachable, rather than walking both branches.
-            // `IsNonTerminalCall` always evaluates to `AlwaysTrue` or `AlwaysFalse`,
-            // never `Ambiguous`.
-            if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                return match analyze_single(db, &predicate) {
-                    Truthiness::AlwaysTrue => narrow_by_constraint_inner(
-                        db,
-                        constraints,
-                        predicates,
-                        node.if_true(),
-                        base_ty,
-                        place,
-                        accumulated,
-                    ),
-                    Truthiness::AlwaysFalse => narrow_by_constraint_inner(
-                        db,
-                        constraints,
-                        predicates,
-                        node.if_false(),
-                        base_ty,
-                        place,
-                        accumulated,
-                    ),
-                    Truthiness::Ambiguous => {
-                        unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+        joins
+    }
+
+    /// Constructs the canonical disjunction of two projected subgraphs.
+    fn or(
+        &mut self,
+        left: ProjectedNarrowingNodeId,
+        right: ProjectedNarrowingNodeId,
+    ) -> ProjectedNarrowingNodeId {
+        if left == right || left == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            return left;
+        }
+        if right == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            return right;
+        }
+        if left == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return right;
+        }
+        if right == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return left;
+        }
+
+        let key = if left.0 <= right.0 {
+            (left, right)
+        } else {
+            (right, left)
+        };
+        if let Some(cached) = self.or_cache.get(&key) {
+            return *cached;
+        }
+
+        let left_node = self.node(left);
+        let right_node = self.node(right);
+        let result = match left_node.atom.cmp(&right_node.atom).reverse() {
+            std::cmp::Ordering::Equal => {
+                let if_true = self.or(left_node.if_true, right_node.if_true);
+                let if_false = self.or(left_node.if_false, right_node.if_false);
+                self.add_node(ProjectedNarrowingNode {
+                    atom: left_node.atom,
+                    if_true,
+                    if_false,
+                })
+            }
+            std::cmp::Ordering::Less => {
+                let if_true = self.or(left_node.if_true, right);
+                let if_false = self.or(left_node.if_false, right);
+                self.add_node(ProjectedNarrowingNode {
+                    atom: left_node.atom,
+                    if_true,
+                    if_false,
+                })
+            }
+            std::cmp::Ordering::Greater => {
+                let if_true = self.or(left, right_node.if_true);
+                let if_false = self.or(left, right_node.if_false);
+                self.add_node(ProjectedNarrowingNode {
+                    atom: right_node.atom,
+                    if_true,
+                    if_false,
+                })
+            }
+        };
+
+        self.or_cache.insert(key, result);
+        result
+    }
+}
+
+/// Projects reachability constraints onto the predicates that can narrow one place.
+struct NarrowingProjector<'a, 'db> {
+    db: &'db dyn Db,
+    constraints: &'a ReachabilityConstraints,
+    predicates: &'a Predicates<'db>,
+    place: ScopedPlaceId,
+    project_cache: FxHashMap<ScopedReachabilityConstraintId, ProjectedNarrowingNodeId>,
+    graph: ProjectedNarrowingGraph<'db>,
+}
+
+impl<'a, 'db> NarrowingProjector<'a, 'db> {
+    /// Creates a projector for narrowing `place`.
+    fn new(
+        db: &'db dyn Db,
+        constraints: &'a ReachabilityConstraints,
+        predicates: &'a Predicates<'db>,
+        place: ScopedPlaceId,
+    ) -> Self {
+        Self {
+            db,
+            constraints,
+            predicates,
+            place,
+            project_cache: FxHashMap::default(),
+            graph: ProjectedNarrowingGraph::default(),
+        }
+    }
+
+    /// Returns the cached positive and negative narrowing constraints for a predicate.
+    fn predicate_constraints(
+        &mut self,
+        predicate_id: ScopedPredicateId,
+    ) -> (
+        Option<NarrowingConstraint<'db>>,
+        Option<NarrowingConstraint<'db>>,
+    ) {
+        if let Some(cached) = self.graph.predicate_constraints_cache.get(&predicate_id) {
+            return cached.clone();
+        }
+
+        let predicate = self.predicates[predicate_id];
+        let pos_constraint = infer_narrowing_constraint(self.db, predicate, self.place);
+        let neg_predicate = Predicate {
+            node: predicate.node,
+            is_positive: !predicate.is_positive,
+        };
+        let neg_constraint = infer_narrowing_constraint(self.db, neg_predicate, self.place);
+        let constraints = (pos_constraint, neg_constraint);
+        self.graph
+            .predicate_constraints_cache
+            .insert(predicate_id, constraints.clone());
+        constraints
+    }
+
+    /// Projects a reachability node into the reduced narrowing graph.
+    fn project(&mut self, id: ScopedReachabilityConstraintId) -> ProjectedNarrowingNodeId {
+        type Id = ScopedReachabilityConstraintId;
+
+        if let Some(cached) = self.project_cache.get(&id) {
+            return *cached;
+        }
+
+        let projected = match id {
+            Id::ALWAYS_TRUE | Id::AMBIGUOUS => ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            Id::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            _ => {
+                let node = self.constraints.get_interior_node(id);
+                let predicate = self.predicates[node.atom()];
+
+                if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    match analyze_single(self.db, &predicate) {
+                        Truthiness::AlwaysTrue => self.project(node.if_true()),
+                        Truthiness::AlwaysFalse => self.project(node.if_false()),
+                        Truthiness::Ambiguous => {
+                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                        }
                     }
-                };
+                } else {
+                    let if_true = self.project(node.if_true());
+                    let if_false = self.project(node.if_false());
+                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom());
+
+                    if pos_constraint.is_none() && neg_constraint.is_none() {
+                        self.graph.or(if_true, if_false)
+                    } else {
+                        self.graph.add_node(ProjectedNarrowingNode {
+                            atom: node.atom(),
+                            if_true,
+                            if_false,
+                        })
+                    }
+                }
             }
+        };
 
-            // Check if this predicate narrows the variable we're interested in.
-            let pos_constraint = infer_narrowing_constraint(db, predicate, place);
+        self.project_cache.insert(id, projected);
+        projected
+    }
+}
 
-            // If the true branch is statically unreachable, skip it entirely.
-            if node.if_true() == Id::ALWAYS_FALSE {
-                let neg_predicate = Predicate {
-                    node: predicate.node,
-                    is_positive: !predicate.is_positive,
-                };
-                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
+/// Evaluates narrowed types over a projected narrowing graph.
+struct ProjectedNarrowingContext<'a, 'db> {
+    db: &'db dyn Db,
+    base_ty: Type<'db>,
+    graph: &'a ProjectedNarrowingGraph<'db>,
+    /// Marks join boundaries in the projected DAG.
+    joins: Vec<bool>,
+    /// Caches each join's narrowed suffix type from its boundary.
+    join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
+}
+
+impl<'db> ProjectedNarrowingContext<'_, 'db> {
+    fn is_join(&self, id: ProjectedNarrowingNodeId) -> bool {
+        !id.is_terminal() && self.joins[id.0]
+    }
+
+    /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
+    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
+        if let Some(cached) = self.join_cache.get(&id) {
+            return *cached;
+        }
+
+        let result = self.narrow_uncached(id, None);
+        self.join_cache.insert(id, result);
+        result
+    }
+
+    /// Recursively evaluates a projected path while accumulating narrowing constraints.
+    fn narrow(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+        accumulated: Option<NarrowingConstraint<'db>>,
+    ) -> Type<'db> {
+        if self.is_join(id) {
+            // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
+            // then apply the incoming prefix constraint to its narrowed type.
+            let suffix_ty = self.narrow_join(id);
+            return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
+        }
+
+        self.narrow_uncached(id, accumulated)
+    }
+
+    /// Recursively evaluates an unshared projected path while accumulating narrowing constraints.
+    fn narrow_uncached(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+        accumulated: Option<NarrowingConstraint<'db>>,
+    ) -> Type<'db> {
+        if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return Type::Never;
+        }
+
+        if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
+        } else {
+            let node = self.graph.node(id);
+            let (pos_constraint, neg_constraint) =
+                self.graph.predicate_constraints_cache[&node.atom].clone();
+
+            if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-                return narrow_by_constraint_inner(
-                    db,
-                    constraints,
-                    predicates,
-                    node.if_false(),
-                    base_ty,
-                    place,
-                    false_accumulated,
-                );
-            }
-
-            // If the false branch is statically unreachable, skip it entirely.
-            if node.if_false() == Id::ALWAYS_FALSE {
+                self.narrow(node.if_false, false_accumulated)
+            } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
                 let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
-                return narrow_by_constraint_inner(
-                    db,
-                    constraints,
-                    predicates,
-                    node.if_true(),
-                    base_ty,
-                    place,
-                    true_accumulated,
-                );
+                self.narrow(node.if_true, true_accumulated)
+            } else {
+                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_ty = self.narrow(node.if_true, true_accumulated);
+
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_ty = self.narrow(node.if_false, false_accumulated);
+
+                UnionType::from_two_elements(self.db, true_ty, false_ty)
             }
-
-            // True branch: predicate holds → accumulate positive narrowing
-            let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
-            let true_ty = narrow_by_constraint_inner(
-                db,
-                constraints,
-                predicates,
-                node.if_true(),
-                base_ty,
-                place,
-                true_accumulated,
-            );
-
-            // False branch: predicate doesn't hold → accumulate negative narrowing
-            let neg_predicate = Predicate {
-                node: predicate.node,
-                is_positive: !predicate.is_positive,
-            };
-            let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-            let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-            let false_ty = narrow_by_constraint_inner(
-                db,
-                constraints,
-                predicates,
-                node.if_false(),
-                base_ty,
-                place,
-                false_accumulated,
-            );
-
-            UnionType::from_two_elements(db, true_ty, false_ty)
         }
     }
 }
@@ -871,6 +1282,13 @@ pub(crate) trait DeclarationsIteratorExtension<'db> {
         db: &'db dyn Db,
         predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool;
+
+    /// Return the first reachable declaration that matches the passed in predicate function.
+    fn first_reachable_declaration_order(
+        self,
+        db: &'db dyn Db,
+        predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> Option<ScopedDefinitionId>;
 }
 
 impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
@@ -886,11 +1304,35 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
             |DeclarationWithConstraint {
                  declaration,
                  reachability_constraint,
+                 ..
              }| {
                 predicate(declaration)
                     && !reachability_constraints
                         .evaluate(db, predicates, reachability_constraint)
                         .is_always_false()
+            },
+        )
+    }
+
+    fn first_reachable_declaration_order(
+        mut self,
+        db: &'db dyn Db,
+        mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> Option<ScopedDefinitionId> {
+        let reachability_predicates = self.predicates();
+        let reachability_constraints = self.reachability_constraints();
+
+        self.find_map(
+            |DeclarationWithConstraint {
+                 declaration,
+                 declaration_order,
+                 reachability_constraint,
+             }| {
+                (predicate(declaration)
+                    && !reachability_constraints
+                        .evaluate(db, reachability_predicates, reachability_constraint)
+                        .is_always_false())
+                .then_some(declaration_order)
             },
         )
     }

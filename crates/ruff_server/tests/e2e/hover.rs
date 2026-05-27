@@ -51,3 +51,14 @@ fn hover_for_python_noqa() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn unavailable_document_returns_empty_response() -> Result<()> {
+    let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
+
+    let result = server.hover_request("not-open.py", Position::default());
+
+    assert!(result.is_none());
+
+    Ok(())
+}

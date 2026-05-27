@@ -306,7 +306,7 @@ support needs to be explicitly included by adding it to `types_or`:
 ```yaml title=".pre-commit-config.yaml"
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+    rev: v0.15.14
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter, markdown]
@@ -430,6 +430,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`indentation-with-invalid-multiple`](rules/indentation-with-invalid-multiple.md) (`E111`)
 - [`indentation-with-invalid-multiple-comment`](rules/indentation-with-invalid-multiple-comment.md) (`E114`)
 - [`over-indented`](rules/over-indented.md) (`E117`)
+- [`incorrect-blank-line-before-class`](rules/incorrect-blank-line-before-class.md) (`D203`)
 - [`docstring-tab-indentation`](rules/docstring-tab-indentation.md) (`D206`)
 - [`triple-single-quotes`](rules/triple-single-quotes.md) (`D300`)
 - [`bad-quotes-inline-string`](rules/bad-quotes-inline-string.md) (`Q000`)

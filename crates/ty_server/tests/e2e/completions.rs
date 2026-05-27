@@ -386,3 +386,60 @@ x: Literal[\"apple\"] = \"app\"
 
     Ok(())
 }
+
+#[test]
+fn typed_dict_literal_key_completion_before_colon() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+from typing import TypedDict
+
+class Box(TypedDict):
+    x: float
+    y: float
+    z: float
+
+def take(box: Box): ...
+
+take({\"\"})
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(9, 7));
+
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "x",
+        "kind": 12,
+        "detail": "Literal[\"x\"]",
+        "sortText": "0",
+        "insertText": "x"
+      },
+      {
+        "label": "y",
+        "kind": 12,
+        "detail": "Literal[\"y\"]",
+        "sortText": "1",
+        "insertText": "y"
+      },
+      {
+        "label": "z",
+        "kind": 12,
+        "detail": "Literal[\"z\"]",
+        "sortText": "2",
+        "insertText": "z"
+      }
+    ]
+    "#);
+
+    Ok(())
+}

@@ -417,10 +417,16 @@ fn render_markdown(docstring: &str) -> String {
             // except we need to find and parse it anyway to do this escaping properly! :(
             // For now we assume `inline code` does not span a line (I'm not even sure if can).
             //
-            // Things that need to be escaped: underscores
+            // Things that need to be escaped: underscores and HTML-sensitive characters.
             //
             // e.g. we want __init__ => \_\_init\_\_ but `__init__` => `__init__`
-            let escape = |input: &str| input.replace('_', "\\_");
+            let escape = |input: &str| {
+                input
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;")
+                    .replace('_', "\\_")
+            };
 
             let mut in_inline_code = false;
             let mut first_chunk = true;
@@ -898,6 +904,38 @@ mod tests {
         Here ```_is_`````__a__``\_random\_````_mess__````<HB>
         ```_is_`````__a__``\_random\_````_mess__````
         ");
+    }
+
+    #[test]
+    fn html_escape() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        Parse a URL into 6 components:
+        <scheme>://<netloc>/<path>;<params>?<query>#<fragment>
+
+        Markdown code fences keep literal HTML:
+
+        ```text
+        <tag attr="value">content</tag>
+        ```
+
+        So does `inline <code>`.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Parse a URL into 6 components:<HB>
+        &lt;scheme&gt;://&lt;netloc&gt;/&lt;path&gt;;&lt;params&gt;?&lt;query&gt;#&lt;fragment&gt;<HB>
+        <HB>
+        Markdown code fences keep literal HTML:<HB>
+        <HB>
+        ```text
+        <tag attr="value">content</tag>
+        ```<HB>
+        <HB>
+        So does `inline <code>`.
+        "#);
     }
 
     // A literal block where the `::` is flush with the paragraph

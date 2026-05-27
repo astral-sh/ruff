@@ -100,6 +100,9 @@ pub(crate) enum ErrorContext<'db> {
         target: Type<'db>,
         parameter: ParameterDescription,
     },
+    ExtraRequiredParameter {
+        parameter: ParameterDescription,
+    },
     ParameterNameMismatch {
         source_name: Name,
         target_name: Name,
@@ -265,6 +268,10 @@ impl<'db> ErrorContext<'db> {
                     target = target.display(db),
                 )
             }
+            Self::ExtraRequiredParameter { parameter } => match parameter {
+                ParameterDescription::Named(name) => format!("unexpected extra parameter `{name}`"),
+                ParameterDescription::Index(_) => "unexpected extra parameter".to_string(),
+            },
             Self::ParameterNameMismatch {
                 source_name,
                 target_name,

@@ -8,11 +8,14 @@ import sys
 from _typeshed import ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Iterable, MutableSequence
 from types import GenericAlias
-from typing import Any, ClassVar, Literal, SupportsIndex, TypeVar, overload
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, ClassVar, Literal, SupportsIndex, TypeAlias, TypeVar, overload
+from typing_extensions import Self, deprecated, disjoint_base
 
 _IntTypeCode: TypeAlias = Literal["b", "B", "h", "H", "i", "I", "l", "L", "q", "Q"]
-_FloatTypeCode: TypeAlias = Literal["f", "d"]
+if sys.version_info >= (3, 15):
+    _FloatTypeCode: TypeAlias = Literal["f", "d", "e", "Zf", "Zd"]
+else:
+    _FloatTypeCode: TypeAlias = Literal["f", "d"]
 if sys.version_info >= (3, 13):
     _UnicodeTypeCode: TypeAlias = Literal["u", "w"]
 else:
@@ -21,7 +24,10 @@ _TypeCode: TypeAlias = _IntTypeCode | _FloatTypeCode | _UnicodeTypeCode
 
 _T = TypeVar("_T", int, float, str)
 
-typecodes: str
+if sys.version_info >= (3, 15):
+    typecodes: tuple[str, ...]
+else:
+    typecodes: str
 
 @disjoint_base
 class array(MutableSequence[_T]):
@@ -120,6 +126,7 @@ class array(MutableSequence[_T]):
     def __new__(cls, typecode: str, initializer: Iterable[_T], /) -> Self: ...
     @overload
     def __new__(cls, typecode: str, initializer: bytes | bytearray = ..., /) -> Self: ...
+
     def append(self, v: _T, /) -> None:
         """Append new value v to the end of the array."""
 
@@ -159,15 +166,12 @@ class array(MutableSequence[_T]):
         Use array.frombytes(ustr.encode(...)) to append Unicode data to an array of
         some other type.
         """
-    if sys.version_info >= (3, 10):
-        def index(self, v: _T, start: int = 0, stop: int = sys.maxsize, /) -> int:
-            """Return index of first occurrence of v in the array.
 
-            Raise ValueError if the value is not present.
-            """
-    else:
-        def index(self, v: _T, /) -> int:  # type: ignore[override]
-            """Return index of first occurrence of v in the array."""
+    def index(self, v: _T, start: int = 0, stop: int = sys.maxsize, /) -> int:
+        """Return index of first occurrence of v in the array.
+
+        Raise ValueError if the value is not present.
+        """
 
     def insert(self, i: int, v: _T, /) -> None:
         """Insert a new item v into the array before position i."""
@@ -207,15 +211,15 @@ class array(MutableSequence[_T]):
     @overload
     def __getitem__(self, key: SupportsIndex, /) -> _T:
         """Return self[key]."""
-
     @overload
     def __getitem__(self, key: slice[SupportsIndex | None], /) -> array[_T]: ...
+
     @overload  # type: ignore[override]
     def __setitem__(self, key: SupportsIndex, value: _T, /) -> None:
         """Set self[key] to value."""
-
     @overload
     def __setitem__(self, key: slice[SupportsIndex | None], value: array[_T], /) -> None: ...
+
     def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
 

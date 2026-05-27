@@ -10,11 +10,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Checks for `raise` statements that raise `NotImplemented`.
 ///
 /// ## Why is this bad?
-/// `NotImplemented` is an exception used by binary special methods to indicate
+/// `NotImplemented` is a special value returned by binary special methods to indicate
 /// that an operation is not implemented with respect to a particular type.
 ///
-/// `NotImplemented` should not be raised directly. Instead, raise
-/// `NotImplementedError`, which is used to indicate that the method is
+/// Because `NotImplemented` is not an exception, it cannot be raised.
+/// Raise `NotImplementedError` instead, which is used to indicate that a method is
 /// abstract or not implemented in the derived class.
 ///
 /// ## Example

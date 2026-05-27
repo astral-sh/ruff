@@ -883,7 +883,9 @@ impl SemanticSyntaxChecker {
                 generators,
                 ..
             }) => {
-                Self::check_generator_expr(key, generators, ctx);
+                if let Some(key) = key {
+                    Self::check_generator_expr(key, generators, ctx);
+                }
                 Self::check_generator_expr(value, generators, ctx);
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {

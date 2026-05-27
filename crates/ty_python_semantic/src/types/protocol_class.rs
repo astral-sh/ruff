@@ -546,7 +546,12 @@ impl<'db> ProtocolMemberKind<'db> {
                 let normalized =
                     curr.signatures(db)
                         .cycle_normalized(db, prev.signatures(db), cycle);
-                Self::Method(CallableType::new(db, normalized, curr.kind(db)))
+                Self::Method(CallableType::new(
+                    db,
+                    normalized,
+                    curr.kind(db),
+                    curr.provenance(db),
+                ))
             }
             (Self::Property(curr), Self::Property(prev)) => {
                 let getter = match (curr.getter(db), prev.getter(db)) {
@@ -957,7 +962,7 @@ impl BoundOnClass {
 
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
-    cycle_initial=proto_interface_cycle_initial,
+    cycle_initial=|db, _, _| ProtocolInterface::empty(db),
     cycle_fn=proto_interface_cycle_recover,
     heap_size=ruff_memory_usage::heap_size,
 )]
@@ -1070,17 +1075,6 @@ fn cached_protocol_interface<'db>(
     ProtocolInterface::new(db, members)
 }
 
-// If we use `expect(clippy::trivially_copy_pass_by_ref)` here,
-// the lint expectation is unfulfilled on WASM
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn proto_interface_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    _class: ClassType<'db>,
-) -> ProtocolInterface<'db> {
-    ProtocolInterface::empty(db)
-}
-
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn proto_interface_cycle_recover<'db>(
     db: &'db dyn Db,
@@ -1106,6 +1100,7 @@ fn protocol_bind_self<'db>(
         db,
         callable.signatures(db).bind_self(db, self_type),
         CallableTypeKind::Regular,
+        callable.provenance(db),
     )
 }
 

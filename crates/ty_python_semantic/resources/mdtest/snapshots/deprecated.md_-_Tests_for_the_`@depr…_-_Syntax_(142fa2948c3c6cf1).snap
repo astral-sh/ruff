@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -85,9 +85,9 @@ error[missing-argument]: No argument provided for required parameter `arg` of bo
   | ^^^^^^^^^^^^^^
   |
 info: Parameter declared here
-    --> stdlib/typing_extensions.pyi:1301:28
+    --> stdlib/typing_extensions.pyi:1167:28
      |
-1301 |         def __call__(self, arg: _T, /) -> _T: ...
+1167 |         def __call__(self, arg: _T, /) -> _T: ...
      |                            ^^^^^^^
      |
 

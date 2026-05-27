@@ -12,6 +12,23 @@ reveal_type(x for x in range(10))
 reveal_type((x, str(y)) for x in range(3) for y in range(3))
 ```
 
+## PEP 798 unpacking generator expressions
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+list_of_lists: list[list[int]] = [[1], [2, 3]]
+not_iterables: list[int] = [1, 2]
+
+# revealed: GeneratorType[int, None, None]
+reveal_type(*xs for xs in list_of_lists)
+
+(*value for value in not_iterables)  # error: [not-iterable] "Object of type `int` is not iterable"
+```
+
 When used in a loop, the yielded type can be inferred:
 
 ```py

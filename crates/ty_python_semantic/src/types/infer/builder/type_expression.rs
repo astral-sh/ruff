@@ -6,8 +6,8 @@ use ruff_text_size::Ranged;
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
+    report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -20,8 +20,8 @@ use ty_python_core::scope::ScopeKind;
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeFormType, TypeGuardType,
+    TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -312,16 +312,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         let python_version =
                                             Program::get(self.db()).python_version(self.db());
 
-                                        if python_version < PythonVersion::PY310
-                                            && !binary.left.is_string_literal_expr()
-                                            && !binary.right.is_string_literal_expr()
-                                        {
-                                            note_py_version_too_old_for_pep_604(
-                                                self.db(),
-                                                self.index,
-                                                &mut diagnostic,
-                                            );
-                                        } else if python_version < PythonVersion::PY314 {
+                                        if python_version < PythonVersion::PY314 {
                                             diagnostic.info(format_args!(
                                                 "All {}s are evaluated at \
                                                 runtime by default on Python <3.14",
@@ -529,7 +520,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::BoolOp(bool_op) => {
                 if !self.in_string_annotation() {
-                    self.infer_boolean_expression(bool_op);
+                    self.infer_boolean_expression(bool_op, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,
@@ -701,7 +692,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Generator(generator) => {
                 if !self.in_string_annotation() {
-                    self.infer_generator_expression(generator);
+                    self.infer_generator_expression(generator, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,
@@ -1588,7 +1579,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::unknown()
                     }
                 }
-
                 KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::Annotated(_)
@@ -1603,6 +1593,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder.into_diagnostic(format_args!(
                             "`{}` is a `NewType` and cannot be specialized",
                             newtype.name(self.db())
+                        ));
+                    }
+                    Type::unknown()
+                }
+                KnownInstanceType::Sentinel(sentinel) => {
+                    if !self.in_string_annotation() {
+                        self.infer_expression(&subscript.slice, TypeContext::default());
+                    }
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`{}` is a sentinel and cannot be specialized",
+                            sentinel.name(self.db())
                         ));
                     }
                     Type::unknown()
@@ -1675,14 +1677,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 todo_type!("string literal subscripted in type expression")
             }
             Type::Union(union) => {
-                self.infer_type_expression(slice);
-                union.map(self.db(), |element| {
+                let db = self.db();
+                let mut union_builder =
+                    UnionBuilder::new(db).recursively_defined(union.recursively_defined(db));
+
+                for (index, element) in union.elements(db).iter().enumerate() {
                     let mut speculative_builder = self.speculate();
                     let subscript_ty =
                         speculative_builder.infer_subscript_type_expression(subscript, *element);
-                    self.context.extend(&speculative_builder.context.finish());
-                    subscript_ty
-                })
+                    if index == 0 {
+                        self.extend(speculative_builder);
+                    } else {
+                        self.context.extend(&speculative_builder.context.finish());
+                    }
+                    union_builder = union_builder.add(subscript_ty);
+                }
+
+                union_builder.build()
             }
             _ => {
                 if !self.in_string_annotation() {
@@ -2033,6 +2044,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 type_of_type
             }
+            SpecialFormType::TypeForm => {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let type_argument = if let [argument] = arguments {
+                    self.infer_type_expression(argument)
+                } else {
+                    let num_arguments = arguments.len();
+
+                    if !self.in_string_annotation() {
+                        for argument in arguments {
+                            self.infer_expression(argument, TypeContext::default());
+                        }
+                    }
+                    report_invalid_argument_number_to_special_form(
+                        &self.context,
+                        subscript,
+                        special_form,
+                        num_arguments,
+                        1,
+                    );
+
+                    Type::unknown()
+                };
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, type_argument);
+                }
+                TypeFormType::from_type_expression(db, type_argument)
+            }
 
             SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
@@ -2063,8 +2105,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) =
-                    argument_type.try_upcast_to_callable(db).map(|callables| {
+                let Some(callable_type) = argument_type
+                    .try_upcast_to_callable_with_recursive_fallback(
+                        db,
+                        self.recursive_type_expression_definition(),
+                    )
+                    .map(|callables| {
                         if special_form == SpecialFormType::RegularCallableTypeOf {
                             callables
                                 .map(|callable| callable.into_regular(db))

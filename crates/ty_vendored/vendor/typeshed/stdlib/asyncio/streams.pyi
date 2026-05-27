@@ -3,8 +3,8 @@ import sys
 from _typeshed import ReadableBuffer, StrPath
 from collections.abc import Awaitable, Callable, Iterable, Sequence, Sized
 from types import ModuleType
-from typing import Any, Protocol, SupportsIndex, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, Protocol, SupportsIndex, TypeAlias, type_check_only
+from typing_extensions import Self
 
 from . import events, protocols, transports
 from .base_events import Server
@@ -28,149 +28,72 @@ _ClientConnectedCallback: TypeAlias = Callable[[StreamReader, StreamWriter], Awa
 @type_check_only
 class _ReaduntilBuffer(ReadableBuffer, Sized, Protocol): ...
 
-if sys.version_info >= (3, 10):
-    async def open_connection(
-        host: str | None = None,
-        port: int | str | None = None,
-        *,
-        limit: int = 65536,
-        ssl_handshake_timeout: float | None = None,
-        **kwds: Any,
-    ) -> tuple[StreamReader, StreamWriter]:
-        """A wrapper for create_connection() returning a (reader, writer) pair.
+async def open_connection(
+    host: str | None = None,
+    port: int | str | None = None,
+    *,
+    limit: int = 65536,
+    ssl_handshake_timeout: float | None = None,
+    **kwds: Any,
+) -> tuple[StreamReader, StreamWriter]:
+    """A wrapper for create_connection() returning a (reader, writer) pair.
 
-        The reader returned is a StreamReader instance; the writer is a
-        StreamWriter instance.
+    The reader returned is a StreamReader instance; the writer is a
+    StreamWriter instance.
 
-        The arguments are all the usual arguments to create_connection()
-        except protocol_factory; most common are positional host and port,
-        with various optional keyword arguments following.
+    The arguments are all the usual arguments to create_connection()
+    except protocol_factory; most common are positional host and port,
+    with various optional keyword arguments following.
 
-        Additional optional keyword arguments are loop (to set the event loop
-        instance to use) and limit (to set the buffer limit passed to the
-        StreamReader).
+    Additional optional keyword arguments are loop (to set the event loop
+    instance to use) and limit (to set the buffer limit passed to the
+    StreamReader).
 
-        (If you want to customize the StreamReader and/or
-        StreamReaderProtocol classes, just copy the code -- there's
-        really nothing special here except some convenience.)
-        """
+    (If you want to customize the StreamReader and/or
+    StreamReaderProtocol classes, just copy the code -- there's
+    really nothing special here except some convenience.)
+    """
 
-    async def start_server(
-        client_connected_cb: _ClientConnectedCallback,
-        host: str | Sequence[str] | None = None,
-        port: int | str | None = None,
-        *,
-        limit: int = 65536,
-        ssl_handshake_timeout: float | None = None,
-        **kwds: Any,
-    ) -> Server:
-        """Start a socket server, call back for each client connected.
+async def start_server(
+    client_connected_cb: _ClientConnectedCallback,
+    host: str | Sequence[str] | None = None,
+    port: int | str | None = None,
+    *,
+    limit: int = 65536,
+    ssl_handshake_timeout: float | None = None,
+    **kwds: Any,
+) -> Server:
+    """Start a socket server, call back for each client connected.
 
-        The first parameter, `client_connected_cb`, takes two parameters:
-        client_reader, client_writer.  client_reader is a StreamReader
-        object, while client_writer is a StreamWriter object.  This
-        parameter can either be a plain callback function or a coroutine;
-        if it is a coroutine, it will be automatically converted into a
-        Task.
+    The first parameter, `client_connected_cb`, takes two parameters:
+    client_reader, client_writer.  client_reader is a StreamReader
+    object, while client_writer is a StreamWriter object.  This
+    parameter can either be a plain callback function or a coroutine;
+    if it is a coroutine, it will be automatically converted into a
+    Task.
 
-        The rest of the arguments are all the usual arguments to
-        loop.create_server() except protocol_factory; most common are
-        positional host and port, with various optional keyword arguments
-        following.  The return value is the same as loop.create_server().
+    The rest of the arguments are all the usual arguments to
+    loop.create_server() except protocol_factory; most common are
+    positional host and port, with various optional keyword arguments
+    following.  The return value is the same as loop.create_server().
 
-        Additional optional keyword argument is limit (to set the buffer
-        limit passed to the StreamReader).
+    Additional optional keyword argument is limit (to set the buffer
+    limit passed to the StreamReader).
 
-        The return value is the same as loop.create_server(), i.e. a
-        Server object which can be used to stop the service.
-        """
-
-else:
-    async def open_connection(
-        host: str | None = None,
-        port: int | str | None = None,
-        *,
-        loop: events.AbstractEventLoop | None = None,
-        limit: int = 65536,
-        ssl_handshake_timeout: float | None = None,
-        **kwds: Any,
-    ) -> tuple[StreamReader, StreamWriter]:
-        """A wrapper for create_connection() returning a (reader, writer) pair.
-
-        The reader returned is a StreamReader instance; the writer is a
-        StreamWriter instance.
-
-        The arguments are all the usual arguments to create_connection()
-        except protocol_factory; most common are positional host and port,
-        with various optional keyword arguments following.
-
-        Additional optional keyword arguments are loop (to set the event loop
-        instance to use) and limit (to set the buffer limit passed to the
-        StreamReader).
-
-        (If you want to customize the StreamReader and/or
-        StreamReaderProtocol classes, just copy the code -- there's
-        really nothing special here except some convenience.)
-        """
-
-    async def start_server(
-        client_connected_cb: _ClientConnectedCallback,
-        host: str | None = None,
-        port: int | str | None = None,
-        *,
-        loop: events.AbstractEventLoop | None = None,
-        limit: int = 65536,
-        ssl_handshake_timeout: float | None = None,
-        **kwds: Any,
-    ) -> Server:
-        """Start a socket server, call back for each client connected.
-
-        The first parameter, `client_connected_cb`, takes two parameters:
-        client_reader, client_writer.  client_reader is a StreamReader
-        object, while client_writer is a StreamWriter object.  This
-        parameter can either be a plain callback function or a coroutine;
-        if it is a coroutine, it will be automatically converted into a
-        Task.
-
-        The rest of the arguments are all the usual arguments to
-        loop.create_server() except protocol_factory; most common are
-        positional host and port, with various optional keyword arguments
-        following.  The return value is the same as loop.create_server().
-
-        Additional optional keyword arguments are loop (to set the event loop
-        instance to use) and limit (to set the buffer limit passed to the
-        StreamReader).
-
-        The return value is the same as loop.create_server(), i.e. a
-        Server object which can be used to stop the service.
-        """
+    The return value is the same as loop.create_server(), i.e. a
+    Server object which can be used to stop the service.
+    """
 
 if sys.platform != "win32":
-    if sys.version_info >= (3, 10):
-        async def open_unix_connection(
-            path: StrPath | None = None, *, limit: int = 65536, **kwds: Any
-        ) -> tuple[StreamReader, StreamWriter]:
-            """Similar to `open_connection` but works with UNIX Domain Sockets."""
+    async def open_unix_connection(
+        path: StrPath | None = None, *, limit: int = 65536, **kwds: Any
+    ) -> tuple[StreamReader, StreamWriter]:
+        """Similar to `open_connection` but works with UNIX Domain Sockets."""
 
-        async def start_unix_server(
-            client_connected_cb: _ClientConnectedCallback, path: StrPath | None = None, *, limit: int = 65536, **kwds: Any
-        ) -> Server:
-            """Similar to `start_server` but works with UNIX Domain Sockets."""
-    else:
-        async def open_unix_connection(
-            path: StrPath | None = None, *, loop: events.AbstractEventLoop | None = None, limit: int = 65536, **kwds: Any
-        ) -> tuple[StreamReader, StreamWriter]:
-            """Similar to `open_connection` but works with UNIX Domain Sockets."""
-
-        async def start_unix_server(
-            client_connected_cb: _ClientConnectedCallback,
-            path: StrPath | None = None,
-            *,
-            loop: events.AbstractEventLoop | None = None,
-            limit: int = 65536,
-            **kwds: Any,
-        ) -> Server:
-            """Similar to `start_server` but works with UNIX Domain Sockets."""
+    async def start_unix_server(
+        client_connected_cb: _ClientConnectedCallback, path: StrPath | None = None, *, limit: int = 65536, **kwds: Any
+    ) -> Server:
+        """Similar to `start_server` but works with UNIX Domain Sockets."""
 
 class FlowControlMixin(protocols.Protocol):
     """Reusable flow control logic for StreamWriter.drain().
@@ -258,7 +181,7 @@ class StreamWriter:
 
 class StreamReader:
     def __init__(self, limit: int = 65536, loop: events.AbstractEventLoop | None = None) -> None: ...
-    def exception(self) -> Exception: ...
+    def exception(self) -> Exception | None: ...
     def set_exception(self, exc: Exception) -> None: ...
     def set_transport(self, transport: transports.BaseTransport) -> None: ...
     def feed_eof(self) -> None: ...

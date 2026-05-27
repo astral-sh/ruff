@@ -4,8 +4,8 @@ import sys
 import types
 from collections.abc import Callable, Iterator
 from opcode import *  # `dis` re-exports it as a part of public API
-from typing import IO, Any, Final, NamedTuple, overload
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import IO, Any, Final, NamedTuple, TypeAlias, overload
+from typing_extensions import Self, deprecated, disjoint_base
 
 __all__ = [
     "code_info",
@@ -445,7 +445,6 @@ if sys.version_info >= (3, 13):
         Otherwise, the source line information (if any) is taken directly from
         the disassembled code object.
         """
-
     @overload
     @deprecated(
         "The `show_caches` parameter is deprecated since Python 3.13. "

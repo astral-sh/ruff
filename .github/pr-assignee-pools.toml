@@ -9,7 +9,7 @@ reviewers = ["ntBre"]
 [[pools]]
 name = "ty-semantic"
 paths = ["/crates/ty_python_core/**", "/crates/ty_python_semantic/**"]
-reviewers = ["carljm", "charliermarsh", "sharkdp", "dcreager", "ibraheemdev", "oconnor663"]
+reviewers = ["carljm", "charliermarsh", "sharkdp", "dcreager", "oconnor663", "dhruvmanila"]
 
 [[pools]]
 name = "ty-module-resolver"
@@ -36,9 +36,9 @@ reviewers = ["MichaReiser"]
 [[pools]]
 name = "ty-ide"
 paths = ["/crates/ty_ide/**"]
-reviewers = ["charliermarsh", "MichaReiser", "dhruvmanila"]
+reviewers = ["charliermarsh", "MichaReiser", "dhruvmanila", "lerebear"]
 
 [[pools]]
 name = "ty-server"
 paths = ["/crates/ty_server/**"]
-reviewers = ["charliermarsh", "MichaReiser", "dhruvmanila"]
+reviewers = ["charliermarsh", "MichaReiser", "dhruvmanila", "lerebear"]

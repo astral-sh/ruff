@@ -156,6 +156,61 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Decorated methods with implicit class attributes
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+class A: ...
+
+T = TypeVar("T")
+U = TypeVar("U", bound=A)
+C = Callable[[T, U], object]
+
+def d() -> Callable[[C[U, A]], object]:
+    raise NotImplementedError
+
+class B:
+    @d()
+    def m1(self, p):
+        pass
+
+    @d()
+    def m2(self, p):
+        self.__slots__  # error: [unresolved-attribute]
+```
+
+## Function annotation and dynamic `NamedTuple` / `NewType`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3485>. Recursive type
+normalization should not force the lazy base of a `NewType` while Salsa is recovering the cycle
+created by the forward reference to `T`.
+
+```py
+class C:
+    pass
+
+def f():
+    pass
+
+def g() -> T:  # error: [unresolved-reference]
+    pass
+
+g()
+
+from typing import NamedTuple, NewType
+
+X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
+
+list(X)
+T = f()
+
+X = NewType("X", C)
+```
+
 ## Lazy cached property behind `hasattr`
 
 This pattern used to panic with "too many cycle iterations".

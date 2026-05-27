@@ -361,3 +361,19 @@ def f(x: int, y: int):
             x = None
         reveal_type(x)  # revealed: None | str
 ```
+
+## A class body cannot see the class name being defined
+
+The class name is bound only after the class body is evaluated, so a class body should not resolve
+the class name to itself.
+
+```py
+class A:
+    A = A  # error: [unresolved-reference]
+
+B = 1
+
+class B:
+    reveal_type(B)  # revealed: Literal[1]
+    B = B
+```

@@ -39,6 +39,7 @@ ruff_python_stdlib = { path = "crates/ruff_python_stdlib" }
 ruff_python_trivia = { path = "crates/ruff_python_trivia" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }
+ruff_mdtest = { path = "crates/ruff_mdtest" }
 ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
@@ -94,12 +95,13 @@ dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
-get-size2 = { version = "0.8.0", features = [
+get-size2 = { version = "0.9.0", features = [
     "derive",
     "smallvec",
     "hashbrown",
     "compact-str",
-    "ordermap"
+    "ordermap",
+    "thin-vec",
 ] }
 getrandom = { version = "0.4.1" }
 glob = { version = "0.3.1" }
@@ -189,6 +191,7 @@ syn = { version = "2.0.55" }
 tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
 thiserror = { version = "2.0.0" }
+thin-vec = { version = "0.2.14" }
 tikv-jemallocator = { version = "0.6.0" }
 toml = { version = "1.0.0" }
 tracing = { version = "0.1.40" }
@@ -219,6 +222,7 @@ zip = { version = "0.6.6", default-features = false }
 [workspace.metadata.cargo-shear]
 ignored = [
     "getrandom",
+    "ruff_mdtest",
     "ty_completion_bench",
     "ty_completion_eval",
 ]

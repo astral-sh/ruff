@@ -9,13 +9,14 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
-    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test_case(Rule::UnnecessaryCallAroundSorted, Path::new("C413.py"))]
     #[test_case(Rule::UnnecessaryCollectionCall, Path::new("C408.py"))]
@@ -51,6 +52,22 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400_py315.py"))]
+    #[test_case(Rule::UnnecessaryGeneratorSet, Path::new("C401_py315.py"))]
+    #[test_case(Rule::UnnecessaryListComprehensionSet, Path::new("C403_py315.py"))]
+    #[test_case(Rule::UnnecessaryListCall, Path::new("C411_py315.py"))]
+    #[test_case(Rule::UnnecessaryLiteralWithinDictCall, Path::new("C418_py315.py"))]
+    #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_py315.py"))]
+    fn rules_py315(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_comprehensions").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY315),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409.py"))]
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -67,6 +84,28 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409_py315.py"))]
+    fn preview_rules_py315(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_comprehensions").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY315)
+            },
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY315)
+            },
+        );
         Ok(())
     }
 

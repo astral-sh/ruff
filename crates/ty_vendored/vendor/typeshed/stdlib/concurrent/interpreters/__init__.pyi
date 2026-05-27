@@ -4,8 +4,8 @@ import sys
 import threading
 import types
 from collections.abc import Callable
-from typing import Any, Literal, TypeVar
-from typing_extensions import ParamSpec, Self
+from typing import Any, Literal, ParamSpec, TypeVar
+from typing_extensions import Self
 
 if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <= 3.13
     from _interpreters import (

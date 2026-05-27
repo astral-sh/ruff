@@ -179,20 +179,16 @@ reveal_type(sys.version_info[:2])
     let builder = TestServerBuilder::new()?;
     let python_home = builder.file_path(python_home);
     let sys_prefix = builder.file_path("venv");
-    let python_uri = builder.file_uri(python);
 
     let workspace_options: ClientOptions = serde_json::from_value(json!({
         "pythonExtension": {
             "activeEnvironment": {
                 "executable": {
-                    "uri": python_uri,
                     "sysPrefix": sys_prefix,
                 },
                 "version": {
                     "major": 3,
                     "minor": 16,
-                    "patch": 0,
-                    "sysVersion": "3.16.0",
                 }
             }
         }

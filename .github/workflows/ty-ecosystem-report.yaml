@@ -35,7 +35,7 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-          version: "0.11.7"
+          version: "0.11.16"
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -57,7 +57,7 @@ jobs:
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@702b757c63622c7ea3cc3a271050eeab15d83aa7"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@88eb3e1ceaf6a573a5b21155a40b15b3d54b6a6c"
 
           ecosystem-analyzer \
             --verbose \

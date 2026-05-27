@@ -282,6 +282,13 @@ impl HasNavigationTargets for Type<'_> {
                 .collect(),
 
             Type::Intersection(intersection) => {
+                if let Some(alternatives) = intersection.finite_alternatives(db) {
+                    return alternatives
+                        .iter()
+                        .flat_map(|alternative| alternative.navigation_targets(db))
+                        .collect();
+                }
+
                 // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
                 let mut targets = intersection.iter_positive(db).filter(|ty| !ty.is_unknown());
 
@@ -298,6 +305,12 @@ impl HasNavigationTargets for Type<'_> {
                     None => first.navigation_targets(db),
                 }
             }
+
+            Type::EnumComplement(complement) => complement
+                .remaining_literal_types(db)
+                .iter()
+                .flat_map(|alternative| alternative.navigation_targets(db))
+                .collect(),
 
             ty => ty
                 .definition(db)

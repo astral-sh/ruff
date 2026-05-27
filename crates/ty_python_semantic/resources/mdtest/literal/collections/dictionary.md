@@ -65,7 +65,7 @@ reveal_type(x)  # revealed: dict[int, (_: int) -> int]
 ## Mixed dict
 
 ```py
-# revealed: dict[str, int | tuple[int, int] | tuple[int, int, int]]
+# revealed: dict[str, int | tuple[int, ...]]
 reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 ```
 
@@ -208,6 +208,7 @@ x3["inner"] = {"inner": {"a": 1}}
 f1(**x3["inner"])
 
 def _(x: dict[str, object]):
+    # error: [invalid-type-form]
     x["inner"]: dict[str, float | str] = {"a": 1, "b": "a"}
 
     f2(**x["inner"])  # ok
