@@ -344,10 +344,14 @@ pub fn implementation_definitions_for_attribute<'db>(
     let mut seen = FxHashSet::default();
     collect_implementation_root_classes(db, lhs_ty, &mut seen, &mut roots);
 
-    roots
-        .into_iter()
-        .flat_map(|root| implementation_definitions_for_class_family(db, root, method_name))
-        .collect()
+    let mut definitions = Vec::new();
+    for root in roots {
+        extend_unique_definitions(
+            &mut definitions,
+            implementation_definitions_for_class_family(db, root, method_name),
+        );
+    }
+    definitions
 }
 
 /// Returns definitions for the implementation family of a method declaration.
@@ -463,10 +467,29 @@ fn implementation_definitions_for_class_family<'db>(
     root: ClassLiteral<'db>,
     method_name: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
-    std::iter::once(root)
-        .chain(transitive_subtypes(db, root))
-        .flat_map(|class| own_method_definitions(db, class, method_name))
-        .collect()
+    let mut definitions = mro_method_definitions(db, root, method_name);
+    for subtype in transitive_subtypes(db, root) {
+        extend_unique_definitions(
+            &mut definitions,
+            own_method_definitions(db, subtype, method_name),
+        );
+    }
+    definitions
+}
+
+fn mro_method_definitions<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    method_name: &str,
+) -> Vec<ResolvedDefinition<'db>> {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find_map(|class| {
+            let definitions = own_method_definitions(db, class.class_literal(db), method_name);
+            (!definitions.is_empty()).then_some(definitions)
+        })
+        .unwrap_or_default()
 }
 
 fn own_method_definitions<'db>(
@@ -501,6 +524,17 @@ fn own_method_definitions<'db>(
     .filter(|definition| matches!(definition.kind(db), DefinitionKind::Function(_)))
     .map(ResolvedDefinition::Definition)
     .collect()
+}
+
+fn extend_unique_definitions<'db>(
+    definitions: &mut Vec<ResolvedDefinition<'db>>,
+    new_definitions: impl IntoIterator<Item = ResolvedDefinition<'db>>,
+) {
+    for definition in new_definitions {
+        if !definitions.contains(&definition) {
+            definitions.push(definition);
+        }
+    }
 }
 
 fn collect_implementation_root_classes<'db>(
