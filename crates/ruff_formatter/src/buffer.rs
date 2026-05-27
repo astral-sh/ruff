@@ -92,7 +92,7 @@ pub enum BufferSnapshot {
 
 impl BufferSnapshot {
     /// Creates a new buffer snapshot that points to the specified position.
-    pub(crate) const fn position(index: usize) -> Self {
+    pub const fn position(index: usize) -> Self {
         Self::Position(index)
     }
 
@@ -101,7 +101,7 @@ impl BufferSnapshot {
     /// # Panics
     ///
     /// If self is not a [`BufferSnapshot::Position`]
-    pub(crate) fn unwrap_position(&self) -> usize {
+    pub fn unwrap_position(&self) -> usize {
         match self {
             BufferSnapshot::Position(index) => *index,
             BufferSnapshot::Any(_) => panic!("Tried to unwrap Any snapshot as a position."),
@@ -113,7 +113,7 @@ impl BufferSnapshot {
     /// # Panics
     ///
     /// If `self` is not a [`BufferSnapshot::Any`].
-    pub(crate) fn unwrap_any<T: 'static>(self) -> T {
+    pub fn unwrap_any<T: 'static>(self) -> T {
         match self {
             BufferSnapshot::Position(_) => {
                 panic!("Tried to unwrap Position snapshot as Any snapshot.")
@@ -169,25 +169,22 @@ impl<W: Buffer<Context = Context> + ?Sized, Context> Buffer for &mut W {
 ///
 /// The buffer writes all elements into the internal elements buffer.
 #[derive(Debug)]
-pub(crate) struct VecBuffer<'a, Context> {
+pub struct VecBuffer<'a, Context> {
     state: &'a mut FormatState<Context>,
     elements: Vec<FormatElement>,
 }
 
 impl<'a, Context> VecBuffer<'a, Context> {
-    pub(crate) fn new(state: &'a mut FormatState<Context>) -> Self {
+    pub fn new(state: &'a mut FormatState<Context>) -> Self {
         Self::new_with_vec(state, Vec::new())
     }
 
-    pub(crate) fn new_with_vec(
-        state: &'a mut FormatState<Context>,
-        elements: Vec<FormatElement>,
-    ) -> Self {
+    pub fn new_with_vec(state: &'a mut FormatState<Context>, elements: Vec<FormatElement>) -> Self {
         Self { state, elements }
     }
 
     /// Creates a buffer with the specified capacity
-    pub(crate) fn with_capacity(capacity: usize, state: &'a mut FormatState<Context>) -> Self {
+    pub fn with_capacity(capacity: usize, state: &'a mut FormatState<Context>) -> Self {
         Self {
             state,
             elements: Vec::with_capacity(capacity),
@@ -195,8 +192,13 @@ impl<'a, Context> VecBuffer<'a, Context> {
     }
 
     /// Consumes the buffer and returns the written [`FormatElement]`s as a vector.
-    pub(crate) fn into_vec(self) -> Vec<FormatElement> {
+    pub fn into_vec(self) -> Vec<FormatElement> {
         self.elements
+    }
+
+    /// Takes the elements without consuming self
+    pub fn take_vec(&mut self) -> Vec<FormatElement> {
+        std::mem::take(&mut self.elements)
     }
 }
 
@@ -250,14 +252,12 @@ Make sure that you take and restore the snapshot in order and that this snapshot
 }
 
 /// Buffer that allows you inspecting elements as they get written to the formatter.
-#[allow(dead_code)]
-pub(crate) struct Inspect<'inner, Context, Inspector> {
+pub struct Inspect<'inner, Context, Inspector> {
     inner: &'inner mut dyn Buffer<Context = Context>,
     inspector: Inspector,
 }
 
 impl<'inner, Context, Inspector> Inspect<'inner, Context, Inspector> {
-    #[allow(dead_code)]
     fn new(inner: &'inner mut dyn Buffer<Context = Context>, inspector: Inspector) -> Self {
         Self { inner, inspector }
     }
@@ -583,10 +583,9 @@ struct RemoveSoftLinebreaksSnapshot {
     state: RemoveSoftLineBreaksState,
 }
 
-pub(crate) trait BufferExtensions: Buffer + Sized {
+pub trait BufferExtensions: Buffer + Sized {
     /// Returns a new buffer that calls the passed inspector for every element that gets written to the output
     #[must_use]
-    #[allow(dead_code)]
     fn inspect<F>(&mut self, inspector: F) -> Inspect<'_, Self::Context, F>
     where
         F: FnMut(&FormatElement),
@@ -650,7 +649,7 @@ pub(crate) trait BufferExtensions: Buffer + Sized {
 impl<T> BufferExtensions for T where T: Buffer {}
 
 #[derive(Debug)]
-pub(crate) struct Recording<'buf, Buffer> {
+pub struct Recording<'buf, Buffer> {
     start: usize,
     buffer: &'buf mut Buffer,
 }
@@ -667,17 +666,16 @@ where
     }
 
     #[inline]
-    pub(crate) fn write_fmt(&mut self, arguments: Arguments<B::Context>) -> FormatResult<()> {
+    pub fn write_fmt(&mut self, arguments: Arguments<B::Context>) -> FormatResult<()> {
         self.buffer.write_fmt(arguments)
     }
 
     #[inline]
-    #[allow(dead_code)]
-    pub(crate) fn write_element(&mut self, element: FormatElement) {
+    pub fn write_element(&mut self, element: FormatElement) {
         self.buffer.write_element(element);
     }
 
-    pub(crate) fn stop(self) -> Recorded<'buf> {
+    pub fn stop(self) -> Recorded<'buf> {
         let buffer: &'buf B = self.buffer;
         let elements = buffer.elements();
 
@@ -693,7 +691,7 @@ where
 }
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct Recorded<'a>(&'a [FormatElement]);
+pub struct Recorded<'a>(&'a [FormatElement]);
 
 impl Deref for Recorded<'_> {
     type Target = [FormatElement];

@@ -13,13 +13,13 @@ pub struct LintMetadata {
     pub name: LintName,
 
     /// A one-sentence summary of what the lint catches.
-    pub(crate) summary: &'static str,
+    pub summary: &'static str,
 
     /// An in depth explanation of the lint in markdown. Covers what the lint does, why it's bad and possible fixes.
     ///
     /// The documentation may require post-processing to be rendered correctly. For example, lines
     /// might have leading or trailing whitespace that should be removed.
-    pub(crate) raw_documentation: &'static str,
+    pub raw_documentation: &'static str,
 
     /// The default level of the lint if the user doesn't specify one.
     pub default_level: Level,
@@ -27,10 +27,10 @@ pub struct LintMetadata {
     pub status: LintStatus,
 
     /// The source file in which the lint is declared.
-    pub(crate) file: &'static str,
+    pub file: &'static str,
 
     /// The 1-based line number in the source `file` where the lint is declared.
-    pub(crate) line: u32,
+    pub line: u32,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
@@ -55,6 +55,20 @@ pub enum Level {
     ///
     /// The lint is enabled and diagnostics have an error severity.
     Error,
+}
+
+impl Level {
+    pub const fn is_error(self) -> bool {
+        matches!(self, Level::Error)
+    }
+
+    pub const fn is_warn(self) -> bool {
+        matches!(self, Level::Warn)
+    }
+
+    pub const fn is_ignore(self) -> bool {
+        matches!(self, Level::Ignore)
+    }
 }
 
 impl fmt::Display for Level {
@@ -102,7 +116,7 @@ impl LintMetadata {
         self.documentation_lines().join("\n")
     }
 
-    pub(crate) fn documentation_url(&self) -> String {
+    pub fn documentation_url(&self) -> String {
         lint_documentation_url(self.name())
     }
 
@@ -123,12 +137,12 @@ impl LintMetadata {
     }
 }
 
-pub(crate) fn lint_documentation_url(lint_name: LintName) -> String {
+pub fn lint_documentation_url(lint_name: LintName) -> String {
     format!("https://ty.dev/rules#{lint_name}")
 }
 
 #[doc(hidden)]
-pub(crate) const fn lint_metadata_defaults() -> LintMetadata {
+pub const fn lint_metadata_defaults() -> LintMetadata {
     LintMetadata {
         name: LintName::of(""),
         summary: "",
@@ -182,15 +196,23 @@ pub enum LintStatus {
 }
 
 impl LintStatus {
-    pub(crate) const fn preview(since: &'static str) -> Self {
+    pub const fn preview(since: &'static str) -> Self {
         LintStatus::Preview { since }
     }
 
-    pub(crate) const fn stable(since: &'static str) -> Self {
+    pub const fn stable(since: &'static str) -> Self {
         LintStatus::Stable { since }
     }
 
-    pub(crate) const fn is_removed(&self) -> bool {
+    pub const fn deprecated(since: &'static str, reason: &'static str) -> Self {
+        LintStatus::Deprecated { since, reason }
+    }
+
+    pub const fn removed(since: &'static str, reason: &'static str) -> Self {
+        LintStatus::Removed { since, reason }
+    }
+
+    pub const fn is_removed(&self) -> bool {
         matches!(self, LintStatus::Removed { .. })
     }
 
@@ -298,7 +320,7 @@ pub struct LintRegistryBuilder {
 
 impl LintRegistryBuilder {
     #[track_caller]
-    pub(crate) fn register_lint(&mut self, lint: &'static LintMetadata) {
+    pub fn register_lint(&mut self, lint: &'static LintMetadata) {
         assert_eq!(
             self.by_name.insert(&*lint.name, lint.into()),
             None,
@@ -311,7 +333,31 @@ impl LintRegistryBuilder {
         }
     }
 
-    pub(crate) fn build(self) -> LintRegistry {
+    #[track_caller]
+    pub fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
+        let target = match self.by_name.get(to.name.as_str()) {
+            Some(LintEntry::Lint(target) | LintEntry::Removed(target)) => target,
+            Some(LintEntry::Alias(target)) => {
+                panic!(
+                    "lint alias {from} -> {to:?} points to another alias {target:?}",
+                    target = target.name()
+                )
+            }
+            None => panic!(
+                "lint alias {from} -> {to} points to non-registered lint",
+                to = to.name
+            ),
+        };
+
+        assert_eq!(
+            self.by_name
+                .insert(from.as_str(), LintEntry::Alias(*target)),
+            None,
+            "duplicate lint registration for '{from}'",
+        );
+    }
+
+    pub fn build(self) -> LintRegistry {
         LintRegistry {
             lints: self.lints,
             by_name: self.by_name,
@@ -361,6 +407,30 @@ impl LintRegistry {
     /// Returns all registered, non-removed lints.
     pub fn lints(&self) -> &[LintId] {
         &self.lints
+    }
+
+    /// Returns an iterator over all known aliases and to their target lints.
+    ///
+    /// This iterator includes aliases that point to removed lints.
+    pub fn aliases(&self) -> impl Iterator<Item = (LintName, LintId)> + '_ {
+        self.by_name.iter().filter_map(|(key, value)| {
+            if let LintEntry::Alias(alias) = value {
+                Some((LintName::of(key), *alias))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Iterates over all removed lints.
+    pub fn removed(&self) -> impl Iterator<Item = LintId> + '_ {
+        self.by_name.values().filter_map(|value| {
+            if let LintEntry::Removed(metadata) = value {
+                Some(*metadata)
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -471,17 +541,29 @@ impl RuleSelection {
         RuleSelection { lints }
     }
 
+    /// Returns an iterator over all enabled lints.
+    pub fn enabled(&self) -> impl Iterator<Item = LintId> + '_ {
+        self.lints.keys().copied()
+    }
+
+    /// Returns an iterator over all enabled lints and their severity.
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (LintId, Severity)> + '_ {
+        self.lints
+            .iter()
+            .map(|(&lint, &(severity, _))| (lint, severity))
+    }
+
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
-    pub(crate) fn severity(&self, lint: LintId) -> Option<Severity> {
+    pub fn severity(&self, lint: LintId) -> Option<Severity> {
         self.lints.get(&lint).map(|(severity, _)| *severity)
     }
 
-    pub(crate) fn get(&self, lint: LintId) -> Option<(Severity, LintSource)> {
+    pub fn get(&self, lint: LintId) -> Option<(Severity, LintSource)> {
         self.lints.get(&lint).copied()
     }
 
     /// Returns `true` if the `lint` is enabled.
-    pub(crate) fn is_enabled(&self, lint: LintId) -> bool {
+    pub fn is_enabled(&self, lint: LintId) -> bool {
         self.severity(lint).is_some()
     }
 

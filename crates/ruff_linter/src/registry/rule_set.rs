@@ -24,6 +24,10 @@ impl RuleSet {
         Self(Self::EMPTY)
     }
 
+    pub fn clear(&mut self) {
+        self.0 = Self::EMPTY;
+    }
+
     #[inline]
     pub const fn from_rule(rule: Rule) -> Self {
         let rule = rule as u16;
@@ -81,7 +85,7 @@ impl RuleSet {
     /// assert!(union.contains(Rule::BooleanPositionalValueInCall));
     /// ```
     #[must_use]
-    pub(crate) const fn union(mut self, other: &Self) -> Self {
+    pub const fn union(mut self, other: &Self) -> Self {
         let mut i = 0;
 
         while i < self.0.len() {
@@ -106,7 +110,7 @@ impl RuleSet {
     /// assert!(!subtract.contains(Rule::AmbiguousFunctionName));
     /// ```
     #[must_use]
-    pub(crate) const fn subtract(mut self, other: &Self) -> Self {
+    pub const fn subtract(mut self, other: &Self) -> Self {
         let mut i = 0;
 
         while i < self.0.len() {
@@ -159,7 +163,7 @@ impl RuleSet {
     ///                 .is_empty()
     ///         );
     /// ```
-    pub(crate) const fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
@@ -174,7 +178,7 @@ impl RuleSet {
     ///     RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString]).len(),
     ///     2
     /// );
-    pub(crate) const fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         let mut len: u32 = 0;
 
         let mut i = 0;
@@ -226,7 +230,7 @@ impl RuleSet {
     /// assert!(set.contains(Rule::AnyType));
     /// assert!(!set.contains(Rule::AmbiguousFunctionName));
     /// ```
-    pub(crate) fn remove(&mut self, rule: Rule) {
+    pub fn remove(&mut self, rule: Rule) {
         let set = std::mem::take(self);
         *self = set.subtract(&RuleSet::from_rule(rule));
     }
@@ -253,7 +257,7 @@ impl RuleSet {
 
     /// Returns `true` if any of the rules in `rules` are in this set.
     #[inline]
-    pub(crate) const fn any(&self, rules: &[Rule]) -> bool {
+    pub const fn any(&self, rules: &[Rule]) -> bool {
         let mut any = false;
         let mut i = 0;
 
@@ -277,7 +281,7 @@ impl RuleSet {
     ///
     /// assert_eq!(iter, vec![Rule::AnyType, Rule::AmbiguousFunctionName]);
     /// ```
-    pub(crate) fn iter(&self) -> RuleSetIterator {
+    pub fn iter(&self) -> RuleSetIterator {
         RuleSetIterator {
             set: self.clone(),
             index: 0,

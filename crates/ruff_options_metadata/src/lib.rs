@@ -49,6 +49,15 @@ pub enum OptionEntry {
     Set(OptionSet),
 }
 
+impl OptionEntry {
+    pub fn into_field(self) -> Option<OptionField> {
+        match self {
+            OptionEntry::Field(field) => Some(field),
+            OptionEntry::Set(_) => None,
+        }
+    }
+}
+
 impl Display for OptionEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {

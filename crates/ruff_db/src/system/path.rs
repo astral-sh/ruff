@@ -2,7 +2,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
-use std::path::{Path, StripPrefixError};
+use std::path::{Path, PathBuf, StripPrefixError};
 
 /// A slice of a path on [`System`](super::System) (akin to [`str`]).
 ///
@@ -120,6 +120,30 @@ impl SystemPath {
     #[must_use]
     pub fn starts_with(&self, base: impl AsRef<SystemPath>) -> bool {
         self.0.starts_with(base.as_ref())
+    }
+
+    /// Determines whether `child` is a suffix of `self`.
+    ///
+    /// Only considers whole path components to match.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let path = SystemPath::new("/etc/resolv.conf");
+    ///
+    /// assert!(path.ends_with("resolv.conf"));
+    /// assert!(path.ends_with("etc/resolv.conf"));
+    /// assert!(path.ends_with("/etc/resolv.conf"));
+    ///
+    /// assert!(!path.ends_with("/resolv.conf"));
+    /// assert!(!path.ends_with("conf")); // use .extension() instead
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn ends_with(&self, child: impl AsRef<SystemPath>) -> bool {
+        self.0.ends_with(child.as_ref())
     }
 
     /// Returns the `FileSystemPath` without its final component, if there is one.
@@ -320,6 +344,28 @@ impl SystemPath {
         SystemPathBuf::from_utf8_path_buf(self.0.join(&path.as_ref().0))
     }
 
+    /// Creates an owned [`SystemPathBuf`] like `self` but with the given extension.
+    ///
+    /// See [`std::path::PathBuf::set_extension`] for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///
+    /// let path = SystemPath::new("foo.rs");
+    /// assert_eq!(path.with_extension("txt"), SystemPathBuf::from("foo.txt"));
+    ///
+    /// let path = SystemPath::new("foo.tar.gz");
+    /// assert_eq!(path.with_extension(""), SystemPathBuf::from("foo.tar"));
+    /// assert_eq!(path.with_extension("xz"), SystemPathBuf::from("foo.tar.xz"));
+    /// assert_eq!(path.with_extension("").with_extension("txt"), SystemPathBuf::from("foo.txt"));
+    /// ```
+    #[inline]
+    pub fn with_extension(&self, extension: &str) -> SystemPathBuf {
+        SystemPathBuf::from_utf8_path_buf(self.0.with_extension(extension))
+    }
+
     /// Converts the path to an owned [`SystemPathBuf`].
     pub fn to_path_buf(&self) -> SystemPathBuf {
         SystemPathBuf(self.0.to_path_buf())
@@ -464,7 +510,7 @@ impl get_size2::GetSize for SystemPathBuf {
 }
 
 impl SystemPathBuf {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self(Utf8PathBuf::new())
     }
 
@@ -516,6 +562,14 @@ impl SystemPathBuf {
 
     pub fn into_utf8_path_buf(self) -> Utf8PathBuf {
         self.0
+    }
+
+    pub fn into_std_path_buf(self) -> PathBuf {
+        self.0.into_std_path_buf()
+    }
+
+    pub fn into_string(self) -> String {
+        self.0.into_string()
     }
 
     #[inline]

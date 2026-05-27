@@ -240,7 +240,7 @@ impl<'a> Generator<'a> {
         self.buffer
     }
 
-    pub(crate) fn unparse_suite(&mut self, suite: &Suite) {
+    pub fn unparse_suite(&mut self, suite: &Suite) {
         for stmt in suite {
             self.unparse_stmt(stmt);
         }

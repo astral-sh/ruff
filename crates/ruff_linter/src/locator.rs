@@ -19,17 +19,24 @@ impl<'a> Locator<'a> {
         }
     }
 
+    pub fn with_index(contents: &'a str, index: LineIndex) -> Self {
+        Self {
+            contents,
+            index: OnceCell::from(index),
+        }
+    }
+
     #[deprecated(
         note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead."
     )]
-    pub(crate) fn compute_line_index(&self, offset: TextSize) -> OneIndexed {
+    pub fn compute_line_index(&self, offset: TextSize) -> OneIndexed {
         self.to_index().line_index(offset)
     }
 
     #[deprecated(
         note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead."
     )]
-    pub(crate) fn compute_source_location(&self, offset: TextSize) -> LineColumn {
+    pub fn compute_source_location(&self, offset: TextSize) -> LineColumn {
         self.to_source_code().line_column(offset)
     }
 
@@ -38,19 +45,23 @@ impl<'a> Locator<'a> {
             .get_or_init(|| LineIndex::from_source_text(self.contents))
     }
 
+    pub fn line_index(&self) -> Option<&LineIndex> {
+        self.index.get()
+    }
+
     pub fn to_source_code(&self) -> SourceCode<'_, '_> {
         SourceCode::new(self.contents, self.to_index())
     }
 
     /// Take the source code up to the given [`TextSize`].
     #[inline]
-    pub(crate) fn up_to(&self, offset: TextSize) -> &'a str {
+    pub fn up_to(&self, offset: TextSize) -> &'a str {
         &self.contents[TextRange::up_to(offset)]
     }
 
     /// Take the source code after the given [`TextSize`].
     #[inline]
-    pub(crate) fn after(&self, offset: TextSize) -> &'a str {
+    pub fn after(&self, offset: TextSize) -> &'a str {
         &self.contents[usize::from(offset)..]
     }
 
@@ -94,7 +105,7 @@ impl<'a> Locator<'a> {
     ///     TextSize::from(2)
     /// );
     /// ```
-    pub(crate) fn floor_char_boundary(&self, offset: TextSize) -> TextSize {
+    pub fn floor_char_boundary(&self, offset: TextSize) -> TextSize {
         if offset >= self.text_len() {
             self.text_len()
         } else {
@@ -109,7 +120,7 @@ impl<'a> Locator<'a> {
 
     /// Take the source code between the given [`TextRange`].
     #[inline]
-    pub(crate) fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
+    pub fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
         &self.contents[ranged.range()]
     }
 
@@ -119,12 +130,17 @@ impl<'a> Locator<'a> {
     }
 
     /// Return the number of bytes in the source code.
-    pub(crate) const fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.contents.len()
     }
 
-    pub(crate) fn text_len(&self) -> TextSize {
+    pub fn text_len(&self) -> TextSize {
         self.contents.text_len()
+    }
+
+    /// Return `true` if the source code is empty.
+    pub const fn is_empty(&self) -> bool {
+        self.contents.is_empty()
     }
 }
 
@@ -133,22 +149,29 @@ impl<'a> Locator<'a> {
     /// Returns the text of the `offset`'s line.
     ///
     /// See [`LineRanges::full_lines_str`].
-    pub(crate) fn full_line_str(&self, offset: TextSize) -> &'a str {
+    pub fn full_line_str(&self, offset: TextSize) -> &'a str {
         self.contents.full_line_str(offset)
     }
 
     /// Returns the text of the `offset`'s line.
     ///
     /// See [`LineRanges::line_str`].
-    pub(crate) fn line_str(&self, offset: TextSize) -> &'a str {
+    pub fn line_str(&self, offset: TextSize) -> &'a str {
         self.contents.line_str(offset)
     }
 
     /// Returns the text of all lines that include `range`.
     ///
     /// See [`LineRanges::lines_str`].
-    pub(crate) fn lines_str(&self, range: TextRange) -> &'a str {
+    pub fn lines_str(&self, range: TextRange) -> &'a str {
         self.contents.lines_str(range)
+    }
+
+    /// Returns the text of all lines that include `range`.
+    ///
+    /// See [`LineRanges::full_lines_str`].
+    pub fn full_lines_str(&self, range: TextRange) -> &'a str {
+        self.contents.full_lines_str(range)
     }
 }
 

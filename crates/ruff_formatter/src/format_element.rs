@@ -69,7 +69,7 @@ pub enum FormatElement {
 }
 
 impl FormatElement {
-    pub(crate) fn tag_kind(&self) -> Option<TagKind> {
+    pub fn tag_kind(&self) -> Option<TagKind> {
         if let FormatElement::Tag(tag) = self {
             Some(tag.kind())
         } else {
@@ -118,6 +118,12 @@ pub enum LineMode {
     Empty,
 }
 
+impl LineMode {
+    pub const fn is_hard(&self) -> bool {
+        matches!(self, LineMode::Hard)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum PrintMode {
     /// Omits any soft line breaks
@@ -127,11 +133,11 @@ pub enum PrintMode {
 }
 
 impl PrintMode {
-    pub(crate) const fn is_flat(self) -> bool {
+    pub const fn is_flat(&self) -> bool {
         matches!(self, PrintMode::Flat)
     }
 
-    pub(crate) const fn is_expanded(self) -> bool {
+    pub const fn is_expanded(&self) -> bool {
         matches!(self, PrintMode::Expanded)
     }
 }
@@ -185,12 +191,9 @@ impl Deref for Interned {
     }
 }
 
-#[allow(dead_code)]
 const LINE_SEPARATOR: char = '\u{2028}';
-#[allow(dead_code)]
 const PARAGRAPH_SEPARATOR: char = '\u{2029}';
-#[allow(dead_code)]
-pub(crate) const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARATOR];
+pub const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARATOR];
 
 /// Replace the line terminators matching the provided list with "\n"
 /// since its the only line break type supported by the printer
@@ -221,15 +224,28 @@ pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) ->
 }
 
 impl FormatElement {
+    /// Returns `true` if self is a [`FormatElement::Tag`]
+    pub const fn is_tag(&self) -> bool {
+        matches!(self, FormatElement::Tag(_))
+    }
+
+    /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_start`] is `true`.
+    pub const fn is_start_tag(&self) -> bool {
+        match self {
+            FormatElement::Tag(tag) => tag.is_start(),
+            _ => false,
+        }
+    }
+
     /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_end`] is `true`.
-    pub(crate) const fn is_end_tag(&self) -> bool {
+    pub const fn is_end_tag(&self) -> bool {
         match self {
             FormatElement::Tag(tag) => tag.is_end(),
             _ => false,
         }
     }
 
-    pub(crate) const fn is_text(&self) -> bool {
+    pub const fn is_text(&self) -> bool {
         matches!(
             self,
             FormatElement::SourceCodeSlice { .. }
@@ -238,7 +254,7 @@ impl FormatElement {
         )
     }
 
-    pub(crate) const fn is_space(&self) -> bool {
+    pub const fn is_space(&self) -> bool {
         matches!(self, FormatElement::Space)
     }
 }
@@ -323,7 +339,7 @@ impl BestFittingVariants {
     ///
     /// You're looking for a way to create a `BestFitting` object, use the `best_fitting![least_expanded, most_expanded]` macro.
     #[doc(hidden)]
-    pub(crate) fn from_vec_unchecked(variants: Vec<FormatElement>) -> Self {
+    pub fn from_vec_unchecked(variants: Vec<FormatElement>) -> Self {
         debug_assert!(
             variants
                 .iter()
@@ -340,7 +356,7 @@ impl BestFittingVariants {
     /// # Panics
     ///
     /// When the number of variants is less than two.
-    pub(crate) fn most_expanded(&self) -> &[FormatElement] {
+    pub fn most_expanded(&self) -> &[FormatElement] {
         assert!(
             self.as_slice()
                 .iter()
@@ -352,7 +368,7 @@ impl BestFittingVariants {
         self.into_iter().last().unwrap()
     }
 
-    pub(crate) fn as_slice(&self) -> &[FormatElement] {
+    pub fn as_slice(&self) -> &[FormatElement] {
         &self.0
     }
 
@@ -361,7 +377,7 @@ impl BestFittingVariants {
     /// # Panics
     ///
     /// When the number of variants is less than two.
-    pub(crate) fn most_flat(&self) -> &[FormatElement] {
+    pub fn most_flat(&self) -> &[FormatElement] {
         assert!(
             self.as_slice()
                 .iter()

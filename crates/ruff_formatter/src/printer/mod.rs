@@ -39,7 +39,7 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    pub(crate) fn new(source_code: SourceCode<'a>, options: PrinterOptions) -> Self {
+    pub fn new(source_code: SourceCode<'a>, options: PrinterOptions) -> Self {
         Self {
             source_code,
             options,
@@ -48,14 +48,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Prints the passed in element as well as all its content
-    pub(crate) fn print(self, document: &'a Document) -> PrintResult<Printed> {
+    pub fn print(self, document: &'a Document) -> PrintResult<Printed> {
         self.print_with_indent(document, 0)
     }
 
     /// Prints the passed in element as well as all its content,
     /// starting at the specified indentation level
     #[tracing::instrument(level = "debug", name = "Printer::print", skip_all)]
-    pub(crate) fn print_with_indent(
+    pub fn print_with_indent(
         mut self,
         document: &'a Document,
         indent: u16,

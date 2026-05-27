@@ -196,8 +196,7 @@ pub(crate) fn assert_notebook_path(
 }
 
 /// Run [`check_path`] on a snippet of Python code.
-#[allow(dead_code)]
-pub(crate) fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
+pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
     test_contents(
@@ -213,6 +212,10 @@ pub(crate) fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Dia
 
 thread_local! {
     static MAX_ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(10) };
+}
+
+pub fn set_max_iterations(max: usize) {
+    MAX_ITERATIONS.with(|iterations| iterations.set(max));
 }
 
 pub(crate) fn max_iterations() -> usize {

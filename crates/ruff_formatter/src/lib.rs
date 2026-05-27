@@ -43,13 +43,14 @@ use std::num::{NonZeroU8, NonZeroU16, TryFromIntError};
 use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions};
 pub use arguments::{Argument, Arguments};
-pub use buffer::{Buffer, RemoveSoftLinesBuffer};
-pub(crate) use buffer::{BufferExtensions, VecBuffer};
+pub use buffer::{
+    Buffer, BufferExtensions, BufferSnapshot, Inspect, RemoveSoftLinesBuffer, VecBuffer,
+};
 pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
-pub use format_element::{FormatElement, normalize_newlines};
+pub use format_element::{FormatElement, LINE_TERMINATORS, normalize_newlines};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -76,8 +77,13 @@ impl IndentStyle {
         matches!(self, IndentStyle::Tab)
     }
 
+    /// Returns `true` if this is an [`IndentStyle::Space`].
+    pub const fn is_space(&self) -> bool {
+        matches!(self, IndentStyle::Space)
+    }
+
     /// Returns the string representation of the indent style.
-    pub(crate) const fn as_str(self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             IndentStyle::Tab => "tab",
             IndentStyle::Space => "space",
@@ -217,8 +223,7 @@ pub struct SimpleFormatContext {
 }
 
 impl SimpleFormatContext {
-    #[allow(dead_code)]
-    pub(crate) fn new(options: SimpleFormatOptions) -> Self {
+    pub fn new(options: SimpleFormatOptions) -> Self {
         Self {
             options,
             source_code: String::new(),
@@ -226,8 +231,7 @@ impl SimpleFormatContext {
     }
 
     #[must_use]
-    #[allow(dead_code)]
-    pub(crate) fn with_source_code(mut self, code: &str) -> Self {
+    pub fn with_source_code(mut self, code: &str) -> Self {
         self.source_code = String::from(code);
         self
     }
@@ -247,9 +251,9 @@ impl FormatContext for SimpleFormatContext {
 
 #[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct SimpleFormatOptions {
-    pub(crate) indent_style: IndentStyle,
-    pub(crate) indent_width: IndentWidth,
-    pub(crate) line_width: LineWidth,
+    pub indent_style: IndentStyle,
+    pub indent_width: IndentWidth,
+    pub line_width: LineWidth,
 }
 
 impl FormatOptions for SimpleFormatOptions {
@@ -281,9 +285,9 @@ impl FormatOptions for SimpleFormatOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SourceMarker {
     /// Position of the marker in the original source
-    pub(crate) source: TextSize,
+    pub source: TextSize,
     /// Position of the marker in the output code
-    pub(crate) dest: TextSize,
+    pub dest: TextSize,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -293,7 +297,7 @@ pub struct Formatted<Context> {
 }
 
 impl<Context> Formatted<Context> {
-    pub(crate) fn new(document: Document, context: Context) -> Self {
+    pub fn new(document: Document, context: Context) -> Self {
         Self { document, context }
     }
 
@@ -308,8 +312,7 @@ impl<Context> Formatted<Context> {
     }
 
     /// Consumes `self` and returns the formatted document.
-    #[allow(dead_code)]
-    pub(crate) fn into_document(self) -> Document {
+    pub fn into_document(self) -> Document {
         self.document
     }
 }
@@ -358,7 +361,7 @@ pub struct Printed {
 }
 
 impl Printed {
-    pub(crate) fn new(
+    pub fn new(
         code: String,
         range: Option<TextRange>,
         sourcemap: Vec<SourceMarker>,
@@ -372,6 +375,41 @@ impl Printed {
         }
     }
 
+    /// Construct an empty formatter result
+    pub fn new_empty() -> Self {
+        Self {
+            code: String::new(),
+            range: None,
+            sourcemap: Vec::new(),
+            verbatim_ranges: Vec::new(),
+        }
+    }
+
+    /// Range of the input source file covered by this formatted code,
+    /// or None if the entire file is covered in this instance
+    pub fn range(&self) -> Option<TextRange> {
+        self.range
+    }
+
+    /// Returns a list of [`SourceMarker`] mapping byte positions
+    /// in the output string to the input source code.
+    /// It's not guaranteed that the markers are sorted by source position.
+    pub fn sourcemap(&self) -> &[SourceMarker] {
+        &self.sourcemap
+    }
+
+    /// Returns a list of [`SourceMarker`] mapping byte positions
+    /// in the output string to the input source code, consuming the result
+    pub fn into_sourcemap(self) -> Vec<SourceMarker> {
+        self.sourcemap
+    }
+
+    /// Takes the list of [`SourceMarker`] mapping byte positions in the output string
+    /// to the input source code.
+    pub fn take_sourcemap(&mut self) -> Vec<SourceMarker> {
+        std::mem::take(&mut self.sourcemap)
+    }
+
     /// Access the resulting code, borrowing the result
     pub fn as_code(&self) -> &str {
         &self.code
@@ -380,6 +418,23 @@ impl Printed {
     /// Access the resulting code, consuming the result
     pub fn into_code(self) -> String {
         self.code
+    }
+
+    /// The text in the formatted code that has been formatted as verbatim.
+    pub fn verbatim(&self) -> impl Iterator<Item = (TextRange, &str)> {
+        self.verbatim_ranges
+            .iter()
+            .map(|range| (*range, &self.code[*range]))
+    }
+
+    /// Ranges of the formatted code that have been formatted as verbatim.
+    pub fn verbatim_ranges(&self) -> &[TextRange] {
+        &self.verbatim_ranges
+    }
+
+    /// Takes the ranges of nodes that have been formatted as verbatim, replacing them with an empty list.
+    pub fn take_verbatim_ranges(&mut self) -> Vec<TextRange> {
+        std::mem::take(&mut self.verbatim_ranges)
     }
 
     /// Slices the formatted code to the sub-slices that covers the passed `source_range` in `source`.
@@ -719,6 +774,12 @@ where
             context: PhantomData,
         }
     }
+
+    #[must_use]
+    pub fn with_item(mut self, item: T) -> Self {
+        self.item = item;
+        self
+    }
 }
 
 impl<T, R, C> Format<C> for FormatOwnedWithRule<T, R, C>
@@ -731,7 +792,16 @@ where
     }
 }
 
-impl<T, R, O, C> FormatOwnedWithRule<T, R, C> where R: FormatRuleWithOptions<T, C, Options = O> {}
+impl<T, R, O, C> FormatOwnedWithRule<T, R, C>
+where
+    R: FormatRuleWithOptions<T, C, Options = O>,
+{
+    #[must_use]
+    pub fn with_options(mut self, options: O) -> Self {
+        self.rule = self.rule.with_options(options);
+        self
+    }
+}
 
 impl<T, R, C> FormatWithRule<C> for FormatOwnedWithRule<T, R, C>
 where
@@ -874,19 +944,19 @@ where
 
 impl<Context> FormatState<Context> {
     /// Creates a new state with the given language specific context
-    pub(crate) fn new(context: Context) -> Self {
+    pub fn new(context: Context) -> Self {
         Self {
             context,
             group_id_builder: UniqueGroupIdBuilder::default(),
         }
     }
 
-    pub(crate) fn into_context(self) -> Context {
+    pub fn into_context(self) -> Context {
         self.context
     }
 
     /// Returns the context specifying how to format the current CST
-    pub(crate) fn context(&self) -> &Context {
+    pub fn context(&self) -> &Context {
         &self.context
     }
 
@@ -898,7 +968,7 @@ impl<Context> FormatState<Context> {
     /// Creates a new group id that is unique to this document. The passed debug name is used in the
     /// [`std::fmt::Debug`] of the document if this is a debug build.
     /// The name is unused for production builds and has no meaning on the equality of two group ids.
-    pub(crate) fn group_id(&self, debug_name: &'static str) -> GroupId {
+    pub fn group_id(&self, debug_name: &'static str) -> GroupId {
         self.group_id_builder.group_id(debug_name)
     }
 }
