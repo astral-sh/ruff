@@ -67,18 +67,13 @@ bad_config: Config = {"form": str}  # error: [invalid-argument-type]
 `TypeForm` is covariant in its type argument:
 
 ```py
-from typing import Any
 from typing_extensions import TypeForm
 
-def check_assignability(
-    any_form: TypeForm[Any],
+def check_covariance(
     int_form: TypeForm[int],
     object_form: TypeForm[object],
     str_form: TypeForm[str],
 ) -> None:
-    any_form = str_form
-    str_form = any_form
-
     object_form = str_form
     str_form = int_form  # error: [invalid-assignment]
 
@@ -86,6 +81,28 @@ def reject_wide_type_form(object_form: TypeForm[object]) -> None:
     str_form: TypeForm[str] = object_form  # error: [invalid-assignment]
 
 invalid: TypeForm[str] = int  # error: [invalid-assignment]
+```
+
+`TypeForm` covariance composes with the variance of nested generic type arguments. `list` is
+invariant, while callable parameter types are contravariant:
+
+```py
+from typing import Callable
+from typing_extensions import TypeForm
+
+def check_invariant_type_argument(
+    str_list_form: TypeForm[list[str]],
+    object_list_form: TypeForm[list[object]],
+) -> None:
+    invalid_object_list: TypeForm[list[object]] = str_list_form  # error: [invalid-assignment]
+    invalid_str_list: TypeForm[list[str]] = object_list_form  # error: [invalid-assignment]
+
+def check_contravariant_type_argument(
+    accepts_object_form: TypeForm[Callable[[object], None]],
+    accepts_str_form: TypeForm[Callable[[str], None]],
+) -> None:
+    accepts_str_expected: TypeForm[Callable[[str], None]] = accepts_object_form
+    accepts_object_expected: TypeForm[Callable[[object], None]] = accepts_str_form  # error: [invalid-assignment]
 ```
 
 ## Preserving existing `TypeForm` values
@@ -128,6 +145,13 @@ the `TypeForm` type argument. Bare `type` is treated as gradual and is only acce
 from typing import Any, Never
 from typing_extensions import TypeForm
 
+def accept_gradual_type_argument(
+    any_form: TypeForm[Any],
+    str_form: TypeForm[str],
+) -> None:
+    any_form = str_form
+    str_form = any_form
+
 def accept_runtime_classes(
     exact: type[int],
     broad: type[object],
@@ -135,6 +159,7 @@ def accept_runtime_classes(
 ) -> None:
     exact_form: TypeForm[int | str] = exact
     broad_form: TypeForm[object] = broad
+    unparameterized_form: TypeForm = broad
     bare_form: TypeForm[Any] = bare
 
     invalid_broad: TypeForm[str] = broad  # error: [invalid-assignment]
@@ -278,4 +303,19 @@ def reject_broad_runtime_type_narrowing(
 class A: ...
 
 assert_type(as_type(A), type[A] | None)
+```
+
+## Availability from `typing`
+
+`TypeForm` is available from the standard-library `typing` module starting in Python 3.15.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import TypeForm
+
+string_form: TypeForm[str] = str
 ```

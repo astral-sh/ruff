@@ -12,8 +12,10 @@ Numbers = list[int]
 reveal_type(Numbers)  # revealed: <class 'list[int]'>
 
 import types
+from typing_extensions import TypeForm
 
 generic_alias: types.GenericAlias = list[int]
+generic_alias_typeform: TypeForm = list[int]
 
 def _(numbers: Numbers) -> None:
     reveal_type(numbers)  # revealed: list[int]
