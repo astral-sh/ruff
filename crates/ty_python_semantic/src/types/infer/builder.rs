@@ -1557,6 +1557,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|node_ref| node_ref.node(self.module()))
     }
 
+    fn function_type(&self, function: &ast::StmtFunctionDef) -> Option<FunctionType<'db>> {
+        let definition = self.index.expect_single_definition(function);
+        infer_definition_types(self.db(), definition).function_type(definition)
+    }
+
+    fn current_function_type(&self) -> Option<FunctionType<'db>> {
+        self.function_type(self.current_function_definition()?)
+    }
+
     fn function_decorator_types<'a>(
         &'a self,
         function: &'a ast::StmtFunctionDef,
@@ -4098,6 +4107,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
+            }
+
+            // Disallow annotations on non-name targets unless they are valid receivers (e.g.
+            // `self.x: int` or `cls.x: int`).
+            let is_receiver_attribute = target
+                .as_attribute_expr()
+                .is_some_and(|target| self.is_receiver_attribute_annotation_target(target));
+            if !is_receiver_attribute {
+                let message = match target.as_ref() {
+                    ast::Expr::Attribute(_) => {
+                        "Type annotations are not allowed on this attribute expression"
+                    }
+                    ast::Expr::Subscript(_) => {
+                        "Type annotations are not allowed on subscripted expressions"
+                    }
+                    _ => {
+                        // For parser-recovered invalid targets, the syntax diagnostic is
+                        // sufficient.
+                        if let Some(value) = value {
+                            self.infer_maybe_standalone_expression(value, TypeContext::default());
+                        }
+                        self.infer_expression(target, TypeContext::default());
+                        return;
+                    }
+                };
+
+                // For syntactically valid non-name targets, reject the annotation and validate
+                // any accompanying assignment.
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
+                {
+                    builder.into_diagnostic(message);
+                }
+
+                if let Some(value) = value {
+                    self.infer_target(target, value, &|builder, tcx| {
+                        builder.infer_maybe_standalone_expression(value, tcx)
+                    });
+                } else {
+                    self.infer_expression(target, TypeContext::default());
+                }
+                return;
             }
 
             let value_ty = value.as_ref().map(|value| {
@@ -8930,9 +8982,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let first_parameter_name = first_parameter.name();
 
-        let function_definition = self.index.expect_single_definition(current_function);
-        let Type::FunctionLiteral(function_type) = binding_type(self.db(), function_definition)
-        else {
+        let Some(function_type) = self.current_function_type() else {
             return;
         };
 
