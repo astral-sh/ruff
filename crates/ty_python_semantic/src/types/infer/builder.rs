@@ -5671,8 +5671,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
-        if tcx.annotation.is_some()
-            && let Some(ty) = self.infer_type_form_contextual_expression(expression, tcx)
+        if let Some(target) = tcx.annotation
+            && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
         {
             self.store_expression_type(expression, ty);
 

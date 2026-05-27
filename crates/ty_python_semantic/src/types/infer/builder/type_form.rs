@@ -16,9 +16,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_type_form_contextual_expression(
         &mut self,
         expression: &ast::Expr,
-        tcx: TypeContext<'db>,
+        target: Type<'db>,
     ) -> Option<Type<'db>> {
-        let target = tcx.annotation?;
         let non_type_form_fallback = match target.resolve_type_alias(self.db()) {
             Type::TypeForm(_) => None,
             Type::Union(union)
@@ -56,7 +55,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             let contextual_ty = self
                 .speculate()
-                .infer_value_expression_impl(expression, tcx);
+                .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
             // TODO: Remove this exception once `Unpack` produces a precise type instead of a
             // dynamic placeholder in ordinary expression inference.
             if contextual_ty.is_assignable_to(self.db(), target)
