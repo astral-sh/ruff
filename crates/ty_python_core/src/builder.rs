@@ -1420,8 +1420,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        loop_header.bindings.shrink_to_fit();
-
         // The `LoopHeader` needs to be visible to uses within the loop body that we've already
         // walked, but all our Salsa state is generally immutable. `specify` is how we work around
         // that. See this section of the Salsa docs:
@@ -2233,17 +2231,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
-        self.expressions_by_node.shrink_to_fit();
-        self.definitions_by_node.shrink_to_fit();
-        self.statements_by_node.shrink_to_fit();
-        self.enclosing_lambda_statements.shrink_to_fit();
-        self.collections_by_use.shrink_to_fit();
-        self.uses_by_collection.shrink_to_fit();
+
         self.imported_modules.shrink_to_fit();
-        self.alias_predicates.shrink_to_fit();
         self.scope_ids_by_scope.shrink_to_fit();
-        self.scopes_by_node.shrink_to_fit();
-        self.generator_functions.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();

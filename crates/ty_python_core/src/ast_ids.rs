@@ -110,9 +110,7 @@ impl AstIdsBuilder {
         self.uses_map.get(&key.into()).copied()
     }
 
-    pub(super) fn finish(mut self) -> AstIds {
-        self.uses_map.shrink_to_fit();
-
+    pub(super) fn finish(self) -> AstIds {
         AstIds {
             uses_map: self.uses_map,
         }
