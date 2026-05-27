@@ -543,7 +543,6 @@ struct SemanticSyntaxCheckerVisitor<'a> {
     source: &'a str,
     scopes: Vec<Scope>,
     in_try: bool,
-    comprehension_iterable_nesting: u32,
 }
 
 impl<'a> SemanticSyntaxCheckerVisitor<'a> {
@@ -555,7 +554,6 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
             source,
             scopes: vec![Scope::Module],
             in_try: false,
-            comprehension_iterable_nesting: 0,
         }
     }
 
@@ -634,10 +632,6 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
             }
         }
         false
-    }
-
-    fn in_comprehension_iterable(&self) -> bool {
-        self.comprehension_iterable_nesting > 0
     }
 
     fn in_class_body_comprehension(&self) -> bool {
@@ -773,17 +767,6 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
             _ => {
                 ast::visitor::walk_expr(self, expr);
             }
-        }
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &ast::Comprehension) {
-        self.comprehension_iterable_nesting += 1;
-        self.visit_expr(&comprehension.iter);
-        self.comprehension_iterable_nesting -= 1;
-
-        self.visit_expr(&comprehension.target);
-        for expr in &comprehension.ifs {
-            self.visit_expr(expr);
         }
     }
 }

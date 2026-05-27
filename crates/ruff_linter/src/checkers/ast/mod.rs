@@ -249,7 +249,6 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
-    comprehension_iterable_nesting: u32,
     context: &'a LintContext<'a>,
 }
 
@@ -300,7 +299,6 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
-            comprehension_iterable_nesting: 0,
             context,
         }
     }
@@ -881,10 +879,6 @@ impl SemanticSyntaxContext for Checker<'_> {
             }
         }
         false
-    }
-
-    fn in_comprehension_iterable(&self) -> bool {
-        self.comprehension_iterable_nesting > 0
     }
 
     fn in_class_body_comprehension(&self) -> bool {
@@ -1817,10 +1811,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
-                self.visit.lambdas.push((
-                    self.semantic.snapshot(),
-                    self.comprehension_iterable_nesting,
-                ));
+                self.visit.lambdas.push(self.semantic.snapshot());
                 self.analyze.lambdas.push(self.semantic.snapshot());
             }
             Expr::If(ast::ExprIf {
@@ -2491,12 +2482,6 @@ impl<'a> Checker<'a> {
         analyze::module(python_ast, self);
     }
 
-    fn visit_comprehension_iterable(&mut self, expr: &'a Expr) {
-        self.comprehension_iterable_nesting += 1;
-        self.visit_expr(expr);
-        self.comprehension_iterable_nesting -= 1;
-    }
-
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
     fn visit_generators(&mut self, kind: GeneratorKind, generators: &'a [Comprehension]) {
@@ -2535,7 +2520,7 @@ impl<'a> Checker<'a> {
         // Following Python's scoping rules, the `T` in `x=T` is thus evaluated in the outer scope,
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
-        self.visit_comprehension_iterable(&generator.iter);
+        self.visit_expr(&generator.iter);
         self.semantic.push_scope(ScopeKind::Generator {
             kind,
             is_async: generators
@@ -2551,7 +2536,7 @@ impl<'a> Checker<'a> {
         }
 
         for generator in iterator {
-            self.visit_comprehension_iterable(&generator.iter);
+            self.visit_expr(&generator.iter);
 
             self.visit_expr(&generator.target);
             self.semantic.flags = flags;
@@ -3182,12 +3167,10 @@ impl<'a> Checker<'a> {
     /// for the same reason as function bodies.
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
-        let comprehension_iterable_nesting = self.comprehension_iterable_nesting;
         while !self.visit.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.visit.lambdas);
-            for (snapshot, lambda_comprehension_iterable_nesting) in lambdas {
+            for snapshot in lambdas {
                 self.semantic.restore(snapshot);
-                self.comprehension_iterable_nesting = lambda_comprehension_iterable_nesting;
 
                 let Some(Expr::Lambda(ast::ExprLambda {
                     parameters,
@@ -3234,7 +3217,6 @@ impl<'a> Checker<'a> {
             }
         }
         self.semantic.restore(snapshot);
-        self.comprehension_iterable_nesting = comprehension_iterable_nesting;
     }
 
     /// After initial traversal of the source tree has been completed,
