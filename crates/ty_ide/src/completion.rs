@@ -117,7 +117,7 @@ pub struct CompletionCapabilities {
 impl CompletionCapabilities {
     #[must_use]
     pub fn snippets(self, snippets: bool) -> Self {
-        Self { snippets, ..self }
+        Self { snippets }
     }
 }
 
@@ -277,8 +277,10 @@ impl<'db> Extend<CompletionBuilder<'db>> for Completions<'db> {
 
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
-    /// The label shown to the user for this suggestion.
+    /// The name used when matching the query and ranking this suggestion.
     pub name: Name,
+    /// The label shown to the user for this suggestion.
+    pub label: Name,
     /// The fully qualified name, when available.
     ///
     /// This is only set when `module_name` is available.
@@ -286,7 +288,7 @@ pub struct Completion<'db> {
     /// The text that should be inserted at the cursor
     /// when the completion is selected.
     ///
-    /// When this is not set, `name` is used.
+    /// When this is not set, [`Self::label`] is used.
     pub insert: Option<Name>,
     /// The format of [`Self::insert`].
     pub insert_text_format: CompletionInsertTextFormat,
@@ -469,24 +471,21 @@ impl<'db> CompletionBuilder<'db> {
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
+        let label = self.insert.as_ref().unwrap_or(&self.name).clone();
         let (insert, insert_text_format) = if ctx.should_complete_function_parentheses(kind) {
-            let insert = self.insert.take().unwrap_or_else(|| self.name.clone());
             if ctx.capabilities.snippets {
-                (
-                    Some(Name::new(format!("{insert}($0)"))),
-                    CompletionInsertTextFormat::Snippet,
-                )
+                let insert = Name::new(format!("{label}($0)"));
+                (Some(insert), CompletionInsertTextFormat::Snippet)
             } else {
-                (
-                    Some(Name::new(format!("{insert}()"))),
-                    CompletionInsertTextFormat::PlainText,
-                )
+                let insert = Name::new(format!("{label}()"));
+                (Some(insert), CompletionInsertTextFormat::PlainText)
             }
         } else {
             (self.insert, CompletionInsertTextFormat::PlainText)
         };
         Completion {
             name: self.name,
+            label,
             qualified: self.qualified,
             insert,
             insert_text_format,
@@ -7566,7 +7565,7 @@ x: Literal["can't", "won't"] = '<CURSOR>'
                 completion
                     .insert
                     .as_deref()
-                    .unwrap_or(completion.name.as_str())
+                    .unwrap_or(completion.label.as_str())
                     .to_string()
             })
             .collect::<Vec<_>>();
@@ -7590,7 +7589,7 @@ x: Literal['say "hi"', 'say "bye"'] = "<CURSOR>"
                 completion
                     .insert
                     .as_deref()
-                    .unwrap_or(completion.name.as_str())
+                    .unwrap_or(completion.label.as_str())
                     .to_string()
             })
             .collect::<Vec<_>>();
@@ -10052,7 +10051,7 @@ raise <CURSOR>
             self.filtered
                 .iter()
                 .map(|c| {
-                    let mut snapshot = c.insert.as_deref().unwrap_or(c.name.as_str()).to_string();
+                    let mut snapshot = c.insert.as_deref().unwrap_or(c.label.as_str()).to_string();
                     if self.type_signatures {
                         let ty =
                             c.ty.map(|ty| ty.display(self.db).to_string())

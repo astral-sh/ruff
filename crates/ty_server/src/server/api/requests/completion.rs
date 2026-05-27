@@ -88,13 +88,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     })
                 });
 
-                let name = match comp.insert_text_format {
-                    CompletionInsertTextFormat::PlainText => {
-                        comp.insert.as_deref().unwrap_or(&comp.name)
-                    }
-                    CompletionInsertTextFormat::Snippet => &comp.name,
-                }
-                .to_string();
+                let label = comp.label.to_string();
                 let import_suffix = comp
                     .module_name
                     .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
@@ -106,11 +100,11 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         detail: import_suffix,
                         description: type_display.clone(),
                     };
-                    (name, Some(label_details))
+                    (label, Some(label_details))
                 } else {
                     let label = import_suffix
-                        .map(|suffix| format!("{name}{suffix}"))
-                        .unwrap_or_else(|| name);
+                        .map(|suffix| format!("{label}{suffix}"))
+                        .unwrap_or(label);
                     (label, None)
                 };
 
