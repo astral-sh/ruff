@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from enum import Enum
 from typing import Any, ClassVar, Protocol, _SpecialForm
 
-from typing_extensions import LiteralString, Self  # noqa: UP035
+from typing_extensions import LiteralString, Self, TypeForm  # noqa: UP035
 
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
@@ -114,7 +114,11 @@ type JustComplex = TypeOf[1.0j]
 # Constraints
 class ConstraintSet:
     @staticmethod
-    def range(lower_bound: Any, typevar: Any, upper_bound: Any) -> Self:
+    def range(
+        lower_bound: TypeForm[object],
+        typevar: TypeForm[object],
+        upper_bound: TypeForm[object],
+    ) -> Self:
         """
         Returns a constraint set that requires `typevar` to specialize to a type
         that is a supertype of `lower_bound` and a subtype of `upper_bound`.
@@ -128,7 +132,7 @@ class ConstraintSet:
     def never() -> Self:
         """Returns a constraint set that is never satisfied"""
 
-    def implies_subtype_of(self, ty: Any, of: Any) -> Self:
+    def implies_subtype_of(self, ty: TypeForm[object], of: TypeForm[object]) -> Self:
         """
         Returns a constraint set that is satisfied when `ty` is a `subtype`_ of
         `of`, assuming that all of the constraints in `self` hold.
@@ -144,7 +148,7 @@ class ConstraintSet:
         """
 
     def satisfied_by_all_typevars(
-        self, *, inferable: tuple[Any, ...] | None = None
+        self, *, inferable: TypeForm[tuple[object, ...]] | None = None
     ) -> bool:
         """
         Returns whether this constraint set is satisfied by all of the typevars
@@ -170,38 +174,39 @@ class Specialization:
     """A mapping of typevars to specific types"""
 
 # Predicates on types
-#
-# Ideally, these would be annotated using `TypeForm`, but that has not been
-# standardized yet (https://peps.python.org/pep-0747).
-def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet:
+def is_equivalent_to(
+    type_a: TypeForm[object], type_b: TypeForm[object]
+) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `type_a` and `type_b` are
     `equivalent`_ types.
 
     .. _equivalent: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     """
 
-def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
+def is_subtype_of(ty: TypeForm[object], of: TypeForm[object]) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
 
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """
 
-def is_assignable_to(ty: Any, to: Any) -> ConstraintSet:
+def is_assignable_to(ty: TypeForm[object], to: TypeForm[object]) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is `assignable`_ to `to`.
 
     .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     """
 
-def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
+def is_disjoint_from(
+    type_a: TypeForm[object], type_b: TypeForm[object]
+) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `type_a` and `type_b` are disjoint types.
 
     Two types are disjoint if they have no inhabitants in common.
     """
 
-def is_singleton(ty: Any) -> bool:
+def is_singleton(ty: TypeForm[object]) -> bool:
     """Returns `True` if `ty` is a singleton type with exactly one inhabitant."""
 
-def is_single_valued(ty: Any) -> bool:
+def is_single_valued(ty: TypeForm[object]) -> bool:
     """Returns `True` if `ty` is non-empty and all inhabitants compare equal to each other."""
 
 def generic_context(ty: Any) -> GenericContext | None:
