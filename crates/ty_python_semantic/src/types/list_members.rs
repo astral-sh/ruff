@@ -614,8 +614,8 @@ pub struct MemberWithDefinition<'db> {
 
 /// A member of a type or scope.
 ///
-/// In the context of the [`all_members`] routine, this represents
-/// a single item in (ideally) the list returned by `dir(object)`.
+/// In the context of member enumeration, this represents a single item in
+/// (ideally) the list returned by `dir(object)`.
 ///
 /// The equality, comparison and hashing traits implemented for
 /// this type are done so by taking only the name into account. At

@@ -174,14 +174,13 @@ pub struct FormatterSettings {
     pub preview: PreviewMode,
     /// The non-path-resolved Python version specified by the `target-version` input option.
     ///
-    /// See [`FormatterSettings::resolve_target_version`] for a way to obtain the Python version for
-    /// a given file, while respecting the overrides in `per_file_target_version`.
+    /// When obtaining the Python version for a file, the overrides in
+    /// `per_file_target_version` must be respected.
     pub unresolved_target_version: PythonVersion,
     /// Path-specific overrides to `unresolved_target_version`.
     ///
-    /// See [`FormatterSettings::resolve_target_version`] for a way to check a given [`Path`]
-    /// against these patterns, while falling back to `unresolved_target_version` if none of them
-    /// match.
+    /// A given [`Path`] is checked against these patterns, falling back to
+    /// `unresolved_target_version` if none of them match.
     pub per_file_target_version: CompiledPerFileTargetVersionList,
 
     pub line_width: LineWidth,

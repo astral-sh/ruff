@@ -873,9 +873,7 @@ pub struct FStringFlags(InterpolatedStringFlagsInner);
 impl FStringFlags {
     /// Construct a new [`FStringFlags`] with **no flags set**.
     ///
-    /// See [`FStringFlags::with_quote_style`], [`FStringFlags::with_triple_quotes`], and
-    /// [`FStringFlags::with_prefix`] for ways of setting the quote style (single or double),
-    /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
+    /// See [`FStringFlags::with_quote_style`] for setting the quote style (single or double).
     ///
     /// See the documentation for [`FStringFlags`] for additional caveats on this constructor, and
     /// situations in which alternative ways to construct this struct should be used, especially
@@ -964,11 +962,7 @@ impl FStringFlags {
 /// ## Notes on usage
 ///
 /// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
-/// from an existing t-string literal, consider passing along the [`FString::flags`] field. If you
-/// don't have an existing literal but have a `Checker` from the `ruff_linter` crate available,
-/// consider using `Checker::default_tstring_flags` to create instances of this struct; this method
-/// will properly handle nested t-strings. For usage that doesn't fit into one of these categories,
-/// the public constructor [`TStringFlags::empty`] can be used.
+/// from an existing t-string literal, consider passing along the [`TString::flags`] field.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TStringFlags(InterpolatedStringFlagsInner);
@@ -1924,9 +1918,9 @@ pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 impl BytesLiteralFlags {
     /// Construct a new [`BytesLiteralFlags`] with **no flags set**.
     ///
-    /// See [`BytesLiteralFlags::with_quote_style`], [`BytesLiteralFlags::with_triple_quotes`], and
-    /// [`BytesLiteralFlags::with_prefix`] for ways of setting the quote style (single or double),
-    /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
+    /// See [`BytesLiteralFlags::with_quote_style`] and
+    /// [`BytesLiteralFlags::with_triple_quotes`] for setting the quote style (single or double)
+    /// and enabling triple quotes, respectively.
     ///
     /// See the documentation for [`BytesLiteralFlags`] for additional caveats on this constructor,
     /// and situations in which alternative ways to construct this struct should be used, especially
@@ -2881,7 +2875,7 @@ impl PatternArguments {
     }
 }
 
-/// The iterator returned by [`PatternArguments::iter_source_order`].
+/// An iterator over patterns and keywords in source order.
 #[derive(Clone)]
 pub struct PatternArgumentsSourceOrder<'a> {
     patterns: &'a [Pattern],

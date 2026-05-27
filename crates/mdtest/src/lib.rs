@@ -213,8 +213,8 @@ impl OutputFormat {
 
     /// Write a module-resolution inconsistency in the appropriate format.
     ///
-    /// See [`write_error`](Self::write_error) for details on why GitHub-format
-    /// messages must be printed directly to stdout.
+    /// GitHub-format messages are printed directly to stdout so that GitHub
+    /// Actions can detect them as workflow commands.
     #[expect(clippy::print_stdout)]
     pub fn write_inconsistency(
         self,

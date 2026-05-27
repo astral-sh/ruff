@@ -917,8 +917,8 @@ impl Default for LinterSettings {
 /// For example, we want to default to `PythonVersion::latest()` for parsing and detecting semantic
 /// syntax errors because this will minimize version-related diagnostics when the Python version is
 /// unset. In contrast, we want to default to `PythonVersion::default()` for lint rules. These
-/// correspond to the [`TargetVersion::parser_version`] and [`TargetVersion::linter_version`]
-/// methods, respectively.
+/// The parsing behavior is exposed through [`TargetVersion::parser_version`]; linting uses the
+/// latter default internally.
 #[derive(Debug, Clone, Copy, CacheKey, PartialEq, Eq)]
 pub struct TargetVersion(pub Option<PythonVersion>);
 

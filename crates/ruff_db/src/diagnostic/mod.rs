@@ -363,8 +363,8 @@ impl Diagnostic {
         Arc::make_mut(&mut self.inner).fix = None;
     }
 
-    /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
-    /// configured applicability level.
+    /// Returns `true` if the diagnostic contains a fix that applies at the configured
+    /// applicability level.
     pub fn has_applicable_fix(&self, fix_applicability: Applicability) -> bool {
         self.fix().is_some_and(|fix| fix.applies(fix_applicability))
     }

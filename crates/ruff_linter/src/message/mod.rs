@@ -175,7 +175,7 @@ pub(crate) trait Emitter {
     ) -> anyhow::Result<()>;
 }
 
-/// Context passed to [`Emitter`].
+/// Context used while rendering diagnostics.
 pub struct EmitterContext<'a> {
     notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
 }

@@ -336,10 +336,9 @@ impl TokenKind {
 
     /// Returns `true` if the token is a keyword (including soft keywords).
     ///
-    /// See also [`is_soft_keyword`], [`is_non_soft_keyword`].
+    /// See also [`is_soft_keyword`].
     ///
     /// [`is_soft_keyword`]: TokenKind::is_soft_keyword
-    /// [`is_non_soft_keyword`]: TokenKind::is_non_soft_keyword
     #[inline]
     pub fn is_keyword(self) -> bool {
         TokenKind::And <= self && self <= TokenKind::Type
@@ -347,10 +346,9 @@ impl TokenKind {
 
     /// Returns `true` if the token is strictly a soft keyword.
     ///
-    /// See also [`is_keyword`], [`is_non_soft_keyword`].
+    /// See also [`is_keyword`].
     ///
     /// [`is_keyword`]: TokenKind::is_keyword
-    /// [`is_non_soft_keyword`]: TokenKind::is_non_soft_keyword
     #[inline]
     pub fn is_soft_keyword(self) -> bool {
         TokenKind::Case <= self && self <= TokenKind::Type

@@ -195,7 +195,7 @@ pub enum ParseErrorType {
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
 
-    /// Parser aborted because [`crate::ParseOptions::max_recursion_depth`] was exceeded.
+    /// Parser aborted because its maximum recursion depth was exceeded.
     RecursionLimitExceeded,
 }
 
