@@ -115,8 +115,8 @@ static_assert(not is_assignable_to(str, LiteralString))
 
 ### String literals and Sequence
 
-String literals are assignable to `Sequence[Literal[chars...]]` because strings are sequences of
-their characters.
+Non-empty string literals can refine `str`'s sequence element type from their known characters.
+Empty string literals retain the declared `Sequence[str]` specialization.
 
 ```py
 from typing import Literal, Sequence, Iterable, Collection, Reversible
@@ -127,7 +127,9 @@ static_assert(is_assignable_to(Literal["abb"], Iterable[Literal["a", "b"]]))
 static_assert(is_assignable_to(Literal["abb"], Collection[Literal["a", "b"]]))
 static_assert(is_assignable_to(Literal["abb"], Reversible[Literal["a", "b"]]))
 static_assert(is_assignable_to(Literal["aaa"], Sequence[Literal["a"]]))
-static_assert(is_assignable_to(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
+static_assert(is_assignable_to(Literal[""], Sequence[str]))
+static_assert(not is_assignable_to(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
+static_assert(not is_assignable_to(Literal[""], Sequence[int]))
 static_assert(is_assignable_to(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  # subset of allowed chars
 
 # String literals are NOT assignable when they contain chars outside the allowed set

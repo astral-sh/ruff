@@ -399,14 +399,14 @@ static_assert(not is_disjoint_from(tuple[int, str], C))
 class CommonSubtype(tuple[int, str], C): ...
 ```
 
-However, we model heterogeneous tuple types to be disjoint from other heterogeneous tuple types.
-Tuple subclasses can still share empty runtime instances, even when their inherited heterogeneous
-tuple specializations differ:
+However, we model heterogeneous tuples to be disjoint from other heterogeneous tuples. To reconcile
+these two things, we explicitly ban two differently specialized heterogeneous tuples from coexisting
+in the same MRO:
 
 ```py
 class I1(tuple[F1, F2]): ...
 class I2(tuple[F2, F1]): ...
-class CommonSubtypeOfTuples(I1, I2): ...
+class CommonSubtypeOfTuples(I1, I2): ...  # error: [invalid-generic-class]
 ```
 
 ## Truthiness

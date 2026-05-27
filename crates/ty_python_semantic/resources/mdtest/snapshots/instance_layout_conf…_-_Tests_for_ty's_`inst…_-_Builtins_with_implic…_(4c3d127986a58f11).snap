@@ -54,7 +54,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/instance_layout_conflict
 39 |     H
 40 | ): ...
 41 | # fmt: on
-42 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+42 | # error: [invalid-generic-class]
+43 | class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 
 # Diagnostics
@@ -190,10 +191,23 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
 ```
 
 ```
-error[subclass-of-final-class]: Class `Foo` cannot inherit from final class `range`
-  --> src/mdtest_snippet.py:42:11
+error[invalid-generic-class]: Inconsistent type arguments for `Sequence` among class bases
+  --> src/mdtest_snippet.py:43:7
    |
-42 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+43 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+   |       ^^^^-----^^---^
+   |           |      |
+   |           |      Later class base inherits from `Sequence[str]`
+   |           Earlier class base inherits from `Sequence[int]`
+   |
+
+```
+
+```
+error[subclass-of-final-class]: Class `Foo` cannot inherit from final class `range`
+  --> src/mdtest_snippet.py:43:11
+   |
+43 | class Foo(range, str): ...  # error: [subclass-of-final-class]
    |           ^^^^^
    |
 

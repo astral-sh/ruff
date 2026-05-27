@@ -2291,8 +2291,8 @@ static_assert(not is_subtype_of(Callable[[str], int], RegularCallableTypeOf[iden
 
 ## String literals and Sequence
 
-String literals are subtypes of `Sequence[Literal[chars...]]` because strings are sequences of their
-characters.
+Non-empty string literals can refine `str`'s sequence element type from their known characters.
+Empty string literals retain the declared `Sequence[str]` specialization.
 
 ```py
 from typing import Literal, Sequence, Iterable, Collection, Reversible
@@ -2303,7 +2303,9 @@ static_assert(is_subtype_of(Literal["abb"], Iterable[Literal["a", "b"]]))
 static_assert(is_subtype_of(Literal["abb"], Collection[Literal["a", "b"]]))
 static_assert(is_subtype_of(Literal["abb"], Reversible[Literal["a", "b"]]))
 static_assert(is_subtype_of(Literal["aaa"], Sequence[Literal["a"]]))
-static_assert(is_subtype_of(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
+static_assert(is_subtype_of(Literal[""], Sequence[str]))
+static_assert(not is_subtype_of(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
+static_assert(not is_subtype_of(Literal[""], Sequence[int]))
 static_assert(is_subtype_of(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  # subset of allowed chars
 
 # String literals are NOT subtypes when they contain chars outside the allowed set
@@ -2327,6 +2329,7 @@ static_assert(is_subtype_of(Literal[b"abb"], Iterable[Literal[97, 98]]))
 static_assert(is_subtype_of(Literal[b"abb"], Collection[int]))
 static_assert(is_subtype_of(Literal[b"abb"], Collection[Literal[97, 98]]))
 static_assert(is_subtype_of(Literal[b""], Sequence[int]))
+static_assert(not is_subtype_of(Literal[b""], Sequence[str]))
 
 static_assert(not is_subtype_of(Literal[b"abc"], Sequence[Literal[97, 98]]))  # '99' not allowed
 

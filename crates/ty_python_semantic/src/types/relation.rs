@@ -1761,6 +1761,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     return self.always();
                 }
 
+                // Empty strings use `str`'s declared sequence specialization instead of
+                // behaving as `Sequence[Never]`. This keeps an empty string from making
+                // `str` overlap with incompatible `Sequence` specializations.
+                if value.value(db).is_empty() {
+                    return self.check_type_pair(db, KnownClass::Str.to_instance(db), target);
+                }
+
                 if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
                     && !sequence_class
                         .iter_mro(db, None)
@@ -1807,6 +1814,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                 if target_class.is_known(db, KnownClass::Bytes) {
                     return self.always();
+                }
+
+                // As for strings, the empty literal retains the builtin's declared
+                // sequence specialization rather than becoming `Sequence[Never]`.
+                if value.value(db).is_empty() {
+                    return self.check_type_pair(db, KnownClass::Bytes.to_instance(db), target);
                 }
 
                 if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)

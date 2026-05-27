@@ -279,22 +279,22 @@ class RecursiveRight(Covariant["type[RecursiveRight]"]):
 static_assert(not is_disjoint_from(type[RecursiveLeft], type[RecursiveRight]))
 
 static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
-static_assert(not is_disjoint_from(Literal[""], Sequence[int]))
+static_assert(is_disjoint_from(Literal[""], Sequence[int]))
 static_assert(is_disjoint_from(Literal["x"], Sequence[int]))
-static_assert(not is_disjoint_from(str, Sequence[int]))
+static_assert(is_disjoint_from(str, Sequence[int]))
 static_assert(not is_disjoint_from(str, Sequence[str]))
-static_assert(not is_disjoint_from(LiteralString, Sequence[int]))
-static_assert(not is_disjoint_from(Literal[b""], Sequence[str]))
+static_assert(is_disjoint_from(LiteralString, Sequence[int]))
+static_assert(is_disjoint_from(Literal[b""], Sequence[str]))
 static_assert(is_disjoint_from(Literal[b"x"], Sequence[str]))
-static_assert(not is_disjoint_from(bytes, Sequence[str]))
-static_assert(not is_disjoint_from(bytearray, Sequence[str]))
-static_assert(not is_disjoint_from(range, Sequence[str]))
-static_assert(not is_disjoint_from(memoryview, Sequence[str]))
+static_assert(is_disjoint_from(bytes, Sequence[str]))
+static_assert(is_disjoint_from(bytearray, Sequence[str]))
+static_assert(is_disjoint_from(range, Sequence[str]))
+static_assert(is_disjoint_from(memoryview, Sequence[str]))
 
-# Empty values satisfy both inherited sequence specializations.
-class StrInts(str, Sequence[int]): ...
-class BytesStr(bytes, Sequence[str]): ...
-class BytearrayStr(bytearray, Sequence[str]): ...
+# Empty-value overlap does not make inconsistent inherited class interfaces valid.
+class StrInts(str, Sequence[int]): ...  # error: [invalid-generic-class]
+class BytesStr(bytes, Sequence[str]): ...  # error: [invalid-generic-class]
+class BytearrayStr(bytearray, Sequence[str]): ...  # error: [invalid-generic-class]
 ```
 
 ## Generic type aliases
@@ -497,9 +497,9 @@ static_assert(not is_disjoint_from(tuple[str, ...], Sequence[int]))
 static_assert(not is_disjoint_from(tuple[()], Sequence[int]))
 static_assert(is_disjoint_from(tuple[str], Sequence[int]))
 
-# Both class definitions are valid because their only shared instances may be empty tuples.
-class BothVariadicTuples(IntTuples, StrTuples): ...
-class BothTupleSequence(IntTuples, StrSequence): ...
+# Empty-tuple overlap does not make inconsistent inherited class interfaces valid.
+class BothVariadicTuples(IntTuples, StrTuples): ...  # error: [invalid-generic-class]
+class BothTupleSequence(IntTuples, StrSequence): ...  # error: [invalid-generic-class]
 
 T = TypeVar("T")
 
