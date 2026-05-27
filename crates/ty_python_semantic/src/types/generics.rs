@@ -2629,8 +2629,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             (
                 formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
-                Type::LiteralValue(literal),
+                actual @ Type::LiteralValue(literal),
             ) => {
+                if matches!(formal, Type::ProtocolInstance(_))
+                    && (literal.is_string() || literal.is_literal_string())
+                {
+                    // Preserve literal-string receiver information while selecting string method
+                    // overloads. In particular, `str.__iter__` exposes `LiteralString` elements
+                    // only for receivers that satisfy its `self: LiteralString` overload.
+                    let actual = if literal.is_string() {
+                        Type::literal_string()
+                    } else {
+                        actual
+                    };
+                    let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
+                    let when = self.constraints.load(self.db, when);
+                    if self.add_type_mappings_from_constraint_set(when).is_ok() {
+                        self.pending.intersect(self.db, self.constraints, when);
+                    }
+                    return Ok(());
+                }
+
                 // Retry specialization with the literal's fallback instance so literals can
                 // contribute to generic inference for nominal and protocol formals.
                 let actual_instance = literal.fallback_instance(self.db);

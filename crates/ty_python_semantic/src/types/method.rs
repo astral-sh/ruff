@@ -80,29 +80,6 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    /// Returns this bound method without pruning overloads by their explicit receiver annotations.
-    ///
-    /// Protocol conformance uses this path to retain its existing inference behavior. Applying
-    /// receiver filtering during protocol member comparison requires protocol-aware inference.
-    #[salsa::tracked(
-        cycle_initial=|db, _, _| CallableType::bottom(db),
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    pub(crate) fn into_unfiltered_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        let function = self.function(db);
-
-        CallableType::new(
-            db,
-            function
-                .signature(db)
-                .bind_self(db, Some(self.typing_self_type(db))),
-            CallableTypeKind::FunctionLike,
-            CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(db),
-            ),
-        )
-    }
-
     #[salsa::tracked(cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
         let function_signature = self.function(db).signature(db);

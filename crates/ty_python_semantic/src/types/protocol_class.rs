@@ -732,12 +732,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // With the new solver, we should be to replace all of this with an additional
                 // constraint that enforces what `Self` can specialize to.
                 let fallback_other = ty.literal_fallback_instance(db).unwrap_or(ty);
-                let attribute_type = match attribute_type {
-                    Type::BoundMethod(method) => {
-                        Type::Callable(method.into_unfiltered_callable_type(db))
-                    }
-                    _ => attribute_type,
-                };
                 attribute_type
                     .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
                     .when_some_and(db, self.constraints, |callables| {

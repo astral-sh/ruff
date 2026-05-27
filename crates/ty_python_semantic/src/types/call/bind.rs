@@ -2933,8 +2933,22 @@ impl<'db> CallableBinding<'db> {
         self
     }
 
-    /// Returns the overload indexes that should be shown in diagnostics.
-    fn diagnostic_overload_indexes(&self) -> SmallVec<[usize; 1]> {
+    /// Returns the source overload indexes that should be shown in diagnostics.
+    ///
+    /// Bound method overloads preserve their source indexes after receiver filtering. Method
+    /// wrapper overloads are synthesized from `__get__`, so their indexes do not correspond to
+    /// the overload declarations of the underlying function.
+    fn diagnostic_overload_indexes(
+        &self,
+        db: &'db dyn Db,
+        kind: FunctionKind,
+        function: FunctionType<'db>,
+    ) -> SmallVec<[usize; 1]> {
+        if matches!(kind, FunctionKind::MethodWrapper) {
+            let (overloads, _) = function.overloads_and_implementation(db);
+            return (0..overloads.len()).collect();
+        }
+
         self.overloads
             .iter()
             .map(Binding::source_overload_index)
@@ -3749,7 +3763,11 @@ impl<'db> CallableBinding<'db> {
                             index: self.overloads[matching_overload_index].source_overload_index(),
                             kind,
                             function,
-                            candidate_indexes: self.diagnostic_overload_indexes(),
+                            candidate_indexes: self.diagnostic_overload_indexes(
+                                context.db(),
+                                kind,
+                                function,
+                            ),
                         });
                     self.overloads[matching_overload_index].report_diagnostics(
                         context,
@@ -3775,7 +3793,11 @@ impl<'db> CallableBinding<'db> {
                             index: self.overloads[matching_overload_index].source_overload_index(),
                             kind,
                             function,
-                            candidate_indexes: self.diagnostic_overload_indexes(),
+                            candidate_indexes: self.diagnostic_overload_indexes(
+                                context.db(),
+                                kind,
+                                function,
+                            ),
                         });
                     self.overloads[matching_overload_index].report_diagnostics(
                         context,
@@ -3820,7 +3842,8 @@ impl<'db> CallableBinding<'db> {
                 if let Some((kind, function)) = function_type_and_kind {
                     let (overloads, implementation) =
                         function.overloads_and_implementation(context.db());
-                    let diagnostic_overload_indexes = self.diagnostic_overload_indexes();
+                    let diagnostic_overload_indexes =
+                        self.diagnostic_overload_indexes(context.db(), kind, function);
                     let possible_overloads = diagnostic_overload_indexes
                         .iter()
                         .filter_map(|&index| overloads.get(index).copied())

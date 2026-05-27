@@ -969,11 +969,7 @@ def literal_string_case(literal_string: LiteralString):
     reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[LiteralString | int]
 
 def literal_string_case(string: str):
-    # TODO: revealed: list[str | int]
-    # str has an __iter__ overload that returns LiteralString elements when self is a LiteralString.
-    # We currently including `LiteralString ≤ FlatT` in our constraint set because of that overload,
-    # even though the overload should not be selectable since `str ≰ LiteralString`.
-    reveal_type(flatten(string, (1, 2, 3)))  # revealed: list[LiteralString | int]
+    reveal_type(flatten(string, (1, 2, 3)))  # revealed: list[str | int]
 
 reveal_type(flatten(b"abc"))  # revealed: list[int]
 reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
