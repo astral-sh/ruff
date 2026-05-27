@@ -1105,11 +1105,11 @@ class CExceptionBindingCleared(metaclass=InitializingMeta):
 
 class BroadInitializingMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
-        value: object = "initial value"
+        value: object = object()
         cls.attr = value
 
 class CDeclared(metaclass=BroadInitializingMeta):
-    attr: str
+    attr: str  # error: [invalid-assignment]
 
 # A class-body declaration is a contract for an attribute populated by metaclass initialization.
 reveal_type(CDeclared.attr)  # revealed: str

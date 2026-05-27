@@ -489,7 +489,7 @@ impl<'db> AllMembers<'db> {
         }
     }
 
-    /// Extend a class object's members with members inherited from its metaclass.
+    /// Extend a class object's members with members set by its metaclass.
     ///
     /// A static metaclass can also assign attributes onto the class objects that it creates,
     /// so those implicit instance members are available on the class object as well.

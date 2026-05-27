@@ -3308,8 +3308,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => object_ty
-                    .class_object_instance_member(db, attribute, MemberLookupPolicy::default()),
+                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                    object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
+                }
                 Type::Union(..)
                 | Type::Intersection(..)
                 | Type::TypeAlias(..)
