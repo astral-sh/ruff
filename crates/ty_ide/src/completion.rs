@@ -31,6 +31,7 @@ use crate::{Db, all_symbols, signature_help};
 pub fn completion<'db>(
     db: &'db dyn Db,
     settings: &CompletionSettings,
+    capabilities: CompletionCapabilities,
     file: File,
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
@@ -61,8 +62,11 @@ pub fn completion<'db>(
     }
 
     let query = UserQuery::fuzzy(context.cursor.typed);
-    let mut completions =
-        Completions::new(db, context.collection_context(db, &model, settings), query);
+    let mut completions = Completions::new(
+        db,
+        context.collection_context(db, &model, settings, capabilities),
+        query,
+    );
     match context.kind {
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
@@ -102,6 +106,19 @@ pub fn completion<'db>(
     }
 
     completions.into_completions()
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct CompletionCapabilities {
+    /// Whether the client supports snippets.
+    snippets: bool,
+}
+
+impl CompletionCapabilities {
+    #[must_use]
+    pub fn snippets(self, snippets: bool) -> Self {
+        Self { snippets, ..self }
+    }
 }
 
 /// A collection of completions built up from various sources.
@@ -454,10 +471,17 @@ impl<'db> CompletionBuilder<'db> {
         let relevance = Relevance::new(ctx, query, &self);
         let (insert, insert_text_format) = if ctx.should_complete_function_parentheses(kind) {
             let insert = self.insert.take().unwrap_or_else(|| self.name.clone());
-            (
-                Some(Name::new(format!("{insert}($0)"))),
-                CompletionInsertTextFormat::Snippet,
-            )
+            if ctx.capabilities.snippets {
+                (
+                    Some(Name::new(format!("{insert}($0)"))),
+                    CompletionInsertTextFormat::Snippet,
+                )
+            } else {
+                (
+                    Some(Name::new(format!("{insert}()"))),
+                    CompletionInsertTextFormat::PlainText,
+                )
+            }
         } else {
             (self.insert, CompletionInsertTextFormat::PlainText)
         };
@@ -673,6 +697,7 @@ impl<'m> Context<'m> {
         db: &'db dyn Db,
         model: &SemanticModel<'db>,
         settings: &CompletionSettings,
+        capabilities: CompletionCapabilities,
     ) -> CollectionContext<'db> {
         match self.kind {
             ContextKind::Import(_) => CollectionContext::none(),
@@ -696,6 +721,7 @@ impl<'m> Context<'m> {
                     valid_keywords: self.cursor.valid_keywords(),
                     complete_function_parentheses: settings.complete_function_parentheses
                         && !self.cursor.suppress_function_parentheses(),
+                    capabilities,
                 }
             }
         }
@@ -1232,6 +1258,8 @@ struct CollectionContext<'db> {
     valid_keywords: Option<FxHashSet<&'static str>>,
     /// Whether callable completions should insert call parentheses.
     complete_function_parentheses: bool,
+    /// The supported completion capabilities
+    capabilities: CompletionCapabilities,
 }
 
 impl<'db> CollectionContext<'db> {
@@ -2864,6 +2892,7 @@ mod tests {
     use ruff_python_parser::{Mode, ParseOptions};
     use ty_module_resolver::ModuleName;
 
+    use crate::CompletionCapabilities;
     use crate::completion::{Completion, completion};
     use crate::tests::{CursorTest, CursorTestBuilder, SitePackagesCursorTestBuilder};
 
@@ -9350,10 +9379,11 @@ call<CURSOR>
 ",
         );
         assert_snapshot!(
-            builder
+            &builder
                 .skip_auto_import()
                 .skip_builtins()
                 .complete_function_parentheses()
+                .snippets_support(true)
                 .build()
                 .snapshot(),
             @"callable($0)",
@@ -9842,6 +9872,7 @@ raise <CURSOR>
         // This doesn't seem like a "very complex" type to me... ---AG
         #[expect(clippy::type_complexity)]
         predicate: Option<Box<dyn Fn(&Completion) -> bool>>,
+        capabilities: CompletionCapabilities,
     }
 
     impl CompletionTestBuilder {
@@ -9850,6 +9881,7 @@ raise <CURSOR>
             let original = completion(
                 &self.cursor_test.db,
                 &self.settings,
+                self.capabilities,
                 self.cursor_test.cursor.file,
                 self.cursor_test.cursor.offset,
             );
@@ -9897,8 +9929,16 @@ raise <CURSOR>
             self
         }
 
+        /// When set, completions insert parentheses for callable items.
         fn complete_function_parentheses(mut self) -> CompletionTestBuilder {
             self.settings.complete_function_parentheses = true;
+            self
+        }
+
+        /// When set, completions may make use of snippets in the insertion text
+        /// (e.g. `$0`).
+        fn snippets_support(mut self, supported: bool) -> CompletionTestBuilder {
+            self.capabilities = self.capabilities.snippets(supported);
             self
         }
 
@@ -10082,6 +10122,7 @@ raise <CURSOR>
                 // tests should be fixed to accomodate that change
                 // as well. ---AG
                 settings: CompletionSettings::default(),
+                capabilities: CompletionCapabilities::default(),
                 skip_builtins: false,
                 skip_keywords: false,
                 skip_dunders: false,
@@ -10099,6 +10140,7 @@ raise <CURSOR>
                 cursor_test: self.build(),
                 // Keep defaults aligned with production completion settings.
                 settings: CompletionSettings::default(),
+                capabilities: CompletionCapabilities::default(),
                 skip_builtins: false,
                 skip_keywords: false,
                 skip_dunders: false,

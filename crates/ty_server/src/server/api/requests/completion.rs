@@ -8,7 +8,7 @@ use lsp_types::{
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
-use ty_ide::{CompletionInsertTextFormat, CompletionKind, completion};
+use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};
@@ -57,10 +57,14 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         };
         let client_capabilities = snapshot.resolved_client_capabilities();
-        let mut completion_settings = snapshot.workspace_settings().completions().clone();
-        completion_settings.complete_function_parentheses &=
-            client_capabilities.supports_completion_item_snippets();
-        let completions = completion(db, &completion_settings, file, offset);
+        let completions = completion(
+            db,
+            snapshot.workspace_settings().completions(),
+            CompletionCapabilities::default()
+                .snippets(client_capabilities.supports_completion_item_snippets()),
+            file,
+            offset,
+        );
         if completions.is_empty() {
             return Ok(None);
         }

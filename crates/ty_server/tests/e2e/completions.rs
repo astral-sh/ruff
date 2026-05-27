@@ -91,9 +91,7 @@ func
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default()
-                .with_auto_import(false)
-                .with_complete_function_parentheses(true),
+            ClientOptions::default().with_complete_function_parentheses(true),
         )
         .enable_completion_snippets(true)
         .with_workspace(workspace_root, None)?
@@ -110,7 +108,7 @@ func
         "label": "function",
         "kind": 3,
         "detail": "def function() -> None",
-        "sortText": "0",
+        "sortText": " 0",
         "insertText": "function($0)",
         "insertTextFormat": 2
       }
@@ -121,7 +119,7 @@ func
 }
 
 #[test]
-fn complete_function_parentheses_requires_snippet_support() -> Result<()> {
+fn complete_function_parentheses_without_snippet_support() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
     let foo_content = "\
@@ -132,9 +130,7 @@ func
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default()
-                .with_auto_import(false)
-                .with_complete_function_parentheses(true),
+            ClientOptions::default().with_complete_function_parentheses(true),
         )
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
@@ -147,10 +143,11 @@ func
     insta::assert_json_snapshot!(completion, @r#"
     [
       {
-        "label": "function",
+        "label": "function()",
         "kind": 3,
         "detail": "def function() -> None",
-        "sortText": "0"
+        "sortText": " 0",
+        "insertText": "function()"
       }
     ]
     "#);
@@ -164,7 +161,7 @@ fn function_completions(
     position: Position,
 ) -> Vec<lsp_types::CompletionItem> {
     let mut completions = server.completion_request(&server.file_uri(file), position);
-    completions.retain(|completion| completion.label == "function");
+    completions.retain(|completion| completion.label.starts_with("function"));
     completions
 }
 

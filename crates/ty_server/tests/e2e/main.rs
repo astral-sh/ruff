@@ -1298,6 +1298,7 @@ impl TestServerBuilder {
         self
     }
 
+    /// Enable or disable the completion snippet capability.
     pub(crate) fn enable_completion_snippets(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document

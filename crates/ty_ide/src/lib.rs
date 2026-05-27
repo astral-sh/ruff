@@ -32,7 +32,8 @@ mod workspace_symbols;
 pub use all_symbols::{AllSymbolInfo, all_symbols};
 pub use code_action::{QuickFix, code_actions};
 pub use completion::{
-    Completion, CompletionInsertTextFormat, CompletionKind, CompletionSettings, completion,
+    Completion, CompletionCapabilities, CompletionInsertTextFormat, CompletionKind,
+    CompletionSettings, completion,
 };
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
