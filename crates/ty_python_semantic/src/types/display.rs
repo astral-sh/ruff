@@ -1281,6 +1281,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::TypeGuard(type_guard) => {
                 fmt_type_guard_like(self.db, type_guard, &self.settings, f)
             }
+            Type::TypeForm(typeform) => {
+                f.with_type(Type::SpecialForm(SpecialFormType::TypeForm))
+                    .write_str("TypeForm")?;
+                f.write_char('[')?;
+                typeform
+                    .type_argument(self.db)
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
+                f.write_char(']')
+            }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
                 ClassType::NonGeneric(class) => class
                     .display_with(self.db, self.settings.clone())

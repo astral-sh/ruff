@@ -137,6 +137,7 @@ mod post_inference;
 mod subscript;
 mod type_call;
 mod type_expression;
+mod type_form;
 mod typed_dict;
 mod typevar;
 
@@ -2535,6 +2536,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
                 // We may infer the value type multiple times with distinct type context during
@@ -3153,6 +3155,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
                 let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
@@ -3315,6 +3318,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::AlwaysFalsy
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -5119,6 +5123,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => None,
             }
@@ -5716,6 +5721,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
+        if let Some(target) = tcx.annotation
+            && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
+        {
+            self.store_expression_type(expression, ty);
+
+            if let Some(expression_cache) = &self.expression_cache {
+                expression_cache
+                    .borrow_mut()
+                    .insert((expression.into(), tcx), ty);
+            }
+
+            return ty;
+        }
+
+        self.infer_value_expression_impl(expression, tcx)
+    }
+
+    /// Infer an expression without implicitly treating this root as a `TypeForm`.
+    ///
+    /// Child expressions still use their normal contextual inference, so the
+    /// expression's existing bidirectional behavior is preserved.
+    fn infer_value_expression_impl(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let mut ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
@@ -7730,6 +7761,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_typeddict_call_expression(call_expression, None);
         }
 
+        if callable_type == Type::SpecialForm(SpecialFormType::TypeForm) {
+            return self.infer_type_form_call_expression(call_expression);
+        }
+
         if callable_type.is_notimplemented(self.db()) {
             if let Some(builder) = self
                 .context
@@ -9612,6 +9647,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
             ) => fallback_unary_expression_type(),

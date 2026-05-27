@@ -403,6 +403,7 @@ impl ClassInfoConstraintFunction {
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_)
@@ -2256,6 +2257,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::BoundSuper(_)
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
+        | Type::TypeForm(_)
         | Type::NewTypeInstance(_) => false,
     }
 }
@@ -2346,6 +2348,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         | Type::BoundSuper(_)
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
+        | Type::TypeForm(_)
         | Type::NewTypeInstance(_) => {
             unreachable!(
                 "invalid type {} in all_matching_typeddict_fields_have_literal_types",
