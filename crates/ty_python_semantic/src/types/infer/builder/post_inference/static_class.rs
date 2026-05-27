@@ -6,6 +6,7 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 use crate::{
     Db, TypeQualifiers,
@@ -53,7 +54,9 @@ use crate::{
     },
 };
 use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
-use ty_python_core::{SemanticIndex, definition::DefinitionKind, scope::ScopeId};
+use ty_python_core::{
+    SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
+};
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition is semantically valid and will not cause an exception to be raised at runtime.
@@ -1027,8 +1030,42 @@ fn check_class_bindings_against_metaclass_instance_declarations<'db>(
     let table = index.place_table(scope);
     let use_def = index.use_def_map(scope);
 
-    for (symbol_id, bindings) in use_def.all_end_of_scope_symbol_bindings() {
-        let name = table.symbol(symbol_id).name();
+    let Some(metaclass) = metaclass.to_class_type(db) else {
+        return;
+    };
+
+    // Metaclass declarations are generally sparse, while class namespaces such as enums can be
+    // large. Collect possible contracts first rather than probing the metaclass for every binding.
+    let mut metaclass_instance_declarations = FxHashSet::default();
+    for metaclass in metaclass
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
+    {
+        let body_scope = metaclass.body_scope(db);
+        let metaclass_index = semantic_index(db, body_scope.file(db));
+        let body_scope = body_scope.file_scope_id(db);
+        let metaclass_table = metaclass_index.place_table(body_scope);
+        let metaclass_use_def = metaclass_index.use_def_map(body_scope);
+
+        for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
+            metaclass_instance_declarations
+                .insert(metaclass_table.symbol(symbol_id).name().to_string());
+        }
+
+        for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
+            for member in metaclass_index.place_table(function_scope).members() {
+                if let Some(name) = member.as_instance_attribute() {
+                    metaclass_instance_declarations.insert(name.to_string());
+                }
+            }
+        }
+    }
+
+    for name in metaclass_instance_declarations {
+        let Some(symbol_id) = table.symbol_id(name.as_str()) else {
+            continue;
+        };
         let Place::Defined(DefinedPlace {
             ty: declared_ty,
             origin: TypeOrigin::Declared,
@@ -1038,7 +1075,7 @@ fn check_class_bindings_against_metaclass_instance_declarations<'db>(
             continue;
         };
 
-        for binding in bindings {
+        for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
             let Some(definition) = binding.binding.definition() else {
                 continue;
             };
