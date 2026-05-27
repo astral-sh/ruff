@@ -1012,8 +1012,8 @@ pub(crate) fn check_static_class_definitions<'db>(
 /// before a metaclass can initialize that same attribute. If the metaclass declares a type for
 /// that attribute, an incompatible class-body value violates that contract.
 ///
-/// Conversely, a declaration in the class body constrains an inferred value populated by
-/// metaclass initialization.
+/// Independently, an explicit attribute declaration in the class body constrains a value
+/// populated by metaclass initialization.
 fn check_class_namespace_against_metaclass_members<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
@@ -1037,9 +1037,9 @@ fn check_class_namespace_against_metaclass_members<'db>(
         return;
     };
 
-    // Metaclass declarations are generally sparse, while class namespaces such as enums can be
-    // large. Collect possible contracts first rather than probing the metaclass for every binding.
-    let mut metaclass_instance_declarations = FxHashSet::default();
+    // Metaclass-populated members are generally sparse, while class namespaces such as enums can
+    // be large. Collect possible members first rather than probing the metaclass for every binding.
+    let mut metaclass_instance_members = FxHashSet::default();
     for metaclass in metaclass
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
@@ -1052,82 +1052,86 @@ fn check_class_namespace_against_metaclass_members<'db>(
         let metaclass_use_def = metaclass_index.use_def_map(body_scope);
 
         for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
-            metaclass_instance_declarations
-                .insert(metaclass_table.symbol(symbol_id).name().to_string());
+            metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().to_string());
         }
 
         for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
             for member in metaclass_index.place_table(function_scope).members() {
                 if let Some(name) = member.as_instance_attribute() {
-                    metaclass_instance_declarations.insert(name.to_string());
+                    metaclass_instance_members.insert(name.to_string());
                 }
             }
         }
     }
 
-    for name in metaclass_instance_declarations {
+    for name in metaclass_instance_members {
         let Some(symbol_id) = table.symbol_id(name.as_str()) else {
             continue;
         };
-        match metaclass_instance.instance_member(db, name.as_str()).place {
-            Place::Defined(DefinedPlace {
-                ty: declared_ty,
-                origin: TypeOrigin::Declared,
-                ..
-            }) => {
-                for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
-                    let Some(definition) = binding.binding.definition() else {
-                        continue;
-                    };
-                    let definition_kind = definition.kind(db);
-                    if !definition_kind.is_user_visible() {
-                        continue;
-                    }
+        let Place::Defined(DefinedPlace {
+            ty: metaclass_member_ty,
+            origin,
+            ..
+        }) = metaclass_instance.instance_member(db, name.as_str()).place
+        else {
+            continue;
+        };
 
-                    let assigned_ty = binding_type(db, definition);
-                    if !assigned_ty.is_assignable_to(db, declared_ty) {
-                        report_invalid_attribute_assignment(
-                            context,
-                            definition_kind.target_range(context.module()),
-                            declared_ty,
-                            assigned_ty,
-                            name.as_str(),
-                        );
-                    }
-                }
-            }
-            Place::Defined(DefinedPlace {
-                ty: initialized_ty,
-                origin: TypeOrigin::Inferred,
-                ..
-            }) => {
-                let result = place_from_declarations(
-                    db,
-                    use_def.end_of_scope_symbol_declarations(symbol_id),
-                );
-                let Some(definition) = result.first_declaration else {
-                    continue;
-                };
-                let Place::Defined(DefinedPlace {
-                    ty: declared_ty, ..
-                }) = result.ignore_conflicting_declarations().place
-                else {
+        if origin == TypeOrigin::Declared {
+            let mut reported_incompatible_binding = false;
+            for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
+                let Some(definition) = binding.binding.definition() else {
                     continue;
                 };
                 let definition_kind = definition.kind(db);
-                if definition_kind.is_user_visible()
-                    && !initialized_ty.is_assignable_to(db, declared_ty)
-                {
+                if !definition_kind.is_user_visible() {
+                    continue;
+                }
+
+                let assigned_ty = binding_type(db, definition);
+                if !assigned_ty.is_assignable_to(db, metaclass_member_ty) {
+                    reported_incompatible_binding = true;
                     report_invalid_attribute_assignment(
                         context,
                         definition_kind.target_range(context.module()),
-                        declared_ty,
-                        initialized_ty,
+                        metaclass_member_ty,
+                        assigned_ty,
                         name.as_str(),
                     );
                 }
             }
-            _ => {}
+
+            if reported_incompatible_binding {
+                continue;
+            }
+        }
+
+        let result =
+            place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id));
+        let Some(definition) = result.first_declaration else {
+            continue;
+        };
+        let Place::Defined(DefinedPlace {
+            ty: class_declared_ty,
+            ..
+        }) = result.ignore_conflicting_declarations().place
+        else {
+            continue;
+        };
+        let definition_kind = definition.kind(db);
+        // A metaclass may intentionally replace an ordinary class namespace value during class
+        // creation. Only an explicit attribute annotation constrains the replacement value.
+        if !matches!(definition_kind, DefinitionKind::AnnotatedAssignment(_)) {
+            continue;
+        }
+        if !metaclass_member_ty.is_assignable_to(db, class_declared_ty) {
+            report_invalid_attribute_assignment(
+                context,
+                definition_kind.target_range(context.module()),
+                class_declared_ty,
+                metaclass_member_ty,
+                name.as_str(),
+            );
         }
     }
 }

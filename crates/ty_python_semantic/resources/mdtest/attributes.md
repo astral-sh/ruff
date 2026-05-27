@@ -1114,6 +1114,15 @@ class CDeclared(metaclass=BroadInitializingMeta):
 # A class-body declaration is a contract for an attribute populated by metaclass initialization.
 reveal_type(CDeclared.attr)  # revealed: str
 
+class DeclaredBroadInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: object = object()
+
+class CDeclaredAgainstDeclaredMeta(metaclass=DeclaredBroadInitializingMeta):
+    attr: str  # error: [invalid-assignment]
+
+reveal_type(CDeclaredAgainstDeclaredMeta.attr)  # revealed: str
+
 class CompatibleInitializingMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
         cls.attr: int | str = 1
@@ -1121,10 +1130,51 @@ class CompatibleInitializingMeta(type):
 def _(flag: bool):
     class CConditionallyDeclared(metaclass=CompatibleInitializingMeta):
         if flag:
-            attr: str = "class value"
+            attr: str = "class value"  # error: [invalid-assignment]
 
     # On paths without the class-body value, the metaclass-populated value remains available.
     reveal_type(CConditionallyDeclared.attr)  # revealed: int | str
+
+class ReplacingMethodsMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory = lambda: object()
+        cls.arguments = lambda: ()
+
+class MethodsReplacedAtConstruction(metaclass=ReplacingMethodsMeta):
+    def factory(self, value: int) -> str:
+        return ""
+
+    def arguments(self, value: int) -> str:
+        return ""
+
+class TypedReplacingMethodsMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory: object = object()
+
+class MethodReplacedByTypedMeta(metaclass=TypedReplacingMethodsMeta):
+    def factory(self) -> str:
+        return ""
+
+class PopulatingMetaclass(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.populated_on_meta: int = 1
+
+class PopulatedMeta(type, metaclass=PopulatingMetaclass): ...
+class ConstructedByPopulatedMeta(metaclass=PopulatedMeta): ...
+
+reveal_type(PopulatedMeta.populated_on_meta)  # revealed: int
+reveal_type(ConstructedByPopulatedMeta.populated_on_meta)  # revealed: int
+
+class DerivedInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.inherited_attr: int = 1
+
+class DeclaringBase:
+    inherited_attr: str
+
+class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
+
+reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 ```
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data

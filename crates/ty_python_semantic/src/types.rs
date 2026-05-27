@@ -2566,6 +2566,10 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
+                .to_meta_type(db)
+                .class_object_member(db, name.as_str(), policy),
+
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
@@ -2590,17 +2594,29 @@ impl<'db> Type<'db> {
             "Calling `class_object_member` on class literals and subclass-of types should always find an MRO",
         );
 
-        // A definitely-declared class attribute is the contract for values populated by
-        // metaclass initialization, analogous to a declared instance attribute initialized in
-        // `__init__`. Nothing from the metaclass changes the type exposed for this attribute.
-        if matches!(
-            class_attr.place,
-            Place::Defined(DefinedPlace {
-                origin: TypeOrigin::Declared,
-                definedness: Definedness::AlwaysDefined,
+        let own_class = match self {
+            Type::SubclassOf(subclass_of) => subclass_of.subclass_of().into_class(db),
+            _ => self.to_class_type(db),
+        };
+        let own_class_attr = own_class.map(|class| class.own_class_member(db, None, name).inner);
+
+        // A definitely-declared attribute in this class's own namespace is the contract for
+        // values populated by metaclass initialization, analogous to a declared instance
+        // attribute initialized in `__init__`. An inherited declaration does not mask a value
+        // that the metaclass stores directly on the newly constructed subclass.
+        let own_declaration_definedness = match own_class_attr {
+            Some(PlaceAndQualifiers {
+                place:
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Declared,
+                        definedness,
+                        ..
+                    }),
                 ..
-            })
-        ) {
+            }) => Some(definedness),
+            _ => None,
+        };
+        if own_declaration_definedness == Some(Definedness::AlwaysDefined) {
             return class_attr;
         }
 
@@ -2609,13 +2625,7 @@ impl<'db> Type<'db> {
         };
         let metaclass_attr = metaclass_instance.instance_member(db, name);
 
-        if matches!(
-            class_attr.place,
-            Place::Defined(DefinedPlace {
-                origin: TypeOrigin::Declared,
-                ..
-            })
-        ) {
+        if own_declaration_definedness.is_some() {
             // A conditionally-declared attribute is a contract only on paths where that
             // declaration is present; the metaclass value is the fallback on other paths.
             class_attr.or_fall_back_to(db, || metaclass_attr)
