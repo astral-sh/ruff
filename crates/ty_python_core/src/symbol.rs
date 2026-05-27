@@ -45,7 +45,7 @@ bitflags! {
 impl get_size2::GetSize for SymbolFlags {}
 
 impl Symbol {
-    pub const fn new(name: Name) -> Self {
+    pub(crate) const fn new(name: Name) -> Self {
         Self {
             name,
             flags: SymbolFlags::empty(),
@@ -117,7 +117,7 @@ impl Symbol {
         self.flags.contains(SymbolFlags::IS_REASSIGNED)
     }
 
-    pub fn is_parameter(&self) -> bool {
+    pub(crate) fn is_parameter(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_PARAMETER)
     }
 

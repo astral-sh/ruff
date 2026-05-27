@@ -615,6 +615,7 @@ pub(crate) mod tests {
     #[derive(Clone)]
     pub struct TestDb {
         storage: salsa::Storage<Self>,
+        #[allow(dead_code)]
         events: Events,
         files: Files,
         system: TestSystem,
@@ -684,7 +685,8 @@ pub(crate) mod tests {
 
     impl TestDb {
         /// Takes the salsa events.
-        pub fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+        #[allow(dead_code)]
+        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let mut events = self.events.lock().unwrap();
 
             std::mem::take(&mut *events)

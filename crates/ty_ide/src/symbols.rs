@@ -23,7 +23,7 @@ use crate::completion::CompletionKind;
 ///
 /// This can be used with the `FlatSymbols::search` API.
 #[derive(Clone, Debug)]
-pub struct QueryPattern {
+pub(crate) struct QueryPattern {
     re: Option<Regex>,
     original: String,
     original_is_exact: bool,
@@ -31,7 +31,7 @@ pub struct QueryPattern {
 
 impl QueryPattern {
     /// Create a new query pattern from a literal search string given.
-    pub fn fuzzy(literal_query_string: &str) -> QueryPattern {
+    pub(crate) fn fuzzy(literal_query_string: &str) -> QueryPattern {
         let mut pattern = "(?i)".to_string();
         for ch in literal_query_string.chars() {
             pattern.push_str(&regex::escape(ch.encode_utf8(&mut [0; 4])));
@@ -50,7 +50,7 @@ impl QueryPattern {
     }
 
     /// Create a new query
-    pub fn exactly(symbol: &str) -> QueryPattern {
+    pub(crate) fn exactly(symbol: &str) -> QueryPattern {
         QueryPattern {
             re: None,
             original: symbol.to_string(),
@@ -59,7 +59,7 @@ impl QueryPattern {
     }
 
     /// Create a new query pattern that matches all symbols.
-    pub fn matches_all_symbols() -> QueryPattern {
+    pub(crate) fn matches_all_symbols() -> QueryPattern {
         QueryPattern {
             re: None,
             original: String::new(),
@@ -71,7 +71,7 @@ impl QueryPattern {
         self.is_match_symbol_name(&symbol.name)
     }
 
-    pub fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
+    pub(crate) fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
         if let Some(ref re) = self.re {
             re.is_match(symbol_name)
         } else if self.original_is_exact {
@@ -91,7 +91,7 @@ impl QueryPattern {
     /// This will never return `true` incorrectly, but it may return `false`
     /// incorrectly. That is, it's possible that this query will match all
     /// inputs but this still returns `false`.
-    pub fn will_match_everything(&self) -> bool {
+    pub(crate) fn will_match_everything(&self) -> bool {
         self.re.is_none() && self.original.is_empty()
     }
 }
@@ -123,22 +123,9 @@ pub struct FlatSymbols {
 }
 
 impl FlatSymbols {
-    /// Get the symbol info for the symbol identified by the given ID.
-    ///
-    /// Returns `None` when the given ID does not reference a symbol in this
-    /// collection.
-    pub fn get(&self, id: SymbolId) -> Option<SymbolInfo<'_>> {
-        self.symbols.get(id).map(Into::into)
-    }
-
     /// Returns true if and only if this collection is empty.
     pub fn is_empty(&self) -> bool {
         self.symbols.is_empty()
-    }
-
-    /// Returns the total number of symbols in this collection.
-    pub fn len(&self) -> usize {
-        self.symbols.len()
     }
 
     /// Returns an iterator over every symbol along with its ID.
@@ -149,7 +136,10 @@ impl FlatSymbols {
     }
 
     /// Returns a sequence of symbols that matches the given query.
-    pub fn search(&self, query: &QueryPattern) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
+    pub(crate) fn search(
+        &self,
+        query: &QueryPattern,
+    ) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
         self.iter()
             .filter(|(_, symbol)| query.is_match_symbol(symbol))
     }
@@ -196,22 +186,10 @@ pub struct HierarchicalSymbols {
 }
 
 impl HierarchicalSymbols {
-    /// Get the symbol info for the symbol identified by the given ID.
-    ///
-    /// Returns `None` when the given ID does not reference a symbol in this
-    /// collection.
-    pub fn get(&self, id: SymbolId) -> Option<SymbolInfo<'_>> {
-        self.symbols.get(id).map(Into::into)
-    }
-
     /// Returns true if and only if this collection is empty.
-    pub fn is_empty(&self) -> bool {
+    #[allow(dead_code)]
+    pub(crate) fn is_empty(&self) -> bool {
         self.symbols.is_empty()
-    }
-
-    /// Returns the total number of symbols in this collection.
-    pub fn len(&self) -> usize {
-        self.symbols.len()
     }
 
     /// Returns an iterator over every top-level symbol along with its ID.
@@ -259,11 +237,11 @@ pub struct SymbolInfo<'a> {
     /// The kind of symbol (function, class, variable, etc.)
     pub kind: SymbolKind,
     /// Whether this symbol has a `@deprecated` decorator.
-    pub deprecated: bool,
+    pub(crate) deprecated: bool,
     /// Whether this symbol was imported from another module.
     ///
     /// And if so, this includes the name of that module.
-    pub imported_from: Option<ImportedFrom>,
+    pub(crate) imported_from: Option<ImportedFrom>,
     /// The range of the symbol name
     pub name_range: TextRange,
     /// The full range of the symbol (including body)
@@ -271,7 +249,7 @@ pub struct SymbolInfo<'a> {
 }
 
 impl SymbolInfo<'_> {
-    pub fn to_owned(&self) -> SymbolInfo<'static> {
+    pub(crate) fn to_owned(&self) -> SymbolInfo<'static> {
         SymbolInfo {
             name: Cow::Owned(self.name.to_string()),
             kind: self.kind,
@@ -334,7 +312,8 @@ pub enum SymbolKind {
 
 impl SymbolKind {
     /// Returns the string representation of the symbol kind.
-    pub fn to_string(self) -> &'static str {
+    #[allow(dead_code)]
+    pub(crate) fn to_string(self) -> &'static str {
         match self {
             SymbolKind::Module => "Module",
             SymbolKind::Class => "Class",
@@ -352,7 +331,7 @@ impl SymbolKind {
     }
 
     /// Maps this to a "completion" kind if a sensible mapping exists.
-    pub fn to_completion_kind(self) -> Option<CompletionKind> {
+    pub(crate) fn to_completion_kind(self) -> Option<CompletionKind> {
         Some(match self {
             SymbolKind::Module => CompletionKind::Module,
             SymbolKind::Class => CompletionKind::Class,
@@ -427,7 +406,7 @@ struct SymbolTree {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub struct ImportedFrom {
+pub(crate) struct ImportedFrom {
     module_name: ModuleName,
     kind: ImportKind,
 }
@@ -448,7 +427,7 @@ impl ImportedFrom {
         Some(ImportedFrom { module_name, kind })
     }
 
-    pub fn module_name(&self) -> &ModuleName {
+    pub(crate) fn module_name(&self) -> &ModuleName {
         &self.module_name
     }
 }

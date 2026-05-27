@@ -15,7 +15,7 @@ const IPYTHON_BUILTINS: &[&str] = &["__IPYTHON__", "display", "get_ipython"];
 
 /// Globally defined names which are not attributes of the builtins module, or
 /// are only present on some platforms.
-pub const MAGIC_GLOBALS: &[&str] = &[
+pub(crate) const MAGIC_GLOBALS: &[&str] = &[
     "WindowsError",
     "__annotations__",
     "__builtins__",

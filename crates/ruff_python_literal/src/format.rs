@@ -32,7 +32,7 @@ impl FormatParse for FormatConversion {
 }
 
 impl FormatConversion {
-    pub fn from_char(c: char) -> Option<FormatConversion> {
+    pub(crate) fn from_char(c: char) -> Option<FormatConversion> {
         match c {
             's' => Some(FormatConversion::Str),
             'r' => Some(FormatConversion::Repr),

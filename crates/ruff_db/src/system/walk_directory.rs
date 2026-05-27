@@ -18,7 +18,7 @@ pub struct WalkDirectoryBuilder {
 }
 
 impl WalkDirectoryBuilder {
-    pub fn new<W>(path: impl AsRef<SystemPath>, walker: W) -> Self
+    pub(crate) fn new<W>(path: impl AsRef<SystemPath>, walker: W) -> Self
     where
         W: DirectoryWalker + 'static,
     {
@@ -76,7 +76,7 @@ impl WalkDirectoryBuilder {
 
     /// Runs the directory traversal and calls the passed `builder` to create visitors
     /// that do the visiting. The walker may run multiple threads to visit the directories.
-    pub fn visit(self, builder: &mut dyn WalkDirectoryVisitorBuilder) {
+    pub(crate) fn visit(self, builder: &mut dyn WalkDirectoryVisitorBuilder) {
         let configuration = WalkDirectoryConfiguration {
             paths: self.paths,
             ignore_hidden: self.ignore_hidden,
@@ -88,7 +88,7 @@ impl WalkDirectoryBuilder {
 }
 
 /// Concrete walker that performs the directory walking.
-pub trait DirectoryWalker {
+pub(crate) trait DirectoryWalker {
     fn walk(
         &self,
         builder: &mut dyn WalkDirectoryVisitorBuilder,
@@ -97,12 +97,12 @@ pub trait DirectoryWalker {
 }
 
 /// Creates a visitor for each thread that does the visiting.
-pub trait WalkDirectoryVisitorBuilder<'s> {
+pub(crate) trait WalkDirectoryVisitorBuilder<'s> {
     fn build(&mut self) -> Box<dyn WalkDirectoryVisitor + 's>;
 }
 
 /// Visitor handling the individual directory entries.
-pub trait WalkDirectoryVisitor: Send {
+pub(crate) trait WalkDirectoryVisitor: Send {
     fn visit(&mut self, entry: std::result::Result<DirectoryEntry, Error>) -> WalkState;
 }
 
@@ -131,10 +131,11 @@ impl WalkDirectoryVisitor for FnVisitorImpl<'_> {
     }
 }
 
-pub struct WalkDirectoryConfiguration {
-    pub paths: Vec<SystemPathBuf>,
-    pub ignore_hidden: bool,
-    pub standard_filters: bool,
+pub(crate) struct WalkDirectoryConfiguration {
+    pub(crate) paths: Vec<SystemPathBuf>,
+    pub(crate) ignore_hidden: bool,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) standard_filters: bool,
 }
 
 /// An entry in a directory.
@@ -149,12 +150,6 @@ impl DirectoryEntry {
     /// The full path that this entry represents.
     pub fn path(&self) -> &SystemPath {
         &self.path
-    }
-
-    /// The full path that this entry represents.
-    /// Analogous to [`DirectoryEntry::path`], but moves ownership of the path.
-    pub fn into_path(self) -> SystemPathBuf {
-        self.path
     }
 
     /// Return the file type for the file that this entry points to.
@@ -185,15 +180,12 @@ pub enum WalkState {
 }
 
 pub struct Error {
+    #[allow(dead_code)]
     pub(super) depth: Option<usize>,
     pub(super) kind: ErrorKind,
 }
 
 impl Error {
-    pub fn depth(&self) -> Option<usize> {
-        self.depth
-    }
-
     pub fn kind(&self) -> &ErrorKind {
         &self.kind
     }

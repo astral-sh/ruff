@@ -356,17 +356,6 @@ impl TokenKind {
         TokenKind::Case <= self && self <= TokenKind::Type
     }
 
-    /// Returns `true` if the token is strictly a non-soft keyword.
-    ///
-    /// See also [`is_keyword`], [`is_soft_keyword`].
-    ///
-    /// [`is_keyword`]: TokenKind::is_keyword
-    /// [`is_soft_keyword`]: TokenKind::is_soft_keyword
-    #[inline]
-    pub fn is_non_soft_keyword(self) -> bool {
-        TokenKind::And <= self && self <= TokenKind::Yield
-    }
-
     #[inline]
     pub const fn is_operator(self) -> bool {
         matches!(

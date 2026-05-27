@@ -206,7 +206,7 @@ impl Project {
         self.metadata(db).root()
     }
 
-    pub fn name(self, db: &dyn Db) -> &str {
+    pub(crate) fn name(self, db: &dyn Db) -> &str {
         self.metadata(db).name()
     }
 
@@ -231,7 +231,7 @@ impl Project {
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
-    pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+    pub(crate) fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         matches!(
             ProjectFilesFilter::from_project(db, self)
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),
@@ -450,7 +450,7 @@ impl Project {
         }
     }
 
-    pub fn verbose(self, db: &dyn Db) -> bool {
+    pub(crate) fn verbose(self, db: &dyn Db) -> bool {
         self.verbose_flag(db)
     }
 
@@ -460,7 +460,7 @@ impl Project {
         }
     }
 
-    pub fn force_exclude(self, db: &dyn Db) -> bool {
+    pub(crate) fn force_exclude(self, db: &dyn Db) -> bool {
         self.force_exclude_flag(db)
     }
 
@@ -482,7 +482,7 @@ impl Project {
     }
 
     /// Returns the open files in the project or `None` if there are no open files.
-    pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
+    pub(crate) fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
     }
 
@@ -643,7 +643,7 @@ impl Project {
         }
     }
 
-    pub fn add_file(self, db: &mut dyn Db, file: File) {
+    pub(crate) fn add_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
             "Adding file `{}` to project `{}`",
             file.path(db),
@@ -660,7 +660,7 @@ impl Project {
     /// Replaces the diagnostics from indexing the project files with `diagnostics`.
     ///
     /// This is a no-op if the project files haven't been indexed yet.
-    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
+    pub(crate) fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
@@ -693,7 +693,7 @@ impl Project {
         }
     }
 
-    pub fn reload_files(self, db: &mut dyn Db) {
+    pub(crate) fn reload_files(self, db: &mut dyn Db) {
         tracing::debug!("Reloading files for project `{}`", self.name(db));
 
         if !self.file_set(db).is_lazy() {

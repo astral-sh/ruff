@@ -10,7 +10,7 @@ use crate::Db;
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Hint {
     pub range: TextRange,
-    pub kind: HintKind,
+    pub(crate) kind: HintKind,
 }
 
 impl Hint {
@@ -26,7 +26,7 @@ pub enum HintKind {
 }
 
 impl HintKind {
-    pub fn message(&self) -> String {
+    pub(crate) fn message(&self) -> String {
         match self {
             Self::UnusedBinding(name) => format!("`{name}` is unused"),
             Self::UnreachableCode(UnreachableKind::Unconditional) => {

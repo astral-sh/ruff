@@ -74,7 +74,7 @@ impl ChangeEvent {
         self.system_path().and_then(|path| path.file_name())
     }
 
-    pub fn system_path(&self) -> Option<&SystemPath> {
+    pub(crate) fn system_path(&self) -> Option<&SystemPath> {
         match self {
             ChangeEvent::Opened(path)
             | ChangeEvent::Created { path, .. }
@@ -86,10 +86,6 @@ impl ChangeEvent {
 
     pub const fn is_rescan(&self) -> bool {
         matches!(self, ChangeEvent::Rescan)
-    }
-
-    pub const fn is_created(&self) -> bool {
-        matches!(self, ChangeEvent::Created { .. })
     }
 
     pub const fn is_changed(&self) -> bool {
@@ -151,7 +147,7 @@ impl ExistingPathKind {
         }
     }
 
-    pub fn from_io_metadata(metadata: &std::io::Result<fs::Metadata>) -> Self {
+    pub(crate) fn from_io_metadata(metadata: &std::io::Result<fs::Metadata>) -> Self {
         match metadata {
             Ok(metadata) if metadata.is_file() => Self::File,
             Ok(metadata) if metadata.is_dir() => Self::Directory,

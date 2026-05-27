@@ -60,12 +60,14 @@ impl ParseOptions {
 
     /// Set the maximum recursion depth for the parser.
     #[must_use]
-    pub fn with_max_recursion_depth(mut self, depth: u16) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn with_max_recursion_depth(mut self, depth: u16) -> Self {
         self.max_recursion_depth = depth;
         self
     }
 
-    pub fn max_recursion_depth(&self) -> u16 {
+    #[allow(dead_code)]
+    pub(crate) fn max_recursion_depth(&self) -> u16 {
         self.max_recursion_depth
     }
 }

@@ -133,7 +133,7 @@ impl ModuleName {
     /// assert!(!ModuleName::new_static("foo_bar").unwrap().starts_with(&ModuleName::new_static("foo").unwrap()));
     /// ```
     #[must_use]
-    pub fn starts_with(&self, other: &ModuleName) -> bool {
+    pub(crate) fn starts_with(&self, other: &ModuleName) -> bool {
         let mut self_components = self.components();
         let other_components = other.components();
 

@@ -26,7 +26,7 @@ use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticMode
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReferencesMode {
+pub(crate) enum ReferencesMode {
     /// Find all references including the declaration
     References,
     /// Find all references but skip the declaration

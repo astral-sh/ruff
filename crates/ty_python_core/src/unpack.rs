@@ -76,7 +76,7 @@ pub struct UnpackValue<'db> {
 }
 
 impl<'db> UnpackValue<'db> {
-    pub fn new(kind: UnpackKind, expression: Expression<'db>) -> Self {
+    pub(crate) fn new(kind: UnpackKind, expression: Expression<'db>) -> Self {
         Self { kind, expression }
     }
 

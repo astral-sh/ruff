@@ -20,7 +20,7 @@ use crate::registry::{Linter, RuleNamespace};
 /// Static Analysis Results Interchange Format (SARIF) is a standard format
 /// for static analysis results. For full specification, see:
 /// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
-pub struct SarifEmitter;
+pub(crate) struct SarifEmitter;
 
 impl Emitter for SarifEmitter {
     fn emit(

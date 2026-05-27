@@ -8,7 +8,7 @@ use crate::settings::types::CompiledPerFileIgnoreList;
 /// Return the current working directory.
 ///
 /// On WASM this just returns `.`. Otherwise, defer to [`path_absolutize::path_dedot::CWD`].
-pub fn get_cwd() -> &'static Path {
+pub(crate) fn get_cwd() -> &'static Path {
     #[cfg(target_arch = "wasm32")]
     {
         Path::new(".")

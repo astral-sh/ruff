@@ -224,7 +224,7 @@ pub enum StringLikePart<'a> {
     TString(&'a ast::TString),
 }
 
-impl<'a> StringLikePart<'a> {
+impl StringLikePart<'_> {
     /// Returns the [`AnyStringFlags`] for the current string-like part.
     pub fn flags(&self) -> AnyStringFlags {
         match self {
@@ -246,13 +246,6 @@ impl<'a> StringLikePart<'a> {
 
     pub const fn is_string_literal(self) -> bool {
         matches!(self, Self::String(_))
-    }
-
-    pub const fn as_string_literal(self) -> Option<&'a ast::StringLiteral> {
-        match self {
-            StringLikePart::String(value) => Some(value),
-            _ => None,
-        }
     }
 
     pub const fn is_interpolated_string(self) -> bool {

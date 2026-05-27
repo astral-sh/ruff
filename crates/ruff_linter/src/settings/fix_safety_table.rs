@@ -20,7 +20,7 @@ pub struct FixSafetyTable {
 }
 
 impl FixSafetyTable {
-    pub const fn resolve_applicability(
+    pub(crate) const fn resolve_applicability(
         &self,
         rule: Rule,
         applicability: Applicability,
@@ -38,10 +38,6 @@ impl FixSafetyTable {
                 }
             }
         }
-    }
-
-    pub const fn is_empty(&self) -> bool {
-        self.forced_safe.is_empty() && self.forced_unsafe.is_empty()
     }
 
     pub fn from_rule_selectors(

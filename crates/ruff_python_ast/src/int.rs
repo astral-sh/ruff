@@ -82,7 +82,7 @@ impl Int {
     }
 
     /// Return the [`Int`] as an u32, if it can be represented as that data type.
-    pub fn as_u32(&self) -> Option<u32> {
+    pub(crate) fn as_u32(&self) -> Option<u32> {
         match &self.0 {
             Number::Small(small) => u32::try_from(*small).ok(),
             Number::Big(_) => None,
@@ -114,7 +114,7 @@ impl Int {
     }
 
     /// Return the [`Int`] as an i16, if it can be represented as that data type.
-    pub fn as_i16(&self) -> Option<i16> {
+    pub(crate) fn as_i16(&self) -> Option<i16> {
         match &self.0 {
             Number::Small(small) => i16::try_from(*small).ok(),
             Number::Big(_) => None,

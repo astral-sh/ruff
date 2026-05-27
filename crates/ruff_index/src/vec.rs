@@ -3,7 +3,7 @@ use crate::slice::IndexSlice;
 use std::borrow::{Borrow, BorrowMut};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut, RangeBounds};
+use std::ops::{Deref, DerefMut};
 
 /// An owned sequence of `T` indexed by `I`
 #[derive(Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -39,22 +39,12 @@ impl<I: Idx, T> IndexVec<I, T> {
     }
 
     #[inline]
-    pub fn drain<R: RangeBounds<usize>>(&mut self, range: R) -> impl Iterator<Item = T> + '_ {
-        self.raw.drain(range)
-    }
-
-    #[inline]
-    pub fn truncate(&mut self, a: usize) {
-        self.raw.truncate(a);
-    }
-
-    #[inline]
-    pub fn as_slice(&self) -> &IndexSlice<I, T> {
+    pub(crate) fn as_slice(&self) -> &IndexSlice<I, T> {
         IndexSlice::from_raw(&self.raw)
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut IndexSlice<I, T> {
+    pub(crate) fn as_mut_slice(&mut self) -> &mut IndexSlice<I, T> {
         IndexSlice::from_raw_mut(&mut self.raw)
     }
 

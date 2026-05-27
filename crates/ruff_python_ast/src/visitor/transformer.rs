@@ -103,13 +103,13 @@ pub trait Transformer {
     }
 }
 
-pub fn walk_body<V: Transformer + ?Sized>(visitor: &V, body: &mut [Stmt]) {
+pub(crate) fn walk_body<V: Transformer + ?Sized>(visitor: &V, body: &mut [Stmt]) {
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
 }
 
-pub fn walk_elif_else_clause<V: Transformer + ?Sized>(
+pub(crate) fn walk_elif_else_clause<V: Transformer + ?Sized>(
     visitor: &V,
     elif_else_clause: &mut ElifElseClause,
 ) {
@@ -338,11 +338,11 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
     }
 }
 
-pub fn walk_annotation<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
+pub(crate) fn walk_annotation<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
     visitor.visit_expr(expr);
 }
 
-pub fn walk_decorator<V: Transformer + ?Sized>(visitor: &V, decorator: &mut Decorator) {
+pub(crate) fn walk_decorator<V: Transformer + ?Sized>(visitor: &V, decorator: &mut Decorator) {
     visitor.visit_expr(&mut decorator.expression);
 }
 
@@ -625,7 +625,10 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
     }
 }
 
-pub fn walk_comprehension<V: Transformer + ?Sized>(visitor: &V, comprehension: &mut Comprehension) {
+pub(crate) fn walk_comprehension<V: Transformer + ?Sized>(
+    visitor: &V,
+    comprehension: &mut Comprehension,
+) {
     visitor.visit_expr(&mut comprehension.iter);
     visitor.visit_expr(&mut comprehension.target);
     for expr in &mut comprehension.ifs {
@@ -633,7 +636,7 @@ pub fn walk_comprehension<V: Transformer + ?Sized>(visitor: &V, comprehension: &
     }
 }
 
-pub fn walk_except_handler<V: Transformer + ?Sized>(
+pub(crate) fn walk_except_handler<V: Transformer + ?Sized>(
     visitor: &V,
     except_handler: &mut ExceptHandler,
 ) {
@@ -647,7 +650,7 @@ pub fn walk_except_handler<V: Transformer + ?Sized>(
     }
 }
 
-pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Arguments) {
+pub(crate) fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Arguments) {
     // Note that there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
@@ -659,7 +662,7 @@ pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Argu
     }
 }
 
-pub fn walk_parameters<V: Transformer + ?Sized>(visitor: &V, parameters: &mut Parameters) {
+pub(crate) fn walk_parameters<V: Transformer + ?Sized>(visitor: &V, parameters: &mut Parameters) {
     // Defaults are evaluated before annotations.
     for arg in &mut parameters.posonlyargs {
         if let Some(default) = &mut arg.default {
@@ -694,30 +697,30 @@ pub fn walk_parameters<V: Transformer + ?Sized>(visitor: &V, parameters: &mut Pa
     }
 }
 
-pub fn walk_parameter<V: Transformer + ?Sized>(visitor: &V, parameter: &mut Parameter) {
+pub(crate) fn walk_parameter<V: Transformer + ?Sized>(visitor: &V, parameter: &mut Parameter) {
     if let Some(expr) = &mut parameter.annotation {
         visitor.visit_annotation(expr);
     }
 }
 
-pub fn walk_keyword<V: Transformer + ?Sized>(visitor: &V, keyword: &mut Keyword) {
+pub(crate) fn walk_keyword<V: Transformer + ?Sized>(visitor: &V, keyword: &mut Keyword) {
     visitor.visit_expr(&mut keyword.value);
 }
 
-pub fn walk_with_item<V: Transformer + ?Sized>(visitor: &V, with_item: &mut WithItem) {
+pub(crate) fn walk_with_item<V: Transformer + ?Sized>(visitor: &V, with_item: &mut WithItem) {
     visitor.visit_expr(&mut with_item.context_expr);
     if let Some(expr) = &mut with_item.optional_vars {
         visitor.visit_expr(expr);
     }
 }
 
-pub fn walk_type_params<V: Transformer + ?Sized>(visitor: &V, type_params: &mut TypeParams) {
+pub(crate) fn walk_type_params<V: Transformer + ?Sized>(visitor: &V, type_params: &mut TypeParams) {
     for type_param in &mut type_params.type_params {
         visitor.visit_type_param(type_param);
     }
 }
 
-pub fn walk_type_param<V: Transformer + ?Sized>(visitor: &V, type_param: &mut TypeParam) {
+pub(crate) fn walk_type_param<V: Transformer + ?Sized>(visitor: &V, type_param: &mut TypeParam) {
     match type_param {
         TypeParam::TypeVar(TypeParamTypeVar {
             bound,
@@ -756,7 +759,7 @@ pub fn walk_type_param<V: Transformer + ?Sized>(visitor: &V, type_param: &mut Ty
     }
 }
 
-pub fn walk_match_case<V: Transformer + ?Sized>(visitor: &V, match_case: &mut MatchCase) {
+pub(crate) fn walk_match_case<V: Transformer + ?Sized>(visitor: &V, match_case: &mut MatchCase) {
     visitor.visit_pattern(&mut match_case.pattern);
     if let Some(expr) = &mut match_case.guard {
         visitor.visit_expr(expr);
@@ -764,7 +767,7 @@ pub fn walk_match_case<V: Transformer + ?Sized>(visitor: &V, match_case: &mut Ma
     visitor.visit_body(&mut match_case.body);
 }
 
-pub fn walk_pattern<V: Transformer + ?Sized>(visitor: &V, pattern: &mut Pattern) {
+pub(crate) fn walk_pattern<V: Transformer + ?Sized>(visitor: &V, pattern: &mut Pattern) {
     match pattern {
         Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => {
             visitor.visit_expr(value);
@@ -801,7 +804,7 @@ pub fn walk_pattern<V: Transformer + ?Sized>(visitor: &V, pattern: &mut Pattern)
     }
 }
 
-pub fn walk_pattern_arguments<V: Transformer + ?Sized>(
+pub(crate) fn walk_pattern_arguments<V: Transformer + ?Sized>(
     visitor: &V,
     pattern_arguments: &mut PatternArguments,
 ) {
@@ -813,20 +816,20 @@ pub fn walk_pattern_arguments<V: Transformer + ?Sized>(
     }
 }
 
-pub fn walk_pattern_keyword<V: Transformer + ?Sized>(
+pub(crate) fn walk_pattern_keyword<V: Transformer + ?Sized>(
     visitor: &V,
     pattern_keyword: &mut PatternKeyword,
 ) {
     visitor.visit_pattern(&mut pattern_keyword.pattern);
 }
 
-pub fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FString) {
+pub(crate) fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FString) {
     for element in &mut f_string.elements {
         visitor.visit_interpolated_string_element(element);
     }
 }
 
-pub fn walk_interpolated_string_element<V: Transformer + ?Sized>(
+pub(crate) fn walk_interpolated_string_element<V: Transformer + ?Sized>(
     visitor: &V,
     interpolated_string_element: &mut InterpolatedStringElement,
 ) {
@@ -845,31 +848,35 @@ pub fn walk_interpolated_string_element<V: Transformer + ?Sized>(
     }
 }
 
-pub fn walk_t_string<V: Transformer + ?Sized>(visitor: &V, t_string: &mut TString) {
+pub(crate) fn walk_t_string<V: Transformer + ?Sized>(visitor: &V, t_string: &mut TString) {
     for element in &mut t_string.elements {
         visitor.visit_interpolated_string_element(element);
     }
 }
 
-pub fn walk_expr_context<V: Transformer + ?Sized>(_visitor: &V, _expr_context: &mut ExprContext) {}
+pub(crate) fn walk_expr_context<V: Transformer + ?Sized>(
+    _visitor: &V,
+    _expr_context: &mut ExprContext,
+) {
+}
 
-pub fn walk_bool_op<V: Transformer + ?Sized>(_visitor: &V, _bool_op: &mut BoolOp) {}
+pub(crate) fn walk_bool_op<V: Transformer + ?Sized>(_visitor: &V, _bool_op: &mut BoolOp) {}
 
-pub fn walk_operator<V: Transformer + ?Sized>(_visitor: &V, _operator: &mut Operator) {}
+pub(crate) fn walk_operator<V: Transformer + ?Sized>(_visitor: &V, _operator: &mut Operator) {}
 
-pub fn walk_unary_op<V: Transformer + ?Sized>(_visitor: &V, _unary_op: &mut UnaryOp) {}
+pub(crate) fn walk_unary_op<V: Transformer + ?Sized>(_visitor: &V, _unary_op: &mut UnaryOp) {}
 
-pub fn walk_cmp_op<V: Transformer + ?Sized>(_visitor: &V, _cmp_op: &mut CmpOp) {}
+pub(crate) fn walk_cmp_op<V: Transformer + ?Sized>(_visitor: &V, _cmp_op: &mut CmpOp) {}
 
-pub fn walk_alias<V: Transformer + ?Sized>(_visitor: &V, _alias: &mut Alias) {}
+pub(crate) fn walk_alias<V: Transformer + ?Sized>(_visitor: &V, _alias: &mut Alias) {}
 
-pub fn walk_string_literal<V: Transformer + ?Sized>(
+pub(crate) fn walk_string_literal<V: Transformer + ?Sized>(
     _visitor: &V,
     _string_literal: &mut StringLiteral,
 ) {
 }
 
-pub fn walk_bytes_literal<V: Transformer + ?Sized>(
+pub(crate) fn walk_bytes_literal<V: Transformer + ?Sized>(
     _visitor: &V,
     _bytes_literal: &mut BytesLiteral,
 ) {

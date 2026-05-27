@@ -1738,7 +1738,7 @@ impl<'src> Lexer<'src> {
         self.errors.truncate(errors_position);
     }
 
-    pub fn finish(self) -> Vec<LexicalError> {
+    pub(crate) fn finish(self) -> Vec<LexicalError> {
         self.errors
     }
 }

@@ -47,6 +47,7 @@ pub enum TestCaseSpeed {
 #[derive(Debug, Clone)]
 pub struct TestCase {
     file: TestFile,
+    #[allow(dead_code)]
     speed: TestCaseSpeed,
 }
 
@@ -78,10 +79,6 @@ impl TestCase {
 
     pub fn name(&self) -> &str {
         self.file.name
-    }
-
-    pub fn speed(&self) -> TestCaseSpeed {
-        self.speed
     }
 
     pub fn path(&self) -> PathBuf {

@@ -28,7 +28,7 @@ impl<'stmt> ControlFlowGraph<'stmt> {
     }
 
     /// Index of terminal block
-    pub fn terminal(&self) -> BlockId {
+    pub(crate) fn terminal(&self) -> BlockId {
         self.terminal
     }
 
@@ -52,11 +52,6 @@ impl<'stmt> ControlFlowGraph<'stmt> {
         &self.blocks[block].out
     }
 
-    /// Returns an iterator over the indices of the direct predecessors of the block at the given index
-    pub fn predecessors(&self, block: BlockId) -> impl ExactSizeIterator<Item = BlockId> + '_ {
-        self.blocks[block].parents.iter().copied()
-    }
-
     /// Returns the [`BlockKind`] of the block at the given index
     pub(crate) fn kind(&self, block: BlockId) -> BlockKind {
         self.blocks[block].kind
@@ -70,6 +65,7 @@ pub struct BlockId;
 /// [`Stmt`]s, together with outgoing edges to other basic blocks.
 #[derive(Debug, Default)]
 struct BlockData<'stmt> {
+    #[allow(dead_code)]
     kind: BlockKind,
     /// Slice of statements regarded as executing unconditionally in order
     stmts: &'stmt [Stmt],
@@ -78,6 +74,7 @@ struct BlockData<'stmt> {
     out: Edges,
     /// Collection of indices for basic blocks having the current
     /// block as the target of an edge
+    #[allow(dead_code)]
     parents: SmallVec<[BlockId; 2]>,
 }
 
@@ -126,12 +123,12 @@ impl Edges {
     }
 
     /// Returns iterator over indices of blocks targeted by given edges
-    pub fn targets(&self) -> impl ExactSizeIterator<Item = BlockId> + '_ {
+    pub(crate) fn targets(&self) -> impl ExactSizeIterator<Item = BlockId> + '_ {
         self.targets.iter().copied()
     }
 
     /// Returns iterator over [`Condition`]s which must be satisfied to traverse corresponding edge
-    pub fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
+    pub(crate) fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
         self.conditions.iter()
     }
 

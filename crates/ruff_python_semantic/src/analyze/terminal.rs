@@ -28,7 +28,7 @@ impl Terminal {
     }
 
     /// Returns `true` if the [`Terminal`] behavior includes at least one `return` path.
-    pub fn has_any_return(self) -> bool {
+    pub(crate) fn has_any_return(self) -> bool {
         matches!(
             self,
             Self::Return | Self::RaiseOrReturn | Self::ConditionalReturn

@@ -427,10 +427,6 @@ impl Notebook {
         &self.raw.cells
     }
 
-    pub fn metadata(&self) -> &RawNotebookMetadata {
-        &self.raw.metadata
-    }
-
     /// Check if it's a Python notebook.
     ///
     /// This is determined by checking the `language_info` or `kernelspec` in the notebook

@@ -394,20 +394,6 @@ impl KnownModules {
         };
         Some((section, reason))
     }
-
-    /// Return the list of user-defined modules, indexed by section.
-    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&IdentifierPattern>> {
-        let mut user_defined: FxHashMap<&str, Vec<&IdentifierPattern>> = FxHashMap::default();
-        for (module, section) in &self.known {
-            if let ImportSection::UserDefined(section_name) = section {
-                user_defined
-                    .entry(section_name.as_str())
-                    .or_default()
-                    .push(module);
-            }
-        }
-        user_defined
-    }
 }
 
 impl fmt::Display for KnownModules {

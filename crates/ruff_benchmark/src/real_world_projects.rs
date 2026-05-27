@@ -119,20 +119,10 @@ pub struct InstalledProject<'a> {
     pub config: RealWorldProject<'a>,
 }
 
-impl<'a> InstalledProject<'a> {
-    /// Get the project configuration
-    pub fn config(&self) -> &RealWorldProject<'a> {
-        &self.config
-    }
-
+impl InstalledProject<'_> {
     /// Get the benchmark paths
     pub fn check_paths(&self) -> &[&str] {
         self.config.paths
-    }
-
-    /// Get the virtual environment path
-    pub fn venv_path(&self) -> PathBuf {
-        self.path.join(".venv")
     }
 
     /// Copies the entire project to a memory file system.

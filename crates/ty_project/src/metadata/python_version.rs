@@ -51,7 +51,7 @@ pub enum SupportedPythonVersion {
 }
 
 impl SupportedPythonVersion {
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Py37 => "3.7",
             Self::Py38 => "3.8",
@@ -65,7 +65,7 @@ impl SupportedPythonVersion {
         }
     }
 
-    pub const fn to_python_version(self) -> PythonVersion {
+    pub(crate) const fn to_python_version(self) -> PythonVersion {
         match self {
             Self::Py37 => PythonVersion::PY37,
             Self::Py38 => PythonVersion::PY38,

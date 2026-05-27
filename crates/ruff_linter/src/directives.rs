@@ -41,15 +41,15 @@ impl Flags {
 #[derive(Default, Debug)]
 pub struct IsortDirectives {
     /// Ranges for which sorting is disabled
-    pub exclusions: Vec<TextRange>,
+    pub(crate) exclusions: Vec<TextRange>,
     /// Text positions at which splits should be inserted
-    pub splits: Vec<TextSize>,
-    pub skip_file: bool,
+    pub(crate) splits: Vec<TextSize>,
+    pub(crate) skip_file: bool,
 }
 
 pub struct Directives {
     pub noqa_line_for: NoqaMapping,
-    pub isort: IsortDirectives,
+    pub(crate) isort: IsortDirectives,
 }
 
 pub fn extract_directives(

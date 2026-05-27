@@ -100,7 +100,7 @@ impl ScopedReachabilityConstraintId {
     pub const ALWAYS_FALSE: ScopedReachabilityConstraintId =
         ScopedReachabilityConstraintId(0xffff_fffd);
 
-    pub fn is_terminal(self) -> bool {
+    pub(crate) fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0
     }
 

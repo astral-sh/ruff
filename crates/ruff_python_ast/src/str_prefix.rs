@@ -27,7 +27,7 @@ pub enum StringLiteralPrefix {
 
 impl StringLiteralPrefix {
     /// Return a `str` representation of the prefix
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Empty => "",
             Self::Unicode => "u",
@@ -63,7 +63,7 @@ pub enum FStringPrefix {
 
 impl FStringPrefix {
     /// Return a `str` representation of the prefix
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Regular => "f",
             Self::Raw { uppercase_r: true } => "Rf",
@@ -71,7 +71,7 @@ impl FStringPrefix {
         }
     }
 
-    pub const fn text_len(self) -> TextSize {
+    pub(crate) const fn text_len(self) -> TextSize {
         match self {
             Self::Regular => TextSize::new(1),
             Self::Raw { .. } => TextSize::new(2),
@@ -104,7 +104,7 @@ pub enum TStringPrefix {
 
 impl TStringPrefix {
     /// Return a `str` representation of the prefix
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Regular => "t",
             Self::Raw { uppercase_r: true } => "Rt",
@@ -112,7 +112,7 @@ impl TStringPrefix {
         }
     }
 
-    pub const fn text_len(self) -> TextSize {
+    pub(crate) const fn text_len(self) -> TextSize {
         match self {
             Self::Regular => TextSize::new(1),
             Self::Raw { .. } => TextSize::new(2),
@@ -121,7 +121,7 @@ impl TStringPrefix {
 
     /// Return true if this prefix indicates a "raw t-string",
     /// e.g. `rt"{bar}"` or `Rt"{bar}"`
-    pub const fn is_raw(self) -> bool {
+    pub(crate) const fn is_raw(self) -> bool {
         matches!(self, Self::Raw { .. })
     }
 }
@@ -145,7 +145,7 @@ pub enum ByteStringPrefix {
 
 impl ByteStringPrefix {
     /// Return a `str` representation of the prefix
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Regular => "b",
             Self::Raw { uppercase_r: true } => "Rb",
@@ -153,7 +153,7 @@ impl ByteStringPrefix {
         }
     }
 
-    pub const fn text_len(self) -> TextSize {
+    pub(crate) const fn text_len(self) -> TextSize {
         match self {
             Self::Regular => TextSize::new(1),
             Self::Raw { .. } => TextSize::new(2),
@@ -209,7 +209,7 @@ impl AnyStringPrefix {
         }
     }
 
-    pub const fn text_len(self) -> TextSize {
+    pub(crate) const fn text_len(self) -> TextSize {
         match self {
             Self::Regular(regular_prefix) => regular_prefix.text_len(),
             Self::Bytes(bytestring_prefix) => bytestring_prefix.text_len(),

@@ -62,7 +62,7 @@ pub struct NodeIndex(NonZeroU32);
 
 impl NodeIndex {
     /// A placeholder `NodeIndex`.
-    pub const NONE: NodeIndex = NodeIndex(NonZeroU32::new(NodeIndex::_NONE).unwrap());
+    pub(crate) const NONE: NodeIndex = NodeIndex(NonZeroU32::new(NodeIndex::_NONE).unwrap());
 
     // Note that the index `u32::MAX` is reserved for the `NonZeroU32` niche, and
     // this placeholder also reserves the second highest index.

@@ -127,7 +127,8 @@ fn detect_indentation(tokens: &[Token], source: &str) -> Indentation {
 pub struct Indentation(String);
 
 impl Indentation {
-    pub const fn new(indentation: String) -> Self {
+    #[allow(dead_code)]
+    pub(crate) const fn new(indentation: String) -> Self {
         Self(indentation)
     }
 }

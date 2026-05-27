@@ -100,24 +100,20 @@ impl MemoryFileSystem {
         Ok(SystemPathBuf::from_utf8_path_buf(self.normalize_path(path)))
     }
 
-    pub fn is_file(&self, path: impl AsRef<SystemPath>) -> bool {
+    #[allow(dead_code)]
+    pub(crate) fn is_file(&self, path: impl AsRef<SystemPath>) -> bool {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path.as_ref());
 
         matches!(by_path.get(&normalized), Some(Entry::File(_)))
     }
 
-    pub fn is_directory(&self, path: impl AsRef<SystemPath>) -> bool {
+    #[allow(dead_code)]
+    pub(crate) fn is_directory(&self, path: impl AsRef<SystemPath>) -> bool {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path.as_ref());
 
         matches!(by_path.get(&normalized), Some(Entry::Directory(_)))
-    }
-
-    pub fn is_executable(&self, path: &SystemPath) -> bool {
-        // Since the permissions of every file are 755,
-        // it follows that every file is executable.
-        self.is_file(path)
     }
 
     pub fn read_to_string(&self, path: impl AsRef<SystemPath>) -> Result<String> {
@@ -157,7 +153,8 @@ impl MemoryFileSystem {
         by_path.contains_key(&normalized)
     }
 
-    pub fn virtual_path_exists(&self, path: &SystemVirtualPath) -> bool {
+    #[allow(dead_code)]
+    pub(crate) fn virtual_path_exists(&self, path: &SystemVirtualPath) -> bool {
         let virtual_files = self.inner.virtual_files.read().unwrap();
         virtual_files.contains_key(&path.to_path_buf())
     }
@@ -240,7 +237,7 @@ impl MemoryFileSystem {
     /// Stores a new virtual file in the file system.
     ///
     /// The operation overrides the content for an existing virtual file with the same `path`.
-    pub fn write_virtual_file(
+    pub(crate) fn write_virtual_file(
         &self,
         path: impl AsRef<SystemVirtualPath>,
         content: impl AsRef<[u8]>,
@@ -290,7 +287,8 @@ impl MemoryFileSystem {
         remove_file(self, path.as_ref())
     }
 
-    pub fn remove_virtual_file(&self, path: impl AsRef<SystemVirtualPath>) -> Result<()> {
+    #[allow(dead_code)]
+    pub(crate) fn remove_virtual_file(&self, path: impl AsRef<SystemVirtualPath>) -> Result<()> {
         let mut virtual_files = self.inner.virtual_files.write().unwrap();
         match virtual_files.entry(path.as_ref().to_path_buf()) {
             std::collections::hash_map::Entry::Occupied(entry) => {
@@ -304,7 +302,8 @@ impl MemoryFileSystem {
     /// Sets the last modified timestamp of the file stored at `path` to now.
     ///
     /// Creates a new file if the file at `path` doesn't exist.
-    pub fn touch(&self, path: impl AsRef<SystemPath>) -> Result<()> {
+    #[allow(dead_code)]
+    pub(crate) fn touch(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
         let normalized = self.normalize_path(path.as_ref());
 

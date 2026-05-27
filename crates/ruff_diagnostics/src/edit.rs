@@ -76,22 +76,10 @@ impl Edit {
         }
     }
 
-    /// Returns `true` if this edit deletes content from the source document.
-    #[inline]
-    pub fn is_deletion(&self) -> bool {
-        self.kind().is_deletion()
-    }
-
     /// Returns `true` if this edit inserts new content into the source document.
     #[inline]
-    pub fn is_insertion(&self) -> bool {
+    pub(crate) fn is_insertion(&self) -> bool {
         self.kind().is_insertion()
-    }
-
-    /// Returns `true` if this edit replaces some existing content with new content.
-    #[inline]
-    pub fn is_replacement(&self) -> bool {
-        self.kind().is_replacement()
     }
 }
 
@@ -131,13 +119,5 @@ enum EditOperationKind {
 impl EditOperationKind {
     pub(crate) const fn is_insertion(self) -> bool {
         matches!(self, EditOperationKind::Insertion)
-    }
-
-    pub(crate) const fn is_deletion(self) -> bool {
-        matches!(self, EditOperationKind::Deletion)
-    }
-
-    pub(crate) const fn is_replacement(self) -> bool {
-        matches!(self, EditOperationKind::Replacement)
     }
 }

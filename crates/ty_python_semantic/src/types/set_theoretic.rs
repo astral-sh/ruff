@@ -910,7 +910,7 @@ impl<'db> IntersectionType<'db> {
         self.positive(db).iter().copied()
     }
 
-    pub fn iter_negative(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+    pub(crate) fn iter_negative(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         self.negative(db).iter().copied()
     }
 

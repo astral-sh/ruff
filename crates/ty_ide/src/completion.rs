@@ -303,17 +303,20 @@ pub struct Completion<'db> {
     /// doesn't make it into the LSP response. Instead, we
     /// use it mainly in tests so that we can write less
     /// noisy tests.
-    pub builtin: bool,
+    #[allow(dead_code)]
+    pub(crate) builtin: bool,
     /// Whether this item only exists for type checking purposes and
     /// will be missing at runtime
-    pub is_type_check_only: bool,
+    #[allow(dead_code)]
+    pub(crate) is_type_check_only: bool,
     /// Whether this item can definitively be used in the current context.
     ///
     /// Some completions are computed based on contextual information.
     /// If that's the case, we know this is a very precise completion
     /// that should always be valid and can be preferred when
     /// ordering completions.
-    pub is_context_specific: bool,
+    #[allow(dead_code)]
+    pub(crate) is_context_specific: bool,
     /// The documentation associated with this item, if
     /// available.
     pub documentation: Option<Docstring>,

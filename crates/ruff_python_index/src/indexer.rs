@@ -111,7 +111,7 @@ impl Indexer {
     }
 
     /// Returns `true` if the given offset is part of a continuation line.
-    pub fn is_continuation(&self, offset: TextSize, source: &str) -> bool {
+    pub(crate) fn is_continuation(&self, offset: TextSize, source: &str) -> bool {
         let line_start = source.line_start(offset);
         self.continuation_lines.binary_search(&line_start).is_ok()
     }

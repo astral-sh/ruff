@@ -16,7 +16,7 @@ pub struct Scope<'a> {
     pub kind: ScopeKind<'a>,
 
     /// The parent scope, if any.
-    pub parent: Option<ScopeId>,
+    pub(crate) parent: Option<ScopeId>,
 
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
@@ -45,7 +45,7 @@ pub struct Scope<'a> {
 }
 
 impl<'a> Scope<'a> {
-    pub fn global() -> Self {
+    pub(crate) fn global() -> Self {
         Scope {
             kind: ScopeKind::Module,
             parent: None,
@@ -57,7 +57,7 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn local(kind: ScopeKind<'a>, parent: ScopeId) -> Self {
+    pub(crate) fn local(kind: ScopeKind<'a>, parent: ScopeId) -> Self {
         Scope {
             kind,
             parent: Some(parent),

@@ -40,7 +40,7 @@ struct NotebookCell {
 }
 
 impl NotebookDocument {
-    pub fn new(
+    pub(crate) fn new(
         url: lsp_types::Url,
         notebook_version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,

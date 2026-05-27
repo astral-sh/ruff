@@ -21,7 +21,7 @@ pub trait StatementVisitor<'a> {
     }
 }
 
-pub fn walk_body<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt]) {
+pub(crate) fn walk_body<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt]) {
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
@@ -79,7 +79,7 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
     }
 }
 
-pub fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
+pub(crate) fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
     visitor: &mut V,
     except_handler: &'a ExceptHandler,
 ) {
@@ -90,14 +90,14 @@ pub fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_elif_else_clause<'a, V: StatementVisitor<'a> + ?Sized>(
+pub(crate) fn walk_elif_else_clause<'a, V: StatementVisitor<'a> + ?Sized>(
     visitor: &mut V,
     elif_else_clause: &'a ElifElseClause,
 ) {
     visitor.visit_body(&elif_else_clause.body);
 }
 
-pub fn walk_match_case<'a, V: StatementVisitor<'a> + ?Sized>(
+pub(crate) fn walk_match_case<'a, V: StatementVisitor<'a> + ?Sized>(
     visitor: &mut V,
     match_case: &'a MatchCase,
 ) {

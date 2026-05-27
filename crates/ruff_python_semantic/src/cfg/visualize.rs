@@ -6,10 +6,12 @@ use std::fmt::{self, Display};
 use crate::cfg::graph::{BlockId, BlockKind, Condition, ControlFlowGraph};
 
 /// Returns control flow graph in Mermaid syntax.
-pub fn draw_cfg(graph: ControlFlowGraph, source: &str) -> String {
+#[allow(dead_code)]
+pub(crate) fn draw_cfg(graph: ControlFlowGraph, source: &str) -> String {
     CFGWithSource::new(graph, source).draw_graph()
 }
 
+#[allow(dead_code)]
 trait MermaidGraph<'a>: DirectedGraph<'a> {
     fn draw_node(&self, node: Self::Node) -> MermaidNode;
     fn draw_edges(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, MermaidEdge)>;
@@ -44,7 +46,8 @@ pub struct MermaidNode {
 }
 
 impl MermaidNode {
-    pub fn with_content(content: String) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn with_content(content: String) -> Self {
         Self {
             shape: MermaidNodeShape::default(),
             content,
@@ -146,20 +149,24 @@ impl Display for MermaidEdgeKind {
     }
 }
 
-pub trait DirectedGraph<'a> {
+#[allow(dead_code)]
+pub(crate) trait DirectedGraph<'a> {
     type Node: Idx;
 
     fn num_nodes(&self) -> usize;
+    #[allow(dead_code)]
     fn start_node(&self) -> Self::Node;
     fn successors(&self, node: Self::Node) -> impl ExactSizeIterator<Item = Self::Node> + '_;
 }
 
+#[allow(dead_code)]
 struct CFGWithSource<'stmt> {
     cfg: ControlFlowGraph<'stmt>,
     source: &'stmt str,
 }
 
 impl<'stmt> CFGWithSource<'stmt> {
+    #[allow(dead_code)]
     fn new(cfg: ControlFlowGraph<'stmt>, source: &'stmt str) -> Self {
         Self { cfg, source }
     }

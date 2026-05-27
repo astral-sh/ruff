@@ -23,7 +23,8 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     });
 }
 
-pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
+#[allow(dead_code)]
+pub(crate) fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
     db: &Db,
     query: Q,
     events: &[salsa::Event],
@@ -76,7 +77,7 @@ pub fn assert_function_query_was_run<Db, Q, QDb, I, R>(
     });
 }
 
-pub fn find_will_execute_event<'a, Q, I>(
+pub(crate) fn find_will_execute_event<'a, Q, I>(
     db: &dyn salsa::Database,
     query: Q,
     input: I,
@@ -144,7 +145,7 @@ pub struct LoggingBuilder {
 }
 
 impl LoggingBuilder {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             filter: EnvFilter::default()
                 .add_directive("ty=trace".parse().expect("Hardcoded directive to be valid"))
@@ -156,13 +157,13 @@ impl LoggingBuilder {
         }
     }
 
-    pub fn with_filter(filter: &str) -> Option<Self> {
+    pub(crate) fn with_filter(filter: &str) -> Option<Self> {
         let filter = EnvFilter::builder().parse(filter).ok()?;
 
         Some(Self { filter })
     }
 
-    pub fn build(self) -> LoggingGuard {
+    pub(crate) fn build(self) -> LoggingGuard {
         let registry = tracing_subscriber::registry().with(self.filter);
 
         let subscriber = registry.with(

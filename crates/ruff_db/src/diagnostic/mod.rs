@@ -290,7 +290,7 @@ impl Diagnostic {
     }
 
     /// Returns a reference to the primary span of this diagnostic.
-    pub fn primary_span_ref(&self) -> Option<&Span> {
+    pub(crate) fn primary_span_ref(&self) -> Option<&Span> {
         self.primary_annotation().map(|ann| &ann.span)
     }
 
@@ -363,11 +363,6 @@ impl Diagnostic {
         Arc::make_mut(&mut self.inner).fix = None;
     }
 
-    /// Returns `true` if the diagnostic contains a [`Fix`].
-    pub fn fixable(&self) -> bool {
-        self.fix().is_some()
-    }
-
     /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
     /// configured applicability level.
     pub fn has_applicable_fix(&self, fix_applicability: Applicability) -> bool {
@@ -397,7 +392,7 @@ impl Diagnostic {
     /// Returns the remapped offset for a suppression comment if it exists.
     ///
     /// Like [`Diagnostic::parent`], this is used for noqa code suppression comments in Ruff.
-    pub fn noqa_offset(&self) -> Option<TextSize> {
+    pub(crate) fn noqa_offset(&self) -> Option<TextSize> {
         self.inner.noqa_offset
     }
 
@@ -492,7 +487,7 @@ impl Diagnostic {
     /// Returns the [`SourceFile`] which the message belongs to.
     ///
     /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.
-    pub fn expect_ruff_source_file(&self) -> &SourceFile {
+    pub(crate) fn expect_ruff_source_file(&self) -> &SourceFile {
         self.ruff_source_file()
             .expect("Expected a ruff source file")
     }
@@ -662,7 +657,7 @@ impl SubDiagnostic {
     }
 
     /// Returns all annotations, skipping the first primary annotation.
-    pub fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
+    pub(crate) fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
         secondary_annotations(self.inner.annotations.iter())
     }
 
@@ -857,19 +852,6 @@ impl Annotation {
     /// Sets the span on this annotation.
     pub fn set_span(&mut self, span: Span) {
         self.span = span;
-    }
-
-    /// Returns the tags associated with this annotation.
-    pub fn get_tags(&self) -> &[DiagnosticTag] {
-        &self.tags
-    }
-
-    /// Attaches this tag to this annotation.
-    ///
-    /// It will not replace any existing tags.
-    pub fn tag(mut self, tag: DiagnosticTag) -> Annotation {
-        self.tags.push(tag);
-        self
     }
 
     /// Attaches an additional tag to this annotation.
@@ -1074,11 +1056,6 @@ impl DiagnosticId {
         Self::Lint(LintName::of(name))
     }
 
-    /// Returns `true` if this `DiagnosticId` represents a lint.
-    pub fn is_lint(&self) -> bool {
-        matches!(self, DiagnosticId::Lint(_))
-    }
-
     pub const fn as_lint(&self) -> Option<LintName> {
         match self {
             DiagnosticId::Lint(name) => Some(*name),
@@ -1120,7 +1097,7 @@ impl DiagnosticId {
         }
     }
 
-    pub fn is_invalid_syntax(&self) -> bool {
+    pub(crate) fn is_invalid_syntax(&self) -> bool {
         matches!(self, Self::InvalidSyntax)
     }
 }
@@ -1147,7 +1124,7 @@ pub enum UnifiedFile {
 }
 
 impl UnifiedFile {
-    pub fn path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a str {
+    pub(crate) fn path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a str {
         match self {
             UnifiedFile::Ty(file) => resolver.path(*file),
             UnifiedFile::Ruff(file) => file.name(),
@@ -1155,7 +1132,7 @@ impl UnifiedFile {
     }
 
     /// Return the file's path relative to the current working directory.
-    pub fn relative_path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a Path {
+    pub(crate) fn relative_path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a Path {
         let cwd = resolver.current_directory();
         let path = Path::new(self.path(resolver));
 
@@ -1212,7 +1189,7 @@ pub struct Span {
 
 impl Span {
     /// Returns the `UnifiedFile` attached to this `Span`.
-    pub fn file(&self) -> &UnifiedFile {
+    pub(crate) fn file(&self) -> &UnifiedFile {
         &self.file
     }
 
@@ -1248,13 +1225,13 @@ impl Span {
     /// Returns the [`SourceFile`] attached to this [`Span`].
     ///
     /// Panics if the file is a [`UnifiedFile::Ty`] instead of a [`UnifiedFile::Ruff`].
-    pub fn expect_ruff_file(&self) -> &SourceFile {
+    pub(crate) fn expect_ruff_file(&self) -> &SourceFile {
         self.as_ruff_file()
             .expect("Expected a ruff `SourceFile`, found a ty `File`")
     }
 
     /// Returns the [`SourceFile`] attached to this [`Span`].
-    pub fn as_ruff_file(&self) -> Option<&SourceFile> {
+    pub(crate) fn as_ruff_file(&self) -> Option<&SourceFile> {
         match &self.file {
             UnifiedFile::Ty(_) => None,
             UnifiedFile::Ruff(file) => Some(file),
@@ -1442,7 +1419,8 @@ impl DisplayDiagnosticConfig {
     ///
     /// If two annotations have fewer than this number of lines between them,
     /// they will be merged into a single annotation.
-    pub fn merge_window(self, lines: usize) -> DisplayDiagnosticConfig {
+    #[allow(dead_code)]
+    pub(crate) fn merge_window(self, lines: usize) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             merge_window: lines,
             ..self
@@ -1510,7 +1488,7 @@ impl DisplayDiagnosticConfig {
         self
     }
 
-    pub fn is_canceled(&self) -> bool {
+    pub(crate) fn is_canceled(&self) -> bool {
         self.cancellation_token
             .as_ref()
             .is_some_and(|token| token.is_cancelled())
@@ -1640,7 +1618,7 @@ pub struct DiagnosticMessage(Box<str>);
 
 impl DiagnosticMessage {
     /// Returns this message as a borrowed string.
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         &self.0
     }
 }

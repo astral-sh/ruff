@@ -42,83 +42,6 @@ impl crate::HasNodeIndex for Mod {
     }
 }
 
-#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
-impl Mod {
-    #[inline]
-    pub const fn is_module(&self) -> bool {
-        matches!(self, Self::Module(_))
-    }
-
-    #[inline]
-    pub fn module(self) -> Option<crate::ModModule> {
-        match self {
-            Self::Module(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_module(self) -> crate::ModModule {
-        match self {
-            Self::Module(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_module_mut(&mut self) -> Option<&mut crate::ModModule> {
-        match self {
-            Self::Module(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_module(&self) -> Option<&crate::ModModule> {
-        match self {
-            Self::Module(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_expression(&self) -> bool {
-        matches!(self, Self::Expression(_))
-    }
-
-    #[inline]
-    pub fn expression(self) -> Option<crate::ModExpression> {
-        match self {
-            Self::Expression(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_expression(self) -> crate::ModExpression {
-        match self {
-            Self::Expression(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_expression_mut(&mut self) -> Option<&mut crate::ModExpression> {
-        match self {
-            Self::Expression(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_expression(&self) -> Option<&crate::ModExpression> {
-        match self {
-            Self::Expression(val) => Some(val),
-            _ => None,
-        }
-    }
-}
-
 /// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
@@ -364,7 +287,7 @@ impl crate::HasNodeIndex for Stmt {
     }
 }
 
-#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl Stmt {
     #[inline]
     pub const fn is_function_def_stmt(&self) -> bool {
@@ -372,62 +295,9 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn function_def_stmt(self) -> Option<crate::StmtFunctionDef> {
-        match self {
-            Self::FunctionDef(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_function_def_stmt(self) -> crate::StmtFunctionDef {
-        match self {
-            Self::FunctionDef(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_function_def_stmt_mut(&mut self) -> Option<&mut crate::StmtFunctionDef> {
-        match self {
-            Self::FunctionDef(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_function_def_stmt(&self) -> Option<&crate::StmtFunctionDef> {
         match self {
             Self::FunctionDef(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_class_def_stmt(&self) -> bool {
-        matches!(self, Self::ClassDef(_))
-    }
-
-    #[inline]
-    pub fn class_def_stmt(self) -> Option<crate::StmtClassDef> {
-        match self {
-            Self::ClassDef(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_class_def_stmt(self) -> crate::StmtClassDef {
-        match self {
-            Self::ClassDef(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_class_def_stmt_mut(&mut self) -> Option<&mut crate::StmtClassDef> {
-        match self {
-            Self::ClassDef(val) => Some(val),
             _ => None,
         }
     }
@@ -446,141 +316,6 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn return_stmt(self) -> Option<crate::StmtReturn> {
-        match self {
-            Self::Return(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_return_stmt(self) -> crate::StmtReturn {
-        match self {
-            Self::Return(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_return_stmt_mut(&mut self) -> Option<&mut crate::StmtReturn> {
-        match self {
-            Self::Return(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_return_stmt(&self) -> Option<&crate::StmtReturn> {
-        match self {
-            Self::Return(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_delete_stmt(&self) -> bool {
-        matches!(self, Self::Delete(_))
-    }
-
-    #[inline]
-    pub fn delete_stmt(self) -> Option<crate::StmtDelete> {
-        match self {
-            Self::Delete(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_delete_stmt(self) -> crate::StmtDelete {
-        match self {
-            Self::Delete(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_delete_stmt_mut(&mut self) -> Option<&mut crate::StmtDelete> {
-        match self {
-            Self::Delete(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_delete_stmt(&self) -> Option<&crate::StmtDelete> {
-        match self {
-            Self::Delete(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_type_alias_stmt(&self) -> bool {
-        matches!(self, Self::TypeAlias(_))
-    }
-
-    #[inline]
-    pub fn type_alias_stmt(self) -> Option<crate::StmtTypeAlias> {
-        match self {
-            Self::TypeAlias(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_type_alias_stmt(self) -> crate::StmtTypeAlias {
-        match self {
-            Self::TypeAlias(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_type_alias_stmt_mut(&mut self) -> Option<&mut crate::StmtTypeAlias> {
-        match self {
-            Self::TypeAlias(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_type_alias_stmt(&self) -> Option<&crate::StmtTypeAlias> {
-        match self {
-            Self::TypeAlias(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_assign_stmt(&self) -> bool {
-        matches!(self, Self::Assign(_))
-    }
-
-    #[inline]
-    pub fn assign_stmt(self) -> Option<crate::StmtAssign> {
-        match self {
-            Self::Assign(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_assign_stmt(self) -> crate::StmtAssign {
-        match self {
-            Self::Assign(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_assign_stmt_mut(&mut self) -> Option<&mut crate::StmtAssign> {
-        match self {
-            Self::Assign(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_assign_stmt(&self) -> Option<&crate::StmtAssign> {
         match self {
             Self::Assign(val) => Some(val),
@@ -589,69 +324,8 @@ impl Stmt {
     }
 
     #[inline]
-    pub const fn is_aug_assign_stmt(&self) -> bool {
-        matches!(self, Self::AugAssign(_))
-    }
-
-    #[inline]
-    pub fn aug_assign_stmt(self) -> Option<crate::StmtAugAssign> {
-        match self {
-            Self::AugAssign(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_aug_assign_stmt(self) -> crate::StmtAugAssign {
-        match self {
-            Self::AugAssign(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_aug_assign_stmt_mut(&mut self) -> Option<&mut crate::StmtAugAssign> {
-        match self {
-            Self::AugAssign(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_aug_assign_stmt(&self) -> Option<&crate::StmtAugAssign> {
-        match self {
-            Self::AugAssign(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_ann_assign_stmt(&self) -> bool {
         matches!(self, Self::AnnAssign(_))
-    }
-
-    #[inline]
-    pub fn ann_assign_stmt(self) -> Option<crate::StmtAnnAssign> {
-        match self {
-            Self::AnnAssign(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_ann_assign_stmt(self) -> crate::StmtAnnAssign {
-        match self {
-            Self::AnnAssign(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_ann_assign_stmt_mut(&mut self) -> Option<&mut crate::StmtAnnAssign> {
-        match self {
-            Self::AnnAssign(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -668,99 +342,9 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn for_stmt(self) -> Option<crate::StmtFor> {
-        match self {
-            Self::For(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_for_stmt(self) -> crate::StmtFor {
-        match self {
-            Self::For(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_for_stmt_mut(&mut self) -> Option<&mut crate::StmtFor> {
-        match self {
-            Self::For(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_for_stmt(&self) -> Option<&crate::StmtFor> {
         match self {
             Self::For(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_while_stmt(&self) -> bool {
-        matches!(self, Self::While(_))
-    }
-
-    #[inline]
-    pub fn while_stmt(self) -> Option<crate::StmtWhile> {
-        match self {
-            Self::While(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_while_stmt(self) -> crate::StmtWhile {
-        match self {
-            Self::While(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_while_stmt_mut(&mut self) -> Option<&mut crate::StmtWhile> {
-        match self {
-            Self::While(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_while_stmt(&self) -> Option<&crate::StmtWhile> {
-        match self {
-            Self::While(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_if_stmt(&self) -> bool {
-        matches!(self, Self::If(_))
-    }
-
-    #[inline]
-    pub fn if_stmt(self) -> Option<crate::StmtIf> {
-        match self {
-            Self::If(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_if_stmt(self) -> crate::StmtIf {
-        match self {
-            Self::If(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_if_stmt_mut(&mut self) -> Option<&mut crate::StmtIf> {
-        match self {
-            Self::If(val) => Some(val),
             _ => None,
         }
     }
@@ -779,67 +363,6 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn with_stmt(self) -> Option<crate::StmtWith> {
-        match self {
-            Self::With(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_with_stmt(self) -> crate::StmtWith {
-        match self {
-            Self::With(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_with_stmt_mut(&mut self) -> Option<&mut crate::StmtWith> {
-        match self {
-            Self::With(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_with_stmt(&self) -> Option<&crate::StmtWith> {
-        match self {
-            Self::With(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_match_stmt(&self) -> bool {
-        matches!(self, Self::Match(_))
-    }
-
-    #[inline]
-    pub fn match_stmt(self) -> Option<crate::StmtMatch> {
-        match self {
-            Self::Match(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_stmt(self) -> crate::StmtMatch {
-        match self {
-            Self::Match(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_stmt_mut(&mut self) -> Option<&mut crate::StmtMatch> {
-        match self {
-            Self::Match(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_match_stmt(&self) -> Option<&crate::StmtMatch> {
         match self {
             Self::Match(val) => Some(val),
@@ -853,67 +376,6 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn raise_stmt(self) -> Option<crate::StmtRaise> {
-        match self {
-            Self::Raise(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_raise_stmt(self) -> crate::StmtRaise {
-        match self {
-            Self::Raise(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_raise_stmt_mut(&mut self) -> Option<&mut crate::StmtRaise> {
-        match self {
-            Self::Raise(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_raise_stmt(&self) -> Option<&crate::StmtRaise> {
-        match self {
-            Self::Raise(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_try_stmt(&self) -> bool {
-        matches!(self, Self::Try(_))
-    }
-
-    #[inline]
-    pub fn try_stmt(self) -> Option<crate::StmtTry> {
-        match self {
-            Self::Try(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_try_stmt(self) -> crate::StmtTry {
-        match self {
-            Self::Try(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_try_stmt_mut(&mut self) -> Option<&mut crate::StmtTry> {
-        match self {
-            Self::Try(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_try_stmt(&self) -> Option<&crate::StmtTry> {
         match self {
             Self::Try(val) => Some(val),
@@ -922,69 +384,8 @@ impl Stmt {
     }
 
     #[inline]
-    pub const fn is_assert_stmt(&self) -> bool {
-        matches!(self, Self::Assert(_))
-    }
-
-    #[inline]
-    pub fn assert_stmt(self) -> Option<crate::StmtAssert> {
-        match self {
-            Self::Assert(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_assert_stmt(self) -> crate::StmtAssert {
-        match self {
-            Self::Assert(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_assert_stmt_mut(&mut self) -> Option<&mut crate::StmtAssert> {
-        match self {
-            Self::Assert(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_assert_stmt(&self) -> Option<&crate::StmtAssert> {
-        match self {
-            Self::Assert(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_import_stmt(&self) -> bool {
         matches!(self, Self::Import(_))
-    }
-
-    #[inline]
-    pub fn import_stmt(self) -> Option<crate::StmtImport> {
-        match self {
-            Self::Import(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_import_stmt(self) -> crate::StmtImport {
-        match self {
-            Self::Import(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_import_stmt_mut(&mut self) -> Option<&mut crate::StmtImport> {
-        match self {
-            Self::Import(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -1001,30 +402,6 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn import_from_stmt(self) -> Option<crate::StmtImportFrom> {
-        match self {
-            Self::ImportFrom(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_import_from_stmt(self) -> crate::StmtImportFrom {
-        match self {
-            Self::ImportFrom(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_import_from_stmt_mut(&mut self) -> Option<&mut crate::StmtImportFrom> {
-        match self {
-            Self::ImportFrom(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_import_from_stmt(&self) -> Option<&crate::StmtImportFrom> {
         match self {
             Self::ImportFrom(val) => Some(val),
@@ -1033,106 +410,8 @@ impl Stmt {
     }
 
     #[inline]
-    pub const fn is_global_stmt(&self) -> bool {
-        matches!(self, Self::Global(_))
-    }
-
-    #[inline]
-    pub fn global_stmt(self) -> Option<crate::StmtGlobal> {
-        match self {
-            Self::Global(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_global_stmt(self) -> crate::StmtGlobal {
-        match self {
-            Self::Global(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_global_stmt_mut(&mut self) -> Option<&mut crate::StmtGlobal> {
-        match self {
-            Self::Global(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_global_stmt(&self) -> Option<&crate::StmtGlobal> {
-        match self {
-            Self::Global(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_nonlocal_stmt(&self) -> bool {
-        matches!(self, Self::Nonlocal(_))
-    }
-
-    #[inline]
-    pub fn nonlocal_stmt(self) -> Option<crate::StmtNonlocal> {
-        match self {
-            Self::Nonlocal(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_nonlocal_stmt(self) -> crate::StmtNonlocal {
-        match self {
-            Self::Nonlocal(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_nonlocal_stmt_mut(&mut self) -> Option<&mut crate::StmtNonlocal> {
-        match self {
-            Self::Nonlocal(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_nonlocal_stmt(&self) -> Option<&crate::StmtNonlocal> {
-        match self {
-            Self::Nonlocal(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_expr_stmt(&self) -> bool {
         matches!(self, Self::Expr(_))
-    }
-
-    #[inline]
-    pub fn expr_stmt(self) -> Option<crate::StmtExpr> {
-        match self {
-            Self::Expr(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_expr_stmt(self) -> crate::StmtExpr {
-        match self {
-            Self::Expr(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_expr_stmt_mut(&mut self) -> Option<&mut crate::StmtExpr> {
-        match self {
-            Self::Expr(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -1149,72 +428,8 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn pass_stmt(self) -> Option<crate::StmtPass> {
-        match self {
-            Self::Pass(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_pass_stmt(self) -> crate::StmtPass {
-        match self {
-            Self::Pass(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_pass_stmt_mut(&mut self) -> Option<&mut crate::StmtPass> {
-        match self {
-            Self::Pass(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_pass_stmt(&self) -> Option<&crate::StmtPass> {
-        match self {
-            Self::Pass(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_break_stmt(&self) -> bool {
         matches!(self, Self::Break(_))
-    }
-
-    #[inline]
-    pub fn break_stmt(self) -> Option<crate::StmtBreak> {
-        match self {
-            Self::Break(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_break_stmt(self) -> crate::StmtBreak {
-        match self {
-            Self::Break(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_break_stmt_mut(&mut self) -> Option<&mut crate::StmtBreak> {
-        match self {
-            Self::Break(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_break_stmt(&self) -> Option<&crate::StmtBreak> {
-        match self {
-            Self::Break(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -1223,72 +438,8 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn continue_stmt(self) -> Option<crate::StmtContinue> {
-        match self {
-            Self::Continue(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_continue_stmt(self) -> crate::StmtContinue {
-        match self {
-            Self::Continue(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_continue_stmt_mut(&mut self) -> Option<&mut crate::StmtContinue> {
-        match self {
-            Self::Continue(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_continue_stmt(&self) -> Option<&crate::StmtContinue> {
-        match self {
-            Self::Continue(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_ipy_escape_command_stmt(&self) -> bool {
         matches!(self, Self::IpyEscapeCommand(_))
-    }
-
-    #[inline]
-    pub fn ipy_escape_command_stmt(self) -> Option<crate::StmtIpyEscapeCommand> {
-        match self {
-            Self::IpyEscapeCommand(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_ipy_escape_command_stmt(self) -> crate::StmtIpyEscapeCommand {
-        match self {
-            Self::IpyEscapeCommand(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_ipy_escape_command_stmt_mut(&mut self) -> Option<&mut crate::StmtIpyEscapeCommand> {
-        match self {
-            Self::IpyEscapeCommand(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_ipy_escape_command_stmt(&self) -> Option<&crate::StmtIpyEscapeCommand> {
-        match self {
-            Self::IpyEscapeCommand(val) => Some(val),
-            _ => None,
-        }
     }
 }
 
@@ -1609,37 +760,8 @@ impl crate::HasNodeIndex for Expr {
     }
 }
 
-#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl Expr {
-    #[inline]
-    pub const fn is_bool_op_expr(&self) -> bool {
-        matches!(self, Self::BoolOp(_))
-    }
-
-    #[inline]
-    pub fn bool_op_expr(self) -> Option<crate::ExprBoolOp> {
-        match self {
-            Self::BoolOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_bool_op_expr(self) -> crate::ExprBoolOp {
-        match self {
-            Self::BoolOp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_bool_op_expr_mut(&mut self) -> Option<&mut crate::ExprBoolOp> {
-        match self {
-            Self::BoolOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
     #[inline]
     pub fn as_bool_op_expr(&self) -> Option<&crate::ExprBoolOp> {
         match self {
@@ -1651,30 +773,6 @@ impl Expr {
     #[inline]
     pub const fn is_named_expr(&self) -> bool {
         matches!(self, Self::Named(_))
-    }
-
-    #[inline]
-    pub fn named_expr(self) -> Option<crate::ExprNamed> {
-        match self {
-            Self::Named(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_named_expr(self) -> crate::ExprNamed {
-        match self {
-            Self::Named(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_named_expr_mut(&mut self) -> Option<&mut crate::ExprNamed> {
-        match self {
-            Self::Named(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -1691,30 +789,6 @@ impl Expr {
     }
 
     #[inline]
-    pub fn bin_op_expr(self) -> Option<crate::ExprBinOp> {
-        match self {
-            Self::BinOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_bin_op_expr(self) -> crate::ExprBinOp {
-        match self {
-            Self::BinOp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_bin_op_expr_mut(&mut self) -> Option<&mut crate::ExprBinOp> {
-        match self {
-            Self::BinOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_bin_op_expr(&self) -> Option<&crate::ExprBinOp> {
         match self {
             Self::BinOp(val) => Some(val),
@@ -1725,30 +799,6 @@ impl Expr {
     #[inline]
     pub const fn is_unary_op_expr(&self) -> bool {
         matches!(self, Self::UnaryOp(_))
-    }
-
-    #[inline]
-    pub fn unary_op_expr(self) -> Option<crate::ExprUnaryOp> {
-        match self {
-            Self::UnaryOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_unary_op_expr(self) -> crate::ExprUnaryOp {
-        match self {
-            Self::UnaryOp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_unary_op_expr_mut(&mut self) -> Option<&mut crate::ExprUnaryOp> {
-        match self {
-            Self::UnaryOp(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -1765,30 +815,6 @@ impl Expr {
     }
 
     #[inline]
-    pub fn lambda_expr(self) -> Option<crate::ExprLambda> {
-        match self {
-            Self::Lambda(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_lambda_expr(self) -> crate::ExprLambda {
-        match self {
-            Self::Lambda(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_lambda_expr_mut(&mut self) -> Option<&mut crate::ExprLambda> {
-        match self {
-            Self::Lambda(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_lambda_expr(&self) -> Option<&crate::ExprLambda> {
         match self {
             Self::Lambda(val) => Some(val),
@@ -1797,69 +823,13 @@ impl Expr {
     }
 
     #[inline]
-    pub const fn is_if_expr(&self) -> bool {
+    pub(crate) const fn is_if_expr(&self) -> bool {
         matches!(self, Self::If(_))
-    }
-
-    #[inline]
-    pub fn if_expr(self) -> Option<crate::ExprIf> {
-        match self {
-            Self::If(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_if_expr(self) -> crate::ExprIf {
-        match self {
-            Self::If(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_if_expr_mut(&mut self) -> Option<&mut crate::ExprIf> {
-        match self {
-            Self::If(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_if_expr(&self) -> Option<&crate::ExprIf> {
-        match self {
-            Self::If(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
     pub const fn is_dict_expr(&self) -> bool {
         matches!(self, Self::Dict(_))
-    }
-
-    #[inline]
-    pub fn dict_expr(self) -> Option<crate::ExprDict> {
-        match self {
-            Self::Dict(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_dict_expr(self) -> crate::ExprDict {
-        match self {
-            Self::Dict(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_dict_expr_mut(&mut self) -> Option<&mut crate::ExprDict> {
-        match self {
-            Self::Dict(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -1871,178 +841,14 @@ impl Expr {
     }
 
     #[inline]
-    pub const fn is_set_expr(&self) -> bool {
-        matches!(self, Self::Set(_))
-    }
-
-    #[inline]
-    pub fn set_expr(self) -> Option<crate::ExprSet> {
-        match self {
-            Self::Set(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_set_expr(self) -> crate::ExprSet {
-        match self {
-            Self::Set(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_set_expr_mut(&mut self) -> Option<&mut crate::ExprSet> {
-        match self {
-            Self::Set(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_set_expr(&self) -> Option<&crate::ExprSet> {
-        match self {
-            Self::Set(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_list_comp_expr(&self) -> bool {
         matches!(self, Self::ListComp(_))
-    }
-
-    #[inline]
-    pub fn list_comp_expr(self) -> Option<crate::ExprListComp> {
-        match self {
-            Self::ListComp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_list_comp_expr(self) -> crate::ExprListComp {
-        match self {
-            Self::ListComp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_list_comp_expr_mut(&mut self) -> Option<&mut crate::ExprListComp> {
-        match self {
-            Self::ListComp(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
     pub fn as_list_comp_expr(&self) -> Option<&crate::ExprListComp> {
         match self {
             Self::ListComp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_set_comp_expr(&self) -> bool {
-        matches!(self, Self::SetComp(_))
-    }
-
-    #[inline]
-    pub fn set_comp_expr(self) -> Option<crate::ExprSetComp> {
-        match self {
-            Self::SetComp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_set_comp_expr(self) -> crate::ExprSetComp {
-        match self {
-            Self::SetComp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_set_comp_expr_mut(&mut self) -> Option<&mut crate::ExprSetComp> {
-        match self {
-            Self::SetComp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_set_comp_expr(&self) -> Option<&crate::ExprSetComp> {
-        match self {
-            Self::SetComp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_dict_comp_expr(&self) -> bool {
-        matches!(self, Self::DictComp(_))
-    }
-
-    #[inline]
-    pub fn dict_comp_expr(self) -> Option<crate::ExprDictComp> {
-        match self {
-            Self::DictComp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_dict_comp_expr(self) -> crate::ExprDictComp {
-        match self {
-            Self::DictComp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_dict_comp_expr_mut(&mut self) -> Option<&mut crate::ExprDictComp> {
-        match self {
-            Self::DictComp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_dict_comp_expr(&self) -> Option<&crate::ExprDictComp> {
-        match self {
-            Self::DictComp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_generator_expr(&self) -> bool {
-        matches!(self, Self::Generator(_))
-    }
-
-    #[inline]
-    pub fn generator_expr(self) -> Option<crate::ExprGenerator> {
-        match self {
-            Self::Generator(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_generator_expr(self) -> crate::ExprGenerator {
-        match self {
-            Self::Generator(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_generator_expr_mut(&mut self) -> Option<&mut crate::ExprGenerator> {
-        match self {
-            Self::Generator(val) => Some(val),
             _ => None,
         }
     }
@@ -2061,72 +867,8 @@ impl Expr {
     }
 
     #[inline]
-    pub fn await_expr(self) -> Option<crate::ExprAwait> {
-        match self {
-            Self::Await(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_await_expr(self) -> crate::ExprAwait {
-        match self {
-            Self::Await(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_await_expr_mut(&mut self) -> Option<&mut crate::ExprAwait> {
-        match self {
-            Self::Await(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_await_expr(&self) -> Option<&crate::ExprAwait> {
-        match self {
-            Self::Await(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_yield_expr(&self) -> bool {
         matches!(self, Self::Yield(_))
-    }
-
-    #[inline]
-    pub fn yield_expr(self) -> Option<crate::ExprYield> {
-        match self {
-            Self::Yield(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_yield_expr(self) -> crate::ExprYield {
-        match self {
-            Self::Yield(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_yield_expr_mut(&mut self) -> Option<&mut crate::ExprYield> {
-        match self {
-            Self::Yield(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_yield_expr(&self) -> Option<&crate::ExprYield> {
-        match self {
-            Self::Yield(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -2135,64 +877,8 @@ impl Expr {
     }
 
     #[inline]
-    pub fn yield_from_expr(self) -> Option<crate::ExprYieldFrom> {
-        match self {
-            Self::YieldFrom(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_yield_from_expr(self) -> crate::ExprYieldFrom {
-        match self {
-            Self::YieldFrom(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_yield_from_expr_mut(&mut self) -> Option<&mut crate::ExprYieldFrom> {
-        match self {
-            Self::YieldFrom(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_yield_from_expr(&self) -> Option<&crate::ExprYieldFrom> {
-        match self {
-            Self::YieldFrom(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_compare_expr(&self) -> bool {
         matches!(self, Self::Compare(_))
-    }
-
-    #[inline]
-    pub fn compare_expr(self) -> Option<crate::ExprCompare> {
-        match self {
-            Self::Compare(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_compare_expr(self) -> crate::ExprCompare {
-        match self {
-            Self::Compare(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_compare_expr_mut(&mut self) -> Option<&mut crate::ExprCompare> {
-        match self {
-            Self::Compare(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -2209,30 +895,6 @@ impl Expr {
     }
 
     #[inline]
-    pub fn call_expr(self) -> Option<crate::ExprCall> {
-        match self {
-            Self::Call(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_call_expr(self) -> crate::ExprCall {
-        match self {
-            Self::Call(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_call_expr_mut(&mut self) -> Option<&mut crate::ExprCall> {
-        match self {
-            Self::Call(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_call_expr(&self) -> Option<&crate::ExprCall> {
         match self {
             Self::Call(val) => Some(val),
@@ -2246,101 +908,13 @@ impl Expr {
     }
 
     #[inline]
-    pub fn f_string_expr(self) -> Option<crate::ExprFString> {
-        match self {
-            Self::FString(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_f_string_expr(self) -> crate::ExprFString {
-        match self {
-            Self::FString(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_f_string_expr_mut(&mut self) -> Option<&mut crate::ExprFString> {
-        match self {
-            Self::FString(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_f_string_expr(&self) -> Option<&crate::ExprFString> {
-        match self {
-            Self::FString(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_t_string_expr(&self) -> bool {
         matches!(self, Self::TString(_))
     }
 
     #[inline]
-    pub fn t_string_expr(self) -> Option<crate::ExprTString> {
-        match self {
-            Self::TString(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_t_string_expr(self) -> crate::ExprTString {
-        match self {
-            Self::TString(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_t_string_expr_mut(&mut self) -> Option<&mut crate::ExprTString> {
-        match self {
-            Self::TString(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_t_string_expr(&self) -> Option<&crate::ExprTString> {
-        match self {
-            Self::TString(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_string_literal_expr(&self) -> bool {
         matches!(self, Self::StringLiteral(_))
-    }
-
-    #[inline]
-    pub fn string_literal_expr(self) -> Option<crate::ExprStringLiteral> {
-        match self {
-            Self::StringLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_string_literal_expr(self) -> crate::ExprStringLiteral {
-        match self {
-            Self::StringLiteral(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_string_literal_expr_mut(&mut self) -> Option<&mut crate::ExprStringLiteral> {
-        match self {
-            Self::StringLiteral(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -2357,30 +931,6 @@ impl Expr {
     }
 
     #[inline]
-    pub fn bytes_literal_expr(self) -> Option<crate::ExprBytesLiteral> {
-        match self {
-            Self::BytesLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_bytes_literal_expr(self) -> crate::ExprBytesLiteral {
-        match self {
-            Self::BytesLiteral(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_bytes_literal_expr_mut(&mut self) -> Option<&mut crate::ExprBytesLiteral> {
-        match self {
-            Self::BytesLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_bytes_literal_expr(&self) -> Option<&crate::ExprBytesLiteral> {
         match self {
             Self::BytesLiteral(val) => Some(val),
@@ -2391,30 +941,6 @@ impl Expr {
     #[inline]
     pub const fn is_number_literal_expr(&self) -> bool {
         matches!(self, Self::NumberLiteral(_))
-    }
-
-    #[inline]
-    pub fn number_literal_expr(self) -> Option<crate::ExprNumberLiteral> {
-        match self {
-            Self::NumberLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_number_literal_expr(self) -> crate::ExprNumberLiteral {
-        match self {
-            Self::NumberLiteral(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_number_literal_expr_mut(&mut self) -> Option<&mut crate::ExprNumberLiteral> {
-        match self {
-            Self::NumberLiteral(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -2431,30 +957,6 @@ impl Expr {
     }
 
     #[inline]
-    pub fn boolean_literal_expr(self) -> Option<crate::ExprBooleanLiteral> {
-        match self {
-            Self::BooleanLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_boolean_literal_expr(self) -> crate::ExprBooleanLiteral {
-        match self {
-            Self::BooleanLiteral(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_boolean_literal_expr_mut(&mut self) -> Option<&mut crate::ExprBooleanLiteral> {
-        match self {
-            Self::BooleanLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_boolean_literal_expr(&self) -> Option<&crate::ExprBooleanLiteral> {
         match self {
             Self::BooleanLiteral(val) => Some(val),
@@ -2468,101 +970,13 @@ impl Expr {
     }
 
     #[inline]
-    pub fn none_literal_expr(self) -> Option<crate::ExprNoneLiteral> {
-        match self {
-            Self::NoneLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_none_literal_expr(self) -> crate::ExprNoneLiteral {
-        match self {
-            Self::NoneLiteral(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_none_literal_expr_mut(&mut self) -> Option<&mut crate::ExprNoneLiteral> {
-        match self {
-            Self::NoneLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_none_literal_expr(&self) -> Option<&crate::ExprNoneLiteral> {
-        match self {
-            Self::NoneLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_ellipsis_literal_expr(&self) -> bool {
         matches!(self, Self::EllipsisLiteral(_))
     }
 
     #[inline]
-    pub fn ellipsis_literal_expr(self) -> Option<crate::ExprEllipsisLiteral> {
-        match self {
-            Self::EllipsisLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_ellipsis_literal_expr(self) -> crate::ExprEllipsisLiteral {
-        match self {
-            Self::EllipsisLiteral(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_ellipsis_literal_expr_mut(&mut self) -> Option<&mut crate::ExprEllipsisLiteral> {
-        match self {
-            Self::EllipsisLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_ellipsis_literal_expr(&self) -> Option<&crate::ExprEllipsisLiteral> {
-        match self {
-            Self::EllipsisLiteral(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_attribute_expr(&self) -> bool {
         matches!(self, Self::Attribute(_))
-    }
-
-    #[inline]
-    pub fn attribute_expr(self) -> Option<crate::ExprAttribute> {
-        match self {
-            Self::Attribute(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_attribute_expr(self) -> crate::ExprAttribute {
-        match self {
-            Self::Attribute(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_attribute_expr_mut(&mut self) -> Option<&mut crate::ExprAttribute> {
-        match self {
-            Self::Attribute(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -2579,30 +993,6 @@ impl Expr {
     }
 
     #[inline]
-    pub fn subscript_expr(self) -> Option<crate::ExprSubscript> {
-        match self {
-            Self::Subscript(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_subscript_expr(self) -> crate::ExprSubscript {
-        match self {
-            Self::Subscript(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_subscript_expr_mut(&mut self) -> Option<&mut crate::ExprSubscript> {
-        match self {
-            Self::Subscript(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_subscript_expr(&self) -> Option<&crate::ExprSubscript> {
         match self {
             Self::Subscript(val) => Some(val),
@@ -2613,30 +1003,6 @@ impl Expr {
     #[inline]
     pub const fn is_starred_expr(&self) -> bool {
         matches!(self, Self::Starred(_))
-    }
-
-    #[inline]
-    pub fn starred_expr(self) -> Option<crate::ExprStarred> {
-        match self {
-            Self::Starred(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_starred_expr(self) -> crate::ExprStarred {
-        match self {
-            Self::Starred(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_starred_expr_mut(&mut self) -> Option<&mut crate::ExprStarred> {
-        match self {
-            Self::Starred(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -2653,62 +1019,9 @@ impl Expr {
     }
 
     #[inline]
-    pub fn name_expr(self) -> Option<crate::ExprName> {
-        match self {
-            Self::Name(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_name_expr(self) -> crate::ExprName {
-        match self {
-            Self::Name(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_name_expr_mut(&mut self) -> Option<&mut crate::ExprName> {
-        match self {
-            Self::Name(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_name_expr(&self) -> Option<&crate::ExprName> {
         match self {
             Self::Name(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_list_expr(&self) -> bool {
-        matches!(self, Self::List(_))
-    }
-
-    #[inline]
-    pub fn list_expr(self) -> Option<crate::ExprList> {
-        match self {
-            Self::List(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_list_expr(self) -> crate::ExprList {
-        match self {
-            Self::List(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_list_expr_mut(&mut self) -> Option<&mut crate::ExprList> {
-        match self {
-            Self::List(val) => Some(val),
             _ => None,
         }
     }
@@ -2727,30 +1040,6 @@ impl Expr {
     }
 
     #[inline]
-    pub fn tuple_expr(self) -> Option<crate::ExprTuple> {
-        match self {
-            Self::Tuple(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_tuple_expr(self) -> crate::ExprTuple {
-        match self {
-            Self::Tuple(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_tuple_expr_mut(&mut self) -> Option<&mut crate::ExprTuple> {
-        match self {
-            Self::Tuple(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_tuple_expr(&self) -> Option<&crate::ExprTuple> {
         match self {
             Self::Tuple(val) => Some(val),
@@ -2764,70 +1053,9 @@ impl Expr {
     }
 
     #[inline]
-    pub fn slice_expr(self) -> Option<crate::ExprSlice> {
-        match self {
-            Self::Slice(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_slice_expr(self) -> crate::ExprSlice {
-        match self {
-            Self::Slice(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_slice_expr_mut(&mut self) -> Option<&mut crate::ExprSlice> {
-        match self {
-            Self::Slice(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub fn as_slice_expr(&self) -> Option<&crate::ExprSlice> {
         match self {
             Self::Slice(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_ipy_escape_command_expr(&self) -> bool {
-        matches!(self, Self::IpyEscapeCommand(_))
-    }
-
-    #[inline]
-    pub fn ipy_escape_command_expr(self) -> Option<crate::ExprIpyEscapeCommand> {
-        match self {
-            Self::IpyEscapeCommand(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_ipy_escape_command_expr(self) -> crate::ExprIpyEscapeCommand {
-        match self {
-            Self::IpyEscapeCommand(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_ipy_escape_command_expr_mut(&mut self) -> Option<&mut crate::ExprIpyEscapeCommand> {
-        match self {
-            Self::IpyEscapeCommand(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_ipy_escape_command_expr(&self) -> Option<&crate::ExprIpyEscapeCommand> {
-        match self {
-            Self::IpyEscapeCommand(val) => Some(val),
             _ => None,
         }
     }
@@ -2862,34 +1090,8 @@ impl crate::HasNodeIndex for ExceptHandler {
     }
 }
 
-#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl ExceptHandler {
-    #[inline]
-    pub const fn is_except_handler(&self) -> bool {
-        matches!(self, Self::ExceptHandler(_))
-    }
-
-    #[inline]
-    pub fn except_handler(self) -> Option<crate::ExceptHandlerExceptHandler> {
-        match self {
-            Self::ExceptHandler(val) => Some(val),
-        }
-    }
-
-    #[inline]
-    pub fn expect_except_handler(self) -> crate::ExceptHandlerExceptHandler {
-        match self {
-            Self::ExceptHandler(val) => val,
-        }
-    }
-
-    #[inline]
-    pub fn as_except_handler_mut(&mut self) -> Option<&mut crate::ExceptHandlerExceptHandler> {
-        match self {
-            Self::ExceptHandler(val) => Some(val),
-        }
-    }
-
     #[inline]
     pub fn as_except_handler(&self) -> Option<&crate::ExceptHandlerExceptHandler> {
         match self {
@@ -2935,35 +1137,11 @@ impl crate::HasNodeIndex for InterpolatedStringElement {
     }
 }
 
-#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl InterpolatedStringElement {
     #[inline]
     pub const fn is_interpolation(&self) -> bool {
         matches!(self, Self::Interpolation(_))
-    }
-
-    #[inline]
-    pub fn interpolation(self) -> Option<crate::InterpolatedElement> {
-        match self {
-            Self::Interpolation(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_interpolation(self) -> crate::InterpolatedElement {
-        match self {
-            Self::Interpolation(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_interpolation_mut(&mut self) -> Option<&mut crate::InterpolatedElement> {
-        match self {
-            Self::Interpolation(val) => Some(val),
-            _ => None,
-        }
     }
 
     #[inline]
@@ -2975,36 +1153,7 @@ impl InterpolatedStringElement {
     }
 
     #[inline]
-    pub const fn is_literal(&self) -> bool {
-        matches!(self, Self::Literal(_))
-    }
-
-    #[inline]
-    pub fn literal(self) -> Option<crate::InterpolatedStringLiteralElement> {
-        match self {
-            Self::Literal(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_literal(self) -> crate::InterpolatedStringLiteralElement {
-        match self {
-            Self::Literal(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_literal_mut(&mut self) -> Option<&mut crate::InterpolatedStringLiteralElement> {
-        match self {
-            Self::Literal(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_literal(&self) -> Option<&crate::InterpolatedStringLiteralElement> {
+    pub(crate) fn as_literal(&self) -> Option<&crate::InterpolatedStringLiteralElement> {
         match self {
             Self::Literal(val) => Some(val),
             _ => None,
@@ -3104,37 +1253,8 @@ impl crate::HasNodeIndex for Pattern {
     }
 }
 
-#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl Pattern {
-    #[inline]
-    pub const fn is_match_value(&self) -> bool {
-        matches!(self, Self::MatchValue(_))
-    }
-
-    #[inline]
-    pub fn match_value(self) -> Option<crate::PatternMatchValue> {
-        match self {
-            Self::MatchValue(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_value(self) -> crate::PatternMatchValue {
-        match self {
-            Self::MatchValue(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_value_mut(&mut self) -> Option<&mut crate::PatternMatchValue> {
-        match self {
-            Self::MatchValue(val) => Some(val),
-            _ => None,
-        }
-    }
-
     #[inline]
     pub fn as_match_value(&self) -> Option<&crate::PatternMatchValue> {
         match self {
@@ -3144,262 +1264,8 @@ impl Pattern {
     }
 
     #[inline]
-    pub const fn is_match_singleton(&self) -> bool {
-        matches!(self, Self::MatchSingleton(_))
-    }
-
-    #[inline]
-    pub fn match_singleton(self) -> Option<crate::PatternMatchSingleton> {
-        match self {
-            Self::MatchSingleton(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_singleton(self) -> crate::PatternMatchSingleton {
-        match self {
-            Self::MatchSingleton(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_singleton_mut(&mut self) -> Option<&mut crate::PatternMatchSingleton> {
-        match self {
-            Self::MatchSingleton(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_match_singleton(&self) -> Option<&crate::PatternMatchSingleton> {
-        match self {
-            Self::MatchSingleton(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_match_sequence(&self) -> bool {
-        matches!(self, Self::MatchSequence(_))
-    }
-
-    #[inline]
-    pub fn match_sequence(self) -> Option<crate::PatternMatchSequence> {
-        match self {
-            Self::MatchSequence(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_sequence(self) -> crate::PatternMatchSequence {
-        match self {
-            Self::MatchSequence(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_sequence_mut(&mut self) -> Option<&mut crate::PatternMatchSequence> {
-        match self {
-            Self::MatchSequence(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_match_sequence(&self) -> Option<&crate::PatternMatchSequence> {
-        match self {
-            Self::MatchSequence(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_match_mapping(&self) -> bool {
-        matches!(self, Self::MatchMapping(_))
-    }
-
-    #[inline]
-    pub fn match_mapping(self) -> Option<crate::PatternMatchMapping> {
-        match self {
-            Self::MatchMapping(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_mapping(self) -> crate::PatternMatchMapping {
-        match self {
-            Self::MatchMapping(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_mapping_mut(&mut self) -> Option<&mut crate::PatternMatchMapping> {
-        match self {
-            Self::MatchMapping(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_match_mapping(&self) -> Option<&crate::PatternMatchMapping> {
-        match self {
-            Self::MatchMapping(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_match_class(&self) -> bool {
-        matches!(self, Self::MatchClass(_))
-    }
-
-    #[inline]
-    pub fn match_class(self) -> Option<crate::PatternMatchClass> {
-        match self {
-            Self::MatchClass(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_class(self) -> crate::PatternMatchClass {
-        match self {
-            Self::MatchClass(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_class_mut(&mut self) -> Option<&mut crate::PatternMatchClass> {
-        match self {
-            Self::MatchClass(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_match_class(&self) -> Option<&crate::PatternMatchClass> {
-        match self {
-            Self::MatchClass(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
     pub const fn is_match_star(&self) -> bool {
         matches!(self, Self::MatchStar(_))
-    }
-
-    #[inline]
-    pub fn match_star(self) -> Option<crate::PatternMatchStar> {
-        match self {
-            Self::MatchStar(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_star(self) -> crate::PatternMatchStar {
-        match self {
-            Self::MatchStar(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_star_mut(&mut self) -> Option<&mut crate::PatternMatchStar> {
-        match self {
-            Self::MatchStar(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_match_star(&self) -> Option<&crate::PatternMatchStar> {
-        match self {
-            Self::MatchStar(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_match_as(&self) -> bool {
-        matches!(self, Self::MatchAs(_))
-    }
-
-    #[inline]
-    pub fn match_as(self) -> Option<crate::PatternMatchAs> {
-        match self {
-            Self::MatchAs(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_as(self) -> crate::PatternMatchAs {
-        match self {
-            Self::MatchAs(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_as_mut(&mut self) -> Option<&mut crate::PatternMatchAs> {
-        match self {
-            Self::MatchAs(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_match_as(&self) -> Option<&crate::PatternMatchAs> {
-        match self {
-            Self::MatchAs(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_match_or(&self) -> bool {
-        matches!(self, Self::MatchOr(_))
-    }
-
-    #[inline]
-    pub fn match_or(self) -> Option<crate::PatternMatchOr> {
-        match self {
-            Self::MatchOr(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_match_or(self) -> crate::PatternMatchOr {
-        match self {
-            Self::MatchOr(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_match_or_mut(&mut self) -> Option<&mut crate::PatternMatchOr> {
-        match self {
-            Self::MatchOr(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_match_or(&self) -> Option<&crate::PatternMatchOr> {
-        match self {
-            Self::MatchOr(val) => Some(val),
-            _ => None,
-        }
     }
 }
 
@@ -3450,115 +1316,12 @@ impl crate::HasNodeIndex for TypeParam {
     }
 }
 
-#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl TypeParam {
-    #[inline]
-    pub const fn is_type_var(&self) -> bool {
-        matches!(self, Self::TypeVar(_))
-    }
-
-    #[inline]
-    pub fn type_var(self) -> Option<crate::TypeParamTypeVar> {
-        match self {
-            Self::TypeVar(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_type_var(self) -> crate::TypeParamTypeVar {
-        match self {
-            Self::TypeVar(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_type_var_mut(&mut self) -> Option<&mut crate::TypeParamTypeVar> {
-        match self {
-            Self::TypeVar(val) => Some(val),
-            _ => None,
-        }
-    }
-
     #[inline]
     pub fn as_type_var(&self) -> Option<&crate::TypeParamTypeVar> {
         match self {
             Self::TypeVar(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_type_var_tuple(&self) -> bool {
-        matches!(self, Self::TypeVarTuple(_))
-    }
-
-    #[inline]
-    pub fn type_var_tuple(self) -> Option<crate::TypeParamTypeVarTuple> {
-        match self {
-            Self::TypeVarTuple(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_type_var_tuple(self) -> crate::TypeParamTypeVarTuple {
-        match self {
-            Self::TypeVarTuple(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_type_var_tuple_mut(&mut self) -> Option<&mut crate::TypeParamTypeVarTuple> {
-        match self {
-            Self::TypeVarTuple(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_type_var_tuple(&self) -> Option<&crate::TypeParamTypeVarTuple> {
-        match self {
-            Self::TypeVarTuple(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_param_spec(&self) -> bool {
-        matches!(self, Self::ParamSpec(_))
-    }
-
-    #[inline]
-    pub fn param_spec(self) -> Option<crate::TypeParamParamSpec> {
-        match self {
-            Self::ParamSpec(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_param_spec(self) -> crate::TypeParamParamSpec {
-        match self {
-            Self::ParamSpec(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_param_spec_mut(&mut self) -> Option<&mut crate::TypeParamParamSpec> {
-        match self {
-            Self::ParamSpec(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_param_spec(&self) -> Option<&crate::TypeParamParamSpec> {
-        match self {
-            Self::ParamSpec(val) => Some(val),
             _ => None,
         }
     }
@@ -5949,17 +3712,6 @@ impl<'a> From<ModRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_mod_ref(self) -> Option<ModRef<'a>> {
-        match self {
-            Self::ModModule(node) => Some(ModRef::Module(node)),
-            Self::ModExpression(node) => Some(ModRef::Expression(node)),
-
-            _ => None,
-        }
-    }
-}
-
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(node: &'a Stmt) -> AnyNodeRef<'a> {
         match node {
@@ -6020,40 +3772,6 @@ impl<'a> From<StmtRef<'a>> for AnyNodeRef<'a> {
             StmtRef::Break(node) => AnyNodeRef::StmtBreak(node),
             StmtRef::Continue(node) => AnyNodeRef::StmtContinue(node),
             StmtRef::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_stmt_ref(self) -> Option<StmtRef<'a>> {
-        match self {
-            Self::StmtFunctionDef(node) => Some(StmtRef::FunctionDef(node)),
-            Self::StmtClassDef(node) => Some(StmtRef::ClassDef(node)),
-            Self::StmtReturn(node) => Some(StmtRef::Return(node)),
-            Self::StmtDelete(node) => Some(StmtRef::Delete(node)),
-            Self::StmtTypeAlias(node) => Some(StmtRef::TypeAlias(node)),
-            Self::StmtAssign(node) => Some(StmtRef::Assign(node)),
-            Self::StmtAugAssign(node) => Some(StmtRef::AugAssign(node)),
-            Self::StmtAnnAssign(node) => Some(StmtRef::AnnAssign(node)),
-            Self::StmtFor(node) => Some(StmtRef::For(node)),
-            Self::StmtWhile(node) => Some(StmtRef::While(node)),
-            Self::StmtIf(node) => Some(StmtRef::If(node)),
-            Self::StmtWith(node) => Some(StmtRef::With(node)),
-            Self::StmtMatch(node) => Some(StmtRef::Match(node)),
-            Self::StmtRaise(node) => Some(StmtRef::Raise(node)),
-            Self::StmtTry(node) => Some(StmtRef::Try(node)),
-            Self::StmtAssert(node) => Some(StmtRef::Assert(node)),
-            Self::StmtImport(node) => Some(StmtRef::Import(node)),
-            Self::StmtImportFrom(node) => Some(StmtRef::ImportFrom(node)),
-            Self::StmtGlobal(node) => Some(StmtRef::Global(node)),
-            Self::StmtNonlocal(node) => Some(StmtRef::Nonlocal(node)),
-            Self::StmtExpr(node) => Some(StmtRef::Expr(node)),
-            Self::StmtPass(node) => Some(StmtRef::Pass(node)),
-            Self::StmtBreak(node) => Some(StmtRef::Break(node)),
-            Self::StmtContinue(node) => Some(StmtRef::Continue(node)),
-            Self::StmtIpyEscapeCommand(node) => Some(StmtRef::IpyEscapeCommand(node)),
-
-            _ => None,
         }
     }
 }
@@ -6196,16 +3914,6 @@ impl<'a> From<ExceptHandlerRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_except_handler_ref(self) -> Option<ExceptHandlerRef<'a>> {
-        match self {
-            Self::ExceptHandlerExceptHandler(node) => Some(ExceptHandlerRef::ExceptHandler(node)),
-
-            _ => None,
-        }
-    }
-}
-
 impl<'a> From<&'a InterpolatedStringElement> for AnyNodeRef<'a> {
     fn from(node: &'a InterpolatedStringElement) -> AnyNodeRef<'a> {
         match node {
@@ -6226,21 +3934,6 @@ impl<'a> From<InterpolatedStringElementRef<'a>> for AnyNodeRef<'a> {
             InterpolatedStringElementRef::Literal(node) => {
                 AnyNodeRef::InterpolatedStringLiteralElement(node)
             }
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_interpolated_string_element_ref(self) -> Option<InterpolatedStringElementRef<'a>> {
-        match self {
-            Self::InterpolatedElement(node) => {
-                Some(InterpolatedStringElementRef::Interpolation(node))
-            }
-            Self::InterpolatedStringLiteralElement(node) => {
-                Some(InterpolatedStringElementRef::Literal(node))
-            }
-
-            _ => None,
         }
     }
 }
@@ -6275,23 +3968,6 @@ impl<'a> From<PatternRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_pattern_ref(self) -> Option<PatternRef<'a>> {
-        match self {
-            Self::PatternMatchValue(node) => Some(PatternRef::MatchValue(node)),
-            Self::PatternMatchSingleton(node) => Some(PatternRef::MatchSingleton(node)),
-            Self::PatternMatchSequence(node) => Some(PatternRef::MatchSequence(node)),
-            Self::PatternMatchMapping(node) => Some(PatternRef::MatchMapping(node)),
-            Self::PatternMatchClass(node) => Some(PatternRef::MatchClass(node)),
-            Self::PatternMatchStar(node) => Some(PatternRef::MatchStar(node)),
-            Self::PatternMatchAs(node) => Some(PatternRef::MatchAs(node)),
-            Self::PatternMatchOr(node) => Some(PatternRef::MatchOr(node)),
-
-            _ => None,
-        }
-    }
-}
-
 impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
     fn from(node: &'a TypeParam) -> AnyNodeRef<'a> {
         match node {
@@ -6308,18 +3984,6 @@ impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a> {
             TypeParamRef::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
             TypeParamRef::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
             TypeParamRef::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_type_param_ref(self) -> Option<TypeParamRef<'a>> {
-        match self {
-            Self::TypeParamTypeVar(node) => Some(TypeParamRef::TypeVar(node)),
-            Self::TypeParamTypeVarTuple(node) => Some(TypeParamRef::TypeVarTuple(node)),
-            Self::TypeParamParamSpec(node) => Some(TypeParamRef::ParamSpec(node)),
-
-            _ => None,
         }
     }
 }
@@ -7384,42 +5048,6 @@ impl AnyNodeRef<'_> {
 impl AnyNodeRef<'_> {
     pub const fn is_except_handler(self) -> bool {
         matches!(self, AnyNodeRef::ExceptHandlerExceptHandler(_))
-    }
-}
-
-impl AnyNodeRef<'_> {
-    pub const fn is_interpolated_string_element(self) -> bool {
-        matches!(
-            self,
-            AnyNodeRef::InterpolatedElement(_) | AnyNodeRef::InterpolatedStringLiteralElement(_)
-        )
-    }
-}
-
-impl AnyNodeRef<'_> {
-    pub const fn is_pattern(self) -> bool {
-        matches!(
-            self,
-            AnyNodeRef::PatternMatchValue(_)
-                | AnyNodeRef::PatternMatchSingleton(_)
-                | AnyNodeRef::PatternMatchSequence(_)
-                | AnyNodeRef::PatternMatchMapping(_)
-                | AnyNodeRef::PatternMatchClass(_)
-                | AnyNodeRef::PatternMatchStar(_)
-                | AnyNodeRef::PatternMatchAs(_)
-                | AnyNodeRef::PatternMatchOr(_)
-        )
-    }
-}
-
-impl AnyNodeRef<'_> {
-    pub const fn is_type_param(self) -> bool {
-        matches!(
-            self,
-            AnyNodeRef::TypeParamTypeVar(_)
-                | AnyNodeRef::TypeParamTypeVarTuple(_)
-                | AnyNodeRef::TypeParamParamSpec(_)
-        )
     }
 }
 
@@ -8706,44 +6334,6 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
             AnyRootNodeRef::StringLiteral(node) => node.node_index(),
             AnyRootNodeRef::BytesLiteral(node) => node.node_index(),
             AnyRootNodeRef::Identifier(node) => node.node_index(),
-        }
-    }
-}
-
-impl<'a> AnyRootNodeRef<'a> {
-    pub fn visit_source_order<'b, V>(self, visitor: &mut V)
-    where
-        V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
-        'a: 'b,
-    {
-        match self {
-            AnyRootNodeRef::Mod(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Stmt(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Expr(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::ExceptHandler(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::InterpolatedStringElement(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Pattern(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::TypeParam(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::InterpolatedStringFormatSpec(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::PatternArguments(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::PatternKeyword(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Comprehension(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Arguments(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Parameters(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Parameter(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::ParameterWithDefault(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Keyword(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Alias(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::WithItem(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::MatchCase(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Decorator(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::ElifElseClause(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::TypeParams(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::FString(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::TString(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::StringLiteral(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::BytesLiteral(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Identifier(node) => node.visit_source_order(visitor),
         }
     }
 }

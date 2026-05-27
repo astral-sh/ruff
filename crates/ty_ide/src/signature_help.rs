@@ -30,20 +30,20 @@ use ty_python_semantic::types::ide_support::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParameterDetails<'db> {
     /// The parameter name (e.g., "param1")
-    pub name: String,
+    pub(crate) name: String,
     /// The parameter label in the signature (e.g., "param1: str")
     pub label: String,
     /// The annotated type of the parameter. If no annotation was provided, this is `Unknown`.
-    pub ty: Type<'db>,
+    pub(crate) ty: Type<'db>,
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
     /// True if the parameter is positional-only.
-    pub is_positional_only: bool,
+    pub(crate) is_positional_only: bool,
     /// True if the parameter can absorb arbitrarily many positional arguments.
-    pub is_variadic: bool,
+    pub(crate) is_variadic: bool,
     /// True if the parameter can absorb arbitrarily many keyword arguments.
-    pub is_keyword_variadic: bool,
+    pub(crate) is_keyword_variadic: bool,
 }
 
 /// Information about a function signature

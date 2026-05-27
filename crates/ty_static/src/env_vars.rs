@@ -80,7 +80,4 @@ impl EnvVars {
     ///
     /// This is a standard Rayon environment variable.
     pub const RAYON_NUM_THREADS: &'static str = "RAYON_NUM_THREADS";
-
-    /// Path to user-level configuration directory on Unix systems.
-    pub const XDG_CONFIG_HOME: &'static str = "XDG_CONFIG_HOME";
 }

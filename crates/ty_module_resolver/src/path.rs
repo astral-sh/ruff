@@ -651,7 +651,7 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub fn as_system_path(&self) -> Option<&SystemPath> {
+    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
         self.as_path().as_system_path()
     }
 

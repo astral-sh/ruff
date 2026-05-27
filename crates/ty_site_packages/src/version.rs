@@ -57,16 +57,6 @@ impl PythonVersionFileSource {
         Self { path, range }
     }
 
-    /// Returns the path to the configuration file.
-    pub fn path(&self) -> &SystemPathBuf {
-        &self.path
-    }
-
-    /// Returns the range of the configuration setting.
-    pub fn range(&self) -> Option<TextRange> {
-        self.range
-    }
-
     /// Attempt to resolve a [`Span`] that corresponds to the location of
     /// the configuration setting that specified the Python version.
     ///

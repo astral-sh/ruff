@@ -22,8 +22,7 @@ use crate::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use crate::{
-    Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern,
-    Stmt, TypeParam, int,
+    Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, Pattern, Stmt, TypeParam, int,
     name::Name,
     str::{Quote, TripleQuotes},
 };
@@ -95,11 +94,6 @@ impl Expr {
         }
         expr
     }
-
-    /// Return the [`OperatorPrecedence`] of this expression
-    pub fn precedence(&self) -> OperatorPrecedence {
-        OperatorPrecedence::from(self)
-    }
 }
 
 impl ExprRef<'_> {
@@ -114,10 +108,6 @@ impl ExprRef<'_> {
                 | ExprRef::NoneLiteral(_)
                 | ExprRef::EllipsisLiteral(_)
         )
-    }
-
-    pub fn precedence(&self) -> OperatorPrecedence {
-        OperatorPrecedence::from(*self)
     }
 }
 
@@ -183,14 +173,6 @@ impl ExprDict {
         DictValueIterator::new(&self.items)
     }
 
-    /// Returns the AST node representing the *n*th key of this
-    /// dictionary.
-    ///
-    /// Panics: If the index `n` is out of bounds.
-    pub fn key(&self, n: usize) -> Option<&Expr> {
-        self.items[n].key()
-    }
-
     /// Returns the AST node representing the *n*th value of this
     /// dictionary.
     ///
@@ -232,10 +214,6 @@ impl<'a> DictKeyIterator<'a> {
             items: items.iter(),
         }
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }
 
 impl<'a> Iterator for DictKeyIterator<'a> {
@@ -273,10 +251,6 @@ impl<'a> DictValueIterator<'a> {
         Self {
             items: items.iter(),
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 }
 
@@ -357,12 +331,6 @@ pub struct InterpolatedStringLiteralElement {
     pub value: Box<str>,
 }
 
-impl InterpolatedStringLiteralElement {
-    pub fn is_valid(&self) -> bool {
-        !self.value.is_empty()
-    }
-}
-
 impl Deref for InterpolatedStringLiteralElement {
     type Target = str;
 
@@ -385,18 +353,6 @@ pub enum ConversionFlag {
     Ascii = b'a' as i8,
     /// Converts by calling `repr(<value>)`.
     Repr = b'r' as i8,
-}
-
-impl ConversionFlag {
-    pub fn to_byte(&self) -> Option<u8> {
-        match self {
-            Self::None => None,
-            flag => Some(*flag as u8),
-        }
-    }
-    pub fn to_char(&self) -> Option<char> {
-        Some(self.to_byte()? as char)
-    }
 }
 
 /// The debug text of a self-documenting f-string expression (e.g., `f"{x=}"`).
@@ -446,7 +402,7 @@ impl DebugText {
     }
 
     /// The full debug text between the `{` and the conversion / `format_spec` / `}`.
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         &self.text
     }
 
@@ -515,7 +471,7 @@ impl FStringValue {
     }
 
     /// Returns a slice of all the [`FStringPart`]s contained in this value.
-    pub fn as_slice(&self) -> &[FStringPart] {
+    pub(crate) fn as_slice(&self) -> &[FStringPart] {
         match &self.inner {
             FStringValueInner::Single(part) => std::slice::from_ref(part),
             FStringValueInner::Concatenated(parts) => parts,
@@ -537,7 +493,7 @@ impl FStringValue {
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, FStringPart> {
+    pub(crate) fn iter_mut(&mut self) -> IterMut<'_, FStringPart> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -580,20 +536,6 @@ impl FStringValue {
     /// expression (`x`) and string literal (`"qux"`).
     pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
         self.f_strings().flat_map(|fstring| fstring.elements.iter())
-    }
-
-    /// Returns `true` if the node represents an empty f-string literal.
-    ///
-    /// Note that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
-    /// This method checks whether the value of the concatenated parts is equal to the empty
-    /// f-string, not whether the f-string has 0 parts inside it.
-    pub fn is_empty_literal(&self) -> bool {
-        match &self.inner {
-            FStringValueInner::Single(fstring_part) => fstring_part.is_empty_literal(),
-            FStringValueInner::Concatenated(fstring_parts) => {
-                fstring_parts.iter().all(FStringPart::is_empty_literal)
-            }
-        }
     }
 }
 
@@ -641,13 +583,6 @@ impl FStringPart {
         match self {
             Self::Literal(string_literal) => string_literal.flags.quote_style(),
             Self::FString(f_string) => f_string.flags.quote_style(),
-        }
-    }
-
-    pub fn is_empty_literal(&self) -> bool {
-        match &self {
-            FStringPart::Literal(string_literal) => string_literal.value.is_empty(),
-            FStringPart::FString(f_string) => f_string.elements.is_empty(),
         }
     }
 }
@@ -710,7 +645,7 @@ impl TStringValue {
     }
 
     /// Returns a slice of all the [`TString`]s contained in this value.
-    pub fn as_slice(&self) -> &[TString] {
+    pub(crate) fn as_slice(&self) -> &[TString] {
         match &self.inner {
             TStringValueInner::Single(part) => std::slice::from_ref(part),
             TStringValueInner::Concatenated(parts) => parts,
@@ -732,7 +667,7 @@ impl TStringValue {
 
     /// Returns an iterator over all the [`TString`]s contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, TString> {
+    pub(crate) fn iter_mut(&mut self) -> IterMut<'_, TString> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -959,7 +894,7 @@ impl FStringFlags {
     }
 
     #[must_use]
-    pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
+    pub(crate) fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
         self.0.set(
             InterpolatedStringFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
@@ -968,13 +903,13 @@ impl FStringFlags {
     }
 
     #[must_use]
-    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+    pub(crate) fn with_unclosed(mut self, unclosed: bool) -> Self {
         self.0.set(InterpolatedStringFlagsInner::UNCLOSED, unclosed);
         self
     }
 
     #[must_use]
-    pub fn with_prefix(mut self, prefix: FStringPrefix) -> Self {
+    pub(crate) fn with_prefix(mut self, prefix: FStringPrefix) -> Self {
         match prefix {
             FStringPrefix::Regular => Self(
                 self.0
@@ -1048,12 +983,12 @@ impl TStringFlags {
     /// See the documentation for [`TStringFlags`] for additional caveats on this constructor, and
     /// situations in which alternative ways to construct this struct should be used, especially
     /// when writing lint rules.
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self(InterpolatedStringFlagsInner::empty())
     }
 
     #[must_use]
-    pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
+    pub(crate) fn with_quote_style(mut self, quote_style: Quote) -> Self {
         self.0.set(
             InterpolatedStringFlagsInner::DOUBLE,
             quote_style.is_double(),
@@ -1062,7 +997,7 @@ impl TStringFlags {
     }
 
     #[must_use]
-    pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
+    pub(crate) fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
         self.0.set(
             InterpolatedStringFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
@@ -1071,13 +1006,13 @@ impl TStringFlags {
     }
 
     #[must_use]
-    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+    pub(crate) fn with_unclosed(mut self, unclosed: bool) -> Self {
         self.0.set(InterpolatedStringFlagsInner::UNCLOSED, unclosed);
         self
     }
 
     #[must_use]
-    pub fn with_prefix(mut self, prefix: TStringPrefix) -> Self {
+    pub(crate) fn with_prefix(mut self, prefix: TStringPrefix) -> Self {
         match prefix {
             TStringPrefix::Regular => Self(
                 self.0
@@ -1094,7 +1029,7 @@ impl TStringFlags {
         }
     }
 
-    pub const fn prefix(self) -> TStringPrefix {
+    pub(crate) const fn prefix(self) -> TStringPrefix {
         if self
             .0
             .contains(InterpolatedStringFlagsInner::R_PREFIX_LOWER)
@@ -1301,7 +1236,7 @@ impl TString {
         self.flags.quote_style()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.elements.is_empty()
     }
 }
@@ -1417,7 +1352,7 @@ impl StringLiteralValue {
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, StringLiteral> {
+    pub(crate) fn iter_mut(&mut self) -> IterMut<'_, StringLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1585,7 +1520,7 @@ impl StringLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+    pub(crate) fn with_unclosed(mut self, unclosed: bool) -> Self {
         self.0.set(StringLiteralFlagsInner::UNCLOSED, unclosed);
         self
     }
@@ -1837,7 +1772,7 @@ impl BytesLiteralValue {
     }
 
     /// Returns a slice of all the [`BytesLiteral`] parts contained in this value.
-    pub fn as_slice(&self) -> &[BytesLiteral] {
+    pub(crate) fn as_slice(&self) -> &[BytesLiteral] {
         match &self.inner {
             BytesLiteralValueInner::Single(value) => std::slice::from_ref(value),
             BytesLiteralValueInner::Concatenated(value) => value.as_slice(),
@@ -1859,7 +1794,7 @@ impl BytesLiteralValue {
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, BytesLiteral> {
+    pub(crate) fn iter_mut(&mut self) -> IterMut<'_, BytesLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -2017,13 +1952,13 @@ impl BytesLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+    pub(crate) fn with_unclosed(mut self, unclosed: bool) -> Self {
         self.0.set(BytesLiteralFlagsInner::UNCLOSED, unclosed);
         self
     }
 
     #[must_use]
-    pub fn with_prefix(mut self, prefix: ByteStringPrefix) -> Self {
+    pub(crate) fn with_prefix(mut self, prefix: ByteStringPrefix) -> Self {
         match prefix {
             ByteStringPrefix::Regular => {
                 self.0 -= BytesLiteralFlagsInner::R_PREFIX_LOWER;
@@ -2122,18 +2057,8 @@ impl Deref for BytesLiteral {
 
 impl BytesLiteral {
     /// Extracts a byte slice containing the entire [`BytesLiteral`].
-    pub fn as_slice(&self) -> &[u8] {
+    pub(crate) fn as_slice(&self) -> &[u8] {
         self
-    }
-
-    /// Creates a new invalid bytes literal with the given range.
-    pub fn invalid(range: TextRange) -> Self {
-        Self {
-            range,
-            value: Box::new([]),
-            node_index: AtomicNodeIndex::NONE,
-            flags: BytesLiteralFlags::empty().with_invalid(),
-        }
     }
 }
 
@@ -2212,7 +2137,7 @@ pub struct AnyStringFlags(AnyStringFlagsInner);
 
 impl AnyStringFlags {
     #[must_use]
-    pub fn with_prefix(mut self, prefix: AnyStringPrefix) -> Self {
+    pub(crate) fn with_prefix(mut self, prefix: AnyStringPrefix) -> Self {
         self.0 |= match prefix {
             // regular strings
             AnyStringPrefix::Regular(StringLiteralPrefix::Empty) => AnyStringFlagsInner::empty(),
@@ -2294,7 +2219,7 @@ impl AnyStringFlags {
     }
 
     #[must_use]
-    pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
+    pub(crate) fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
         self.0
             .set(AnyStringFlagsInner::TRIPLE_QUOTED, triple_quotes.is_yes());
         self
@@ -2504,10 +2429,6 @@ impl ExprList {
         self.elts.iter()
     }
 
-    pub fn len(&self) -> usize {
-        self.elts.len()
-    }
-
     pub fn is_empty(&self) -> bool {
         self.elts.is_empty()
     }
@@ -2564,7 +2485,7 @@ pub enum BoolOp {
 }
 
 impl BoolOp {
-    pub const fn as_str(&self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             BoolOp::And => "and",
             BoolOp::Or => "or",
@@ -2691,7 +2612,7 @@ pub enum UnaryOp {
 }
 
 impl UnaryOp {
-    pub const fn as_str(&self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             UnaryOp::Invert => "~",
             UnaryOp::Not => "not",
@@ -2911,7 +2832,8 @@ impl Pattern {
 pub struct IrrefutablePattern {
     pub kind: IrrefutablePatternKind,
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    #[allow(dead_code)]
+    pub(crate) node_index: AtomicNodeIndex,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -2949,7 +2871,7 @@ pub struct PatternKeyword {
 
 impl PatternArguments {
     /// Returns an iterator over the patterns and keywords in source order.
-    pub fn iter_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
+    pub(crate) fn iter_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
         PatternArgumentsSourceOrder {
             patterns: &self.patterns,
             keywords: &self.keywords,
@@ -3605,10 +3527,6 @@ impl Arguments {
             next_arg: 0,
             next_keyword: 0,
         }
-    }
-
-    pub fn inner_range(&self) -> TextRange {
-        TextRange::new(self.l_paren_range().end(), self.r_paren_range().start())
     }
 
     pub fn l_paren_range(&self) -> TextRange {

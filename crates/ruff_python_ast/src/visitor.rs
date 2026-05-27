@@ -122,7 +122,7 @@ pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt])
     }
 }
 
-pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     elif_else_clause: &'a ElifElseClause,
 ) {
@@ -354,7 +354,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
     }
 }
 
-pub fn walk_annotation<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
+pub(crate) fn walk_annotation<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
     visitor.visit_expr(expr);
 }
 
@@ -664,7 +664,10 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
+pub(crate) fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    arguments: &'a Arguments,
+) {
     // Note that there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
@@ -707,7 +710,10 @@ pub fn walk_with_item<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, with_item: &
     }
 }
 
-pub fn walk_type_params<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_params: &'a TypeParams) {
+pub(crate) fn walk_type_params<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    type_params: &'a TypeParams,
+) {
     for type_param in &type_params.type_params {
         visitor.visit_type_param(type_param);
     }
@@ -797,7 +803,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
     }
 }
 
-pub fn walk_pattern_arguments<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_pattern_arguments<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     pattern_arguments: &'a PatternArguments,
 ) {
@@ -809,7 +815,7 @@ pub fn walk_pattern_arguments<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     pattern_keyword: &'a PatternKeyword,
 ) {
@@ -847,19 +853,19 @@ pub fn walk_t_string<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, t_string: &'a
     }
 }
 
-pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
     _visitor: &V,
     _expr_context: &'a ExprContext,
 ) {
 }
 
-pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _bool_op: &'a BoolOp) {}
+pub(crate) fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _bool_op: &'a BoolOp) {}
 
-pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _operator: &'a Operator) {}
+pub(crate) fn walk_operator<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _operator: &'a Operator) {}
 
-pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _unary_op: &'a UnaryOp) {}
+pub(crate) fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _unary_op: &'a UnaryOp) {}
 
-pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _cmp_op: &'a CmpOp) {}
+pub(crate) fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _cmp_op: &'a CmpOp) {}
 
 pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _alias: &'a Alias) {}
 

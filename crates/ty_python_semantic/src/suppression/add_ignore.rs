@@ -20,7 +20,7 @@ use crate::suppression::{SuppressionKind, SuppressionTarget, Suppressions, suppr
 /// This is different from calling `suppress_single` for every item in `ids_with_range`
 /// in that errors on the same line are grouped together and ty will only insert a single
 /// suppression with possibly multiple codes instead of adding multiple suppression comments.
-pub fn suppress_all(
+pub(crate) fn suppress_all(
     db: &dyn Db,
     file: File,
     ids_with_range: &[(LintName, TextRange)],
@@ -153,10 +153,10 @@ enum SuppressionPosition {
 }
 
 /// Fix to suppress one or more diagnostics.
-pub struct SuppressFix {
-    pub fix: Fix,
+pub(crate) struct SuppressFix {
+    pub(crate) fix: Fix,
     /// The number of diagnostics that will be suppressed if this fix is applied.
-    pub suppressed_diagnostics: usize,
+    pub(crate) suppressed_diagnostics: usize,
 }
 
 /// Creates a fix to suppress a single lint.

@@ -32,7 +32,6 @@ pub use std::time::{Instant, SystemTime, SystemTimeError};
 pub use web_time::{Instant, SystemTime, SystemTimeError};
 
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
-pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
 
 static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 

@@ -137,7 +137,7 @@ impl IgnoreNames {
     }
 
     /// Returns `true` if the given name matches any of the ignored patterns.
-    pub fn matches(&self, name: &str) -> bool {
+    pub(crate) fn matches(&self, name: &str) -> bool {
         match self {
             IgnoreNames::Default => matches!(
                 name,
@@ -159,7 +159,8 @@ impl IgnoreNames {
     }
 
     /// Create a new [`IgnoreNames`] from the given patterns.
-    pub fn from_patterns(
+    #[allow(dead_code)]
+    pub(crate) fn from_patterns(
         patterns: impl IntoIterator<Item = String>,
     ) -> Result<Self, SettingsError> {
         let mut builder = GlobSetBuilder::new();

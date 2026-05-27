@@ -8,7 +8,7 @@ use std::fmt::{Display, Formatter};
 // By default, ignore the `namedtuple` methods and attributes, as well as the
 // _sunder_ names in Enum, which are underscore-prefixed to prevent conflicts
 // with field names.
-pub const IGNORE_NAMES: [&str; 7] = [
+pub(crate) const IGNORE_NAMES: [&str; 7] = [
     "_make",
     "_asdict",
     "_replace",

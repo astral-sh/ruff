@@ -33,10 +33,6 @@ impl VendoredPath {
         &self.0
     }
 
-    pub fn as_std_path(&self) -> &path::Path {
-        self.0.as_std_path()
-    }
-
     pub fn components(&self) -> Utf8Components<'_> {
         self.0.components()
     }
@@ -47,18 +43,8 @@ impl VendoredPath {
     }
 
     #[must_use]
-    pub fn with_pyi_extension(&self) -> VendoredPathBuf {
-        VendoredPathBuf(self.0.with_extension("pyi"))
-    }
-
-    #[must_use]
     pub fn join(&self, other: impl AsRef<VendoredPath>) -> VendoredPathBuf {
         VendoredPathBuf(self.0.join(other.as_ref()))
-    }
-
-    #[must_use]
-    pub fn ends_with(&self, suffix: impl AsRef<VendoredPath>) -> bool {
-        self.0.ends_with(suffix.as_ref())
     }
 
     #[must_use]
@@ -104,17 +90,13 @@ impl Default for VendoredPathBuf {
 }
 
 impl VendoredPathBuf {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self(Utf8PathBuf::new())
     }
 
     #[inline]
     pub fn as_path(&self) -> &VendoredPath {
         VendoredPath::new(&self.0)
-    }
-
-    pub fn push(&mut self, component: impl AsRef<VendoredPath>) {
-        self.0.push(component.as_ref())
     }
 }
 

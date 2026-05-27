@@ -260,7 +260,7 @@ pub struct PlaceTableBuilder {
 
 impl PlaceTableBuilder {
     /// Looks up a place ID by its expression.
-    pub fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
+    pub(crate) fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
         match expression {
             PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
             PlaceExprRef::Member(member) => {
@@ -293,7 +293,7 @@ impl PlaceTableBuilder {
     }
 
     #[track_caller]
-    pub fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
+    pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
         match place_id.into() {
             ScopedPlaceId::Symbol(id) => PlaceExprRef::Symbol(self.symbols.symbol(id)),
             ScopedPlaceId::Member(id) => PlaceExprRef::Member(self.member.member(id)),
@@ -307,18 +307,18 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = PlaceExprRef<'_>> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef<'_>> {
         self.symbols
             .iter()
             .map(Into::into)
             .chain(self.member.iter().map(PlaceExprRef::Member))
     }
 
-    pub fn symbols(&self) -> impl Iterator<Item = &Symbol> {
+    pub(crate) fn symbols(&self) -> impl Iterator<Item = &Symbol> {
         self.symbols.iter()
     }
 
-    pub fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
+    pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
         let (id, is_new) = self.symbols.add(symbol);
 
         if is_new {
@@ -329,7 +329,7 @@ impl PlaceTableBuilder {
         (id, is_new)
     }
 
-    pub fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
+    pub(crate) fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
         let (id, is_new) = self.member.add(member);
 
         if is_new {
@@ -393,7 +393,7 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub fn finish(self) -> PlaceTable {
+    pub(crate) fn finish(self) -> PlaceTable {
         PlaceTable {
             symbols: self.symbols.build(),
             members: self.member.build(),
@@ -402,12 +402,8 @@ impl PlaceTableBuilder {
 }
 
 impl ScopedPlaceId {
-    pub const fn is_symbol(self) -> bool {
+    pub(crate) const fn is_symbol(self) -> bool {
         matches!(self, ScopedPlaceId::Symbol(_))
-    }
-
-    pub const fn is_member(self) -> bool {
-        matches!(self, ScopedPlaceId::Member(_))
     }
 
     pub const fn as_symbol(self) -> Option<ScopedSymbolId> {
@@ -424,14 +420,6 @@ impl ScopedPlaceId {
             ScopedPlaceId::Member(_) => {
                 panic!("Expected ScopedPlaceId::Symbol, found ScopedPlaceId::Member")
             }
-        }
-    }
-
-    pub const fn as_member(self) -> Option<ScopedMemberId> {
-        if let ScopedPlaceId::Member(id) = self {
-            Some(id)
-        } else {
-            None
         }
     }
 }
@@ -467,10 +455,6 @@ pub struct FilePlaceId {
 }
 
 impl FilePlaceId {
-    pub fn scope(self) -> FileScopeId {
-        self.scope
-    }
-
     pub(crate) fn scoped_place_id(self) -> ScopedPlaceId {
         self.scoped_place_id
     }

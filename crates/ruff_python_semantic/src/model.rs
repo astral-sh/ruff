@@ -1400,12 +1400,12 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns the parent of the given [`Scope`], if any.
-    pub fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
+    pub(crate) fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
     /// Returns the ID of the parent of the given [`ScopeId`], if any.
-    pub fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+    pub(crate) fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
         self.scopes[scope_id].parent
     }
 
@@ -1440,15 +1440,9 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
-    /// Return the [`Stmt`] corresponding to the given [`NodeId`].
-    #[inline]
-    pub fn node(&self, node_id: NodeId) -> &NodeRef<'a> {
-        &self.nodes[node_id]
-    }
-
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
-    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub(crate) fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
         let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
         self.nodes[parent_node_id].as_expression()
     }
@@ -1881,7 +1875,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
-    pub fn exceptions(&self) -> Exceptions {
+    pub(crate) fn exceptions(&self) -> Exceptions {
         let mut exceptions = Exceptions::empty();
         for exception in &self.handled_exceptions {
             exceptions.insert(*exception);
@@ -1942,12 +1936,6 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION)
     }
 
-    /// Return `true` if the context is in a runtime-required type annotation.
-    pub const fn in_runtime_required_annotation(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION)
-    }
-
     /// Return `true` if the model is in a type definition.
     pub const fn in_type_definition(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::TYPE_DEFINITION)
@@ -1960,13 +1948,6 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::STRING_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the model is visiting a "simple string type definition"
-    /// that was previously deferred when initially traversing the AST
-    pub const fn in_simple_string_type_definition(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
-    }
-
     /// Return `true` if the model is visiting a "complex string type definition"
     /// that was previously deferred when initially traversing the AST
     pub const fn in_complex_string_type_definition(&self) -> bool {
@@ -1976,7 +1957,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the model is visiting a "`__future__` type definition"
     /// that was previously deferred when initially traversing the AST
-    pub const fn in_future_type_definition(&self) -> bool {
+    pub(crate) const fn in_future_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
@@ -2003,7 +1984,7 @@ impl<'a> SemanticModel<'a> {
     /// cast("Thread", x)  # Forward reference
     /// cast(Thread, x)  # Non-forward reference
     /// ```
-    pub const fn in_forward_reference(&self) -> bool {
+    pub(crate) const fn in_forward_reference(&self) -> bool {
         self.in_string_type_definition()
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
@@ -2065,7 +2046,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the model is in a t-string.
-    pub const fn in_t_string(&self) -> bool {
+    pub(crate) const fn in_t_string(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::T_STRING)
     }
 
@@ -2145,13 +2126,6 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_named_expression_assignment(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT)
-    }
-
-    /// Return `true` if the model is visiting the r.h.s. of an `__all__` definition
-    /// (e.g. `"foo"` in `__all__ = ["foo"]`)
-    pub const fn in_dunder_all_definition(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
     }
 
     /// Return `true` if the model is visiting an item in a class's bases tuple
@@ -2268,11 +2242,7 @@ pub enum TypingOnlyBindingsStatus {
 }
 
 impl TypingOnlyBindingsStatus {
-    pub const fn is_allowed(self) -> bool {
-        matches!(self, TypingOnlyBindingsStatus::Allowed)
-    }
-
-    pub const fn is_disallowed(self) -> bool {
+    pub(crate) const fn is_disallowed(self) -> bool {
         matches!(self, TypingOnlyBindingsStatus::Disallowed)
     }
 }
@@ -2758,7 +2728,7 @@ bitflags! {
 }
 
 impl SemanticModelFlags {
-    pub fn new(path: &Path) -> Self {
+    pub(crate) fn new(path: &Path) -> Self {
         if PySourceType::from(path).is_stub() {
             Self::STUB_FILE
         } else {

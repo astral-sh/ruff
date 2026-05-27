@@ -167,7 +167,7 @@ pub struct SemanticTokens {
 
 impl SemanticTokens {
     /// Create a new `SemanticTokens` instance.
-    pub fn new(tokens: Vec<SemanticToken>) -> Self {
+    pub(crate) fn new(tokens: Vec<SemanticToken>) -> Self {
         Self { tokens }
     }
 }

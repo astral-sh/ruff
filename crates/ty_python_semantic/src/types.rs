@@ -24,8 +24,9 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
+pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
-pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
+pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
     infer_expression_type, infer_expression_types, infer_scope_types,
@@ -34,16 +35,15 @@ pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
+pub(crate) use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
-pub use self::set_theoretic::{
-    IntersectionType, NegativeIntersectionElements, NegativeIntersectionElementsIterator, UnionType,
-};
+pub use self::set_theoretic::{IntersectionType, UnionType};
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
-pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
+pub(crate) use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
     imported_symbol, known_module_symbol,
@@ -82,9 +82,10 @@ use crate::types::tuple::TupleSpec;
 use crate::types::type_alias::TypeAliasType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
 use crate::types::typevar::TypeVarInstance;
-pub use crate::types::typevar::{
-    BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints, TypeVarKind,
+pub(crate) use crate::types::typevar::{
+    BindingContext, ParamSpecAttrKind, TypeVarBoundOrConstraints,
 };
+pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
@@ -356,7 +357,7 @@ pub enum MaterializationKind {
 impl MaterializationKind {
     /// Flip the materialization type: `Top` becomes `Bottom` and vice versa.
     #[must_use]
-    pub const fn flip(self) -> Self {
+    pub(crate) const fn flip(self) -> Self {
         match self {
             Self::Top => Self::Bottom,
             Self::Bottom => Self::Top,
@@ -469,7 +470,7 @@ impl Default for MemberLookupPolicy {
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
 #[cfg(debug_assertions)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub struct TodoType(pub &'static str);
+pub struct TodoType(pub(crate) &'static str);
 
 #[cfg(debug_assertions)]
 impl std::fmt::Display for TodoType {
@@ -1348,7 +1349,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub const fn as_property_instance(self) -> Option<PropertyInstanceType<'db>> {
+    pub(crate) const fn as_property_instance(self) -> Option<PropertyInstanceType<'db>> {
         match self {
             Type::PropertyInstance(property) => Some(property),
             _ => None,
@@ -1465,7 +1466,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub const fn is_property_instance(&self) -> bool {
+    pub(crate) const fn is_property_instance(&self) -> bool {
         matches!(self, Type::PropertyInstance(..))
     }
 
@@ -7601,12 +7602,6 @@ impl<'db> InvalidTypeExpression<'db> {
 pub enum InferredAs {
     ValueExpression,
     TypeExpression,
-}
-
-impl InferredAs {
-    pub const fn type_expression(self) -> bool {
-        matches!(self, InferredAs::TypeExpression)
-    }
 }
 
 /// Error returned if a type is not awaitable.

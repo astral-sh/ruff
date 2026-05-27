@@ -28,16 +28,6 @@ impl FilePath {
         FilePath::System(path.as_ref().to_path_buf())
     }
 
-    /// Returns `Some` if the path is a file system path that points to a path on disk.
-    #[must_use]
-    #[inline]
-    pub fn into_system_path_buf(self) -> Option<SystemPathBuf> {
-        match self {
-            FilePath::System(path) => Some(path),
-            FilePath::Vendored(_) | FilePath::SystemVirtual(_) => None,
-        }
-    }
-
     #[must_use]
     #[inline]
     pub fn as_system_path(&self) -> Option<&SystemPath> {
@@ -45,13 +35,6 @@ impl FilePath {
             FilePath::System(path) => Some(path.as_path()),
             FilePath::Vendored(_) | FilePath::SystemVirtual(_) => None,
         }
-    }
-
-    /// Returns `true` if the path is a file system path that points to a path on disk.
-    #[must_use]
-    #[inline]
-    pub const fn is_system_path(&self) -> bool {
-        matches!(self, FilePath::System(_))
     }
 
     /// Returns `true` if the path is a file system path that is virtual i.e., it doesn't exists on
@@ -71,7 +54,7 @@ impl FilePath {
 
     #[must_use]
     #[inline]
-    pub fn as_vendored_path(&self) -> Option<&VendoredPath> {
+    pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPath> {
         match self {
             FilePath::Vendored(path) => Some(path.as_path()),
             FilePath::System(_) | FilePath::SystemVirtual(_) => None,

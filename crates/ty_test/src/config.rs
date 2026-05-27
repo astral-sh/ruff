@@ -105,7 +105,7 @@ pub(crate) struct Environment {
     /// ty will search in the resolved environment's `site-packages` directories for type
     /// information and third-party imports.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub python: Option<SystemPathBuf>,
+    pub(crate) python: Option<SystemPathBuf>,
 }
 
 #[derive(Deserialize, Default, Debug, Clone)]

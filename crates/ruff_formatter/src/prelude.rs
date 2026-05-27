@@ -6,7 +6,8 @@ pub use crate::format_extensions::{MemoizeFormat, Memoized};
 pub use crate::formatter::Formatter;
 pub use crate::printer::PrinterOptions;
 
+pub(crate) use crate::BufferExtensions;
 pub use crate::{
-    Buffer as _, BufferExtensions, Format, Format as _, FormatResult, FormatRule,
-    FormatWithRule as _, SimpleFormatContext, best_fitting, dbg_write, format, format_args, write,
+    Buffer as _, Format, Format as _, FormatResult, FormatRule, SimpleFormatContext, best_fitting,
+    dbg_write, format, format_args, write,
 };

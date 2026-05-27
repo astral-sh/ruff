@@ -266,11 +266,11 @@ impl ProjectMetadata {
         Ok(metadata)
     }
 
-    pub fn root(&self) -> &SystemPath {
+    pub(crate) fn root(&self) -> &SystemPath {
         &self.root
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
@@ -278,7 +278,7 @@ impl ProjectMetadata {
         &self.options
     }
 
-    pub fn extra_configuration_paths(&self) -> &[SystemPathBuf] {
+    pub(crate) fn extra_configuration_paths(&self) -> &[SystemPathBuf] {
         &self.extra_configuration_paths
     }
 

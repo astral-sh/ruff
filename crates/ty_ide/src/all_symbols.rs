@@ -12,7 +12,7 @@ use crate::{
 ///
 /// Returns symbols from all files in the workspace and dependencies, filtered
 /// by the query.
-pub fn all_symbols<'db>(
+pub(crate) fn all_symbols<'db>(
     db: &'db dyn Db,
     importing_from: File,
     query: &QueryPattern,
@@ -103,7 +103,7 @@ pub fn all_symbols<'db>(
 /// A symbol found in the workspace and dependencies, including the
 /// file it was found in.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AllSymbolInfo<'db> {
+pub(crate) struct AllSymbolInfo<'db> {
     /// The symbol information.
     ///
     /// When absent, this implies the symbol is the module itself.
@@ -155,7 +155,7 @@ impl<'db> AllSymbolInfo<'db> {
     /// somewhere. Instead, this represents importing a module.
     /// In this case, if the caller needs a symbol name, they
     /// should use `AllSymbolInfo::module().name()`.
-    pub fn name_in_file(&self) -> Option<&str> {
+    pub(crate) fn name_in_file(&self) -> Option<&str> {
         self.symbol.as_ref().map(|symbol| &*symbol.name)
     }
 
@@ -165,7 +165,7 @@ impl<'db> AllSymbolInfo<'db> {
     ///
     /// When this symbol corresponds to a module, then this is
     /// just the full absolute module name itself.
-    pub fn qualified(&self) -> &str {
+    pub(crate) fn qualified(&self) -> &str {
         &self.qualified
     }
 
@@ -174,7 +174,7 @@ impl<'db> AllSymbolInfo<'db> {
     /// The kind of a symbol in the context of auto-import is
     /// determined on a best effort basis. It may be imprecise
     /// in some cases, e.g., reporting a module as a variable.
-    pub fn kind(&self) -> SymbolKind {
+    pub(crate) fn kind(&self) -> SymbolKind {
         self.symbol
             .as_ref()
             .map(|symbol| symbol.kind)
@@ -182,12 +182,12 @@ impl<'db> AllSymbolInfo<'db> {
     }
 
     /// Returns whether this symbol has a `@deprecated` decorator.
-    pub fn deprecated(&self) -> bool {
+    pub(crate) fn deprecated(&self) -> bool {
         self.symbol.as_ref().is_some_and(|symbol| symbol.deprecated)
     }
 
     /// Returns the module this symbol is exported from.
-    pub fn module(&self) -> Module<'db> {
+    pub(crate) fn module(&self) -> Module<'db> {
         self.module
     }
 
@@ -195,7 +195,7 @@ impl<'db> AllSymbolInfo<'db> {
     ///
     /// This is always equivalent to
     /// `AllSymbolInfo::module().file().unwrap()`.
-    pub fn file(&self) -> File {
+    pub(crate) fn file(&self) -> File {
         self.file
     }
 

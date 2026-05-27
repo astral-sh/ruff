@@ -75,7 +75,8 @@ impl ModuleGlobSet {
     /// # Errors
     ///
     /// Returns an error if any pattern is invalid or if the regex set fails to compile.
-    pub fn from_patterns<I, S>(patterns: I) -> Result<Self, ModuleGlobError>
+    #[allow(dead_code)]
+    pub(crate) fn from_patterns<I, S>(patterns: I) -> Result<Self, ModuleGlobError>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
@@ -211,16 +212,6 @@ impl ModuleNameMatch {
     /// Returns `true` if the match result is [`ModuleNameMatch::Include`].
     pub const fn is_include(self) -> bool {
         matches!(self, ModuleNameMatch::Include)
-    }
-
-    /// Returns `true` if the match result is [`ModuleNameMatch::Exclude`].
-    pub const fn is_exclude(self) -> bool {
-        matches!(self, ModuleNameMatch::Exclude)
-    }
-
-    /// Returns `true` if the match result is [`ModuleNameMatch::None`].
-    pub const fn is_none(self) -> bool {
-        matches!(self, ModuleNameMatch::None)
     }
 }
 

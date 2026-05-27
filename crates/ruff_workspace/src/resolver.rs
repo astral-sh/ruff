@@ -32,7 +32,7 @@ use crate::{FileResolverSettings, pyproject};
 pub struct PyprojectConfig {
     /// The strategy used to discover the relevant `pyproject.toml` file for
     /// each Python file.
-    pub strategy: PyprojectDiscoveryStrategy,
+    pub(crate) strategy: PyprojectDiscoveryStrategy,
     /// All settings from the `pyproject.toml` file.
     pub settings: Settings,
     /// Absolute path to the `pyproject.toml` file. This would be `None` when
@@ -68,12 +68,7 @@ pub enum PyprojectDiscoveryStrategy {
 
 impl PyprojectDiscoveryStrategy {
     #[inline]
-    pub const fn is_fixed(self) -> bool {
-        matches!(self, PyprojectDiscoveryStrategy::Fixed)
-    }
-
-    #[inline]
-    pub const fn is_hierarchical(self) -> bool {
+    pub(crate) const fn is_hierarchical(self) -> bool {
         matches!(self, PyprojectDiscoveryStrategy::Hierarchical)
     }
 }
@@ -89,7 +84,7 @@ pub enum Relativity {
 }
 
 impl Relativity {
-    pub fn resolve(self, path: &Path) -> &Path {
+    pub(crate) fn resolve(self, path: &Path) -> &Path {
         match self {
             Relativity::Parent => path
                 .parent()
@@ -126,7 +121,7 @@ impl<'a> Resolver<'a> {
 
     /// Return `true` if the [`Resolver`] is using a hierarchical discovery strategy.
     #[inline]
-    pub fn is_hierarchical(&self) -> bool {
+    pub(crate) fn is_hierarchical(&self) -> bool {
         self.pyproject_config.strategy.is_hierarchical()
     }
 
@@ -138,7 +133,7 @@ impl<'a> Resolver<'a> {
 
     /// Return `true` if the [`Resolver`] should respect `.gitignore` files.
     #[inline]
-    pub fn respect_gitignore(&self) -> bool {
+    pub(crate) fn respect_gitignore(&self) -> bool {
         self.pyproject_config
             .settings
             .file_resolver
@@ -836,7 +831,7 @@ pub fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
 
 /// Return `true` if the given candidates should be ignored based on the exclusion
 /// criteria.
-pub fn match_candidate_exclusion(
+pub(crate) fn match_candidate_exclusion(
     file_path: &Candidate,
     file_basename: &Candidate,
     exclusion: &GlobSet,

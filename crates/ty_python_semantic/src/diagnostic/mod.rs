@@ -43,7 +43,7 @@ pub fn inferred_python_version_source_annotation(
 ///
 /// ty can infer the Python version from various sources, such as command-line arguments,
 /// configuration files, or defaults.
-pub fn add_inferred_python_version_hint_to_diagnostic(
+pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
     db: &dyn Db,
     diagnostic: &mut Diagnostic,
     action: &str,

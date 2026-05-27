@@ -29,7 +29,7 @@ mod symbols;
 mod type_hierarchy;
 mod workspace_symbols;
 
-pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub(crate) use all_symbols::all_symbols;
 pub use code_action::{QuickFix, code_actions};
 pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
@@ -43,7 +43,6 @@ pub use inlay_hints::{
     InlayHintKind, InlayHintLabel, InlayHintSettings, InlayHintTextEdit, inlay_hints,
 };
 pub use markup::MarkupKind;
-pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
 pub use selection_range::selection_range;
 pub use semantic_tokens::{
@@ -71,7 +70,7 @@ use ty_python_semantic::types::{Type, TypeDefinition};
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct RangedValue<T> {
     pub range: FileRange,
-    pub value: T,
+    pub(crate) value: T,
 }
 
 impl<T> RangedValue<T> {
@@ -124,7 +123,7 @@ pub struct NavigationTarget {
 
 impl NavigationTarget {
     /// Creates a new `NavigationTarget` where the focus and full range are identical.
-    pub fn new(file: File, range: TextRange) -> Self {
+    pub(crate) fn new(file: File, range: TextRange) -> Self {
         Self {
             file,
             focus_range: range,
@@ -182,7 +181,7 @@ pub struct ReferenceTarget {
 
 impl ReferenceTarget {
     /// Creates a new `ReferenceTarget`.
-    pub fn new(file: File, range: TextRange, kind: ReferenceKind) -> Self {
+    pub(crate) fn new(file: File, range: TextRange, kind: ReferenceKind) -> Self {
         Self {
             file_range: FileRange::new(file, range),
             kind,
@@ -335,7 +334,7 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 }
 
 /// Get the cache-relative path where vendored paths should be written to.
-pub fn relative_cached_vendored_root() -> SystemPathBuf {
+pub(crate) fn relative_cached_vendored_root() -> SystemPathBuf {
     // The vendored files are uniquely identified by the source commit.
     SystemPathBuf::from(format!("vendored/typeshed/{}", ty_vendored::SOURCE_COMMIT))
 }

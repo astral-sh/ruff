@@ -1,11 +1,10 @@
-use ruff_db::files::{File, FilePath};
+use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::source_text;
 use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
-use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
@@ -59,14 +58,6 @@ impl<'db> SemanticModel<'db> {
 
     pub fn file(&self) -> File {
         self.file
-    }
-
-    pub fn file_path(&self) -> &FilePath {
-        self.file.path(self.db)
-    }
-
-    pub fn line_index(&self) -> LineIndex {
-        line_index(self.db, self.file)
     }
 
     /// Returns a map from symbol name to that symbol's
@@ -279,7 +270,7 @@ impl<'db> SemanticModel<'db> {
     }
 
     /// Returns the scope in which `node` is defined (handles string annotations).
-    pub fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
+    pub(crate) fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
         let index = semantic_index(self.db, self.file);
         match self.node_in_ast(node) {
             ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
@@ -366,7 +357,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If we're analyzing a string annotation, it will return the string literal's node.
     /// Otherwise it will return the input.
-    pub fn node_in_ast<'a>(&'a self, node: ast::AnyNodeRef<'a>) -> ast::AnyNodeRef<'a> {
+    pub(crate) fn node_in_ast<'a>(&'a self, node: ast::AnyNodeRef<'a>) -> ast::AnyNodeRef<'a> {
         if let Some(string_annotation) = &self.in_string_annotation_expr {
             (&**string_annotation).into()
         } else {
@@ -378,7 +369,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If we're analyzing a string annotation, it will return the string literal's expression.
     /// Otherwise it will return the input.
-    pub fn expr_in_ast<'a>(&'a self, expr: &'a Expr) -> &'a Expr {
+    pub(crate) fn expr_in_ast<'a>(&'a self, expr: &'a Expr) -> &'a Expr {
         if let Some(string_annotation) = &self.in_string_annotation_expr {
             string_annotation
         } else {
@@ -390,7 +381,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If we're analyzing a string annotation, it will return the string literal's expression.
     /// Otherwise it will return the input.
-    pub fn expr_ref_in_ast<'a>(&'a self, expr: ExprRef<'a>) -> ExprRef<'a> {
+    pub(crate) fn expr_ref_in_ast<'a>(&'a self, expr: ExprRef<'a>) -> ExprRef<'a> {
         if let Some(string_annotation) = &self.in_string_annotation_expr {
             ExprRef::from(string_annotation)
         } else {
@@ -631,7 +622,7 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
-pub trait HasOptionalDefinition {
+pub(crate) trait HasOptionalDefinition {
     /// Returns the definition of `self`, if it has one.
     ///
     /// ## Panics

@@ -39,40 +39,11 @@ impl SourceKind {
         }
     }
 
-    pub fn as_python(&self) -> Option<&str> {
-        match self {
-            SourceKind::Python { code, .. } => Some(code),
-            SourceKind::Markdown(_) => None,
-            SourceKind::IpyNotebook(_) => None,
-        }
-    }
-
-    pub fn as_markdown(&self) -> Option<&str> {
-        match self {
-            SourceKind::Markdown(code) => Some(code),
-            SourceKind::Python { .. } => None,
-            SourceKind::IpyNotebook(_) => None,
-        }
-    }
-
-    pub fn expect_python(self) -> String {
-        match self {
-            SourceKind::Python { code, is_stub: _ } => code,
-            _ => panic!("expected python code"),
-        }
-    }
-
-    pub fn expect_ipy_notebook(self) -> Notebook {
+    #[allow(dead_code)]
+    pub(crate) fn expect_ipy_notebook(self) -> Notebook {
         match self {
             SourceKind::IpyNotebook(notebook) => *notebook,
             _ => panic!("expected ipy notebook"),
-        }
-    }
-
-    pub fn expect_markdown(self) -> String {
-        match self {
-            SourceKind::Markdown(code) => code,
-            _ => panic!("expected markdown text"),
         }
     }
 

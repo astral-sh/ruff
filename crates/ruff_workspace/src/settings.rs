@@ -85,9 +85,9 @@ pub struct FileResolverSettings {
     pub extend_exclude: FilePatternSet,
     pub force_exclude: bool,
     pub include: FilePatternSet,
-    pub extend_include: FilePatternSet,
+    pub(crate) extend_include: FilePatternSet,
     pub respect_gitignore: bool,
-    pub project_root: PathBuf,
+    pub(crate) project_root: PathBuf,
 }
 
 impl fmt::Display for FileResolverSettings {
@@ -251,7 +251,7 @@ impl FormatterSettings {
     /// This method respects the per-file version overrides in
     /// [`FormatterSettings::per_file_target_version`] and falls back on
     /// [`FormatterSettings::unresolved_target_version`] if none of the override patterns match.
-    pub fn resolve_target_version(&self, path: &Path) -> PythonVersion {
+    pub(crate) fn resolve_target_version(&self, path: &Path) -> PythonVersion {
         self.per_file_target_version
             .is_match(path)
             .unwrap_or(self.unresolved_target_version)

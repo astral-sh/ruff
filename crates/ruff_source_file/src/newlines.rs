@@ -256,9 +256,7 @@ impl<'a> Line<'a> {
     /// Returns the text of the line, excluding the terminating new line character.
     #[inline]
     pub fn as_str(&self) -> &'a str {
-        let newline_len = self
-            .line_ending()
-            .map_or(0, |line_ending| line_ending.len());
+        let newline_len = self.line_ending().map_or(0, LineEnding::len);
         &self.text[..self.text.len() - newline_len]
     }
 
@@ -269,7 +267,7 @@ impl<'a> Line<'a> {
     }
 
     #[inline]
-    pub fn full_text_len(&self) -> TextSize {
+    pub(crate) fn full_text_len(&self) -> TextSize {
         self.text.text_len()
     }
 }
@@ -322,15 +320,14 @@ impl LineEnding {
         }
     }
 
-    #[expect(clippy::len_without_is_empty)]
-    pub const fn len(&self) -> usize {
+    pub(crate) const fn len(self) -> usize {
         match self {
             LineEnding::Lf | LineEnding::Cr => 1,
             LineEnding::CrLf => 2,
         }
     }
 
-    pub const fn text_len(&self) -> TextSize {
+    pub(crate) const fn text_len(self) -> TextSize {
         match self {
             LineEnding::Lf | LineEnding::Cr => TextSize::new(1),
             LineEnding::CrLf => TextSize::new(2),

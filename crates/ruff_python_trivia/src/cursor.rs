@@ -2,7 +2,7 @@ use std::str::Chars;
 
 use ruff_text_size::{TextLen, TextSize};
 
-pub const EOF_CHAR: char = '\0';
+pub(crate) const EOF_CHAR: char = '\0';
 
 /// A [`Cursor`] over a string.
 ///
@@ -57,7 +57,7 @@ impl<'a> Cursor<'a> {
 
     /// Peeks the next character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the file is at the end of the file.
-    pub fn last(&self) -> char {
+    pub(crate) fn last(&self) -> char {
         self.chars.clone().next_back().unwrap_or(EOF_CHAR)
     }
 
@@ -84,7 +84,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Consumes the next character from the back
-    pub fn bump_back(&mut self) -> Option<char> {
+    pub(crate) fn bump_back(&mut self) -> Option<char> {
         self.chars.next_back()
     }
 
@@ -124,7 +124,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub fn eat_char_back(&mut self, c: char) -> bool {
+    pub(crate) fn eat_char_back(&mut self, c: char) -> bool {
         if self.last() == c {
             self.bump_back();
             true
@@ -153,7 +153,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Eats symbols from the back while predicate returns true or until the beginning of file is reached.
-    pub fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
+    pub(crate) fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
         // It was tried making optimized version of this for eg. line comments, but
         // LLVM can inline all of this and compile it down to fast iteration over bytes.
         while predicate(self.last()) && !self.is_eof() {

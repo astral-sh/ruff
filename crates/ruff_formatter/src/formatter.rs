@@ -12,7 +12,7 @@ pub struct Formatter<'buf, Context> {
 
 impl<'buf, Context> Formatter<'buf, Context> {
     /// Creates a new context that uses the given formatter context
-    pub fn new(buffer: &'buf mut (dyn Buffer<Context = Context> + 'buf)) -> Self {
+    pub(crate) fn new(buffer: &'buf mut (dyn Buffer<Context = Context> + 'buf)) -> Self {
         Self { buffer }
     }
 
@@ -39,36 +39,6 @@ impl<'buf, Context> Formatter<'buf, Context> {
     /// The name is unused for production builds and has no meaning on the equality of two group ids.
     pub fn group_id(&self, debug_name: &'static str) -> GroupId {
         self.state().group_id(debug_name)
-    }
-
-    /// Joins multiple [Format] together without any separator
-    ///
-    /// ## Examples
-    ///
-    /// ```rust
-    /// use ruff_formatter::format;
-    /// use ruff_formatter::prelude::*;
-    ///
-    /// # fn main() -> FormatResult<()> {
-    /// let formatted = format!(SimpleFormatContext::default(), [format_with(|f| {
-    ///     f.join()
-    ///         .entry(&token("a"))
-    ///         .entry(&space())
-    ///         .entry(&token("+"))
-    ///         .entry(&space())
-    ///         .entry(&token("b"))
-    ///         .finish()
-    /// })])?;
-    ///
-    /// assert_eq!(
-    ///     "a + b",
-    ///     formatted.print()?.as_code()
-    /// );
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn join<'a>(&'a mut self) -> JoinBuilder<'a, 'buf, (), Context> {
-        JoinBuilder::new(self)
     }
 
     /// Joins the objects by placing the specified separator between every two items.
@@ -164,15 +134,18 @@ impl<'buf, Context> Formatter<'buf, Context> {
     }
 
     /// Formats `content` into an interned element without writing it to the formatter's buffer.
-    pub fn intern(&mut self, content: &dyn Format<Context>) -> FormatResult<Option<FormatElement>> {
+    pub(crate) fn intern(
+        &mut self,
+        content: &dyn Format<Context>,
+    ) -> FormatResult<Option<FormatElement>> {
         let mut buffer = VecBuffer::new(self.state_mut());
         crate::write!(&mut buffer, [content])?;
         let elements = buffer.into_vec();
 
-        Ok(self.intern_vec(elements))
+        Ok(Self::intern_vec(elements))
     }
 
-    pub fn intern_vec(&mut self, mut elements: Vec<FormatElement>) -> Option<FormatElement> {
+    pub(crate) fn intern_vec(mut elements: Vec<FormatElement>) -> Option<FormatElement> {
         match elements.len() {
             0 => None,
             // Doesn't get cheaper than calling clone, use the element directly
@@ -183,24 +156,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
     }
 }
 
-impl<Context> Formatter<'_, Context>
-where
-    Context: FormatContext,
-{
-    /// Take a snapshot of the state of the formatter
-    #[inline]
-    pub fn state_snapshot(&self) -> FormatterSnapshot {
-        FormatterSnapshot {
-            buffer: self.buffer.snapshot(),
-        }
-    }
-
-    #[inline]
-    /// Restore the state of the formatter to a previous snapshot
-    pub fn restore_state_snapshot(&mut self, snapshot: FormatterSnapshot) {
-        self.buffer.restore_snapshot(snapshot.buffer);
-    }
-}
+impl<Context> Formatter<'_, Context> where Context: FormatContext {}
 
 impl<Context> Buffer for Formatter<'_, Context> {
     type Context = Context;
@@ -237,14 +193,4 @@ impl<Context> Buffer for Formatter<'_, Context> {
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
         self.buffer.restore_snapshot(snapshot);
     }
-}
-
-/// Snapshot of the formatter state  used to handle backtracking if
-/// errors are encountered in the formatting process and the formatter
-/// has to fallback to printing raw tokens
-///
-/// In practice this only saves the set of printed tokens in debug
-/// mode and compiled to nothing in release mode
-pub struct FormatterSnapshot {
-    buffer: BufferSnapshot,
 }

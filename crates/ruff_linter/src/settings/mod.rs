@@ -788,7 +788,8 @@ pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
 impl LinterSettings {
-    pub fn for_rule(rule_code: Rule) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
             unresolved_target_version: PythonVersion::latest().into(),
@@ -871,19 +872,22 @@ impl LinterSettings {
     }
 
     #[must_use]
-    pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn with_target_version(mut self, target_version: PythonVersion) -> Self {
         self.unresolved_target_version = target_version.into();
         self
     }
 
     #[must_use]
-    pub fn with_preview_mode(mut self) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn with_preview_mode(mut self) -> Self {
         self.preview = PreviewMode::Enabled;
         self
     }
 
     #[must_use]
-    pub fn with_external_rules(mut self, rules: &[&str]) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn with_external_rules(mut self, rules: &[&str]) -> Self {
         self.external
             .extend(rules.iter().map(std::string::ToString::to_string));
         self
@@ -931,7 +935,7 @@ impl TargetVersion {
     ///
     /// This will either be the Python version specified by the user or the default Python version
     /// if unset.
-    pub fn linter_version(&self) -> PythonVersion {
+    pub(crate) fn linter_version(self) -> PythonVersion {
         self.0.unwrap_or_default()
     }
 }

@@ -163,7 +163,7 @@ const SINGLE_QUOTE_STR_PREFIXES: &[&str] = &[
 ///
 /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
 #[rustfmt::skip]
-pub const TRIPLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
+pub(crate) const TRIPLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
     "BR\"\"\"",
     "Br\"\"\"",
     "bR\"\"\"",
@@ -187,7 +187,7 @@ pub const TRIPLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
 ];
 
 #[rustfmt::skip]
-pub const SINGLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
+pub(crate) const SINGLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
     "BR\"",
     "Br\"",
     "bR\"",
@@ -215,7 +215,7 @@ pub const SINGLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
 ///
 /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
 #[rustfmt::skip]
-pub const TRIPLE_QUOTE_TEMPLATE_PREFIXES: &[&str] = &[
+pub(crate) const TRIPLE_QUOTE_TEMPLATE_PREFIXES: &[&str] = &[
     "TR\"\"\"",
     "Tr\"\"\"",
     "tR\"\"\"",
@@ -239,7 +239,7 @@ pub const TRIPLE_QUOTE_TEMPLATE_PREFIXES: &[&str] = &[
 ];
 
 #[rustfmt::skip]
-pub const SINGLE_QUOTE_TEMPLATE_PREFIXES: &[&str] = &[
+pub(crate) const SINGLE_QUOTE_TEMPLATE_PREFIXES: &[&str] = &[
     "TR\"",
     "Tr\"",
     "tR\"",
@@ -271,7 +271,7 @@ pub fn raw_contents(contents: &str) -> Option<&str> {
     Some(&contents[range])
 }
 
-pub fn raw_contents_range(contents: &str) -> Option<TextRange> {
+pub(crate) fn raw_contents_range(contents: &str) -> Option<TextRange> {
     let leading_quote_str = leading_quote(contents)?;
     let trailing_quote_str = trailing_quote(contents)?;
 

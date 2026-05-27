@@ -100,7 +100,7 @@ pub enum Tag {
 
 impl Tag {
     /// Returns `true` if `self` is any start tag.
-    pub const fn is_start(&self) -> bool {
+    pub(crate) const fn is_start(&self) -> bool {
         matches!(
             self,
             Tag::StartIndent
@@ -122,11 +122,11 @@ impl Tag {
     }
 
     /// Returns `true` if `self` is any end tag.
-    pub const fn is_end(&self) -> bool {
+    pub(crate) const fn is_end(&self) -> bool {
         !self.is_start()
     }
 
-    pub const fn kind(&self) -> TagKind {
+    pub(crate) const fn kind(&self) -> TagKind {
         #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
@@ -189,7 +189,7 @@ pub enum GroupMode {
 }
 
 impl GroupMode {
-    pub const fn is_flat(&self) -> bool {
+    pub(crate) const fn is_flat(self) -> bool {
         matches!(self, GroupMode::Flat)
     }
 }
@@ -201,17 +201,17 @@ pub struct FitsExpanded {
 }
 
 impl FitsExpanded {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     #[must_use]
-    pub fn with_condition(mut self, condition: Option<Condition>) -> Self {
+    pub(crate) fn with_condition(mut self, condition: Option<Condition>) -> Self {
         self.condition = condition;
         self
     }
 
-    pub fn propagate_expand(&self) {
+    pub(crate) fn propagate_expand(&self) {
         self.propagate_expand.set(true);
     }
 }
@@ -231,28 +231,28 @@ impl Group {
     }
 
     #[must_use]
-    pub fn with_id(mut self, id: Option<GroupId>) -> Self {
+    pub(crate) fn with_id(mut self, id: Option<GroupId>) -> Self {
         self.id = id;
         self
     }
 
     #[must_use]
-    pub fn with_mode(mut self, mode: GroupMode) -> Self {
+    pub(crate) fn with_mode(mut self, mode: GroupMode) -> Self {
         self.mode = Cell::new(mode);
         self
     }
 
-    pub fn mode(&self) -> GroupMode {
+    pub(crate) fn mode(&self) -> GroupMode {
         self.mode.get()
     }
 
-    pub fn propagate_expand(&self) {
+    pub(crate) fn propagate_expand(&self) {
         if self.mode.get() == GroupMode::Flat {
             self.mode.set(GroupMode::Propagated);
         }
     }
 
-    pub fn id(&self) -> Option<GroupId> {
+    pub(crate) fn id(&self) -> Option<GroupId> {
         self.id
     }
 }
@@ -271,15 +271,15 @@ impl ConditionalGroup {
         }
     }
 
-    pub fn condition(&self) -> Condition {
+    pub(crate) fn condition(&self) -> Condition {
         self.condition
     }
 
-    pub fn propagate_expand(&self) {
+    pub(crate) fn propagate_expand(&self) {
         self.mode.set(GroupMode::Propagated);
     }
 
-    pub fn mode(&self) -> GroupMode {
+    pub(crate) fn mode(&self) -> GroupMode {
         self.mode.get()
     }
 }
@@ -312,24 +312,10 @@ impl Condition {
         }
     }
 
-    pub fn if_fits_on_line() -> Self {
-        Self {
-            mode: PrintMode::Flat,
-            group_id: None,
-        }
-    }
-
     pub fn if_group_fits_on_line(group_id: GroupId) -> Self {
         Self {
             mode: PrintMode::Flat,
             group_id: Some(group_id),
-        }
-    }
-
-    pub fn if_breaks() -> Self {
-        Self {
-            mode: PrintMode::Expanded,
-            group_id: None,
         }
     }
 
@@ -341,7 +327,7 @@ impl Condition {
     }
 
     #[must_use]
-    pub fn with_group_id(mut self, id: Option<GroupId>) -> Self {
+    pub(crate) fn with_group_id(mut self, id: Option<GroupId>) -> Self {
         self.group_id = id;
         self
     }
@@ -351,7 +337,7 @@ impl Condition {
 pub struct Align(pub(crate) NonZeroU8);
 
 impl Align {
-    pub fn count(&self) -> NonZeroU8 {
+    pub(crate) fn count(&self) -> NonZeroU8 {
         self.0
     }
 }
@@ -381,27 +367,6 @@ impl PartialEq for LabelId {
     }
 }
 
-impl LabelId {
-    #[expect(clippy::needless_pass_by_value)]
-    pub fn of<T: LabelDefinition>(label: T) -> Self {
-        Self {
-            value: label.value(),
-            #[cfg(debug_assertions)]
-            name: label.name(),
-        }
-    }
-}
-
-/// Defines the valid labels of a language. You want to have at most one implementation per formatter
-/// project.
-pub trait LabelDefinition {
-    /// Returns the `u64` uniquely identifying this specific label.
-    fn value(&self) -> u64;
-
-    /// Returns the name of the label that is shown in debug builds.
-    fn name(&self) -> &'static str;
-}
-
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum VerbatimKind {
     Bogus,
@@ -410,10 +375,4 @@ pub enum VerbatimKind {
         /// the length of the formatted node
         length: TextSize,
     },
-}
-
-impl VerbatimKind {
-    pub const fn is_bogus(&self) -> bool {
-        matches!(self, VerbatimKind::Bogus)
-    }
 }

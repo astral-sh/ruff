@@ -83,7 +83,9 @@ pub enum RuleSelectorKind {
 }
 
 impl RuleSelection {
-    pub fn selectors_by_kind(&self) -> impl Iterator<Item = (RuleSelectorKind, &RuleSelector)> {
+    pub(crate) fn selectors_by_kind(
+        &self,
+    ) -> impl Iterator<Item = (RuleSelectorKind, &RuleSelector)> {
         self.select
             .iter()
             .flatten()
@@ -639,7 +641,7 @@ impl Configuration {
     }
 
     #[must_use]
-    pub fn apply_fallbacks(
+    pub(crate) fn apply_fallbacks(
         mut self,
         origin: ConfigurationOrigin,
         initial_config_path: &Path,
@@ -1168,7 +1170,7 @@ impl LintConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    pub(crate) fn combine(self, config: Self) -> Self {
         let mut rule_selections = config.rule_selections;
         rule_selections.extend(self.rule_selections);
 
@@ -1262,7 +1264,8 @@ pub struct FormatConfiguration {
 }
 
 impl FormatConfiguration {
-    pub fn from_options(options: FormatOptions, project_root: &Path) -> Result<Self> {
+    #[allow(clippy::unnecessary_wraps)]
+    pub(crate) fn from_options(options: FormatOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             // `--extension` is a hidden command-line argument that isn't supported in configuration
             // files at present.
@@ -1300,7 +1303,7 @@ impl FormatConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    pub(crate) fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
@@ -1322,18 +1325,19 @@ impl FormatConfiguration {
 
 #[derive(Clone, Debug, Default)]
 pub struct AnalyzeConfiguration {
-    pub exclude: Option<Vec<FilePattern>>,
-    pub preview: Option<PreviewMode>,
+    pub(crate) exclude: Option<Vec<FilePattern>>,
+    pub(crate) preview: Option<PreviewMode>,
 
-    pub direction: Option<Direction>,
+    pub(crate) direction: Option<Direction>,
     pub detect_string_imports: Option<bool>,
     pub string_imports_min_dots: Option<usize>,
-    pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
+    pub(crate) include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
     pub type_checking_imports: Option<bool>,
 }
 
 impl AnalyzeConfiguration {
-    pub fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
+    #[allow(clippy::unnecessary_wraps)]
+    pub(crate) fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             exclude: options.exclude.map(|paths| {
                 paths
@@ -1361,7 +1365,7 @@ impl AnalyzeConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    pub(crate) fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
@@ -1394,7 +1398,7 @@ impl<T: CombinePluginOptions> CombinePluginOptions for Option<T> {
 
 /// Given a list of source paths, which could include glob patterns, resolve the
 /// matching paths.
-pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
+pub(crate) fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
     let expansions = src
         .iter()
         .map(shellexpand::full)

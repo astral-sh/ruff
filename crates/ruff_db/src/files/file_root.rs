@@ -32,7 +32,7 @@ pub struct FileRoot {
 }
 
 impl FileRoot {
-    pub fn durability(self, db: &dyn Db) -> salsa::Durability {
+    pub(crate) fn durability(self, db: &dyn Db) -> salsa::Durability {
         self.kind_at_time_of_creation(db).durability()
     }
 }

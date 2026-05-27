@@ -25,7 +25,7 @@ pub struct TextDocument {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum LanguageId {
+pub(crate) enum LanguageId {
     Python,
     Markdown,
     Other,
@@ -53,12 +53,12 @@ impl TextDocument {
     }
 
     #[must_use]
-    pub fn with_language_id(mut self, language_id: &str) -> Self {
+    pub(crate) fn with_language_id(mut self, language_id: &str) -> Self {
         self.language_id = Some(LanguageId::from(language_id));
         self
     }
 
-    pub fn into_contents(self) -> String {
+    pub(crate) fn into_contents(self) -> String {
         self.contents
     }
 
@@ -66,15 +66,15 @@ impl TextDocument {
         &self.contents
     }
 
-    pub fn index(&self) -> &LineIndex {
+    pub(crate) fn index(&self) -> &LineIndex {
         &self.index
     }
 
-    pub fn version(&self) -> DocumentVersion {
+    pub(crate) fn version(&self) -> DocumentVersion {
         self.version
     }
 
-    pub fn language_id(&self) -> Option<LanguageId> {
+    pub(crate) fn language_id(&self) -> Option<LanguageId> {
         self.language_id
     }
 
@@ -128,7 +128,7 @@ impl TextDocument {
         });
     }
 
-    pub fn update_version(&mut self, new_version: DocumentVersion) {
+    pub(crate) fn update_version(&mut self, new_version: DocumentVersion) {
         self.modify_with_manual_index(|_, version, _| {
             *version = new_version;
         });

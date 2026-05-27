@@ -122,6 +122,10 @@ class Group:
 
     add_suffix_to_is_methods: bool
     anynode_is_label: str
+    owned_accessors: set[str] | None
+    crate_owned_accessors: set[str]
+    anynode_accessor: bool
+    anynode_predicate: bool
     doc: str | None
 
     def __init__(self, group_name: str, group: dict[str, Any]) -> None:
@@ -130,10 +134,23 @@ class Group:
         self.ref_enum_ty = group_name + "Ref"
         self.add_suffix_to_is_methods = group.get("add_suffix_to_is_methods", False)
         self.anynode_is_label = group.get("anynode_is_label", to_snake_case(group_name))
+        self.owned_accessors = (
+            set(group["owned_accessors"]) if "owned_accessors" in group else None
+        )
+        self.crate_owned_accessors = set(group.get("crate_owned_accessors", []))
+        self.anynode_accessor = group.get("anynode_accessor", True)
+        self.anynode_predicate = group.get("anynode_predicate", True)
         self.doc = group.get("doc")
         self.nodes = [
             Node(self, node_name, node) for node_name, node in group["nodes"].items()
         ]
+
+    def owned_accessor_visibility(self, name: str) -> str | None:
+        if name in self.crate_owned_accessors:
+            return "pub(crate)"
+        if self.owned_accessors is None or name in self.owned_accessors:
+            return "pub"
+        return None
 
 
 @dataclass
@@ -368,92 +385,63 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         }
         """)
 
-        out.append(
-            "#[allow(dead_code, clippy::match_wildcard_for_single_variants)]"
-        )  # Not all is_methods are used
-        out.append(f"impl {group.name} {{")
+        has_owned_accessors = group.owned_accessors is None or bool(
+            group.owned_accessors | group.crate_owned_accessors
+        )
+        if has_owned_accessors:
+            out.append("#[allow(clippy::match_wildcard_for_single_variants)]")
+            out.append(f"impl {group.name} {{")
         for node in group.nodes:
             is_name = to_snake_case(node.variant)
             variant_name = node.variant
             match_arm = f"Self::{variant_name}"
             if group.add_suffix_to_is_methods:
                 is_name = to_snake_case(node.variant + group.name)
-            if len(group.nodes) > 1:
-                out.append(f"""
-                    #[inline]
-                    pub const fn is_{is_name}(&self) -> bool {{
-                        matches!(self, {match_arm}(_))
-                    }}
-
-                    #[inline]
-                    pub fn {is_name}(self) -> Option<{node.ty}> {{
-                        match self {{
-                            {match_arm}(val) => Some(val),
-                            _ => None,
+            fallback = "_ => None," if len(group.nodes) > 1 else ""
+            expected_fallback = (
+                '_ => panic!("called expect on {self:?}"),'
+                if len(group.nodes) > 1
+                else ""
+            )
+            accessors = [
+                (
+                    f"is_{is_name}",
+                    f"const fn is_{is_name}(&self) -> bool",
+                    f"matches!(self, {match_arm}(_))",
+                ),
+                (
+                    is_name,
+                    f"fn {is_name}(self) -> Option<{node.ty}>",
+                    f"match self {{ {match_arm}(val) => Some(val), {fallback} }}",
+                ),
+                (
+                    f"expect_{is_name}",
+                    f"fn expect_{is_name}(self) -> {node.ty}",
+                    f"match self {{ {match_arm}(val) => val, {expected_fallback} }}",
+                ),
+                (
+                    f"as_{is_name}_mut",
+                    f"fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}>",
+                    f"match self {{ {match_arm}(val) => Some(val), {fallback} }}",
+                ),
+                (
+                    f"as_{is_name}",
+                    f"fn as_{is_name}(&self) -> Option<&{node.ty}>",
+                    f"match self {{ {match_arm}(val) => Some(val), {fallback} }}",
+                ),
+            ]
+            for accessor, signature, body in accessors:
+                visibility = group.owned_accessor_visibility(accessor)
+                if visibility is not None:
+                    out.append(f"""
+                        #[inline]
+                        {visibility} {signature} {{
+                            {body}
                         }}
-                    }}
+                    """)
 
-                    #[inline]
-                    pub fn expect_{is_name}(self) -> {node.ty} {{
-                        match self {{
-                            {match_arm}(val) => val,
-                            _ => panic!("called expect on {{self:?}}"),
-                        }}
-                    }}
-
-                    #[inline]
-                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}> {{
-                        match self {{
-                            {match_arm}(val) => Some(val),
-                            _ => None,
-                        }}
-                    }}
-
-                    #[inline]
-                    pub fn as_{is_name}(&self) -> Option<&{node.ty}> {{
-                        match self {{
-                            {match_arm}(val) => Some(val),
-                            _ => None,
-                        }}
-                    }}
-                           """)
-            elif len(group.nodes) == 1:
-                out.append(f"""
-                    #[inline]
-                    pub const fn is_{is_name}(&self) -> bool {{
-                        matches!(self, {match_arm}(_))
-                    }}
-
-                    #[inline]
-                    pub fn {is_name}(self) -> Option<{node.ty}> {{
-                        match self {{
-                            {match_arm}(val) => Some(val),
-                        }}
-                    }}
-
-                    #[inline]
-                    pub fn expect_{is_name}(self) -> {node.ty} {{
-                        match self {{
-                            {match_arm}(val) => val,
-                        }}
-                    }}
-
-                    #[inline]
-                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}> {{
-                        match self {{
-                            {match_arm}(val) => Some(val),
-                        }}
-                    }}
-
-                    #[inline]
-                    pub fn as_{is_name}(&self) -> Option<&{node.ty}> {{
-                        match self {{
-                            {match_arm}(val) => Some(val),
-                        }}
-                    }}
-                           """)
-
-        out.append("}")
+        if has_owned_accessors:
+            out.append("}")
 
     for node in ast.all_nodes:
         out.append(f"""
@@ -658,16 +646,17 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
         """)
 
         # `as_*` methods to convert from `AnyNodeRef` to e.g. `ExprRef`
-        out.append(f"""
+        if group.anynode_accessor:
+            out.append(f"""
             impl<'a> AnyNodeRef<'a> {{
                 pub fn as_{to_snake_case(group.ref_enum_ty)}(self) -> Option<{group.ref_enum_ty}<'a>> {{
                     match self {{
         """)
-        for node in group.nodes:
-            out.append(
-                f"Self::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"
-            )
-        out.append("""
+            for node in group.nodes:
+                out.append(
+                    f"Self::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"
+                )
+            out.append("""
                         _ => None,
                     }
                 }
@@ -744,6 +733,8 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     """)
 
     for group in ast.groups:
+        if not group.anynode_predicate:
+            continue
         out.append(f"""
         impl AnyNodeRef<'_> {{
             pub const fn is_{group.anynode_is_label}(self) -> bool {{
@@ -886,29 +877,6 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
         out.append(f"""AnyRootNodeRef::{group.name}(node) => node.node_index(),""")
     for node in ast.ungrouped_nodes:
         out.append(f"""AnyRootNodeRef::{node.name}(node) => node.node_index(),""")
-    out.append("""
-                }
-            }
-        }
-    """)
-
-    out.append("""
-        impl<'a> AnyRootNodeRef<'a> {
-            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
-            where
-                V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
-                'a: 'b,
-            {
-                match self {
-    """)
-    for group in ast.groups:
-        out.append(
-            f"""AnyRootNodeRef::{group.name}(node) => node.visit_source_order(visitor),"""
-        )
-    for node in ast.ungrouped_nodes:
-        out.append(
-            f"""AnyRootNodeRef::{node.name}(node) => node.visit_source_order(visitor),"""
-        )
     out.append("""
                 }
             }

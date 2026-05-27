@@ -329,7 +329,7 @@ impl Metadata {
         self.revision
     }
 
-    pub fn permissions(&self) -> Option<u32> {
+    pub(crate) fn permissions(&self) -> Option<u32> {
         self.permissions
     }
 
@@ -353,10 +353,6 @@ impl FileType {
     pub const fn is_directory(self) -> bool {
         matches!(self, FileType::Directory)
     }
-
-    pub const fn is_symlink(self) -> bool {
-        matches!(self, FileType::Symlink)
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -366,7 +362,8 @@ pub struct DirectoryEntry {
 }
 
 impl DirectoryEntry {
-    pub fn new(path: SystemPathBuf, file_type: FileType) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn new(path: SystemPathBuf, file_type: FileType) -> Self {
         Self { path, file_type }
     }
 

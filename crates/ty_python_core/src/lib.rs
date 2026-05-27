@@ -24,7 +24,7 @@ use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
 use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
-pub use reachability_constraints::ReachabilityConstraintsBuilder;
+pub(crate) use reachability_constraints::ReachabilityConstraintsBuilder;
 pub use scope::FileScopeId;
 use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness};
 use symbol::ScopedSymbolId;
@@ -136,13 +136,13 @@ pub struct LoopHeader {
 }
 
 impl LoopHeader {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             bindings: FxHashMap::default(),
         }
     }
 
-    pub fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
+    pub(crate) fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
         self.bindings.entry(place).or_default().push(binding);
     }
 
@@ -390,7 +390,7 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
     #[track_caller]
-    pub fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope {
+    pub(crate) fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
@@ -416,12 +416,6 @@ impl<'db> SemanticIndex<'db> {
     pub fn parent_scope_id(&self, scope_id: FileScopeId) -> Option<FileScopeId> {
         let scope = self.scope(scope_id);
         scope.parent()
-    }
-
-    /// Returns the parent scope of `scope_id`.
-    #[track_caller]
-    pub fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope> {
-        Some(&self.scopes[self.parent_scope_id(scope_id)?])
     }
 
     /// Return the [`Definition`] of the class enclosing this method, given the
@@ -809,7 +803,7 @@ pub struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    pub fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
+    pub(crate) fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
         let descendants = DescendantsIter::new(scopes, parent);
 
         Self {
@@ -983,7 +977,7 @@ pub enum BoundnessAnalysis {
 /// This is a conservative upper bound - all places that actually get narrowed
 /// will be in this set, but there may be additional places that end up not
 /// being narrowed after full analysis.
-pub type PossiblyNarrowedPlaces = FxHashSet<ScopedPlaceId>;
+pub(crate) type PossiblyNarrowedPlaces = FxHashSet<ScopedPlaceId>;
 
 /// Implemented by types for which the semantic index tracks their scope.
 pub trait HasTrackedScope: ast::HasNodeIndex {}

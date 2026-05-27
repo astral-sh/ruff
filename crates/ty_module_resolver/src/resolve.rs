@@ -518,7 +518,7 @@ impl SearchPaths {
     /// This method also implements the typing spec's [module resolution order].
     ///
     /// [module resolution order]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
-    pub fn from_settings<Strategy: MisconfigurationStrategy>(
+    pub(crate) fn from_settings<Strategy: MisconfigurationStrategy>(
         settings: &SearchPathSettings,
         system: &dyn System,
         vendored: &VendoredFileSystem,
@@ -682,7 +682,8 @@ impl SearchPaths {
     /// Returns a new `SearchPaths` with no search paths configured.
     ///
     /// This is primarily useful for testing.
-    pub fn empty(vendored: &VendoredFileSystem) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn empty(vendored: &VendoredFileSystem) -> Self {
         Self {
             static_paths: vec![],
             stdlib_path: Some(SearchPath::vendored_stdlib()),

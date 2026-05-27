@@ -13,7 +13,7 @@ use ruff_source_file::{LineColumn, OneIndexed};
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext};
 
-pub struct GroupedEmitter {
+pub(crate) struct GroupedEmitter {
     show_fix_status: bool,
     applicability: Applicability,
 }
@@ -29,13 +29,13 @@ impl Default for GroupedEmitter {
 
 impl GroupedEmitter {
     #[must_use]
-    pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
+    pub(crate) fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
         self.show_fix_status = show_fix_status;
         self
     }
 
     #[must_use]
-    pub fn with_applicability(mut self, applicability: Applicability) -> Self {
+    pub(crate) fn with_applicability(mut self, applicability: Applicability) -> Self {
         self.applicability = applicability;
         self
     }

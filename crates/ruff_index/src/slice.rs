@@ -9,17 +9,12 @@ use std::ops::{Index, IndexMut, Range};
 #[repr(transparent)]
 pub struct IndexSlice<I, T> {
     index: PhantomData<I>,
-    pub raw: [T],
+    pub(crate) raw: [T],
 }
 
 impl<I: Idx, T> IndexSlice<I, T> {
     #[inline]
-    pub const fn empty() -> &'static Self {
-        Self::from_raw(&[])
-    }
-
-    #[inline]
-    pub const fn from_raw(raw: &[T]) -> &Self {
+    pub(crate) const fn from_raw(raw: &[T]) -> &Self {
         let ptr: *const [T] = raw;
 
         #[expect(unsafe_code)]
@@ -30,7 +25,7 @@ impl<I: Idx, T> IndexSlice<I, T> {
     }
 
     #[inline]
-    pub fn from_raw_mut(raw: &mut [T]) -> &mut Self {
+    pub(crate) fn from_raw_mut(raw: &mut [T]) -> &mut Self {
         let ptr: *mut [T] = raw;
 
         #[expect(unsafe_code)]
@@ -38,21 +33,6 @@ impl<I: Idx, T> IndexSlice<I, T> {
         unsafe {
             &mut *(ptr as *mut Self)
         }
-    }
-
-    #[inline]
-    pub const fn first(&self) -> Option<&T> {
-        self.raw.first()
-    }
-
-    #[inline]
-    pub const fn last(&self) -> Option<&T> {
-        self.raw.last()
-    }
-
-    #[inline]
-    pub const fn last_mut(&mut self) -> Option<&mut T> {
-        self.raw.last_mut()
     }
 
     #[inline]
@@ -86,25 +66,8 @@ impl<I: Idx, T> IndexSlice<I, T> {
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
+    pub(crate) fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
         self.raw.iter_mut()
-    }
-
-    #[inline]
-    pub fn iter_mut_enumerated(
-        &mut self,
-    ) -> impl DoubleEndedIterator<Item = (I, &mut T)> + ExactSizeIterator + '_ {
-        self.raw.iter_mut().enumerate().map(|(n, t)| (I::new(n), t))
-    }
-
-    #[inline]
-    pub fn last_index(&self) -> Option<I> {
-        self.len().checked_sub(1).map(I::new)
-    }
-
-    #[inline]
-    pub fn swap(&mut self, a: I, b: I) {
-        self.raw.swap(a.index(), b.index());
     }
 
     #[inline]
@@ -115,17 +78,6 @@ impl<I: Idx, T> IndexSlice<I, T> {
     #[inline]
     pub fn get_mut(&mut self, index: I) -> Option<&mut T> {
         self.raw.get_mut(index.index())
-    }
-
-    #[inline]
-    pub fn binary_search(&self, value: &T) -> Result<I, I>
-    where
-        T: Ord,
-    {
-        match self.raw.binary_search(value) {
-            Ok(i) => Ok(Idx::new(i)),
-            Err(i) => Err(Idx::new(i)),
-        }
     }
 }
 

@@ -81,7 +81,7 @@ impl FixTable {
             .map(|(code, FixCount { rule_name, count })| (code, *rule_name, *count))
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
+    pub(crate) fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
         self.0.keys()
     }
 

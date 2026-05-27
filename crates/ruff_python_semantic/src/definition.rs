@@ -24,7 +24,7 @@ pub struct DefinitionId;
 impl DefinitionId {
     /// Returns the ID for the module definition.
     #[inline]
-    pub const fn module() -> Self {
+    pub(crate) const fn module() -> Self {
         DefinitionId::from_u32(0)
     }
 }
@@ -69,7 +69,7 @@ impl<'a> Module<'a> {
     }
 
     /// Return the name of the module.
-    pub const fn name(&self) -> Option<&'a str> {
+    pub(crate) const fn name(&self) -> Option<&'a str> {
         self.name
     }
 }
@@ -97,7 +97,7 @@ pub struct Member<'a> {
 
 impl<'a> Member<'a> {
     /// Return the name of the member.
-    pub fn name(&self) -> &'a str {
+    pub(crate) fn name(&self) -> &'a str {
         match self.kind {
             MemberKind::Class(class) => &class.name,
             MemberKind::NestedClass(class) => &class.name,
@@ -201,7 +201,7 @@ impl<'a> Definition<'a> {
 pub struct Definitions<'a>(IndexVec<DefinitionId, Definition<'a>>);
 
 impl<'a> Definitions<'a> {
-    pub fn for_module(definition: Module<'a>) -> Self {
+    pub(crate) fn for_module(definition: Module<'a>) -> Self {
         Self(IndexVec::from_raw(vec![Definition::Module(definition)]))
     }
 

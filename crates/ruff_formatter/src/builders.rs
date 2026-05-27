@@ -537,82 +537,6 @@ impl<Context> Format<Context> for LineSuffixBoundary {
     }
 }
 
-/// Marks some content with a label.
-///
-/// This does not directly influence how this content will be printed, but some
-/// parts of the formatter may inspect the [labelled element](Tag::StartLabelled)
-/// using [`FormatElements::has_label`].
-///
-/// ## Examples
-///
-/// ```rust
-/// use ruff_formatter::prelude::*;
-/// use ruff_formatter::{format, write, LineWidth};
-///
-/// #[derive(Debug, Copy, Clone)]
-/// enum MyLabels {
-///     Main
-/// }
-///
-/// impl tag::LabelDefinition for MyLabels {
-///     fn value(&self) -> u64 {
-///         *self as u64
-///     }
-///
-///     fn name(&self) -> &'static str {
-///         match self {
-///             Self::Main => "Main"
-///         }
-///     }
-/// }
-///
-/// # fn main() -> FormatResult<()> {
-/// let formatted = format!(
-///     SimpleFormatContext::default(),
-///     [format_with(|f| {
-///         let mut recording = f.start_recording();
-///         write!(recording, [
-///             labelled(
-///                 LabelId::of(MyLabels::Main),
-///                 &token("'I have a label'")
-///             )
-///         ])?;
-///
-///         let recorded = recording.stop();
-///
-///         let is_labelled = recorded.first().is_some_and( |element| element.has_label(LabelId::of(MyLabels::Main)));
-///
-///         if is_labelled {
-///             write!(f, [token(" has label `Main`")])
-///         } else {
-///             write!(f, [token(" doesn't have label `Main`")])
-///         }
-///     })]
-/// )?;
-///
-/// assert_eq!("'I have a label' has label `Main`", formatted.print()?.as_code());
-/// # Ok(())
-/// # }
-/// ```
-///
-/// ## Alternatives
-///
-/// Use `Memoized.inspect(f)?.has_label(LabelId::of::<SomeLabelId>()` if you need to know if some content breaks that should
-/// only be written later.
-#[inline]
-pub fn labelled<Content, Context>(
-    label_id: LabelId,
-    content: &Content,
-) -> FormatLabelled<'_, Context>
-where
-    Content: Format<Context>,
-{
-    FormatLabelled {
-        label_id,
-        content: Argument::new(content),
-    }
-}
-
 #[derive(Copy, Clone)]
 pub struct FormatLabelled<'a, Context> {
     label_id: LabelId,
@@ -736,57 +660,6 @@ impl<Context> std::fmt::Debug for Indent<'_, Context> {
     }
 }
 
-/// It reduces the indentation for the given content depending on the closest [indent] or [align] parent element.
-/// - [align] Undoes the spaces added by [align]
-/// - [indent] Reduces the indentation level by one
-///
-/// This is a No-op if the indentation level is zero.
-///
-/// # Examples
-///
-/// ```
-/// use ruff_formatter::{format, format_args};
-/// use ruff_formatter::prelude::*;
-///
-/// # fn main() -> FormatResult<()> {
-/// let block = format!(SimpleFormatContext::default(), [
-///     token("root"),
-///     align(2, &format_args![
-///         hard_line_break(),
-///         token("aligned"),
-///         dedent(&format_args![
-///             hard_line_break(),
-///             token("not aligned"),
-///         ]),
-///         dedent(&indent(&format_args![
-///             hard_line_break(),
-///             token("Indented, not aligned")
-///         ]))
-///     ]),
-///     dedent(&format_args![
-///         hard_line_break(),
-///         token("Dedent on root level is a no-op.")
-///     ])
-/// ])?;
-///
-/// assert_eq!(
-///     "root\n  aligned\nnot aligned\n\tIndented, not aligned\nDedent on root level is a no-op.",
-///     block.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-#[inline]
-pub fn dedent<Content, Context>(content: &Content) -> Dedent<'_, Context>
-where
-    Content: Format<Context>,
-{
-    Dedent {
-        content: Argument::new(content),
-        mode: DedentMode::Level,
-    }
-}
-
 #[derive(Copy, Clone)]
 pub struct Dedent<'a, Context> {
     content: Argument<'a, Context>,
@@ -806,173 +679,6 @@ impl<Context> Format<Context> for Dedent<'_, Context> {
 impl<Context> std::fmt::Debug for Dedent<'_, Context> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Dedent").field(&"{{content}}").finish()
-    }
-}
-
-/// It resets the indent document so that the content will be printed at the start of the line.
-///
-/// # Examples
-///
-/// ```
-/// use ruff_formatter::{format, format_args};
-/// use ruff_formatter::prelude::*;
-///
-/// # fn main() -> FormatResult<()> {
-/// let block = format!(SimpleFormatContext::default(), [
-///     token("root"),
-///     indent(&format_args![
-///         hard_line_break(),
-///         token("indent level 1"),
-///         indent(&format_args![
-///             hard_line_break(),
-///             token("indent level 2"),
-///             align(2, &format_args![
-///                 hard_line_break(),
-///                 token("two space align"),
-///                 dedent_to_root(&format_args![
-///                     hard_line_break(),
-///                     token("starts at the beginning of the line")
-///                 ]),
-///             ]),
-///             hard_line_break(),
-///             token("end indent level 2"),
-///         ])
-///  ]),
-/// ])?;
-///
-/// assert_eq!(
-///     "root\n\tindent level 1\n\t\tindent level 2\n\t\t  two space align\nstarts at the beginning of the line\n\t\tend indent level 2",
-///     block.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-///
-/// ## Prettier
-///
-/// This resembles the behaviour of Prettier's `align(Number.NEGATIVE_INFINITY, content)` IR element.
-#[inline]
-pub fn dedent_to_root<Content, Context>(content: &Content) -> Dedent<'_, Context>
-where
-    Content: Format<Context>,
-{
-    Dedent {
-        content: Argument::new(content),
-        mode: DedentMode::Root,
-    }
-}
-
-/// Aligns its content by indenting the content by `count` spaces.
-///
-/// [align] is a variant of `[indent]` that indents its content by a specified number of spaces rather than
-/// using the configured indent character (tab or a specified number of spaces).
-///
-/// You should use [align] when you want to indent a content by a specific number of spaces.
-/// Using [indent] is preferred in all other situations as it respects the users preferred indent character.
-///
-/// # Examples
-///
-/// ## Tab indentation
-///
-/// ```
-/// use std::num::NonZeroU8;
-/// use ruff_formatter::{format, format_args};
-/// use ruff_formatter::prelude::*;
-///
-/// # fn main() -> FormatResult<()> {
-/// let block = format!(SimpleFormatContext::default(), [
-///     token("a"),
-///     hard_line_break(),
-///     token("?"),
-///     space(),
-///     align(2, &format_args![
-///         token("function () {"),
-///         hard_line_break(),
-///         token("}"),
-///     ]),
-///     hard_line_break(),
-///     token(":"),
-///     space(),
-///     align(2, &format_args![
-///         token("function () {"),
-///         block_indent(&token("console.log('test');")),
-///         token("}"),
-///     ]),
-///     token(";")
-/// ])?;
-///
-/// assert_eq!(
-///     "a\n? function () {\n  }\n: function () {\n\t\tconsole.log('test');\n  };",
-///     block.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-///
-/// You can see that:
-///
-/// - the printer indents the function's `}` by two spaces because it is inside of an `align`.
-/// - the block `console.log` gets indented by two tabs.
-///   This is because `align` increases the indentation level by one (same as `indent`)
-///   if you nest an `indent` inside an `align`.
-///   Meaning that, `align > ... > indent` results in the same indentation as `indent > ... > indent`.
-///
-/// ## Spaces indentation
-///
-/// ```
-/// use std::num::NonZeroU8;
-/// use ruff_formatter::{format, format_args, IndentStyle, SimpleFormatOptions};
-/// use ruff_formatter::prelude::*;
-///
-/// # fn main() -> FormatResult<()> {
-/// use ruff_formatter::IndentWidth;
-/// let context = SimpleFormatContext::new(SimpleFormatOptions {
-///     indent_style: IndentStyle::Space,
-///     indent_width: IndentWidth::try_from(4).unwrap(),
-///     ..SimpleFormatOptions::default()
-/// });
-///
-/// let block = format!(context, [
-///     token("a"),
-///     hard_line_break(),
-///     token("?"),
-///     space(),
-///     align(2, &format_args![
-///         token("function () {"),
-///         hard_line_break(),
-///         token("}"),
-///     ]),
-///     hard_line_break(),
-///     token(":"),
-///     space(),
-///     align(2, &format_args![
-///         token("function () {"),
-///         block_indent(&token("console.log('test');")),
-///         token("}"),
-///     ]),
-///     token(";")
-/// ])?;
-///
-/// assert_eq!(
-///     "a\n? function () {\n  }\n: function () {\n      console.log('test');\n  };",
-///     block.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-///
-/// The printing of `align` differs if using spaces as indentation sequence *and* it contains an `indent`.
-/// You can see the difference when comparing the indentation of the `console.log(...)` expression to the previous example:
-///
-/// - tab indentation: Printer indents the expression with two tabs because the `align` increases the indentation level.
-/// - space indentation: Printer indents the expression by 4 spaces (one indentation level) **and** 2 spaces for the align.
-pub fn align<Content, Context>(count: u8, content: &Content) -> Align<'_, Context>
-where
-    Content: Format<Context>,
-{
-    Align {
-        count: NonZeroU8::new(count).expect("Alignment count must be a non-zero number."),
-        content: Argument::new(content),
     }
 }
 
@@ -1114,82 +820,6 @@ pub fn soft_block_indent<Context>(content: &impl Format<Context>) -> BlockIndent
     }
 }
 
-/// If the enclosing `Group` doesn't fit on a single line, inserts a line break and indent.
-/// Otherwise, just inserts a space.
-///
-/// Line indents are used to break a single line of code, and therefore only insert a line
-/// break before the content and not after the content.
-///
-/// # Examples
-///
-/// Indents the content by one level and puts in new lines if the enclosing `Group` doesn't
-/// fit on a single line. Otherwise, just inserts a space.
-///
-/// ```
-/// use ruff_formatter::{format, format_args, LineWidth, SimpleFormatOptions};
-/// use ruff_formatter::prelude::*;
-///
-/// # fn main() -> FormatResult<()> {
-/// let context = SimpleFormatContext::new(SimpleFormatOptions {
-///     line_width: LineWidth::try_from(10).unwrap(),
-///     ..SimpleFormatOptions::default()
-/// });
-///
-/// let elements = format!(context, [
-///     group(&format_args![
-///         token("name"),
-///         space(),
-///         token("="),
-///         soft_line_indent_or_space(&format_args![
-///             token("firstName"),
-///             space(),
-///             token("+"),
-///             space(),
-///             token("lastName"),
-///         ]),
-///     ])
-/// ])?;
-///
-/// assert_eq!(
-///     "name =\n\tfirstName + lastName",
-///     elements.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-///
-/// Only adds a space if the enclosing `Group` fits on a single line
-/// ```
-/// use ruff_formatter::{format, format_args};
-/// use ruff_formatter::prelude::*;
-///
-/// # fn main() -> FormatResult<()> {
-/// let elements = format!(SimpleFormatContext::default(), [
-///     group(&format_args![
-///         token("a"),
-///         space(),
-///         token("="),
-///         soft_line_indent_or_space(&token("10")),
-///     ])
-/// ])?;
-///
-/// assert_eq!(
-///     "a = 10",
-///     elements.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-#[inline]
-pub fn soft_line_indent_or_space<Context>(
-    content: &impl Format<Context>,
-) -> BlockIndent<'_, Context> {
-    BlockIndent {
-        content: Argument::new(content),
-        mode: IndentMode::SoftLineOrSpace,
-    }
-}
-
 #[derive(Copy, Clone)]
 pub struct BlockIndent<'a, Context> {
     content: Argument<'a, Context>,
@@ -1200,8 +830,6 @@ pub struct BlockIndent<'a, Context> {
 enum IndentMode {
     Soft,
     Block,
-    SoftSpace,
-    SoftLineOrSpace,
 }
 
 impl<Context> Format<Context> for BlockIndent<'_, Context> {
@@ -1213,9 +841,6 @@ impl<Context> Format<Context> for BlockIndent<'_, Context> {
         match self.mode {
             IndentMode::Soft => write!(f, [soft_line_break()])?,
             IndentMode::Block => write!(f, [hard_line_break()])?,
-            IndentMode::SoftLineOrSpace | IndentMode::SoftSpace => {
-                write!(f, [soft_line_break_or_space()])?;
-            }
         }
 
         let is_empty = {
@@ -1234,8 +859,6 @@ impl<Context> Format<Context> for BlockIndent<'_, Context> {
         match self.mode {
             IndentMode::Soft => write!(f, [soft_line_break()]),
             IndentMode::Block => write!(f, [hard_line_break()]),
-            IndentMode::SoftSpace => write!(f, [soft_line_break_or_space()]),
-            IndentMode::SoftLineOrSpace => Ok(()),
         }
     }
 }
@@ -1245,83 +868,9 @@ impl<Context> std::fmt::Debug for BlockIndent<'_, Context> {
         let name = match self.mode {
             IndentMode::Soft => "SoftBlockIndent",
             IndentMode::Block => "HardBlockIndent",
-            IndentMode::SoftLineOrSpace => "SoftLineIndentOrSpace",
-            IndentMode::SoftSpace => "SoftSpaceBlockIndent",
         };
 
         f.debug_tuple(name).field(&"{{content}}").finish()
-    }
-}
-
-/// Adds spaces around the content if its enclosing group fits on a line, otherwise indents the content and separates it by line breaks.
-///
-/// # Examples
-///
-/// Adds line breaks and indents the content if the enclosing group doesn't fit on the line.
-///
-/// ```
-/// use ruff_formatter::{format, format_args, LineWidth, SimpleFormatOptions};
-/// use ruff_formatter::prelude::*;
-///
-/// # fn main() -> FormatResult<()> {
-/// let context = SimpleFormatContext::new(SimpleFormatOptions {
-///     line_width: LineWidth::try_from(10).unwrap(),
-///     ..SimpleFormatOptions::default()
-/// });
-///
-/// let elements = format!(context, [
-///     group(&format_args![
-///         token("{"),
-///         soft_space_or_block_indent(&format_args![
-///             token("aPropertyThatExceeds"),
-///             token(":"),
-///             space(),
-///             token("'line width'"),
-///         ]),
-///         token("}")
-///     ])
-/// ])?;
-///
-/// assert_eq!(
-///     "{\n\taPropertyThatExceeds: 'line width'\n}",
-///     elements.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-///
-/// Adds spaces around the content if the group fits on the line
-/// ```
-/// use ruff_formatter::{format, format_args};
-/// use ruff_formatter::prelude::*;
-///
-/// # fn main() -> FormatResult<()> {
-/// let elements = format!(SimpleFormatContext::default(), [
-///     group(&format_args![
-///         token("{"),
-///         soft_space_or_block_indent(&format_args![
-///             token("a"),
-///             token(":"),
-///             space(),
-///             token("5"),
-///         ]),
-///         token("}")
-///     ])
-/// ])?;
-///
-/// assert_eq!(
-///     "{ a: 5 }",
-///     elements.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-pub fn soft_space_or_block_indent<Context>(
-    content: &impl Format<Context>,
-) -> BlockIndent<'_, Context> {
-    BlockIndent {
-        content: Argument::new(content),
-        mode: IndentMode::SoftSpace,
     }
 }
 
@@ -1604,110 +1153,6 @@ impl<Context> std::fmt::Debug for BestFitParenthesize<'_, Context> {
             .field("group_id", &self.group_id)
             .field("content", &"{{content}}")
             .finish()
-    }
-}
-
-/// Sets the `condition` for the group. The element will behave as a regular group if `condition` is met,
-/// and as *ungrouped* content if the condition is not met.
-///
-/// ## Examples
-///
-/// Only expand before operators if the parentheses are necessary.
-///
-/// ```
-/// # use ruff_formatter::prelude::*;
-/// # use ruff_formatter::{format, format_args, LineWidth, SimpleFormatOptions};
-///
-/// # fn main() -> FormatResult<()> {
-/// use ruff_formatter::Formatted;
-/// let content = format_with(|f| {
-///     let parentheses_id = f.group_id("parentheses");
-///     group(&format_args![
-///         if_group_breaks(&token("(")),
-///         indent_if_group_breaks(&format_args![
-///             soft_line_break(),
-///             conditional_group(&format_args![
-///                 token("'aaaaaaa'"),
-///                 soft_line_break_or_space(),
-///                 token("+"),
-///                 space(),
-///                 fits_expanded(&conditional_group(&format_args![
-///                     token("["),
-///                     soft_block_indent(&format_args![
-///                         token("'Good morning!',"),
-///                         soft_line_break_or_space(),
-///                         token("'How are you?'"),
-///                     ]),
-///                     token("]"),
-///                 ], tag::Condition::if_group_fits_on_line(parentheses_id))),
-///                 soft_line_break_or_space(),
-///                 token("+"),
-///                 space(),
-///                 conditional_group(&format_args![
-///                     token("'bbbb'"),
-///                     soft_line_break_or_space(),
-///                     token("and"),
-///                     space(),
-///                     token("'c'")
-///                 ], tag::Condition::if_group_fits_on_line(parentheses_id))
-///             ], tag::Condition::if_breaks()),
-///         ], parentheses_id),
-///         soft_line_break(),
-///         if_group_breaks(&token(")"))
-///     ])
-///     .with_id(Some(parentheses_id))
-///     .fmt(f)
-/// });
-///
-/// let formatted = format!(SimpleFormatContext::default(), [content])?;
-/// let document = formatted.into_document();
-///
-/// // All content fits
-/// let all_fits = Formatted::new(document.clone(), SimpleFormatContext::new(SimpleFormatOptions {
-///     line_width: LineWidth::try_from(65).unwrap(),
-///     ..SimpleFormatOptions::default()
-/// }));
-///
-/// assert_eq!(
-///     "'aaaaaaa' + ['Good morning!', 'How are you?'] + 'bbbb' and 'c'",
-///     all_fits.print()?.as_code()
-/// );
-///
-/// // The parentheses group fits, because it can expand the list,
-/// let list_expanded = Formatted::new(document.clone(), SimpleFormatContext::new(SimpleFormatOptions {
-///     line_width: LineWidth::try_from(21).unwrap(),
-///     ..SimpleFormatOptions::default()
-/// }));
-///
-/// assert_eq!(
-///     "'aaaaaaa' + [\n\t'Good morning!',\n\t'How are you?'\n] + 'bbbb' and 'c'",
-///     list_expanded.print()?.as_code()
-/// );
-///
-/// // It is necessary to split all groups to fit the content
-/// let all_expanded = Formatted::new(document, SimpleFormatContext::new(SimpleFormatOptions {
-///     line_width: LineWidth::try_from(11).unwrap(),
-///     ..SimpleFormatOptions::default()
-/// }));
-///
-/// assert_eq!(
-///     "(\n\t'aaaaaaa'\n\t+ [\n\t\t'Good morning!',\n\t\t'How are you?'\n\t]\n\t+ 'bbbb'\n\tand 'c'\n)",
-///     all_expanded.print()?.as_code()
-/// );
-/// # Ok(())
-/// # }
-/// ```
-#[inline]
-pub fn conditional_group<Content, Context>(
-    content: &Content,
-    condition: Condition,
-) -> ConditionalGroup<'_, Context>
-where
-    Content: Format<Context>,
-{
-    ConditionalGroup {
-        content: Argument::new(content),
-        condition,
     }
 }
 
@@ -2439,6 +1884,7 @@ where
     Separator: Format<Context>,
 {
     /// Creates a new instance that joins the elements without a separator
+    #[allow(dead_code)]
     pub(super) fn new(fmt: &'fmt mut Formatter<'buf, Context>) -> Self {
         Self {
             result: Ok(()),
@@ -2510,19 +1956,6 @@ impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
             fmt,
             empty: true,
         }
-    }
-
-    /// Adds an iterator of entries to the fill output. Uses the passed `separator` to separate any two items.
-    pub fn entries<F, I>(&mut self, separator: &dyn Format<Context>, entries: I) -> &mut Self
-    where
-        F: Format<Context>,
-        I: IntoIterator<Item = F>,
-    {
-        for entry in entries {
-            self.entry(separator, &entry);
-        }
-
-        self
     }
 
     /// Adds a new entry to the fill output. The `separator` isn't written if this is the first element in the list.

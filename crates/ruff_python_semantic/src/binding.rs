@@ -85,11 +85,6 @@ impl<'a> Binding<'a> {
         self.flags.intersects(BindingFlags::GLOBAL)
     }
 
-    /// Return `true` if this [`Binding`] was deleted.
-    pub const fn is_deleted(&self) -> bool {
-        self.flags.intersects(BindingFlags::DELETED)
-    }
-
     /// Return `true` if this [`Binding`] represents an assignment to `__all__` with an invalid
     /// value (e.g., `__all__ = "Foo"`).
     pub const fn is_invalid_all_format(&self) -> bool {
@@ -155,22 +150,6 @@ impl<'a> Binding<'a> {
     /// [PEP 613]: https://peps.python.org/pep-0613/
     pub const fn is_annotated_type_alias(&self) -> bool {
         self.flags.intersects(BindingFlags::ANNOTATED_TYPE_ALIAS)
-    }
-
-    /// Return `true` if this [`Binding`] represents a [PEP 695] type alias
-    /// e.g. `OptString` in:
-    /// ```python
-    /// type OptString = str | None
-    /// ```
-    ///
-    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-    pub const fn is_deferred_type_alias(&self) -> bool {
-        self.flags.intersects(BindingFlags::DEFERRED_TYPE_ALIAS)
-    }
-
-    /// Return `true` if this [`Binding`] represents either kind of type alias
-    pub const fn is_type_alias(&self) -> bool {
-        self.flags.intersects(BindingFlags::TYPE_ALIAS)
     }
 
     /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
@@ -458,7 +437,7 @@ pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
     /// Pushes a new [`Binding`] and returns its [`BindingId`].
-    pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
+    pub(crate) fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)
     }
 }

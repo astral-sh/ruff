@@ -1810,7 +1810,7 @@ pub enum YieldOutsideFunctionKind {
 }
 
 impl YieldOutsideFunctionKind {
-    pub fn is_await(&self) -> bool {
+    pub(crate) fn is_await(self) -> bool {
         matches!(self, Self::Await)
     }
 }

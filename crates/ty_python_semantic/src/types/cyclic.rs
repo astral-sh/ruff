@@ -67,7 +67,7 @@ pub struct CycleDetector<Tag, T, R> {
 }
 
 impl<Tag, T, R> CycleDetector<Tag, T, R> {
-    pub fn new(fallback: R) -> Self {
+    pub(crate) fn new(fallback: R) -> Self {
         CycleDetector {
             seen: RefCell::new(FxIndexSet::default()),
             cache: RefCell::new(FxHashMap::default()),
@@ -137,7 +137,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         }
     }
 
-    pub fn visit_type(
+    pub(crate) fn visit_type(
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,

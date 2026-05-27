@@ -29,21 +29,14 @@ where
 
 impl PrinterOptions {
     #[must_use]
-    pub fn with_line_width(mut self, width: LineWidth) -> Self {
+    pub(crate) fn with_line_width(mut self, width: LineWidth) -> Self {
         self.line_width = width;
         self
     }
 
     #[must_use]
-    pub fn with_indent(mut self, style: IndentStyle) -> Self {
+    pub(crate) fn with_indent(mut self, style: IndentStyle) -> Self {
         self.indent_style = style;
-
-        self
-    }
-
-    #[must_use]
-    pub fn with_tab_width(mut self, width: IndentWidth) -> Self {
-        self.indent_width = width;
 
         self
     }
@@ -60,12 +53,6 @@ impl PrinterOptions {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PrintWidth(u16);
-
-impl PrintWidth {
-    pub fn new(width: u16) -> Self {
-        Self(width)
-    }
-}
 
 impl Default for PrintWidth {
     fn default() -> Self {
@@ -110,10 +97,6 @@ impl SourceMapGeneration {
     pub const fn is_enabled(self) -> bool {
         matches!(self, SourceMapGeneration::Enabled)
     }
-
-    pub const fn is_disabled(self) -> bool {
-        matches!(self, SourceMapGeneration::Disabled)
-    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
@@ -132,7 +115,7 @@ pub enum LineEnding {
 
 impl LineEnding {
     #[inline]
-    pub const fn as_str(&self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             LineEnding::LineFeed => "\n",
             LineEnding::CarriageReturnLineFeed => "\r\n",

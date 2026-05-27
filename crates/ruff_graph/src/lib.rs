@@ -60,7 +60,7 @@ impl ModuleImports {
     }
 
     /// Insert a file path into the module imports.
-    pub fn insert(&mut self, path: SystemPathBuf) {
+    pub(crate) fn insert(&mut self, path: SystemPathBuf) {
         self.0.insert(path);
     }
 
@@ -69,12 +69,8 @@ impl ModuleImports {
         self.0.extend(paths);
     }
 
-    /// Returns `true` if the module imports are empty.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
     /// Returns the number of module imports.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.0.len()
     }

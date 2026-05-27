@@ -13,9 +13,7 @@ pub use resolve::{
 };
 pub use settings::{SearchPathSettings, SearchPathSettingsError};
 pub use strategy::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
-pub use typeshed::{
-    PyVersionRange, TypeshedVersions, TypeshedVersionsParseError, vendored_typeshed_versions,
-};
+pub use typeshed::{PyVersionRange, TypeshedVersions, TypeshedVersionsParseError};
 
 pub use list::{all_modules, list_modules};
 pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, ModuleNameMatch};

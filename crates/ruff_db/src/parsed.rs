@@ -39,7 +39,7 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     ParsedModule::new(file, parsed)
 }
 
-pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
+pub(crate) fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
@@ -98,7 +98,7 @@ pub struct ParsedModule {
 }
 
 impl ParsedModule {
-    pub fn new(file: File, parsed: Parsed<ModModule>) -> Self {
+    pub(crate) fn new(file: File, parsed: Parsed<ModModule>) -> Self {
         Self {
             file,
             inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(

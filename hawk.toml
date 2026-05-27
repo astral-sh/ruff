@@ -1,0 +1,32 @@
+# Hawk analyzes the workspace's native binary products and non-production Cargo targets as a closed world.
+# TODO: Include `ruff_wasm` and `ty_wasm` as products when Hawk supports `cdylib` production roots.
+
+[[production]]
+package = "ruff"
+bin = "ruff"
+reason = "shipped Ruff binary"
+
+[[production]]
+package = "ty"
+bin = "ty"
+reason = "shipped ty type checker binary"
+
+[[production]]
+package = "ruff_python_formatter"
+bin = "ruff_python_formatter"
+reason = "workspace formatter development binary"
+
+[[production]]
+package = "ruff_dev"
+bin = "ruff_dev"
+reason = "workspace development binary"
+
+[[production]]
+package = "ty_completion_bench"
+bin = "ty_completion_bench"
+reason = "workspace completion benchmark binary"
+
+[[production]]
+package = "ty_completion_eval"
+bin = "ty_completion_eval"
+reason = "workspace completion evaluation binary"

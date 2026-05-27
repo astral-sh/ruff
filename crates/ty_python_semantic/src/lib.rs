@@ -8,9 +8,8 @@ use crate::suppression::{
 };
 use crate::types::check_types;
 pub use db::Db;
-pub use diagnostic::{
-    add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
-};
+pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
+pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
@@ -18,13 +17,13 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasOptionalDefinition, HasType,
-    MemberDefinition, NameKind, SemanticModel,
+    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, MemberDefinition,
+    NameKind, SemanticModel,
 };
 use std::hash::BuildHasherDefault;
-pub use suppression::{
+pub use suppression::suppress_single;
+pub(crate) use suppression::{
     SuppressFix, UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all,
-    suppress_single,
 };
 use ty_module_resolver::ModuleGlobSet;
 use ty_python_core::definition::docstring_from_body;
@@ -79,7 +78,7 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 }
 
 /// Register all known semantic lints.
-pub fn register_lints(registry: &mut LintRegistryBuilder) {
+pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
@@ -215,7 +214,7 @@ pub struct IOErrorDiagnostic {
 }
 
 impl IOErrorDiagnostic {
-    pub fn to_diagnostic(&self) -> Diagnostic {
+    pub(crate) fn to_diagnostic(&self) -> Diagnostic {
         let mut diag = Diagnostic::new(DiagnosticId::Io, Severity::Error, &self.error);
         diag.annotate(Annotation::primary(Span::from(self.file)));
         diag

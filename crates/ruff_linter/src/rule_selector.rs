@@ -362,7 +362,8 @@ impl RuleSelector {
     }
 
     /// Parse [`RuleSelector`] from a string; but do not follow redirects.
-    pub fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
         // **Changes should be reflected in `from_str` as well**
         match s {
             "ALL" => Ok(Self::All),

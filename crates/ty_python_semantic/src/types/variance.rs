@@ -9,14 +9,6 @@ pub enum TypeVarVariance {
 }
 
 impl TypeVarVariance {
-    pub const fn bottom() -> Self {
-        TypeVarVariance::Bivariant
-    }
-
-    pub const fn top() -> Self {
-        TypeVarVariance::Invariant
-    }
-
     // supremum
     #[must_use]
     pub(crate) const fn join(self, other: Self) -> Self {

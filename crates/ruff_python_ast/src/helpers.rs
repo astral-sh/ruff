@@ -824,7 +824,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 
 /// Return `true` if the [`Expr`] is a singleton (`None`, `True`, `False`, or
 /// `...`).
-pub const fn is_singleton(expr: &Expr) -> bool {
+pub(crate) const fn is_singleton(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_)
@@ -916,17 +916,6 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
         value
     } else {
         // Ex) `Iterable`  => return `Iterable`
-        expr
-    }
-}
-
-/// Given an [`Expr`] that can be starred, return the underlying starred expression.
-pub fn map_starred(expr: &Expr) -> &Expr {
-    if let Expr::Starred(ast::ExprStarred { value, .. }) = expr {
-        // Ex) `*args`
-        value
-    } else {
-        // Ex) `args`
         expr
     }
 }

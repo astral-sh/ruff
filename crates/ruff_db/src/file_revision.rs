@@ -21,12 +21,12 @@ impl FileRevision {
         Self::from(file_time_now())
     }
 
-    pub const fn zero() -> Self {
+    pub(crate) const fn zero() -> Self {
         Self(0)
     }
 
     #[must_use]
-    pub fn as_u128(self) -> u128 {
+    pub(crate) fn as_u128(self) -> u128 {
         self.0
     }
 }

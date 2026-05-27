@@ -77,7 +77,9 @@ fn sort_alphabetically<T: Serialize, S: serde::Serializer>(
 /// );
 /// ```
 #[derive(Serialize)]
-pub struct SortAlphabetically<T: Serialize>(#[serde(serialize_with = "sort_alphabetically")] pub T);
+pub struct SortAlphabetically<T: Serialize>(
+    #[serde(serialize_with = "sort_alphabetically")] pub(crate) T,
+);
 
 /// The root of the JSON of a Jupyter Notebook
 ///
@@ -116,14 +118,14 @@ pub enum Cell {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct RawCell {
-    pub attachments: Option<Value>,
+    pub(crate) attachments: Option<Value>,
     /// Technically, id isn't required (it's not even present) in schema v4.0 through v4.4, but
     /// it's required in v4.5. Main issue is that pycharm creates notebooks without an id
     /// <https://youtrack.jetbrains.com/issue/PY-59438/Jupyter-notebooks-created-with-PyCharm-are-missing-the-id-field-in-cells-in-the-.ipynb-json>
-    pub id: Option<String>,
+    pub(crate) id: Option<String>,
     /// Cell-level metadata.
-    pub metadata: CellMetadata,
-    pub source: SourceValue,
+    pub(crate) metadata: CellMetadata,
+    pub(crate) source: SourceValue,
 }
 
 /// Notebook markdown cell.
@@ -168,10 +170,10 @@ pub struct CellMetadata {
     /// This is [`Some`] only if the cell's preferred language is different from the notebook's
     /// preferred language.
     /// <https://github.com/microsoft/vscode/blob/e6c009a3d4ee60f352212b978934f52c4689fbd9/extensions/ipynb/src/serializers.ts#L117-L122>
-    pub vscode: Option<CodeCellMetadataVSCode>,
+    pub(crate) vscode: Option<CodeCellMetadataVSCode>,
     /// For additional properties that isn't required by Ruff.
     #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
+    pub(crate) extra: HashMap<String, Value>,
 }
 
 /// VS Code specific cell metadata.
@@ -180,7 +182,7 @@ pub struct CellMetadata {
 #[serde(rename_all = "camelCase")]
 pub struct CodeCellMetadataVSCode {
     /// <https://code.visualstudio.com/docs/languages/identifiers>
-    pub language_id: String,
+    pub(crate) language_id: String,
 }
 
 /// Notebook root-level metadata.
@@ -188,19 +190,19 @@ pub struct CodeCellMetadataVSCode {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct RawNotebookMetadata {
     /// The author(s) of the notebook document
-    pub authors: Option<Value>,
+    pub(crate) authors: Option<Value>,
     /// Kernel information.
-    pub kernelspec: Option<Kernelspec>,
+    pub(crate) kernelspec: Option<Kernelspec>,
     /// Language information.
-    pub language_info: Option<LanguageInfo>,
+    pub(crate) language_info: Option<LanguageInfo>,
     /// Original notebook format (major number) before converting the notebook between versions.
     /// This should never be written to a file.
-    pub orig_nbformat: Option<i64>,
+    pub(crate) orig_nbformat: Option<i64>,
     /// The title of the notebook document
-    pub title: Option<String>,
+    pub(crate) title: Option<String>,
     /// For additional properties.
     #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
+    pub(crate) extra: BTreeMap<String, Value>,
 }
 
 /// Kernel information.
@@ -214,10 +216,10 @@ pub struct Kernelspec {
     /// <https://github.com/microsoft/vscode/blob/1c31e758985efe11bc0453a45ea0bb6887e670a4/extensions/ipynb/src/deserializers.ts#L20-L22>.
     ///
     /// [`language_info`]: RawNotebookMetadata::language_info
-    pub language: Option<String>,
+    pub(crate) language: Option<String>,
     /// For additional properties that isn't required by Ruff.
     #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
+    pub(crate) extra: HashMap<String, Value>,
 }
 
 /// Language information.
@@ -225,18 +227,18 @@ pub struct Kernelspec {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct LanguageInfo {
     /// The codemirror mode to use for code in this language.
-    pub codemirror_mode: Option<Value>,
+    pub(crate) codemirror_mode: Option<Value>,
     /// The file extension for files in this language.
-    pub file_extension: Option<String>,
+    pub(crate) file_extension: Option<String>,
     /// The mimetype corresponding to files in this language.
-    pub mimetype: Option<String>,
+    pub(crate) mimetype: Option<String>,
     /// The programming language which this kernel runs.
-    pub name: String,
+    pub(crate) name: String,
     /// The pygments lexer to use for code in this language.
-    pub pygments_lexer: Option<String>,
+    pub(crate) pygments_lexer: Option<String>,
     /// For additional properties.
     #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
+    pub(crate) extra: BTreeMap<String, Value>,
 }
 
 /// mimetype output (e.g. text/plain), represented as either an array of strings or a

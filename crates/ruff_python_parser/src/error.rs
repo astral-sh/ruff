@@ -49,12 +49,6 @@ impl Ranged for ParseError {
     }
 }
 
-impl ParseError {
-    pub fn error(self) -> ParseErrorType {
-        self.error
-    }
-}
-
 /// Represents the different types of errors that can occur during parsing of an f-string or t-string.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum InterpolatedStringErrorType {

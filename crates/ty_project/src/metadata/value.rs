@@ -1,4 +1,3 @@
-use crate::Db;
 use crate::glob::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
@@ -36,16 +35,12 @@ pub enum ValueSource {
 }
 
 impl ValueSource {
-    pub fn file(&self) -> Option<&SystemPath> {
+    pub(crate) fn file(&self) -> Option<&SystemPath> {
         match self {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
             ValueSource::Editor => None,
         }
-    }
-
-    pub const fn is_cli(&self) -> bool {
-        matches!(self, ValueSource::Cli)
     }
 }
 
@@ -131,7 +126,7 @@ where
 }
 
 impl<T> RangedValue<T> {
-    pub fn new(value: T, source: ValueSource) -> Self {
+    pub(crate) fn new(value: T, source: ValueSource) -> Self {
         Self::with_range(value, source, TextRange::default())
     }
 
@@ -143,7 +138,7 @@ impl<T> RangedValue<T> {
         Self::with_range(value, ValueSource::Editor, TextRange::default())
     }
 
-    pub fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
+    pub(crate) fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
         Self {
             value,
             range: Some(range),
@@ -151,31 +146,21 @@ impl<T> RangedValue<T> {
         }
     }
 
-    pub fn range(&self) -> Option<TextRange> {
+    pub(crate) fn range(&self) -> Option<TextRange> {
         self.range
     }
 
-    pub fn source(&self) -> &ValueSource {
+    pub(crate) fn source(&self) -> &ValueSource {
         &self.source
     }
 
     #[must_use]
-    pub fn with_source(mut self, source: ValueSource) -> Self {
-        self.source = source;
-        self
-    }
-
-    #[must_use]
-    pub fn map_value<R>(self, f: impl FnOnce(T) -> R) -> RangedValue<R> {
+    pub(crate) fn map_value<R>(self, f: impl FnOnce(T) -> R) -> RangedValue<R> {
         RangedValue {
             value: f(self.value),
             source: self.source,
             range: self.range,
         }
-    }
-
-    pub fn into_inner(self) -> T {
-        self.value
     }
 }
 
@@ -357,7 +342,7 @@ where
 pub struct RelativePathBuf(RangedValue<SystemPathBuf>);
 
 impl RelativePathBuf {
-    pub fn new(path: impl AsRef<SystemPath>, source: ValueSource) -> Self {
+    pub(crate) fn new(path: impl AsRef<SystemPath>, source: ValueSource) -> Self {
         Self(RangedValue::new(path.as_ref().to_path_buf(), source))
     }
 
@@ -374,22 +359,12 @@ impl RelativePathBuf {
         &self.0
     }
 
-    pub fn source(&self) -> &ValueSource {
+    pub(crate) fn source(&self) -> &ValueSource {
         self.0.source()
     }
 
-    pub fn range(&self) -> Option<TextRange> {
+    pub(crate) fn range(&self) -> Option<TextRange> {
         self.0.range()
-    }
-
-    /// Returns the owned relative path.
-    pub fn into_path_buf(self) -> SystemPathBuf {
-        self.0.into_inner()
-    }
-
-    /// Resolves the absolute path for `self` based on its origin.
-    pub fn absolute_with_db(&self, db: &dyn Db) -> SystemPathBuf {
-        self.absolute(db.project().root(db), db.system())
     }
 
     /// Resolves the absolute path for `self` based on its origin.
@@ -449,7 +424,7 @@ impl fmt::Display for RelativePathBuf {
 pub struct RelativeGlobPattern(RangedValue<String>);
 
 impl RelativeGlobPattern {
-    pub fn new(pattern: impl AsRef<str>, source: ValueSource) -> Self {
+    pub(crate) fn new(pattern: impl AsRef<str>, source: ValueSource) -> Self {
         Self(RangedValue::new(pattern.as_ref().to_string(), source))
     }
 

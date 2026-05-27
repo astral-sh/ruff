@@ -62,13 +62,13 @@ impl TestSystem {
     ///
     /// ## Panics
     /// If the underlying test system isn't the [`InMemorySystem`].
-    pub fn in_memory(&self) -> &InMemorySystem {
+    pub(crate) fn in_memory(&self) -> &InMemorySystem {
         self.as_in_memory()
             .expect("The test db is not using a memory file system")
     }
 
     /// Returns the `InMemorySystem` or `None` if the underlying test system isn't the [`InMemorySystem`].
-    pub fn as_in_memory(&self) -> Option<&InMemorySystem> {
+    pub(crate) fn as_in_memory(&self) -> Option<&InMemorySystem> {
         self.system().as_any().downcast_ref::<InMemorySystem>()
     }
 
@@ -87,7 +87,7 @@ impl TestSystem {
         self.inner = Arc::new(system);
     }
 
-    pub fn system(&self) -> &dyn WritableSystem {
+    pub(crate) fn system(&self) -> &dyn WritableSystem {
         &*self.inner
     }
 }
@@ -343,11 +343,6 @@ impl InMemorySystem {
 
     pub fn fs(&self) -> &MemoryFileSystem {
         &self.memory_fs
-    }
-
-    pub fn set_user_configuration_directory(&self, directory: Option<SystemPathBuf>) {
-        let mut user_directory = self.user_config_directory.lock().unwrap();
-        *user_directory = directory;
     }
 }
 

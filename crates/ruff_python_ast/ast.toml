@@ -26,6 +26,17 @@
 #   Controls the name of the AnyNodeRef::is_foo_bar method.  The default is the
 #   group name in snake_case.
 #
+# owned_accessors: [foo, as_foo, ...]
+#   Limits generated accessors on the owned group enum to the listed reachable
+#   methods. If omitted, all accessors are generated.
+#
+# crate_owned_accessors: [foo, as_foo, ...]
+#   Generates the listed owned accessors with `pub(crate)` visibility.
+#
+# anynode_accessor / anynode_predicate: [true/false]
+#   Controls generation of the group's `AnyNodeRef::as_*` conversion and
+#   `AnyNodeRef::is_*` predicate, respectively. Both default to true.
+#
 # doc:
 #   A doc comment that is added to the group's enums.
 #
@@ -65,6 +76,8 @@
 
 [Mod]
 anynode_is_label = "module"
+owned_accessors = []
+anynode_accessor = false
 doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
 [Mod.nodes.ModModule]
@@ -78,6 +91,33 @@ fields = [{ name = "body", type = "Box<Expr>" }]
 [Stmt]
 add_suffix_to_is_methods = true
 anynode_is_label = "statement"
+anynode_accessor = false
+owned_accessors = [
+  "is_function_def_stmt",
+  "as_function_def_stmt",
+  "as_class_def_stmt",
+  "is_return_stmt",
+  "as_assign_stmt",
+  "is_ann_assign_stmt",
+  "as_ann_assign_stmt",
+  "is_for_stmt",
+  "as_for_stmt",
+  "as_if_stmt",
+  "is_with_stmt",
+  "as_match_stmt",
+  "is_raise_stmt",
+  "as_try_stmt",
+    "is_import_stmt",
+    "as_import_stmt",
+    "is_import_from_stmt",
+    "as_import_from_stmt",
+  "is_expr_stmt",
+  "as_expr_stmt",
+  "is_pass_stmt",
+  "is_break_stmt",
+  "is_continue_stmt",
+  "is_ipy_escape_command_stmt",
+]
 doc = "See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
 
 [Stmt.nodes.StmtFunctionDef]
@@ -317,6 +357,55 @@ fields = [
 [Expr]
 add_suffix_to_is_methods = true
 anynode_is_label = "expression"
+owned_accessors = [
+  "as_bool_op_expr",
+  "is_named_expr",
+  "as_named_expr",
+  "is_bin_op_expr",
+  "as_bin_op_expr",
+  "is_unary_op_expr",
+  "as_unary_op_expr",
+  "is_lambda_expr",
+  "as_lambda_expr",
+  "is_dict_expr",
+  "as_dict_expr",
+  "is_list_comp_expr",
+  "as_list_comp_expr",
+  "as_generator_expr",
+  "is_await_expr",
+  "is_yield_expr",
+  "is_yield_from_expr",
+  "is_compare_expr",
+  "as_compare_expr",
+  "is_call_expr",
+  "as_call_expr",
+  "is_f_string_expr",
+  "is_t_string_expr",
+  "is_string_literal_expr",
+  "as_string_literal_expr",
+  "is_bytes_literal_expr",
+  "as_bytes_literal_expr",
+  "is_number_literal_expr",
+  "as_number_literal_expr",
+  "is_boolean_literal_expr",
+  "as_boolean_literal_expr",
+  "is_none_literal_expr",
+  "is_ellipsis_literal_expr",
+  "is_attribute_expr",
+  "as_attribute_expr",
+  "is_subscript_expr",
+  "as_subscript_expr",
+  "is_starred_expr",
+  "as_starred_expr",
+  "is_name_expr",
+  "as_name_expr",
+  "as_list_expr",
+  "is_tuple_expr",
+  "as_tuple_expr",
+  "is_slice_expr",
+  "as_slice_expr",
+]
+crate_owned_accessors = ["is_if_expr"]
 doc = "See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 
 [Expr.nodes.ExprBoolOp]
@@ -552,10 +641,18 @@ fields = [
 ]
 
 [ExceptHandler]
+owned_accessors = ["as_except_handler"]
+anynode_accessor = false
 doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
 
 [ExceptHandler.nodes]
 ExceptHandlerExceptHandler = {}
+
+[InterpolatedStringElement]
+owned_accessors = ["is_interpolation", "as_interpolation"]
+crate_owned_accessors = ["as_literal"]
+anynode_accessor = false
+anynode_predicate = false
 
 [InterpolatedStringElement.nodes]
 InterpolatedElement = { variant = "Interpolation" }
@@ -563,6 +660,9 @@ InterpolatedStringLiteralElement = { variant = "Literal" }
 
 
 [Pattern]
+owned_accessors = ["as_match_value", "is_match_star"]
+anynode_accessor = false
+anynode_predicate = false
 doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
 
 [Pattern.nodes.PatternMatchValue]
@@ -609,6 +709,9 @@ doc = "See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr
 fields = [{ name = "patterns", type = "Pattern*" }]
 
 [TypeParam]
+owned_accessors = ["as_type_var"]
+anynode_accessor = false
+anynode_predicate = false
 doc = "See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
 
 [TypeParam.nodes.TypeParamTypeVar]

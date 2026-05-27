@@ -44,7 +44,7 @@ impl VendoredFileSystem {
         Self::new_impl(Cow::Borrowed(raw_bytes))
     }
 
-    pub fn new(raw_bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn new(raw_bytes: Vec<u8>) -> Result<Self> {
         Self::new_impl(Cow::Owned(raw_bytes))
     }
 
@@ -94,11 +94,6 @@ impl VendoredFileSystem {
     pub fn is_directory(&self, path: impl AsRef<VendoredPath>) -> bool {
         self.metadata(path)
             .is_ok_and(|metadata| metadata.kind().is_directory())
-    }
-
-    pub fn is_file(&self, path: impl AsRef<VendoredPath>) -> bool {
-        self.metadata(path)
-            .is_ok_and(|metadata| metadata.kind().is_file())
     }
 
     /// Read the entire contents of the zip file at `path` into a string
@@ -322,7 +317,7 @@ impl Metadata {
         self.kind
     }
 
-    pub fn revision(&self) -> FileRevision {
+    pub(crate) fn revision(&self) -> FileRevision {
         self.revision
     }
 }
@@ -334,14 +329,6 @@ pub struct DirectoryEntry {
 }
 
 impl DirectoryEntry {
-    pub fn new(path: VendoredPathBuf, file_type: FileType) -> Self {
-        Self { path, file_type }
-    }
-
-    pub fn into_path(self) -> VendoredPathBuf {
-        self.path
-    }
-
     pub fn path(&self) -> &VendoredPath {
         &self.path
     }
@@ -472,7 +459,8 @@ impl VendoredFileSystemBuilder {
         self.writer.write_all(content.as_bytes())
     }
 
-    pub fn add_directory(&mut self, path: impl AsRef<VendoredPath>) -> ZipResult<()> {
+    #[allow(dead_code)]
+    pub(crate) fn add_directory(&mut self, path: impl AsRef<VendoredPath>) -> ZipResult<()> {
         self.writer
             .add_directory(path.as_ref().as_str(), self.options())
     }

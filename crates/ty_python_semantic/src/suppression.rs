@@ -14,7 +14,8 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
-pub use crate::suppression::add_ignore::{SuppressFix, suppress_all, suppress_single};
+pub use crate::suppression::add_ignore::suppress_single;
+pub(crate) use crate::suppression::add_ignore::{SuppressFix, suppress_all};
 use crate::suppression::parser::{
     ParseError, ParseErrorKind, SuppressionComment, SuppressionParser,
 };
@@ -44,7 +45,7 @@ declare_lint! {
     /// ## Options
     /// Set [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
     /// to `false` to prevent this rule from reporting unused `type: ignore` comments.
-    pub static UNUSED_IGNORE_COMMENT = {
+    pub(crate) static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `ty: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
@@ -130,7 +131,7 @@ declare_lint! {
     }
 }
 
-pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
+pub(crate) fn is_unused_ignore_comment_lint(name: LintName) -> bool {
     name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
 }
 

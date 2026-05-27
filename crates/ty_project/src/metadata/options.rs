@@ -1073,7 +1073,7 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
 
 impl Rules {
     /// Convert the rules to a `RuleSelection` with diagnostics.
-    pub fn to_rule_selection(
+    pub(crate) fn to_rule_selection(
         &self,
         db: &dyn Db,
         diagnostics: &mut Vec<OptionDiagnostic>,
@@ -1708,7 +1708,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+    pub(crate) include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// A list of file and directory patterns to exclude from this override.
     ///
@@ -1730,7 +1730,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+    pub(crate) exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// Rule overrides for files matching the include/exclude patterns.
     ///
@@ -1749,11 +1749,11 @@ pub struct OverrideOptions {
             possibly-unresolved-reference = "ignore"
         "#
     )]
-    pub rules: Option<Rules>,
+    pub(crate) rules: Option<Rules>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
-    pub analysis: Option<AnalysisOptions>,
+    pub(crate) analysis: Option<AnalysisOptions>,
 }
 
 impl RangedValue<OverrideOptions> {
@@ -1949,7 +1949,7 @@ pub struct ToSettingsError {
 }
 
 impl ToSettingsError {
-    pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
+    pub(crate) fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
         struct DisplayPretty<'a> {
             db: &'a dyn ruff_db::Db,
             error: &'a ToSettingsError,
@@ -1975,7 +1975,7 @@ impl ToSettingsError {
         DisplayPretty { db, error: self }
     }
 
-    pub fn into_diagnostic(self) -> OptionDiagnostic {
+    pub(crate) fn into_diagnostic(self) -> OptionDiagnostic {
         *self.diagnostic
     }
 }
@@ -2080,7 +2080,7 @@ pub struct OptionDiagnostic {
 }
 
 impl OptionDiagnostic {
-    pub fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
+    pub(crate) fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
         Self {
             id,
             message,
@@ -2186,7 +2186,7 @@ pub struct ProjectOptionsOverrides {
     pub config_file_override: Option<SystemPathBuf>,
     pub fallback_python_version: Option<RangedValue<SupportedPythonVersion>>,
     pub fallback_python: Option<RelativePathBuf>,
-    pub options: Options,
+    pub(crate) options: Options,
 }
 
 impl ProjectOptionsOverrides {
@@ -2198,7 +2198,7 @@ impl ProjectOptionsOverrides {
         }
     }
 
-    pub fn apply_to(&self, options: Options) -> Options {
+    pub(crate) fn apply_to(&self, options: Options) -> Options {
         let mut combined = self.options.clone().combine(options);
 
         // Set the fallback python version and path if set

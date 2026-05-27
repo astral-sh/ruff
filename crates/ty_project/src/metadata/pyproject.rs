@@ -60,11 +60,11 @@ pub struct Project {
     ///
     /// Note: Intentionally option to be more permissive during deserialization.
     /// `PackageMetadata::from_pyproject` reports missing names.
-    pub name: Option<RangedValue<PackageName>>,
+    pub(crate) name: Option<RangedValue<PackageName>>,
     /// The version of the project
-    pub version: Option<RangedValue<Version>>,
+    pub(crate) version: Option<RangedValue<Version>>,
     /// The Python versions this project is compatible with.
-    pub requires_python: Option<RangedValue<VersionSpecifiers>>,
+    pub(crate) requires_python: Option<RangedValue<VersionSpecifiers>>,
 }
 
 impl Project {

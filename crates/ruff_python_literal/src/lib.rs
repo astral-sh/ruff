@@ -1,5 +1,5 @@
 pub mod cformat;
-pub mod char;
+pub(crate) mod char;
 pub mod escape;
 pub mod float;
 pub mod format;

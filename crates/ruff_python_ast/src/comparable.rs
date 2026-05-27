@@ -1394,14 +1394,14 @@ pub struct StmtDelete<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtTypeAlias<'a> {
-    pub name: Box<ComparableExpr<'a>>,
-    pub type_params: Option<ComparableTypeParams<'a>>,
-    pub value: Box<ComparableExpr<'a>>,
+    pub(crate) name: Box<ComparableExpr<'a>>,
+    pub(crate) type_params: Option<ComparableTypeParams<'a>>,
+    pub(crate) value: Box<ComparableExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableTypeParams<'a> {
-    pub type_params: Vec<ComparableTypeParam<'a>>,
+    pub(crate) type_params: Vec<ComparableTypeParam<'a>>,
 }
 
 impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
@@ -1463,21 +1463,21 @@ impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct TypeParamTypeVar<'a> {
-    pub name: &'a str,
-    pub bound: Option<Box<ComparableExpr<'a>>>,
-    pub default: Option<Box<ComparableExpr<'a>>>,
+    pub(crate) name: &'a str,
+    pub(crate) bound: Option<Box<ComparableExpr<'a>>>,
+    pub(crate) default: Option<Box<ComparableExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct TypeParamParamSpec<'a> {
-    pub name: &'a str,
-    pub default: Option<Box<ComparableExpr<'a>>>,
+    pub(crate) name: &'a str,
+    pub(crate) default: Option<Box<ComparableExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct TypeParamTypeVarTuple<'a> {
-    pub name: &'a str,
-    pub default: Option<Box<ComparableExpr<'a>>>,
+    pub(crate) name: &'a str,
+    pub(crate) default: Option<Box<ComparableExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

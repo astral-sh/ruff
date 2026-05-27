@@ -190,13 +190,13 @@ pub struct Definitions<'db> {
 }
 
 impl<'db> Definitions<'db> {
-    pub fn single(definition: Definition<'db>) -> Self {
+    pub(crate) fn single(definition: Definition<'db>) -> Self {
         Self {
             definitions: smallvec::smallvec_inline![definition],
         }
     }
 
-    pub fn push(&mut self, definition: Definition<'db>) {
+    pub(crate) fn push(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
     }
 }
@@ -868,7 +868,7 @@ pub enum DefinitionKind<'db> {
 }
 
 impl<'db> DefinitionKind<'db> {
-    pub fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
@@ -905,7 +905,7 @@ impl<'db> DefinitionKind<'db> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
-    pub fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
+    pub(crate) fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
         match self {
             DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
             _ => None,
@@ -1254,7 +1254,7 @@ impl ImportDefinitionKind {
         &self.node.node(module).names[self.alias_index as usize]
     }
 
-    pub fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> bool {
         self.is_reexported
     }
 }
@@ -1275,7 +1275,7 @@ impl ImportFromDefinitionKind {
         &self.node.node(module).names[self.alias_index as usize]
     }
 
-    pub fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> bool {
         self.is_reexported
     }
 }
@@ -1291,11 +1291,11 @@ impl ImportFromSubmoduleDefinitionKind {
         self.node.node(module)
     }
 
-    pub fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+    pub(crate) fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
         self.module.node(module)
     }
 
-    pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+    pub(crate) fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         let module_ident = self.module(module);
         let module_str = module_ident.as_str();
 
@@ -1487,7 +1487,7 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
         self.place
     }
 
-    pub fn range(&self, module: &ParsedModuleRef) -> TextRange {
+    pub(crate) fn range(&self, module: &ParsedModuleRef) -> TextRange {
         match &self.loop_stmt {
             LoopStmtKind::While(stmt) => stmt.node(module).range(),
             LoopStmtKind::For(stmt) => stmt.node(module).range(),

@@ -346,18 +346,6 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_format_spec<'a, V: SourceOrderVisitor<'a> + ?Sized>(
-    visitor: &mut V,
-    format_spec: &'a Expr,
-) {
-    let node = AnyNodeRef::from(format_spec);
-    if visitor.enter_node(node).is_traverse() {
-        visitor.visit_expr(format_spec);
-    }
-
-    visitor.leave_node(node);
-}
-
 pub fn walk_arguments<'a, V>(visitor: &mut V, arguments: &'a Arguments)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
@@ -523,28 +511,28 @@ pub fn walk_interpolated_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor.leave_node(node);
 }
 
-pub fn walk_bool_op<'a, V>(_visitor: &mut V, _bool_op: &'a BoolOp)
+pub(crate) fn walk_bool_op<'a, V>(_visitor: &mut V, _bool_op: &'a BoolOp)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
 }
 
 #[inline]
-pub fn walk_operator<'a, V>(_visitor: &mut V, _operator: &'a Operator)
+pub(crate) fn walk_operator<'a, V>(_visitor: &mut V, _operator: &'a Operator)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
 }
 
 #[inline]
-pub fn walk_unary_op<'a, V>(_visitor: &mut V, _unary_op: &'a UnaryOp)
+pub(crate) fn walk_unary_op<'a, V>(_visitor: &mut V, _unary_op: &'a UnaryOp)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {
 }
 
 #[inline]
-pub fn walk_cmp_op<'a, V>(_visitor: &mut V, _cmp_op: &'a CmpOp)
+pub(crate) fn walk_cmp_op<'a, V>(_visitor: &mut V, _cmp_op: &'a CmpOp)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {

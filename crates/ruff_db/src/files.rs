@@ -217,7 +217,7 @@ impl Files {
     }
 
     /// Updates the revision of the root for `path`.
-    pub fn touch_root(db: &mut dyn Db, path: &SystemPath) {
+    pub(crate) fn touch_root(db: &mut dyn Db, path: &SystemPath) {
         if let Some(root) = db.files().root(db, path) {
             root.set_revision(db).to(FileRevision::now());
         }
@@ -391,7 +391,7 @@ impl File {
     ///
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
-    pub fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
+    pub(crate) fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
         let path = self.path(db);
 
         match path {
@@ -510,11 +510,6 @@ impl File {
     /// Returns `true` if the file should be analyzed as a type stub.
     pub fn is_stub(self, db: &dyn Db) -> bool {
         self.source_type(db).is_stub()
-    }
-
-    /// Returns `true` if the file is an `__init__.pyi`
-    pub fn is_package_stub(self, db: &dyn Db) -> bool {
-        self.path(db).as_str().ends_with("__init__.pyi")
     }
 
     /// Returns `true` if the file is an `__init__.pyi`

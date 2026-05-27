@@ -561,7 +561,7 @@ pub fn definitions_and_overloads_for_function<'db>(
 #[derive(Debug, Clone)]
 pub struct CallSignatureDetails<'db> {
     /// The signature itself
-    pub signature: Signature<'db>,
+    pub(crate) signature: Signature<'db>,
 
     /// The display label for this signature (e.g., "(param1: str, param2: int) -> str")
     pub label: String,
@@ -1276,7 +1276,7 @@ mod resolve_definition {
     use crate::Db;
     use crate::module_docstring;
     use crate::types::binding_type;
-    use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
+    use ty_python_core::definition::{Definition, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
@@ -1305,19 +1305,6 @@ mod resolve_definition {
                 // For modules, navigate to the start of the file
                 ResolvedDefinition::Module(module) => FileRange::new(*module, TextRange::default()),
                 ResolvedDefinition::FileWithRange(file_range) => *file_range,
-            }
-        }
-
-        pub fn category(&self, db: &dyn Db) -> DefinitionCategory {
-            match self {
-                ResolvedDefinition::Definition(definition) => {
-                    let file = definition.file(db);
-                    let parsed = parsed_module(db, file).load(db);
-                    definition.kind(db).category(file.is_stub(db), &parsed)
-                }
-                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => {
-                    DefinitionCategory::DeclarationAndBinding
-                }
             }
         }
 

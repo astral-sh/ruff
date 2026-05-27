@@ -157,7 +157,7 @@ pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseErro
 /// let parsed = parse_expression_range("11 + 22 + 33", TextRange::new(TextSize::new(5), TextSize::new(7)));
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse_expression_range(
+pub(crate) fn parse_expression_range(
     source: &str,
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
@@ -183,7 +183,7 @@ pub fn parse_expression_range(
 ///
 /// let parsed = parse_parenthesized_expression_range("'''\n int | str'''", TextRange::new(TextSize::new(3), TextSize::new(14)));
 /// assert!(parsed.is_ok());
-pub fn parse_parenthesized_expression_range(
+pub(crate) fn parse_parenthesized_expression_range(
     source: &str,
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
@@ -336,7 +336,7 @@ impl<T> Parsed<T> {
     }
 
     /// Consumes the [`Parsed`] output and returns a list of syntax errors found during parsing.
-    pub fn into_errors(self) -> Vec<ParseError> {
+    pub(crate) fn into_errors(self) -> Vec<ParseError> {
         self.errors
     }
 
@@ -362,7 +362,7 @@ impl<T> Parsed<T> {
     /// [`UnsupportedSyntaxError`]s.
     ///
     /// See [`Parsed::has_valid_syntax`] for a version specific to [`ParseError`]s.
-    pub fn has_no_syntax_errors(&self) -> bool {
+    pub(crate) fn has_no_syntax_errors(&self) -> bool {
         self.has_valid_syntax() && self.unsupported_syntax_errors.is_empty()
     }
 
@@ -372,19 +372,6 @@ impl<T> Parsed<T> {
     /// See [`Parsed::has_invalid_syntax`] for a version specific to [`ParseError`]s.
     pub fn has_syntax_errors(&self) -> bool {
         !self.has_no_syntax_errors()
-    }
-
-    /// Returns the [`Parsed`] output as a [`Result`], returning [`Ok`] if it has no syntax errors,
-    /// or [`Err`] containing the first [`ParseError`] encountered.
-    ///
-    /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
-    /// cause [`Err`] to be returned.
-    pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
-        if self.has_valid_syntax() {
-            Ok(self)
-        } else {
-            Err(&self.errors)
-        }
     }
 
     /// Consumes the [`Parsed`] output and returns a [`Result`] which is [`Ok`] if it has no syntax
@@ -428,7 +415,7 @@ impl Parsed<Mod> {
     /// Otherwise, it returns [`None`].
     ///
     /// [`Some(Parsed<ModExpression>)`]: Some
-    pub fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
+    pub(crate) fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
         match self.syntax {
             Mod::Module(_) => None,
             Mod::Expression(expression) => Some(Parsed {
@@ -460,13 +447,8 @@ impl Parsed<ModExpression> {
     }
 
     /// Returns a mutable reference to the expression contained in this parsed output.
-    pub fn expr_mut(&mut self) -> &mut Expr {
+    pub(crate) fn expr_mut(&mut self) -> &mut Expr {
         &mut self.syntax.body
-    }
-
-    /// Consumes the [`Parsed`] output and returns the contained [`Expr`].
-    pub fn into_expr(self) -> Expr {
-        *self.syntax.body
     }
 }
 

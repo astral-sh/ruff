@@ -4,7 +4,7 @@ use ruff_python_ast::{
 };
 
 pub struct EscapeLayout {
-    pub quote: Quote,
+    pub(crate) quote: Quote,
     pub len: Option<usize>,
 }
 
@@ -59,7 +59,8 @@ impl<'a> UnicodeEscape<'a> {
         Self { source, layout }
     }
     #[inline]
-    pub fn new_repr(source: &'a str) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn new_repr(source: &'a str) -> Self {
         Self::with_preferred_quote(source, Quote::Single)
     }
     #[inline]
@@ -86,12 +87,6 @@ impl StrRepr<'_, '_> {
         formatter.write_str(flags.quote_str())?;
         Ok(())
     }
-
-    pub fn to_string(&self) -> Option<String> {
-        let mut s = String::with_capacity(self.escape.layout().len?);
-        self.write(&mut s).unwrap();
-        Some(s)
-    }
 }
 
 impl std::fmt::Display for StrRepr<'_, '_> {
@@ -104,7 +99,7 @@ impl UnicodeEscape<'_> {
     const REPR_RESERVED_LEN: usize = 2; // for quotes
 
     #[expect(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
-    pub fn repr_layout(source: &str, preferred_quote: Quote) -> EscapeLayout {
+    pub(crate) fn repr_layout(source: &str, preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
@@ -239,18 +234,11 @@ pub struct AsciiEscape<'a> {
 
 impl<'a> AsciiEscape<'a> {
     #[inline]
-    pub fn new(source: &'a [u8], layout: EscapeLayout) -> Self {
-        Self { source, layout }
-    }
-    #[inline]
     pub fn with_preferred_quote(source: &'a [u8], quote: Quote) -> Self {
         let layout = Self::repr_layout(source, quote);
         Self { source, layout }
     }
-    #[inline]
-    pub fn new_repr(source: &'a [u8]) -> Self {
-        Self::with_preferred_quote(source, Quote::Single)
-    }
+
     #[inline]
     pub fn bytes_repr<'r>(&'a self, triple_quotes: TripleQuotes) -> BytesRepr<'r, 'a> {
         BytesRepr {
@@ -262,7 +250,7 @@ impl<'a> AsciiEscape<'a> {
 
 impl AsciiEscape<'_> {
     #[expect(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
-    pub fn repr_layout(source: &[u8], preferred_quote: Quote) -> EscapeLayout {
+    pub(crate) fn repr_layout(source: &[u8], preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
@@ -383,12 +371,6 @@ impl BytesRepr<'_, '_> {
         self.escape.write_body(formatter)?;
         formatter.write_str(flags.quote_str())?;
         Ok(())
-    }
-
-    pub fn to_string(&self) -> Option<String> {
-        let mut s = String::with_capacity(self.escape.layout().len?);
-        self.write(&mut s).unwrap();
-        Some(s)
     }
 }
 

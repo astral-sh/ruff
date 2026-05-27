@@ -131,7 +131,8 @@ impl<'a> Generator<'a> {
 
     /// Sets the mode for code unparsing.
     #[must_use]
-    pub fn with_mode(mut self, mode: Mode) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn with_mode(mut self, mode: Mode) -> Self {
         self.mode = mode;
         self
     }
@@ -239,7 +240,7 @@ impl<'a> Generator<'a> {
         self.buffer
     }
 
-    pub fn unparse_suite(&mut self, suite: &Suite) {
+    pub(crate) fn unparse_suite(&mut self, suite: &Suite) {
         for stmt in suite {
             self.unparse_stmt(stmt);
         }
