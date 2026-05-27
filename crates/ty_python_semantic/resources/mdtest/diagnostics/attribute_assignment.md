@@ -90,7 +90,8 @@ class C:
 
     @classmethod
     def initialize(cls):
-        cls.class_attr: int = 1  # fine
+        cls.class_attr1: str = None  # snapshot: invalid-assignment
+        cls.class_attr2: int = 1  # fine
 ```
 
 ```snapshot
@@ -101,6 +102,16 @@ error[invalid-assignment]: Object of type `None` is not assignable to `str`
   |                    ---   ^^^^ Incompatible value of type `None`
   |                    |
   |                    Declared type
+  |
+
+
+error[invalid-assignment]: Object of type `None` is not assignable to `str`
+ --> src/mdtest_snippet.py:8:26
+  |
+8 |         cls.class_attr1: str = None  # snapshot: invalid-assignment
+  |                          ---   ^^^^ Incompatible value of type `None`
+  |                          |
+  |                          Declared type
   |
 ```
 
