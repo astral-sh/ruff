@@ -350,15 +350,34 @@ def f(x: IntOrStr) -> None:
 ### Generic example
 
 ```py
-from typing_extensions import TypeAliasType, TypeVar
+from typing_extensions import TypeAliasType, TypeVar, Union
 
 T = TypeVar("T")
 
 IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 
 def f(x: IntAndT[str]) -> None:
-    # TODO: This should be `tuple[int, str]`
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: tuple[int, str]
+
+U = TypeVar("U", default=str)
+
+ListOrSet = TypeAliasType("ListOrSet", Union[list[U], set[U]], type_params=(U,))
+
+def g(
+    list_or_set_of_int: ListOrSet[int],
+    list_or_set_of_str: ListOrSet,
+) -> None:
+    reveal_type(list_or_set_of_int)  # revealed: list[int] | set[int]
+    reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
+
+MyDict = TypeAliasType("MyDict", dict[U, T], type_params=(U, T))
+
+def h(
+    dict_int_str: MyDict[int, str],
+    dict_str_unknown: MyDict,
+) -> None:
+    reveal_type(dict_int_str)  # revealed: dict[int, str]
+    reveal_type(dict_str_unknown)  # revealed: dict[str, Unknown]
 ```
 
 ### Generic value binds type variables to alias definition
@@ -390,6 +409,35 @@ def get_name() -> str:
 
 # error: [invalid-type-alias-type] "The first argument to `TypeAliasType` must be a string literal"
 IntOrStr = TypeAliasType(get_name(), int | str)
+```
+
+#### Type parameters argument is not a tuple
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-type-alias-type] "`type_params` argument to `TypeAliasType` must be a tuple"
+IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=T)
+
+def _(x: IntAndT[str]) -> None:
+    reveal_type(x)  # revealed: Unknown
+```
+
+#### Invalid type parameters entries
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+
+# TODO: This should be an error
+IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=(str,))
+
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `IntAndT`"
+def _(x: IntAndT[str]) -> None:
+    reveal_type(x)  # revealed: Unknown
 ```
 
 #### Name does not match variable

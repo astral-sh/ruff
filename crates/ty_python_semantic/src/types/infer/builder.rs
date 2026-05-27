@@ -3990,6 +3990,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
+        if let Some(type_params_arg) = arguments.find_argument_value("type_params", 2) {
+            let previous_context = self.typevar_binding_context.replace(definition);
+            let type_params_ty = self.infer_expression(type_params_arg, TypeContext::default());
+            self.typevar_binding_context = previous_context;
+
+            if type_params_ty.tuple_instance_spec(db).is_none() {
+                return error(
+                    &self.context,
+                    "`type_params` argument to `TypeAliasType` must be a tuple",
+                    type_params_arg,
+                );
+            }
+        }
+
         // Inference of the value argument must be deferred, to avoid cycles.
         self.deferred.insert(definition);
 
@@ -3998,6 +4012,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 ast::name::Name::new(name),
                 definition,
+                None,
             )),
         ))
     }
