@@ -6,16 +6,15 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxHashMap;
 
 use crate::{
     Db, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
-        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type, TypeVarVariance, binding_type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, KnownInstanceType, MemberLookupPolicy,
+        MetaclassCandidate, Parameters, Signature, SpecialFormType, StaticClassLiteral, Type,
+        TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -31,9 +30,10 @@ use crate::{
             INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
-            report_duplicate_bases, report_instance_layout_conflict,
-            report_invalid_or_unsupported_base, report_invalid_total_ordering,
-            report_invalid_type_param_order, report_invalid_typevar_default_reference,
+            report_duplicate_bases, report_inconsistent_generic_bases,
+            report_instance_layout_conflict, report_invalid_or_unsupported_base,
+            report_invalid_total_ordering, report_invalid_type_param_order,
+            report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
@@ -524,122 +524,16 @@ pub(crate) fn check_static_class_definitions<'db>(
                 );
             }
 
-            // Check for inconsistent specializations of the same generic
-            // base class. This detects when different explicit bases
-            // contribute conflicting specializations of a common generic
-            // ancestor to the MRO. For example:
-            //
-            //   class Grandparent(Generic[T1, T2]): ...
-            //   class Parent(Grandparent[T1, T2]): ...
-            //   class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
             let explicit_bases = class.explicit_bases(db);
-            let can_annotate_bases = || {
-                class_node.bases().len() == explicit_bases.len()
-                    && !class_node.bases().iter().any(ast::Expr::is_starred_expr)
-            };
-
-            // Maps each generic ancestor's class literal to the first
-            // specialization seen and the index of the explicit base it
-            // came from.
-            let mut ancestor_specs =
-                FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
-
-            'outer: for (i, base) in explicit_bases.iter().enumerate() {
-                let base_class = match base {
-                    Type::GenericAlias(c) => ClassType::Generic(*c),
-                    Type::ClassLiteral(c) if c.generic_context(db).is_none() => {
-                        ClassType::NonGeneric(*c)
-                    }
-                    _ => continue,
-                };
-
-                for supercls in base_class.iter_mro(db) {
-                    let ClassBase::Class(ClassType::Generic(supercls_alias)) = supercls else {
-                        continue;
-                    };
-                    let origin = supercls_alias.origin(db);
-
-                    if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin) {
-                        if earlier_idx != i
-                            && earlier_alias
-                                .specialization(db)
-                                .types(db)
-                                .iter()
-                                .zip(supercls_alias.specialization(db).types(db))
-                                .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
-                        {
-                            let Some(builder) =
-                                context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db))
-                            else {
-                                break 'outer;
-                            };
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Inconsistent type arguments for `{}` among class bases",
-                                origin.name(db)
-                            ));
-
-                            let later_is_direct = matches!(
-                                base,
-                                Type::GenericAlias(a)
-                                    if a.origin(db) == origin
-                            );
-
-                            if can_annotate_bases() {
-                                diagnostic.annotate(
-                                    context.secondary(&class_node.bases()[earlier_idx]).message(
-                                        format_args!(
-                                            "Earlier class base inherits from `{}`",
-                                            earlier_alias.display(db)
-                                        ),
-                                    ),
-                                );
-                                let later_annotation = context.secondary(&class_node.bases()[i]);
-                                diagnostic.annotate(if later_is_direct {
-                                    later_annotation.message(format_args!(
-                                        "Later class base is `{}`",
-                                        supercls_alias.display(db)
-                                    ))
-                                } else {
-                                    later_annotation.message(format_args!(
-                                        "Later class base inherits from `{}`",
-                                        supercls_alias.display(db)
-                                    ))
-                                });
-                            } else {
-                                diagnostic.info(format_args!(
-                                    "Earlier class base inherits from `{}`",
-                                    earlier_alias.display(db)
-                                ));
-                                if later_is_direct {
-                                    diagnostic.info(format_args!(
-                                        "Later class base is `{}`",
-                                        supercls_alias.display(db)
-                                    ));
-                                } else {
-                                    diagnostic.info(format_args!(
-                                        "Later class base inherits from `{}`",
-                                        supercls_alias.display(db)
-                                    ));
-                                }
-                            }
-                            diagnostic.set_concise_message(format_args!(
-                                "Inconsistent type arguments: class cannot \
-                                        inherit from both `{}` and `{}`",
-                                supercls_alias.display(db),
-                                earlier_alias.display(db)
-                            ));
-                            break 'outer;
-                        }
-                    } else if !supercls_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .all(Type::is_dynamic)
-                    {
-                        ancestor_specs.insert(origin, (supercls_alias, i));
-                    }
-                }
-            }
+            let base_nodes = (class_node.bases().len() == explicit_bases.len()
+                && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
+            .then_some(class_node.bases());
+            report_inconsistent_generic_bases(
+                context,
+                class.header_range(db),
+                explicit_bases,
+                base_nodes,
+            );
         }
     }
 
