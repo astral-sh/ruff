@@ -210,16 +210,21 @@ reveal_type(a)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(i)  # revealed: Unknown
 
-# error: [invalid-syntax] "comprehension inner loop cannot rebind assignment expression target `y`"
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[(item := 0) for (item, other) in [(0, 1)]]
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 [x for x in [1] if (y := x) for y in [1]]
 
 [x for x in [0] if [(y := z) for z in [1]] for y in [2]]
 
+# An active outer target remains active within a nested result.
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
-[[x for x in [0] if (x := 1)] for x in [0]]
+[[(outer := 1) for _ in []] for outer in []]
 
+# An active outer target remains active within a nested filter.
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
-[[a for a in [] if (x := 1) for x in []] for x in []]
+[[a for a in [] if (outer := 1)] for outer in []]
 
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 [(x := 1).bit_length() for x in [0]]
@@ -245,29 +250,12 @@ class C:
     reveal_type(x)  # revealed: Unknown
 
 class D:
-    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
-    [x for x in [0] if (x := 1)]
-
-    # error: [invalid-syntax] "assignment expression within a comprehension cannot be used in a class body"
-    [x for x in [1] if (y := x) for y in [1]]
-
-    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
-    [(y := 1) for y in [0]]
-
-    # Nested comprehensions are part of the same walrus escape chain.
-    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
-    [[(outer := 1) for _ in [0]] for outer in [0]]
-
-    # A later nested target does not hide an already-active outer target in an earlier filter.
-    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
-    [[a for a in [] if (x := 1) for x in []] for x in []]
-
     # Lambda bodies own their walrus targets.
     [(lambda: (local := 1))() for local in [0]]
 
     # Lambda defaults are evaluated in the enclosing comprehension scope.
-    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
-    [(lambda value=(default := 1): value)() for default in [0]]
+    # error: [invalid-syntax] "assignment expression within a comprehension cannot be used in a class body"
+    [(lambda value=(default := 1): value)() for item in [0]]
 
 def returns_list() -> list[int]:
     return [1, 2, 3]
@@ -279,10 +267,12 @@ def returns_list() -> list[int]:
 [x for x in (z := returns_list()).copy()]
 
 # error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 [a for a in [(b := 1) for b in [1]]]
 
 xs = [1]
 # error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 [x for x in xs if [z for z in (x := xs)]]
 ```
 

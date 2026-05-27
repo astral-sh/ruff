@@ -792,7 +792,6 @@ impl SemanticSyntaxContext for Checker<'_> {
             SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable
             | SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension
             | SemanticSyntaxErrorKind::ReboundComprehensionVariable
-            | SemanticSyntaxErrorKind::ComprehensionInnerLoopRebindsNamedExpressionTarget(_)
             | SemanticSyntaxErrorKind::LazyImportNotAllowed { .. }
             | SemanticSyntaxErrorKind::LazyImportStar
             | SemanticSyntaxErrorKind::LazyFutureImport

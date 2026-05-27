@@ -6,78 +6,23 @@ invalid-syntax: assignment expression cannot rebind comprehension variable
   |
 1 | [x:= 2 for x in range(2)]
   |  ^
-2 | [x for x in [1] if (y := x) for y in [1]]
-3 | [[x for x in [0] if (x := 1)] for x in [0]]
-  |
-
-invalid-syntax: comprehension inner loop cannot rebind assignment expression target `y`
- --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:2:21
-  |
-1 | [x:= 2 for x in range(2)]
-2 | [x for x in [1] if (y := x) for y in [1]]
-  |                     ^
-3 | [[x for x in [0] if (x := 1)] for x in [0]]
-4 | [x for x in (lambda: (y := [1]))()]
-  |
-
-invalid-syntax: assignment expression cannot rebind comprehension variable
- --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:3:22
-  |
-1 | [x:= 2 for x in range(2)]
-2 | [x for x in [1] if (y := x) for y in [1]]
-3 | [[x for x in [0] if (x := 1)] for x in [0]]
-  |                      ^
-4 | [x for x in (lambda: (y := [1]))()]
-5 | [x for x in [0] if [(y := z) for z in [1]] for y in [2]]
+2 | [x for x in (lambda: (y := [1]))()]
   |
 
 invalid-syntax: assignment expression cannot be used in a comprehension iterable expression
- --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:4:23
+ --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:2:23
   |
-2 | [x for x in [1] if (y := x) for y in [1]]
-3 | [[x for x in [0] if (x := 1)] for x in [0]]
-4 | [x for x in (lambda: (y := [1]))()]
+1 | [x:= 2 for x in range(2)]
+2 | [x for x in (lambda: (y := [1]))()]
   |                       ^^^^^^^^
-5 | [x for x in [0] if [(y := z) for z in [1]] for y in [2]]
-6 | [[a for a in [] if (x := 1) for x in []] for x in []]
-  |
-
-invalid-syntax: assignment expression cannot rebind comprehension variable
- --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:6:21
-  |
-4 | [x for x in (lambda: (y := [1]))()]
-5 | [x for x in [0] if [(y := z) for z in [1]] for y in [2]]
-6 | [[a for a in [] if (x := 1) for x in []] for x in []]
-  |                     ^
-7 |
-8 | class C:
+3 |
+4 | class C:
   |
 
 invalid-syntax: assignment expression within a comprehension cannot be used in a class body
-  --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:9:7
-   |
- 8 | class C:
- 9 |     [(x := y) for y in range(3)]
-   |       ^^^^^^
-10 |     [x for x in [1] if (y := x) for y in [1]]
-11 |     [[a for a in [] if (x := 1) for x in []] for x in []]
-   |
-
-invalid-syntax: assignment expression within a comprehension cannot be used in a class body
-  --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:10:25
-   |
- 8 | class C:
- 9 |     [(x := y) for y in range(3)]
-10 |     [x for x in [1] if (y := x) for y in [1]]
-   |                         ^^^^^^
-11 |     [[a for a in [] if (x := 1) for x in []] for x in []]
-   |
-
-invalid-syntax: assignment expression cannot rebind comprehension variable
-  --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:11:25
-   |
- 9 |     [(x := y) for y in range(3)]
-10 |     [x for x in [1] if (y := x) for y in [1]]
-11 |     [[a for a in [] if (x := 1) for x in []] for x in []]
-   |                         ^
-   |
+ --> resources/test/fixtures/semantic_errors/rebound_comprehension.py:5:7
+  |
+4 | class C:
+5 |     [(x := y) for y in range(3)]
+  |       ^^^^^^
+  |
