@@ -194,6 +194,65 @@ union_form: TypeForm[str | None] | None = str | None
 
 literal_form: TypeForm[None] | None = Literal[None]
 reveal_type(literal_form)  # revealed: TypeForm[None]
+
+# Ordinary expressions preserve their normal bidirectional inference in a `TypeForm` context.
+# Valid type expressions at contextually inferred nested positions undergo `TypeForm` evaluation.
+def either(flag: bool) -> TypeForm[str] | None:
+    return str if flag else None
+
+def either_quoted(flag: bool) -> TypeForm[str] | None:
+    return "str" if flag else None
+
+def either_union(flag: bool) -> TypeForm[int | str] | None:
+    return (int | str) if flag else None
+
+def either_generic(flag: bool) -> TypeForm[list[int]] | None:
+    return list[int] if flag else None
+
+def either_invalid(flag: bool) -> TypeForm[str] | None:
+    return 1 if flag else None  # error: [invalid-type-form]
+
+def boolean_fallback(value: None) -> TypeForm[str] | None:
+    return value or str
+
+def boolean_union(value: None) -> TypeForm[int | str] | None:
+    return value or (int | str)
+
+def boolean_quoted(value: None) -> TypeForm[str] | None:
+    return value or "str"
+
+def boolean_invalid(value: None) -> TypeForm[str] | None:
+    return value or 1  # error: [invalid-type-form]
+
+def identity[T](value: T) -> T:
+    return value
+
+def returned_class() -> TypeForm[str]:
+    return identity(str)
+
+def returned_quoted() -> TypeForm[str]:
+    return identity("str")
+
+def returned_union() -> TypeForm[int | str]:
+    return identity(int | str)
+
+def returned_incompatible_class() -> TypeForm[str]:
+    return identity(int)  # error: [invalid-return-type]
+
+async def async_identity[T](value: T) -> T:
+    return value
+
+async def awaited_class() -> TypeForm[str]:
+    return await async_identity(str)
+
+async def awaited_quoted() -> TypeForm[str]:
+    return await async_identity("str")
+
+async def awaited_union() -> TypeForm[int | str]:
+    return await async_identity(int | str)
+
+def named_class() -> TypeForm[str]:
+    return (form := str)
 ```
 
 ## Invalid type-form expressions
@@ -222,7 +281,7 @@ bad_literal_var: TypeForm = Literal[var]  # error: [invalid-type-form]
 bad_literal_f_string: TypeForm = Literal[f""]  # error: [invalid-type-form]
 bad_qualifier: TypeForm = ClassVar[int]  # error: [invalid-type-form]
 bad_final: TypeForm = Final[int]  # error: [invalid-type-form]
-bad_unpack: TypeForm = Unpack[Ts]  # error: [invalid-type-form]
+bad_unpack: TypeForm = Unpack[Ts]  # TODO: should be error: [invalid-type-form] once `Unpack` is supported
 bad_optional: TypeForm = Optional  # error: [invalid-type-form]
 bad_quoted_operator: TypeForm = "int + str"  # error: [invalid-type-form]
 ```

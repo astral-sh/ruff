@@ -5686,13 +5686,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // produces a type-form value or satisfies the non-`TypeForm` arm of the union.
         let value_ty = self
             .speculate()
-            .infer_expression(expression, TypeContext::default());
+            .infer_maybe_standalone_expression(expression, TypeContext::default());
         if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
-            || self.contains_type_form_value(value_ty)
+            || self.contains_type_form_value(expression, value_ty)
             || non_type_form_fallback
                 .is_some_and(|alternative| value_ty.is_assignable_to(self.db(), alternative))
         {
             return None;
+        }
+
+        // If interpreting the root as a type expression yields no usable type,
+        // try ordinary contextual inference. This lets existing bidirectional
+        // inference propagate `TypeForm` through conditionals, calls, and `await`.
+        if self
+            .speculate()
+            .infer_type_expression_no_store(expression)
+            .is_unknown()
+        {
+            let contextual_ty = self
+                .speculate()
+                .infer_value_expression_impl(expression, tcx);
+            if contextual_ty.is_assignable_to(self.db(), target) {
+                return None;
+            }
         }
 
         Some(TypeFormType::from_type_expression(
@@ -5701,9 +5717,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
-    fn contains_type_form_value(&self, ty: Type<'db>) -> bool {
+    fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
         match ty.resolve_type_alias(self.db()) {
             Type::TypeForm(_) | Type::SubclassOf(_) => true,
+            // A bare class object is valid type-expression syntax and should still be
+            // interpreted as a `TypeForm`. Preserve its ordinary value type only when
+            // it was produced by an expression that is not itself a type expression.
+            Type::ClassLiteral(_) => self
+                .speculate()
+                .infer_type_expression_no_store(expression)
+                .is_unknown(),
             Type::NominalInstance(instance)
                 if instance.has_known_class(self.db(), KnownClass::Type) =>
             {
@@ -5712,7 +5735,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Union(union) => union
                 .elements(self.db())
                 .iter()
-                .any(|element| self.contains_type_form_value(*element)),
+                .any(|element| self.contains_type_form_value(expression, *element)),
             _ => false,
         }
     }
@@ -5745,6 +5768,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
+        self.infer_value_expression_impl(expression, tcx)
+    }
+
+    /// Infer an expression without implicitly treating this root as a `TypeForm`.
+    ///
+    /// Child expressions still use their normal contextual inference, so the
+    /// expression's existing bidirectional behavior is preserved.
+    fn infer_value_expression_impl(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let mut ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
