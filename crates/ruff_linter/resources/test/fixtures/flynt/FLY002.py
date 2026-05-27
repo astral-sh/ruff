@@ -40,6 +40,7 @@ nok17 = "".join((r"", "\r"))  # Mixed raw/non-raw; result contains carriage retu
 nok18 = "".join((r"", "\\r"))  # Mixed raw/non-raw; result contains backslash followed by literal r
 nok19 = "".join((r"", "\\\\"))  # Mixed raw/non-raw; result ends with even number of backslashes (safe)
 nok20 = "".join((r"", "\\\\\\"))  # Mixed raw/non-raw; result ends with odd number of backslashes (unsafe)
+nok21 = "".join((r"""prefix""", '"'))
 
 # Test that all-raw strings still work (should be OK)
 ok7 = "".join((r"", r"something"))  # Both are raw - OK
