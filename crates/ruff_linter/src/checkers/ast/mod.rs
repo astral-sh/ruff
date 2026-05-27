@@ -794,6 +794,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable
             | SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension
             | SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            | SemanticSyntaxErrorKind::ComprehensionInnerLoopRebindsNamedExpressionTarget(_)
             | SemanticSyntaxErrorKind::LazyImportNotAllowed { .. }
             | SemanticSyntaxErrorKind::LazyImportStar
             | SemanticSyntaxErrorKind::LazyFutureImport
@@ -884,6 +885,21 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn in_comprehension_iterable(&self) -> bool {
         self.comprehension_iterable_nesting > 0
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Generator { .. } => {}
+                ScopeKind::Class(_) => return true,
+                ScopeKind::Function(_)
+                | ScopeKind::Lambda(_)
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => return false,
+            }
+        }
+        false
     }
 
     fn in_module_scope(&self) -> bool {
@@ -1801,7 +1817,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
-                self.visit.lambdas.push(self.semantic.snapshot());
+                self.visit.lambdas.push((
+                    self.semantic.snapshot(),
+                    self.comprehension_iterable_nesting,
+                ));
                 self.analyze.lambdas.push(self.semantic.snapshot());
             }
             Expr::If(ast::ExprIf {
@@ -3163,10 +3182,12 @@ impl<'a> Checker<'a> {
     /// for the same reason as function bodies.
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
+        let comprehension_iterable_nesting = self.comprehension_iterable_nesting;
         while !self.visit.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.visit.lambdas);
-            for snapshot in lambdas {
+            for (snapshot, lambda_comprehension_iterable_nesting) in lambdas {
                 self.semantic.restore(snapshot);
+                self.comprehension_iterable_nesting = lambda_comprehension_iterable_nesting;
 
                 let Some(Expr::Lambda(ast::ExprLambda {
                     parameters,
@@ -3213,6 +3234,7 @@ impl<'a> Checker<'a> {
             }
         }
         self.semantic.restore(snapshot);
+        self.comprehension_iterable_nesting = comprehension_iterable_nesting;
     }
 
     /// After initial traversal of the source tree has been completed,

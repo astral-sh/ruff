@@ -210,6 +210,12 @@ reveal_type(a)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(i)  # revealed: Unknown
 
+# error: [invalid-syntax] "comprehension inner loop cannot rebind assignment expression target `y`"
+[x for x in [1] if (y := x) for y in [1]]
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[[x for x in [0] if (x := 1)] for x in [0]]
+
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
 [(x := 1).bit_length() for x in [0]]
 # error: [unresolved-reference]

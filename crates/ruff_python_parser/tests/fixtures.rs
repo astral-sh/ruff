@@ -640,6 +640,17 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         self.comprehension_iterable_nesting > 0
     }
 
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope in self.scopes.iter().rev() {
+            match scope {
+                Scope::Comprehension { .. } => {}
+                Scope::Class => return true,
+                Scope::Module | Scope::Function { .. } => return false,
+            }
+        }
+        false
+    }
+
     fn in_module_scope(&self) -> bool {
         self.scopes.len() == 1
     }

@@ -10,7 +10,7 @@ pub(crate) struct Visit<'a> {
     pub(crate) future_type_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) type_param_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) functions: Vec<Snapshot>,
-    pub(crate) lambdas: Vec<Snapshot>,
+    pub(crate) lambdas: Vec<(Snapshot, u32)>,
     /// N.B. This field should always be empty unless it's a stub file
     pub(crate) class_bases: Vec<(&'a Expr, Snapshot)>,
 }
