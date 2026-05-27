@@ -4109,32 +4109,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // Disallow annotations on non-receiver targets while preserving assignment checks for
-            // the non-name targets that are valid Python syntax.
+            // Disallow annotations on non-name targets unless they are valid receivers (e.g.
+            // `self.x: int` or `cls.x: int`).
             let is_receiver_attribute = target
                 .as_attribute_expr()
                 .is_some_and(|target| self.is_receiver_attribute_annotation_target(target));
             if !is_receiver_attribute {
-                match target.as_ref() {
-                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                        // For syntactically valid non-name targets, reject the annotation and
-                        // validate any accompanying assignment.
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
-                        {
-                            builder.into_diagnostic(
-                                "Annotations are not allowed on this assignment target",
-                            );
-                        }
-
-                        if let Some(value) = value {
-                            self.infer_target(target, value, &|builder, tcx| {
-                                builder.infer_maybe_standalone_expression(value, tcx)
-                            });
-                        } else {
-                            self.infer_expression(target, TypeContext::default());
-                        }
+                let message = match target.as_ref() {
+                    ast::Expr::Attribute(_) => {
+                        "Type annotations are not allowed on this attribute expression"
+                    }
+                    ast::Expr::Subscript(_) => {
+                        "Type annotations are not allowed on subscripted expressions"
                     }
                     _ => {
                         // For parser-recovered invalid targets, the syntax diagnostic is
@@ -4143,7 +4129,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.infer_maybe_standalone_expression(value, TypeContext::default());
                         }
                         self.infer_expression(target, TypeContext::default());
+                        return;
                     }
+                };
+
+                // For syntactically valid non-name targets, reject the annotation and validate
+                // any accompanying assignment.
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
+                {
+                    builder.into_diagnostic(message);
+                }
+
+                if let Some(value) = value {
+                    self.infer_target(target, value, &|builder, tcx| {
+                        builder.infer_maybe_standalone_expression(value, tcx)
+                    });
+                } else {
+                    self.infer_expression(target, TypeContext::default());
                 }
                 return;
             }

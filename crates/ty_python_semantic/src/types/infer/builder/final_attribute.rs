@@ -94,9 +94,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// in intermediate scopes. We additionally check that the enclosing function has an implicit
     /// receiver, since static methods still have a first parameter.
     pub(super) fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
-        if !self
+        if self
             .current_function_type()
-            .is_some_and(|function| function.has_implicit_receiver(self.db()))
+            .is_none_or(|function| !function.has_implicit_receiver(self.db()))
         {
             return false;
         }

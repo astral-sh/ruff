@@ -32,7 +32,7 @@ error[invalid-assignment]: Invalid subscript assignment with key of type `Litera
 ```
 
 ```
-error[invalid-type-form]: Annotations are not allowed on this assignment target
+error[invalid-type-form]: Type annotations are not allowed on subscripted expressions
  --> src/mdtest_snippet.py:4:13
   |
 4 | numbers[0]: str = "three"

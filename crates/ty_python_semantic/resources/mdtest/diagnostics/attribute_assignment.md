@@ -124,7 +124,7 @@ class C:
 
 instance = C()
 
-# error: [invalid-type-form]
+# error: [invalid-type-form] "Type annotations are not allowed on this attribute expression"
 # error: [invalid-assignment]
 instance.declared: str = "wrong"
 
