@@ -3887,7 +3887,7 @@ pub(super) fn report_invalid_assignment<'db>(
 
 pub(super) fn report_invalid_attribute_assignment(
     context: &InferContext,
-    node: AnyNodeRef,
+    range: TextRange,
     target_ty: Type,
     source_ty: Type,
     attribute_name: &'_ str,
@@ -3899,7 +3899,7 @@ pub(super) fn report_invalid_attribute_assignment(
 
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
-        node,
+        range,
         target_ty,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
