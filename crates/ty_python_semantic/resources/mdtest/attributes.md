@@ -1113,6 +1113,18 @@ class CDeclared(metaclass=BroadInitializingMeta):
 
 # A class-body declaration is a contract for an attribute populated by metaclass initialization.
 reveal_type(CDeclared.attr)  # revealed: str
+
+class CompatibleInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: int | str = 1
+
+def _(flag: bool):
+    class CConditionallyDeclared(metaclass=CompatibleInitializingMeta):
+        if flag:
+            attr: str = "class value"
+
+    # On paths without the class-body value, the metaclass-populated value remains available.
+    reveal_type(CConditionallyDeclared.attr)  # revealed: int | str
 ```
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data

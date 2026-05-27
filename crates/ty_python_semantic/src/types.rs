@@ -2590,25 +2590,37 @@ impl<'db> Type<'db> {
             "Calling `class_object_member` on class literals and subclass-of types should always find an MRO",
         );
 
-        if let Some(metaclass_instance) = self.to_meta_type(db).to_instance(db) {
-            let metaclass_attr = metaclass_instance.instance_member(db, name);
+        // A definitely-declared class attribute is the contract for values populated by
+        // metaclass initialization, analogous to a declared instance attribute initialized in
+        // `__init__`. Nothing from the metaclass changes the type exposed for this attribute.
+        if matches!(
+            class_attr.place,
+            Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Declared,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            })
+        ) {
+            return class_attr;
+        }
 
-            // A declaration on the class object is its contract for values populated by
-            // metaclass initialization, analogous to a declared instance attribute initialized
-            // in `__init__`. A bound class-body value can still be overwritten by the metaclass.
-            if matches!(
-                class_attr.place,
-                Place::Defined(DefinedPlace {
-                    origin: TypeOrigin::Declared,
-                    ..
-                })
-            ) {
-                class_attr.or_fall_back_to(db, || metaclass_attr)
-            } else {
-                metaclass_attr.or_fall_back_to(db, || class_attr)
-            }
+        let Some(metaclass_instance) = self.to_meta_type(db).to_instance(db) else {
+            return class_attr;
+        };
+        let metaclass_attr = metaclass_instance.instance_member(db, name);
+
+        if matches!(
+            class_attr.place,
+            Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Declared,
+                ..
+            })
+        ) {
+            // A conditionally-declared attribute is a contract only on paths where that
+            // declaration is present; the metaclass value is the fallback on other paths.
+            class_attr.or_fall_back_to(db, || metaclass_attr)
         } else {
-            class_attr
+            metaclass_attr.or_fall_back_to(db, || class_attr)
         }
     }
 
