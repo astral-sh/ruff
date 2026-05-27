@@ -316,16 +316,16 @@ class GoodCovariant(Covariant[T_co]): ...
 class GoodContravariant(Contravariant[T_contra]): ...
 class GoodNested(Contravariant[Contravariant[T_co]]): ...
 
-# error: [invalid-generic-class]
+# snapshot: invalid-generic-class
 class BadInvariantCo(Invariant[T_co]): ...
 
-# error: [invalid-generic-class]
+# snapshot: invalid-generic-class
 class BadInvariantContra(Invariant[T_contra]): ...
 
-# error: [invalid-generic-class]
+# snapshot: invalid-generic-class
 class BadCovariant(Covariant[T_contra]): ...
 
-# error: [invalid-generic-class]
+# snapshot: invalid-generic-class
 class BadContravariant(Contravariant[T_co]): ...
 
 # error: [invalid-generic-class]
@@ -356,6 +356,43 @@ class BadAlias(InvariantAlias[T_co]): ...
 class BadNestedAlias(NestedAlias[NestedAlias[NestedAlias[T_co]]]): ...
 ```
 
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with base class `Invariant`
+  --> src/mdtest_snippet.py:18:22
+   |
+18 | class BadInvariantCo(Invariant[T_co]): ...
+   |                      ^^^^^^^^^^^^^^^
+   |
+help: Type variable `T_co` is declared as covariant, but base class `Invariant` requires it to be invariant
+
+
+error[invalid-generic-class]: Variance of type variable `T_contra` is incompatible with base class `Invariant`
+  --> src/mdtest_snippet.py:21:26
+   |
+21 | class BadInvariantContra(Invariant[T_contra]): ...
+   |                          ^^^^^^^^^^^^^^^^^^^
+   |
+help: Type variable `T_contra` is declared as contravariant, but base class `Invariant` requires it to be invariant
+
+
+error[invalid-generic-class]: Variance of type variable `T_contra` is incompatible with base class `Covariant`
+  --> src/mdtest_snippet.py:24:20
+   |
+24 | class BadCovariant(Covariant[T_contra]): ...
+   |                    ^^^^^^^^^^^^^^^^^^^
+   |
+help: Type variable `T_contra` is declared as contravariant, but base class `Covariant` requires it to be covariant
+
+
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with base class `Contravariant`
+  --> src/mdtest_snippet.py:27:24
+   |
+27 | class BadContravariant(Contravariant[T_co]): ...
+   |                        ^^^^^^^^^^^^^^^^^^^
+   |
+help: Type variable `T_co` is declared as covariant, but base class `Contravariant` requires it to be contravariant
+```
+
 Legacy type variables with inferred variance are validated according to their uses, rather than as
 if they had an explicit invariant declaration.
 
@@ -377,27 +414,11 @@ T_infer = TypeVar("T_infer", infer_variance=True)
 
 class Invariant(Generic[T]): ...
 class Covariant(Generic[T_co]): ...
-from typing import Generic, TypeVar
+class GoodInferredInvariant(Invariant[T_infer]): ...
+class GoodInferredCovariant(Covariant[T_infer]): ...
 
-T = TypeVar("T")
-T_co = TypeVar("T_co", covariant=True)
-T_contra = TypeVar("T_contra", contravariant=True)
-
-class Invariant(Generic[T]): ...
-class Covariant(Generic[T_co]): ...
-class Contravariant(Generic[T_contra]): ...
-
-# error: [invalid-generic-class] "Variance of type variable `T_co` is incompatible with base class `Invariant`"
-class BadCo(Invariant[T_co]): ...
-
-# error: [invalid-generic-class] "Variance of type variable `T_contra` is incompatible with base class `Invariant`"
-class BadContra(Invariant[T_contra]): ...
-
-# error: [invalid-generic-class] "Variance of type variable `T_contra` is incompatible with base class `Covariant`"
-class BadCovariant(Covariant[T_contra]): ...
-
-# error: [invalid-generic-class] "Variance of type variable `T_co` is incompatible with base class `Contravariant`"
-class BadContravariant(Contravariant[T_co]): ...
+static_assert(not is_assignable_to(GoodInferredInvariant[B], GoodInferredInvariant[A]))
+static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvariant[B]))
 ```
 
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance
