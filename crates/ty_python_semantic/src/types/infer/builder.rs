@@ -2355,7 +2355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !assignable && emit_diagnostics {
                     report_invalid_attribute_assignment(
                         &builder.context,
-                        target.into(),
+                        target.range(),
                         attr_ty,
                         value_ty,
                         attribute,
@@ -3040,7 +3040,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if emit_diagnostics {
                             report_invalid_attribute_assignment(
                                 &self.context,
-                                target.into(),
+                                target.range(),
                                 attr_ty,
                                 value_ty,
                                 attribute,

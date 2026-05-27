@@ -10,11 +10,11 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::{
     Db, TypeQualifiers,
     diagnostic::format_enumeration,
-    place::{place_from_bindings, place_from_declarations},
+    place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, KnownInstanceType, MemberLookupPolicy,
-        MetaclassCandidate, Parameters, Signature, SpecialFormType, StaticClassLiteral, Type,
-        TypeVarVariance, binding_type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, KnownClass, KnownInstanceType,
+        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
+        StaticClassLiteral, Type, TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -31,9 +31,9 @@ use crate::{
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
-            report_instance_layout_conflict, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference,
+            report_instance_layout_conflict, report_invalid_attribute_assignment,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
@@ -983,10 +983,13 @@ pub(crate) fn check_static_class_definitions<'db>(
     // and for violations of other rules relating to invalid overrides of some sort.
     overrides::check_class(context, class);
 
-    // (14) Check for unimplemented abstract methods on final classes.
+    // (14) Check class namespace values against declared metaclass attributes.
+    check_class_bindings_against_metaclass_instance_declarations(context, class, index);
+
+    // (15) Check for unimplemented abstract methods on final classes.
     check_final_class_abstract_methods(context, class, class_node);
 
-    // (15) Check for Final-qualified declarations without a value.
+    // (16) Check for Final-qualified declarations without a value.
     check_class_final_without_value(context, class, index);
 
     if let Some(protocol) = class.into_protocol_class(db) {
@@ -998,6 +1001,64 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+/// Check values in a class namespace against attributes declared on its metaclass instance.
+///
+/// A binding in a class body is passed through the namespace used to construct the class object
+/// before a metaclass can initialize that same attribute. If the metaclass declares a type for
+/// that attribute, an incompatible class-body value violates that contract.
+fn check_class_bindings_against_metaclass_instance_declarations<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    let metaclass = class.metaclass(db);
+    if metaclass == KnownClass::Type.to_class_literal(db) {
+        return;
+    }
+
+    let Some(metaclass_instance) = metaclass.to_instance(db) else {
+        return;
+    };
+
+    let scope = class.body_scope(db).file_scope_id(db);
+    let table = index.place_table(scope);
+    let use_def = index.use_def_map(scope);
+
+    for (symbol_id, bindings) in use_def.all_end_of_scope_symbol_bindings() {
+        let name = table.symbol(symbol_id).name();
+        let Place::Defined(DefinedPlace {
+            ty: declared_ty,
+            origin: TypeOrigin::Declared,
+            ..
+        }) = metaclass_instance.instance_member(db, name.as_str()).place
+        else {
+            continue;
+        };
+
+        for binding in bindings {
+            let Some(definition) = binding.binding.definition() else {
+                continue;
+            };
+            let definition_kind = definition.kind(db);
+            if !definition_kind.is_user_visible() {
+                continue;
+            }
+
+            let assigned_ty = binding_type(db, definition);
+            if !assigned_ty.is_assignable_to(db, declared_ty) {
+                report_invalid_attribute_assignment(
+                    context,
+                    definition_kind.target_range(context.module()),
+                    declared_ty,
+                    assigned_ty,
+                    name.as_str(),
+                );
+            }
+        }
+    }
 }
 
 fn ordered_dataclass_base_class<'db>(
