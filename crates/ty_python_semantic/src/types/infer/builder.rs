@@ -5706,7 +5706,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let contextual_ty = self
                 .speculate()
                 .infer_value_expression_impl(expression, tcx);
-            if contextual_ty.is_assignable_to(self.db(), target) {
+            // TODO: Remove this exception once `Unpack` produces a precise type instead of a
+            // dynamic placeholder in ordinary expression inference.
+            if contextual_ty.is_assignable_to(self.db(), target)
+                && contextual_ty != Type::Dynamic(DynamicType::TodoUnpack)
+            {
                 return None;
             }
         }

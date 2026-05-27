@@ -306,7 +306,7 @@ bad_literal_var: TypeForm = Literal[var]  # error: [invalid-type-form]
 bad_literal_f_string: TypeForm = Literal[f""]  # error: [invalid-type-form]
 bad_qualifier: TypeForm = ClassVar[int]  # error: [invalid-type-form]
 bad_final: TypeForm = Final[int]  # error: [invalid-type-form]
-bad_unpack: TypeForm = Unpack[Ts]  # TODO: should be error: [invalid-type-form] once `Unpack` is supported
+bad_unpack: TypeForm = Unpack[Ts]  # error: [invalid-type-form]
 bad_optional: TypeForm = Optional  # error: [invalid-type-form]
 bad_quoted_operator: TypeForm = "int + str"  # error: [invalid-type-form]
 ```
