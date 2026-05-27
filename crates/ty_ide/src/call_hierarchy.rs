@@ -28,9 +28,11 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use ty_python_core::definition::DefinitionKind;
 use ty_python_core::scope::ScopeKind;
-use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
-use ty_python_semantic::{HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel};
+use ty_python_semantic::types::{PropertyAccessorRole, Type};
+use ty_python_semantic::{
+    HasDefinition, HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel,
+};
 
 /// What kind of callable an item represents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -247,8 +249,11 @@ pub fn call_hierarchy_incoming_calls(
     // wrong role (e.g. when querying a setter, don't let the getter
     // co-definition pull in every read site).
     let target_role = match &goto_target {
-        GotoTarget::FunctionDef(function) => property_accessor_role(function, &model),
-        _ => PropertyAccessorRole::NotProperty,
+        GotoTarget::FunctionDef(function) => function
+            .inferred_type(&model)
+            .and_then(Type::as_property_instance)
+            .and_then(|property| property.accessor_role(db, function.definition(&model))),
+        _ => None,
     };
 
     // Pre-compute the set of attribute names that *could* resolve to one of
@@ -528,7 +533,7 @@ fn call_sites_for_file(
     db: &dyn Db,
     file: File,
     target_definitions: &Definitions<'_>,
-    target_role: PropertyAccessorRole,
+    target_role: Option<PropertyAccessorRole>,
     candidate_attribute_names: &[String],
 ) -> Vec<RawCallSite> {
     let parsed = parsed_module(db, file);
@@ -556,12 +561,12 @@ struct CallSitesFinder<'a, 'db> {
     model: &'a SemanticModel<'db>,
     tokens: &'a Tokens,
     target_definitions: &'a Definitions<'db>,
-    /// Property accessor role the user originally queried (the
-    /// definition the cursor was on). Used at attribute sites to constrain
-    /// which co-definitions in `target_definitions` are eligible matches.
-    /// Without this, querying a setter would also match reads (via the
-    /// getter co-definition).
-    target_role: PropertyAccessorRole,
+    /// Property accessor role the user originally queried (the definition the
+    /// cursor was on), or `None` when the queried symbol is not a property
+    /// accessor. Used at attribute sites to constrain which co-definitions in
+    /// `target_definitions` are eligible matches. Without this, querying a
+    /// setter would also match reads (via the getter co-definition).
+    target_role: Option<PropertyAccessorRole>,
     /// Names that an attribute leaf could textually match before any
     /// semantic resolution. `obj.X` cannot resolve to a definition with a
     /// different name (attribute names are invariant under import aliasing),
@@ -712,24 +717,25 @@ impl<'a> CallSitesFinder<'a, '_> {
         // `target_definitions`) and pollute incoming-calls of the setter with
         // every read site. Non-property attributes (regular methods, attribute
         // reads of class names, …) pass through unchanged.
-        let is_property = matches!(
-            static_member_type_for_attribute(self.model, attribute),
-            Some(Type::PropertyInstance(_))
-        );
-        if is_property {
+        let property = match static_member_type_for_attribute(self.model, attribute) {
+            Some(Type::PropertyInstance(property)) => Some(property),
+            _ => None,
+        };
+        if let Some(property) = property {
             let intersects = current_definitions.iter().any(|resolved| {
-                let role = resolved_property_role(self.db, resolved);
+                let role = resolved
+                    .definition()
+                    .and_then(|def| property.accessor_role(self.db, def));
                 // (1) Site-context filter: a read points at the getter, a
                 //     write at the setter, a `del` at the deleter. Regular
-                //     methods (`NotProperty`) appear only on reads — writes
+                //     methods (role `None`) appear only on reads — writes
                 //     and deletes of a non-property attribute aren't calls.
                 let matches_site_kind = match attribute.ctx {
-                    ast::ExprContext::Load => matches!(
-                        role,
-                        PropertyAccessorRole::Getter | PropertyAccessorRole::NotProperty
-                    ),
-                    ast::ExprContext::Store => matches!(role, PropertyAccessorRole::Setter),
-                    ast::ExprContext::Del => matches!(role, PropertyAccessorRole::Deleter),
+                    ast::ExprContext::Load => {
+                        matches!(role, Some(PropertyAccessorRole::Getter) | None)
+                    }
+                    ast::ExprContext::Store => matches!(role, Some(PropertyAccessorRole::Setter)),
+                    ast::ExprContext::Del => matches!(role, Some(PropertyAccessorRole::Deleter)),
                     ast::ExprContext::Invalid => false,
                 };
                 if !matches_site_kind {
@@ -742,9 +748,13 @@ impl<'a> CallSitesFinder<'a, '_> {
                 //     read sites would match through the getter co-def and
                 //     pollute the setter's caller list.
                 let matches_queried_role = match self.target_role {
-                    PropertyAccessorRole::Getter | PropertyAccessorRole::NotProperty => true,
-                    PropertyAccessorRole::Setter => role == PropertyAccessorRole::Setter,
-                    PropertyAccessorRole::Deleter => role == PropertyAccessorRole::Deleter,
+                    None | Some(PropertyAccessorRole::Getter) => true,
+                    Some(PropertyAccessorRole::Setter) => {
+                        role == Some(PropertyAccessorRole::Setter)
+                    }
+                    Some(PropertyAccessorRole::Deleter) => {
+                        role == Some(PropertyAccessorRole::Deleter)
+                    }
                 };
                 if !matches_queried_role {
                     return false;
@@ -785,72 +795,6 @@ fn attribute_is_callee_of_parent<'a>(
         AnyNodeRef::Decorator(decorator) => decorator.expression.range() == attribute_range,
         _ => false,
     }
-}
-
-/// Role of a function definition in the property descriptor protocol.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PropertyAccessorRole {
-    /// `@property def x(self)` — runs on read.
-    Getter,
-    /// `@x.setter def x(self, v)` — runs on write.
-    Setter,
-    /// `@x.deleter def x(self)` — runs on `del`.
-    Deleter,
-    /// A regular function/method (no property decorator we recognise).
-    NotProperty,
-}
-
-// TODO: this duplicates classification logic that ty_python_semantic already
-//       owns via PropertyInstanceType. Long-term, expose a
-//       Type::property_accessor_role(db) helper there and delete this.
-//       The name-match fast path below (`property` literal) is the only
-//       reason this lives in ty_ide today — it deliberately avoids paying a
-//       type-inference query on every decorator. See the inline comment below.
-fn property_accessor_role(
-    function: &ast::StmtFunctionDef,
-    model: &SemanticModel<'_>,
-) -> PropertyAccessorRole {
-    for decorator in &function.decorator_list {
-        // `@x.setter` / `@x.deleter` — verify the receiver is a
-        // `Type::PropertyInstance` so we don't misclassify
-        // `@something_else.setter` shadow names.
-        if let Some(attr_expr) = decorator.expression.as_attribute_expr()
-            && matches!(
-                attr_expr.value.inferred_type(model),
-                Some(Type::PropertyInstance(_))
-            )
-        {
-            match attr_expr.attr.as_str() {
-                "setter" => return PropertyAccessorRole::Setter,
-                "deleter" => return PropertyAccessorRole::Deleter,
-                _ => {}
-            }
-        }
-        // `@property`. Recognise by name; a user shadowing `property` is rare
-        // enough that we accept the residual false-positive risk in exchange
-        // for not paying a type-inference query on every method's decorators.
-        if let Some(name_expr) = decorator.expression.as_name_expr()
-            && name_expr.id.as_str() == "property"
-        {
-            return PropertyAccessorRole::Getter;
-        }
-    }
-    PropertyAccessorRole::NotProperty
-}
-
-fn resolved_property_role(db: &dyn Db, resolved: &ResolvedDefinition<'_>) -> PropertyAccessorRole {
-    let Some(def) = resolved.definition() else {
-        return PropertyAccessorRole::NotProperty;
-    };
-    let DefinitionKind::Function(fn_ref) = def.kind(db) else {
-        return PropertyAccessorRole::NotProperty;
-    };
-    let def_file = def.file(db);
-    let parsed = parsed_module(db, def_file).load(db);
-    let function = fn_ref.node(&parsed);
-    // Decorator type-inference needs a model for the file the function lives in.
-    let model = SemanticModel::new(db, def_file);
-    property_accessor_role(function, &model)
 }
 
 /// The relevant node + offset for resolving the callee of a call site. For
@@ -1615,7 +1559,7 @@ mod tests {
         let outgoing = test.outgoing();
         let names: Vec<_> = outgoing.iter().map(|c| c.to.name.as_str()).collect();
         assert!(
-            names.iter().any(|n| *n == "m"),
+            names.contains(&"m"),
             "expected Base.m as an outgoing target, got: {names:?}",
         );
     }

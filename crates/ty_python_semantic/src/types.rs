@@ -542,6 +542,17 @@ macro_rules! todo_type {
 pub use crate::types::definition::TypeDefinition;
 pub(crate) use todo_type;
 
+/// The role a function definition plays in a property's descriptor protocol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PropertyAccessorRole {
+    /// `@property def x(self)` — runs on read.
+    Getter,
+    /// `@x.setter def x(self, value)` — runs on write.
+    Setter,
+    /// `@x.deleter def x(self)` — runs on `del`.
+    Deleter,
+}
+
 /// Represents an instance of `builtins.property`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
@@ -570,6 +581,37 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for PropertyInstanceType<'_> {}
 
 impl<'db> PropertyInstanceType<'db> {
+    /// Returns the [`PropertyAccessorRole`] that `def` plays in this property, or `None` when
+    /// `def` is not one of this property's accessors.
+    ///
+    /// Each accessor slot is a function-literal `Type`; an accessor may be overloaded, so a
+    /// definition is matched against every overload signature and the implementation, not just
+    /// the implementation's definition.
+    pub fn accessor_role(
+        self,
+        db: &'db dyn Db,
+        def: Definition<'db>,
+    ) -> Option<PropertyAccessorRole> {
+        let slot_matches = |accessor: Option<Type<'db>>| -> bool {
+            accessor
+                .and_then(Type::as_function_literal)
+                .into_iter()
+                .flat_map(|function| function.iter_overloads_and_implementation(db))
+                .filter_map(|overload| overload.signature(db).definition())
+                .any(|accessor_def| accessor_def == def)
+        };
+
+        if slot_matches(self.getter(db)) {
+            Some(PropertyAccessorRole::Getter)
+        } else if slot_matches(self.setter(db)) {
+            Some(PropertyAccessorRole::Setter)
+        } else if slot_matches(self.deleter(db)) {
+            Some(PropertyAccessorRole::Deleter)
+        } else {
+            None
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
