@@ -1,10 +1,9 @@
-use std::collections::BTreeSet;
-
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
+use rustc_hash::FxHashSet;
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::Db;
@@ -13,17 +12,15 @@ use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
-#[salsa::tracked(returns(as_deref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<Box<[Name]>> {
+#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
     let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
     collector.visit_body(module.suite());
-    collector
-        .into_names()
-        .map(|names| names.into_iter().collect())
+    collector.into_names()
 }
 
 /// A visitor that collects the names in the `__all__` variable of a module.
@@ -42,7 +39,7 @@ struct DunderAllNamesCollector<'db> {
     invalid: bool,
 
     /// A set of names found in `__all__` for the current module.
-    names: BTreeSet<Name>,
+    names: FxHashSet<Name>,
 }
 
 impl<'db> DunderAllNamesCollector<'db> {
@@ -53,7 +50,7 @@ impl<'db> DunderAllNamesCollector<'db> {
             index,
             origin: None,
             invalid: false,
-            names: BTreeSet::default(),
+            names: FxHashSet::default(),
         }
     }
 
@@ -158,7 +155,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     fn dunder_all_names_for_import_from(
         &self,
         import_from: &ast::StmtImportFrom,
-    ) -> Option<&'db [Name]> {
+    ) -> Option<&'db FxHashSet<Name>> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, self.file, &module_name)?;
@@ -199,13 +196,14 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// Returns [`None`] if `__all__` is not defined in the current module or if it contains
     /// invalid elements.
-    fn into_names(self) -> Option<BTreeSet<Name>> {
+    fn into_names(mut self) -> Option<FxHashSet<Name>> {
         if self.origin.is_none() {
             None
         } else if self.invalid {
             tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
             None
         } else {
+            self.names.shrink_to_fit();
             Some(self.names)
         }
     }

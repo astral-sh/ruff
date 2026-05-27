@@ -76,3 +76,5 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Run `cargo dev generate-all` after changing configuration options, CLI arguments, lint rules, or environment variable definitions, as these changes require regeneration of schemas, docs, and CLI references.
 - Don't prefix tests with `test_`.
 - Don't separate struct definitions from their `impl` blocks unless the `impl` is deliberately placed in a separate file, as for large structs.
+- The `db` parameter should always be the first, or second, if it's a method taking a `self` argument
+- For Salsa cached functions, prefer boxed slices or call `shrink_to_fit` on collections to reduce memory usage.
