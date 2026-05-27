@@ -286,7 +286,8 @@ impl<'db> AllMembers<'db> {
             | Type::Divergent(_)
             | Type::Never
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => {
+            | Type::AlwaysFalsy
+            | Type::TypeForm(_) => {
                 self.extend_with_type(db, Type::object());
             }
 

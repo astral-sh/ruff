@@ -2278,6 +2278,57 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
             }
 
+            (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
+                let variance = TypeVarVariance::Covariant.compose(polarity);
+                return self.infer_map_impl(
+                    formal_typeform.type_argument(self.db),
+                    actual_typeform.type_argument(self.db),
+                    variance,
+                    seen,
+                );
+            }
+
+            (
+                Type::TypeForm(formal_typeform),
+                actual @ (Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)),
+            ) => {
+                let variance = TypeVarVariance::Covariant.compose(polarity);
+                if let Some(actual_instance) = actual.to_instance(self.db) {
+                    return self.infer_map_impl(
+                        formal_typeform.type_argument(self.db),
+                        actual_instance,
+                        variance,
+                        seen,
+                    );
+                }
+            }
+
+            (Type::TypeForm(formal_typeform), Type::KnownInstance(actual_instance))
+                if actual_instance.is_type_form_value() =>
+            {
+                let variance = TypeVarVariance::Covariant.compose(polarity);
+                if let Some(actual_argument) = actual_instance.type_form_argument(self.db) {
+                    return self.infer_map_impl(
+                        formal_typeform.type_argument(self.db),
+                        actual_argument,
+                        variance,
+                        seen,
+                    );
+                }
+            }
+
+            (Type::TypeForm(formal_typeform), Type::SpecialForm(actual_form)) => {
+                let variance = TypeVarVariance::Covariant.compose(polarity);
+                if let Some(actual_argument) = actual_form.type_form_argument(self.db) {
+                    return self.infer_map_impl(
+                        formal_typeform.type_argument(self.db),
+                        actual_argument,
+                        variance,
+                        seen,
+                    );
+                }
+            }
+
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
             // multiple union elements, we ideally want to express that _only one_ of them needs to
             // match, and that we should infer the smallest type mapping that allows that.

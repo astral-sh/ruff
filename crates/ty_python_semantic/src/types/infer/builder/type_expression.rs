@@ -20,8 +20,8 @@ use ty_python_core::scope::ScopeKind;
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeFormType, TypeGuardType,
+    TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -1579,7 +1579,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::unknown()
                     }
                 }
-
                 KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::Annotated(_)
@@ -2044,6 +2043,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(arguments_slice, type_of_type);
                 }
                 type_of_type
+            }
+            SpecialFormType::TypeForm => {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let type_argument = if let [argument] = arguments {
+                    self.infer_type_expression(argument)
+                } else {
+                    let num_arguments = arguments.len();
+
+                    if !self.in_string_annotation() {
+                        for argument in arguments {
+                            self.infer_expression(argument, TypeContext::default());
+                        }
+                    }
+                    report_invalid_argument_number_to_special_form(
+                        &self.context,
+                        subscript,
+                        special_form,
+                        num_arguments,
+                        1,
+                    );
+
+                    Type::unknown()
+                };
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, type_argument);
+                }
+                TypeFormType::from_type_expression(db, type_argument)
             }
 
             SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {

@@ -292,6 +292,43 @@ impl<'db> KnownInstanceType<'db> {
         self.class(db).to_instance(db)
     }
 
+    /// Return the type denoted by this retained runtime type-expression object.
+    ///
+    /// This is the scope-independent subset of `Type::in_type_expression` used when a value
+    /// reaches a `TypeForm` position after it has already been inferred in value context.
+    pub(crate) fn type_form_argument(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
+            Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
+            Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
+                Some(ty.inner(db))
+            }
+            Self::TypeGenericAlias(instance) => Some(instance.inner(db).to_meta_type(db)),
+            Self::Callable(callable) => Some(Type::Callable(callable)),
+            Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
+            Self::Sentinel(sentinel) => {
+                Some(Type::KnownInstance(KnownInstanceType::Sentinel(sentinel)))
+            }
+            _ => None,
+        }
+    }
+
+    /// Return whether this known instance can represent a type expression at runtime.
+    pub(crate) fn is_type_form_value(self) -> bool {
+        matches!(
+            self,
+            Self::TypeAliasType(_)
+                | Self::UnionType(_)
+                | Self::Literal(_)
+                | Self::Annotated(_)
+                | Self::TypeGenericAlias(_)
+                | Self::Callable(_)
+                | Self::LiteralStringAlias(_)
+                | Self::NewType(_)
+                | Self::Sentinel(_)
+        )
+    }
+
     /// Return `true` if this symbol is an instance of `class`.
     pub(super) fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
         self.class(db).is_subclass_of(db, class)

@@ -1754,6 +1754,7 @@ fn is_instance_truthiness<'db>(
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
         | Type::TypeGuard(..)
+        | Type::TypeForm(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
         | Type::Divergent(_)
