@@ -324,6 +324,59 @@ pub fn definitions_for_attribute<'db>(
     resolved
 }
 
+/// Returns definitions for the implementation family of an attribute expression `x.y`.
+///
+/// This finds same-named methods defined on the inferred receiver class and on all known
+/// transitive subclasses. It intentionally only returns methods defined in class bodies,
+/// not call sites or arbitrary assignments with the same name.
+pub fn implementation_definitions_for_attribute<'db>(
+    model: &SemanticModel<'db>,
+    attribute: &ast::ExprAttribute,
+) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
+    let method_name = attribute.attr.as_str();
+
+    let Some(lhs_ty) = attribute.value.inferred_type(model) else {
+        return Vec::new();
+    };
+
+    let mut roots = Vec::new();
+    let mut seen = FxHashSet::default();
+    collect_implementation_root_classes(db, lhs_ty, &mut seen, &mut roots);
+
+    roots
+        .into_iter()
+        .flat_map(|root| implementation_definitions_for_class_family(db, root, method_name))
+        .collect()
+}
+
+/// Returns definitions for the implementation family of a method declaration.
+///
+/// The containing class is used as the root, and same-named methods defined on known transitive
+/// subclasses are returned along with the method itself.
+pub fn implementation_definitions_for_method<'db>(
+    model: &SemanticModel<'db>,
+    function: &ast::StmtFunctionDef,
+) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
+    let method_name = function.name.as_str();
+    let function_definition = function.definition(model);
+    let containing_scope = function_definition.scope(db);
+
+    let Some(class_node) = containing_scope.node(db).as_class() else {
+        return Vec::new();
+    };
+
+    let class_definition =
+        semantic_index(db, containing_scope.file(db)).expect_single_definition(class_node);
+    let class_ty = crate::types::binding_type(db, class_definition);
+    let Some(root) = extract_class_literal(db, class_ty) else {
+        return Vec::new();
+    };
+
+    implementation_definitions_for_class_family(db, root, method_name)
+}
+
 /// Returns the descriptor object type for an attribute expression `x.y`, without invoking the
 /// descriptor protocol. This corresponds to `inspect.getattr_static(x, "y")` at the type level.
 pub fn static_member_type_for_attribute<'db>(
@@ -403,6 +456,94 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     }
 
     resolved
+}
+
+fn implementation_definitions_for_class_family<'db>(
+    db: &'db dyn Db,
+    root: ClassLiteral<'db>,
+    method_name: &str,
+) -> Vec<ResolvedDefinition<'db>> {
+    std::iter::once(root)
+        .chain(transitive_subtypes(db, root))
+        .flat_map(|class| own_method_definitions(db, class, method_name))
+        .collect()
+}
+
+fn own_method_definitions<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    method_name: &str,
+) -> Vec<ResolvedDefinition<'db>> {
+    let Some(class) = class.as_static() else {
+        return Vec::new();
+    };
+
+    let class_scope = class.body_scope(db);
+    let class_place_table = ty_python_core::place_table(db, class_scope);
+
+    let Some(place_id) = class_place_table.symbol_id(method_name) else {
+        return Vec::new();
+    };
+
+    let use_def = use_def_map(db, class_scope);
+    reachable_definitions(
+        db,
+        use_def
+            .reachable_symbol_declarations(place_id)
+            .filter_map(|declaration| declaration.declaration.definition())
+            .chain(
+                use_def
+                    .reachable_symbol_bindings(place_id)
+                    .filter_map(|binding| binding.binding.definition()),
+            ),
+    )
+    .into_iter()
+    .filter(|definition| matches!(definition.kind(db), DefinitionKind::Function(_)))
+    .map(ResolvedDefinition::Definition)
+    .collect()
+}
+
+fn collect_implementation_root_classes<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen: &mut FxHashSet<ClassLiteral<'db>>,
+    roots: &mut Vec<ClassLiteral<'db>>,
+) {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => {
+            for element in union.elements(db) {
+                collect_implementation_root_classes(db, *element, seen, roots);
+            }
+        }
+        Type::Intersection(intersection) => {
+            if let Some(alternatives) = intersection.finite_alternatives(db) {
+                for alternative in alternatives {
+                    collect_implementation_root_classes(db, alternative, seen, roots);
+                }
+            }
+        }
+        ty => {
+            let root = match ty {
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                    extract_class_literal(db, ty)
+                }
+                Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::KnownInstance(_)
+                | Type::LiteralValue(_)
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_) => extract_class_literal(db, ty)
+                    .or_else(|| extract_class_literal(db, ty.to_meta_type(db))),
+                _ => None,
+            };
+
+            if let Some(root) = root
+                && seen.insert(root)
+            {
+                roots.push(root);
+            }
+        }
+    }
 }
 
 fn reachable_definitions<'db>(
@@ -1990,6 +2131,38 @@ pub fn type_hierarchy_subtypes(
     let Some(target_class) = extract_class_literal(db, ty) else {
         return vec![];
     };
+    direct_subtypes(db, target_class)
+        .into_iter()
+        .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
+        .collect()
+}
+
+fn transitive_subtypes<'db>(db: &'db dyn Db, root: ClassLiteral<'db>) -> Vec<ClassLiteral<'db>> {
+    fn collect<'db>(
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+        seen: &mut FxHashSet<ClassLiteral<'db>>,
+        subtypes: &mut Vec<ClassLiteral<'db>>,
+    ) {
+        for subtype in direct_subtypes(db, class) {
+            if seen.insert(subtype) {
+                subtypes.push(subtype);
+                collect(db, subtype, seen, subtypes);
+            }
+        }
+    }
+
+    let mut subtypes = Vec::new();
+    let mut seen = FxHashSet::default();
+    seen.insert(root);
+    collect(db, root, &mut seen, &mut subtypes);
+    subtypes
+}
+
+fn direct_subtypes<'db>(
+    db: &'db dyn Db,
+    target_class: ClassLiteral<'db>,
+) -> Vec<ClassLiteral<'db>> {
     let target_name = target_class.name(db);
     let target_is_object = target_class.is_known(db, KnownClass::Object);
     let mut subtypes = vec![];
@@ -2055,7 +2228,7 @@ pub fn type_hierarchy_subtypes(
                 })
             };
             if is_subtype {
-                subtypes.push(class_literal_to_hierarchy_info(db, class_ty));
+                subtypes.push(class_ty);
             }
         }
     }

@@ -2613,6 +2613,7 @@ class GenericFoo[T](Base):
         Definition,
         Declaration,
         TypeDefinition,
+        Implementation,
     }
 
     impl GotoAction {
@@ -2621,6 +2622,7 @@ class GenericFoo[T](Base):
                 GotoAction::Definition => "goto-definition",
                 GotoAction::Declaration => "goto-declaration",
                 GotoAction::TypeDefinition => "goto-type definition",
+                GotoAction::Implementation => "goto-implementation",
             }
         }
 
@@ -2629,6 +2631,7 @@ class GenericFoo[T](Base):
                 GotoAction::Definition => "Go to definition",
                 GotoAction::Declaration => "Go to declaration",
                 GotoAction::TypeDefinition => "Go to type definition",
+                GotoAction::Implementation => "Go to implementation",
             }
         }
 
@@ -2637,6 +2640,7 @@ class GenericFoo[T](Base):
                 GotoAction::Definition => "definition",
                 GotoAction::Declaration => "declaration",
                 GotoAction::TypeDefinition => "type definition",
+                GotoAction::Implementation => "implementation",
             }
         }
     }
