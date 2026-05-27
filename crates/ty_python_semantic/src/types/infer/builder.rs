@@ -2364,7 +2364,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !assignable && emit_diagnostics {
                     report_invalid_attribute_assignment(
                         &builder.context,
-                        target.into(),
+                        target.range(),
                         attr_ty,
                         value_ty,
                         attribute,
@@ -3049,7 +3049,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if emit_diagnostics {
                             report_invalid_attribute_assignment(
                                 &self.context,
-                                target.into(),
+                                target.range(),
                                 attr_ty,
                                 value_ty,
                                 attribute,
@@ -3318,9 +3318,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                    object_ty.find_name_in_mro(db, attribute).expect(
-                        "called on Type::ClassLiteral, Type::GenericAlias, or Type::SubclassOf",
-                    )
+                    object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
                 }
                 Type::Union(..)
                 | Type::Intersection(..)

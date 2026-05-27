@@ -193,6 +193,20 @@ def _[T: D](x: type[T]):
     static_assert(has_member(x, "meta_attr"))
     static_assert(has_member(x, "base_attr"))
     static_assert(has_member(x, "class_attr"))
+
+class InitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized_attr: int = 1
+
+class Initialized(metaclass=InitializingMeta): ...
+
+static_assert(has_member(Initialized, "initialized_attr"))
+
+def _(x: type[Initialized]):
+    static_assert(has_member(x, "initialized_attr"))
+
+def _[T: Initialized](x: type[T]):
+    static_assert(has_member(x, "initialized_attr"))
 ```
 
 ### Generic classes
@@ -216,12 +230,42 @@ Generic classes can also have metaclasses:
 class Meta(type):
     FOO = 42
 
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized_attr: int = 1
+
 class E(Generic[T], metaclass=Meta): ...
 
 static_assert(has_member(E[int], "FOO"))
+static_assert(has_member(E[int], "initialized_attr"))
 
 def f(x: type[E[str]]):
     static_assert(has_member(x, "FOO"))
+    static_assert(has_member(x, "initialized_attr"))
+```
+
+### Generic metaclasses
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import has_member, static_assert
+
+class InitializingMeta[T](type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized_attr: int = 1
+
+class Initialized(metaclass=InitializingMeta[int]): ...
+
+static_assert(has_member(Initialized, "initialized_attr"))
+
+def _(x: type[Initialized]):
+    static_assert(has_member(x, "initialized_attr"))
+
+def _[T: Initialized](x: type[T]):
+    static_assert(has_member(x, "initialized_attr"))
 ```
 
 ### `type[Any]` and `Any`

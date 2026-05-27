@@ -6,15 +6,16 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 use crate::{
     Db, TypeQualifiers,
     diagnostic::format_enumeration,
-    place::{place_from_bindings, place_from_declarations},
+    place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, KnownInstanceType, MemberLookupPolicy,
-        MetaclassCandidate, Parameters, Signature, SpecialFormType, StaticClassLiteral, Type,
-        TypeVarVariance, binding_type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, KnownClass, KnownInstanceType,
+        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
+        StaticClassLiteral, Type, TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -31,9 +32,9 @@ use crate::{
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
-            report_instance_layout_conflict, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference,
+            report_instance_layout_conflict, report_invalid_attribute_assignment,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
@@ -53,7 +54,9 @@ use crate::{
     },
 };
 use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
-use ty_python_core::{SemanticIndex, definition::DefinitionKind, scope::ScopeId};
+use ty_python_core::{
+    SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
+};
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition is semantically valid and will not cause an exception to be raised at runtime.
@@ -983,10 +986,13 @@ pub(crate) fn check_static_class_definitions<'db>(
     // and for violations of other rules relating to invalid overrides of some sort.
     overrides::check_class(context, class);
 
-    // (14) Check for unimplemented abstract methods on final classes.
+    // (14) Check compatibility between class namespace values and metaclass-populated attributes.
+    check_class_namespace_against_metaclass_members(context, class, index);
+
+    // (15) Check for unimplemented abstract methods on final classes.
     check_final_class_abstract_methods(context, class, class_node);
 
-    // (15) Check for Final-qualified declarations without a value.
+    // (16) Check for Final-qualified declarations without a value.
     check_class_final_without_value(context, class, index);
 
     if let Some(protocol) = class.into_protocol_class(db) {
@@ -998,6 +1004,136 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+/// Check compatibility between class namespace values and attributes populated by its metaclass.
+///
+/// A binding in a class body is passed through the namespace used to construct the class object
+/// before a metaclass can initialize that same attribute. If the metaclass declares a type for
+/// that attribute, an incompatible class-body value violates that contract.
+///
+/// Independently, an explicit attribute declaration in the class body constrains a value
+/// populated by metaclass initialization.
+fn check_class_namespace_against_metaclass_members<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    let metaclass = class.metaclass(db);
+    if metaclass == KnownClass::Type.to_class_literal(db) {
+        return;
+    }
+
+    let Some(metaclass_instance) = metaclass.to_instance(db) else {
+        return;
+    };
+
+    let scope = class.body_scope(db).file_scope_id(db);
+    let table = index.place_table(scope);
+    let use_def = index.use_def_map(scope);
+
+    let Some(metaclass) = metaclass.to_class_type(db) else {
+        return;
+    };
+
+    // Metaclass-populated members are generally sparse, while class namespaces such as enums can
+    // be large. Collect possible members first rather than probing the metaclass for every binding.
+    let mut metaclass_instance_members = FxHashSet::default();
+    for metaclass in metaclass
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
+    {
+        let body_scope = metaclass.body_scope(db);
+        let metaclass_index = semantic_index(db, body_scope.file(db));
+        let body_scope = body_scope.file_scope_id(db);
+        let metaclass_table = metaclass_index.place_table(body_scope);
+        let metaclass_use_def = metaclass_index.use_def_map(body_scope);
+
+        for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
+            metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().to_string());
+        }
+
+        for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
+            for member in metaclass_index.place_table(function_scope).members() {
+                if let Some(name) = member.as_instance_attribute() {
+                    metaclass_instance_members.insert(name.to_string());
+                }
+            }
+        }
+    }
+
+    for name in metaclass_instance_members {
+        let Some(symbol_id) = table.symbol_id(name.as_str()) else {
+            continue;
+        };
+        let Place::Defined(DefinedPlace {
+            ty: metaclass_member_ty,
+            origin,
+            ..
+        }) = metaclass_instance.instance_member(db, name.as_str()).place
+        else {
+            continue;
+        };
+
+        if origin == TypeOrigin::Declared {
+            let mut reported_incompatible_binding = false;
+            for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
+                let Some(definition) = binding.binding.definition() else {
+                    continue;
+                };
+                let definition_kind = definition.kind(db);
+                if !definition_kind.is_user_visible() {
+                    continue;
+                }
+
+                let assigned_ty = binding_type(db, definition);
+                if !assigned_ty.is_assignable_to(db, metaclass_member_ty) {
+                    reported_incompatible_binding = true;
+                    report_invalid_attribute_assignment(
+                        context,
+                        definition_kind.target_range(context.module()),
+                        metaclass_member_ty,
+                        assigned_ty,
+                        name.as_str(),
+                    );
+                }
+            }
+
+            if reported_incompatible_binding {
+                continue;
+            }
+        }
+
+        let result =
+            place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id));
+        let Some(definition) = result.first_declaration else {
+            continue;
+        };
+        let Place::Defined(DefinedPlace {
+            ty: class_declared_ty,
+            ..
+        }) = result.ignore_conflicting_declarations().place
+        else {
+            continue;
+        };
+        let definition_kind = definition.kind(db);
+        // A metaclass may intentionally replace an ordinary class namespace value during class
+        // creation. Only an explicit attribute annotation constrains the replacement value.
+        if !matches!(definition_kind, DefinitionKind::AnnotatedAssignment(_)) {
+            continue;
+        }
+        if !metaclass_member_ty.is_assignable_to(db, class_declared_ty) {
+            report_invalid_attribute_assignment(
+                context,
+                definition_kind.target_range(context.module()),
+                class_declared_ty,
+                metaclass_member_ty,
+                name.as_str(),
+            );
+        }
+    }
 }
 
 fn ordered_dataclass_base_class<'db>(
