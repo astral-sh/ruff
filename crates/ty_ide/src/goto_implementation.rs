@@ -129,6 +129,71 @@ mod tests {
     }
 
     #[test]
+    fn implementation_inherited_method_from_concrete_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                def speak(self): ...
+
+            class Dog(Animal):
+                pass
+
+            dog = Dog()
+            dog.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:9:5
+          |
+        9 | dog.speak()
+          |     ^^^^^ Clicking here
+          |
+        info: Found 1 implementation
+         --> main.py:3:9
+          |
+        3 |     def speak(self): ...
+          |         -----
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_inherited_method_from_union_receivers_deduplicates() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                def speak(self): ...
+
+            class Dog(Animal):
+                pass
+
+            class Cat(Animal):
+                pass
+
+            def f(pet: Dog | Cat):
+                pet.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+          --> main.py:12:9
+           |
+        12 |     pet.speak()
+           |         ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:3:9
+          |
+        3 |     def speak(self): ...
+          |         -----
+          |
+        ");
+    }
+
+    #[test]
     fn implementation_method_declaration_root() {
         let test = cursor_test(
             r#"
