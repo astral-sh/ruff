@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use crate::call_hierarchy::CalleeLeaf;
 use crate::goto::find_goto_target;
 use crate::{CallHierarchyItem, Db};
@@ -42,7 +44,7 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
     };
 
     // Use a stable group key so multiple call sites to the same callee fold into
-    // one outgoing entry, and so output order is deterministic across runs.
+    // one outgoing entry.
     let mut groups: FxHashMap<CalleeKey, (CallHierarchyItem, Vec<TextRange>)> =
         FxHashMap::default();
 
@@ -53,14 +55,13 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
         let def_file = def.file(db);
         let parsed = parsed_module(db, def_file).load(db);
 
-        let body_model = SemanticModel::new(db, def_file);
+        let model = SemanticModel::new(db, def_file);
         let mut finder = OutgoingCallsFinder {
             db,
-            model: &body_model,
+            model: &model,
             tokens: parsed.tokens(),
             groups: &mut groups,
             ancestors: Vec::new(),
-            seen_for_this_call: rustc_hash::FxHashSet::default(),
         };
 
         // Walk the queried symbol's signature parts (everything evaluated when
@@ -69,8 +70,7 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
         match def.kind(db) {
             DefinitionKind::Function(fn_ref) => {
                 let func = fn_ref.node(&parsed);
-                walk_callable_signature(
-                    &mut finder,
+                finder.walk_callable_signature(
                     &func.decorator_list,
                     func.type_params.as_deref(),
                     Some(&func.parameters),
@@ -80,8 +80,7 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
             }
             DefinitionKind::Class(class_ref) => {
                 let class = class_ref.node(&parsed);
-                walk_class_signature(
-                    &mut finder,
+                finder.walk_class_signature(
                     &class.decorator_list,
                     class.type_params.as_deref(),
                     class.arguments.as_deref(),
@@ -124,10 +123,6 @@ struct OutgoingCallsFinder<'a, 'db> {
     tokens: &'a Tokens,
     groups: &'a mut FxHashMap<CalleeKey, (CallHierarchyItem, Vec<TextRange>)>,
     ancestors: Vec<AnyNodeRef<'a>>,
-    /// Reused across `record_callee` invocations: cleared at the top of each
-    /// call instead of allocated fresh. Carries the `(file, selection_range)`
-    /// dedup keys for one call site's resolved-definitions iteration.
-    seen_for_this_call: rustc_hash::FxHashSet<(File, TextRange)>,
 }
 
 impl<'a> OutgoingCallsFinder<'a, '_> {
@@ -137,6 +132,7 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
         else {
             return;
         };
+
         let Some(definitions) = goto_target
             .definitions(self.model, ImportAliasResolution::ResolveAliases)
             .and_then(|d| d.goto_declaration(self.model, &goto_target))
@@ -144,16 +140,6 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
             return;
         };
 
-        // A single call site can resolve to multiple `ResolvedDefinition`s
-        // pointing at the same logical callee (overload chains, co-definitions,
-        // import alias + underlying). Deduplicate by callee key so this call
-        // site contributes exactly one range per distinct callee.
-        //
-        // We compute the dedup key (`(file, selection_range)`) up-front and
-        // only construct the full `CallHierarchyItem` when inserting a new
-        // entry, so callees hit repeatedly through the body don't pay repeated
-        // name allocations and range computations.
-        self.seen_for_this_call.clear();
         for resolved in &definitions {
             let Some(def) = resolved.definition() else {
                 continue;
@@ -168,20 +154,69 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
             let def_file = def.file(self.db);
             let module_ref = parsed_module(self.db, def_file).load(self.db);
             let selection_range = def.focus_range(self.db, &module_ref).range();
-            if !self.seen_for_this_call.insert((def_file, selection_range)) {
-                continue;
-            }
+
             let key = CalleeKey {
                 file: def_file,
                 selection_range,
             };
-            if let Some((_, ranges)) = self.groups.get_mut(&key) {
-                ranges.push(call_site_range);
-            } else if let Some(item) =
-                CallHierarchyItem::from_definition(self.db, resolved, &module_ref)
-            {
-                self.groups.insert(key, (item, vec![call_site_range]));
+
+            match self.groups.entry(key) {
+                Entry::Occupied(mut occupied) => {
+                    occupied.get_mut().1.push(call_site_range);
+                }
+                Entry::Vacant(entry) => {
+                    if let Some(item) =
+                        CallHierarchyItem::from_definition(self.db, resolved, &module_ref)
+                    {
+                        entry.insert((item, vec![call_site_range]));
+                    }
+                }
             }
+        }
+    }
+
+    /// Visit the definition-time parts of a function / lambda — everything
+    /// evaluated when the `def` (or `lambda` expression) is reached at runtime
+    /// in the *enclosing* scope: decorators, type parameters, parameter defaults
+    /// and annotations, return-type annotation.
+    fn walk_callable_signature(
+        &mut self,
+        decorator_list: &'a [ast::Decorator],
+        type_params: Option<&'a ast::TypeParams>,
+        parameters: Option<&'a ast::Parameters>,
+        returns: Option<&'a ast::Expr>,
+    ) {
+        for decorator in decorator_list {
+            walk_decorator(self, decorator);
+        }
+        if let Some(type_params) = type_params {
+            walk_type_params(self, type_params);
+        }
+        if let Some(parameters) = parameters {
+            walk_parameters(self, parameters);
+        }
+        if let Some(returns) = returns {
+            walk_expr(self, returns);
+        }
+    }
+
+    /// Visit the definition-time parts of a class statement: decorators, type
+    /// parameters, base classes / keyword arguments / metaclass. The body is
+    /// handled separately so the caller can decide whether to walk it.
+    fn walk_class_signature(
+        &mut self,
+        decorator_list: &'a [ast::Decorator],
+        type_params: Option<&'a ast::TypeParams>,
+        arguments: Option<&'a ast::Arguments>,
+    ) {
+        for decorator in decorator_list {
+            walk_decorator(self, decorator);
+        }
+        if let Some(type_params) = type_params {
+            walk_type_params(self, type_params);
+        }
+        if let Some(arguments) = arguments {
+            walk_arguments(self, arguments);
         }
     }
 }
@@ -209,8 +244,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
             // body belongs to the nested item itself and is reached by
             // expanding that item separately in the call hierarchy tree.
             AnyNodeRef::StmtFunctionDef(func) => {
-                walk_callable_signature(
-                    self,
+                self.walk_callable_signature(
                     &func.decorator_list,
                     func.type_params.as_deref(),
                     Some(&func.parameters),
@@ -219,8 +253,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
                 return TraversalSignal::Skip;
             }
             AnyNodeRef::StmtClassDef(class) => {
-                walk_class_signature(
-                    self,
+                self.walk_class_signature(
                     &class.decorator_list,
                     class.type_params.as_deref(),
                     class.arguments.as_deref(),
@@ -228,7 +261,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
                 return TraversalSignal::Skip;
             }
             AnyNodeRef::ExprLambda(lambda) => {
-                walk_callable_signature(self, &[], None, lambda.parameters.as_deref(), None);
+                self.walk_callable_signature(&[], None, lambda.parameters.as_deref(), None);
                 return TraversalSignal::Skip;
             }
             _ => {}
@@ -247,55 +280,6 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
 struct CalleeKey {
     file: File,
     selection_range: TextRange,
-}
-
-/// Visit the definition-time parts of a function / lambda — everything
-/// evaluated when the `def` (or `lambda` expression) is reached at runtime
-/// in the *enclosing* scope: decorators, type parameters, parameter defaults
-/// and annotations, return-type annotation.
-fn walk_callable_signature<'a, V>(
-    visitor: &mut V,
-    decorator_list: &'a [ast::Decorator],
-    type_params: Option<&'a ast::TypeParams>,
-    parameters: Option<&'a ast::Parameters>,
-    returns: Option<&'a ast::Expr>,
-) where
-    V: SourceOrderVisitor<'a> + ?Sized,
-{
-    for decorator in decorator_list {
-        walk_decorator(visitor, decorator);
-    }
-    if let Some(type_params) = type_params {
-        walk_type_params(visitor, type_params);
-    }
-    if let Some(parameters) = parameters {
-        walk_parameters(visitor, parameters);
-    }
-    if let Some(returns) = returns {
-        walk_expr(visitor, returns);
-    }
-}
-
-/// Visit the definition-time parts of a class statement: decorators, type
-/// parameters, base classes / keyword arguments / metaclass. The body is
-/// handled separately so the caller can decide whether to walk it.
-fn walk_class_signature<'a, V>(
-    visitor: &mut V,
-    decorator_list: &'a [ast::Decorator],
-    type_params: Option<&'a ast::TypeParams>,
-    arguments: Option<&'a ast::Arguments>,
-) where
-    V: SourceOrderVisitor<'a> + ?Sized,
-{
-    for decorator in decorator_list {
-        walk_decorator(visitor, decorator);
-    }
-    if let Some(type_params) = type_params {
-        walk_type_params(visitor, type_params);
-    }
-    if let Some(arguments) = arguments {
-        walk_arguments(visitor, arguments);
-    }
 }
 
 #[cfg(test)]
