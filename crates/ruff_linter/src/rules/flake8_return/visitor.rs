@@ -1,6 +1,6 @@
-use ruff_python_ast::helpers::any_over_body;
+use ruff_python_ast::helpers::{StoredNameFinder, any_over_body};
+use ruff_python_ast::statement_visitor::{self, StatementVisitor};
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Identifier, Stmt};
-use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::visitor;
@@ -46,8 +46,10 @@ pub(super) struct ReturnVisitor<'semantic, 'data> {
     pub(super) stack: Stack<'data>,
     /// The preceding sibling of the current node.
     sibling: Option<&'data Stmt>,
-    /// The parent nodes of the current node.
-    parents: Vec<&'data Stmt>,
+    /// Enclosing `try` statements whose `finalbody` would run after a pending
+    /// `return`. Pushed before walking `body`/`handlers`/`orelse`, popped
+    /// before walking the try's own `finalbody`.
+    enclosing_tries: Vec<&'data ast::StmtTry>,
 }
 
 impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
@@ -56,7 +58,7 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
             semantic,
             stack: Stack::default(),
             sibling: None,
-            parents: Vec::new(),
+            enclosing_tries: Vec::new(),
         }
     }
 }
@@ -67,11 +69,9 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
             Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. }) => {
                 // Visit the decorators, etc.
                 self.sibling = Some(stmt);
-                self.parents.push(stmt);
                 for decorator in decorator_list {
                     visitor::walk_decorator(self, decorator);
                 }
-                self.parents.pop();
 
                 // But don't recurse into the body.
                 return;
@@ -84,7 +84,6 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
             }) => {
                 // Visit the decorators, etc.
                 self.sibling = Some(stmt);
-                self.parents.push(stmt);
                 for decorator in decorator_list {
                     visitor::walk_decorator(self, decorator);
                 }
@@ -92,9 +91,20 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                     visitor::walk_expr(self, returns);
                 }
                 visitor::walk_parameters(self, parameters);
-                self.parents.pop();
 
                 // But don't recurse into the body.
+                return;
+            }
+            Stmt::Try(stmt_try) => {
+                self.sibling = Some(stmt);
+                self.enclosing_tries.push(stmt_try);
+                self.visit_body(&stmt_try.body);
+                for handler in &stmt_try.handlers {
+                    visitor::walk_except_handler(self, handler);
+                }
+                self.visit_body(&stmt_try.orelse);
+                self.enclosing_tries.pop();
+                self.visit_body(&stmt_try.finalbody);
                 return;
             }
             Stmt::Global(ast::StmtGlobal {
@@ -130,7 +140,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                         //     return x
                         // ```
                         Stmt::Assign(stmt_assign) => {
-                            if !is_observed_by_enclosing_try(stmt_assign, &self.parents) {
+                            if !is_observed_by_enclosing_try(stmt_assign, &self.enclosing_tries) {
                                 self.stack
                                     .assignment_return
                                     .push((stmt_assign, stmt_return, stmt));
@@ -148,7 +158,10 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                                 with.body.last().and_then(Stmt::as_assign_stmt)
                             {
                                 if !has_conditional_body(with, self.semantic)
-                                    && !is_observed_by_enclosing_try(stmt_assign, &self.parents)
+                                    && !is_observed_by_enclosing_try(
+                                        stmt_assign,
+                                        &self.enclosing_tries,
+                                    )
                                 {
                                     self.stack.assignment_return.push((
                                         stmt_assign,
@@ -177,9 +190,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
         }
 
         self.sibling = Some(stmt);
-        self.parents.push(stmt);
         visitor::walk_stmt(self, stmt);
-        self.parents.pop();
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
@@ -230,38 +241,87 @@ pub(crate) fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticMode
     })
 }
 
-/// Returns `true` if the `finally` clause of a `try` enclosing the pending
-/// `return` reads the assigned name. The `finally` runs after the `return`,
-/// so removing the assignment would hide the value from it.
+/// Returns `true` if the `finally` clause of an enclosing `try` reads the
+/// assigned name. The `finally` runs after the `return`, so removing the
+/// assignment would hide the value from it.
 ///
 /// `except` handlers are **not** checked: they are alternative control-flow
 /// paths to the `return`. If an exception fires, the assignment never
 /// completed, so the handler reads whatever value the name had before the
-/// `try` either way — removing the assignment does not change that.
-///
-/// An enclosing `try` whose `finalbody` already contains the assignment is
-/// skipped: that `finally` is currently executing, so its reads can't fire
-/// after the `return`. Outer enclosing tries still apply.
-fn is_observed_by_enclosing_try(stmt_assign: &ast::StmtAssign, parents: &[&Stmt]) -> bool {
+/// `try` either way; removing the assignment does not change that.
+fn is_observed_by_enclosing_try(
+    stmt_assign: &ast::StmtAssign,
+    enclosing_tries: &[&ast::StmtTry],
+) -> bool {
     let [Expr::Name(target)] = stmt_assign.targets.as_slice() else {
         return false;
     };
     let name = target.id.as_str();
-    let name_read = |expr: &Expr| {
+    enclosing_tries
+        .iter()
+        .any(|stmt_try| finalbody_observes(name, &stmt_try.finalbody))
+}
+
+/// `Stmt::AugAssign` targets count as reads: `x += 1` loads `x` first, but
+/// the AST encodes the target as `Store`, so a load-only walk misses it.
+fn finalbody_observes(name: &str, finalbody: &[Stmt]) -> bool {
+    let load_of = |expr: &Expr| {
         matches!(
             expr,
             Expr::Name(ast::ExprName { id, ctx, .. })
                 if ctx.is_load() && id == name
         )
     };
-    parents
-        .iter()
-        .filter_map(|stmt| stmt.as_try_stmt())
-        .filter(|stmt_try| {
-            !stmt_try
-                .finalbody
-                .iter()
-                .any(|s| s.range().contains_range(stmt_assign.range()))
-        })
-        .any(|stmt_try| any_over_body(&stmt_try.finalbody, &name_read))
+    for stmt in finalbody {
+        let body = std::slice::from_ref(stmt);
+        let mut finder = AugAssignFinder { name, found: false };
+        finder.visit_body(body);
+        if finder.found || any_over_body(body, load_of) {
+            return true;
+        }
+        if is_top_level_kill(stmt, name) {
+            return false;
+        }
+    }
+    false
+}
+
+struct AugAssignFinder<'a> {
+    name: &'a str,
+    found: bool,
+}
+
+impl<'a> StatementVisitor<'a> for AugAssignFinder<'_> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        if self.found {
+            return;
+        }
+        if let Stmt::AugAssign(ast::StmtAugAssign { target, .. }) = stmt
+            && let Expr::Name(ast::ExprName { id, .. }) = target.as_ref()
+            && id == self.name
+        {
+            self.found = true;
+            return;
+        }
+        statement_visitor::walk_stmt(self, stmt);
+    }
+}
+
+/// Conditional rebinds (inside `if`/`for`/...) don't count, since they may
+/// not execute.
+fn is_top_level_kill(stmt: &Stmt, name: &str) -> bool {
+    let targets: &[Expr] = match stmt {
+        Stmt::Assign(ast::StmtAssign { targets, .. }) => targets,
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            target,
+            value: Some(_),
+            ..
+        }) => std::slice::from_ref(target.as_ref()),
+        _ => return false,
+    };
+    let mut finder = StoredNameFinder::default();
+    for target in targets {
+        finder.visit_expr(target);
+    }
+    finder.names.contains_key(name)
 }
