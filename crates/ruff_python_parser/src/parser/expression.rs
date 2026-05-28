@@ -1507,7 +1507,7 @@ impl<'src> Parser<'src> {
             if tstring_count < strings.len() {
                 self.add_error(
                     ParseErrorType::OtherError(
-                        "cannot mix t-string literals with string or bytes literals".to_string(),
+                        "Cannot mix t-string literals with string or bytes literals".to_string(),
                     ),
                     range,
                 );
@@ -2124,7 +2124,7 @@ impl<'src> Parser<'src> {
         // Nice error message when having a unclosed open bracket `[`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
-                ParseErrorType::OtherError("missing closing bracket `]`".to_string()),
+                ParseErrorType::OtherError("Missing closing bracket `]`".to_string()),
                 self.current_token_range(),
             );
         }
@@ -2216,7 +2216,7 @@ impl<'src> Parser<'src> {
         // Nice error message when having a unclosed open brace `{`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
-                ParseErrorType::OtherError("missing closing brace `}`".to_string()),
+                ParseErrorType::OtherError("Missing closing brace `}`".to_string()),
                 self.current_token_range(),
             );
         }
@@ -2377,7 +2377,7 @@ impl<'src> Parser<'src> {
         if self.at_ts(NEWLINE_EOF_SET) {
             let range = self.current_token_range();
             self.add_error(
-                ParseErrorType::OtherError("missing closing parenthesis `)`".to_string()),
+                ParseErrorType::OtherError("Missing closing parenthesis `)`".to_string()),
                 range,
             );
         }
