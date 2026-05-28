@@ -7,7 +7,6 @@ use lsp_types::notification::Notification;
 use lsp_types::request::Request;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 
-mod call_hierarchy;
 mod diagnostics;
 mod notifications;
 mod requests;

@@ -4,13 +4,15 @@ use lsp_types::request::CallHierarchyPrepare;
 use lsp_types::{CallHierarchyItem, CallHierarchyPrepareParams, Url};
 use ty_project::ProjectDatabase;
 
-use crate::document::PositionExt;
-use crate::server::api::call_hierarchy::convert_to_lsp_item;
+use crate::PositionEncoding;
+use crate::document::{PositionExt, ToRangeExt as _};
+use crate::server::api::symbols::convert_symbol_kind;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
+use crate::system::file_to_url;
 
 /// Handles `textDocument/prepareCallHierarchy`.
 ///
@@ -73,3 +75,28 @@ impl BackgroundDocumentRequestHandler for PrepareCallHierarchyRequestHandler {
 }
 
 impl RetriableRequestHandler for PrepareCallHierarchyRequestHandler {}
+
+pub(super) fn convert_to_lsp_item(
+    db: &ProjectDatabase,
+    item: ty_ide::CallHierarchyItem,
+    encoding: PositionEncoding,
+) -> Option<CallHierarchyItem> {
+    let uri = file_to_url(db, item.file)?;
+    let full_range = item.full_range.to_lsp_range(db, item.file, encoding)?;
+    let selection_range = item.selection_range.to_lsp_range(db, item.file, encoding)?;
+
+    let kind = convert_symbol_kind(item.kind);
+
+    Some(CallHierarchyItem {
+        name: item.name.into(),
+        kind,
+        tags: None,
+        detail: None,
+        uri,
+        range: full_range.local_range(),
+        selection_range: selection_range.local_range(),
+        // The `data` field is intentionally unused. We re-derive identity from
+        // `(uri, selection_range.start)` — see `resolve_item_location`.
+        data: None,
+    })
+}

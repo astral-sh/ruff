@@ -4,7 +4,7 @@ use lsp_types::request::{
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    PartialResultParams, Position, Range, TextDocumentIdentifier, TextDocumentPositionParams,
+    PartialResultParams, Position, TextDocumentIdentifier, TextDocumentPositionParams,
     WorkDoneProgressParams,
 };
 
@@ -26,9 +26,35 @@ result = my_function()
 
     // Cursor on the `def my_function` name.
     let items = prepare(&mut server, "foo.py", Position::new(0, 6)).unwrap();
-    assert_eq!(items.len(), 1, "expected one item, got {items:?}");
-    assert_eq!(items[0].name, "my_function");
-    assert_eq!(items[0].kind, lsp_types::SymbolKind::FUNCTION);
+    insta::assert_json_snapshot!(items, @r#"
+    [
+      {
+        "name": "my_function",
+        "kind": 12,
+        "uri": "file://<temp_dir>/foo.py",
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 1,
+            "character": 8
+          }
+        },
+        "selectionRange": {
+          "start": {
+            "line": 0,
+            "character": 4
+          },
+          "end": {
+            "line": 0,
+            "character": 15
+          }
+        }
+      }
+    ]
+    "#);
 
     Ok(())
 }
@@ -51,13 +77,60 @@ def caller():
 
     // Position on `caller`.
     let items = prepare(&mut server, "foo.py", Position::new(3, 4)).unwrap();
-    assert_eq!(items[0].name, "caller");
-
     let calls = outgoing(&mut server, items[0].clone()).unwrap();
-    // One callee group (`helper`), two call sites.
-    assert_eq!(calls.len(), 1, "got {calls:?}");
-    assert_eq!(calls[0].to.name, "helper");
-    assert_eq!(calls[0].from_ranges.len(), 2);
+    insta::assert_json_snapshot!(calls, @r#"
+    [
+      {
+        "to": {
+          "name": "helper",
+          "kind": 12,
+          "uri": "file://<temp_dir>/foo.py",
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 8
+            }
+          },
+          "selectionRange": {
+            "start": {
+              "line": 0,
+              "character": 4
+            },
+            "end": {
+              "line": 0,
+              "character": 10
+            }
+          }
+        },
+        "fromRanges": [
+          {
+            "start": {
+              "line": 4,
+              "character": 4
+            },
+            "end": {
+              "line": 4,
+              "character": 10
+            }
+          },
+          {
+            "start": {
+              "line": 5,
+              "character": 4
+            },
+            "end": {
+              "line": 5,
+              "character": 10
+            }
+          }
+        ]
+      }
+    ]
+    "#);
 
     Ok(())
 }
@@ -88,40 +161,103 @@ def use_b():
     server.open_text_document("lib.py", lib, 1);
 
     let items = prepare(&mut server, "lib.py", Position::new(0, 4)).unwrap();
-    assert_eq!(items[0].name, "func");
-
     let mut calls = incoming(&mut server, items[0].clone()).unwrap();
-    // Sort by caller name for stable assertions.
+    // Sort by caller name so the snapshot does not depend on discovery order.
     calls.sort_by(|a, b| a.from.name.cmp(&b.from.name));
-    let names: Vec<_> = calls.iter().map(|c| c.from.name.as_str()).collect();
-    assert!(
-        names.contains(&"use_a") && names.contains(&"use_b"),
-        "got callers: {names:?}"
-    );
-
-    // Assert exact call-site ranges (not just count). `caller_b.py` has
-    // `    func()` at lines 3 and 4 — both `func` identifiers span columns 4..8.
-    // Crucially this verifies `from_ranges` are converted using the *caller's*
-    // line index, not the prepared file's (a regression we shipped once: the
-    // wrong file index produces absurd column numbers on cross-file callers).
-    let use_b = calls.iter().find(|c| c.from.name == "use_b").unwrap();
-    let mut b_ranges = use_b.from_ranges.clone();
-    b_ranges.sort_by_key(|r| (r.start.line, r.start.character));
-    assert_eq!(
-        b_ranges,
-        vec![
-            Range::new(Position::new(3, 4), Position::new(3, 8)),
-            Range::new(Position::new(4, 4), Position::new(4, 8)),
-        ],
-        "use_b call-site ranges mismatch"
-    );
-
-    let use_a = calls.iter().find(|c| c.from.name == "use_a").unwrap();
-    assert_eq!(
-        use_a.from_ranges,
-        vec![Range::new(Position::new(3, 4), Position::new(3, 8))],
-        "use_a call-site range mismatch"
-    );
+    // In particular, this records that `fromRanges` use the caller files'
+    // line indexes rather than the prepared definition's file.
+    insta::assert_json_snapshot!(calls, @r#"
+    [
+      {
+        "from": {
+          "name": "use_a",
+          "kind": 12,
+          "uri": "file://<temp_dir>/caller_a.py",
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 0
+            },
+            "end": {
+              "line": 3,
+              "character": 10
+            }
+          },
+          "selectionRange": {
+            "start": {
+              "line": 2,
+              "character": 4
+            },
+            "end": {
+              "line": 2,
+              "character": 9
+            }
+          }
+        },
+        "fromRanges": [
+          {
+            "start": {
+              "line": 3,
+              "character": 4
+            },
+            "end": {
+              "line": 3,
+              "character": 8
+            }
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "use_b",
+          "kind": 12,
+          "uri": "file://<temp_dir>/caller_b.py",
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 0
+            },
+            "end": {
+              "line": 4,
+              "character": 10
+            }
+          },
+          "selectionRange": {
+            "start": {
+              "line": 2,
+              "character": 4
+            },
+            "end": {
+              "line": 2,
+              "character": 9
+            }
+          }
+        },
+        "fromRanges": [
+          {
+            "start": {
+              "line": 3,
+              "character": 4
+            },
+            "end": {
+              "line": 3,
+              "character": 8
+            }
+          },
+          {
+            "start": {
+              "line": 4,
+              "character": 4
+            },
+            "end": {
+              "line": 4,
+              "character": 8
+            }
+          }
+        ]
+      }
+    ]
+    "#);
 
     Ok(())
 }

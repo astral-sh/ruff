@@ -2,11 +2,14 @@ use super::PositionEncoding;
 use crate::Db;
 use crate::system::file_to_url;
 
-use ruff_db::files::{File, FileRange};
+use lsp_types::Url;
+use ruff_db::files::{File, FileRange, system_path_to_file, vendored_path_to_file};
 use ruff_db::source::{line_index, source_text};
+use ruff_db::system::SystemPathBuf;
 use ruff_source_file::LineIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_project::ProjectDatabase;
 
 /// A range in an LSP text document (cell or a regular document).
 #[derive(Clone, Debug, Default)]
@@ -343,4 +346,45 @@ impl FileRangeExt for FileRange {
     fn to_lsp_range(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<LspRange> {
         self.range().to_lsp_range(db, self.file(), encoding)
     }
+}
+
+/// Attempts to resolve the location for a file and range. This includes
+/// mapping system paths back into their proper vendored
+/// path types (if applicable).
+pub(crate) fn resolve_file_uri_range(
+    db: &ProjectDatabase,
+    file_uri: &Url,
+    range: lsp_types::Range,
+    encoding: PositionEncoding,
+) -> Option<(File, TextSize)> {
+    let system_path = SystemPathBuf::from_path_buf(file_uri.to_file_path().ok()?).ok()?;
+
+    let file = if let Some(ref vendored_root) = ty_ide::cached_vendored_root(db)
+        && let Some(vendored_path) = ty_ide::map_system_to_vendored(vendored_root, &system_path)
+    {
+        match vendored_path_to_file(db, vendored_path) {
+            Ok(file) => file,
+            Err(err) => {
+                tracing::warn!(
+                    "Could not resolve item location \
+                     for vendored file path `{vendored_path}`: {err}"
+                );
+                return None;
+            }
+        }
+    } else {
+        match system_path_to_file(db, &system_path) {
+            Ok(file) => file,
+            Err(err) => {
+                tracing::warn!(
+                    "Could not resolve item location \
+                     for system file path `{system_path}`: {err}"
+                );
+                return None;
+            }
+        }
+    };
+
+    let offset = range.start.to_text_size(db, file, file_uri, encoding)?;
+    Some((file, offset))
 }
