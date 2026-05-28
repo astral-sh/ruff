@@ -1,4 +1,4 @@
-use crate::goto::{GotoTarget, find_goto_target};
+use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -33,7 +33,7 @@ pub fn goto_implementation(
     }
 
     let implementation_targets =
-        crate::goto::Definitions::new(implementations).into_navigation_targets(model.db());
+        Definitions::new(implementations).into_navigation_targets(model.db());
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
