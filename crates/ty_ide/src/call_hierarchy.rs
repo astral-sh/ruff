@@ -43,13 +43,18 @@ pub fn prepare_call_hierarchy(
         .goto_declaration(&model, &goto_target)?;
 
     let mut items = Vec::new();
+    // A call target can resolve through both its invoked implementation and its
+    // callable expression; expose one LSP item when those point to the same location.
+    let mut seen = rustc_hash::FxHashSet::default();
     for resolved in &definitions {
         let Some(def) = resolved.definition() else {
             continue;
         };
         let def_file = def.file(db);
         let module_ref = parsed_module(db, def_file).load(db);
-        if let Some(item) = CallHierarchyItem::from_definition(db, resolved, &module_ref) {
+        if let Some(item) = CallHierarchyItem::from_definition(db, resolved, &module_ref)
+            && seen.insert((item.file, item.selection_range))
+        {
             items.push(item);
         }
     }
@@ -171,30 +176,48 @@ fn resolve_callee<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{CursorTest, cursor_test};
-
-    pub(super) fn snapshot_item(db: &dyn Db, item: &CallHierarchyItem) -> String {
-        format!(
-            "{path}:{start}:{end} {name} ({kind})",
-            path = item.file.path(db),
-            start = item.selection_range.start().to_usize(),
-            end = item.selection_range.end().to_usize(),
-            name = item.name,
-            kind = item.kind.to_string(),
-        )
-    }
-
-    fn snapshot_items(db: &dyn Db, items: &[CallHierarchyItem]) -> String {
-        items
-            .iter()
-            .map(|item| snapshot_item(db, item))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
+    use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
 
     impl CursorTest {
         pub(super) fn prepare_calls(&self) -> Option<Vec<CallHierarchyItem>> {
             prepare_call_hierarchy(&self.db, self.cursor.file, self.cursor.offset)
+        }
+
+        fn prepare_call_hierarchy(&self) -> String {
+            let Some(items) = self.prepare_calls() else {
+                return "No call hierarchy items found".to_string();
+            };
+
+            self.render_diagnostics(items.into_iter().map(CallHierarchyItemDiagnostic::new))
+        }
+    }
+
+    struct CallHierarchyItemDiagnostic {
+        item: CallHierarchyItem,
+    }
+
+    impl CallHierarchyItemDiagnostic {
+        fn new(item: CallHierarchyItem) -> Self {
+            Self { item }
+        }
+    }
+
+    impl IntoDiagnostic for CallHierarchyItemDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic {
+            let mut diagnostic = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("prepare-call-hierarchy")),
+                Severity::Info,
+                format!(
+                    "Call hierarchy item: `{}` ({})",
+                    self.item.name,
+                    self.item.kind.to_string()
+                ),
+            );
+            diagnostic.annotate(Annotation::primary(
+                Span::from(self.item.file).with_range(self.item.selection_range),
+            ));
+            diagnostic
         }
     }
 
@@ -206,8 +229,14 @@ mod tests {
                 pass
             "#,
         );
-        let items = test.prepare_calls().unwrap();
-        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:5:8 foo (Function)");
+        insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
+        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+         --> main.py:2:5
+          |
+        2 | def foo():
+          |     ^^^
+          |
+        ");
     }
 
     #[test]
@@ -218,8 +247,14 @@ mod tests {
                 pass
             "#,
         );
-        let items = test.prepare_calls().unwrap();
-        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:7:14 MyClass (Class)");
+        insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
+        info[prepare-call-hierarchy]: Call hierarchy item: `MyClass` (Class)
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^
+          |
+        ");
     }
 
     #[test]
@@ -231,8 +266,14 @@ mod tests {
                     pass
             "#,
         );
-        let items = test.prepare_calls().unwrap();
-        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:18:24 method (Method)");
+        insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
+        info[prepare-call-hierarchy]: Call hierarchy item: `method` (Method)
+         --> main.py:3:9
+          |
+        3 |     def method(self):
+          |         ^^^^^^
+          |
+        ");
     }
 
     #[test]
@@ -245,10 +286,13 @@ mod tests {
             f<CURSOR>oo()
             "#,
         );
-        let items = test.prepare_calls().unwrap();
-        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"
-        /main.py:5:8 foo (Function)
-        /main.py:5:8 foo (Function)
+        insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
+        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+         --> main.py:2:5
+          |
+        2 | def foo():
+          |     ^^^
+          |
         ");
     }
 
@@ -279,11 +323,28 @@ mod tests {
                 return x
             "#,
         );
-        let items = test.prepare_calls().unwrap();
-        assert!(
-            items.len() >= 2,
-            "expected multiple items for overload group, got {items:?}",
-        );
+        insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
+        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+         --> main.py:5:5
+          |
+        5 | def foo(x: int) -> int: ...
+          |     ^^^
+          |
+
+        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+         --> main.py:7:5
+          |
+        7 | def foo(x: str) -> str: ...
+          |     ^^^
+          |
+
+        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+         --> main.py:8:5
+          |
+        8 | def foo(x):
+          |     ^^^
+          |
+        ");
     }
 
     #[test]
@@ -296,10 +357,14 @@ mod tests {
                 pass
             "#,
         );
-        let items = test.prepare_calls().unwrap();
-        assert_eq!(items.len(), 1, "got {items:?}");
-        assert_eq!(items[0].kind, SymbolKind::Function);
-        assert_eq!(items[0].name.as_str(), "foo");
+        insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
+        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+         --> main.py:2:11
+          |
+        2 | async def foo():
+          |           ^^^
+          |
+        ");
     }
 
     #[test]
@@ -312,9 +377,14 @@ mod tests {
                     pass
             "#,
         );
-        let items = test.prepare_calls().unwrap();
-        assert_eq!(items.len(), 1, "got {items:?}");
-        assert_eq!(items[0].kind, SymbolKind::Method);
+        insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
+        info[prepare-call-hierarchy]: Call hierarchy item: `method` (Method)
+         --> main.py:4:9
+          |
+        4 |     def method():
+          |         ^^^^^^
+          |
+        ");
     }
 
     #[test]
@@ -327,8 +397,13 @@ mod tests {
                     pass
             "#,
         );
-        let items = test.prepare_calls().unwrap();
-        assert_eq!(items.len(), 1, "got {items:?}");
-        assert_eq!(items[0].kind, SymbolKind::Method);
+        insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
+        info[prepare-call-hierarchy]: Call hierarchy item: `method` (Method)
+         --> main.py:4:9
+          |
+        4 |     def method(cls):
+          |         ^^^^^^
+          |
+        ");
     }
 }
