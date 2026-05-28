@@ -300,43 +300,76 @@ fn walk_class_signature<'a, V>(
 
 #[cfg(test)]
 mod tests {
-    use ty_project::Db;
-
     use crate::{
-        OutgoingCall,
-        call_hierarchy::tests::snapshot_item,
-        outgoing_calls,
-        tests::{CursorTest, cursor_test},
+        CallHierarchyItem,
+        tests::{CursorTest, IntoDiagnostic, cursor_test},
+    };
+    use insta::assert_snapshot;
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
+        SubDiagnosticSeverity,
     };
 
-    fn snapshot_outgoing(db: &dyn Db, calls: &[OutgoingCall]) -> String {
-        calls
-            .iter()
-            .map(|call| {
-                let head = snapshot_item(db, &call.to);
-                let ranges: Vec<String> = call
-                    .from_ranges
-                    .iter()
-                    .map(|r| format!("  call @ {}..{}", r.start().to_usize(), r.end().to_usize()))
-                    .collect();
-                format!("{head}\n{}", ranges.join("\n"))
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
+    use super::*;
 
     impl CursorTest {
-        fn outgoing(&self) -> Vec<OutgoingCall> {
-            let Some(items) = self.prepare_calls() else {
-                return vec![];
+        fn outgoing_calls(&self) -> String {
+            let Some(target) = self
+                .prepare_calls()
+                .and_then(|items| items.into_iter().next())
+            else {
+                return "No outgoing calls found".to_string();
             };
-            let item = &items[0];
-            outgoing_calls(&self.db, item.file, item.selection_range.start())
+            let calls = outgoing_calls(&self.db, target.file, target.selection_range.start());
+            if calls.is_empty() {
+                return "No outgoing calls found".to_string();
+            }
+
+            self.render_diagnostics([OutgoingCallsDiagnostic { target, calls }])
+        }
+    }
+
+    struct OutgoingCallsDiagnostic {
+        target: CallHierarchyItem,
+        calls: Vec<OutgoingCall>,
+    }
+
+    impl IntoDiagnostic for OutgoingCallsDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic {
+            let caller_file = self.target.file;
+            let mut diagnostic = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("outgoing-calls")),
+                Severity::Info,
+                "Outgoing calls".to_string(),
+            );
+            diagnostic.annotate(
+                Annotation::primary(
+                    Span::from(caller_file).with_range(self.target.selection_range),
+                )
+                .message("Caller"),
+            );
+
+            for call in self.calls {
+                let call_message = format!("Calls {}", call.to.name);
+                let mut callee = SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format!("{} ({})", call.to.name, call.to.kind.to_string()),
+                );
+                for range in call.from_ranges {
+                    callee.annotate(
+                        Annotation::secondary(Span::from(caller_file).with_range(range))
+                            .message(call_message.clone()),
+                    );
+                }
+                diagnostic.sub(callee);
+            }
+
+            diagnostic
         }
     }
 
     #[test]
-    fn outgoing_direct_call() {
+    fn direct_call() {
         let test = cursor_test(
             r#"
             def helper():
@@ -346,14 +379,24 @@ mod tests {
                 helper()
             "#,
         );
-        insta::assert_snapshot!(snapshot_outgoing(&test.db, &test.outgoing()), @"
-        /main.py:5:11 helper (Function)
-          call @ 40..46
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:5:5
+          |
+        5 | def foo():
+          |     ^^^ Caller
+          |
+        info: helper (Function)
+         --> main.py:6:5
+          |
+        6 |     helper()
+          |     ------ Calls helper
+          |
         ");
     }
 
     #[test]
-    fn outgoing_attribute_call() {
+    fn attribute_call() {
         let test = cursor_test(
             r#"
             class C:
@@ -364,14 +407,24 @@ mod tests {
                 c.m()
             "#,
         );
-        insta::assert_snapshot!(snapshot_outgoing(&test.db, &test.outgoing()), @"
-        /main.py:18:19 m (Method)
-          call @ 62..63
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:6:5
+          |
+        6 | def foo(c: C):
+          |     ^^^ Caller
+          |
+        info: m (Method)
+         --> main.py:7:7
+          |
+        7 |     c.m()
+          |       - Calls m
+          |
         ");
     }
 
     #[test]
-    fn outgoing_constructor_call() {
+    fn constructor_call() {
         let test = cursor_test(
             r#"
             class C:
@@ -381,14 +434,24 @@ mod tests {
                 C()
             "#,
         );
-        insta::assert_snapshot!(snapshot_outgoing(&test.db, &test.outgoing()), @"
-        /main.py:7:8 C (Class)
-          call @ 35..36
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:5:5
+          |
+        5 | def foo():
+          |     ^^^ Caller
+          |
+        info: C (Class)
+         --> main.py:6:5
+          |
+        6 |     C()
+          |     - Calls C
+          |
         ");
     }
 
     #[test]
-    fn outgoing_multiple_calls_to_same_callee() {
+    fn multiple_calls_to_same_callee() {
         let test = cursor_test(
             r#"
             def helper():
@@ -399,13 +462,26 @@ mod tests {
                 helper()
             "#,
         );
-        let outgoing = test.outgoing();
-        assert_eq!(outgoing.len(), 1, "expected one callee group");
-        assert_eq!(outgoing[0].from_ranges.len(), 2, "expected two call sites");
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:5:5
+          |
+        5 | def foo():
+          |     ^^^ Caller
+          |
+        info: helper (Function)
+         --> main.py:6:5
+          |
+        6 |     helper()
+          |     ------ Calls helper
+        7 |     helper()
+          |     ------ Calls helper
+          |
+        ");
     }
 
     #[test]
-    fn outgoing_class_excludes_method_bodies() {
+    fn class_excludes_method_bodies() {
         // Calls inside method bodies belong to the method, not the class. They
         // are reachable from a separate `outgoingCalls` query on the method.
         let test = cursor_test(
@@ -424,23 +500,11 @@ mod tests {
                     helper_other()
             "#,
         );
-        let names: Vec<_> = test
-            .outgoing()
-            .into_iter()
-            .map(|c| c.to.name.as_str().to_string())
-            .collect();
-        assert!(
-            !names.contains(&"helper_init".to_string()),
-            "method body call should NOT appear under class; got: {names:?}"
-        );
-        assert!(
-            !names.contains(&"helper_other".to_string()),
-            "method body call should NOT appear under class; got: {names:?}"
-        );
+        assert_snapshot!(test.outgoing_calls(), @"No outgoing calls found");
     }
 
     #[test]
-    fn outgoing_class_includes_decorators_bases_and_class_body() {
+    fn class_includes_decorators_bases_and_class_body() {
         // Everything evaluated when the `class` statement runs.
         let test = cursor_test(
             r#"
@@ -468,27 +532,48 @@ mod tests {
                     pass
             "#,
         );
-        let names: Vec<_> = test
-            .outgoing()
-            .into_iter()
-            .map(|c| c.to.name.as_str().to_string())
-            .collect();
-        for expected in [
-            "cls_deco",
-            "base_factory",
-            "class_body_helper",
-            "method_deco",
-            "default_factory",
-        ] {
-            assert!(
-                names.contains(&expected.to_string()),
-                "{expected} should appear in class outgoing; got: {names:?}"
-            );
-        }
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+          --> main.py:18:7
+           |
+        18 | class Cls(base_factory()):
+           |       ^^^ Caller
+           |
+        info: cls_deco (Function)
+          --> main.py:17:2
+           |
+        17 | @cls_deco
+           |  -------- Calls cls_deco
+           |
+        info: base_factory (Function)
+          --> main.py:18:11
+           |
+        18 | class Cls(base_factory()):
+           |           ------------ Calls base_factory
+           |
+        info: class_body_helper (Function)
+          --> main.py:19:12
+           |
+        19 |     attr = class_body_helper()
+           |            ----------------- Calls class_body_helper
+           |
+        info: method_deco (Function)
+          --> main.py:21:6
+           |
+        21 |     @method_deco
+           |      ----------- Calls method_deco
+           |
+        info: default_factory (Function)
+          --> main.py:22:19
+           |
+        22 |     def m(self, x=default_factory()):
+           |                   --------------- Calls default_factory
+           |
+        ");
     }
 
     #[test]
-    fn outgoing_function_excludes_nested_def_body() {
+    fn function_excludes_nested_def_body() {
         // The outer function should NOT include calls from inside a nested
         // `def`'s body; the user navigates to `nested` and expands it
         // separately.
@@ -503,23 +588,24 @@ mod tests {
                 nested()
             "#,
         );
-        let names: Vec<_> = test
-            .outgoing()
-            .into_iter()
-            .map(|c| c.to.name.as_str().to_string())
-            .collect();
-        assert!(
-            !names.contains(&"baz".to_string()),
-            "nested def body call should NOT leak to outer; got: {names:?}"
-        );
-        assert!(
-            names.contains(&"nested".to_string()),
-            "outer should still see `nested` as a callee; got: {names:?}"
-        );
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:5:5
+          |
+        5 | def outer():
+          |     ^^^^^ Caller
+          |
+        info: nested (Function)
+         --> main.py:8:5
+          |
+        8 |     nested()
+          |     ------ Calls nested
+          |
+        ");
     }
 
     #[test]
-    fn outgoing_function_includes_param_default() {
+    fn function_includes_param_default() {
         // Parameter defaults are evaluated at definition time and belong to
         // the function's own outgoing edges.
         let test = cursor_test(
@@ -531,19 +617,24 @@ mod tests {
                 pass
             "#,
         );
-        let names: Vec<_> = test
-            .outgoing()
-            .into_iter()
-            .map(|c| c.to.name.as_str().to_string())
-            .collect();
-        assert!(
-            names.contains(&"default_factory".to_string()),
-            "param default call should appear in outgoing; got: {names:?}"
-        );
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:5:5
+          |
+        5 | def foo(x=default_factory()):
+          |     ^^^ Caller
+          |
+        info: default_factory (Function)
+         --> main.py:5:11
+          |
+        5 | def foo(x=default_factory()):
+          |           --------------- Calls default_factory
+          |
+        ");
     }
 
     #[test]
-    fn outgoing_class_with_base_call() {
+    fn class_with_base_call() {
         // Calls inside a class's base list are evaluated when the class
         // statement runs.
         let test = cursor_test(
@@ -555,19 +646,24 @@ mod tests {
                 pass
             "#,
         );
-        let names: Vec<_> = test
-            .outgoing()
-            .into_iter()
-            .map(|c| c.to.name.as_str().to_string())
-            .collect();
-        assert!(
-            names.contains(&"base_factory".to_string()),
-            "base-class call should appear in outgoing; got: {names:?}"
-        );
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:5:7
+          |
+        5 | class Derived(base_factory()):
+          |       ^^^^^^^ Caller
+          |
+        info: base_factory (Function)
+         --> main.py:5:15
+          |
+        5 | class Derived(base_factory()):
+          |               ------------ Calls base_factory
+          |
+        ");
     }
 
     #[test]
-    fn outgoing_lambda_default_attributed_to_enclosing_scope() {
+    fn lambda_default_attributed_to_enclosing_scope() {
         // A lambda's parameter defaults are evaluated when the surrounding
         // scope reaches the lambda expression — they belong to the enclosing
         // scope's outgoing, not to the lambda. The lambda's own body call is
@@ -585,23 +681,24 @@ mod tests {
                 return f
             "#,
         );
-        let names: Vec<_> = test
-            .outgoing()
-            .into_iter()
-            .map(|c| c.to.name.as_str().to_string())
-            .collect();
-        assert!(
-            names.contains(&"default_factory".to_string()),
-            "lambda default should be in enclosing scope outgoing; got: {names:?}"
-        );
-        assert!(
-            !names.contains(&"lambda_body_helper".to_string()),
-            "lambda body call should NOT leak to enclosing scope; got: {names:?}"
-        );
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:8:5
+          |
+        8 | def outer():
+          |     ^^^^^ Caller
+          |
+        info: default_factory (Function)
+         --> main.py:9:18
+          |
+        9 |     f = lambda x=default_factory(): lambda_body_helper()
+          |                  --------------- Calls default_factory
+          |
+        ");
     }
 
     #[test]
-    fn outgoing_skips_unresolved_calls() {
+    fn skips_unresolved_calls() {
         let test = cursor_test(
             r#"
             def f<CURSOR>oo():
@@ -609,22 +706,30 @@ mod tests {
                 undefined_name()  # this should be skipped silently
             "#,
         );
-        // Just verify we don't panic and that undefined_name doesn't appear.
-        let outgoing = test.outgoing();
-        assert!(
-            outgoing
-                .iter()
-                .all(|c| c.to.name.as_str() != "undefined_name"),
-            "undefined_name should be skipped, got: {:?}",
-            outgoing
-                .iter()
-                .map(|c| c.to.name.as_str())
-                .collect::<Vec<_>>()
-        );
+        assert_snapshot!(test.outgoing_calls(), @r#"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:2:5
+          |
+        2 | def foo():
+          |     ^^^ Caller
+          |
+        info: print (Function)
+         --> main.py:3:5
+          |
+        3 |     print("hi")  # builtins resolve via stubs, so this *does* appear
+          |     ----- Calls print
+          |
+        info: print (Function)
+         --> main.py:3:5
+          |
+        3 |     print("hi")  # builtins resolve via stubs, so this *does* appear
+          |     ----- Calls print
+          |
+        "#);
     }
 
     #[test]
-    fn outgoing_super_method_call() {
+    fn super_method_call() {
         // `super().m()` in a subclass method should record the parent class's
         // method as an outgoing target.
         let test = cursor_test(
@@ -638,16 +743,30 @@ mod tests {
                     super().m()
             "#,
         );
-        let outgoing = test.outgoing();
-        let names: Vec<_> = outgoing.iter().map(|c| c.to.name.as_str()).collect();
-        assert!(
-            names.contains(&"m"),
-            "expected Base.m as an outgoing target, got: {names:?}",
-        );
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:7:9
+          |
+        7 |     def m(self):
+          |         ^ Caller
+          |
+        info: m (Method)
+         --> main.py:8:17
+          |
+        8 |         super().m()
+          |                 - Calls m
+          |
+        info: super (Class)
+         --> main.py:8:9
+          |
+        8 |         super().m()
+          |         ----- Calls super
+          |
+        ");
     }
 
     #[test]
-    fn outgoing_multi_file() {
+    fn multi_file() {
         // Outgoing calls should resolve across files for imported callees.
         let test = CursorTest::builder()
             .source(
@@ -667,11 +786,19 @@ def f<CURSOR>oo():
 ",
             )
             .build();
-        let outgoing = test.outgoing();
-        let names: Vec<_> = outgoing.iter().map(|c| c.to.name.as_str()).collect();
-        assert!(
-            names.contains(&"helper"),
-            "expected cross-file `helper` as outgoing target, got: {names:?}",
-        );
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls
+         --> main.py:4:5
+          |
+        4 | def foo():
+          |     ^^^ Caller
+          |
+        info: helper (Function)
+         --> main.py:5:5
+          |
+        5 |     helper()
+          |     ------ Calls helper
+          |
+        ");
     }
 }
