@@ -551,42 +551,73 @@ fn attribute_is_callee_of_parent<'a>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        SymbolKind,
-        call_hierarchy::tests::snapshot_item,
-        outgoing_calls,
-        tests::{CursorTest, cursor_test},
+        CallHierarchyItem, outgoing_calls,
+        tests::{CursorTest, IntoDiagnostic, cursor_test},
+    };
+    use insta::assert_snapshot;
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
+        SubDiagnosticSeverity,
     };
 
     use super::*;
 
     impl CursorTest {
-        fn incoming(&self) -> Vec<IncomingCall> {
-            let Some(items) = self.prepare_calls() else {
-                return vec![];
+        fn incoming_calls(&self) -> String {
+            let Some(target) = self
+                .prepare_calls()
+                .and_then(|items| items.into_iter().next())
+            else {
+                return "No incoming calls found".to_string();
             };
-            let item = &items[0];
-            incoming_calls(&self.db, item.file, item.selection_range.start())
+            let calls = incoming_calls(&self.db, target.file, target.selection_range.start());
+            if calls.is_empty() {
+                return "No incoming calls found".to_string();
+            }
+
+            self.render_diagnostics([IncomingCallsDiagnostic { target, calls }])
         }
     }
 
-    fn snapshot_incoming(db: &dyn Db, calls: &[IncomingCall]) -> String {
-        calls
-            .iter()
-            .map(|call| {
-                let head = snapshot_item(db, &call.from);
-                let ranges: Vec<String> = call
-                    .from_ranges
-                    .iter()
-                    .map(|r| format!("  call @ {}..{}", r.start().to_usize(), r.end().to_usize()))
-                    .collect();
-                format!("{head}\n{}", ranges.join("\n"))
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+    struct IncomingCallsDiagnostic {
+        target: CallHierarchyItem,
+        calls: Vec<IncomingCall>,
+    }
+
+    impl IntoDiagnostic for IncomingCallsDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic {
+            let mut diagnostic = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("incoming-calls")),
+                Severity::Info,
+                "Incoming calls".to_string(),
+            );
+            diagnostic.annotate(
+                Annotation::primary(
+                    Span::from(self.target.file).with_range(self.target.selection_range),
+                )
+                .message("Target"),
+            );
+
+            for call in self.calls {
+                let mut caller = SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format!("{} ({})", call.from.name, call.from.kind.to_string()),
+                );
+                for range in call.from_ranges {
+                    caller.annotate(
+                        Annotation::secondary(Span::from(call.from.file).with_range(range))
+                            .message("Call site"),
+                    );
+                }
+                diagnostic.sub(caller);
+            }
+
+            diagnostic
+        }
     }
 
     #[test]
-    fn incoming_single_file() {
+    fn single_file() {
         let test = cursor_test(
             r#"
             def f<CURSOR>oo():
@@ -596,14 +627,24 @@ mod tests {
                 foo()
             "#,
         );
-        insta::assert_snapshot!(snapshot_incoming(&test.db, &test.incoming()), @"
-        /main.py:26:32 caller (Function)
-          call @ 40..43
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def foo():
+          |     ^^^ Target
+          |
+        info: caller (Function)
+         --> main.py:6:5
+          |
+        6 |     foo()
+          |     --- Call site
+          |
         ");
     }
 
     #[test]
-    fn incoming_non_call_reference_filtered_out() {
+    fn non_call_reference_filtered_out() {
         let test = cursor_test(
             r#"
             def f<CURSOR>oo():
@@ -614,14 +655,24 @@ mod tests {
                 foo()     # this is a call — should appear once
             "#,
         );
-        let incoming = test.incoming();
-        // exactly one caller, with exactly one call-site range
-        assert_eq!(incoming.len(), 1, "got {incoming:?}");
-        assert_eq!(incoming[0].from_ranges.len(), 1);
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def foo():
+          |     ^^^ Target
+          |
+        info: caller (Function)
+         --> main.py:7:5
+          |
+        7 |     foo()     # this is a call — should appear once
+          |     --- Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_multi_file() {
+    fn multi_file() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -640,16 +691,24 @@ def use():
 ",
             )
             .build();
-        let incoming = test.incoming();
-        let names: Vec<_> = incoming
-            .iter()
-            .map(|c| c.from.name.as_str().to_string())
-            .collect();
-        assert!(names.contains(&"use".to_string()), "got callers: {names:?}");
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> utils.py:2:5
+          |
+        2 | def foo():
+          |     ^^^ Target
+          |
+        info: use (Function)
+         --> caller.py:5:5
+          |
+        5 |     foo()
+          |     --- Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_via_import_alias() {
+    fn via_import_alias() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -668,19 +727,24 @@ def use():
 ",
             )
             .build();
-        let incoming = test.incoming();
-        let names: Vec<_> = incoming
-            .iter()
-            .map(|c| c.from.name.as_str().to_string())
-            .collect();
-        assert!(
-            names.contains(&"use".to_string()),
-            "alias call should resolve through; got: {names:?}"
-        );
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> utils.py:2:5
+          |
+        2 | def foo():
+          |     ^^^ Target
+          |
+        info: use (Function)
+         --> caller.py:5:5
+          |
+        5 |     bar()
+          |     --- Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_keyword_call() {
+    fn keyword_call() {
         let test = cursor_test(
             r#"
             def f<CURSOR>oo(x):
@@ -690,13 +754,24 @@ def use():
                 foo(x=1)
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
-        assert!(total_sites >= 1, "got {incoming:?}");
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def foo(x):
+          |     ^^^ Target
+          |
+        info: caller (Function)
+         --> main.py:6:5
+          |
+        6 |     foo(x=1)
+          |     --- Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_top_level_call_attributed_to_module() {
+    fn top_level_call_attributed_to_module() {
         let test = cursor_test(
             r#"
             def f<CURSOR>oo():
@@ -705,13 +780,24 @@ def use():
             foo()
             "#,
         );
-        let incoming = test.incoming();
-        assert_eq!(incoming.len(), 1, "got {incoming:?}");
-        assert_eq!(incoming[0].from.kind, SymbolKind::Module);
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def foo():
+          |     ^^^ Target
+          |
+        info: main (Module)
+         --> main.py:5:1
+          |
+        5 | foo()
+          | --- Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_decorator_application() {
+    fn decorator_application() {
         // `@foo` (no parens) is a runtime call to `foo`.
         let test = cursor_test(
             r#"
@@ -723,16 +809,24 @@ def use():
                 pass
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
-        assert!(
-            total_sites >= 1,
-            "decorator should be recorded as call; got {incoming:?}"
-        );
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def foo(f):
+          |     ^^^ Target
+          |
+        info: bar (Function)
+         --> main.py:5:2
+          |
+        5 | @foo
+          |  --- Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_method_does_not_confuse_with_same_name_on_other_class() {
+    fn method_does_not_confuse_with_same_name_on_other_class() {
         let test = cursor_test(
             r#"
             class A:
@@ -748,14 +842,25 @@ def use():
                 b.foo()
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
         // Should only record the `a.foo()` site, not `b.foo()`.
-        assert_eq!(total_sites, 1, "got {incoming:?}");
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:3:9
+          |
+        3 |     def foo(self):
+          |         ^^^ Target
+          |
+        info: use (Function)
+          --> main.py:11:7
+           |
+        11 |     a.foo()
+           |       --- Call site
+           |
+        ");
     }
 
     #[test]
-    fn incoming_super_method_call() {
+    fn super_method_call() {
         // `super().m()` in a subclass method should record the subclass method
         // as a caller of the parent class's method.
         let test = cursor_test(
@@ -769,12 +874,20 @@ def use():
                     super().m()
             "#,
         );
-        let incoming = test.incoming();
-        let callers: Vec<_> = incoming.iter().map(|c| c.from.name.as_str()).collect();
-        assert!(
-            callers.contains(&"m"),
-            "expected Child.m as a caller of Base.m, got: {callers:?}",
-        );
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:3:9
+          |
+        3 |     def m(self):
+          |         ^ Target
+          |
+        info: m (Method)
+         --> main.py:8:17
+          |
+        8 |         super().m()
+          |                 - Call site
+          |
+        ");
     }
 
     // --- incoming: attribute-reference call sites --------------------------
@@ -786,7 +899,7 @@ def use():
     // appear at the reference site.
 
     #[test]
-    fn incoming_property_getter_read() {
+    fn property_getter_read() {
         let test = cursor_test(
             r#"
             class C:
@@ -798,16 +911,24 @@ def use():
                 return c.prop
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
-        assert_eq!(
-            total_sites, 1,
-            "expected 1 getter call site; got {incoming:?}"
-        );
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:4:9
+          |
+        4 |     def prop(self) -> int:
+          |         ^^^^ Target
+          |
+        info: read (Function)
+         --> main.py:8:14
+          |
+        8 |     return c.prop
+          |              ---- Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_property_setter_write() {
+    fn property_setter_write() {
         // Querying the setter must surface the assignment (`c.prop = 5`) but
         // not the read (`c.prop`) — pyright lumps them; we don't.
         let test = cursor_test(
@@ -828,22 +949,24 @@ def use():
                 return c.prop
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
-        assert_eq!(
-            total_sites, 1,
-            "expected setter to match the write site only; got {incoming:?}",
-        );
-        // And the matched caller must be `write`, not `read`.
-        let names: Vec<_> = incoming
-            .iter()
-            .map(|c| c.from.name.as_str().to_string())
-            .collect();
-        assert!(names.contains(&"write".to_string()), "got: {names:?}");
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:8:9
+          |
+        8 |     def prop(self, v: int) -> None:
+          |         ^^^^ Target
+          |
+        info: write (Function)
+          --> main.py:12:7
+           |
+        12 |     c.prop = 5
+           |       ---- Call site
+           |
+        ");
     }
 
     #[test]
-    fn incoming_property_deleter_del() {
+    fn property_deleter_del() {
         let test = cursor_test(
             r#"
             class C:
@@ -862,21 +985,24 @@ def use():
                 return c.prop
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
-        assert_eq!(
-            total_sites, 1,
-            "expected deleter to match the del site only; got {incoming:?}",
-        );
-        let names: Vec<_> = incoming
-            .iter()
-            .map(|c| c.from.name.as_str().to_string())
-            .collect();
-        assert!(names.contains(&"remove".to_string()), "got: {names:?}");
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:8:9
+          |
+        8 |     def prop(self) -> None:
+          |         ^^^^ Target
+          |
+        info: remove (Function)
+          --> main.py:12:11
+           |
+        12 |     del c.prop
+           |           ---- Call site
+           |
+        ");
     }
 
     #[test]
-    fn incoming_method_reference_passed_as_arg() {
+    fn method_reference_passed_as_arg() {
         let test = cursor_test(
             r#"
             def make_async(fn, executor=None):
@@ -890,16 +1016,24 @@ def use():
                     self._async = make_async(self.method)
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
-        assert!(
-            total_sites >= 1,
-            "expected `self.method` arg reference to be a call site; got {incoming:?}",
-        );
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:6:9
+          |
+        6 |     def method(self) -> int:
+          |         ^^^^^^ Target
+          |
+        info: __init__ (Method)
+          --> main.py:10:39
+           |
+        10 |         self._async = make_async(self.method)
+           |                                       ------ Call site
+           |
+        ");
     }
 
     #[test]
-    fn incoming_method_reference_assigned() {
+    fn method_reference_assigned() {
         let test = cursor_test(
             r#"
             class C:
@@ -910,16 +1044,24 @@ def use():
                     cb = self.method
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
-        assert!(
-            total_sites >= 1,
-            "expected `cb = self.method` to record method as call site; got {incoming:?}",
-        );
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:3:9
+          |
+        3 |     def method(self) -> int:
+          |         ^^^^^^ Target
+          |
+        info: setup (Method)
+         --> main.py:7:19
+          |
+        7 |         cb = self.method
+          |                   ------ Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_attribute_call_not_double_counted() {
+    fn attribute_call_not_double_counted() {
         // `c.method()` is one site, not two — the `ExprCall` arm and the
         // `ExprAttribute` arm must not both record the same range.
         let test = cursor_test(
@@ -932,16 +1074,24 @@ def use():
                 return c.method()
             "#,
         );
-        let incoming = test.incoming();
-        let total_sites: usize = incoming.iter().map(|c| c.from_ranges.len()).sum();
-        assert_eq!(
-            total_sites, 1,
-            "expected exactly one site for c.method(); got {incoming:?}",
-        );
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:3:9
+          |
+        3 |     def method(self) -> int:
+          |         ^^^^^^ Target
+          |
+        info: use (Function)
+         --> main.py:7:14
+          |
+        7 |     return c.method()
+          |              ------ Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_non_callable_attribute_filtered() {
+    fn non_callable_attribute_filtered() {
         // A plain instance attribute that isn't a function/method/property
         // must not show up in incomingCalls of anything.
         let test = cursor_test(
@@ -957,28 +1107,11 @@ def use():
                 _ = c.func
             "#,
         );
-        let incoming = test.incoming();
-        // `c.func` resolves to the `int` instance attribute, not the free
-        // function `func`, so it must not be in `func`'s callers — and the
-        // only legitimate `func` use in the fixture (`self.func = 42`) is a
-        // write to an instance attribute, never a call.
-        let source = test.cursor.source.as_str().to_string();
-        for call in &incoming {
-            for range in &call.from_ranges {
-                let start = range.start().to_usize();
-                let end = range.end().to_usize();
-                let text = &source[start..end];
-                assert_ne!(
-                    text, "func",
-                    "stray match on c.func from caller {}: {call:?}",
-                    call.from.name,
-                );
-            }
-        }
+        assert_snapshot!(test.incoming_calls(), @"No incoming calls found");
     }
 
     #[test]
-    fn incoming_lambda_caller_is_synthesized_item() {
+    fn lambda_caller_is_synthesized_item() {
         // A call inside a top-level lambda should be attributed to a
         // synthetic `(lambda)` item, not to the module.
         let test = cursor_test(
@@ -989,10 +1122,27 @@ def use():
             f = lambda x: target(x)
             "#,
         );
-        let incoming = test.incoming();
-        assert_eq!(incoming.len(), 1, "got {incoming:?}");
-        assert_eq!(incoming[0].from.name.as_str(), "(lambda)");
-        assert_eq!(incoming[0].from.kind, SymbolKind::Function);
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def target(x):
+          |     ^^^^^^ Target
+          |
+        info: (lambda) (Function)
+         --> main.py:5:15
+          |
+        5 | f = lambda x: target(x)
+          |               ------ Call site
+          |
+        ");
+        let Some(target) = test
+            .prepare_calls()
+            .and_then(|items| items.into_iter().next())
+        else {
+            panic!("expected a call hierarchy target");
+        };
+        let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
         // selection_range must anchor at the `lambda` keyword (6 chars).
         let sel = incoming[0].from.selection_range;
         let source = test.cursor.source.as_str();
@@ -1000,11 +1150,10 @@ def use():
             &source[sel.start().to_usize()..sel.end().to_usize()],
             "lambda",
         );
-        assert_eq!(incoming[0].from_ranges.len(), 1);
     }
 
     #[test]
-    fn incoming_two_lambdas_calling_same_function_two_distinct_items() {
+    fn two_lambdas_calling_same_function_two_distinct_items() {
         // Two separate lambdas, both calling `target`, must surface as
         // two distinct `(lambda)` items with different selection_ranges
         // — not collapsed into one entry.
@@ -1017,21 +1166,30 @@ def use():
             b = lambda y: target(y)
             "#,
         );
-        let incoming = test.incoming();
-        assert_eq!(incoming.len(), 2, "got {incoming:?}");
-        for call in &incoming {
-            assert_eq!(call.from.name.as_str(), "(lambda)");
-            assert_eq!(call.from.kind, SymbolKind::Function);
-            assert_eq!(call.from_ranges.len(), 1);
-        }
-        assert_ne!(
-            incoming[0].from.selection_range,
-            incoming[1].from.selection_range,
-        );
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def target(x):
+          |     ^^^^^^ Target
+          |
+        info: (lambda) (Function)
+         --> main.py:5:15
+          |
+        5 | a = lambda x: target(x)
+          |               ------ Call site
+          |
+        info: (lambda) (Function)
+         --> main.py:6:15
+          |
+        6 | b = lambda y: target(y)
+          |               ------ Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_lambda_inside_function_attributed_to_lambda() {
+    fn lambda_inside_function_attributed_to_lambda() {
         // A call inside a lambda nested in a function must be attributed
         // to the lambda, not to the enclosing function — the lambda is
         // the innermost callable scope.
@@ -1045,14 +1203,24 @@ def use():
                 return f
             "#,
         );
-        let incoming = test.incoming();
-        assert_eq!(incoming.len(), 1, "got {incoming:?}");
-        assert_eq!(incoming[0].from.name.as_str(), "(lambda)");
-        assert_eq!(incoming[0].from.kind, SymbolKind::Function);
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def target(x):
+          |     ^^^^^^ Target
+          |
+        info: (lambda) (Function)
+         --> main.py:6:19
+          |
+        6 |     f = lambda x: target(x)
+          |                   ------ Call site
+          |
+        ");
     }
 
     #[test]
-    fn incoming_comprehension_attributed_to_enclosing_function() {
+    fn comprehension_attributed_to_enclosing_function() {
         // Comprehensions are NOT synthesized as items — a call inside a
         // list comprehension is still attributed to the enclosing named
         // scope (regression guard for "lambda only, not comprehensions").
@@ -1065,10 +1233,20 @@ def use():
                 return [target(x) for x in xs]
             "#,
         );
-        let incoming = test.incoming();
-        assert_eq!(incoming.len(), 1, "got {incoming:?}");
-        assert_eq!(incoming[0].from.name.as_str(), "caller");
-        assert_eq!(incoming[0].from.kind, SymbolKind::Function);
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls
+         --> main.py:2:5
+          |
+        2 | def target(x):
+          |     ^^^^^^ Target
+          |
+        info: caller (Function)
+         --> main.py:6:13
+          |
+        6 |     return [target(x) for x in xs]
+          |             ------ Call site
+          |
+        ");
     }
 
     #[test]
@@ -1089,7 +1267,13 @@ def use():
             f = lambda x: target(helper(x))
             "#,
         );
-        let incoming = test.incoming();
+        let Some(target) = test
+            .prepare_calls()
+            .and_then(|items| items.into_iter().next())
+        else {
+            panic!("expected a call hierarchy target");
+        };
+        let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
         let lambda_item = &incoming[0].from;
         assert_eq!(lambda_item.name.as_str(), "(lambda)");
