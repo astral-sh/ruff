@@ -69,7 +69,7 @@ static POSITIVE_CASES: LazyLock<RegexSet> = LazyLock::new(|| {
         // Multiline assignment
         r"^(?:[(\[]\s*)?(?:\w+\s*,\s*)*\w+\s*([)\]]\s*)?=.*[(\[{]\s*(#.*)?$",
         // Brackets,
-        r"^[()\[\]{}\s]+(\s*#.*)?$",
+        r"^[()\[\]{}\s]+\s*(#.*)?$",
     ])
     .unwrap()
 });
@@ -224,6 +224,7 @@ mod tests {
         assert!(comment_contains_code("# try:", &[]));
         assert!(comment_contains_code("# )  # noqa: ERA001", &[]));
         assert!(comment_contains_code("# \t(  # noqa: ERA001", &[]));
+        assert!(comment_contains_code("# x = [  # noqa: ERA001", &[]));
 
         assert!(!comment_contains_code("# this is = to that :(", &[]));
         assert!(!comment_contains_code("#else", &[]));
