@@ -1138,6 +1138,13 @@ class CStoredDescriptor(metaclass=DeclaredCallableMeta):
     # A metaclass declaration constrains access without replacing this stored descriptor.
     factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
 
+class MethodDeclaredCallableMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory: Callable[[str], str]
+
+class CStoredDescriptorAgainstMethodDeclaration(metaclass=MethodDeclaredCallableMeta):
+    factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
+
 class CompatibleInitializingMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
         cls.attr: int | str = 1

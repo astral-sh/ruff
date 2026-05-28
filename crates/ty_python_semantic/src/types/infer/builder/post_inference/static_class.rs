@@ -1060,7 +1060,18 @@ fn check_class_namespace_against_metaclass_members<'db>(
             for member in metaclass_index.place_table(function_scope).members() {
                 if let Some(name) = member.as_instance_attribute() {
                     let name = name.to_string();
-                    metaclass_assigned_members.insert(name.clone());
+                    // A method-scope member may only be declared, as in `cls.attr: int`.
+                    // Only an assignment such as `cls.attr: int = 1` populates a value that
+                    // can replace the corresponding value in the constructed class namespace.
+                    if attribute_assignments(db, metaclass.body_scope(db), name.as_str()).any(
+                        |(bindings, _)| {
+                            bindings
+                                .into_iter()
+                                .any(|binding| binding.binding.definition().is_some())
+                        },
+                    ) {
+                        metaclass_assigned_members.insert(name.clone());
+                    }
                     metaclass_instance_members.insert(name);
                 }
             }
