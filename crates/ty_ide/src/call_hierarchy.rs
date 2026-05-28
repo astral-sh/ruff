@@ -93,13 +93,9 @@ impl CallHierarchyItem {
 
         let kind = match def_kind {
             DefinitionKind::Function(_) => {
-                let item_kind = if def.scope(db).scope(db).kind().is_class() {
-                    SymbolKind::Method
-                } else {
-                    SymbolKind::Function
-                };
-                item_kind
+                SymbolKind::function_kind(&name, def.scope(db).scope(db).kind().is_class())
             }
+
             DefinitionKind::Class(_) => SymbolKind::Class,
 
             _ => return None,
