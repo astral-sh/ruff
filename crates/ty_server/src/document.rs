@@ -11,7 +11,9 @@ use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::system::AnySystemPath;
 pub(crate) use location::ToLink;
 pub use notebook::NotebookDocument;
-pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
+pub(crate) use range::{
+    FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt, resolve_file_uri_range,
+};
 pub use text_document::TextDocument;
 pub(crate) use text_document::{DocumentVersion, LanguageId};
 

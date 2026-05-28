@@ -6645,10 +6645,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         "The stdlib module `{module_name}` only has a `{name}` \
             submodule on Python {version_range}",
         module_name = parent_module.name(db),
-        name = full_submodule_name
-            .components()
-            .next_back()
-            .expect("A `ModuleName` always has at least one component"),
+        name = full_submodule_name.last_component(),
         version_range = version_range.diagnostic_display(),
     ));
 

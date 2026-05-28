@@ -27,6 +27,7 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod call_hierarchy;
 mod code_actions;
 mod commands;
 mod completions;
