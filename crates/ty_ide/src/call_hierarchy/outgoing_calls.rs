@@ -284,7 +284,10 @@ struct CalleeKey {
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
+    use crate::{
+        call_hierarchy::snapshot_item_label,
+        tests::{CursorTest, IntoDiagnostic, cursor_test},
+    };
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
@@ -337,10 +340,8 @@ mod tests {
                 );
             }
 
-            let mut callee = SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!("Callee: `{}` ({})", to.name, to.kind.to_string()),
-            );
+            let mut callee =
+                SubDiagnostic::new(SubDiagnosticSeverity::Info, snapshot_item_label(&to));
             callee.annotate(Annotation::primary(
                 Span::from(to.file).with_range(to.selection_range),
             ));
@@ -368,7 +369,7 @@ mod tests {
         6 |     helper()
           |     ^^^^^^ Call site
           |
-        info: Callee: `helper` (Function)
+        info: Function: `helper` (`main`)
          --> main.py:2:5
           |
         2 | def helper():
@@ -396,7 +397,7 @@ mod tests {
         7 |     c.m()
           |       ^ Call site
           |
-        info: Callee: `m` (Method)
+        info: Method: `m` (`main`)
          --> main.py:3:9
           |
         3 |     def m(self):
@@ -423,7 +424,7 @@ mod tests {
         6 |     C()
           |     ^ Call site
           |
-        info: Callee: `C` (Class)
+        info: Class: `C` (`main`)
          --> main.py:2:7
           |
         2 | class C:
@@ -453,7 +454,7 @@ mod tests {
         7 |     helper()
           |     ^^^^^^ Call site
           |
-        info: Callee: `helper` (Function)
+        info: Function: `helper` (`main`)
          --> main.py:2:5
           |
         2 | def helper():
@@ -521,7 +522,7 @@ mod tests {
         17 | @cls_deco
            |  ^^^^^^^^ Call site
            |
-        info: Callee: `cls_deco` (Function)
+        info: Function: `cls_deco` (`main`)
          --> main.py:2:5
           |
         2 | def cls_deco(cls):
@@ -534,7 +535,7 @@ mod tests {
         18 | class Cls(base_factory()):
            |           ^^^^^^^^^^^^ Call site
            |
-        info: Callee: `base_factory` (Function)
+        info: Function: `base_factory` (`main`)
          --> main.py:5:5
           |
         5 | def base_factory():
@@ -547,7 +548,7 @@ mod tests {
         19 |     attr = class_body_helper()
            |            ^^^^^^^^^^^^^^^^^ Call site
            |
-        info: Callee: `class_body_helper` (Function)
+        info: Function: `class_body_helper` (`main`)
          --> main.py:8:5
           |
         8 | def class_body_helper():
@@ -560,7 +561,7 @@ mod tests {
         21 |     @method_deco
            |      ^^^^^^^^^^^ Call site
            |
-        info: Callee: `method_deco` (Function)
+        info: Function: `method_deco` (`main`)
           --> main.py:11:5
            |
         11 | def method_deco(fn):
@@ -573,7 +574,7 @@ mod tests {
         22 |     def m(self, x=default_factory()):
            |                   ^^^^^^^^^^^^^^^ Call site
            |
-        info: Callee: `default_factory` (Function)
+        info: Function: `default_factory` (`main`)
           --> main.py:14:5
            |
         14 | def default_factory():
@@ -605,7 +606,7 @@ mod tests {
         8 |     nested()
           |     ^^^^^^ Call site
           |
-        info: Callee: `nested` (Function)
+        info: Function: `nested` (`main`)
          --> main.py:6:9
           |
         6 |     def nested():
@@ -634,7 +635,7 @@ mod tests {
         5 | def foo(x=default_factory()):
           |           ^^^^^^^^^^^^^^^ Call site
           |
-        info: Callee: `default_factory` (Function)
+        info: Function: `default_factory` (`main`)
          --> main.py:2:5
           |
         2 | def default_factory():
@@ -663,7 +664,7 @@ mod tests {
         5 | class Derived(base_factory()):
           |               ^^^^^^^^^^^^ Call site
           |
-        info: Callee: `base_factory` (Function)
+        info: Function: `base_factory` (`main`)
          --> main.py:2:5
           |
         2 | def base_factory():
@@ -698,7 +699,7 @@ mod tests {
         9 |     f = lambda x=default_factory(): lambda_body_helper()
           |                  ^^^^^^^^^^^^^^^ Call site
           |
-        info: Callee: `default_factory` (Function)
+        info: Function: `default_factory` (`main`)
          --> main.py:2:5
           |
         2 | def default_factory():
@@ -723,7 +724,7 @@ mod tests {
         3 |     print("hi")  # builtins resolve via stubs, so this *does* appear
           |     ^^^^^ Call site
           |
-        info: Callee: `print` (Function)
+        info: Function: `print` (`builtins`)
             --> stdlib/builtins.pyi:4367:5
              |
         4367 | def print(
@@ -736,7 +737,7 @@ mod tests {
         3 |     print("hi")  # builtins resolve via stubs, so this *does* appear
           |     ^^^^^ Call site
           |
-        info: Callee: `print` (Function)
+        info: Function: `print` (`builtins`)
             --> stdlib/builtins.pyi:4386:5
              |
         4386 | def print(
@@ -767,7 +768,7 @@ mod tests {
         8 |         super().m()
           |                 ^ Call site
           |
-        info: Callee: `m` (Method)
+        info: Method: `m` (`main`)
          --> main.py:3:9
           |
         3 |     def m(self):
@@ -780,7 +781,7 @@ mod tests {
         8 |         super().m()
           |         ^^^^^ Call site
           |
-        info: Callee: `super` (Class)
+        info: Class: `super` (`builtins`)
            --> stdlib/builtins.pyi:316:7
             |
         316 | class super:
@@ -817,7 +818,7 @@ def f<CURSOR>oo():
         5 |     helper()
           |     ^^^^^^ Call site
           |
-        info: Callee: `helper` (Function)
+        info: Function: `helper` (`lib`)
          --> lib.py:2:5
           |
         2 | def helper():

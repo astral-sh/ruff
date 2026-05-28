@@ -31,6 +31,7 @@ result = my_function()
       {
         "name": "my_function",
         "kind": 12,
+        "detail": "foo",
         "uri": "file://<temp_dir>/foo.py",
         "range": {
           "start": {
@@ -84,6 +85,7 @@ def caller():
         "to": {
           "name": "helper",
           "kind": 12,
+          "detail": "foo",
           "uri": "file://<temp_dir>/foo.py",
           "range": {
             "start": {
@@ -172,6 +174,7 @@ def use_b():
         "from": {
           "name": "use_a",
           "kind": 12,
+          "detail": "caller_a",
           "uri": "file://<temp_dir>/caller_a.py",
           "range": {
             "start": {
@@ -211,6 +214,7 @@ def use_b():
         "from": {
           "name": "use_b",
           "kind": 12,
+          "detail": "caller_b",
           "uri": "file://<temp_dir>/caller_b.py",
           "range": {
             "start": {

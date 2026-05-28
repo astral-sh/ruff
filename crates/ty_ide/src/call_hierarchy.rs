@@ -66,6 +66,8 @@ pub fn prepare_call_hierarchy(
 pub struct CallHierarchyItem {
     pub name: Name,
     pub kind: SymbolKind,
+    /// The containing module, matching the detail shown for type hierarchy items.
+    pub detail: Option<String>,
     /// The file containing the callable definition.
     pub file: File,
     /// Full range of the definition (or full file range for `Module`).
@@ -106,10 +108,24 @@ impl CallHierarchyItem {
         Some(CallHierarchyItem {
             name: Name::new(name),
             kind,
+            detail: module_detail(db, def_file),
             file: def_file,
             full_range: def.full_range(db, module).range(),
             selection_range: def.focus_range(db, module).range(),
         })
+    }
+}
+
+fn module_detail(db: &dyn Db, file: File) -> Option<String> {
+    ty_module_resolver::file_to_module(db, file).map(|module| module.name(db).to_string())
+}
+
+#[cfg(test)]
+pub(super) fn snapshot_item_label(item: &CallHierarchyItem) -> String {
+    let label = format!("{}: `{}`", item.kind.to_string(), item.name);
+    match &item.detail {
+        Some(detail) => format!("{label} (`{detail}`)"),
+        None => label,
     }
 }
 
@@ -207,11 +223,7 @@ mod tests {
             let mut diagnostic = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("prepare-call-hierarchy")),
                 Severity::Info,
-                format!(
-                    "Call hierarchy item: `{}` ({})",
-                    self.item.name,
-                    self.item.kind.to_string()
-                ),
+                snapshot_item_label(&self.item),
             );
             diagnostic.annotate(Annotation::primary(
                 Span::from(self.item.file).with_range(self.item.selection_range),
@@ -229,7 +241,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
-        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+        info[prepare-call-hierarchy]: Function: `foo` (`main`)
          --> main.py:2:5
           |
         2 | def foo():
@@ -247,7 +259,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
-        info[prepare-call-hierarchy]: Call hierarchy item: `MyClass` (Class)
+        info[prepare-call-hierarchy]: Class: `MyClass` (`main`)
          --> main.py:2:7
           |
         2 | class MyClass:
@@ -266,7 +278,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
-        info[prepare-call-hierarchy]: Call hierarchy item: `method` (Method)
+        info[prepare-call-hierarchy]: Method: `method` (`main`)
          --> main.py:3:9
           |
         3 |     def method(self):
@@ -286,7 +298,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
-        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+        info[prepare-call-hierarchy]: Function: `foo` (`main`)
          --> main.py:2:5
           |
         2 | def foo():
@@ -323,21 +335,21 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
-        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+        info[prepare-call-hierarchy]: Function: `foo` (`main`)
          --> main.py:5:5
           |
         5 | def foo(x: int) -> int: ...
           |     ^^^
           |
 
-        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+        info[prepare-call-hierarchy]: Function: `foo` (`main`)
          --> main.py:7:5
           |
         7 | def foo(x: str) -> str: ...
           |     ^^^
           |
 
-        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+        info[prepare-call-hierarchy]: Function: `foo` (`main`)
          --> main.py:8:5
           |
         8 | def foo(x):
@@ -357,7 +369,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
-        info[prepare-call-hierarchy]: Call hierarchy item: `foo` (Function)
+        info[prepare-call-hierarchy]: Function: `foo` (`main`)
          --> main.py:2:11
           |
         2 | async def foo():
@@ -377,7 +389,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
-        info[prepare-call-hierarchy]: Call hierarchy item: `method` (Method)
+        info[prepare-call-hierarchy]: Method: `method` (`main`)
          --> main.py:4:9
           |
         4 |     def method():
@@ -397,7 +409,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(test.prepare_call_hierarchy(), @"
-        info[prepare-call-hierarchy]: Call hierarchy item: `method` (Method)
+        info[prepare-call-hierarchy]: Method: `method` (`main`)
          --> main.py:4:9
           |
         4 |     def method(cls):

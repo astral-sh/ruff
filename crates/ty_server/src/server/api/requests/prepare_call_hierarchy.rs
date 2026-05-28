@@ -91,7 +91,7 @@ pub(super) fn convert_to_lsp_item(
         name: item.name.into(),
         kind,
         tags: None,
-        detail: None,
+        detail: item.detail,
         uri,
         range: full_range.local_range(),
         selection_range: selection_range.local_range(),

@@ -1,4 +1,4 @@
-use crate::call_hierarchy::CalleeLeaf;
+use crate::call_hierarchy::{CalleeLeaf, module_detail};
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::references::{contains_identifier, has_any_external_visible_definitions};
 use crate::{CallHierarchyItem, Db, SymbolKind};
@@ -433,6 +433,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                     } else {
                         SymbolKind::Function
                     },
+                    detail: module_detail(self.db, file),
                     file,
                     full_range: func.range(),
                     selection_range: func.name.range(),
@@ -443,6 +444,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: Name::new(class.name.as_str()),
                     kind: SymbolKind::Class,
+                    detail: module_detail(self.db, file),
                     file,
                     full_range: class.range(),
                     selection_range: class.name.range(),
@@ -459,6 +461,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: Name::new_static("(lambda)"),
                     kind: SymbolKind::Function,
+                    detail: module_detail(self.db, file),
                     file,
                     full_range: lambda.range(),
                     selection_range: TextRange::new(lambda.start(), end),
@@ -482,6 +485,7 @@ fn module_item(db: &dyn Db, file: File) -> CallHierarchyItem {
     CallHierarchyItem {
         name,
         kind: SymbolKind::Module,
+        detail: None,
         file,
         full_range: TextRange::default(),
         selection_range: TextRange::default(),
@@ -512,6 +516,7 @@ fn attribute_is_callee_of_parent<'a>(
 #[cfg(test)]
 mod tests {
     use crate::{
+        call_hierarchy::snapshot_item_label,
         outgoing_calls,
         tests::{CursorTest, IntoDiagnostic, cursor_test},
     };
@@ -565,10 +570,8 @@ mod tests {
                 );
             }
 
-            let mut caller = SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!("Caller: `{}` ({})", from.name, from.kind.to_string()),
-            );
+            let mut caller =
+                SubDiagnostic::new(SubDiagnosticSeverity::Info, snapshot_item_label(&from));
             let mut caller_annotation =
                 Annotation::primary(Span::from(from.file).with_range(from.selection_range));
             if matches!(&from.kind, SymbolKind::Module) {
@@ -599,7 +602,7 @@ mod tests {
         6 |     foo()
           |     ^^^ Call site
           |
-        info: Caller: `caller` (Function)
+        info: Function: `caller` (`main`)
          --> main.py:5:5
           |
         5 | def caller():
@@ -627,7 +630,7 @@ mod tests {
         7 |     foo()     # this is a call — should appear once
           |     ^^^ Call site
           |
-        info: Caller: `caller` (Function)
+        info: Function: `caller` (`main`)
          --> main.py:5:5
           |
         5 | def caller():
@@ -663,7 +666,7 @@ def use():
         5 |     foo()
           |     ^^^ Call site
           |
-        info: Caller: `use` (Function)
+        info: Function: `use` (`caller`)
          --> caller.py:4:5
           |
         4 | def use():
@@ -699,7 +702,7 @@ def use():
         5 |     bar()
           |     ^^^ Call site
           |
-        info: Caller: `use` (Function)
+        info: Function: `use` (`caller`)
          --> caller.py:4:5
           |
         4 | def use():
@@ -736,7 +739,7 @@ def invoke(value: Callable) -> int:
         5 |     return value()
           |            ^^^^^ Call site
           |
-        info: Caller: `invoke` (Function)
+        info: Function: `invoke` (`caller`)
          --> caller.py:4:5
           |
         4 | def invoke(value: Callable) -> int:
@@ -763,7 +766,7 @@ def invoke(value: Callable) -> int:
         6 |     foo(x=1)
           |     ^^^ Call site
           |
-        info: Caller: `caller` (Function)
+        info: Function: `caller` (`main`)
          --> main.py:5:5
           |
         5 | def caller():
@@ -789,7 +792,7 @@ def invoke(value: Callable) -> int:
         5 | foo()
           | ^^^ Call site
           |
-        info: Caller: `main` (Module)
+        info: Module: `main`
         --> main.py:1:1
         ");
     }
@@ -814,7 +817,7 @@ def invoke(value: Callable) -> int:
         5 | @foo
           |  ^^^ Call site
           |
-        info: Caller: `main` (Module)
+        info: Module: `main`
         --> main.py:1:1
         ");
     }
@@ -845,7 +848,7 @@ class C:
         9 |         def method(self, value=default()):
           |                                ^^^^^^^ Call site
           |
-        info: Caller: `C` (Class)
+        info: Class: `C` (`main`)
          --> main.py:7:7
           |
         7 | class C:
@@ -879,7 +882,7 @@ class C:
         11 |     a.foo()
            |       ^^^ Call site
            |
-        info: Caller: `use` (Function)
+        info: Function: `use` (`main`)
           --> main.py:10:5
            |
         10 | def use(a: A, b: B):
@@ -910,7 +913,7 @@ class C:
         8 |         super().m()
           |                 ^ Call site
           |
-        info: Caller: `m` (Method)
+        info: Method: `m` (`main`)
          --> main.py:7:9
           |
         7 |     def m(self):
@@ -947,7 +950,7 @@ def make() -> C:
         5 |     return C()
           |            ^ Call site
           |
-        info: Caller: `make` (Function)
+        info: Function: `make` (`caller`)
          --> caller.py:4:5
           |
         4 | def make() -> C:
@@ -984,7 +987,7 @@ def make() -> C:
         8 |     return c.prop
           |              ^^^^ Call site
           |
-        info: Caller: `read` (Function)
+        info: Function: `read` (`main`)
          --> main.py:7:5
           |
         7 | def read(c: C) -> int:
@@ -1022,7 +1025,7 @@ def make() -> C:
         12 |     c.prop = 5
            |       ^^^^ Call site
            |
-        info: Caller: `write` (Function)
+        info: Function: `write` (`main`)
           --> main.py:11:5
            |
         11 | def write(c: C) -> None:
@@ -1058,7 +1061,7 @@ def make() -> C:
         12 |     del c.prop
            |           ^^^^ Call site
            |
-        info: Caller: `remove` (Function)
+        info: Function: `remove` (`main`)
           --> main.py:11:5
            |
         11 | def remove(c: C) -> None:
@@ -1089,7 +1092,7 @@ def make() -> C:
         10 |         self._async = make_async(self.method)
            |                                       ^^^^^^ Call site
            |
-        info: Caller: `__init__` (Method)
+        info: Method: `__init__` (`main`)
          --> main.py:9:9
           |
         9 |     def __init__(self) -> None:
@@ -1117,7 +1120,7 @@ def make() -> C:
         7 |         cb = self.method
           |                   ^^^^^^ Call site
           |
-        info: Caller: `setup` (Method)
+        info: Method: `setup` (`main`)
          --> main.py:6:9
           |
         6 |     def setup(self) -> None:
@@ -1147,7 +1150,7 @@ def make() -> C:
         7 |     return c.method()
           |              ^^^^^^ Call site
           |
-        info: Caller: `use` (Function)
+        info: Function: `use` (`main`)
          --> main.py:6:5
           |
         6 | def use(c: C) -> int:
@@ -1196,7 +1199,7 @@ def make() -> C:
         5 | f = lambda x: target(x)
           |               ^^^^^^ Call site
           |
-        info: Caller: `(lambda)` (Function)
+        info: Function: `(lambda)` (`main`)
          --> main.py:5:5
           |
         5 | f = lambda x: target(x)
@@ -1239,7 +1242,7 @@ def make() -> C:
         5 | a = lambda x: target(x)
           |               ^^^^^^ Call site
           |
-        info: Caller: `(lambda)` (Function)
+        info: Function: `(lambda)` (`main`)
          --> main.py:5:5
           |
         5 | a = lambda x: target(x)
@@ -1252,7 +1255,7 @@ def make() -> C:
         6 | b = lambda: target(0)
           |             ^^^^^^ Call site
           |
-        info: Caller: `(lambda)` (Function)
+        info: Function: `(lambda)` (`main`)
          --> main.py:6:5
           |
         6 | b = lambda: target(0)
@@ -1283,7 +1286,7 @@ def make() -> C:
         6 |     f = lambda x: target(x)
           |                   ^^^^^^ Call site
           |
-        info: Caller: `(lambda)` (Function)
+        info: Function: `(lambda)` (`main`)
          --> main.py:6:9
           |
         6 |     f = lambda x: target(x)
@@ -1313,7 +1316,7 @@ def make() -> C:
         6 |     return [target(x) for x in xs]
           |             ^^^^^^ Call site
           |
-        info: Caller: `caller` (Function)
+        info: Function: `caller` (`main`)
          --> main.py:5:5
           |
         5 | def caller(xs):
