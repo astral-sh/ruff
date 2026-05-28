@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
-use ruff_python_ast::identifier::Identifier;
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Violation;
 
@@ -100,7 +100,7 @@ pub(crate) fn too_many_try_statements(
                 statements,
                 max_statements,
             },
-            stmt.identifier(),
+            TextRange::at(stmt.start(), "try".text_len()),
         );
     }
 }

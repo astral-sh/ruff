@@ -25,19 +25,11 @@ except:
 
 ```snapshot
 error[PLW0717]: Try clause contains too many statements (6 > 5)
-  --> src/mdtest_snippet.py:2:1
-   |
- 2 | / try:
- 3 | |     call1()
- 4 | |     call2()
- 5 | |     call3()
- 6 | |     call4()
- 7 | |     call5()
- 8 | |     call6()
- 9 | | except:
-10 | |     ...
-   | |_______^
-   |
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | try:
+  | ^^^
+  |
 ```
 
 ## Context managers
