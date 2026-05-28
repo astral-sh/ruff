@@ -14,8 +14,12 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
-use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
-use crate::types::signatures::{CallableSignature, Parameters, ReturnCallableTypeVarScope};
+use crate::types::relation::{
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+};
+use crate::types::signatures::{
+    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
+};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
@@ -26,8 +30,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, any_over_type, binding_type,
-    declaration_type, infer_definition_types,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
+    infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1351,6 +1355,28 @@ impl<'db> Specialization<'db> {
         )
     }
 
+    pub(crate) fn is_disjoint_from<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = DisjointnessChecker::new(
+            constraints,
+            inferable,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+        checker.check_specialization_pair(db, self, other)
+    }
+
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -1617,19 +1643,9 @@ fn specialization_variance<'db>(
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
-    /// Return `true` if a type can safely participate in specialization disjointness shortcuts.
-    ///
-    /// Gradual types and unresolved type variables are intentionally excluded. For example,
-    /// `Any` might materialize to `int`, and an unconstrained `T` might specialize to the same
-    /// type as another type variable, so treating either as definitive evidence of disjointness
-    /// would make overload filtering and union simplification too eager.
-    fn type_is_static_for_specialization_disjointness(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        if any_over_type(db, ty, true, |ty| {
-            matches!(
-                ty,
-                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
-            )
-        }) {
+    fn type_is_fully_static_for_invariant_disjointness(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let ty = ty.expand_eagerly(db);
+        if ty.is_dynamic() || ty.has_typevar_or_typevar_instance(db) {
             return false;
         }
 
@@ -1641,90 +1657,24 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             && visitor.is_equivalent_to_materialization(db, ty, bottom)
     }
 
-    /// Return the constraints under which two invariant specialization arguments are disjoint.
-    ///
-    /// Besides direct type disjointness, fully static non-equivalent invariant arguments
-    /// make the enclosing specializations disjoint.
     fn invariant_specialization_pair_is_disjoint(
         &self,
         db: &'db dyn Db,
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_type_pair(db, left, right)
-            .or(db, self.constraints, || {
-                // For fully static invariant arguments, any non-equivalent
-                // specialization forces the enclosing generic specializations
-                // to be disjoint. For gradual types and type variables, stay
-                // conservative unless direct disjointness already proved it.
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    Self::type_is_static_for_specialization_disjointness(db, left)
-                        && Self::type_is_static_for_specialization_disjointness(db, right),
-                )
-                .and(db, self.constraints, || {
-                    self.as_equivalence_checker()
-                        .check_type_pair(db, left, right)
-                        .negate(db, self.constraints)
-                })
-            })
-    }
-
-    /// Return the constraints under which two generic specializations are incompatible as
-    /// shared bases in a valid MRO.
-    ///
-    /// This is used when comparing generic aliases found in the MROs of two classes.
-    /// The check is intentionally conservative for dynamic types and type variables, because
-    /// those cases can materialize or specialize to compatible bases.
-    pub(super) fn check_specialization_pair_in_mro(
-        &self,
-        db: &'db dyn Db,
-        left: Specialization<'db>,
-        right: Specialization<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let generic_context = left.generic_context(db);
-        debug_assert_eq!(generic_context, right.generic_context(db));
-
-        // For non-static arguments like `Any` or an unresolved `T`, stay conservative: they can
-        // materialize or specialize to a type that makes the two bases compatible.
-        let specialization_is_static = |specialization: Specialization<'db>| {
-            specialization
-                .types(db)
-                .iter()
-                .copied()
-                .all(|ty| Self::type_is_static_for_specialization_disjointness(db, ty))
-        };
-        if !specialization_is_static(left) || !specialization_is_static(right) {
-            return self.never();
-        }
-
-        itertools::izip!(
-            generic_context.variables(db),
-            left.types(db),
-            right.types(db)
-        )
-        .when_any(
-            db,
+        // Unlike covariant parameters, unequal static invariant arguments cannot share a
+        // common specialization. Gradual and type-variable arguments may still overlap.
+        ConstraintSet::from_bool(
             self.constraints,
-            |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
-                TypeVarVariance::Invariant => {
-                    self.invariant_specialization_pair_is_disjoint(db, *left_type, *right_type)
-                }
-                // `Covariant[Never]` is compatible with every `Covariant[T]`, so `Never` cannot
-                // prove that two covariant generic bases are impossible to combine.
-                TypeVarVariance::Covariant
-                    if left_type.resolve_type_alias(db).is_never()
-                        || right_type.resolve_type_alias(db).is_never() =>
-                {
-                    self.never()
-                }
-                TypeVarVariance::Covariant => self.check_type_pair(db, *left_type, *right_type),
-                // A common specialization can satisfy both contravariant or bivariant bases; for
-                // example, `Contra[int | str]` can stand in for both `Contra[int]` and
-                // `Contra[str]`.
-                TypeVarVariance::Contravariant | TypeVarVariance::Bivariant => self.never(),
-            },
+            Self::type_is_fully_static_for_invariant_disjointness(db, left)
+                && Self::type_is_fully_static_for_invariant_disjointness(db, right),
         )
+        .and(db, self.constraints, || {
+            self.as_equivalence_checker()
+                .check_type_pair(db, left, right)
+                .negate(db, self.constraints)
+        })
     }
 
     pub(super) fn check_specialization_pair(
@@ -1749,8 +1699,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             right.types(db)
         );
 
-        // A single incompatible type argument is enough to make the two
-        // specializations disjoint.
         types.when_any(
             db,
             self.constraints,
@@ -1759,7 +1707,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     self.invariant_specialization_pair_is_disjoint(db, *left_type, *right_type)
                 }
 
-                // `Foo[Never]` is a subtype of both `Foo[A]` and `Foo[B]`.
+                // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
                 TypeVarVariance::Covariant => self.never(),
 
                 // If `Foo[T]` is contravariant in `T`, `Foo[A | B]` is a subtype of `Foo[A]` and `Foo[B]`
@@ -2347,14 +2295,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
-        // Pairs with no type variables cannot contribute any mapping. Look through nested alias
-        // values here so `list[Alias[T]]` still reaches structural inference.
-        if !any_over_type(self.db, formal, true, |ty| matches!(ty, Type::TypeVar(_)))
-            && !any_over_type(self.db, actual, true, |ty| matches!(ty, Type::TypeVar(_)))
-        {
-            return Ok(());
-        }
-
         // Remove the union elements from `actual` that are not related to `formal`, and vice
         // versa.
         //
@@ -2363,11 +2303,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
         let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
-        if let Type::TypeAlias(alias) = formal {
-            return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
-        }
-
         match (formal, actual) {
+            // Expand PEP 695 type aliases in the formal type.
+            // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
+            (Type::TypeAlias(alias), _) => {
+                return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
+            }
+
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 return self.infer_map_impl(

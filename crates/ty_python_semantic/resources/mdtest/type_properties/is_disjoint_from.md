@@ -141,33 +141,22 @@ static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
 static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```
 
-## Generic specializations and generic bases
+## Invariant generic specializations and bases
+
+Only incompatible invariant generic arguments imply disjointness. Covariant generic arguments do
+not: a covariant container can be inhabited by an empty value.
 
 ```py
-from typing import AbstractSet, Any, Generic, Literal, Sequence, TypeVar, final
-from typing_extensions import LiteralString, Never, TypeAlias, disjoint_base
-from ty_extensions import Intersection, is_disjoint_from, static_assert
-
-class A: ...
-class B: ...
-
-@final
-class FinalA: ...
-
-@final
-class FinalB: ...
-
-class Meta(type): ...
-class WithMeta(metaclass=Meta): ...
-
-@disjoint_base
-class DisjointA: ...
+from collections.abc import Sequence
+from typing import Any, Generic, TypeVar
+from ty_extensions import is_disjoint_from, static_assert
 
 T = TypeVar("T")
 U = TypeVar("U")
 T_co = TypeVar("T_co", covariant=True)
-T_contra = TypeVar("T_contra", contravariant=True)
-U_co = TypeVar("U_co", covariant=True)
+
+class A: ...
+class B: ...
 
 class Invariant(Generic[T]):
     x: T
@@ -176,172 +165,57 @@ class InvariantPair(Generic[T, U]):
     x: T
     y: U
 
-class InvSubA(Invariant[A]):
-    pass
-
-@final
-class FinalInvSubInt(Invariant[int]):
-    pass
-
 class Covariant(Generic[T_co]):
     def get(self) -> T_co:
         raise NotImplementedError()
 
-class DerivedCovariant(Covariant[T_co], Generic[T_co]):
-    pass
-
-class Mixed(Generic[T, U_co]):
-    pass
-
-class DerivedMixed(Mixed[T, U_co], Generic[T, U_co]):
+class InvSubA(Invariant[A]):
     pass
 
 class CoSubB(Covariant[B]):
     pass
 
-AliasToNever: TypeAlias = Never
-
-class CoSubNever(Covariant[Never]):
-    pass
-
-class CoSubAliasNever(Covariant[AliasToNever]):
-    pass
-
-class CoSubFinalA(Covariant[FinalA]):
-    pass
-
-@final
-class FinalCoSubA(Covariant[FinalA]):
-    pass
-
-class Contravariant(Generic[T_contra]):
-    def set(self, value: T_contra) -> None:
-        raise NotImplementedError()
-
-class ContraSubFinalA(Contravariant[FinalA]):
-    pass
-
-class ContraSubFinalB(Contravariant[FinalB]):
-    pass
-
-class Left(Covariant[FinalA], Generic[T]):
-    pass
-
-class Right(Covariant[B], Generic[T]):
-    pass
-
-class Pair(Generic[T, U_co]):
-    pass
-
-class PairLeft(Pair[Any, FinalA]):
-    pass
-
-class PairRight(Pair[int, B]):
-    pass
-
 static_assert(is_disjoint_from(Invariant[A], Invariant[B]))
 static_assert(is_disjoint_from(InvSubA, Invariant[B]))
 static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
-static_assert(not is_disjoint_from(Invariant[FinalA], Invariant[FinalA]))
-static_assert(not is_disjoint_from(Invariant[DisjointA], Invariant[DisjointA]))
-static_assert(not is_disjoint_from(Invariant[Intersection[A, Any]], Invariant[B]))
-static_assert(is_disjoint_from(InvariantPair[FinalA, A], InvariantPair[FinalB, A]))
-static_assert(is_disjoint_from(InvariantPair[A, FinalA], InvariantPair[A, FinalB]))
-static_assert(not is_disjoint_from(type[Invariant[Any]], type[FinalInvSubInt]))
-static_assert(not is_disjoint_from(type[FinalInvSubInt], type[Invariant[Any]]))
-static_assert(not is_disjoint_from(WithMeta, A))
-
+static_assert(not is_disjoint_from(Invariant[Any], Invariant[B]))
+static_assert(is_disjoint_from(InvariantPair[A, A], InvariantPair[A, B]))
 static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
-static_assert(not is_disjoint_from(DerivedCovariant[FinalA], Covariant[FinalB]))
-static_assert(not is_disjoint_from(frozenset[int], AbstractSet[str]))
-static_assert(is_disjoint_from(DerivedMixed[int, FinalA], Mixed[str, FinalB]))
 static_assert(not is_disjoint_from(Covariant[A], CoSubB))
-static_assert(not is_disjoint_from(Covariant[A], CoSubNever))
-static_assert(not is_disjoint_from(CoSubNever, Covariant[A]))
-static_assert(not is_disjoint_from(Covariant[A], CoSubAliasNever))
-static_assert(not is_disjoint_from(CoSubAliasNever, CoSubB))
-static_assert(not is_disjoint_from(Covariant[FinalA], Covariant[B]))
-static_assert(is_disjoint_from(CoSubFinalA, Covariant[B]))
-static_assert(is_disjoint_from(FinalCoSubA, Covariant[B]))
-static_assert(is_disjoint_from(Covariant[FinalA], CoSubB))
-static_assert(is_disjoint_from(type[FinalCoSubA], type[Covariant[B]]))
-static_assert(is_disjoint_from(type[Covariant[B]], type[FinalCoSubA]))
-static_assert(is_disjoint_from(Left[int], Right[str]))
-static_assert(not is_disjoint_from(ContraSubFinalA, ContraSubFinalB))
-static_assert(not is_disjoint_from(PairLeft, PairRight))
-
-class RecursiveLeft(Covariant["type[RecursiveLeft]"]):
-    pass
-
-class RecursiveRight(Covariant["type[RecursiveRight]"]):
-    pass
-
-static_assert(not is_disjoint_from(type[RecursiveLeft], type[RecursiveRight]))
-
 static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
-static_assert(is_disjoint_from(Literal[""], Sequence[int]))
-static_assert(is_disjoint_from(Literal["x"], Sequence[int]))
-static_assert(is_disjoint_from(str, Sequence[int]))
-static_assert(not is_disjoint_from(str, Sequence[str]))
-static_assert(is_disjoint_from(LiteralString, Sequence[int]))
-static_assert(not is_disjoint_from(LiteralString, Sequence[Literal["a"]]))
-static_assert(is_disjoint_from(LiteralString, A))
-static_assert(is_disjoint_from(Literal[b""], Sequence[str]))
-static_assert(is_disjoint_from(Literal[b"x"], Sequence[str]))
-static_assert(is_disjoint_from(bytes, Sequence[str]))
-static_assert(is_disjoint_from(bytearray, Sequence[str]))
-static_assert(is_disjoint_from(range, Sequence[str]))
-static_assert(is_disjoint_from(memoryview, Sequence[str]))
-
-# Empty-value overlap does not make inconsistent inherited class interfaces valid.
-class StrInts(str, Sequence[int]): ...  # error: [invalid-generic-class]
-class BytesStr(bytes, Sequence[str]): ...  # error: [invalid-generic-class]
-class BytearrayStr(bytearray, Sequence[str]): ...  # error: [invalid-generic-class]
 ```
 
-## Generic type aliases
+## Type-variable aliases and empty invariant arguments
 
-Generic type aliases should not let us conclude disjointness too eagerly when their values preserve
-free type variables or inherited generic bases:
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-from typing import Generic, TypeVar, final
-from typing_extensions import TypeAlias, TypeAliasType
+from typing import Generic, Never, TypeVar
 from ty_extensions import is_disjoint_from, static_assert
 
 T = TypeVar("T")
-T_co = TypeVar("T_co", covariant=True)
-U = TypeVar("U")
 
-FreeAlias = TypeAliasType("FreeAlias", T)
+class Invariant(Generic[T]):
+    x: T
 
-class B: ...
+type Id[V] = V
 
-@final
-class FinalA: ...
+def _[U]():
+    static_assert(not is_disjoint_from(Invariant[Id[U]], Invariant[int]))
 
-class Invariant(Generic[U]):
-    pass
+class Mixed[T, U]:
+    x: T
 
-class CovariantBase(Generic[T_co]):
-    pass
+static_assert(not is_disjoint_from(Mixed[Never, int], Mixed[Never, str]))
 
-class Covariant(CovariantBase[T_co], Generic[T_co]):
-    pass
+class Left(Invariant[Never]): ...
+class Right(Invariant[Never]): ...
+class Both(Left, Right): ...
 
-LeftWithFreeAlias: TypeAlias = Invariant[FreeAlias]
-RightWithConcrete: TypeAlias = Invariant[int]
-
-# `FreeAlias` has an unspecialized type variable, so `Invariant[FreeAlias]` could overlap with
-# `Invariant[int]`.
-static_assert(not is_disjoint_from(LeftWithFreeAlias, RightWithConcrete))
-
-LeftWithInheritedBase: TypeAlias = Covariant[FinalA]
-RightWithInheritedBase: TypeAlias = Covariant[B]
-
-# The direct `Covariant[...]` aliases can overlap even though their inherited generic bases
-# appear disjoint.
-static_assert(not is_disjoint_from(LeftWithInheritedBase, RightWithInheritedBase))
+static_assert(not is_disjoint_from(Left, Right))
 ```
 
 ## "Disjoint base" builtin types
@@ -458,8 +332,6 @@ static_assert(is_disjoint_from(I, J))
 ## Tuple types
 
 ```py
-from collections.abc import Sequence
-from typing import Generic, TypeVar
 from typing_extensions import Literal, Never
 from ty_extensions import TypeOf, is_disjoint_from, static_assert
 
@@ -478,39 +350,6 @@ static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], 
 
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], int]))
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[int, ...]))
-
-class OneIntTuple(tuple[int]): ...
-class TwoIntsTuple(tuple[int, int]): ...
-class BothTupleSubclasses(OneIntTuple, TwoIntsTuple): ...
-
-# Tuple subclasses with incompatible inherited element specs can share a runtime subclass.
-static_assert(not is_disjoint_from(OneIntTuple, TwoIntsTuple))
-
-class IntTuples(tuple[int, ...]): ...
-class StrTuples(tuple[str, ...]): ...
-
-# Variadic tuple subclasses with disjoint element types can both contain the empty tuple.
-static_assert(not is_disjoint_from(IntTuples, StrTuples))
-
-class StrSequence(Sequence[str]): ...
-
-static_assert(not is_disjoint_from(IntTuples, StrSequence))
-static_assert(not is_disjoint_from(tuple[str, ...], Sequence[int]))
-static_assert(not is_disjoint_from(tuple[()], Sequence[int]))
-static_assert(is_disjoint_from(tuple[str], Sequence[int]))
-
-# Empty-tuple overlap does not make inconsistent inherited class interfaces valid.
-class BothVariadicTuples(IntTuples, StrTuples): ...  # error: [invalid-generic-class]
-class BothTupleSequence(IntTuples, StrSequence): ...  # error: [invalid-generic-class]
-
-T = TypeVar("T")
-
-class Invariant(Generic[T]): ...
-class IntInvariantTuples(tuple[int, ...], Invariant[int]): ...
-class StrInvariantTuples(tuple[str, ...], Invariant[str]): ...
-
-# Generic bases unrelated to `tuple` can still make tuple subclasses disjoint.
-static_assert(is_disjoint_from(IntInvariantTuples, StrInvariantTuples))
 
 # TODO: should pass
 static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [static-assert-error]

@@ -227,9 +227,9 @@ class I(  # error: [instance-layout-conflict]
 ```
 
 We avoid emitting an `instance-layout-conflict` diagnostic for this class definition, because
-`range` is `@final`, so we'll complain about the `class` statement anyway. We also emit
-`invalid-generic-class` here: empty values overlap, but the inherited `Sequence[int]` and
-`Sequence[str]` interfaces are inconsistent for non-empty values.
+`range` is `@final`, so we'll complain about the `class` statement anyway. (We also emit
+`invalid-generic-class` here, as `Sequence[str]` and `Sequence[int]` coexist invalidly in this
+class's MRO.)
 
 ```py
 # error: [invalid-generic-class]

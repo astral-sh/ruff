@@ -1761,13 +1761,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     return self.always();
                 }
 
-                // Empty strings use `str`'s declared sequence specialization instead of
-                // behaving as `Sequence[Never]`. This keeps an empty string from making
-                // `str` overlap with incompatible `Sequence` specializations.
-                if value.value(db).is_empty() {
-                    return self.check_type_pair(db, KnownClass::Str.to_instance(db), target);
-                }
-
                 if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
                     && !sequence_class
                         .iter_mro(db, None)
@@ -1781,6 +1774,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 let chars: FxHashSet<char> = value.value(db).chars().collect();
 
                 let spec = match chars.len() {
+                    0 => Type::Never,
                     1 => Type::single_char_string_literal(db, *chars.iter().next().unwrap()),
                     _ => {
                         // Optimisation: since we know this union will only include string-literal types,
@@ -1815,12 +1809,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     return self.always();
                 }
 
-                // As for strings, the empty literal retains the builtin's declared
-                // sequence specialization rather than becoming `Sequence[Never]`.
-                if value.value(db).is_empty() {
-                    return self.check_type_pair(db, KnownClass::Bytes.to_instance(db), target);
-                }
-
                 if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
                     && !sequence_class
                         .iter_mro(db, None)
@@ -1838,6 +1826,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .collect();
 
                 let spec = match ints.len() {
+                    0 => Type::Never,
                     1 => Type::int_literal(*ints.iter().next().unwrap()),
                     _ => {
                         let union_elements: Box<[Type<'db>]> =
@@ -2738,17 +2727,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => self.never(),
-                    SubclassOfInner::Class(class_a) => {
-                        let class_b = ClassType::NonGeneric(class_b);
-                        let could_exist = if class_b.is_final(db) {
-                            self.as_relation_checker(TypeRelation::Assignability)
-                                .check_class_pair(db, class_b, class_a)
-                                .is_always_satisfied(db)
-                        } else {
-                            self.class_could_exist_in_mro_of(db, class_a, class_b)
-                        };
-                        ConstraintSet::from_bool(self.constraints, !could_exist)
-                    }
+                    SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
+                        self.constraints,
+                        !class_a.could_exist_in_mro_of(
+                            db,
+                            ClassType::NonGeneric(class_b),
+                            self.constraints,
+                        ),
+                    ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
@@ -2759,20 +2745,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !self.class_could_exist_in_mro_of(db, class_a, ClassType::Generic(alias_b)),
+                        !class_a.could_exist_in_mro_of(
+                            db,
+                            ClassType::Generic(alias_b),
+                            self.constraints,
+                        ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
 
-            (Type::SubclassOf(left_subclass), Type::SubclassOf(right_subclass)) => {
-                // Generic bases can mention the class object being compared, e.g.
-                // `class L(Co["type[L]"])` checked against `class R(Co["type[R]"])`.
-                // Reuse the active disjointness guard so that recursive `type[L]` vs `type[R]`
-                // comparisons bottom out conservatively instead of re-entering indefinitely.
-                self.with_recursion_guard(left, right, || {
-                    self.check_subclassof_pair(db, left_subclass, right_subclass)
-                })
+            (Type::SubclassOf(left), Type::SubclassOf(right)) => {
+                self.check_subclassof_pair(db, left, right)
             }
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
@@ -2813,34 +2797,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     LiteralValueTypeKind::Bool(_) => {
                         KnownClass::Bool.when_subclass_of(db, instance.class(db), self.constraints)
                     }
-                    LiteralValueTypeKind::LiteralString => {
-                        let target_class = instance.class(db);
-                        if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
-                            && sequence_class
-                                .iter_mro(db, None)
-                                .filter_map(ClassBase::into_class)
-                                .map(|class| class.class_literal(db))
-                                .contains(&target_class.class_literal(db))
-                        {
-                            // `LiteralString` can still overlap with a specialized sequence:
-                            // `"a"` is both `LiteralString` and `Sequence[Literal["a"]]`.
-                            // Use `str` here to preserve that possible overlap.
-                            return self.check_type_pair(
-                                db,
-                                KnownClass::Str.to_instance(db),
-                                Type::NominalInstance(instance),
-                            );
-                        }
-
-                        KnownClass::Str.when_subclass_of(db, target_class, self.constraints)
+                    LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::String(_) => {
+                        KnownClass::Str.when_subclass_of(db, instance.class(db), self.constraints)
                     }
-                    LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => self
-                        .as_relation_checker(TypeRelation::Subtyping)
-                        .check_type_pair(
-                            db,
-                            Type::LiteralValue(literal),
-                            Type::NominalInstance(instance),
-                        ),
+                    LiteralValueTypeKind::Bytes(_) => {
+                        KnownClass::Bytes.when_subclass_of(db, instance.class(db), self.constraints)
+                    }
                     LiteralValueTypeKind::Enum(enum_literal) => self
                         .as_relation_checker(TypeRelation::Subtyping)
                         .check_type_pair(
