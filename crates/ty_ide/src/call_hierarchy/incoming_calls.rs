@@ -1,4 +1,4 @@
-use crate::call_hierarchy::{CalleeLeaf, callee_leaf, resolve_callee};
+use crate::call_hierarchy::CalleeLeaf;
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::references::{contains_identifier, has_any_external_visible_definitions};
 use crate::{CallHierarchyItem, Db, SymbolKind};
@@ -244,7 +244,7 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
             // where `bar` is a local rebinding/alias of the target resolves
             // semantically without needing the alias name in the text needle.
             AnyNodeRef::ExprCall(call) => {
-                if let Some(leaf) = callee_leaf(&call.func)
+                if let Some(leaf) = CalleeLeaf::from_expr(&call.func)
                     && self.leaf_could_match(leaf)
                 {
                     self.check_call_site(leaf);
@@ -253,7 +253,7 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
             AnyNodeRef::Decorator(decorator) => {
                 // `@foo` without parens is a runtime call; `@foo()` is handled
                 // by the `ExprCall` arm above.
-                if let Some(leaf) = callee_leaf(&decorator.expression)
+                if let Some(leaf) = CalleeLeaf::from_expr(&decorator.expression)
                     && self.leaf_could_match(leaf)
                 {
                     self.check_call_site(leaf);
@@ -315,7 +315,7 @@ impl<'a> CallSitesFinder<'a, '_> {
 
     fn check_call_site(&mut self, leaf: CalleeLeaf<'a>) {
         let Some((goto_target, call_site_range)) =
-            resolve_callee(self.model, self.tokens, &self.ancestors, leaf)
+            leaf.resolve(self.model, self.tokens, &self.ancestors)
         else {
             return;
         };
@@ -351,7 +351,7 @@ impl<'a> CallSitesFinder<'a, '_> {
         // `Decorator` pass to `resolve_callee` (they resolve before descending).
         let ancestors_without_self = &self.ancestors[..self.ancestors.len() - 1];
         let Some((goto_target, call_site_range)) =
-            resolve_callee(self.model, self.tokens, ancestors_without_self, leaf)
+            leaf.resolve(self.model, self.tokens, ancestors_without_self)
         else {
             return;
         };

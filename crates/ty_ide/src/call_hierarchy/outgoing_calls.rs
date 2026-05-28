@@ -1,4 +1,4 @@
-use crate::call_hierarchy::{CalleeLeaf, callee_leaf, resolve_callee};
+use crate::call_hierarchy::CalleeLeaf;
 use crate::goto::find_goto_target;
 use crate::{CallHierarchyItem, Db};
 use ruff_db::files::File;
@@ -133,7 +133,7 @@ struct OutgoingCallsFinder<'a, 'db> {
 impl<'a> OutgoingCallsFinder<'a, '_> {
     fn record_callee(&mut self, leaf: CalleeLeaf<'a>) {
         let Some((goto_target, call_site_range)) =
-            resolve_callee(self.model, self.tokens, &self.ancestors, leaf)
+            leaf.resolve(self.model, self.tokens, &self.ancestors)
         else {
             return;
         };
@@ -192,7 +192,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
 
         match node {
             AnyNodeRef::ExprCall(call) => {
-                if let Some(leaf) = callee_leaf(&call.func) {
+                if let Some(leaf) = CalleeLeaf::from_expr(&call.func) {
                     self.record_callee(leaf);
                 }
             }
@@ -200,7 +200,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
                 // A bare `@foo` decorator with no parens is a runtime call. If
                 // the user wrote `@foo()` we'll pick it up via the `ExprCall`
                 // arm above instead.
-                if let Some(leaf) = callee_leaf(&decorator.expression) {
+                if let Some(leaf) = CalleeLeaf::from_expr(&decorator.expression) {
                     self.record_callee(leaf);
                 }
             }

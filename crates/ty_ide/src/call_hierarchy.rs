@@ -43,21 +43,18 @@ pub fn prepare_call_hierarchy(
         .goto_declaration(&model, &goto_target)?;
 
     let mut items = Vec::new();
-    // A call target can resolve through both its invoked implementation and its
-    // callable expression; expose one LSP item when those point to the same location.
-    let mut seen = rustc_hash::FxHashSet::default();
     for resolved in &definitions {
         let Some(def) = resolved.definition() else {
             continue;
         };
-        let def_file = def.file(db);
-        let module_ref = parsed_module(db, def_file).load(db);
-        if let Some(item) = CallHierarchyItem::from_definition(db, resolved, &module_ref)
-            && seen.insert((item.file, item.selection_range))
-        {
+
+        let module_ref = parsed_module(db, def.file(db)).load(db);
+
+        if let Some(item) = CallHierarchyItem::from_definition(db, resolved, &module_ref) {
             items.push(item);
         }
     }
+
     if items.is_empty() { None } else { Some(items) }
 }
 
@@ -128,49 +125,51 @@ enum CalleeLeaf<'a> {
     },
 }
 
-fn callee_leaf(expr: &ast::Expr) -> Option<CalleeLeaf<'_>> {
-    match expr {
-        ast::Expr::Name(name) => Some(CalleeLeaf::Name(name)),
-        ast::Expr::Attribute(attr) => Some(CalleeLeaf::AttrIdentifier {
-            attribute: attr,
-            identifier: &attr.attr,
-        }),
-        _ => None,
+impl<'a> CalleeLeaf<'a> {
+    fn from_expr(expr: &'a ast::Expr) -> Option<Self> {
+        match expr {
+            ast::Expr::Name(name) => Some(CalleeLeaf::Name(name)),
+            ast::Expr::Attribute(attr) => Some(CalleeLeaf::AttrIdentifier {
+                attribute: attr,
+                identifier: &attr.attr,
+            }),
+            _ => None,
+        }
     }
-}
 
-/// Build a `CoveringNode` whose leaf is the callee identifier and run
-/// `GotoTarget::from_covering_node`. Returns the resolved goto target and the
-/// callee's range (the range LSP wants for `from_ranges`).
-fn resolve_callee<'a>(
-    model: &SemanticModel<'_>,
-    tokens: &Tokens,
-    ancestors: &[AnyNodeRef<'a>],
-    leaf: CalleeLeaf<'a>,
-) -> Option<(GotoTarget<'a>, TextRange)> {
-    // Construct the leaf stack the way `find_goto_target_impl` does: the leaf
-    // node has to be the identifier/name, with `ExprAttribute` (for attribute
-    // calls) sitting just above it so `from_covering_node`'s `Identifier` arm
-    // walks up to the `ExprCall` grandparent.
-    let mut stack: Vec<AnyNodeRef<'_>> = ancestors.to_vec();
-    let call_site_range = match leaf {
-        CalleeLeaf::Name(name) => {
-            stack.push(AnyNodeRef::from(name));
-            name.range
-        }
-        CalleeLeaf::AttrIdentifier {
-            attribute,
-            identifier,
-        } => {
-            stack.push(AnyNodeRef::from(attribute));
-            stack.push(AnyNodeRef::from(identifier));
-            identifier.range
-        }
-    };
-    let covering = CoveringNode::from_ancestors(stack);
-    let goto_target =
-        GotoTarget::from_covering_node(model, &covering, call_site_range.start(), tokens)?;
-    Some((goto_target, call_site_range))
+    /// Build a `CoveringNode` whose leaf is the callee identifier and run
+    /// `GotoTarget::from_covering_node`. Returns the resolved goto target and the
+    /// callee's range (the range LSP wants for `from_ranges`).
+    fn resolve(
+        self,
+        model: &'a SemanticModel,
+        tokens: &Tokens,
+        ancestors: &[AnyNodeRef<'a>],
+    ) -> Option<(GotoTarget<'a>, TextRange)> {
+        // Construct the leaf stack the way `find_goto_target_impl` does: the leaf
+        // node has to be the identifier/name, with `ExprAttribute` (for attribute
+        // calls) sitting just above it so `from_covering_node`'s `Identifier` arm
+        // walks up to the `ExprCall` grandparent.
+        let mut stack: Vec<AnyNodeRef<'_>> = ancestors.to_vec();
+        let call_site_range = match self {
+            CalleeLeaf::Name(name) => {
+                stack.push(AnyNodeRef::from(name));
+                name.range
+            }
+            CalleeLeaf::AttrIdentifier {
+                attribute,
+                identifier,
+            } => {
+                stack.push(AnyNodeRef::from(attribute));
+                stack.push(AnyNodeRef::from(identifier));
+                identifier.range
+            }
+        };
+        let covering = CoveringNode::from_ancestors(stack);
+        let goto_target =
+            GotoTarget::from_covering_node(model, &covering, call_site_range.start(), tokens)?;
+        Some((goto_target, call_site_range))
+    }
 }
 
 #[cfg(test)]
