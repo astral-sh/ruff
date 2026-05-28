@@ -162,9 +162,10 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
 pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
     ///
-    /// This method short-circuits if we encounter a structurally `always` constraint set. It does
-    /// not short-circuit on evidence-bearing constraints that are only semantically always true,
-    /// since those constraints can still be relevant for inference.
+    /// This method short-circuits if we encounter a constraint set that is semantically always
+    /// satisfied. Unlike a structural `ALWAYS_TRUE`, a semantically-always set may still carry
+    /// inference evidence; in that case, the evidence-bearing node is returned rather than being
+    /// replaced by `ALWAYS_TRUE`.
     fn when_any<'db, 'c>(
         self,
         db: &'db dyn Db,
@@ -503,7 +504,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns the union of this constraint set and another. The other constraint set is provided
     /// as a thunk, to implement short-circuiting: the thunk is not forced if the constraint set is
-    /// structurally `always`.
+    /// semantically always satisfied.
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
@@ -514,13 +515,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if self.node == ALWAYS_TRUE {
-            return self;
+        if !self.is_always_satisfied(db) {
+            let other = other();
+            other.verify_builder(builder);
+            self.union(db, builder, other);
         }
-
-        let other = other();
-        other.verify_builder(builder);
-        self.union(db, builder, other);
         self
     }
 
@@ -2188,15 +2187,16 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
-        // Only short-circuit on structural `always`. A constraint can be semantically always
-        // satisfied while still carrying inference evidence, such as an explicit `Never` lower
-        // bound. Dropping that node would lose a valid solution path.
+        // Short-circuiting on a semantically-always node is safe here because `tree_fold` returns
+        // that node itself. This preserves any inference evidence attached to the tautology (for
+        // example an explicit `Never` lower bound) while avoiding the combinatorial explosion from
+        // unioning many alternative evidence-bearing tautologies.
         Self::tree_fold(
             db,
             builder,
             nodes,
             ALWAYS_FALSE,
-            |node, _db, _builder| node == ALWAYS_TRUE,
+            Self::is_always_satisfied,
             Self::or_with_offset,
         )
     }
@@ -2692,23 +2692,33 @@ impl NodeId {
         }
     }
 
-    /// Invokes a closure for each constraint variable that appears anywhere in a BDD. (Any given
-    /// constraint can appear multiple times in different paths from the root; we do not
-    /// deduplicate those constraints, and will instead invoke the callback each time we encounter
-    /// the constraint.)
+    /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
+    ///
+    /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
+    /// caller only needs to discover the set of constraints mentioned in a BDD; traversing every
+    /// root-to-leaf occurrence can be exponential in the presence of shared subgraphs.
     fn for_each_constraint(
         self,
         builder: &ConstraintSetBuilder<'_>,
         f: &mut dyn FnMut(ConstraintId, usize),
     ) {
-        if self.is_terminal() {
-            return;
+        fn walk(
+            node: NodeId,
+            builder: &ConstraintSetBuilder<'_>,
+            seen: &mut FxHashSet<NodeId>,
+            f: &mut dyn FnMut(ConstraintId, usize),
+        ) {
+            if node.is_terminal() || !seen.insert(node) {
+                return;
+            }
+            let interior = builder.interior_node_data(node);
+            f(interior.constraint, interior.source_order);
+            walk(interior.if_true, builder, seen, f);
+            walk(interior.if_uncertain, builder, seen, f);
+            walk(interior.if_false, builder, seen, f);
         }
-        let interior = builder.interior_node_data(self);
-        f(interior.constraint, interior.source_order);
-        interior.if_true.for_each_constraint(builder, f);
-        interior.if_uncertain.for_each_constraint(builder, f);
-        interior.if_false.for_each_constraint(builder, f);
+
+        walk(self, builder, &mut FxHashSet::default(), f);
     }
 
     /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
@@ -3821,16 +3831,21 @@ impl InteriorNode {
     }
 
     fn path_assignments(self, builder: &ConstraintSetBuilder<'_>) -> PathAssignments {
-        // Sort the constraints in this BDD by their `source_order`s before adding them to the
-        // sequent map. This ensures that constraints appear in the sequent map in a stable order.
-        // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
-        // unstable sort is fine.
-        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
+        // Sort the constraints in this BDD by their earliest `source_order` before adding them to
+        // the sequent map. This ensures that constraints appear in the sequent map in a stable
+        // order. We only need to discover which constraints are mentioned in the BDD, so we treat
+        // the BDD as a DAG and deduplicate repeated constraints before sorting.
+        let mut constraints: FxHashMap<ConstraintId, usize> = FxHashMap::default();
         self.node()
             .for_each_constraint(builder, &mut |constraint, source_order| {
-                constraints.push((constraint, source_order));
+                constraints
+                    .entry(constraint)
+                    .and_modify(|existing: &mut usize| *existing = (*existing).min(source_order))
+                    .or_insert(source_order);
             });
-        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
+        let mut constraints: SmallVec<[_; 8]> = constraints.into_iter().collect();
+        constraints
+            .sort_unstable_by_key(|(constraint, source_order)| (*source_order, constraint.index()));
 
         PathAssignments::new(constraints.into_iter().map(|(constraint, _)| constraint))
     }
@@ -3868,7 +3883,10 @@ impl InteriorNode {
         self.node()
             .for_each_constraint(builder, &mut |constraint, source_order| {
                 seen_constraints.insert(constraint);
-                source_orders.insert(constraint, source_order);
+                source_orders
+                    .entry(constraint)
+                    .and_modify(|existing: &mut usize| *existing = (*existing).min(source_order))
+                    .or_insert(source_order);
             });
         let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
             .tuple_combinations()
