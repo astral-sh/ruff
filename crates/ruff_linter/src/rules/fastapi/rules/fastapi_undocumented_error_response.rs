@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::source_order;
-use ruff_python_ast::{AnyNodeRef, Expr, ExprCall, Number, Stmt};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::{Expr, ExprCall, Number, Stmt};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -13,8 +13,8 @@ use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 
 /// ## What it does
 /// Checks for FastAPI routes that raise an `HTTPException` (or return a response
-/// with a `status_code=`) for an HTTP error status code that is not documented
-/// in the route's `responses=` parameter, the parent router's `responses=`, or
+/// with a `status_code`) for an HTTP error status code that is not documented
+/// in the route's `responses` parameter, the parent router's `responses`, or
 /// the decorator's `openapi_extra` value.
 ///
 /// ## Why is this bad?
@@ -22,7 +22,7 @@ use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 /// `raise HTTPException(status_code=404, ...)` or returns
 /// `JSONResponse(..., status_code=404)`. Clients generated from the resulting
 /// `OpenAPI` schema have no type information for the error body. The fix is to
-/// list the missing code in `responses=`.
+/// list the missing code in `responses`.
 ///
 /// ## Example
 ///
@@ -55,11 +55,12 @@ use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 /// ```
 ///
 /// ## Known problems
-/// This rule only inspects the route function's own body and its decorator. It does
-/// not follow `include_router(..., responses=...)` composition, custom router
-/// subclasses, or `HTTPException` subclasses. Codes that flow through helper
-/// functions, attribute assignment (`response.status_code = 500`), or other
-/// indirection are also missed.
+/// This rule only inspects the route function's own body, its decorator, and
+/// same-module router/app constructor arguments. It does not follow
+/// `include_router(..., responses=...)` composition, custom router subclasses,
+/// or `HTTPException` subclasses. Codes that flow through helper functions,
+/// attribute assignment (`response.status_code = 500`), or other indirection
+/// are also missed.
 ///
 /// ## References
 /// - [FastAPI Additional Responses](https://fastapi.tiangolo.com/advanced/additional-responses/)
@@ -99,27 +100,26 @@ pub(crate) fn fastapi_undocumented_error_response(
         return;
     }
 
-    let route_decorators: Vec<(&ast::Decorator, &ExprCall)> = function_def
+    let semantic = checker.semantic();
+    let mut route_decorators = function_def
         .decorator_list
         .iter()
         .filter_map(|decorator| {
-            let call = is_fastapi_route_decorator(decorator, checker.semantic())?;
-            if has_include_in_schema_false(call)
-                || route_suppressed_by_router(call, checker.semantic())
-            {
+            let call = is_fastapi_route_decorator(decorator, semantic)?;
+            if has_include_in_schema_false(call) || route_suppressed_by_router(call, semantic) {
                 return None;
             }
             Some((decorator, call))
         })
-        .collect();
+        .peekable();
 
-    if route_decorators.is_empty() {
+    if route_decorators.peek().is_none() {
         return;
     }
 
     let raised = {
-        let mut visitor = RaisedCodeVisitor::new(checker.semantic());
-        source_order::walk_body(&mut visitor, &function_def.body);
+        let mut visitor = RaisedCodeVisitor::new(semantic);
+        visitor.visit_body(&function_def.body);
         visitor.into_codes()
     };
 
@@ -129,8 +129,8 @@ pub(crate) fn fastapi_undocumented_error_response(
 
     for (decorator, call) in route_decorators {
         let mut documented = DocumentedCodes::default();
-        collect_decorator_documented(call, checker.semantic(), &mut documented);
-        collect_router_documented(call, checker.semantic(), &mut documented);
+        collect_decorator_documented(call, semantic, &mut documented);
+        collect_router_documented(call, semantic, &mut documented);
 
         let missing: Vec<u16> = raised
             .iter()
@@ -161,8 +161,8 @@ fn has_include_in_schema_false(call: &ExprCall) -> bool {
 /// AST visitor that walks the body of a route function and collects 4xx/5xx status codes
 /// from `raise HTTPException(...)` and `return SomeResponse(..., status_code=...)`.
 ///
-/// Nested function, class, lambda, and comprehension scopes are skipped, since their
-/// status codes belong to a different callable. `RUF029` uses the same approach.
+/// Nested function and class scopes are skipped, since their status codes belong
+/// to a different callable.
 struct RaisedCodeVisitor<'a> {
     codes: BTreeSet<u16>,
     semantic: &'a SemanticModel<'a>,
@@ -220,19 +220,10 @@ impl<'a> RaisedCodeVisitor<'a> {
     }
 }
 
-impl<'a> source_order::SourceOrderVisitor<'a> for RaisedCodeVisitor<'a> {
-    fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> source_order::TraversalSignal {
-        source_order::TraversalSignal::Traverse
-    }
-
+impl<'a> StatementVisitor<'a> for RaisedCodeVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::FunctionDef(function_def) => {
-                function_def_visit_preorder_except_body(function_def, self);
-            }
-            Stmt::ClassDef(class_def) => {
-                class_def_visit_preorder_except_body(class_def, self);
-            }
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
             Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
                 if let Expr::Call(call) = exc.as_ref() {
                     self.record_call_status(call);
@@ -243,73 +234,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for RaisedCodeVisitor<'a> {
             }) => {
                 self.record_return_expr(value);
             }
-            _ => source_order::walk_stmt(self, stmt),
+            _ => walk_stmt(self, stmt),
         }
-    }
-
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Lambda(_) => {}
-            _ => source_order::walk_expr(self, expr),
-        }
-    }
-
-    fn visit_comprehension(&mut self, _comprehension: &'a ast::Comprehension) {}
-}
-
-/// Visit a `StmtFunctionDef`'s decorators, type params, parameters, and return annotation,
-/// without descending into the body.
-fn function_def_visit_preorder_except_body<'a, V>(
-    function_def: &'a ast::StmtFunctionDef,
-    visitor: &mut V,
-) where
-    V: source_order::SourceOrderVisitor<'a>,
-{
-    let ast::StmtFunctionDef {
-        parameters,
-        decorator_list,
-        returns,
-        type_params,
-        ..
-    } = function_def;
-
-    for decorator in decorator_list {
-        visitor.visit_decorator(decorator);
-    }
-
-    if let Some(type_params) = type_params {
-        visitor.visit_type_params(type_params);
-    }
-
-    visitor.visit_parameters(parameters);
-
-    if let Some(expr) = returns {
-        visitor.visit_annotation(expr);
-    }
-}
-
-/// Same as above for `StmtClassDef`.
-fn class_def_visit_preorder_except_body<'a, V>(class_def: &'a ast::StmtClassDef, visitor: &mut V)
-where
-    V: source_order::SourceOrderVisitor<'a>,
-{
-    let ast::StmtClassDef {
-        arguments,
-        decorator_list,
-        type_params,
-        ..
-    } = class_def;
-
-    for decorator in decorator_list {
-        visitor.visit_decorator(decorator);
-    }
-
-    if let Some(type_params) = type_params {
-        visitor.visit_type_params(type_params);
-    }
-
-    if let Some(arguments) = arguments {
-        visitor.visit_arguments(arguments);
     }
 }
 
@@ -396,10 +322,31 @@ fn parse_status_constant(name: &str) -> Option<u16> {
     after_http[..digit_end].parse().ok()
 }
 
-/// Map a Python `http.HTTPStatus` enum member name to its numeric code. Only includes
-/// 4xx and 5xx values, since other codes are out of scope for this rule.
+/// Map a Python `http.HTTPStatus` enum member name to its numeric code.
 fn http_status_name_to_code(name: &str) -> Option<u16> {
     Some(match name {
+        "CONTINUE" => 100,
+        "SWITCHING_PROTOCOLS" => 101,
+        "PROCESSING" => 102,
+        "EARLY_HINTS" => 103,
+        "OK" => 200,
+        "CREATED" => 201,
+        "ACCEPTED" => 202,
+        "NON_AUTHORITATIVE_INFORMATION" => 203,
+        "NO_CONTENT" => 204,
+        "RESET_CONTENT" => 205,
+        "PARTIAL_CONTENT" => 206,
+        "MULTI_STATUS" => 207,
+        "ALREADY_REPORTED" => 208,
+        "IM_USED" => 226,
+        "MULTIPLE_CHOICES" => 300,
+        "MOVED_PERMANENTLY" => 301,
+        "FOUND" => 302,
+        "SEE_OTHER" => 303,
+        "NOT_MODIFIED" => 304,
+        "USE_PROXY" => 305,
+        "TEMPORARY_REDIRECT" => 307,
+        "PERMANENT_REDIRECT" => 308,
         "BAD_REQUEST" => 400,
         "UNAUTHORIZED" => 401,
         "PAYMENT_REQUIRED" => 402,
@@ -450,11 +397,12 @@ struct DocumentedCodes {
     has_4xx_wildcard: bool,
     has_5xx_wildcard: bool,
     has_default: bool,
+    has_unknown: bool,
 }
 
 impl DocumentedCodes {
     fn covers(&self, code: u16) -> bool {
-        if self.has_default {
+        if self.has_unknown || self.has_default {
             return true;
         }
         if self.has_4xx_wildcard && (400..500).contains(&code) {
@@ -473,19 +421,29 @@ fn collect_decorator_documented(
     semantic: &SemanticModel,
     documented: &mut DocumentedCodes,
 ) {
+    if has_variadic_keyword(call) {
+        documented.has_unknown = true;
+    }
     if let Some(keyword) = call.arguments.find_keyword("responses") {
         collect_codes_from_dict(&keyword.value, semantic, documented);
     }
-    if let Some(keyword) = call.arguments.find_keyword("openapi_extra")
-        && let Expr::Dict(ast::ExprDict { items, .. }) = &keyword.value
-    {
+    if let Some(keyword) = call.arguments.find_keyword("openapi_extra") {
+        let Expr::Dict(ast::ExprDict { items, .. }) = &keyword.value else {
+            if may_be_mapping(&keyword.value) {
+                documented.has_unknown = true;
+            }
+            return;
+        };
         for item in items {
             let Some(key) = item.key.as_ref() else {
+                documented.has_unknown = true;
                 continue;
             };
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key
-                && value.to_str() == "responses"
-            {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key {
+                if value.to_str() == "responses" {
+                    collect_codes_from_dict(&item.value, semantic, documented);
+                }
+            } else if may_be_string_key(key) {
                 collect_codes_from_dict(&item.value, semantic, documented);
             }
         }
@@ -498,11 +456,19 @@ fn collect_router_documented(
     semantic: &SemanticModel,
     documented: &mut DocumentedCodes,
 ) {
-    let Some(router_call) = resolve_router_call(call, semantic) else {
-        return;
-    };
-    if let Some(keyword) = router_call.arguments.find_keyword("responses") {
-        collect_codes_from_dict(&keyword.value, semantic, documented);
+    match resolve_router_call(call, semantic) {
+        Some(RouterCall::Direct(router_call)) => {
+            if has_variadic_keyword(router_call) {
+                documented.has_unknown = true;
+            }
+            if let Some(keyword) = router_call.arguments.find_keyword("responses") {
+                collect_codes_from_dict(&keyword.value, semantic, documented);
+            }
+        }
+        Some(RouterCall::Unknown) => {
+            documented.has_unknown = true;
+        }
+        None => {}
     }
 }
 
@@ -510,10 +476,15 @@ fn collect_router_documented(
 /// which suppresses all of its routes from the `OpenAPI` schema (so there is nothing to
 /// document).
 fn route_suppressed_by_router(call: &ExprCall, semantic: &SemanticModel) -> bool {
-    let Some(router_call) = resolve_router_call(call, semantic) else {
-        return false;
-    };
-    has_include_in_schema_false(router_call)
+    match resolve_router_call(call, semantic) {
+        Some(RouterCall::Direct(router_call)) => has_include_in_schema_false(router_call),
+        Some(RouterCall::Unknown) | None => false,
+    }
+}
+
+enum RouterCall<'a> {
+    Direct(&'a ExprCall),
+    Unknown,
 }
 
 /// Resolve `@router.get(...)` to the `APIRouter(...)` (or `FastAPI(...)`) call site that
@@ -522,7 +493,7 @@ fn route_suppressed_by_router(call: &ExprCall, semantic: &SemanticModel) -> bool
 fn resolve_router_call<'a>(
     call: &'a ExprCall,
     semantic: &'a SemanticModel,
-) -> Option<&'a ExprCall> {
+) -> Option<RouterCall<'a>> {
     let Expr::Attribute(ast::ExprAttribute { value, .. }) = call.func.as_ref() else {
         return None;
     };
@@ -538,11 +509,25 @@ fn resolve_router_call<'a>(
         }) => value.as_ref(),
         _ => return None,
     };
-    if let Expr::Call(router_call) = value {
-        Some(router_call)
+    let Expr::Call(router_call) = value else {
+        return Some(RouterCall::Unknown);
+    };
+    if is_fastapi_router_constructor(&router_call.func, semantic) {
+        Some(RouterCall::Direct(router_call))
     } else {
-        None
+        Some(RouterCall::Unknown)
     }
+}
+
+fn is_fastapi_router_constructor(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["fastapi", "FastAPI" | "APIRouter"]
+            )
+        })
 }
 
 /// Parse a `{<status>: ..., ...}` dict literal and record what's covered.
@@ -552,10 +537,14 @@ fn collect_codes_from_dict(
     documented: &mut DocumentedCodes,
 ) {
     let Expr::Dict(ast::ExprDict { items, .. }) = expr else {
+        if may_be_mapping(expr) {
+            documented.has_unknown = true;
+        }
         return;
     };
     for item in items {
         let Some(key) = item.key.as_ref() else {
+            documented.has_unknown = true;
             continue;
         };
         match key {
@@ -581,10 +570,66 @@ fn collect_codes_from_dict(
                 }
             }
             _ => {
-                if let Some(code) = resolve_status_code(key, semantic) {
-                    documented.explicit.insert(code);
-                }
+                let Some(code) = resolve_status_code(key, semantic) else {
+                    if may_be_status_code_key(key) {
+                        documented.has_unknown = true;
+                    }
+                    continue;
+                };
+                documented.explicit.insert(code);
             }
         }
     }
+}
+
+fn has_variadic_keyword(call: &ExprCall) -> bool {
+    call.arguments
+        .keywords
+        .iter()
+        .any(|keyword| keyword.arg.is_none())
+}
+
+fn may_be_mapping(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::BoolOp(_)
+            | Expr::Named(_)
+            | Expr::If(_)
+            | Expr::DictComp(_)
+            | Expr::Await(_)
+            | Expr::Call(_)
+            | Expr::Attribute(_)
+            | Expr::Subscript(_)
+            | Expr::Name(_)
+    )
+}
+
+fn may_be_string_key(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::BoolOp(_)
+            | Expr::Named(_)
+            | Expr::If(_)
+            | Expr::Await(_)
+            | Expr::Call(_)
+            | Expr::Attribute(_)
+            | Expr::Subscript(_)
+            | Expr::Name(_)
+    )
+}
+
+fn may_be_status_code_key(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::BoolOp(_)
+            | Expr::Named(_)
+            | Expr::BinOp(_)
+            | Expr::UnaryOp(_)
+            | Expr::If(_)
+            | Expr::Await(_)
+            | Expr::Call(_)
+            | Expr::Attribute(_)
+            | Expr::Subscript(_)
+            | Expr::Name(_)
+    )
 }

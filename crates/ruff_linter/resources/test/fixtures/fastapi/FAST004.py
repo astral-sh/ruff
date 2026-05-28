@@ -216,3 +216,107 @@ async def missing_http_status_value():
 )
 async def documented_http_status_value():
     raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="missing")
+
+
+COMMON_RESPONSES = {404: {"description": "Missing"}}
+
+
+# OK: responses passed through a variable cannot be resolved statically, so
+# assume it may document the raised code rather than reporting a false positive.
+@app.get("/indirect-responses", responses=COMMON_RESPONSES)
+async def indirect_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+common_responses_router = APIRouter(responses=COMMON_RESPONSES)
+
+
+# OK: router-level responses passed through a variable are treated the same way.
+@common_responses_router.get("/indirect-router-responses")
+async def indirect_router_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: openapi_extra may contain responses through a variable.
+@app.get("/indirect-openapi-extra", openapi_extra={"responses": COMMON_RESPONSES})
+async def indirect_openapi_extra():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: a dict unpack may document any response code.
+@app.get("/unpacked-responses", responses={**COMMON_RESPONSES})
+async def unpacked_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+ROUTE_KWARGS = {"responses": COMMON_RESPONSES}
+ROUTER_KWARGS = {"responses": COMMON_RESPONSES}
+HIDDEN_KWARGS = {"include_in_schema": False}
+
+
+# OK: decorator-level keyword unpacking may document the raised code.
+@app.get("/indirect-kwargs", **ROUTE_KWARGS)
+async def indirect_kwargs():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+indirect_kwargs_router = APIRouter(**ROUTER_KWARGS)
+
+
+# OK: router-level keyword unpacking may document the raised code.
+@indirect_kwargs_router.get("/indirect-router-kwargs")
+async def indirect_router_kwargs():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: keyword unpacking may also suppress schema inclusion.
+@app.get("/indirect-hidden-kwargs", **HIDDEN_KWARGS)
+async def indirect_hidden_kwargs():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# Violation: None is known not to document any responses.
+@app.get("/none-responses", responses=None)
+async def none_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# Violation: None is known not to provide openapi_extra responses.
+@app.get("/none-openapi-extra", openapi_extra=None)
+async def none_openapi_extra():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# Violation: documenting a non-error HTTPStatus does not cover a raised 404.
+@app.get("/http-status-ok-key", responses={HTTPStatus.OK: {"description": "OK"}})
+async def http_status_ok_key():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+def make_router(**kwargs):
+    return APIRouter(**kwargs)
+
+
+factory_router: APIRouter = make_router()
+factory_responses_router: APIRouter = make_router(responses=COMMON_RESPONSES)
+
+
+# OK: an annotated router initialized by a factory may include default responses.
+@factory_router.get("/factory-router")
+async def factory_router_route():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: factory kwargs are not treated as APIRouter constructor kwargs.
+@factory_responses_router.get("/factory-responses-router")
+async def factory_responses_router_route():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+DYNAMIC_EXTRA_KEY = "not-responses"
+
+
+# Violation: a dynamic openapi_extra key with a known-empty value cannot document responses.
+@app.get("/dynamic-openapi-extra-key", openapi_extra={DYNAMIC_EXTRA_KEY: None})
+async def dynamic_openapi_extra_key():
+    raise HTTPException(status_code=404, detail="missing")

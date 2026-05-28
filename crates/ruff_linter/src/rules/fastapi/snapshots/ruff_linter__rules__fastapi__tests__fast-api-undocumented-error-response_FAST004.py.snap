@@ -150,3 +150,43 @@ FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
 208 | async def missing_http_status_value():
 209 |     raise HTTPException(status_code=HTTPStatus.NOT_FOUND.value, detail="missing")
     |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+   --> FAST004.py:279:1
+    |
+278 | # Violation: None is known not to document any responses.
+279 | @app.get("/none-responses", responses=None)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+280 | async def none_responses():
+281 |     raise HTTPException(status_code=404, detail="missing")
+    |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+   --> FAST004.py:285:1
+    |
+284 | # Violation: None is known not to provide openapi_extra responses.
+285 | @app.get("/none-openapi-extra", openapi_extra=None)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+286 | async def none_openapi_extra():
+287 |     raise HTTPException(status_code=404, detail="missing")
+    |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+   --> FAST004.py:291:1
+    |
+290 | # Violation: documenting a non-error HTTPStatus does not cover a raised 404.
+291 | @app.get("/http-status-ok-key", responses={HTTPStatus.OK: {"description": "OK"}})
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+292 | async def http_status_ok_key():
+293 |     raise HTTPException(status_code=404, detail="missing")
+    |
+
+FAST004 FastAPI route raises HTTP 404 but does not document it in `responses=`
+   --> FAST004.py:320:1
+    |
+319 | # Violation: a dynamic openapi_extra key with a known-empty value cannot document responses.
+320 | @app.get("/dynamic-openapi-extra-key", openapi_extra={DYNAMIC_EXTRA_KEY: None})
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+321 | async def dynamic_openapi_extra_key():
+322 |     raise HTTPException(status_code=404, detail="missing")
+    |

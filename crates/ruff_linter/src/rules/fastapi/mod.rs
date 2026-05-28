@@ -20,6 +20,7 @@ mod tests {
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_1.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_2.py"))]
     #[test_case(Rule::FastApiUnusedPathParameter, Path::new("FAST003.py"))]
+    #[test_case(Rule::FastApiUndocumentedErrorResponse, Path::new("FAST004.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -27,16 +28,6 @@ mod tests {
             &LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn preview_fastapi_undocumented_error_response() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("fastapi/FAST004.py"),
-            &LinterSettings::for_rule(Rule::FastApiUndocumentedErrorResponse).with_preview_mode(),
-        )?;
-        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
