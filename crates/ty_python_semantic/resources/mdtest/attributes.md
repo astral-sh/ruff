@@ -1138,6 +1138,17 @@ class CStoredDescriptor(metaclass=DeclaredCallableMeta):
     # A metaclass declaration constrains access without replacing this stored descriptor.
     factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
 
+class CIncompatibleStoredValue(metaclass=DeclaredCallableMeta):
+    factory: ClassVar[int] = 1  # error: [invalid-assignment]
+
+class CIncompatibleInferredValue(metaclass=DeclaredCallableMeta):
+    factory = 1  # error: [invalid-assignment]
+
+class CIncompatibleDeclaredAccess(metaclass=DeclaredCallableMeta):
+    # TODO: This should be an `invalid-assignment` error, analogous to an incompatible
+    # mutable attribute redeclaration on a subclass.
+    factory: ClassVar[int]
+
 class MethodDeclaredCallableMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
         cls.factory: Callable[[str], str]
