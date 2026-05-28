@@ -1,5 +1,4 @@
-import pytest
-import pytest_asyncio
+import pytest, pytest_asyncio
 
 
 @pytest.fixture()
