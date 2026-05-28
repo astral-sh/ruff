@@ -206,8 +206,8 @@ fn warm(fixture: &Fixture) {
     for positions in fixture.by_category.values() {
         for p in positions {
             let _ = ty_ide::prepare_call_hierarchy(&fixture.db, p.file, p.offset);
-            let _ = ty_ide::call_hierarchy_incoming_calls(&fixture.db, p.file, p.offset);
-            let _ = ty_ide::call_hierarchy_outgoing_calls(&fixture.db, p.file, p.offset);
+            let _ = ty_ide::incoming_calls(&fixture.db, p.file, p.offset);
+            let _ = ty_ide::outgoing_calls(&fixture.db, p.file, p.offset);
         }
     }
 }
@@ -284,10 +284,10 @@ fn bench_call_hierarchy(criterion: &mut Criterion) {
             let _ = ty_ide::prepare_call_hierarchy(db, f, o);
         });
         run_phase_bench(criterion, &fixture, category, "incoming", |db, f, o| {
-            let _ = ty_ide::call_hierarchy_incoming_calls(db, f, o);
+            let _ = ty_ide::incoming_calls(db, f, o);
         });
         run_phase_bench(criterion, &fixture, category, "outgoing", |db, f, o| {
-            let _ = ty_ide::call_hierarchy_outgoing_calls(db, f, o);
+            let _ = ty_ide::outgoing_calls(db, f, o);
         });
     }
 }

@@ -30,7 +30,7 @@ pub(crate) fn incoming_calls_handler(
         let Some((file, offset)) = resolve_item_location(db, requested_item, encoding) else {
             continue;
         };
-        for call in ty_ide::call_hierarchy_incoming_calls(db, file, offset) {
+        for call in ty_ide::incoming_calls(db, file, offset) {
             // `from_ranges` are byte offsets into `call.from.file` (the caller),
             // NOT into `file` (the prepared/queried symbol). Capture the caller
             // file before moving `call.from` into `convert_to_lsp_item`.
@@ -63,7 +63,7 @@ pub(crate) fn outgoing_calls_handler(
         let Some((file, offset)) = resolve_item_location(db, requested_item, encoding) else {
             continue;
         };
-        for call in ty_ide::call_hierarchy_outgoing_calls(db, file, offset) {
+        for call in ty_ide::outgoing_calls(db, file, offset) {
             let Some(to) = convert_to_lsp_item(db, call.to, encoding) else {
                 continue;
             };
@@ -148,7 +148,7 @@ pub(crate) fn convert_to_lsp_item(
         name: item.name.into(),
         kind,
         tags: None,
-        detail: item.detail,
+        detail: None,
         uri,
         range: full_range.local_range(),
         selection_range: selection_range.local_range(),
