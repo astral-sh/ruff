@@ -1125,6 +1125,19 @@ class CDeclaredAgainstDeclaredMeta(metaclass=DeclaredBroadInitializingMeta):
 
 reveal_type(CDeclaredAgainstDeclaredMeta.attr)  # revealed: str
 
+from collections.abc import Callable
+from typing import ClassVar
+
+class DeclaredCallableMeta(type):
+    factory: Callable[[str], str]
+
+def identity(value: str) -> str:
+    return value
+
+class CStoredDescriptor(metaclass=DeclaredCallableMeta):
+    # A metaclass declaration constrains access without replacing this stored descriptor.
+    factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
+
 class CompatibleInitializingMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
         cls.attr: int | str = 1

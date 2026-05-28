@@ -1040,6 +1040,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
     // Metaclass-populated members are generally sparse, while class namespaces such as enums can
     // be large. Collect possible members first rather than probing the metaclass for every binding.
     let mut metaclass_instance_members = FxHashSet::default();
+    let mut metaclass_assigned_members = FxHashSet::default();
     for metaclass in metaclass
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
@@ -1058,7 +1059,9 @@ fn check_class_namespace_against_metaclass_members<'db>(
         for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
             for member in metaclass_index.place_table(function_scope).members() {
                 if let Some(name) = member.as_instance_attribute() {
-                    metaclass_instance_members.insert(name.to_string());
+                    let name = name.to_string();
+                    metaclass_assigned_members.insert(name.clone());
+                    metaclass_instance_members.insert(name);
                 }
             }
         }
@@ -1104,6 +1107,12 @@ fn check_class_namespace_against_metaclass_members<'db>(
             if reported_incompatible_binding {
                 continue;
             }
+        }
+
+        // A declaration on the metaclass constrains class-object access, but does not itself
+        // populate a replacement value into the constructed class's namespace.
+        if !metaclass_assigned_members.contains(name.as_str()) {
+            continue;
         }
 
         let result =
