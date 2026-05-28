@@ -1,8 +1,23 @@
 #!/usr/bin/env -S uv run --script
 #
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.11"
 # dependencies = ["mypy-primer"]
+#
+# [tool.uv]
+# # The only direct dependency of this script is mypy-primer,
+# # and mypy-primer is a git dependency, so it is unaffected
+# # by the `exclude-newer` setting:
+# #
+# # > The --exclude-newer option is only applied to packages
+# # > that are read from a registry (as opposed to, e.g., Git dependencies).
+# # -- https://docs.astral.sh/uv/concepts/resolution/#reproducible-resolutions
+# #
+# # That's probably desirable: we usually want the latest
+# # version of mypy-primer anyway. But it's still worth setting
+# # `exclude-newer` here for any transitive dependencies of
+# # mypy-primer.
+# exclude-newer = "7 days"
 #
 # [tool.uv.sources]
 # mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
@@ -90,13 +105,13 @@ def main() -> None:
     if project.install_cmd:
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
-        subprocess.run(install_cmd, shell=True, cwd=target_dir, check=True)
+        subprocess.run(shlex.split(install_cmd), cwd=target_dir, check=True)
 
     # Install listed dependencies (matching primer's setup())
     if project.deps:
-        deps_cmd = f"{install_base} {' '.join(project.deps)}"
+        deps_cmd_parts = shlex.split(install_base) + project.deps
         print(f"Installing dependencies: {', '.join(project.deps)}")
-        subprocess.run(deps_cmd, shell=True, cwd=target_dir, check=True)
+        subprocess.run(deps_cmd_parts, cwd=target_dir, check=True)
 
     print(f"\nDone! Project set up at {target_dir}")
     print(f"Activate the venv with: source {venv_dir}/bin/activate")

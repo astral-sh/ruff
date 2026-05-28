@@ -12,7 +12,7 @@ use crate::{
     session::Client,
 };
 
-pub type MainLoopSender = crossbeam::channel::Sender<Event>;
+pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
 pub(crate) type MainLoopReceiver = crossbeam::channel::Receiver<Event>;
 
 impl Server {
@@ -200,7 +200,7 @@ impl Server {
 }
 
 #[derive(Debug)]
-pub enum Event {
+pub(crate) enum Event {
     /// An incoming message from the LSP client.
     Message(lsp_server::Message),
 

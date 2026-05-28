@@ -14,6 +14,6 @@ help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the `# noqa` comment
 1 | # Invalid file-level code
   - # ruff: noqa: INVALID123
-2 | 
+2 |
 3 | # External file-level code
 4 | # ruff: noqa: V123

@@ -16,7 +16,7 @@ help: Remove whitespace from blank line
 5  | #: W293:2:1
 6  | class Foo(object):
    -     
-7  + 
+7  +
 8  |     bang = 12
 9  | #: W291:2:35
 10 | '''multiline

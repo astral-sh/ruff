@@ -13,11 +13,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
 help: Move into type-checking block
   - def f():
 1 + from typing import TYPE_CHECKING
-2 + 
+2 +
 3 + if TYPE_CHECKING:
 4 |     from django.contrib.auth.models import AbstractBaseUser
 5 + def f():
-6 | 
+6 |
 7 |     def test_remove_inner_quotes_double(self, user: AbstractBaseUser["int"]):
 8 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -33,18 +33,18 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     from django.contrib.auth.models import AbstractBaseUser
 5  | def f():
 6  |     from django.contrib.auth.models import AbstractBaseUser
-7  | 
+7  |
 --------------------------------------------------------------------------------
-10 | 
-11 | 
+10 |
+11 |
 12 | def f():
    -     from django.contrib.auth.models import AbstractBaseUser
-13 | 
+13 |
 14 |     def test_remove_inner_quotes_single(self, user: AbstractBaseUser['int']):
 15 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -60,18 +60,18 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     from django.contrib.auth.models import AbstractBaseUser
 5  | def f():
 6  |     from django.contrib.auth.models import AbstractBaseUser
-7  | 
+7  |
 --------------------------------------------------------------------------------
-17 | 
-18 | 
+17 |
+18 |
 19 | def f():
    -     from django.contrib.auth.models import AbstractBaseUser
-20 | 
+20 |
 21 |     def test_remove_inner_quotes_mixed(self, user: AbstractBaseUser['int', "str"]):
 22 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -88,18 +88,18 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     from django.contrib.auth.models import AbstractBaseUser
 5  | def f():
 6  |     from django.contrib.auth.models import AbstractBaseUser
-7  | 
+7  |
 --------------------------------------------------------------------------------
 26 | def f():
 27 |     from typing import Annotated, Literal
-28 | 
+28 |
    -     from django.contrib.auth.models import AbstractBaseUser
-29 | 
+29 |
 30 |     def test_literal_annotation_args_contain_quotes(self, type1: AbstractBaseUser[Literal["user", "admin"], Annotated["int", "1", 2]]):
 31 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -116,18 +116,18 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     from django.contrib.auth.models import AbstractBaseUser
 5  | def f():
 6  |     from django.contrib.auth.models import AbstractBaseUser
-7  | 
+7  |
 --------------------------------------------------------------------------------
 35 | def f():
 36 |     from typing import Literal
-37 | 
+37 |
    -     from django.contrib.auth.models import AbstractBaseUser
-38 | 
+38 |
 39 |     def test_union_contain_inner_quotes(self, type1: AbstractBaseUser["int" | Literal["int"]]):
 40 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -144,18 +144,18 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     from django.contrib.auth.models import AbstractBaseUser
 5  | def f():
 6  |     from django.contrib.auth.models import AbstractBaseUser
-7  | 
+7  |
 --------------------------------------------------------------------------------
 44 | def f():
 45 |     from typing import Literal
-46 | 
+46 |
    -     from django.contrib.auth.models import AbstractBaseUser
-47 | 
+47 |
 48 |     def test_inner_literal_mixed_quotes(user: AbstractBaseUser[Literal['user', "admin"]]):
 49 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -172,18 +172,18 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     from django.contrib.auth.models import AbstractBaseUser
 5  | def f():
 6  |     from django.contrib.auth.models import AbstractBaseUser
-7  | 
+7  |
 --------------------------------------------------------------------------------
 53 | def f():
 54 |     from typing import Literal
-55 | 
+55 |
    -     from django.contrib.auth.models import AbstractBaseUser
-56 | 
+56 |
 57 |     def test_inner_literal_single_quote(user: AbstractBaseUser[Literal['int'], str]):
 58 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -200,18 +200,18 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     from django.contrib.auth.models import AbstractBaseUser
 5  | def f():
 6  |     from django.contrib.auth.models import AbstractBaseUser
-7  | 
+7  |
 --------------------------------------------------------------------------------
 62 | def f():
 63 |     from typing import Literal
-64 | 
+64 |
    -     from django.contrib.auth.models import AbstractBaseUser
-65 | 
+65 |
 66 |     def test_mixed_quotes_literal(user: AbstractBaseUser[Literal['user'], "int"]):
 67 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -228,18 +228,18 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
 1  + from typing import TYPE_CHECKING
-2  + 
+2  +
 3  + if TYPE_CHECKING:
 4  +     from django.contrib.auth.models import AbstractBaseUser
 5  | def f():
 6  |     from django.contrib.auth.models import AbstractBaseUser
-7  | 
+7  |
 --------------------------------------------------------------------------------
 71 | def f():
 72 |     from typing import Annotated, Literal
-73 | 
+73 |
    -     from django.contrib.auth.models import AbstractBaseUser
-74 | 
+74 |
 75 |     def test_annotated_literal_mixed_quotes(user: AbstractBaseUser[Annotated[str, "max_length=20", Literal['user', "admin"]]]):
 76 |         pass
 note: This is an unsafe fix and may change runtime behavior

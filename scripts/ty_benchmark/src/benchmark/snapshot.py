@@ -4,8 +4,14 @@ import difflib
 import logging
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Mapping, NamedTuple
+
+if sys.platform == "win32":
+    import mslex as shlex
+else:
+    import shlex
 
 from benchmark import Command
 
@@ -68,8 +74,7 @@ class SnapshotRunner(NamedTuple):
             if command.prepare:
                 logging.info(f"Running prepare: {command.prepare}")
                 subprocess.run(
-                    command.prepare,
-                    shell=True,
+                    shlex.split(command.prepare),
                     cwd=cwd,
                     env=env,
                     capture_output=True,

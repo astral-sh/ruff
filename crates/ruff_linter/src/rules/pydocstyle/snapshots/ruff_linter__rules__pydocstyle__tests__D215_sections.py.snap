@@ -11,12 +11,12 @@ D215 [*] Section underline is over-indented ("Returns")
     |
 help: Remove over-indentation from "Returns" underline
 156 |     """Toggle the gizmo.
-157 | 
+157 |
 158 |     Returns
     -         -------
 159 +     ------
 160 |     A value of some sort.
-161 | 
+161 |
 162 |     """
 
 D215 [*] Section underline is over-indented ("Returns")
@@ -29,10 +29,10 @@ D215 [*] Section underline is over-indented ("Returns")
     |
 help: Remove over-indentation from "Returns" underline
 170 |     """Toggle the gizmo.
-171 | 
+171 |
 172 |     Returns
     -         -------
 173 +     ------
 174 |     """
-175 | 
+175 |
 176 |

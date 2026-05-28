@@ -18,7 +18,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::{CellMetadata, CellStart, RawNotebookMetadata, schema};
+use crate::{CellMetadata, CellStart, RawNotebookMetadata, SYNTHETIC_CELL_SEPARATOR, schema};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -146,7 +146,7 @@ impl Notebook {
                 SourceValue::String(string) => string.clone(),
                 SourceValue::StringArray(string_array) => string_array.join(""),
             };
-            current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
+            current_offset += TextSize::of(&cell_contents) + TextSize::of(SYNTHETIC_CELL_SEPARATOR);
             contents.push(cell_contents);
             cell_offsets.push(current_offset);
         }
@@ -199,7 +199,11 @@ impl Notebook {
             // The additional newline at the end is to maintain consistency for
             // all cells. These newlines will be removed before updating the
             // source code with the transformed content. Refer `update_cell_content`.
-            source_code: contents.join("\n") + "\n",
+            source_code: {
+                let mut source_code = contents.join("\n");
+                source_code.push(SYNTHETIC_CELL_SEPARATOR);
+                source_code
+            },
             cell_offsets,
             valid_code_cells,
             trailing_newline,

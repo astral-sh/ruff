@@ -11,14 +11,14 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
 7 | x: TypeAlias = int
   |
 help: Use the `type` keyword
-3 | 
+3 |
 4 | # UP040
 5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
   - x: typing.TypeAlias = int
 6 + type x = int
 7 | x: TypeAlias = int
-8 | 
-9 | 
+8 |
+9 |
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
  --> UP040.pyi:7:1
@@ -34,8 +34,8 @@ help: Use the `type` keyword
 6  | x: typing.TypeAlias = int
    - x: TypeAlias = int
 7  + type x = int
-8  | 
-9  | 
+8  |
+9  |
 10 | # comments in the value are preserved
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
@@ -51,8 +51,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
 16 |   T: TypeAlias = ( # comment0
    |
 help: Use the `type` keyword
-8  | 
-9  | 
+8  |
+9  |
 10 | # comments in the value are preserved
    - x: TypeAlias = tuple[
 11 + type x = tuple[
@@ -79,7 +79,7 @@ UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keywo
 help: Use the `type` keyword
 13 |     float,
 14 | ]
-15 | 
+15 |
    - T: TypeAlias = ( # comment0
 16 + type T = ( # comment0
 17 |     # comment1

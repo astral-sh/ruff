@@ -14,7 +14,7 @@ PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
 help: Replace with `Path(...).stat().st_size`
 1 | import os
 2 + import pathlib
-3 | 
+3 |
   - os.path.getsize(filename="filename")
 4 + pathlib.Path("filename").stat().st_size
 5 | os.path.getsize(filename=b"filename")
@@ -31,7 +31,7 @@ PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
 help: Replace with `Path(...).stat().st_size`
 1 | import os
 2 + import pathlib
-3 | 
+3 |
 4 | os.path.getsize(filename="filename")
   - os.path.getsize(filename=b"filename")
 5 + pathlib.Path(b"filename").stat().st_size
@@ -48,7 +48,7 @@ PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
 help: Replace with `Path(...).stat().st_size`
 1 | import os
 2 + import pathlib
-3 | 
+3 |
 4 | os.path.getsize(filename="filename")
 5 | os.path.getsize(filename=b"filename")
   - os.path.getsize(filename=__file__)

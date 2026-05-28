@@ -16,10 +16,10 @@ help: Replace with `Path(...).resolve()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
-14 | 
+14 |
    - a = xabspath(p)
 15 + a = pathlib.Path(p).resolve()
 16 | aa = xchmod(p)
@@ -53,10 +53,10 @@ help: Replace with `Path(...).mkdir()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
-14 | 
+14 |
 15 | a = xabspath(p)
 16 | aa = xchmod(p)
    - aaa = xmkdir(p)
@@ -80,7 +80,7 @@ help: Replace with `Path(...).mkdir(parents=True)`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -132,7 +132,7 @@ help: Replace with `Path(...).rmdir()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -160,7 +160,7 @@ help: Replace with `Path(...).unlink()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -188,7 +188,7 @@ help: Replace with `Path(...).unlink()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -228,7 +228,7 @@ help: Replace with `Path(...).exists()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -256,7 +256,7 @@ help: Replace with `Path(...).expanduser()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -285,7 +285,7 @@ help: Replace with `Path(...).is_dir()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -313,7 +313,7 @@ help: Replace with `Path(...).is_file()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -341,7 +341,7 @@ help: Replace with `Path(...).is_symlink()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -369,7 +369,7 @@ help: Replace with `Path(...).readlink()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -408,7 +408,7 @@ help: Replace with `Path(...).is_absolute()`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -469,7 +469,7 @@ help: Replace with `Path(...).name`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------
@@ -498,7 +498,7 @@ help: Replace with `Path(...).parent`
 8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  | from os.path import samefile as xsamefile, splitext as xsplitext
 10 + import pathlib
-11 | 
+11 |
 12 | p = "/foo"
 13 | q = "bar"
 --------------------------------------------------------------------------------

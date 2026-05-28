@@ -11,6 +11,12 @@ Numbers = list[int]
 # this as `list[int]` is more helpful, though:
 reveal_type(Numbers)  # revealed: <class 'list[int]'>
 
+import types
+from typing_extensions import TypeForm
+
+generic_alias: types.GenericAlias = list[int]
+generic_alias_typeform: TypeForm = list[int]
+
 def _(numbers: Numbers) -> None:
     reveal_type(numbers)  # revealed: list[int]
 ```
@@ -28,7 +34,7 @@ reveal_type(Strings)  # revealed: GenericAlias
 However, using such a `GenericAlias` instance in a type expression is currently not supported:
 
 ```py
-# error: [invalid-type-form] "Variable of type `GenericAlias` is not allowed in a type expression"
+# error: [invalid-type-form] "Variable of type `GenericAlias` is not allowed in a parameter annotation"
 def _(strings: Strings) -> None:
     reveal_type(strings)  # revealed: Unknown
 ```

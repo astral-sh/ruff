@@ -10,10 +10,10 @@ F401 [*] `pathlib.PurePath` imported but unused
   |
 help: Remove unused import: `pathlib.PurePath`
 1 | """Test: parsing of nested string annotations."""
-2 | 
+2 |
 3 | from typing import List
   - from pathlib import Path, PurePath
 4 + from pathlib import Path
-5 | 
-6 | 
+5 |
+6 |
 7 | x: """List['Path']""" = []

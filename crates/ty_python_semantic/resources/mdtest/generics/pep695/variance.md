@@ -361,6 +361,54 @@ static_assert(not is_equivalent_to(D[Any], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
+## Only specialized types of generic class instances influence variance
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+If a generic class definition refers to a specialized instance of itself, only the specialized types
+of that instance affect its variance.
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+
+class Bivariant[T]:
+    def takes_int_self(self, value: Bivariant[int]): ...
+
+static_assert(is_subtype_of(Bivariant[int], Bivariant[object]))
+static_assert(is_subtype_of(Bivariant[object], Bivariant[int]))
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def takes_int_self(self, value: Covariant[int]): ...
+
+static_assert(is_subtype_of(Covariant[int], Covariant[object]))
+static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
+
+class Contravariant[T]:
+    def send(self, value: T): ...
+    def takes_int_self(self, value: Contravariant[int]): ...
+
+static_assert(is_subtype_of(Contravariant[object], Contravariant[int]))
+static_assert(not is_subtype_of(Contravariant[int], Contravariant[object]))
+```
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def add[S](self: Covariant[S], other: list[S]) -> Covariant[S]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Covariant[int], Covariant[object]))
+static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
+```
+
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,
@@ -531,6 +579,29 @@ static_assert(is_subtype_of(E[B], E[A]))
 static_assert(not is_subtype_of(E[A], E[B]))
 ```
 
+This also works for dataclass-transformers:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=False)
+class ModelBase:
+    def __init_subclass__(cls, frozen: bool = False) -> None:
+        pass
+
+class NonFrozenModel[T](ModelBase):
+    value: T
+
+static_assert(not is_subtype_of(NonFrozenModel[B], NonFrozenModel[A]))
+static_assert(not is_subtype_of(NonFrozenModel[A], NonFrozenModel[B]))
+
+class FrozenModel[T](ModelBase, frozen=True):
+    value: T
+
+static_assert(is_subtype_of(FrozenModel[B], FrozenModel[A]))
+static_assert(not is_subtype_of(FrozenModel[A], FrozenModel[B]))
+```
+
 #### Frozen dataclasses in Python 3.13 and later
 
 ```toml
@@ -555,6 +626,29 @@ class D[U]:
 
 static_assert(not is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+The same holds for dataclass-transformers:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class ModelBase:
+    def __init_subclass__(cls, frozen: bool = True) -> None:
+        pass
+
+class DefaultFrozenModel[T](ModelBase):
+    value: T
+
+static_assert(not is_subtype_of(DefaultFrozenModel[B], DefaultFrozenModel[A]))
+static_assert(not is_subtype_of(DefaultFrozenModel[A], DefaultFrozenModel[B]))
+
+class ExplicitFrozenModel[T](ModelBase, frozen=True):
+    value: T
+
+static_assert(not is_subtype_of(ExplicitFrozenModel[B], ExplicitFrozenModel[A]))
+static_assert(not is_subtype_of(ExplicitFrozenModel[A], ExplicitFrozenModel[B]))
 ```
 
 #### NamedTuple

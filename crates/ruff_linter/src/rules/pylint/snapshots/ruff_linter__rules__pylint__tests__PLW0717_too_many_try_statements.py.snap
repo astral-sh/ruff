@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLW0717 Try clause contains too many statements (6 > 5)
+  --> too_many_try_statements.py:63:1
+   |
+61 |       print()
+62 |
+63 | / try:  # Too many try statements (6/5)
+64 | |     print()
+65 | |     print()
+66 | |     print()
+67 | |     print()
+68 | |     print()
+69 | |     print()
+70 | | except Exception:
+71 | |     raise
+   | |_________^
+   |

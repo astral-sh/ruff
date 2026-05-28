@@ -132,16 +132,22 @@ a = f"""
 
 ## Codes
 
-Mypy supports `type: ignore[code]`. ty doesn't understand mypy's rule names. Therefore, ignore the
-codes and suppress all errors.
+Similar to mypy support `type: ignore[codes]` comments. But unlike mypy, ty only respects codes
+starting with `ty:` to avoid ambiguity with suppression comments from mypy and other type checkers.
 
 ```py
-a = test  # type: ignore[name-defined]
+a = test  # type: ignore[name-defined, ty:unresolved-reference]
+```
+
+## Unknown codes starting with `ty`
+
+```py
+# error: [unresolved-reference]
+# error: [ignore-comment-unknown-rule]
+a = test  # type: ignore[ty:name-defined]
 ```
 
 ## Nested comments
-
-<!-- snapshot-diagnostics -->
 
 ```py
 # fmt: off
@@ -150,14 +156,51 @@ a = test \
 
 a = test \
   + 2  # type: ignore # fmt: skip
+```
 
+```py
 a = (3
-  # error: [unused-ignore-comment]
+  # snapshot
   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+```
 
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression comment
+6  |   + 2  # type: ignore # fmt: skip
+7  | a = (3
+8  |   # snapshot
+   -   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+9  +   + 2)  # fmt: skip
+10 | a = (3
+11 |   # snapshot
+12 |   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+```
+
+```py
 a = (3
-  # error: [unused-ignore-comment]
+  # snapshot
   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+  --> src/mdtest_snippet.py:12:21
+   |
+12 |   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove the unused suppression comment
+9  |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+10 | a = (3
+11 |   # snapshot
+   -   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+12 +   + 2)  # fmt: skip
 ```
 
 ## Misspelled `type: ignore`
@@ -188,6 +231,15 @@ a = (  # type: ignore
 
 a = 10 / 0
 b = a / 0
+```
+
+## File level suppression with code
+
+```py
+# type: ignore[ty:division-by-zero]
+
+a = 10 / 0
+b = a + c  # error: [unresolved-reference]
 ```
 
 ## File level suppression with leading shebang
@@ -241,4 +293,60 @@ ty doesn't report invalid `type: ignore` comments:
 
 ```py
 a = 10 + 4  # type: ignoreee
+```
+
+## Unused ignore comment mixed with mypy comments
+
+```py
+# snapshot
+a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
+```
+
+```snapshot
+warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
+ --> src/mdtest_snippet.py:2:39
+  |
+2 | a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
+  |                                       ^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression code
+1 | # snapshot
+  - a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
+2 + a = 10 / 2  # type: ignore[mypy-code]
+```
+
+## Unused ignore comment
+
+```py
+# snapshot
+a = 10 / 2  # type: ignore[ty:division-by-zero]
+```
+
+```snapshot
+warning[unused-type-ignore-comment]: Unused `type: ignore` directive
+ --> src/mdtest_snippet.py:2:13
+  |
+2 | a = 10 / 2  # type: ignore[ty:division-by-zero]
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression comment
+1 | # snapshot
+  - a = 10 / 2  # type: ignore[ty:division-by-zero]
+2 + a = 10 / 2
+```
+
+## Unknown ignore code
+
+```py
+# snapshot
+a = 10 / 2  # type: ignore[ty:division-by]
+```
+
+```snapshot
+warning[ignore-comment-unknown-rule]: Unknown rule `division-by`. Did you mean `division-by-zero`?
+ --> src/mdtest_snippet.py:2:28
+  |
+2 | a = 10 / 2  # type: ignore[ty:division-by]
+  |                            ^^^^^^^^^^^^^^
+  |
 ```

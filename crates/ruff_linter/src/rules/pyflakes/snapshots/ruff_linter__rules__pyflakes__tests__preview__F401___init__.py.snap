@@ -11,7 +11,7 @@ F401 [*] `os` imported but unused
   |
 help: Remove unused import: `os`
   - import os
-1 | 
+1 |
 2 | print(__path__)
-3 | 
+3 |
 note: This is an unsafe fix and may change runtime behavior

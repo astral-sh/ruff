@@ -13,7 +13,7 @@ help: Replace `exit` with `sys.exit()`
 2 | def main():
   -     exit(0)
 3 +     sys.exit(0)
-4 | 
-5 | 
+4 |
+5 |
 6 | from sys import argv
 note: This is an unsafe fix and may change runtime behavior

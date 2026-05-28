@@ -15,10 +15,10 @@ help: Remove whitespace from blank line
 2 | class Chassis(RobotModuleTemplate):
 3 |     """底盘信息推送控制
   -     
-4 + 
+4 +
 5 |     """\
-6 | 
-7 | 
+6 |
+7 |
 note: This is an unsafe fix and may change runtime behavior
 
 W293 [*] Blank line contains whitespace
@@ -31,14 +31,14 @@ W293 [*] Blank line contains whitespace
    |
 help: Remove whitespace from blank line
 5  |     """\
-6  | 
-7  | 
+6  |
+7  |
    - """""" \
    -     \
    -     
 8  + """""" 
-9  | 
-10 | 
+9  |
+10 |
 11 | "abc\
 
 W293 [*] Blank line contains whitespace
@@ -51,8 +51,8 @@ W293 [*] Blank line contains whitespace
 17 | '''blank line with whitespace
    |
 help: Remove whitespace from blank line
-11 | 
-12 | 
+11 |
+12 |
 13 | "abc\
    -  " \
    -     \
@@ -75,6 +75,6 @@ help: Remove whitespace from blank line
 16 |     
 17 | '''blank line with whitespace
    -  
-18 + 
+18 +
 19 | inside a multiline string'''
 note: This is an unsafe fix and may change runtime behavior

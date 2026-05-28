@@ -32,6 +32,7 @@
 //!
 //! The above snippet has been built out of the following structure:
 use crate::{Id, snippet};
+use std::borrow::Cow;
 use std::cmp::{Reverse, max, min};
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -357,7 +358,7 @@ impl DisplaySet<'_> {
     }
 
     // Adapted from https://github.com/rust-lang/rust/blob/d371d17496f2ce3a56da76aa083f4ef157572c20/compiler/rustc_errors/src/emitter.rs#L706-L1211
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[inline]
     fn format_line(
         &self,
@@ -1863,12 +1864,21 @@ const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
     ('\u{2069}', ""),
 ];
 
-fn normalize_whitespace(str: &str) -> String {
+fn normalize_whitespace(str: &str) -> Cow<'_, str> {
+    // This is an optimization to avoid repeated `str::replace` calls in the typical case of no
+    // valid replacements. Note that this list needs to be kept in sync with `OUTPUT_REPLACEMENTS`.
+    if !str.contains([
+        '\t', '\u{200d}', '\u{202a}', '\u{202b}', '\u{202d}', '\u{202e}', '\u{2066}', '\u{2067}',
+        '\u{2068}', '\u{202c}', '\u{2069}',
+    ]) {
+        return Cow::Borrowed(str);
+    }
+
     let mut s = str.to_owned();
     for (c, replacement) in OUTPUT_REPLACEMENTS {
         s = s.replace(*c, replacement);
     }
-    s
+    Cow::Owned(s)
 }
 
 fn overlaps(

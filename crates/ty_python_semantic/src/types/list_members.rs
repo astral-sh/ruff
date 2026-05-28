@@ -16,15 +16,15 @@ use crate::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
     },
-    semantic_index::{
-        attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
-        semantic_index, use_def_map,
-    },
     types::{
         ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
         generics::Specialization,
     },
+};
+use ty_python_core::{
+    attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
+    semantic_index, use_def_map,
 };
 
 /// Iterate over all declarations and bindings that exist at the end
@@ -201,6 +201,10 @@ impl<'db> AllMembers<'db> {
                     .unwrap_or_default(),
             ),
 
+            Type::EnumComplement(complement) => {
+                self.extend_with_type(db, complement.to_intersection(db));
+            }
+
             Type::NominalInstance(instance) => {
                 let class = instance.class(db);
                 if let Some((class_literal, specialization)) = class.static_class_literal(db) {
@@ -237,9 +241,7 @@ impl<'db> AllMembers<'db> {
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
                 self.extend_with_synthetic_members(db, ty, class_literal, None);
-                if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                    self.extend_with_class_members(db, ty, metaclass);
-                }
+                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
             Type::GenericAlias(generic_alias) => {
@@ -251,9 +253,7 @@ impl<'db> AllMembers<'db> {
                     ClassLiteral::Static(class_literal),
                     None,
                 );
-                if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                    self.extend_with_class_members(db, ty, metaclass);
-                }
+                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
@@ -276,15 +276,18 @@ impl<'db> AllMembers<'db> {
                                 ClassLiteral::Static(class_literal),
                                 specialization,
                             );
-                            if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                                self.extend_with_class_members(db, ty, metaclass);
-                            }
+                            self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
                         }
                     }
                 }
             },
 
-            Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {
+            Type::Dynamic(_)
+            | Type::Divergent(_)
+            | Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeForm(_) => {
                 self.extend_with_type(db, Type::object());
             }
 
@@ -484,6 +487,26 @@ impl<'db> AllMembers<'db> {
                     ty,
                 });
             }
+        }
+    }
+
+    /// Extend a class object's members with members set by its metaclass.
+    ///
+    /// A static metaclass can also assign attributes onto the class objects that it creates,
+    /// so those implicit instance members are available on the class object as well.
+    fn extend_with_metaclass_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        metaclass: Type<'db>,
+    ) {
+        let Some(metaclass) = metaclass.to_class_type(db) else {
+            return;
+        };
+
+        self.extend_with_class_members(db, ty, metaclass.class_literal(db));
+        if let Some((metaclass, _)) = metaclass.static_class_literal(db) {
+            self.extend_with_instance_members(db, ty, metaclass);
         }
     }
 

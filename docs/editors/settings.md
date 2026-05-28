@@ -64,13 +64,13 @@ _Using configuration file path:_
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           configuration = "~/path/to/ruff.toml"
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -117,7 +117,7 @@ _Using inline configuration:_
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           configuration = {
@@ -138,7 +138,7 @@ _Using inline configuration:_
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -199,13 +199,13 @@ configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           configurationPreference = "filesystemFirst"
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -246,13 +246,13 @@ documentation](https://docs.astral.sh/ruff/settings/#exclude) for more details.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           exclude = ["**/tests/**"]
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -292,13 +292,13 @@ The line length to use for the linter and formatter.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lineLength = 100
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -338,13 +338,13 @@ Whether to register the server as capable of handling `source.fixAll` code actio
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           fixAll = false
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -384,13 +384,13 @@ Whether to register the server as capable of handling `source.organizeImports` c
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           organizeImports = false
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -432,13 +432,13 @@ Whether to show syntax error diagnostics.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           showSyntaxErrors = false
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -478,13 +478,13 @@ The log level to use for the server.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           logLevel = "debug"
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -526,13 +526,13 @@ If not set, logs will be written to stderr.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           logFile = "~/path/to/ruff.log"
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -576,7 +576,7 @@ Whether to display Quick Fix actions to disable rules via `noqa` suppression com
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           codeAction = {
@@ -586,7 +586,7 @@ Whether to display Quick Fix actions to disable rules via `noqa` suppression com
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -630,7 +630,7 @@ Whether to display Quick Fix actions to autofix violations.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           codeAction = {
@@ -640,7 +640,7 @@ Whether to display Quick Fix actions to autofix violations.
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -652,7 +652,7 @@ Whether to display Quick Fix actions to autofix violations.
           "initialization_options": {
             "settings": {
               "codeAction": {
-                "fixViolation": = {
+                "fixViolation": {
                   "enable": false
                 }
               }
@@ -688,7 +688,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -696,7 +696,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -738,7 +738,7 @@ Whether to enable Ruff's preview mode when linting.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -746,7 +746,7 @@ Whether to enable Ruff's preview mode when linting.
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -788,7 +788,7 @@ Rules to enable by default. See [the documentation](https://docs.astral.sh/ruff/
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -796,7 +796,7 @@ Rules to enable by default. See [the documentation](https://docs.astral.sh/ruff/
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -838,7 +838,7 @@ Rules to enable in addition to those in [`lint.select`](#select).
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -846,7 +846,7 @@ Rules to enable in addition to those in [`lint.select`](#select).
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -888,7 +888,7 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           lint = {
@@ -896,7 +896,7 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -942,7 +942,7 @@ Whether to enable Ruff's preview mode when formatting.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           format = {
@@ -950,7 +950,7 @@ Whether to enable Ruff's preview mode when formatting.
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"
@@ -998,7 +998,7 @@ formatter version may differ.
 === "Neovim"
 
     ```lua
-    require('lspconfig').ruff.setup {
+    vim.lsp.config('ruff', {
       init_options = {
         settings = {
           format = {
@@ -1006,7 +1006,7 @@ formatter version may differ.
           }
         }
       }
-    }
+    })
     ```
 
 === "Zed"

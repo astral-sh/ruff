@@ -42,20 +42,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 error[override-of-final-method]: Cannot override `Base.method`
  --> src/derived.py:5:5
   |
-4 | class Derived(Base):
 5 |     method = replacement_method  # error: [override-of-final-method]
   |     ^^^^^^ Overrides a definition from superclass `Base`
   |
 info: `Base.method` is decorated with `@final`, forbidding overrides
  --> src/base.py:4:5
   |
-3 | class Base:
 4 |     @final
   |     ------
 5 |     def method(self) -> None: ...
   |         ------ `Base.method` defined here
   |
 help: Remove the override of `method`
-info: rule `override-of-final-method` is enabled by default
 
 ```

@@ -133,6 +133,8 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_32.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_33.pyi"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_35.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -170,6 +172,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_34.pyi"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_34.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -228,6 +231,32 @@ mod tests {
         assert_diagnostics!(diagnostics);
     }
 
+    #[test]
+    fn f821_frozendict_py315_available() {
+        // frozendict is available starting in Python 3.15.
+        let diagnostics = test_snippet(
+            "frozendict",
+            &LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY315.into(),
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn f821_frozendict_pre_py315_undefined() {
+        // frozendict is not available before Python 3.15.
+        let diagnostics = test_snippet(
+            "frozendict",
+            &LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY314.into(),
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert_diagnostics!(diagnostics);
+    }
+
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
@@ -236,6 +265,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -724,6 +754,19 @@ mod tests {
     }
 
     #[test]
+    fn f811_annotated_assignment_redefinition() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F811_34.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn extend_generics() -> Result<()> {
         let snapshot = "extend_immutable_calls".to_string();
         let diagnostics = test_path(
@@ -989,7 +1032,8 @@ mod tests {
             &locator,
             &indexer,
         );
-        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+        let suppressions =
+            Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, &settings);
         let mut messages = check_path(
             Path::new("<filename>"),
             None,
@@ -1366,6 +1410,43 @@ mod tests {
         test = True
         if False:
             del(test)
+        assert(test)
+        ",
+            &[],
+        );
+    }
+
+    #[test]
+    fn del_conditional_except() {
+        // Ignores conditional bindings deletion.
+        flakes(
+            r"
+        context = None
+        test = True
+        try:
+            ...
+        except Exception:
+            del(test)
+        else:
+            assert(test)
+        ",
+            &[],
+        );
+    }
+
+    #[test]
+    fn del_conditional_orelse() {
+        // Ignores conditional bindings deletion.
+        flakes(
+            r"
+        context = None
+        test = True
+        try:
+            ...
+        except Exception:
+            print(test)
+        else:
+            del test
         assert(test)
         ",
             &[],
@@ -4058,6 +4139,13 @@ lambda: fu
         class B: pass
         ",
             &[],
+        );
+
+        flakes(
+            r"
+        lazy from __future__ import annotations
+        ",
+            &[Rule::UnusedImport],
         );
 
         flakes(

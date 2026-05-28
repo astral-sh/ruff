@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+expression: transformed.source_code()
+---
+# All three non-body clauses are no-ops — after all rules converge,
+# only `contextlib.suppress(Exception): foo()` remains
+import contextlib
+with contextlib.suppress(Exception):
+    foo()

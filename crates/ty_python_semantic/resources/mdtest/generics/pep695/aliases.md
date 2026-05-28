@@ -45,6 +45,17 @@ You cannot use the same typevar more than once.
 type RepeatedTypevar[T, T] = tuple[T, T]
 ```
 
+Legacy type variables cannot be used:
+
+```py
+from typing import TypeVar
+
+V = TypeVar("V")
+
+# error: [unbound-type-variable]
+type TA1[K] = dict[K, V]
+```
+
 ## Specializing type aliases explicitly
 
 The type parameter can be specified explicitly:
@@ -94,11 +105,11 @@ def _(l: ListOfInts[int]):
 
 type List[T] = list[T]
 
-# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[T@DoubleSpecialization]'>`"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type alias values"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):
@@ -246,9 +257,57 @@ def _(g: G):
     reveal_type(g)  # revealed: list[int]
 ```
 
-## Snapshots of verbose diagnostics
+Bare generic aliases used inside another specialized alias are also specialized with their defaults:
 
-<!-- snapshot-diagnostics -->
+```py
+type Defaulted[T = int] = T
+type Outer[U] = Defaulted
+
+def _(x: Outer[str]):
+    reveal_type(x)  # revealed: int
+    y: int = x
+```
+
+Self-referential defaults should not crash type inference:
+
+```py
+# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+type A[T = A] = A[int]
+```
+
+A self-referential default that does not reference itself in the alias body should also not crash,
+even when the default is evaluated (e.g., by omitting the type argument):
+
+```py
+type B[T = B] = list[T]
+
+def _(x: B) -> None:
+    pass
+```
+
+Mutually-referential defaults (where two type aliases reference each other via their typevar
+defaults) should also not crash:
+
+```py
+type X[T = Y] = list[T]
+type Y[U = X] = list[U]
+
+def _(x: X, y: Y) -> None:
+    pass
+```
+
+Indirect self-references through a chain of type aliases should also not crash:
+
+```py
+type P[T = R] = list[T]
+type Q[T = P] = list[T]
+type R[T = Q] = list[T]
+
+def _(p: P) -> None:
+    pass
+```
+
+## Snapshots of verbose diagnostics
 
 ```py
 class A: ...
@@ -257,14 +316,35 @@ class B[T]: ...
 type AliasA = A
 type AliasB = B[int]
 
-# fmt: off
+# snapshot: not-subscriptable
+def _(a: AliasA[int]): ...
+```
 
-def f(
-    a: AliasA[int],  # error: [not-subscriptable]
-    b: AliasB[int],  # error: [not-subscriptable]
-): ...
+```snapshot
+error[not-subscriptable]: Cannot specialize non-generic type alias `AliasA`
+ --> src/mdtest_snippet.py:8:10
+  |
+8 | def _(a: AliasA[int]): ...
+  |          ------^^^^^
+  |          |
+  |          Alias to `A`, which is not generic
+  |
+```
 
-# fmt: on
+```py
+# snapshot: not-subscriptable
+def _(b: AliasB[int]): ...
+```
+
+```snapshot
+error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
+  --> src/mdtest_snippet.py:10:10
+   |
+10 | def _(b: AliasB[int]): ...
+   |          ------^^^^^
+   |          |
+   |          Alias to `B[int]`, which is already specialized
+   |
 ```
 
 ## Aliases are not callable
@@ -302,16 +382,14 @@ r2: RecursiveList[int] = [1, [1, 2, 3]]
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# TODO: this should be an error
+# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `RecursiveList[int]`"
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
-        # TODO: should be `list[RecursiveList[int]]
-        reveal_type(x[0])  # revealed: int | list[Any]
+        reveal_type(x[0])  # revealed: int | list[RecursiveList[int]]
     if isinstance(x, list) and isinstance(x[0], list):
-        # TODO: should be `list[RecursiveList[int]]`
-        reveal_type(x[0])  # revealed: list[Any]
+        reveal_type(x[0])  # revealed: list[RecursiveList[int]]
 ```
 
 Assignment checks respect structural subtyping, i.e. type aliases with the same structure are
@@ -344,7 +422,7 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# TODO: this should be an error
+# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):
@@ -367,8 +445,8 @@ def head[T](my_list: MyList[T]) -> T:
 def get_value[K, V](my_dict: MyDict[K, V], key: K) -> V:
     return my_dict[key]
 
-reveal_type(head([1, 2]))  # revealed: Unknown | int
-reveal_type(head(["a", "b"]))  # revealed: Unknown | str
+reveal_type(head([1, 2]))  # revealed: int
+reveal_type(head(["a", "b"]))  # revealed: str
 
 d: dict[str, int] = {"a": 1}
 reveal_type(get_value(d, "a"))  # revealed: int
@@ -553,4 +631,84 @@ class Container2:
 def j(x: Container1.Item, y: Container2.Item) -> None:
     # error: [invalid-assignment] "Object of type `mdtest_snippet.Container2.Item` is not assignable to `mdtest_snippet.Container1.Item`"
     a: Container1.Item = y
+```
+
+## Default type parameter after `TypeVarTuple`
+
+A type parameter with a default cannot follow a `TypeVarTuple` in a type parameter list. This is
+prohibited by the typing spec because a `TypeVarTuple` consumes all remaining positional type
+arguments, making any subsequent defaults meaningless.
+
+```py
+# snapshot: invalid-type-variable-default
+type Alias1[*Ts, T = int] = tuple[*Ts, T]
+```
+
+```snapshot
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:2:13
+  |
+2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
+  |             ---  ^^^^^^^ `T` has a default
+  |             |
+  |             `Ts` is a TypeVarTuple
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+```
+
+```py
+# snapshot: invalid-type-variable-default
+type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
+```
+
+```snapshot
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:4:17
+  |
+4 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
+  |                 ---  ^^^^^^^^ `T2` has a default
+  |                 |
+  |                 `Ts` is a TypeVarTuple
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+```
+
+```py
+# snapshot: invalid-type-variable-default
+type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
+```
+
+```snapshot
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:6:13
+  |
+6 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
+  |             ---  ^^^^^^^^  -------- `T2` also has a default
+  |             |    |
+  |             |    `T1` has a default
+  |             `Ts` is a TypeVarTuple
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+```
+
+```py
+# snapshot: invalid-type-variable-default
+type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+```
+
+```snapshot
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:8:13
+  |
+8 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+  |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
+  |             |
+  |             `Us` is a TypeVarTuple
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+```
+
+```py
+# These are fine:
+type Ok1[T, *Ts] = tuple[T, *Ts]
 ```

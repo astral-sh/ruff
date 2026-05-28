@@ -11,9 +11,9 @@ F401 [*] `re.RegexFlag` imported but unused
   |
 help: Remove unused import: `re.RegexFlag`
 1 | """Test: ensure that we treat strings in `typing.Annotation` as type definitions."""
-2 | 
+2 |
 3 | from pathlib import Path
   - from re import RegexFlag
 4 | from typing import Annotated
-5 | 
+5 |
 6 | p: Annotated["Path", int] = 1

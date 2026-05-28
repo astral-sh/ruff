@@ -30,13 +30,13 @@ RUF028 [*] This suppression comment is invalid because it cannot be on its own l
 13 |     pass  # fmt: skip
    |
 help: Remove this comment
-9  | 
+9  |
 10 | # note: the second `fmt: skip`` should be OK
 11 | def fmt_skip_on_own_line():
    -     # fmt: skip
 12 |     pass  # fmt: skip
-13 | 
-14 | 
+13 |
+14 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
@@ -49,8 +49,8 @@ RUF028 [*] This suppression comment is invalid because it cannot be after a deco
 19 | def fmt_off_between_decorators():
    |
 help: Remove this comment
-14 | 
-15 | 
+14 |
+15 |
 16 | @fmt_skip_on_own_line
    - # fmt: off
 17 | @fmt_off_between_lists
@@ -68,13 +68,13 @@ RUF028 [*] This suppression comment is invalid because it cannot be after a deco
 26 |     ...
    |
 help: Remove this comment
-21 | 
-22 | 
+21 |
+22 |
 23 | @fmt_off_between_decorators
    - # fmt: off
 24 | class FmtOffBetweenClassDecorators:
 25 |     ...
-26 | 
+26 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
@@ -134,7 +134,7 @@ help: Remove this comment
    -     # fmt: off
 45 |     else:
 46 |         print("expected")
-47 | 
+47 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
@@ -148,7 +148,7 @@ RUF028 [*] This suppression comment is invalid because it cannot be after a deco
 54 |         # fmt: off
    |
 help: Remove this comment
-49 | 
+49 |
 50 | class Test:
 51 |     @classmethod
    -     # fmt: off
@@ -187,14 +187,14 @@ RUF028 [*] This suppression comment is invalid because it cannot be at the end o
 63 |     pass # fmt: on
    |
 help: Remove this comment
-59 | 
+59 |
 60 | def fmt_on_trailing():
 61 |     # fmt: off
    -     val = 5 # fmt: on
 62 +     val = 5
 63 |     pass # fmt: on
-64 | 
-65 | 
+64 |
+65 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
@@ -211,7 +211,7 @@ help: Remove this comment
 62 |     val = 5 # fmt: on
    -     pass # fmt: on
 63 +     pass
-64 | 
-65 | 
+64 |
+65 |
 66 | # all of these should be fine
 note: This is an unsafe fix and may change runtime behavior

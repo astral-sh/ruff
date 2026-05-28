@@ -81,11 +81,11 @@ with open("file.txt", mode="a+") as f:
 with open("file.txt", buffering=1) as f:
     x = f.read()
 
-# force CRLF, not supported in read_text()
+# FURB101 (newline is supported in read_text on Python 3.13+)
 with open("file.txt", newline="\r\n") as f:
     x = f.read()
 
-# dont mistake "newline" for "mode"
+# FURB101 (dont mistake "newline" for "mode")
 with open("file.txt", newline="b") as f:
     x = f.read()
 

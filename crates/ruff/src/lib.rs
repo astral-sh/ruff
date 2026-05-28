@@ -359,10 +359,9 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     );
 
     // the settings should already be combined with the CLI overrides at this point
-    // TODO(jane): let's make this `PreviewMode`
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
-    let preview = pyproject_config.settings.linter.preview.is_enabled();
+    let preview = pyproject_config.settings.linter.preview;
 
     if cli.watch {
         // Configure the file watcher.

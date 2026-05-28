@@ -10,7 +10,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
 use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
 use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Parsed, parse_unchecked};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
@@ -47,10 +47,19 @@ datatest_stable::harness! {
     { test = inline_err, root="./resources/inline/err", pattern = r"\.pyi?$" }
 }
 
+fn snapshot_input_file_for_test(root: &str, test_name: &str) -> String {
+    format!(
+        "crates/ruff_python_parser/{}/{}",
+        root.trim_start_matches("./"),
+        test_name
+    )
+}
+
 /// Asserts that the parser generates no syntax errors for a valid program.
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
     let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
     let options = extract_options(source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest_preview())
     });
@@ -133,7 +142,7 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     insta::with_settings!({
         omit_expression => true,
-        input_file => input_path,
+        input_file => snapshot_input_file,
         prepend_module_to_snapshot => false,
         snapshot_suffix => test_name
     }, {
@@ -145,6 +154,7 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
     let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
 
     let options = extract_options(source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY314)
@@ -230,7 +240,7 @@ fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     insta::with_settings!({
         omit_expression => true,
-        input_file => input_path,
+        input_file => snapshot_input_file,
         prepend_module_to_snapshot => false,
         snapshot_suffix => test_name
     }, {
@@ -532,6 +542,7 @@ struct SemanticSyntaxCheckerVisitor<'a> {
     python_version: PythonVersion,
     source: &'a str,
     scopes: Vec<Scope>,
+    in_try: bool,
 }
 
 impl<'a> SemanticSyntaxCheckerVisitor<'a> {
@@ -542,6 +553,7 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
             python_version: PythonVersion::default(),
             source,
             scopes: vec![Scope::Module],
+            in_try: false,
         }
     }
 
@@ -565,6 +577,20 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
 impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     fn future_annotations_or_stub(&self) -> bool {
         false
+    }
+
+    fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.scopes.last() {
+            Some(Scope::Function { .. }) => return Some(LazyImportContext::Function),
+            Some(Scope::Class) => return Some(LazyImportContext::Class),
+            Some(Scope::Module | Scope::Comprehension { .. }) | None => {}
+        }
+
+        if self.in_try {
+            return Some(LazyImportContext::TryExceptBlocks);
+        }
+
+        None
     }
 
     fn python_version(&self) -> PythonVersion {
@@ -603,6 +629,17 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         for scope in &self.scopes {
             if let Scope::Comprehension { is_async: false } = scope {
                 return true;
+            }
+        }
+        false
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope in self.scopes.iter().rev() {
+            match scope {
+                Scope::Comprehension { .. } => {}
+                Scope::Class => return true,
+                Scope::Module | Scope::Function { .. } => return false,
             }
         }
         false
@@ -672,6 +709,11 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 ast::visitor::walk_stmt(self, stmt);
                 self.scopes.pop().unwrap();
             }
+            ast::Stmt::Try(_) => {
+                let was_in_try = std::mem::replace(&mut self.in_try, true);
+                ast::visitor::walk_stmt(self, stmt);
+                self.in_try = was_in_try;
+            }
             _ => {
                 ast::visitor::walk_stmt(self, stmt);
             }
@@ -716,7 +758,9 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.scopes.push(Scope::Comprehension {
                     is_async: generators.iter().any(|generator| generator.is_async),
                 });
-                self.visit_expr(key);
+                if let Some(key) = key {
+                    self.visit_expr(key);
+                }
                 self.visit_expr(value);
                 self.scopes.pop().unwrap();
             }

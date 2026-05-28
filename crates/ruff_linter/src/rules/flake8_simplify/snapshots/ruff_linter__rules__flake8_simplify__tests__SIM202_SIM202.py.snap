@@ -14,7 +14,7 @@ help: Replace with `==` operator
   - if not a != b:
 2 + if a == b:
 3 |     pass
-4 | 
+4 |
 5 | # SIM202
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,12 +28,12 @@ SIM202 [*] Use `a == b + c` instead of `not a != b + c`
   |
 help: Replace with `==` operator
 3 |     pass
-4 | 
+4 |
 5 | # SIM202
   - if not a != (b + c):
 6 + if a == b + c:
 7 |     pass
-8 | 
+8 |
 9 | # SIM202
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,11 +47,11 @@ SIM202 [*] Use `a + b == c` instead of `not a + b != c`
    |
 help: Replace with `==` operator
 7  |     pass
-8  | 
+8  |
 9  | # SIM202
    - if not (a + b) != c:
 10 + if a + b == c:
 11 |     pass
-12 | 
+12 |
 13 | # OK
 note: This is an unsafe fix and may change runtime behavior

@@ -39,6 +39,18 @@ pub(crate) fn unresolved_references(checker: &Checker) {
                     }
                 }
 
+                // Bare local annotations can be initialized through nested `nonlocal`
+                // rebindings. If such a rebinding exists, skip F821.
+                if let Some(annotation_binding_id) = reference.annotation_binding_id() {
+                    if checker
+                        .semantic
+                        .rebinding_scopes(annotation_binding_id)
+                        .is_some_and(|scopes| !scopes.is_empty())
+                    {
+                        continue;
+                    }
+                }
+
                 let symbol_name = reference.name(checker.source());
 
                 checker.report_diagnostic(

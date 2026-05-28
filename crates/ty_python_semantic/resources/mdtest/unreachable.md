@@ -464,6 +464,29 @@ if False:
             print(x)
 ```
 
+This also applies to deferred annotations on Python 3.14+, which are resolved from the perspective
+of the end of the scope, which may not be part of the unreachable section.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TYPE_CHECKING
+
+class NonCallable:
+    pass
+
+if not TYPE_CHECKING:
+    def _(non_callable: NonCallable):
+        non_callable()
+
+if False:
+    def _(non_callable: NonCallable):
+        non_callable()
+```
+
 ### Type annotations
 
 Silencing of diagnostics also works for type annotations, even if they are stringified:
@@ -508,19 +531,19 @@ def _():
     class Sub(C): ...
 ```
 
-### Emit diagnostics for definitely wrong code
+### No diagnostics for unreachable statements
 
-Even though the expressions in the snippet below are unreachable, we still emit diagnostics for
-them:
+Our current strategy is to silence diagnostics unconditionally, even if the expression itself is
+obviously wrong in isolation:
 
 ```py
 if False:
-    1 + "a"  # error: [unsupported-operator]
+    1 + "a"
 
 def f():
     return
 
-    1 / 0  # error: [division-by-zero]
+    1 / 0
 ```
 
 ### Conflicting type information
@@ -588,8 +611,6 @@ We offer a helpful subdiagnostic if a variable in a type expression is inferred 
 `Never`, since this almost certainly resulted in the definition of the type being inferred by ty as
 being unreachable:
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.14"
@@ -611,5 +632,16 @@ class AwesomeAPI: ...
 ```py
 import module
 
-def f(x: module.AwesomeAPI): ...  # error: [invalid-type-form]
+# snapshot: invalid-type-form
+def f(x: module.AwesomeAPI): ...
+```
+
+```snapshot
+error[invalid-type-form]: Variable of type `Never` is not allowed in a parameter annotation
+ --> src/main.py:4:10
+  |
+4 | def f(x: module.AwesomeAPI): ...
+  |          ^^^^^^^^^^^^^^^^^
+  |
+help: The variable may have been inferred as `Never` because its definition was inferred as being unreachable
 ```

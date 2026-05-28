@@ -72,6 +72,29 @@ impl<'a> Resolver<'a> {
                     .chain(std::iter::once(source_file))
                     .flatten()
             }
+            CollectedImport::StringImport(import, min_dots) => {
+                // Try the full name first, then progressively shorter prefixes.
+                // This handles cases like `"a.b.c.MyClass"` where `MyClass` is an
+                // attribute of module `a.b.c`, not a submodule.
+                let count = import.components().count();
+                let (resolved, source_file) = import
+                    .ancestors()
+                    .take(count.saturating_sub(min_dots))
+                    .find_map(|name| {
+                        let file = self.resolve_module(&name)?;
+                        // If the file is a stub, look for the corresponding source file.
+                        if file.extension() == Some("pyi") {
+                            Some((Some(file), self.resolve_real_module(&name)))
+                        } else {
+                            Some((Some(file), None))
+                        }
+                    })
+                    .unwrap_or_default();
+
+                std::iter::once(resolved)
+                    .chain(std::iter::once(source_file))
+                    .flatten()
+            }
         }
     }
 

@@ -13,7 +13,7 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import { FileHandle, Workspace } from "ty_wasm";
+import { FileHandle, Hint, Workspace } from "ty_wasm";
 import {
   Panel,
   Group as PanelGroup,
@@ -27,7 +27,7 @@ import SecondaryPanel, {
 } from "./SecondaryPanel";
 import Diagnostics, { Diagnostic } from "./Diagnostics";
 import VendoredFileBanner from "./VendoredFileBanner";
-import { FileId, ReadonlyFiles } from "../Playground";
+import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
 
@@ -35,23 +35,23 @@ const Editor = lazy(() => import("./Editor"));
 
 interface CheckResult {
   diagnostics: Diagnostic[];
+  hints: Hint[];
   error: string | null;
   secondary: SecondaryPanelResult;
 }
 
 export interface Props {
-  workspacePromise: Promise<Workspace>;
+  sessionPromise: Promise<PlaygroundSession>;
   files: ReadonlyFiles;
   theme: Theme;
   selectedFileName: string;
+  onRun(): Promise<string>;
 
-  onAddFile(workspace: Workspace, name: string): void;
+  onAddFile(session: PlaygroundSession, name: string): void;
 
-  onChangeFile(workspace: Workspace, content: string): void;
+  onRenameFile(session: PlaygroundSession, file: FileId, newName: string): void;
 
-  onRenameFile(workspace: Workspace, file: FileId, newName: string): void;
-
-  onRemoveFile(workspace: Workspace, file: FileId): void;
+  onRemoveFile(session: PlaygroundSession, file: FileId): void;
 
   onSelectFile(id: FileId): void;
 
@@ -63,17 +63,18 @@ export interface Props {
 export default function Chrome({
   files,
   selectedFileName,
-  workspacePromise,
+  sessionPromise,
   theme,
+  onRun,
   onAddFile,
   onRenameFile,
   onRemoveFile,
   onSelectFile,
-  onChangeFile,
   onSelectVendoredFile,
   onClearVendoredFile,
 }: Props) {
-  const workspace = use(workspacePromise);
+  const session = use(sessionPromise);
+  const workspace = session.workspace;
 
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
     null,
@@ -85,19 +86,23 @@ export default function Chrome({
   } | null>(null);
 
   const handleFileRenamed = (file: FileId, newName: string) => {
-    onRenameFile(workspace, file, newName);
+    onRenameFile(session, file, newName);
     editorRef.current?.editor.focus();
   };
 
+  const handleAdd = useCallback(
+    (name: string) => {
+      onAddFile(session, name);
+    },
+    [session, onAddFile],
+  );
+
   const handleBackToUserFile = useCallback(() => {
     if (editorRef.current && files.selected != null) {
-      const selectedFile = files.index.find(
-        (file) => file.id === files.selected,
-      );
+      const selectedFile = files.metadata[files.selected];
       if (selectedFile != null) {
         const monaco = editorRef.current.monaco;
-        const fileUri = monaco.Uri.file(selectedFile.name);
-        const userModel = monaco.editor.getModel(fileUri);
+        const userModel = monaco.editor.getModel(selectedFile.uri);
 
         if (userModel != null) {
           onClearVendoredFile();
@@ -105,7 +110,7 @@ export default function Chrome({
         }
       }
     }
-  }, [files.selected, files.index, onClearVendoredFile]);
+  }, [files.selected, files.metadata, onClearVendoredFile]);
 
   const handleSecondaryToolSelected = useCallback(
     (tool: SecondaryTool | null) => {
@@ -145,29 +150,10 @@ export default function Chrome({
   }, []);
 
   const handleRemoved = useCallback(
-    async (id: FileId) => {
-      const name = files.index.find((file) => file.id === id)?.name;
-
-      if (name != null && editorRef.current != null) {
-        // Remove the file from the monaco state to avoid that monaco "restores" the old content.
-        // An alternative is to use a `key` on the `Editor` but that means we lose focus and selection
-        // range when changing between tabs.
-        const monaco = await import("monaco-editor");
-        editorRef.current.monaco.editor
-          .getModel(monaco.Uri.file(name))
-          ?.dispose();
-      }
-
-      onRemoveFile(workspace, id);
+    (id: FileId) => {
+      onRemoveFile(session, id);
     },
-    [workspace, files.index, onRemoveFile],
-  );
-
-  const handleChange = useCallback(
-    (content: string) => {
-      onChangeFile(workspace, content);
-    },
-    [onChangeFile, workspace],
+    [session, onRemoveFile],
   );
 
   const { defaultLayout, onLayoutChange } = useDefaultLayout({
@@ -180,6 +166,7 @@ export default function Chrome({
     workspace,
     secondaryTool,
     files.currentVendoredFile ?? null,
+    files.revision,
   );
 
   return (
@@ -187,10 +174,11 @@ export default function Chrome({
       {files.selected != null ? (
         <>
           <Files
-            files={files.index}
+            order={files.order}
+            metadata={files.metadata}
             theme={theme}
             selected={files.selected}
-            onAdd={(name) => onAddFile(workspace, name)}
+            onAdd={handleAdd}
             onRename={handleFileRenamed}
             onSelect={onSelectFile}
             onRemove={handleRemoved}
@@ -223,12 +211,11 @@ export default function Chrome({
                     theme={theme}
                     visible={true}
                     files={files}
-                    selected={files.selected}
                     fileName={selectedFileName}
                     diagnostics={checkResult.diagnostics}
+                    hints={checkResult.hints}
                     workspace={workspace}
                     onMount={handleEditorMount}
-                    onChange={handleChange}
                     onOpenFile={onSelectFile}
                     onVendoredFileChange={onSelectVendoredFile}
                     onBackToUserFile={handleBackToUserFile}
@@ -263,6 +250,7 @@ export default function Chrome({
                 <Panel id="secondary-panel" minSize={100}>
                   <SecondaryPanel
                     files={files}
+                    onRun={onRun}
                     theme={theme}
                     tool={secondaryTool}
                     result={checkResult.secondary}
@@ -286,27 +274,23 @@ function useCheckResult(
   workspace: Workspace,
   secondaryTool: SecondaryTool | null,
   currentVendoredFileHandle: FileHandle | null,
+  revision: number,
 ): CheckResult {
-  const deferredContent = useDeferredValue(
-    files.selected == null ? null : files.contents[files.selected],
-  );
+  const deferredRevision = useDeferredValue(revision);
 
   return useMemo(() => {
     // Determine which file handle to use
     const currentHandle =
       currentVendoredFileHandle ??
-      (files.selected == null ? null : files.handles[files.selected]);
+      (files.selected == null ? null : files.metadata[files.selected].handle);
 
     const isVendoredFile = currentVendoredFileHandle != null;
 
     // Regular file handling
-    if (
-      currentHandle == null ||
-      deferredContent == null ||
-      !isPythonFile(currentHandle)
-    ) {
+    if (currentHandle == null || !isPythonFile(currentHandle)) {
       return {
         diagnostics: [],
+        hints: [],
         error: null,
         secondary: null,
       };
@@ -317,6 +301,7 @@ function useCheckResult(
       const diagnostics = isVendoredFile
         ? []
         : workspace.checkFile(currentHandle);
+      const hints = isVendoredFile ? [] : workspace.hints(currentHandle);
 
       let secondary: SecondaryPanelResult = null;
 
@@ -367,23 +352,27 @@ function useCheckResult(
 
       return {
         diagnostics: serializedDiagnostics,
+        hints,
         error: null,
         secondary,
       };
     } catch (e) {
       return {
         diagnostics: [],
+        hints: [],
         error: formatError(e),
         secondary: null,
       };
     }
+    // Monaco document edits mutate the workspace in place. The deferred
+    // revision is an invalidation token for this memoized check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    deferredContent,
+    files,
     workspace,
-    files.selected,
-    files.handles,
     secondaryTool,
     currentVendoredFileHandle,
+    deferredRevision,
   ]);
 }
 

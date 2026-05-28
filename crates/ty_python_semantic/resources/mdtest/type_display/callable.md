@@ -19,8 +19,8 @@ We don't parenthesize display of an overloaded callable, since it is already wra
 `Overload[...]`:
 
 ```py
-from typing import overload, Callable
-from ty_extensions import CallableTypeOf
+from typing import Callable, Literal, overload
+from ty_extensions import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> bool: ...
@@ -29,9 +29,18 @@ def f(x: str) -> str: ...
 def f(x: int | str) -> bool | str:
     return bool(x) if isinstance(x, int) else str(x)
 
-def _(flag: bool, c: CallableTypeOf[f]):
-    x = c if flag else True
+def _(x: RegularCallableTypeOf[f] | Literal[True]):
     reveal_type(x)  # revealed: Overload[(x: int) -> bool, (x: str) -> str] | Literal[True]
+```
+
+When a union would otherwise display two distinct overloaded callables identically, we include their
+names to avoid implying that the union contains duplicate elements:
+
+```py
+def f(flag: bool):
+    x = str.upper if flag else str.lower
+    # revealed: (Overload[def upper(self: LiteralString) -> LiteralString, def upper(self) -> str]) | (Overload[def lower(self: LiteralString) -> LiteralString, def lower(self) -> str])
+    reveal_type(x)
 ```
 
 ### Top
@@ -101,8 +110,7 @@ class Bar:
     def g(self, x: Scalar | ArrayNd) -> None:
         pass
 
-# TODO: should be `bound method Bar.g(x: Scalar | ArrayNd) -> None`
-reveal_type(Bar().g)  # revealed: bound method Bar.g(x: Scalar | list[Any] | tuple[Any]) -> None
+reveal_type(Bar().g)  # revealed: bound method Bar.g(x: Scalar | ArrayNd) -> None
 
 type GenericArray1d[T] = list[T] | tuple[T]
 

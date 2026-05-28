@@ -12,6 +12,6 @@ Q002 [*] Double quote docstring found but single quotes preferred
 help: Replace double quotes docstring with single quotes
   - "Do not"' start with empty string' ' and lint docstring safely'
 1 + 'Do not'' start with empty string' ' and lint docstring safely'
-2 | 
+2 |
 3 | def foo():
 4 |     pass

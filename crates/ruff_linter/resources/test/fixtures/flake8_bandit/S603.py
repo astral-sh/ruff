@@ -45,3 +45,12 @@ run(e)
 # Tuple literals are trusted
 check_output(("literal", "cmd", "using", "tuple"), text=True)
 Popen(("literal", "cmd", "using", "tuple"))
+
+# https://github.com/astral-sh/ruff/issues/24084
+# sys.executable is trusted
+import sys
+
+run([sys.executable, "-m", "pip", "install", "ruff"], check=True)
+Popen([sys.executable, "-m", "pip"])
+run(sys.executable)
+check_output((sys.executable, "-m", "pip"))

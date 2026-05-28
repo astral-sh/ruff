@@ -17,11 +17,11 @@ F811 [*] Redefinition of unused `fu` from line 2
   |        -- previous definition of `fu` here
   |
 help: Remove definition: `fu`
-3 | 
-4 | 
+3 |
+4 |
 5 | def bar():
   -     import fu
-6 | 
+6 |
 7 |     def baz():
 8 |         def fu():
 

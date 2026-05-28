@@ -45,28 +45,28 @@ reveal_type(C(1))
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
 
 ```py
-from ty_extensions import into_callable
+from ty_extensions import into_regular_callable
 
 # revealed: [T](t: T) -> T
-reveal_type(into_callable(identity))
+reveal_type(into_regular_callable(identity))
 # revealed: ty_extensions.GenericContext[T@identity]
-reveal_type(generic_context(into_callable(identity)))
+reveal_type(generic_context(into_regular_callable(identity)))
 # revealed: Literal[1]
-reveal_type(into_callable(identity)(1))
+reveal_type(into_regular_callable(identity)(1))
 
 # revealed: [**P, T](c: (**P) -> T) -> ((**P) -> T)
-reveal_type(into_callable(identity2))
+reveal_type(into_regular_callable(identity2))
 # revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
-reveal_type(generic_context(into_callable(identity2)))
+reveal_type(generic_context(into_regular_callable(identity2)))
 # revealed: [T](t: T) -> T
-reveal_type(into_callable(identity2)(identity))
+reveal_type(into_regular_callable(identity2)(identity))
 
 # revealed: [T](t: T) -> C[T]
-reveal_type(into_callable(C))
+reveal_type(into_regular_callable(C))
 # revealed: ty_extensions.GenericContext[T@C]
-reveal_type(generic_context(into_callable(C)))
+reveal_type(generic_context(into_regular_callable(C)))
 # revealed: C[int]
-reveal_type(into_callable(C)(1))
+reveal_type(into_regular_callable(C)(1))
 ```
 
 ## Naming a generic `Callable`: type aliases
@@ -181,7 +181,7 @@ def outside_callable(t: T) -> Callable[[T], T]:
 # revealed: ty_extensions.GenericContext[T@outside_callable]
 reveal_type(generic_context(outside_callable))
 
-# revealed: (Literal[1], /) -> Literal[1]
+# revealed: (int, /) -> int
 reveal_type(outside_callable(1))
 # revealed: None
 reveal_type(generic_context(outside_callable(1)))

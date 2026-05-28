@@ -4,8 +4,8 @@ use std::fmt::{Display, Write};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
-    PythonVersion, Stmt, WithItem,
+    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
+    Operator, PythonVersion, Stmt, Suite, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -117,8 +117,12 @@ impl<'src> Parser<'src> {
             TokenKind::If => Stmt::If(self.parse_if_statement()),
             TokenKind::For => Stmt::For(self.parse_for_statement(start)),
             TokenKind::While => Stmt::While(self.parse_while_statement()),
-            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(vec![], start)),
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(vec![], start)),
+            TokenKind::Def => {
+                Stmt::FunctionDef(self.parse_function_definition(DecoratorList::new(), start))
+            }
+            TokenKind::Class => {
+                Stmt::ClassDef(self.parse_class_definition(DecoratorList::new(), start))
+            }
             TokenKind::Try => Stmt::Try(self.parse_try_statement()),
             TokenKind::With => Stmt::With(self.parse_with_statement(start)),
             TokenKind::At => self.parse_decorators(),
@@ -190,8 +194,8 @@ impl<'src> Parser<'src> {
     /// Matches the `simple_stmts` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_simple_statements(&mut self) -> Vec<Stmt> {
-        let mut stmts = vec![];
+    fn parse_simple_statements(&mut self) -> Suite {
+        let mut stmts = Suite::new();
         let mut progress = ParserProgress::default();
 
         loop {
@@ -263,8 +267,14 @@ impl<'src> Parser<'src> {
     fn parse_simple_statement(&mut self) -> Stmt {
         match self.current_token_kind() {
             TokenKind::Return => Stmt::Return(self.parse_return_statement()),
-            TokenKind::Import => Stmt::Import(self.parse_import_statement()),
-            TokenKind::From => Stmt::ImportFrom(self.parse_from_import_statement()),
+            TokenKind::Import => {
+                let start = self.node_start();
+                Stmt::Import(self.parse_import_statement(start, false))
+            }
+            TokenKind::From => {
+                let start = self.node_start();
+                Stmt::ImportFrom(self.parse_from_import_statement(start, false))
+            }
             TokenKind::Pass => Stmt::Pass(self.parse_pass_statement()),
             TokenKind::Continue => Stmt::Continue(self.parse_continue_statement()),
             TokenKind::Break => Stmt::Break(self.parse_break_statement()),
@@ -277,6 +287,59 @@ impl<'src> Parser<'src> {
                 Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
             }
             token => {
+                if token == TokenKind::Lazy {
+                    let start = self.node_start();
+                    let lazy_range = self.current_token_range();
+
+                    match self.peek() {
+                        // test_ok lazy_import_stmt_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy import foo
+                        // lazy import foo as bar
+                        // lazy from bar import baz
+                        // lazy from sys import x as y
+                        // lazy = 1
+                        // import foo as lazy
+                        // from lazy import qux
+
+                        // test_ok lazy_import_relative_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy from . import basic2
+                        // lazy from .basic2 import x, f
+                        // lazy from . import b, x
+
+                        // test_ok lazy_import_soft_keyword_split_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy
+                        // import os
+                        //
+                        // lazy  # comment
+                        // from sys import path
+
+                        // test_err lazy_import_stmt_py314
+                        // # parse_options: {"target-version": "3.14"}
+                        // lazy import foo
+                        // lazy from bar import baz
+                        TokenKind::Import => {
+                            self.bump(TokenKind::Lazy);
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::LazyImportStatement,
+                                lazy_range,
+                            );
+                            return Stmt::Import(self.parse_import_statement(start, true));
+                        }
+                        TokenKind::From => {
+                            self.bump(TokenKind::Lazy);
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::LazyImportStatement,
+                                lazy_range,
+                            );
+                            return Stmt::ImportFrom(self.parse_from_import_statement(start, true));
+                        }
+                        _ => {}
+                    }
+                }
+
                 if token == TokenKind::Type {
                     // Type is considered a soft keyword, so we will treat it as an identifier if
                     // it's followed by an unexpected token.
@@ -535,8 +598,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `import` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
-    fn parse_import_statement(&mut self) -> ast::StmtImport {
-        let start = self.node_start();
+    fn parse_import_statement(&mut self, start: TextSize, is_lazy: bool) -> ast::StmtImport {
         self.bump(TokenKind::Import);
 
         // test_err import_stmt_parenthesized_names
@@ -563,8 +625,9 @@ impl<'src> Parser<'src> {
         }
 
         ast::StmtImport {
-            range: self.node_range(start),
             names,
+            is_lazy,
+            range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -576,8 +639,11 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `from` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
-    fn parse_from_import_statement(&mut self) -> ast::StmtImportFrom {
-        let start = self.node_start();
+    fn parse_from_import_statement(
+        &mut self,
+        start: TextSize,
+        is_lazy: bool,
+    ) -> ast::StmtImportFrom {
         self.bump(TokenKind::From);
 
         let mut leading_dots = 0;
@@ -600,6 +666,7 @@ impl<'src> Parser<'src> {
             // from match import pattern
             // from type import bar
             // from case import pattern
+            // from lazy import qux
             // from match.type.case import foo
             Some(self.parse_dotted_name())
         } else {
@@ -676,6 +743,7 @@ impl<'src> Parser<'src> {
             module,
             names,
             level: leading_dots,
+            is_lazy,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -713,6 +781,7 @@ impl<'src> Parser<'src> {
                 // import foo as match
                 // import bar as case
                 // import baz as type
+                // import qux as lazy
                 Some(self.parse_identifier())
             } else {
                 // test_err import_alias_missing_asname
@@ -972,7 +1041,7 @@ impl<'src> Parser<'src> {
             type_range,
         );
 
-        let mut name = Expr::Name(self.parse_name());
+        let mut name = Expr::Name(self.parse_name(ExpressionContext::default()));
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
 
         let type_params = self.try_parse_type_params();
@@ -1512,14 +1581,14 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         let (finalbody, has_finally) = if self.eat(TokenKind::Finally) {
             self.expect(TokenKind::Colon);
             (self.parse_body(Clause::Finally), true)
         } else {
-            (vec![], false)
+            (Suite::new(), false)
         };
 
         if !has_except && !has_finally {
@@ -1825,7 +1894,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         ast::StmtFor {
@@ -1875,7 +1944,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         ast::StmtWhile {
@@ -1901,7 +1970,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
         &mut self,
-        decorator_list: Vec<ast::Decorator>,
+        decorator_list: DecoratorList,
         start: TextSize,
     ) -> ast::StmtFunctionDef {
         self.bump(TokenKind::Def);
@@ -2029,7 +2098,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
-        decorator_list: Vec<ast::Decorator>,
+        decorator_list: DecoratorList,
         start: TextSize,
     ) -> ast::StmtClassDef {
         self.bump(TokenKind::Class);
@@ -2329,12 +2398,12 @@ impl<'src> Parser<'src> {
         }
 
         let with_items = if with_item_kind.is_parenthesized() {
-            Some(
-                parsed_with_items
-                    .into_iter()
-                    .map(|parsed_with_item| parsed_with_item.item)
-                    .collect(),
-            )
+            let with_items: Vec<_> = parsed_with_items
+                .into_iter()
+                .map(|parsed_with_item| parsed_with_item.item)
+                .collect();
+
+            Some(with_items)
         } else {
             self.rewind(checkpoint);
 
@@ -2735,7 +2804,7 @@ impl<'src> Parser<'src> {
             // async def foo(): ...
             TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: true,
-                ..self.parse_function_definition(vec![], async_start)
+                ..self.parse_function_definition(DecoratorList::new(), async_start)
             }),
 
             // test_ok async_with_statement
@@ -2766,8 +2835,24 @@ impl<'src> Parser<'src> {
                 );
 
                 // Although this statement is not a valid `async` statement,
-                // we still parse it.
-                self.parse_statement()
+                // we still parse it. Guard the recursive recovery path so
+                // `async async async ...` cannot overflow the parser stack.
+                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
+                    stmt
+                } else {
+                    let range = self.node_range(async_start);
+                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
+                    Stmt::Expr(ast::StmtExpr {
+                        range,
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            range,
+                            id: Name::new_static("async"),
+                            ctx: ExprContext::Invalid,
+                            node_index: AtomicNodeIndex::NONE,
+                        })),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                }
             }
         }
     }
@@ -2778,7 +2863,7 @@ impl<'src> Parser<'src> {
     fn parse_decorators(&mut self) -> Stmt {
         let start = self.node_start();
 
-        let mut decorators = vec![];
+        let mut decorators = DecoratorList::new();
         let mut progress = ParserProgress::default();
 
         // test_err decorator_missing_expression
@@ -2944,7 +3029,7 @@ impl<'src> Parser<'src> {
                         ..ast::Parameters::default()
                     }),
                     returns: None,
-                    body: vec![],
+                    body: Suite::new(),
                 }
                 .into()
             }
@@ -2955,7 +3040,7 @@ impl<'src> Parser<'src> {
     ///
     /// This could either be a single statement that's on the same line as the
     /// clause header or an indented block.
-    fn parse_body(&mut self, parent_clause: Clause) -> Vec<Stmt> {
+    fn parse_body(&mut self, parent_clause: Clause) -> Suite {
         // Note: The test cases in this method chooses a clause at random to test
         // the error logic.
 
@@ -2993,7 +3078,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        Vec::new()
+        Suite::new()
     }
 
     /// Parses a block of statements.
@@ -3001,11 +3086,20 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at an `Indent` token.
-    fn parse_block(&mut self) -> Vec<Stmt> {
+    fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements =
-            self.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement);
+        let statements = if let Some(statements) = self.with_recursion(|parser| {
+            parser.parse_list_into_thin_vec(
+                RecoveryContextKind::BlockStatements,
+                Parser::parse_statement,
+            )
+        }) {
+            statements
+        } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            Suite::new()
+        };
 
         self.expect(TokenKind::Dedent);
 
@@ -3843,12 +3937,11 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Specialized [`Parser::parse_list_into_vec`] for parsing a sequence of clauses.
+    /// Parses a sequence of clauses.
     ///
-    /// The difference is that the parser only continues parsing for as long as it sees the token
-    /// indicating the start of the specific clause. This is different from
-    /// [`Parser::parse_list_into_vec`] that performs error recovery when the next token is not a
-    /// list terminator or the start of a list element.
+    /// The parser only continues for as long as it sees the token indicating the start of the
+    /// specific clause. Unlike [`Parser::parse_list`], this method does not perform error recovery
+    /// when the next token is not a list terminator or the start of a list element.
     ///
     /// The special method is necessary because Python uses indentation over explicit delimiters to
     /// indicate the end of a clause.

@@ -9,11 +9,11 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
   |
 help: Remove unused import: `.unused`
 2 | """
-3 | 
-4 | 
+3 |
+4 |
   - from . import unused  # F401: add to __all__
-5 | 
-6 | 
+5 |
+6 |
 7 | from . import renamed as bees  # F401: add to __all__
 note: This is an unsafe fix and may change runtime behavior
 
@@ -25,10 +25,10 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
   |
 help: Remove unused import: `.renamed`
 5  | from . import unused  # F401: add to __all__
-6  | 
-7  | 
+6  |
+7  |
    - from . import renamed as bees  # F401: add to __all__
-8  | 
-9  | 
+8  |
+9  |
 10 | __all__ = []
 note: This is an unsafe fix and may change runtime behavior

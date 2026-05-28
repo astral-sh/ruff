@@ -1,8 +1,6 @@
-use ruff_python_ast::Expr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::str;
-use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -53,7 +51,7 @@ impl Violation for NonLowercaseVariableInFunction {
 }
 
 /// N806
-pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, expr: &Expr, name: &str) {
+pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, range: TextRange, name: &str) {
     if str::is_lowercase(name) {
         return;
     }
@@ -86,6 +84,6 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, expr: &Expr,
         NonLowercaseVariableInFunction {
             name: name.to_string(),
         },
-        expr.range(),
+        range,
     );
 }

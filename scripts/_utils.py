@@ -23,4 +23,4 @@ def snake_case(name: str) -> str:
 
 
 def get_indent(line: str) -> str:
-    return re.match(r"^\s*", line).group()  # type: ignore[union-attr]
+    return re.match(r"^\s*", line).group()  # type: ignore[union-attr, ty:unresolved-attribute]

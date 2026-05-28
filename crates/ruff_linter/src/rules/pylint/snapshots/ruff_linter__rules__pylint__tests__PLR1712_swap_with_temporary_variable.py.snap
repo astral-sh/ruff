@@ -18,8 +18,8 @@ help: Use `x, y = y, x` instead
   -     x = y
   -     y = temp
 3 +     x, y = y, x
-4 | 
-5 | 
+4 |
+5 |
 6 | # safe fix inside an if condition
 
 PLR1712 [*] Unnecessary temporary variable
@@ -40,8 +40,8 @@ help: Use `x, y = y, x` instead
    -         x = y
    -         y = temp
 11 +         x, y = y, x
-12 | 
-13 | 
+12 |
+13 |
 14 | # unsafe fix because the swap statements contain a comment
 
 PLR1712 [*] Unnecessary temporary variable
@@ -55,14 +55,14 @@ PLR1712 [*] Unnecessary temporary variable
    | |____________^
    |
 help: Use `x, y = y, x` instead
-15 | 
+15 |
 16 | # unsafe fix because the swap statements contain a comment
 17 | def bar(x: int, y: int):
    -     temp: int = x  # comment
    -     x = y
    -     y = temp
 18 +     x, y = y, x
-19 | 
-20 | 
+19 |
+20 |
 21 | # not a swap statement
 note: This is an unsafe fix and may change runtime behavior

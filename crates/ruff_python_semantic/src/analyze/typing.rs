@@ -438,7 +438,7 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
 pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
-    any_over_expr(test, &|expr| {
+    any_over_expr(test, |expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| {
@@ -1320,10 +1320,8 @@ fn match_target<'a>(binding: &Binding, targets: &[Expr], values: &'a [Expr]) -> 
                     _ => (),
                 }
             }
-            Expr::Name(name) => {
-                if name.range() == binding.range() {
-                    return Some(value);
-                }
+            Expr::Name(name) if name.range() == binding.range() => {
+                return Some(value);
             }
             _ => (),
         }

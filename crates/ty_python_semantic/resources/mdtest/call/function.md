@@ -9,6 +9,63 @@ def get_int() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Gradual variadic parameters
+
+```py
+from typing import Any
+
+def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
+def accepts_only_gradual(*args: Any, **kwargs: Any) -> None: ...
+
+accepts_anything(1, "one", object(), keyword=object())
+accepts_anything("not an int")  # error: [invalid-argument-type]
+accepts_only_gradual(1, "one", keyword=object())
+accepts_only_gradual(**{1: "one"})  # error: [invalid-argument-type]
+```
+
+## Object variadic parameters
+
+`*args: object` and `**kwargs: object` can receive many unrelated argument types. Call binding
+should not build large unions to remember the exact values that were supplied to these broad sinks.
+
+```py
+class C0: ...
+class C1: ...
+class C2: ...
+class C3: ...
+class C4: ...
+class C5: ...
+class C6: ...
+class C7: ...
+class C8: ...
+class C9: ...
+
+def accepts_objects(*args: object, **kwargs: object) -> None: ...
+
+accepts_objects(
+    C0(),
+    C1(),
+    C2(),
+    C3(),
+    C4(),
+    C5(),
+    C6(),
+    C7(),
+    C8(),
+    C9(),
+    k0=C0(),
+    k1=C1(),
+    k2=C2(),
+    k3=C3(),
+    k4=C4(),
+    k5=C5(),
+    k6=C6(),
+    k7=C7(),
+    k8=C8(),
+    k9=C9(),
+)
+```
+
 ## Async
 
 ```py
@@ -30,6 +87,41 @@ def get_int[T]() -> int:
     return 42
 
 reveal_type(get_int())  # revealed: int
+```
+
+## Generic callable chains
+
+Inferring a chain of generic callable parameters should discard internal typevar artifacts from
+transitive constraints instead of expanding them recursively.
+
+```py
+from typing import Callable, TypeVar
+
+_A = TypeVar("_A")
+_B = TypeVar("_B")
+_C = TypeVar("_C")
+_D = TypeVar("_D")
+_E = TypeVar("_E")
+_F = TypeVar("_F")
+_G = TypeVar("_G")
+_H = TypeVar("_H")
+
+def compose(
+    fn1: Callable[[_A], _B],
+    fn2: Callable[[_B], _C],
+    fn3: Callable[[_C], _D],
+    fn4: Callable[[_D], _E],
+    fn5: Callable[[_E], _F],
+    fn6: Callable[[_F], _G],
+    fn7: Callable[[_G], _H],
+) -> Callable[[_A], _H]:
+    raise NotImplementedError
+
+Func = Callable[[int], int]
+fn: Func = lambda x: x + 42
+
+cn = compose(fn, fn, fn, fn, fn, fn, fn)
+reveal_type(cn)  # revealed: (int, /) -> int
 ```
 
 ## Decorated
@@ -786,6 +878,71 @@ for tup in my_other_args:
     f4(*tup, e=None)
 ```
 
+Regression test for <https://github.com/astral-sh/ty/issues/2734>.
+
+```py
+def f5(x: int | None = None, y: str = "") -> None: ...
+def f6(args: tuple[()] | tuple[int]) -> None:
+    f5(*args)
+
+def f7(x: int | None = None, y: str = "") -> None: ...
+def f8(args: tuple[()] | tuple[str]) -> None:
+    f7(*args)  # error: [invalid-argument-type]
+
+def f11(*args: int) -> None: ...
+def f12(args: tuple[int] | int) -> None:
+    f11(*args)  # error: [not-iterable]
+
+def f13(a: int, b: int, c: str) -> None: ...
+def f14(a: int, b: int, c: str, d: list[float], e: list[float]) -> None: ...
+def f15(profile: bool, line: str) -> None:
+    matcher = f13
+    timings = []
+    if profile:
+        matcher = f14
+        timings = [[0.0], [1.0], [2.0], [3.0]]
+    matcher(1, 2, line, *timings[:2])
+
+def f9(x: int = 0, y: str = "") -> None: ...
+def f10(args: tuple[int, ...] | tuple[int, str]) -> None:
+    # The variable-length element `int` from `tuple[int, ...]` unions with `str`
+    # from `tuple[int, str]` at position 1, giving `int | str` for `y: str`.
+    f9(*args)  # error: [invalid-argument-type]
+
+def f18(x: int = 0, y: int = 0) -> None: ...
+def f19(args: tuple[int, ...] | tuple[int, int]) -> None:
+    f18(*args)
+
+# Union variadic unpacking also works when the non-defaulted parameters are covered by
+# the shortest union element, even if not all remaining parameters are defaulted.
+def f16(a: int, b: int = 0, c: str = "") -> None: ...
+def f17(x: tuple[int] | tuple[int, int]) -> None:
+    f16(*x)
+
+# Longer union elements must still be rejected when they would contribute
+# extra positional arguments.
+def f20(a: int, b: int) -> None: ...
+def f21(x: tuple[int, int] | tuple[int, int, int]) -> None:
+    f20(*x)  # error: [too-many-positional-arguments]
+
+# Shorter union elements must also be rejected when they cannot provide a required
+# positional argument.
+def f22(a: int, b: int, c: int) -> None: ...
+def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
+    f22(*x)  # error: [missing-argument]
+
+# Later positional arguments must not be allowed to "slide left" when a longer
+# union member would still bind an incompatible tuple element. We currently
+# handle this conservatively, so this still reports the broader iterator-based
+# family of errors.
+def f24(a: int, b: int, c: int = 0) -> None: ...
+def f25(x: tuple[int] | tuple[int, str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    f24(*x, 1)  # error: [invalid-argument-type]
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
@@ -1104,6 +1261,13 @@ from ty_extensions import static_assert
 # error: [missing-argument] "No argument provided for required parameter `condition` of function `static_assert`"
 static_assert()
 
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(condition=False)
+
+# error: [static-assert-error] "Static assertion error: argument of type `Unknown` has an ambiguous static truthiness"
+# error: [invalid-syntax]
+static_assert(**)
+
 # error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"
 # error: [invalid-argument-type] "Argument to function `static_assert` is incorrect: Expected `LiteralString | None`, found `Literal[2]`"
 static_assert(True, 2, 3)
@@ -1280,6 +1444,37 @@ def f(**kwargs: int) -> None: ...
 f(**Foo1(a=1, b="b"))
 # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
 f(**Foo2(a=1))
+```
+
+### TypedDict union
+
+```py
+from typing_extensions import TypedDict
+
+class GoodA(TypedDict):
+    a: int
+    b: int
+
+class GoodB(TypedDict):
+    a: int
+    b: int
+
+class BadA(TypedDict):
+    a: int
+    b: str
+
+class BadB(TypedDict):
+    a: int
+    b: str
+
+def needs_known_keys(*, a: int, b: int, c: int) -> None: ...
+def takes_int_kwargs(**kwargs: int) -> None: ...
+def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
+    # error: [missing-argument] "No argument provided for required parameter `c` of function `needs_known_keys`"
+    needs_known_keys(**good)
+
+    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `str`"
+    takes_int_kwargs(**bad)
 ```
 
 ### Keys must be strings
@@ -1511,4 +1706,45 @@ foo(*None)
 def _(arg: int):
     # error: [not-iterable] "Object of type `int` is not iterable"
     foo(*arg)
+```
+
+## Union variadic unpacking with explicit keyword arguments
+
+When a union type containing variable-length elements (like `Unknown`) is unpacked as `*args`, the
+variadic expansion should not greedily consume optional positional parameters that are also provided
+as explicit keyword arguments.
+
+```py
+from ty_extensions import Unknown
+
+def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
+def _(args: "Unknown | tuple[int, int, int]"):
+    f(*args, fmt="{key}")  # fine
+
+def g(a: int, b: int = 0, c: int = 0) -> None: ...
+def _(args: tuple[int, int] | tuple[int, int, int]):
+    g(*args, c=1)  # error: [parameter-already-assigned]
+```
+
+## Variadic unpacking should stop at max known arity
+
+When unpacking (a union of) fixed-length tuples, variadic matching should stop once the known
+positions are exhausted. Otherwise, optional positional parameters can be incorrectly treated as
+already assigned, causing false positives for `**kwargs`.
+
+(This test uses `**kwargs` unpacking of a `TypedDict` instead of the simpler `c=1` keyword argument,
+because `c=1` is a known keyword argument and we always prevent unpacking `*args` over an
+explicitly-provided keyword argument. The case shown here, without the explicit keyword argument,
+requires instead that we use our knowledge of the tuple length to prevent over-unpacking.)
+
+```py
+from typing import TypedDict
+
+class CKwargs(TypedDict):
+    c: int
+
+def f(a: int = 0, b: int = 0, c: int = 0) -> None: ...
+def _(args_tuple: tuple[int, int], args_union: tuple[int] | tuple[int, int], kwargs: CKwargs) -> None:
+    f(*args_tuple, **kwargs)  # fine
+    f(*args_union, **kwargs)  # fine
 ```

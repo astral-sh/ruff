@@ -75,8 +75,8 @@ from email.message import Message
 from http.client import HTTPConnection, HTTPMessage, HTTPResponse
 from http.cookiejar import CookieJar
 from re import Pattern
-from typing import IO, Any, ClassVar, Literal, NoReturn, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, deprecated
+from typing import IO, Any, ClassVar, Literal, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import deprecated
 from urllib.error import HTTPError as HTTPError
 from urllib.response import addclosehook, addinfourl
 
@@ -234,7 +234,6 @@ else:
         installed and makes sure the requests are handled through the proxy.
 
         """
-
     @overload
     @deprecated(
         "The `cafile`, `capath`, `cadefault` parameters are deprecated since Python 3.6; "
@@ -251,7 +250,7 @@ else:
         context: None = None,
     ) -> _UrlopenRet: ...
 
-def install_opener(opener: OpenerDirector) -> None: ...
+def install_opener(opener: OpenerDirector | None) -> None: ...
 def build_opener(*handlers: BaseHandler | Callable[[], BaseHandler]) -> OpenerDirector:
     """Create an opener object from a list of handlers.
 
@@ -346,6 +345,7 @@ class Request:
     def full_url(self, value: str) -> None: ...
     @full_url.deleter
     def full_url(self) -> None: ...
+
     type: str
     host: str
     origin_req_host: str
@@ -374,10 +374,12 @@ class Request:
     def remove_header(self, header_name: str) -> None: ...
     def get_full_url(self) -> str: ...
     def set_proxy(self, host: str, type: str) -> None: ...
+
     @overload
     def get_header(self, header_name: str) -> str | None: ...
     @overload
     def get_header(self, header_name: str, default: _T) -> str | _T: ...
+
     def header_items(self) -> list[tuple[str, str]]: ...
     def has_proxy(self) -> bool: ...
 

@@ -57,5 +57,5 @@ help: Add missing whitespace
     - msg = "Error %d occurred"%errno
 135 + msg = "Error %d occurred" % errno
 136 | #:
-137 | 
+137 |
 138 | #: Okay

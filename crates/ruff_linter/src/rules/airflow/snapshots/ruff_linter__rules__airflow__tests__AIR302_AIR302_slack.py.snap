@@ -13,11 +13,11 @@ AIR302 [*] `airflow.hooks.slack_hook.SlackHook` is moved into `slack` provider i
   |
 help: Install `apache-airflow-providers-slack>=1.0.0` and use `SlackHook` from `airflow.providers.slack.hooks.slack` instead.
 1 | from __future__ import annotations
-2 | 
+2 |
   - from airflow.hooks.slack_hook import SlackHook
 3 | from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOperator
 4 + from airflow.providers.slack.hooks.slack import SlackHook
-5 | 
+5 |
 6 | SlackHook()
 7 | SlackAPIOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -32,12 +32,12 @@ AIR302 [*] `airflow.operators.slack_operator.SlackAPIOperator` is moved into `sl
   |
 help: Install `apache-airflow-providers-slack>=1.0.0` and use `SlackAPIOperator` from `airflow.providers.slack.operators.slack` instead.
 1 | from __future__ import annotations
-2 | 
+2 |
 3 | from airflow.hooks.slack_hook import SlackHook
   - from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOperator
 4 + from airflow.operators.slack_operator import SlackAPIPostOperator
 5 + from airflow.providers.slack.operators.slack import SlackAPIOperator
-6 | 
+6 |
 7 | SlackHook()
 8 | SlackAPIOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -52,12 +52,12 @@ AIR302 [*] `airflow.operators.slack_operator.SlackAPIPostOperator` is moved into
   |
 help: Install `apache-airflow-providers-slack>=1.0.0` and use `SlackAPIPostOperator` from `airflow.providers.slack.operators.slack` instead.
 1 | from __future__ import annotations
-2 | 
+2 |
 3 | from airflow.hooks.slack_hook import SlackHook
   - from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOperator
 4 + from airflow.operators.slack_operator import SlackAPIOperator
 5 + from airflow.providers.slack.operators.slack import SlackAPIPostOperator
-6 | 
+6 |
 7 | SlackHook()
 8 | SlackAPIOperator()
 note: This is an unsafe fix and may change runtime behavior

@@ -189,8 +189,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ## Inferring a bound typevar
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import TypeVar
 
@@ -201,13 +199,26 @@ def f(x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
-## Inferring a constrained typevar
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:11:15
+   |
+11 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", bound=int)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+```
 
-<!-- snapshot-diagnostics -->
+## Inferring a constrained typevar
 
 ```py
 from typing import TypeVar
@@ -220,8 +231,23 @@ def f(x: T) -> T:
 reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:12:15
+   |
+12 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, None)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 ```
 
 ## Typevar constraints
@@ -306,6 +332,23 @@ def negate_typevar(t: S) -> S:
 
 def positive_typevar(t: S) -> S:
     return +t
+```
+
+Narrowing should preserve the constrained typevar identity so the narrowed value remains assignable
+to the function's return type:
+
+```py
+from typing import TypeVar
+
+class P: ...
+class Q: ...
+
+T = TypeVar("T", P, Q)
+
+def return_narrowed_typevar(x: T) -> T:
+    if isinstance(x, P):
+        return x
+    return x
 ```
 
 Unary operations that are not supported by all constraints should error:
@@ -630,6 +673,27 @@ def decorated(t: T) -> None:
     reveal_type(cast(T, t))  # revealed: T@decorated
 ```
 
+## Attribute access on `Callable`-bounded TypeVars
+
+```py
+from typing import Callable, Generic, TypeVar
+
+F = TypeVar("F", bound=Callable)
+
+def my_decorator(f: F) -> None:
+    # error: [unresolved-attribute]
+    f.whatever
+    # error: [unresolved-attribute]
+    f.whatever = 1
+
+class Box(Generic[F]):
+    cls: type[F]
+
+def specialized(box: Box[Callable]) -> None:
+    # error: [unresolved-attribute]
+    box.cls.whatever
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
@@ -898,16 +962,103 @@ def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
 def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
     return tuple(x for iterable in iterables for x in iterable)
 
-reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
-# TODO: we could have `Literal["a", "b", "c"]` instead of `str` here
-reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
+reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[LiteralString | int]
+reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[LiteralString | Literal[1, 2, 3], ...]
 
 def literal_string_case(literal_string: LiteralString):
-    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[LiteralString | int]
+
+def literal_string_case(string: str):
+    # TODO: revealed: list[str | int]
+    # str has an __iter__ overload that returns LiteralString elements when self is a LiteralString.
+    # We currently including `LiteralString ≤ FlatT` in our constraint set because of that overload,
+    # even though the overload should not be selectable since `str ≰ LiteralString`.
+    reveal_type(flatten(string, (1, 2, 3)))  # revealed: list[LiteralString | int]
 
 reveal_type(flatten(b"abc"))  # revealed: list[int]
 reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
 # TODO: we could have `Literal[97, 98, 99]` instead of `int` in the next two lines
 reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
 reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
+```
+
+## Inferring typevars in intersections (formal type position)
+
+```py
+from typing import TypeVar, Iterable
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Foo: ...
+
+def foo(x: Intersection[Iterable[T], Foo]) -> T:
+    return next(iter(x))
+
+class Bar(list[int], Foo): ...
+
+reveal_type(foo(Bar()))  # revealed: int
+```
+
+## Inferring typevars in intersections (actual type position)
+
+```py
+from typing import TypeVar, Sequence, Iterable
+
+T = TypeVar("T")
+
+def first(iterable: Iterable[T]) -> T:
+    return next(iter(iterable))
+
+def narrowed_via_isinstance(x: Sequence[str] | int):
+    if isinstance(x, int):
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: Sequence[str] & ~int
+        reveal_type(first(x))  # revealed: str
+
+def narrowed_via_truthiness(y: list[str]):
+    if y:
+        reveal_type(y)  # revealed: list[str] & ~AlwaysFalsy
+        reveal_type(first(y))  # revealed: str
+```
+
+## Inferring typevars in intersections (actual type position, multiple positive types)
+
+When an actual intersection has multiple positive elements and a bounded typevar, inference can fail
+for some elements but succeed for others:
+
+```py
+from typing import Sequence, TypeVar
+from ty_extensions import Intersection
+
+class Base: ...
+class Sub1(Base): ...
+class Sub2(Base): ...
+class Unrelated1: ...
+class Unrelated2: ...
+
+T = TypeVar("T", bound=Base)
+
+def first(x: Sequence[T]) -> T:
+    return x[0]
+
+# An intersection where both positive elements satisfy the bound.
+def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1 | Sub2
+
+# An intersection with one positive element that satisfies the bound and one that doesn't.
+def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1
+
+# An intersection with two positive elements that satisfy the bound and one that doesn't.
+def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1 | Sub2
+
+# An intersection with two positive elements, neither of which satisfies the bound. In this case,
+# only the error related to the first element is reported.
+def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
+    # TODO: We only report the first error here, but we should report both.
+    # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
+    reveal_type(first(x))  # revealed: Unknown
 ```

@@ -11,7 +11,7 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 help: Replace `exit` with `sys.exit()`
   - from sys import argv
 1 + from sys import argv, exit
-2 | 
-3 | 
+2 |
+3 |
 4 | def main():
 note: This is an unsafe fix and may change runtime behavior

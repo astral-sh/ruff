@@ -16,22 +16,30 @@ pub struct PanicError {
 pub struct Payload(Box<dyn std::any::Any + Send>);
 
 impl Payload {
-    pub fn as_str(&self) -> Option<&str> {
-        if let Some(s) = self.0.downcast_ref::<String>() {
-            Some(s)
-        } else if let Some(s) = self.0.downcast_ref::<&str>() {
-            Some(s)
-        } else {
-            None
-        }
-    }
-
     pub fn downcast_ref<R: Any>(&self) -> Option<&R> {
         self.0.downcast_ref::<R>()
     }
 }
 
+impl std::fmt::Display for Payload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(s) = self.0.downcast_ref::<String>() {
+            f.write_str(s)
+        } else if let Some(s) = self.0.downcast_ref::<&str>() {
+            f.write_str(s)
+        } else if let Some(s) = self.0.downcast_ref::<salsa::Cancelled>() {
+            write!(f, "{s}")
+        } else {
+            f.write_str("Box<dyn Any>")
+        }
+    }
+}
+
 impl PanicError {
+    pub fn resume_unwind(self) -> ! {
+        std::panic::resume_unwind(self.payload.0)
+    }
+
     pub fn to_diagnostic_message(&self, path: Option<impl std::fmt::Display>) -> String {
         use std::fmt::Write;
 
@@ -46,9 +54,7 @@ impl PanicError {
             let _ = write!(&mut message, " when checking `{path}`");
         }
 
-        if let Some(payload) = self.payload.as_str() {
-            let _ = write!(&mut message, ": `{payload}`");
-        }
+        let _ = write!(&mut message, ": `{payload}`", payload = self.payload);
 
         message
     }
@@ -60,9 +66,9 @@ impl std::fmt::Display for PanicError {
         if let Some(location) = &self.location {
             write!(f, " {location}")?;
         }
-        if let Some(payload) = self.payload.as_str() {
-            write!(f, ":\n{payload}")?;
-        }
+
+        write!(f, ":\n{payload}", payload = self.payload)?;
+
         if let Some(query_trace) = self.salsa_backtrace.as_ref() {
             let _ = writeln!(f, "{query_trace}");
         }

@@ -5,7 +5,7 @@ expression: parsed.syntax()
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..929,
+        range: 0..953,
         body: [
             Expr(
                 StmtExpr {
@@ -362,10 +362,58 @@ Module(
                     ),
                 },
             ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 785..796,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 785..788,
+                                id: Name("bar"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: IpyEscapeCommand(
+                        ExprIpyEscapeCommand {
+                            node_index: NodeIndex(None),
+                            range: 791..796,
+                            kind: Magic,
+                            value: "foo?",
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 797..808,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 797..800,
+                                id: Name("baz"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: IpyEscapeCommand(
+                        ExprIpyEscapeCommand {
+                            node_index: NodeIndex(None),
+                            range: 803..808,
+                            kind: Shell,
+                            value: "pwd?",
+                        },
+                    ),
+                },
+            ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
                     node_index: NodeIndex(None),
-                    range: 786..791,
+                    range: 810..815,
                     kind: Magic,
                     value: " foo",
                 },
@@ -373,12 +421,12 @@ Module(
             Assign(
                 StmtAssign {
                     node_index: NodeIndex(None),
-                    range: 792..813,
+                    range: 816..837,
                     targets: [
                         Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 792..795,
+                                range: 816..819,
                                 id: Name("foo"),
                                 ctx: Store,
                             },
@@ -387,7 +435,7 @@ Module(
                     value: IpyEscapeCommand(
                         ExprIpyEscapeCommand {
                             node_index: NodeIndex(None),
-                            range: 798..813,
+                            range: 822..837,
                             kind: Magic,
                             value: "foo  # comment",
                         },
@@ -397,7 +445,7 @@ Module(
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
                     node_index: NodeIndex(None),
-                    range: 838..842,
+                    range: 862..866,
                     kind: Help,
                     value: "foo",
                 },
@@ -405,7 +453,7 @@ Module(
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
                     node_index: NodeIndex(None),
-                    range: 843..852,
+                    range: 867..876,
                     kind: Help2,
                     value: "foo.bar",
                 },
@@ -413,7 +461,7 @@ Module(
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
                     node_index: NodeIndex(None),
-                    range: 853..865,
+                    range: 877..889,
                     kind: Help,
                     value: "foo.bar.baz",
                 },
@@ -421,7 +469,7 @@ Module(
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
                     node_index: NodeIndex(None),
-                    range: 866..874,
+                    range: 890..898,
                     kind: Help2,
                     value: "foo[0]",
                 },
@@ -429,7 +477,7 @@ Module(
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
                     node_index: NodeIndex(None),
-                    range: 875..885,
+                    range: 899..909,
                     kind: Help,
                     value: "foo[0][1]",
                 },
@@ -437,7 +485,7 @@ Module(
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
                     node_index: NodeIndex(None),
-                    range: 886..905,
+                    range: 910..929,
                     kind: Help2,
                     value: "foo.bar[0].baz[1]",
                 },
@@ -445,7 +493,7 @@ Module(
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
                     node_index: NodeIndex(None),
-                    range: 906..929,
+                    range: 930..953,
                     kind: Help2,
                     value: "foo.bar[0].baz[2].egg",
                 },

@@ -133,7 +133,7 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
     for iterable in iterables {
         // For example, (x+1 for x in (c:=a)) is invalid syntax
         // so we can't suggest it.
-        if any_over_expr(iterable, &|expr| expr.is_named_expr()) {
+        if any_over_expr(iterable, ruff_python_ast::Expr::is_named_expr) {
             return;
         }
 
@@ -193,7 +193,7 @@ fn map_lambda_and_iterables<'a>(
 
 /// Returns true if the expression tree contains a `yield` or `yield from` expression.
 fn lambda_contains_yield(expr: &Expr) -> bool {
-    any_over_expr(expr, &|expr| {
+    any_over_expr(expr, |expr| {
         matches!(expr, Expr::Yield(_) | Expr::YieldFrom(_))
     })
 }
@@ -208,6 +208,10 @@ fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
         return false;
     };
 
+    if parameters.len() != 1 {
+        return false;
+    }
+
     let [parameter] = &*parameters.args else {
         return false;
     };
@@ -215,11 +219,6 @@ fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
     if parameter.default.is_some() {
         return false;
     }
-
-    if parameters.vararg.is_some() || parameters.kwarg.is_some() {
-        return false;
-    }
-
     if late_binding(parameters, &lambda.body) {
         return false;
     }

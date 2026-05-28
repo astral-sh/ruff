@@ -32,7 +32,7 @@ help: Remove unnecessary comprehension
 2 + min(x.val for x in bar)
 3 | max([x.val for x in bar])
 4 | sum([x.val for x in bar], 0)
-5 | 
+5 |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary list comprehension
@@ -50,7 +50,7 @@ help: Remove unnecessary comprehension
   - max([x.val for x in bar])
 3 + max(x.val for x in bar)
 4 | sum([x.val for x in bar], 0)
-5 | 
+5 |
 6 | # OK
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,7 +70,7 @@ help: Remove unnecessary comprehension
 3 | max([x.val for x in bar])
   - sum([x.val for x in bar], 0)
 4 + sum((x.val for x in bar), 0)
-5 | 
+5 |
 6 | # OK
 7 | sum(x.val for x in bar)
 note: This is an unsafe fix and may change runtime behavior
@@ -90,7 +90,7 @@ C419 [*] Unnecessary list comprehension
 20 |   )
    |
 help: Remove unnecessary comprehension
-11 | 
+11 |
 12 | # Multi-line
 13 | sum(
    -     [

@@ -35,7 +35,7 @@ help: Replace single quotes with double quotes
 3 +     "is"
 4 |     'not'
 5 | )
-6 | 
+6 |
 
 Q000 [*] Single quotes found but double quotes preferred
  --> singles_implicit.py:4:5
@@ -53,7 +53,7 @@ help: Replace single quotes with double quotes
   -     'not'
 4 +     "not"
 5 | )
-6 | 
+6 |
 7 | x = (
 
 Q000 [*] Single quotes found but double quotes preferred
@@ -67,7 +67,7 @@ Q000 [*] Single quotes found but double quotes preferred
    |
 help: Replace single quotes with double quotes
 5  | )
-6  | 
+6  |
 7  | x = (
    -     'This' \
 8  +     "This" \
@@ -86,14 +86,14 @@ Q000 [*] Single quotes found but double quotes preferred
 11 | )
    |
 help: Replace single quotes with double quotes
-6  | 
+6  |
 7  | x = (
 8  |     'This' \
    -     'is' \
 9  +     "is" \
 10 |     'not'
 11 | )
-12 | 
+12 |
 
 Q000 [*] Single quotes found but double quotes preferred
   --> singles_implicit.py:10:5
@@ -111,7 +111,7 @@ help: Replace single quotes with double quotes
    -     'not'
 10 +     "not"
 11 | )
-12 | 
+12 |
 13 | x = (
 
 Q000 [*] Single quotes found but double quotes preferred
@@ -123,7 +123,7 @@ Q000 [*] Single quotes found but double quotes preferred
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace single quotes with double quotes
-24 | 
+24 |
 25 | if True:
 26 |     'This can use "single" quotes'
    - 'But this needs to be changed'

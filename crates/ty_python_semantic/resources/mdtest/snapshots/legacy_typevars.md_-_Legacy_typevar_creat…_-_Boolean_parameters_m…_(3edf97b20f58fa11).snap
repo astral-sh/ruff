@@ -34,13 +34,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 error[invalid-legacy-type-variable]: The `covariant` parameter of `TypeVar` cannot have an ambiguous truthiness
  --> src/mdtest_snippet.py:7:28
   |
-6 | # error: [invalid-legacy-type-variable]
 7 | T = TypeVar("T", covariant=cond())
   |                            ^^^^^^
-8 |
-9 | # error: [invalid-legacy-type-variable]
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```
 
@@ -48,13 +44,9 @@ info: rule `invalid-legacy-type-variable` is enabled by default
 error[invalid-legacy-type-variable]: The `contravariant` parameter of `TypeVar` cannot have an ambiguous truthiness
   --> src/mdtest_snippet.py:10:32
    |
- 9 | # error: [invalid-legacy-type-variable]
 10 | U = TypeVar("U", contravariant=cond())
    |                                ^^^^^^
-11 |
-12 | # error: [invalid-legacy-type-variable]
    |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```
 
@@ -62,10 +54,8 @@ info: rule `invalid-legacy-type-variable` is enabled by default
 error[invalid-legacy-type-variable]: The `infer_variance` parameter of `TypeVar` cannot have an ambiguous truthiness
   --> src/mdtest_snippet.py:13:33
    |
-12 | # error: [invalid-legacy-type-variable]
 13 | V = TypeVar("V", infer_variance=cond())
    |                                 ^^^^^^
    |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```

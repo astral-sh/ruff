@@ -13,8 +13,8 @@ use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, PatternError, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
+    CaseSensitivity, DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, SystemVirtualPathBuf, WhichResult, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
@@ -124,12 +124,20 @@ impl LSPSystem {
         extension: Option<&str>,
     ) -> Option<PySourceType> {
         match document {
-            Document::Text(text) => match text.language_id()? {
-                LanguageId::Python => Some(
-                    extension
+            Document::Text(text) => match text.language_id() {
+                LanguageId::Python => {
+                    let source_type = extension
                         .and_then(PySourceType::try_from_extension)
-                        .unwrap_or(PySourceType::Python),
-                ),
+                        .unwrap_or(PySourceType::Python);
+
+                    // JupyterLab presents notebook virtual documents to language servers as
+                    // simple text files rather than serialized `.ipynb` contents. See:
+                    // https://github.com/jupyterlab/jupyterlab/blob/f51404192bf6d0ff79187c884f21e1f91b928146/packages/lsp/src/virtual/document.ts#L308-L314
+                    Some(match source_type {
+                        PySourceType::Ipynb => PySourceType::Python,
+                        source_type => source_type,
+                    })
+                }
                 LanguageId::Other => None,
             },
             Document::Notebook(_) => Some(PySourceType::Ipynb),
@@ -228,8 +236,8 @@ impl System for LSPSystem {
         }
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        self.native_system.is_executable(path)
+    fn which(&self, name: &str) -> WhichResult {
+        self.native_system.which(name)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -253,16 +261,6 @@ impl System for LSPSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.native_system.walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        self.native_system.glob(pattern)
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

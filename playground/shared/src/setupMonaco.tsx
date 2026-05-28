@@ -37,6 +37,7 @@ export function setupMonaco(
   defineFirLanguage(monaco);
   defineRustPythonTokensLanguage(monaco);
   defineRustPythonAstLanguage(monaco);
+  defineTomlLanguage(monaco);
   defineCommentsLanguage(monaco);
 
   monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -829,6 +830,125 @@ function defineFirLanguage(monaco: Monaco) {
         close: ">",
         token: "delimiter.angle",
       },
+    ],
+  });
+}
+
+function defineTomlLanguage(monaco: Monaco) {
+  monaco.languages.register({
+    id: "toml",
+    extensions: [".toml"],
+    aliases: ["TOML", "toml"],
+  });
+
+  monaco.languages.setMonarchTokensProvider("toml", {
+    keywords: ["true", "false"],
+    tokenizer: {
+      root: [
+        // Comments
+        [/#.*$/, "comment"],
+
+        // Array-of-tables header: [[...]]
+        [/^\s*\[\[/, { token: "tag", next: "@array_table" }],
+
+        // Table header: [...]
+        [/^\s*\[/, { token: "tag", next: "@table" }],
+
+        // Whitespace
+        [/[ \t\r\n]+/, "white"],
+
+        // Keys are context-sensitive in TOML. Match the full left-hand side of
+        // a key/value pair before value rules run, otherwise identifiers like
+        // `include` compete with value tokens and numeric prefixes in values
+        // such as `79.5` or `07:32:00.123` get misclassified as keys.
+        [
+          /(?:"(?:[^"\\]|\\.)*"|'[^']*'|[A-Za-z0-9_-]+)(?:\s*\.\s*(?:"(?:[^"\\]|\\.)*"|'[^']*'|[A-Za-z0-9_-]+))*\s*(?==)/,
+          "variable",
+        ],
+
+        // Key-value separator
+        [/=/, "delimiter"],
+
+        // Multiline strings (must come before single-line strings)
+        [/"""/, { token: "string", next: "@multiline_basic_string" }],
+        [/'''/, { token: "string", next: "@multiline_literal_string" }],
+
+        // Single-line strings
+        [/"/, { token: "string", next: "@basic_string" }],
+        [/'/, { token: "string", next: "@literal_string" }],
+
+        // Numbers: hex, octal, binary, then float/int
+        [/0x[0-9a-fA-F][0-9a-fA-F_]*/, "number"],
+        [/0o[0-7][0-7_]*/, "number"],
+        [/0b[01][01_]*/, "number"],
+        [/[-+]?(?:inf|nan)/, "number"],
+        // Date-time (ISO 8601)
+        [
+          /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?/,
+          "number",
+        ],
+        // Float
+        [/[-+]?\d[\d_]*(?:\.[\d_]+)?(?:[eE][-+]?[\d_]+)?/, "number"],
+
+        // Booleans / keywords
+        [
+          /[a-zA-Z_][\w-]*/,
+          {
+            cases: {
+              "@keywords": "keyword",
+              "@default": "variable",
+            },
+          },
+        ],
+
+        // Brackets (inline tables and arrays)
+        [/[{}[\]]/, "@brackets"],
+
+        // Punctuation
+        [/[,.]/, "delimiter"],
+      ],
+
+      table: [
+        [/\]\]/, { token: "tag", next: "@pop" }],
+        [/\]/, { token: "tag", next: "@pop" }],
+        [/[^\]]+/, "tag"],
+      ],
+
+      array_table: [
+        [/\]\]/, { token: "tag", next: "@pop" }],
+        [/[^\]]+/, "tag"],
+      ],
+
+      basic_string: [
+        [/[^"\\]+/, "string"],
+        [/\\(?:[btnfr"\\]|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8})/, "string.escape"],
+        [/"/, { token: "string", next: "@pop" }],
+      ],
+
+      literal_string: [
+        [/[^']+/, "string"],
+        [/'/, { token: "string", next: "@pop" }],
+      ],
+
+      multiline_basic_string: [
+        [/"""/, { token: "string", next: "@pop" }],
+        [
+          /\\(?:[btnfr"\\]|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|\n[ \t]*)/,
+          "string.escape",
+        ],
+        [/[^"\\]+/, "string"],
+        [/"/, "string"],
+      ],
+
+      multiline_literal_string: [
+        [/'''/, { token: "string", next: "@pop" }],
+        [/[^']+/, "string"],
+        [/'/, "string"],
+      ],
+    },
+    brackets: [
+      { open: "{", close: "}", token: "delimiter.curly" },
+      { open: "[", close: "]", token: "delimiter.bracket" },
     ],
   });
 }

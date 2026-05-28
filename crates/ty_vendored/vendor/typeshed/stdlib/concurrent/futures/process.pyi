@@ -141,7 +141,7 @@ class _SafeQueue(Queue[Future[Any]]):
 
     def _on_queue_feeder_error(self, e: Exception, obj: _CallItem) -> None: ...
 
-def _get_chunks(*iterables: Any, chunksize: int) -> Generator[tuple[Any, ...], None, None]:
+def _get_chunks(*iterables: Any, chunksize: int) -> Generator[tuple[Any, ...]]:
     """Iterates over zip()ed iterables in chunks."""
 
 def _process_chunk(fn: Callable[..., _T], chunk: Iterable[tuple[Any, ...]]) -> list[_T]:
@@ -305,7 +305,6 @@ class ProcessPoolExecutor(Executor):
                     start method. When given, we default to using 'spawn' if no
                     mp_context is supplied.
             """
-
         @overload
         def __init__(
             self,
@@ -346,7 +345,6 @@ class ProcessPoolExecutor(Executor):
                 initializer: A callable used to initialize worker processes.
                 initargs: A tuple of arguments to pass to the initializer.
             """
-
         @overload
         def __init__(
             self,

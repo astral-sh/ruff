@@ -15,7 +15,7 @@ ignored = ["ruff_cache"]
 
 [dependencies]
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true, features = ["os", "serde"] }
+ruff_db = { workspace = true, features = ["serde"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
@@ -33,3 +33,7 @@ zip = { workspace = true, features = [] }
 
 [lints]
 workspace = true
+
+[lib]
+test = false
+doctest = false

@@ -17,7 +17,7 @@ help: Remove assignment to unused variable `x`
    -     except ValueError as x:
 7  +     except ValueError:
 8  |         pass
-9  | 
+9  |
 10 |     def g():
 
 F841 [*] Local variable `x` is assigned to but never used
@@ -36,5 +36,5 @@ help: Remove assignment to unused variable `x`
    -         except ValueError as x:
 13 +         except ValueError:
 14 |             pass
-15 | 
+15 |
 16 |         # This should resolve to the `x` in `x = 1`.

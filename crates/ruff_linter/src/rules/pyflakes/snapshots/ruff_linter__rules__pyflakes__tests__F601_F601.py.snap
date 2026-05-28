@@ -99,7 +99,7 @@ help: Remove repeated key literal `"a"`
 17 |     "a": 3,
    -     "a": 3,
 18 | }
-19 | 
+19 |
 20 | x = {
 note: This is an unsafe fix and may change runtime behavior
 
@@ -144,7 +144,7 @@ help: Remove repeated key literal `"a"`
    -     "a": 3,
 25 |     "a": 4,
 26 | }
-27 | 
+27 |
 note: This is an unsafe fix and may change runtime behavior
 
 F601 Dictionary key literal `"a"` repeated
@@ -169,7 +169,7 @@ F601 [*] Dictionary key literal `"a"` repeated
 33 |     "a": 3,
    |
 help: Remove repeated key literal `"a"`
-28 | 
+28 |
 29 | x = {
 30 |     "a": 1,
    -     "a": 1,
@@ -254,7 +254,7 @@ help: Remove repeated key literal `"a"`
    -     "a": 3,
 45 |     a: 4,
 46 | }
-47 | 
+47 |
 note: This is an unsafe fix and may change runtime behavior
 
 F601 [*] Dictionary key literal `"a"` repeated
@@ -269,11 +269,11 @@ F601 [*] Dictionary key literal `"a"` repeated
 help: Remove repeated key literal `"a"`
 46 |     a: 4,
 47 | }
-48 | 
+48 |
    - x = {"a": 1, "a": 1}
 49 + x = {"a": 1}
 50 | x = {"a": 1, "b": 2, "a": 1}
-51 | 
+51 |
 52 | x = {
 note: This is an unsafe fix and may change runtime behavior
 
@@ -288,11 +288,11 @@ F601 [*] Dictionary key literal `"a"` repeated
    |
 help: Remove repeated key literal `"a"`
 47 | }
-48 | 
+48 |
 49 | x = {"a": 1, "a": 1}
    - x = {"a": 1, "b": 2, "a": 1}
 50 + x = {"a": 1, "b": 2}
-51 | 
+51 |
 52 | x = {
 53 |     ('a', 'b'): 'asdf',
 note: This is an unsafe fix and may change runtime behavior
@@ -319,13 +319,13 @@ F601 [*] Dictionary key literal `"x"` repeated
    |
 help: Remove repeated key literal `"x"`
 55 | }
-56 | 
+56 |
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
    - t={"x":"test123", "x":("test123")}
 58 + t={"x":"test123"}
-59 | 
+59 |
 60 | t={"x":("test123"), "x":"test123"}
-61 | 
+61 |
 note: This is an unsafe fix and may change runtime behavior
 
 F601 [*] Dictionary key literal `"x"` repeated
@@ -341,10 +341,10 @@ F601 [*] Dictionary key literal `"x"` repeated
 help: Remove repeated key literal `"x"`
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
 58 | t={"x":"test123", "x":("test123")}
-59 | 
+59 |
    - t={"x":("test123"), "x":"test123"}
 60 + t={"x":("test123")}
-61 | 
+61 |
 62 | # Regression test for: https://github.com/astral-sh/ruff/issues/12772
 63 | x = {
 note: This is an unsafe fix and may change runtime behavior

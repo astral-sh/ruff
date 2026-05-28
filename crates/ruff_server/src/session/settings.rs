@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-pub struct GlobalClientSettings {
+pub(crate) struct GlobalClientSettings {
     pub(super) options: ClientOptions,
 
     /// Lazily initialized client settings to avoid showing error warnings

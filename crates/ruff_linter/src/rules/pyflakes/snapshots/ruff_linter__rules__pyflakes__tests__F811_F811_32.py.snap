@@ -12,10 +12,10 @@ F811 [*] Redefinition of unused `List` from line 4
 6 | )
   |
 help: Remove definition: `List`
-2 | 
+2 |
 3 | from typing import (
 4 |     List,
   -     List,
 5 | )
-6 | 
+6 |
 7 |

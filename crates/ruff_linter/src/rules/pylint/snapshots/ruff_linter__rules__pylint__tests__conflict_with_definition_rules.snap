@@ -12,7 +12,7 @@ PLR1712 [*] Unnecessary temporary variable
   |
 help: Use `x, y = y, x` instead
 3 | """
-4 | 
+4 |
 5 | x, y = 1, 2
   - temp = x  # PLR1712
   - x = y

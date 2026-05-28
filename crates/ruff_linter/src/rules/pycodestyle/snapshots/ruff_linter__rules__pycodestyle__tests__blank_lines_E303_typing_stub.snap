@@ -12,8 +12,8 @@ E303 [*] Too many blank lines (2)
 help: Remove extraneous blank line(s)
 13 | @overload
 14 | def a(arg: int, name: str): ...
-15 | 
-   - 
+15 |
+   -
 16 | def grouped1(): ...
 17 | def grouped2(): ...
 18 | def grouped3( ): ...
@@ -29,8 +29,8 @@ E303 [*] Too many blank lines (2)
 help: Remove extraneous blank line(s)
 18 | def grouped2(): ...
 19 | def grouped3( ): ...
-20 | 
-   - 
+20 |
+   -
 21 | class BackendProxy:
 22 |     backend_module: str
 23 |     backend_object: str | None
@@ -49,7 +49,7 @@ help: Remove extraneous blank line(s)
    -     
 34 |     def ungrouped(): ...
 35 | a = "test"
-36 | 
+36 |
 
 E303 [*] Too many blank lines (2)
   --> E30.pyi:43:1
@@ -62,8 +62,8 @@ E303 [*] Too many blank lines (2)
 help: Remove extraneous blank line(s)
 39 |     pass
 40 | b = "test"
-41 | 
-   - 
+41 |
+   -
 42 | def outer():
 43 |      def inner():
 44 |          pass

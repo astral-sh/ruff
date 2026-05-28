@@ -43,11 +43,21 @@ RUF067 `__init__` module should only contain docstrings and re-exports
    |
 
 RUF067 `__init__` module should only contain docstrings and re-exports
-  --> __init__.py:48:1
+  --> __init__.py:54:1
    |
-47 | # non-`extend_path` assignments are not allowed
-48 | __path__ = 5  # RUF067
-   | ^^^^^^^^^^^^
-49 |
-50 | # also allow `__author__`
+52 | __submodules__ += ["extra"]  # ok
+53 |
+54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+   |
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:55:1
+   |
+54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+56 |
+57 | # also allow `__author__`
    |

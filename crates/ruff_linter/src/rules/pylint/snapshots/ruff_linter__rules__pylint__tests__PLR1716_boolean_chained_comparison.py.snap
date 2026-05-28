@@ -17,7 +17,7 @@ help: Use a single compare expression
    - if a < b and b < c:  # [boolean-chained-comparison]
 8  + if a < b < c:  # [boolean-chained-comparison]
 9  |     pass
-10 | 
+10 |
 11 | a = int(input())
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -36,7 +36,7 @@ help: Use a single compare expression
    - if a < b and b <= c:  # [boolean-chained-comparison]
 14 + if a < b <= c:  # [boolean-chained-comparison]
 15 |     pass
-16 | 
+16 |
 17 | a = int(input())
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -55,7 +55,7 @@ help: Use a single compare expression
    - if a <= b and b < c:  # [boolean-chained-comparison]
 20 + if a <= b < c:  # [boolean-chained-comparison]
 21 |     pass
-22 | 
+22 |
 23 | a = int(input())
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -74,7 +74,7 @@ help: Use a single compare expression
    - if a <= b and b <= c:  # [boolean-chained-comparison]
 26 + if a <= b <= c:  # [boolean-chained-comparison]
 27 |     pass
-28 | 
+28 |
 29 | # ---------------------
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -93,7 +93,7 @@ help: Use a single compare expression
    - if a > b and b > c:  # [boolean-chained-comparison]
 36 + if a > b > c:  # [boolean-chained-comparison]
 37 |     pass
-38 | 
+38 |
 39 | a = int(input())
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -112,7 +112,7 @@ help: Use a single compare expression
    - if a >= b and b > c:  # [boolean-chained-comparison]
 42 + if a >= b > c:  # [boolean-chained-comparison]
 43 |     pass
-44 | 
+44 |
 45 | a = int(input())
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -131,7 +131,7 @@ help: Use a single compare expression
    - if a > b and b >= c:  # [boolean-chained-comparison]
 48 + if a > b >= c:  # [boolean-chained-comparison]
 49 |     pass
-50 | 
+50 |
 51 | a = int(input())
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -150,7 +150,7 @@ help: Use a single compare expression
    - if a >= b and b >= c:  # [boolean-chained-comparison]
 54 + if a >= b >= c:  # [boolean-chained-comparison]
 55 |     pass
-56 | 
+56 |
 57 | # -----------------------
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -169,7 +169,7 @@ help: Use a single compare expression
    - if a < b and b < c and c < d:  # [boolean-chained-comparison]
 65 + if a < b < c and c < d:  # [boolean-chained-comparison]
 66 |     pass
-67 | 
+67 |
 68 | a = int(input())
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -188,7 +188,7 @@ help: Use a single compare expression
    - if a < b and b < c and c < d:  # [boolean-chained-comparison]
 65 + if a < b and b < c < d:  # [boolean-chained-comparison]
 66 |     pass
-67 | 
+67 |
 68 | a = int(input())
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -207,7 +207,7 @@ help: Use a single compare expression
    - if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
 73 + if a < b < c and c < d and d < e:  # [boolean-chained-comparison]
 74 |     pass
-75 | 
+75 |
 76 | # ------------
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -226,7 +226,7 @@ help: Use a single compare expression
    - if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
 73 + if a < b and b < c < d and d < e:  # [boolean-chained-comparison]
 74 |     pass
-75 | 
+75 |
 76 | # ------------
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -245,7 +245,7 @@ help: Use a single compare expression
    - if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
 73 + if a < b and b < c and c < d < e:  # [boolean-chained-comparison]
 74 |     pass
-75 | 
+75 |
 76 | # ------------
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -259,7 +259,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
     |
 help: Use a single compare expression
 120 |     pass
-121 | 
+121 |
 122 | # fixes will balance parentheses
     - (a < b) and b < c
 123 + (a < b < c)
@@ -278,7 +278,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 126 | (a < b) and (b < c)
     |
 help: Use a single compare expression
-121 | 
+121 |
 122 | # fixes will balance parentheses
 123 | (a < b) and b < c
     - a < b and (b < c)
@@ -305,7 +305,7 @@ help: Use a single compare expression
 125 + ((a < b < c))
 126 | (a < b) and (b < c)
 127 | (((a < b))) and (b < c)
-128 | 
+128 |
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
    --> boolean_chained_comparison.py:126:2
@@ -323,7 +323,7 @@ help: Use a single compare expression
     - (a < b) and (b < c)
 126 + (a < b < c)
 127 | (((a < b))) and (b < c)
-128 | 
+128 |
 129 | (a<b) and b<c and ((c<d))
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -342,9 +342,9 @@ help: Use a single compare expression
 126 | (a < b) and (b < c)
     - (((a < b))) and (b < c)
 127 + (((a < b < c)))
-128 | 
+128 |
 129 | (a<b) and b<c and ((c<d))
-130 | 
+130 |
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
    --> boolean_chained_comparison.py:129:2
@@ -359,10 +359,10 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 help: Use a single compare expression
 126 | (a < b) and (b < c)
 127 | (((a < b))) and (b < c)
-128 | 
+128 |
     - (a<b) and b<c and ((c<d))
 129 + (a<b<c) and ((c<d))
-130 | 
+130 |
 131 | # should error and fix
 132 | a<b<c and c<d
 
@@ -379,10 +379,10 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 help: Use a single compare expression
 126 | (a < b) and (b < c)
 127 | (((a < b))) and (b < c)
-128 | 
+128 |
     - (a<b) and b<c and ((c<d))
 129 + (a<b) and ((b<c<d))
-130 | 
+130 |
 131 | # should error and fix
 132 | a<b<c and c<d
 
@@ -397,11 +397,11 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
     |
 help: Use a single compare expression
 129 | (a<b) and b<c and ((c<d))
-130 | 
+130 |
 131 | # should error and fix
     - a<b<c and c<d
 132 + a<b<c<d
-133 | 
+133 |
 134 | # more involved examples (all should error and fix)
 135 | a < ( # sneaky comment
 
@@ -423,7 +423,7 @@ help: Use a single compare expression
 137 |   # more comments 
     - ) and b < c
 138 + ) < c
-139 | 
+139 |
 140 | (
 141 |     a
 
@@ -441,7 +441,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
     |
 help: Use a single compare expression
 138 | ) and b < c
-139 | 
+139 |
 140 | (
     -     a
 141 +     ((a
@@ -451,7 +451,7 @@ help: Use a single compare expression
     -     and ((c<d))
 144 +     <c<d))
 145 | )
-146 | 
+146 |
 147 | a < (b) and (((b)) < c)
 
 PLR1716 [*] Contains chained boolean comparison that can be simplified
@@ -465,6 +465,6 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 help: Use a single compare expression
 145 |     and ((c<d))
 146 | )
-147 | 
+147 |
     - a < (b) and (((b)) < c)
 148 + (a < (b) < c)

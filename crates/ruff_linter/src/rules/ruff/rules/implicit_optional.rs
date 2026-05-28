@@ -63,13 +63,18 @@ use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 ///
 /// ## Limitations
 ///
-/// Type aliases are not supported and could result in false negatives.
-/// For example, the following code will not be flagged:
+/// Type aliases and other user-defined types are not supported and could
+/// result in false negatives. For example, the following code will not be
+/// flagged:
+///
 /// ```python
 /// Text = str | bytes
 ///
 ///
-/// def foo(arg: Text = None):
+/// class Custom: ...
+///
+///
+/// def foo(text_arg: Text = None, custom_arg: Custom = None):
 ///     pass
 /// ```
 ///

@@ -49,8 +49,10 @@
 #   type field uses a special syntax to describe the rust type:
 #    * `Expr` - A single expression.
 #    * `Expr?` - Option type.
-#    * `Expr*` - A vector of Expr.
-#    * `&Expr*` - A boxed slice of Expr.
+#    * `Expr*` - A vector of Expr, shorthand for `Vec<Expr>`.
+#    * `Vec<Expr>` - A vector of Expr.
+#    * `Box<[Expr]>` - A boxed slice of Expr.
+#    * `ThinVec<Expr>` - A thin vector of Expr.
 #    These properties cannot be nested, for example we cannot create a vector of option types.
 # * is_annotation - If this field is a type annotation.
 #
@@ -67,7 +69,7 @@ doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
 [Mod.nodes.ModModule]
 doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
-fields = [{ name = "body", type = "Stmt*" }]
+fields = [{ name = "body", type = "ThinVec<Stmt>" }]
 
 [Mod.nodes.ModExpression]
 doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
@@ -85,22 +87,22 @@ and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunct
 This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
 fields = [
   { name = "is_async", type = "bool" },
-  { name = "decorator_list", type = "Decorator*" },
+  { name = "decorator_list", type = "ThinVec<Decorator>" },
   { name = "name", type = "Identifier" },
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "parameters", type = "Box<crate::Parameters>" },
   { name = "returns", type = "Expr?", is_annotation = true },
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "ThinVec<Stmt>" },
 ]
 
 [Stmt.nodes.StmtClassDef]
 doc = "See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)"
 fields = [
-  { name = "decorator_list", type = "Decorator*" },
+  { name = "decorator_list", type = "ThinVec<Decorator>" },
   { name = "name", type = "Identifier" },
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "arguments", type = "Box<crate::Arguments>?" },
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "ThinVec<Stmt>" },
 ]
 
 [Stmt.nodes.StmtReturn]
@@ -152,8 +154,8 @@ fields = [
   { name = "is_async", type = "bool" },
   { name = "target", type = "Expr" },
   { name = "iter", type = "Expr" },
-  { name = "body", type = "Stmt*" },
-  { name = "orelse", type = "Stmt*" },
+  { name = "body", type = "ThinVec<Stmt>" },
+  { name = "orelse", type = "ThinVec<Stmt>" },
 ]
 
 [Stmt.nodes.StmtWhile]
@@ -161,8 +163,8 @@ doc = """See also [While](https://docs.python.org/3/library/ast.html#ast.While)
 and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile)."""
 fields = [
   { name = "test", type = "Expr" },
-  { name = "body", type = "Stmt*" },
-  { name = "orelse", type = "Stmt*" },
+  { name = "body", type = "ThinVec<Stmt>" },
+  { name = "orelse", type = "ThinVec<Stmt>" },
 ]
 
 [Stmt.nodes.StmtIf]
@@ -170,7 +172,7 @@ doc = "See also [If](https://docs.python.org/3/library/ast.html#ast.If)"
 fields = [
 
   { name = "test", type = "Expr" },
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "ThinVec<Stmt>" },
   { name = "elif_else_clauses", type = "ElifElseClause*" },
 ]
 
@@ -182,7 +184,7 @@ This type differs from the original Python AST, as it collapses the synchronous 
 fields = [
   { name = "is_async", type = "bool" },
   { name = "items", type = "WithItem*" },
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "ThinVec<Stmt>" },
 ]
 
 [Stmt.nodes.StmtMatch]
@@ -200,10 +202,10 @@ fields = [{ name = "exc", type = "Expr?" }, { name = "cause", type = "Expr?" }]
 doc = """See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
 and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)"""
 fields = [
-  { name = "body", type = "Stmt*" },
+  { name = "body", type = "ThinVec<Stmt>" },
   { name = "handlers", type = "ExceptHandler*" },
-  { name = "orelse", type = "Stmt*" },
-  { name = "finalbody", type = "Stmt*" },
+  { name = "orelse", type = "ThinVec<Stmt>" },
+  { name = "finalbody", type = "ThinVec<Stmt>" },
   { name = "is_star", type = "bool" },
 ]
 
@@ -213,7 +215,10 @@ fields = [{ name = "test", type = "Expr" }, { name = "msg", type = "Expr?" }]
 
 [Stmt.nodes.StmtImport]
 doc = "See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)"
-fields = [{ name = "names", type = "Alias*" }]
+fields = [
+  { name = "names", type = "Alias*" },
+  { name = "is_lazy", type = "bool" },
+]
 
 [Stmt.nodes.StmtImportFrom]
 doc = "See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)"
@@ -221,6 +226,7 @@ fields = [
   { name = "module", type = "Identifier?" },
   { name = "names", type = "Alias*" },
   { name = "level", type = "u32" },
+  { name = "is_lazy", type = "bool" },
 ]
 
 [Stmt.nodes.StmtGlobal]
@@ -379,7 +385,7 @@ fields = [
 [Expr.nodes.ExprDictComp]
 doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)"
 fields = [
-  { name = "key", type = "Expr" },
+  { name = "key", type = "Expr?" },
   { name = "value", type = "Expr" },
   { name = "generators", type = "Comprehension*" },
 ]
@@ -408,8 +414,8 @@ fields = [{ name = "value", type = "Expr" }]
 doc = "See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)"
 fields = [
   { name = "left", type = "Expr" },
-  { name = "ops", type = "&CmpOp*" },
-  { name = "comparators", type = "&Expr*" },
+  { name = "ops", type = "Box<[CmpOp]>" },
+  { name = "comparators", type = "Box<[Expr]>" },
 ]
 # The fields must be visited simultaneously
 custom_source_order = true
@@ -574,8 +580,8 @@ fields = [{ name = "patterns", type = "Pattern*" }]
 [Pattern.nodes.PatternMatchMapping]
 doc = "See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)"
 fields = [
-  { name = "keys", type = "Expr*" },
-  { name = "patterns", type = "Pattern*" },
+  { name = "keys", type = "ThinVec<Expr>" },
+  { name = "patterns", type = "ThinVec<Pattern>" },
   { name = "rest", type = "Identifier?" },
 ]
 custom_source_order = true

@@ -45,18 +45,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 
 ```
 error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented abstract methods
-  --> src/mdtest_snippet.py:6:7
-   |
- 4 | @final
- 5 | # error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccc…
- 6 | class Abstract(ABC):
-   |       ^^^^^^^^ Abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk` are unimplemented
- 7 |     @abstractmethod
- 8 |     def aaaaaaaaaa(self) -> int: ...
-   |         ---------- `aaaaaaaaaa` declared as abstract
- 9 |     @abstractmethod
-10 |     def bbbbbbbb(self) -> int: ...
-   |
+ --> src/mdtest_snippet.py:4:1
+  |
+4 |   @final
+  |   ------
+5 |   # error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `ccccccc…
+6 |   class Abstract(ABC):
+  |         ^^^^^^^^ Abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk` are unimplemented
+7 | /     @abstractmethod
+8 | |     def aaaaaaaaaa(self) -> int: ...
+  | |____________________________________- `aaaaaaaaaa` declared as abstract
+  |
 info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

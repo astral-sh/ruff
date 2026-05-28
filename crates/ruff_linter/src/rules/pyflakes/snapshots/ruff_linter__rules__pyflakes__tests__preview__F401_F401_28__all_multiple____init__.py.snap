@@ -9,8 +9,8 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
   |
 help: Add unused import `unused` to __all__
 5 | from . import unused, renamed as bees  # F401: add to __all__
-6 | 
-7 | 
+6 |
+7 |
   - __all__ = [];
 8 + __all__ = ["bees", "unused"];
 
@@ -22,7 +22,7 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
   |
 help: Add unused import `bees` to __all__
 5 | from . import unused, renamed as bees  # F401: add to __all__
-6 | 
-7 | 
+6 |
+7 |
   - __all__ = [];
 8 + __all__ = ["bees", "unused"];

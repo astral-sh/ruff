@@ -11,8 +11,8 @@ E202 [*] Whitespace before ')'
 21 | spam(ham[1], {eggs: 2 })
    |
 help: Remove whitespace before ')'
-16 | 
-17 | 
+16 |
+17 |
 18 | #: E202:1:23
    - spam(ham[1], {eggs: 2} )
 19 + spam(ham[1], {eggs: 2})
@@ -118,7 +118,7 @@ help: Remove whitespace before ']'
 29 + spam(ham[1], {eggs: 2})
 30 | #: Okay
 31 | spam(ham[1], {eggs: 2})
-32 | 
+32 |
 
 E202 [*] Whitespace before ']'
    --> E20.py:116:18
@@ -130,13 +130,13 @@ E202 [*] Whitespace before ']'
 117 | f"normal { {f"{ { [1, 2] } }" } } normal"
     |
 help: Remove whitespace before ']'
-113 | 
+113 |
 114 | # F-strings
 115 | f"{ {'a': 1} }"
     - f"{[ { {'a': 1} } ]}"
 116 + f"{[ { {'a': 1} }]}"
 117 | f"normal { {f"{ { [1, 2] } }" } } normal"
-118 | 
+118 |
 119 | #: Okay
 
 E202 [*] Whitespace before ']'
@@ -150,11 +150,11 @@ E202 [*] Whitespace before ']'
     |
 help: Remove whitespace before ']'
 169 | ham[upper :]
-170 | 
+170 |
 171 | #: E202:1:12
     - ham[upper : ]
 172 + ham[upper :]
-173 | 
+173 |
 174 | #: E203:1:10
 175 | ham[upper  :]
 
@@ -168,11 +168,11 @@ E202 [*] Whitespace before ']'
 196 | t"normal { {t"{ { [1, 2] } }" } } normal"
     |
 help: Remove whitespace before ']'
-192 | 
+192 |
 193 | # t-strings
 194 | t"{ {'a': 1} }"
     - t"{[ { {'a': 1} } ]}"
 195 + t"{[ { {'a': 1} }]}"
 196 | t"normal { {t"{ { [1, 2] } }" } } normal"
-197 | 
+197 |
 198 | t"{x = :.2f}"

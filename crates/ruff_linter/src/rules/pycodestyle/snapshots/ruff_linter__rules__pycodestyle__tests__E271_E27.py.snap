@@ -192,10 +192,10 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
 68 | # Soft keywords
-69 | 
+69 |
 70 | #: E271
    - type  Number = int
 71 + type Number = int
-72 | 
+72 |
 73 | #: E273
 74 | type	Number = int

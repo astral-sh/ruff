@@ -48,6 +48,7 @@ exit_code: 1
     },
     "message": "`os` imported but unused",
     "noqa_row": 1,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
   },
   {
@@ -65,6 +66,7 @@ exit_code: 1
     },
     "message": "Undefined name `y`",
     "noqa_row": 2,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/undefined-name"
   },
   {
@@ -82,6 +84,7 @@ exit_code: 1
     },
     "message": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
     "noqa_row": null,
+    "severity": "error",
     "url": null
   }
 ]

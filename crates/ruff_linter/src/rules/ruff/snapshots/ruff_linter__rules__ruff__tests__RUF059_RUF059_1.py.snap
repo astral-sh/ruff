@@ -12,8 +12,8 @@ help: Prefix it with an underscore or any other dummy variable pattern
 1 | def f(tup):
   -     x, y = tup
 2 +     _x, y = tup
-3 | 
-4 | 
+3 |
+4 |
 5 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,8 +28,8 @@ help: Prefix it with an underscore or any other dummy variable pattern
 1 | def f(tup):
   -     x, y = tup
 2 +     x, _y = tup
-3 | 
-4 | 
+3 |
+4 |
 5 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -43,14 +43,14 @@ RUF059 [*] Unpacked variable `y` is never used
 12 |         print(coords)
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-7  | 
-8  | 
+7  |
+8  |
 9  | def f():
    -     (x, y) = coords = 1, 2
 10 +     (x, _y) = coords = 1, 2
 11 |     if x > 1:
 12 |         print(coords)
-13 | 
+13 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x` is never used
@@ -61,13 +61,13 @@ RUF059 [*] Unpacked variable `x` is never used
    |      ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-13 | 
-14 | 
+13 |
+14 |
 15 | def f():
    -     (x, y) = coords = 1, 2
 16 +     (_x, y) = coords = 1, 2
-17 | 
-18 | 
+17 |
+18 |
 19 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -79,13 +79,13 @@ RUF059 [*] Unpacked variable `y` is never used
    |         ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-13 | 
-14 | 
+13 |
+14 |
 15 | def f():
    -     (x, y) = coords = 1, 2
 16 +     (x, _y) = coords = 1, 2
-17 | 
-18 | 
+17 |
+18 |
 19 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -97,13 +97,13 @@ RUF059 [*] Unpacked variable `x` is never used
    |               ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-17 | 
-18 | 
+17 |
+18 |
 19 | def f():
    -     coords = (x, y) = 1, 2
 20 +     coords = (_x, y) = 1, 2
-21 | 
-22 | 
+21 |
+22 |
 23 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -115,12 +115,12 @@ RUF059 [*] Unpacked variable `y` is never used
    |                  ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-17 | 
-18 | 
+17 |
+18 |
 19 | def f():
    -     coords = (x, y) = 1, 2
 20 +     coords = (x, _y) = 1, 2
-21 | 
-22 | 
+21 |
+22 |
 23 | def f():
 note: This is an unsafe fix and may change runtime behavior

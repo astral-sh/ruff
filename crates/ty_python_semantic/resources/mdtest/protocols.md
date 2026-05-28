@@ -260,8 +260,8 @@ And it is also an error to use `Protocol` in type expressions:
 # fmt: off
 
 def f(
-    x: Protocol,  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
-    y: type[Protocol],  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
+    x: Protocol,  # error: [invalid-type-form] "`typing.Protocol` is not allowed in parameter annotations"
+    y: type[Protocol],  # error: [invalid-type-form] "`typing.Protocol` is not allowed in parameter annotations"
 ):
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: type[Unknown]
@@ -474,6 +474,8 @@ from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
 # revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self, /) -> str` }, "z": PropertyMember { getter: `def z(self, /) -> int`, setter: `def z(self, /, z: int) -> None` }}
 reveal_protocol_interface(Foo)
+# revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self, /) -> str` }, "z": PropertyMember { getter: `def z(self, /) -> int`, setter: `def z(self, /, z: int) -> None` }}
+reveal_protocol_interface(protocol=Foo)
 # revealed: {"__index__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsIndex)
 # revealed: {"__abs__": MethodMember(`(self, /) -> Unknown`)}
@@ -729,10 +731,10 @@ static_assert(is_subtype_of(Qux, HasX))
 static_assert(is_assignable_to(Qux, HasX))
 
 class HalfUnknownQux:
-    def __init__(self, x: int) -> None:
-        self.x = x
+    def __init__(self, x: int, y, flag: bool) -> None:
+        self.x = x if flag else y
 
-reveal_type(HalfUnknownQux(1).x)  # revealed: Unknown | int
+reveal_type(HalfUnknownQux(1, "foo", True).x)  # revealed: int | Unknown
 
 static_assert(not is_subtype_of(HalfUnknownQux, HasX))
 static_assert(is_assignable_to(HalfUnknownQux, HasX))
@@ -1578,6 +1580,29 @@ as something that must be supported by type checkers:
 
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
+
+## Declared instance attribute members
+
+Declared protocol instance attributes should be available both on protocol-typed values and through
+`self` inside protocol methods, with `Self` rebinding appropriately.
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+
+class Linked(Protocol):
+    value: int
+    next: Self
+
+    def advance(self) -> Self:
+        reveal_type(self.value)  # revealed: int
+        reveal_type(self.next)  # revealed: Self@advance
+        return self.next
+
+def f(x: Linked) -> None:
+    reveal_type(x.value)  # revealed: int
+    reveal_type(x.next)  # revealed: Linked
+```
 
 ## Subtyping of protocols with property members
 
@@ -2817,6 +2842,37 @@ static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[str]))  # err
 static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[int | str]))  # error: [static-assert-error]
 ```
 
+## Generic protocols and union arguments
+
+When a union is passed to a parameter annotated as a generic protocol, each union element can
+satisfy the protocol with a different specialization. For `IntBox | StrBox` assigned to `Box[T]`,
+`IntBox` satisfies `Box[int]` and `StrBox` satisfies `Box[str]`, so `T` is inferred as `int | str`.
+Other type variables in the same call are still inferred from their corresponding arguments:
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Protocol[T]):
+    def get(self) -> T: ...
+
+class IntBox:
+    def get(self) -> int:
+        return 1
+
+class StrBox:
+    def get(self) -> str:
+        return ""
+
+def infer_protocol_union_box(x: Box[T], y: U) -> tuple[T, U]:
+    raise NotImplementedError
+
+def check_protocol_union_box(x: IntBox | StrBox):
+    reveal_type(infer_protocol_union_box(x, 1))  # revealed: tuple[int | str, Literal[1]]
+```
+
 ## Nominal subtyping of protocols
 
 Protocols can participate in nominal subtyping as well as structural subtyping. The main use case
@@ -3077,6 +3133,59 @@ class Nominal:
     x: "Nominal"
 
 static_assert(not is_disjoint_from(Proto, Nominal))
+```
+
+### Regression test: recursive protocol through `dict.items()`
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class IntArray(Protocol):
+    def __add__(self, other: IntArray | int) -> IntArray: ...
+    def __getitem__(self, key: slice) -> IntArray: ...
+
+data: dict[str, IntArray] = {}
+indexed_data = {k: v[0:10] for k, v in data.items()}
+
+reveal_type(indexed_data)  # revealed: dict[str, IntArray]
+```
+
+### Regression test: `dict()` overloads with tuple-of-tuples input
+
+This is a regression test for [ty#3026](https://github.com/astral-sh/ty/issues/3026). Matching the
+`dict()` overloads that accept `_typeshed.SupportsKeysAndGetItem` against a tuple of tuples used to
+trigger exponential behavior before we rejected the protocol candidates.
+
+```py
+output = dict((
+    ("0", 0),
+    ("1", 1),
+    ("2", 2),
+    ("3", 3),
+    ("4", 4),
+    ("5", 5),
+    ("6", 6),
+    ("7", 7),
+    ("8", 8),
+    ("9", 9),
+    ("10", 10),
+    ("11", 11),
+    ("12", 12),
+    ("13", 13),
+    ("14", 14),
+    ("15", 15),
+    ("16", 16),
+    ("17", 17),
+    ("18", 18),
+    ("19", 19),
+    ("20", 20),
+    ("21", 21),
+    ("22", 22),
+    ("23", 23),
+))
+reveal_type(output)  # revealed: dict[str, int]
 ```
 
 ### Regression test: narrowing with self-referential protocols

@@ -3,8 +3,8 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     place_by_id, place_from_bindings,
 };
-use crate::semantic_index::{place_table, scope::ScopeId, use_def_map};
 use crate::types::Type;
+use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.

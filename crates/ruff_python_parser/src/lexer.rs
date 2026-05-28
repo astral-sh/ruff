@@ -131,6 +131,12 @@ impl<'src> Lexer<'src> {
         self.current_range
     }
 
+    /// Returns the current parenthesis, bracket, and brace nesting level.
+    #[inline]
+    pub(crate) const fn nesting(&self) -> u32 {
+        self.nesting
+    }
+
     /// Returns the flags for the current token.
     pub(crate) fn current_flags(&self) -> TokenFlags {
         self.current_flags
@@ -156,7 +162,11 @@ impl<'src> Lexer<'src> {
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
-        self.current_value = TokenValue::None;
+        // In optimized assembly this keeps the common empty case to a discriminant branch,
+        // rather than calling `TokenValue` drop glue to assign `None` again.
+        if !matches!(self.current_value, TokenValue::None) {
+            self.current_value = TokenValue::None;
+        }
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
@@ -434,7 +444,10 @@ impl<'src> Lexer<'src> {
                     && self.nesting == 0 =>
             {
                 // SAFETY: Safe because `c` has been matched against one of the possible escape command token
-                self.lex_ipython_escape_command(IpyEscapeKind::try_from(c).unwrap())
+                self.lex_ipython_escape_command(
+                    IpyEscapeKind::try_from(c).unwrap(),
+                    IpyEscapeLexContext::Assignment,
+                )
             }
 
             c @ ('%' | '!' | '?' | '/' | ';' | ',')
@@ -448,7 +461,7 @@ impl<'src> Lexer<'src> {
                     IpyEscapeKind::try_from(c).unwrap()
                 };
 
-                self.lex_ipython_escape_command(kind)
+                self.lex_ipython_escape_command(kind, IpyEscapeLexContext::LogicalLineStart)
             }
 
             '?' if self.mode == Mode::Ipython => TokenKind::Question,
@@ -724,6 +737,7 @@ impl<'src> Lexer<'src> {
             "import" => TokenKind::Import,
             "in" => TokenKind::In,
             "is" => TokenKind::Is,
+            "lazy" => TokenKind::Lazy,
             "lambda" => TokenKind::Lambda,
             "match" => TokenKind::Match,
             "nonlocal" => TokenKind::Nonlocal,
@@ -1261,7 +1275,11 @@ impl<'src> Lexer<'src> {
     }
 
     /// Lex a single IPython escape command.
-    fn lex_ipython_escape_command(&mut self, escape_kind: IpyEscapeKind) -> TokenKind {
+    fn lex_ipython_escape_command(
+        &mut self,
+        escape_kind: IpyEscapeKind,
+        context: IpyEscapeLexContext,
+    ) -> TokenKind {
         let mut value = String::new();
 
         loop {
@@ -1307,6 +1325,27 @@ impl<'src> Lexer<'src> {
                     let mut question_count = 1u32;
                     while self.cursor.eat_char('?') {
                         question_count += 1;
+                    }
+
+                    // Help end tokens (`?` / `??`) are only valid in certain contexts
+                    // (e.g., not within f-strings or parenthesized expressions), and only
+                    // for escape kinds that IPython recognizes as supporting a trailing `?`
+                    // (i.e., `%`, `%%`, `?`, and `??`). For other escape kinds like `!` or
+                    // `/`, the `?` is just part of the command value.
+                    if !context.allows_help_end()
+                        || !matches!(
+                            escape_kind,
+                            IpyEscapeKind::Magic
+                                | IpyEscapeKind::Magic2
+                                | IpyEscapeKind::Help
+                                | IpyEscapeKind::Help2
+                        )
+                    {
+                        value.reserve(question_count as usize);
+                        for _ in 0..question_count {
+                            value.push('?');
+                        }
+                        continue;
                     }
 
                     // The original implementation in the IPython codebase is based on regex which
@@ -1748,6 +1787,18 @@ impl State {
 }
 
 #[derive(Copy, Clone, Debug)]
+enum IpyEscapeLexContext {
+    Assignment,
+    LogicalLineStart,
+}
+
+impl IpyEscapeLexContext {
+    const fn allows_help_end(self) -> bool {
+        matches!(self, Self::LogicalLineStart)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 enum Radix {
     Binary,
     Octal,
@@ -2107,7 +2158,9 @@ pwd = !pwd
 foo = %timeit a = b
 bar = %timeit a % 3
 baz = %matplotlib \
-        inline"
+        inline
+qux = %foo?
+quux = !pwd?"
             .trim();
         assert_snapshot!(lex_jupyter_source(source));
     }

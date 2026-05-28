@@ -321,7 +321,7 @@ impl<'a> Generator<'a> {
                     if let Some(arguments) = arguments {
                         self.p("(");
                         let mut first = true;
-                        for arg_or_keyword in arguments.arguments_source_order() {
+                        for arg_or_keyword in arguments.iter_source_order() {
                             match arg_or_keyword {
                                 ArgOrKeyword::Arg(arg) => {
                                     self.p_delim(&mut first, ", ");
@@ -634,10 +634,14 @@ impl<'a> Generator<'a> {
             }
             Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => {
                 statement!({
+                    if *is_lazy {
+                        self.p("lazy ");
+                    }
                     self.p("import ");
                     let mut first = true;
                     for alias in names {
@@ -650,10 +654,14 @@ impl<'a> Generator<'a> {
                 module,
                 names,
                 level,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => {
                 statement!({
+                    if *is_lazy {
+                        self.p("lazy ");
+                    }
                     self.p("from ");
                     if *level > 0 {
                         for _ in 0..*level {
@@ -866,7 +874,7 @@ impl<'a> Generator<'a> {
     fn unparse_type_params(&mut self, type_params: &TypeParams) {
         self.p("[");
         let mut first = true;
-        for type_param in type_params.iter() {
+        for type_param in type_params {
             self.p_delim(&mut first, ", ");
             self.unparse_type_param(type_param);
         }
@@ -1103,8 +1111,12 @@ impl<'a> Generator<'a> {
                 node_index: _,
             }) => {
                 self.p("{");
-                self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
-                self.p(": ");
+                if let Some(key) = key {
+                    self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
+                    self.p(": ");
+                } else {
+                    self.p("**");
+                }
                 self.unparse_expr(value, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("}");
@@ -1209,7 +1221,7 @@ impl<'a> Generator<'a> {
                 } else {
                     let mut first = true;
 
-                    for arg_or_keyword in arguments.arguments_source_order() {
+                    for arg_or_keyword in arguments.iter_source_order() {
                         match arg_or_keyword {
                             ArgOrKeyword::Arg(arg) => {
                                 self.p_delim(&mut first, ", ");
@@ -1492,13 +1504,13 @@ impl<'a> Generator<'a> {
         self.p(brace);
 
         if let Some(debug_text) = debug_text {
-            self.buffer += debug_text.leading.as_str();
+            self.buffer += debug_text.leading();
         }
 
         self.buffer += &generator.buffer;
 
         if let Some(debug_text) = debug_text {
-            self.buffer += debug_text.trailing.as_str();
+            self.buffer += debug_text.trailing();
         }
 
         if !conversion.is_none() {

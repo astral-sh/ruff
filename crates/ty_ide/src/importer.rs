@@ -31,7 +31,7 @@ use ruff_python_importer::Insertion;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::ModuleName;
 use ty_project::Db;
-use ty_python_semantic::semantic_index::definition::DefinitionKind;
+use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::{MemberDefinition, SemanticModel};
 
@@ -301,7 +301,9 @@ impl<'a> Importer<'a> {
                 import
                     .stmt
                     .as_import_from_stmt()
-                    .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+                    .is_some_and(|import_from| {
+                        !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                    })
             })
             .last()
     }
@@ -890,9 +892,8 @@ mod tests {
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SemanticModel,
-    };
+    use ty_python_core::program::{Program, ProgramSettings};
+    use ty_python_semantic::{PythonVersionWithSource, SemanticModel};
 
     use super::*;
 
@@ -1457,6 +1458,25 @@ from __future__ import annotations
 
         typing.TypeVar
         "#);
+    }
+
+    #[test]
+    fn lazy_future_import_is_not_special() {
+        // Lazy `__future__` imports must not act like real future-import anchors for insertion.
+        let test = cursor_test(
+            "\
+lazy from __future__ import annotations
+
+<CURSOR>
+        ",
+        );
+        assert_snapshot!(
+            test.import("typing", "TypeVar"), @"
+        import typing
+        lazy from __future__ import annotations
+
+        typing.TypeVar
+        ");
     }
 
     #[test]

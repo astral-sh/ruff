@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> lazy_imports.py:1:1
+  |
+1 | / lazy from math import pi
+2 | | from math import pi
+3 | | lazy import os
+4 | | import os
+  | |_________^
+  |
+help: Organize imports
+  - lazy from math import pi
+1 + import os
+2 | from math import pi
+3 | lazy import os
+  - import os
+4 + lazy from math import pi

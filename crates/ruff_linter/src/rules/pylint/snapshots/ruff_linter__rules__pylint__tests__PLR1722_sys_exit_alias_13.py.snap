@@ -11,5 +11,5 @@ help: Replace `exit` with `sys.exit()`
   - exit(code=2)
 1 + import sys
 2 + sys.exit(2)
-3 | 
+3 |
 note: This is an unsafe fix and may change runtime behavior

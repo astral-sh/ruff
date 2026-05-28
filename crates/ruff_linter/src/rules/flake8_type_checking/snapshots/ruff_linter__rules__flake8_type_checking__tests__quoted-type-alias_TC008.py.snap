@@ -14,7 +14,7 @@ TC008 [*] Remove quotes from type alias
 help: Remove quotes
 12 | else:
 13 |     Bar = Foo
-14 | 
+14 |
    - a: TypeAlias = 'int'  # TC008
 15 + a: TypeAlias = int  # TC008
 16 | b: TypeAlias = 'Dict'  # OK
@@ -32,7 +32,7 @@ TC008 [*] Remove quotes from type alias
 19 | e: TypeAlias = 'Foo.bar'  # OK
    |
 help: Remove quotes
-14 | 
+14 |
 15 | a: TypeAlias = 'int'  # TC008
 16 | b: TypeAlias = 'Dict'  # OK
    - c: TypeAlias = 'Foo'   # TC008
@@ -160,7 +160,7 @@ help: Remove quotes
    - n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
    -     ' | None')
 29 + n: TypeAlias = (int | None)
-30 | 
+30 |
 31 | type B = 'Dict'  # TC008
 32 | type D = 'Foo[str]'  # TC008
 note: This is an unsafe fix and may change runtime behavior
@@ -178,7 +178,7 @@ TC008 [*] Remove quotes from type alias
 help: Remove quotes
 29 | n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
 30 |     ' | None')
-31 | 
+31 |
    - type B = 'Dict'  # TC008
 32 + type B = Dict  # TC008
 33 | type D = 'Foo[str]'  # TC008
@@ -196,7 +196,7 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
 30 |     ' | None')
-31 | 
+31 |
 32 | type B = 'Dict'  # TC008
    - type D = 'Foo[str]'  # TC008
 33 + type D = Foo[str]  # TC008
@@ -215,7 +215,7 @@ TC008 [*] Remove quotes from type alias
 36 | type I = Foo['str']  # TC008
    |
 help: Remove quotes
-31 | 
+31 |
 32 | type B = 'Dict'  # TC008
 33 | type D = 'Foo[str]'  # TC008
    - type E = 'Foo.bar'  # TC008
@@ -361,8 +361,8 @@ help: Remove quotes
    - type N = ('int'  # TC008 (fix removes comment currently)
    -     ' | None')
 42 + type N = (int | None)
-43 | 
-44 | 
+43 |
+44 |
 45 | class Baz:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -377,12 +377,12 @@ TC008 [*] Remove quotes from type alias
 50 |     class Nested:
    |
 help: Remove quotes
-45 | 
+45 |
 46 | class Baz:
 47 |     a: TypeAlias = 'Baz'  # OK
    -     type A = 'Baz'  # TC008
 48 +     type A = Baz  # TC008
-49 | 
+49 |
 50 |     class Nested:
 51 |         a: TypeAlias = 'Baz'  # OK
 
@@ -397,12 +397,12 @@ TC008 [*] Remove quotes from type alias
 54 | # O should have parenthesis added
    |
 help: Remove quotes
-49 | 
+49 |
 50 |     class Nested:
 51 |         a: TypeAlias = 'Baz'  # OK
    -         type A = 'Baz'  # TC008
 52 +         type A = Baz  # TC008
-53 | 
+53 |
 54 | # O should have parenthesis added
 55 | o: TypeAlias = """int
 
@@ -419,7 +419,7 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
 52 |         type A = 'Baz'  # TC008
-53 | 
+53 |
 54 | # O should have parenthesis added
    - o: TypeAlias = """int
    - | None"""
@@ -427,7 +427,7 @@ help: Remove quotes
 56 + | None)
 57 | type O = """int
 58 | | None"""
-59 | 
+59 |
 
 TC008 [*] Remove quotes from type alias
   --> TC008.py:57:10
@@ -449,7 +449,7 @@ help: Remove quotes
    - | None"""
 57 + type O = (int
 58 + | None)
-59 | 
+59 |
 60 | # P, Q, and R should not have parenthesis added
 61 | p: TypeAlias = ("""int
 
@@ -466,7 +466,7 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
 58 | | None"""
-59 | 
+59 |
 60 | # P, Q, and R should not have parenthesis added
    - p: TypeAlias = ("""int
    - | None""")
@@ -474,7 +474,7 @@ help: Remove quotes
 62 + | None)
 63 | type P = ("""int
 64 | | None""")
-65 | 
+65 |
 
 TC008 [*] Remove quotes from type alias
   --> TC008.py:63:11
@@ -496,7 +496,7 @@ help: Remove quotes
    - | None""")
 63 + type P = (int
 64 + | None)
-65 | 
+65 |
 66 | q: TypeAlias = """(int
 67 | | None)"""
 
@@ -515,14 +515,14 @@ TC008 [*] Remove quotes from type alias
 help: Remove quotes
 63 | type P = ("""int
 64 | | None""")
-65 | 
+65 |
    - q: TypeAlias = """(int
    - | None)"""
 66 + q: TypeAlias = (int
 67 + | None)
 68 | type Q = """(int
 69 | | None)"""
-70 | 
+70 |
 
 TC008 [*] Remove quotes from type alias
   --> TC008.py:68:10
@@ -537,14 +537,14 @@ TC008 [*] Remove quotes from type alias
 71 |   r: TypeAlias = """int | None"""
    |
 help: Remove quotes
-65 | 
+65 |
 66 | q: TypeAlias = """(int
 67 | | None)"""
    - type Q = """(int
    - | None)"""
 68 + type Q = (int
 69 + | None)
-70 | 
+70 |
 71 | r: TypeAlias = """int | None"""
 72 | type R = """int | None"""
 
@@ -560,7 +560,7 @@ TC008 [*] Remove quotes from type alias
 help: Remove quotes
 68 | type Q = """(int
 69 | | None)"""
-70 | 
+70 |
    - r: TypeAlias = """int | None"""
 71 + r: TypeAlias = int | None
 72 | type R = """int | None"""
@@ -574,7 +574,7 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
 69 | | None)"""
-70 | 
+70 |
 71 | r: TypeAlias = """int | None"""
    - type R = """int | None"""
 72 + type R = int | None

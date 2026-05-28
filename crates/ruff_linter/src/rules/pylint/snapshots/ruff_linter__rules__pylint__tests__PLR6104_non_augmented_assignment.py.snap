@@ -14,7 +14,7 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 help: Replace with augmented assignment
 13 | some_set = {"elem"}
 14 | mat1, mat2 = None, None
-15 | 
+15 |
    - some_string = some_string + "a very long end of string"
 16 + some_string += "a very long end of string"
 17 | index = index - 1
@@ -33,7 +33,7 @@ PLR6104 [*] Use `-=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
 14 | mat1, mat2 = None, None
-15 | 
+15 |
 16 | some_string = some_string + "a very long end of string"
    - index = index - 1
 17 + index -= 1
@@ -53,7 +53,7 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 20 | to_multiply = to_multiply * 5
    |
 help: Replace with augmented assignment
-15 | 
+15 |
 16 | some_string = some_string + "a very long end of string"
 17 | index = index - 1
    - a_list = a_list + ["to concat"]
@@ -354,7 +354,7 @@ help: Replace with augmented assignment
 33 + flags >>= 1
 34 | mat1 = mat1 @ mat2
 35 | a_list[1] = a_list[1] + 1
-36 | 
+36 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `@=` to perform an augmented assignment directly
@@ -373,7 +373,7 @@ help: Replace with augmented assignment
    - mat1 = mat1 @ mat2
 34 + mat1 @= mat2
 35 | a_list[1] = a_list[1] + 1
-36 | 
+36 |
 37 | a_list[0:2] = a_list[0:2] * 3
 note: This is an unsafe fix and may change runtime behavior
 
@@ -393,7 +393,7 @@ help: Replace with augmented assignment
 34 | mat1 = mat1 @ mat2
    - a_list[1] = a_list[1] + 1
 35 + a_list[1] += 1
-36 | 
+36 |
 37 | a_list[0:2] = a_list[0:2] * 3
 38 | a_list[:2] = a_list[:2] * 3
 note: This is an unsafe fix and may change runtime behavior
@@ -411,7 +411,7 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
 help: Replace with augmented assignment
 34 | mat1 = mat1 @ mat2
 35 | a_list[1] = a_list[1] + 1
-36 | 
+36 |
    - a_list[0:2] = a_list[0:2] * 3
 37 + a_list[0:2] *= 3
 38 | a_list[:2] = a_list[:2] * 3
@@ -430,13 +430,13 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
 35 | a_list[1] = a_list[1] + 1
-36 | 
+36 |
 37 | a_list[0:2] = a_list[0:2] * 3
    - a_list[:2] = a_list[:2] * 3
 38 + a_list[:2] *= 3
 39 | a_list[1:] = a_list[1:] * 3
 40 | a_list[:] = a_list[:] * 3
-41 | 
+41 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
@@ -449,13 +449,13 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
 40 | a_list[:] = a_list[:] * 3
    |
 help: Replace with augmented assignment
-36 | 
+36 |
 37 | a_list[0:2] = a_list[0:2] * 3
 38 | a_list[:2] = a_list[:2] * 3
    - a_list[1:] = a_list[1:] * 3
 39 + a_list[1:] *= 3
 40 | a_list[:] = a_list[:] * 3
-41 | 
+41 |
 42 | index = index * (index + 10)
 note: This is an unsafe fix and may change runtime behavior
 
@@ -475,9 +475,9 @@ help: Replace with augmented assignment
 39 | a_list[1:] = a_list[1:] * 3
    - a_list[:] = a_list[:] * 3
 40 + a_list[:] *= 3
-41 | 
+41 |
 42 | index = index * (index + 10)
-43 | 
+43 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
@@ -491,11 +491,11 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
 help: Replace with augmented assignment
 39 | a_list[1:] = a_list[1:] * 3
 40 | a_list[:] = a_list[:] * 3
-41 | 
+41 |
    - index = index * (index + 10)
 42 + index *= (index + 10)
-43 | 
-44 | 
+43 |
+44 |
 45 | class T:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -508,13 +508,13 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |         ^^^^^^^^^^^^^^^^^^^
    |
 help: Replace with augmented assignment
-44 | 
+44 |
 45 | class T:
 46 |     def t(self):
    -         self.a = self.a + 1
 47 +         self.a += 1
-48 | 
-49 | 
+48 |
+49 |
 50 | obj = T()
 note: This is an unsafe fix and may change runtime behavior
 
@@ -526,13 +526,13 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    | ^^^^^^^^^^^^^^^^^
    |
 help: Replace with augmented assignment
-48 | 
-49 | 
+48 |
+49 |
 50 | obj = T()
    - obj.a = obj.a + 1
 51 + obj.a += 1
-52 | 
-53 | 
+52 |
+53 |
 54 | a = a+-1
 note: This is an unsafe fix and may change runtime behavior
 
@@ -546,11 +546,11 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
 51 | obj.a = obj.a + 1
-52 | 
-53 | 
+52 |
+53 |
    - a = a+-1
 54 + a += -1
-55 | 
+55 |
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
 57 | test = 0x5
 note: This is an unsafe fix and may change runtime behavior
@@ -566,12 +566,12 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 60 | test2 = b""
    |
 help: Replace with augmented assignment
-55 | 
+55 |
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
 57 | test = 0x5
    - test = test + 0xBA
 58 + test += 0xBA
-59 | 
+59 |
 60 | test2 = b""
 61 | test2 = test2 + b"\000"
 note: This is an unsafe fix and may change runtime behavior
@@ -587,11 +587,11 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
 58 | test = test + 0xBA
-59 | 
+59 |
 60 | test2 = b""
    - test2 = test2 + b"\000"
 61 + test2 += b"\000"
-62 | 
+62 |
 63 | test3 = ""
 64 | test3 = test3 + (   a := R""
 note: This is an unsafe fix and may change runtime behavior
@@ -608,12 +608,12 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
 61 | test2 = test2 + b"\000"
-62 | 
+62 |
 63 | test3 = ""
    - test3 = test3 + (   a := R""
 64 + test3 += (   a := R""
 65 |                          f"oo"   )
-66 | 
+66 |
 67 | test4 = []
 note: This is an unsafe fix and may change runtime behavior
 
@@ -631,7 +631,7 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
 65 |                          f"oo"   )
-66 | 
+66 |
 67 | test4 = []
    - test4 = test4 + ( e
 68 + test4 += ( e
@@ -657,7 +657,7 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 help: Replace with augmented assignment
 70 |                   range(10)
 71 |                   )
-72 | 
+72 |
    - test5 = test5 + (
 73 + test5 += (
 74 |     4
@@ -683,7 +683,7 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 help: Replace with augmented assignment
 76 |     10
 77 | )
-78 | 
+78 |
    - test6 = test6 + \
    -         (
 79 + test6 += (
@@ -707,12 +707,12 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 help: Replace with augmented assignment
 83 |             10
 84 |         )
-85 | 
+85 |
    - test7 = \
    -         100 \
    -     + test7
 86 + test7 += 100
-87 | 
+87 |
 88 | test8 = \
 89 |     886 \
 note: This is an unsafe fix and may change runtime behavior
@@ -732,14 +732,14 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 help: Replace with augmented assignment
 87 |         100 \
 88 |     + test7
-89 | 
+89 |
    - test8 = \
    -     886 \
    -     + \
    -  \
    -     test8
 90 + test8 += 886
-91 | 
-92 | 
+91 |
+92 |
 93 | # OK
 note: This is an unsafe fix and may change runtime behavior

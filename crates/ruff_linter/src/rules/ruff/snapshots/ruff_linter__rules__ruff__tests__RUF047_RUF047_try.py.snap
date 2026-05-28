@@ -16,8 +16,8 @@ help: Remove the `else` clause
 6 |     pass
   - else:
   -     pass
-7 | 
-8 | 
+7 |
+8 |
 9 | try:
 
 RUF047 [*] Empty `else` clause
@@ -35,6 +35,6 @@ help: Remove the `else` clause
 16 |     to()  # `except`
    - else:
    -     ...
-17 | 
-18 | 
+17 |
+18 |
 19 | try:

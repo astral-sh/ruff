@@ -2,7 +2,7 @@ import sys
 from _typeshed import FileDescriptorLike, Unused
 from collections.abc import Sequence
 from struct import Struct
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 __all__ = ["ensure_running", "get_inherited_fds", "connect_to_new_process", "set_forkserver_preload"]
 
@@ -10,8 +10,13 @@ MAXFDS_TO_SEND: Final = 256
 SIGNED_STRUCT: Final[Struct]
 
 class ForkServer:
-    def set_forkserver_preload(self, modules_names: list[str]) -> None:
-        """Set list of module names to try to load in forkserver process."""
+    if sys.version_info >= (3, 15):
+        def set_forkserver_preload(
+            self, modules_names: list[str], *, on_error: Literal["ignore", "warn", "fail"] = "ignore"
+        ) -> None: ...
+    else:
+        def set_forkserver_preload(self, modules_names: list[str]) -> None:
+            """Set list of module names to try to load in forkserver process."""
 
     def get_inherited_fds(self) -> list[int] | None:
         """Return list of fds inherited from parent process.
@@ -37,7 +42,20 @@ class ForkServer:
         ensure_running() will do nothing.
         """
 
-if sys.version_info >= (3, 14):
+if sys.version_info >= (3, 15):
+    def main(
+        listener_fd: int | None,
+        alive_r: FileDescriptorLike,
+        preload: Sequence[str],
+        main_path: str | None = None,
+        sys_path: list[str] | None = None,
+        *,
+        sys_argv: list[str] | None = None,
+        authkey_r: int | None = None,
+        on_error: str = "ignore",
+    ) -> None: ...
+
+elif sys.version_info >= (3, 14):
     # `sys_argv` parameter added in Python 3.14.3
     def main(
         listener_fd: int | None,

@@ -101,7 +101,7 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
     }
 
     // Avoid, e.g., `for x in y: filtered[x].append(x)`.
-    if any_over_expr(value, &|expr| {
+    if any_over_expr(value, |expr| {
         expr.as_name_expr().is_some_and(|expr| expr.id == *id)
     }) {
         return;

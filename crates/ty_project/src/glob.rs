@@ -1,4 +1,5 @@
-use ruff_db::system::SystemPath;
+use ruff_db::system::{System, SystemPath};
+use ruff_python_ast::PySourceType;
 
 use crate::glob::include::MatchFile;
 pub(crate) use exclude::{ExcludeFilter, ExcludeFilterBuilder};
@@ -6,6 +7,8 @@ pub(crate) use include::{IncludeFilter, IncludeFilterBuilder};
 pub(crate) use portable::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
+
+use crate::metadata::options::DEFAULT_SRC_EXCLUDES;
 
 mod exclude;
 mod include;
@@ -69,6 +72,40 @@ impl IncludeExcludeFilter {
     }
 }
 
+impl Default for IncludeExcludeFilter {
+    fn default() -> Self {
+        let mut includes = IncludeFilterBuilder::new();
+        includes
+            .add(
+                &PortableGlobPattern::parse("**", PortableGlobKind::Include)
+                    .unwrap()
+                    .into_absolute(""),
+            )
+            .expect("default include filter to be infallible");
+
+        let mut excludes = ExcludeFilterBuilder::new();
+
+        for pattern in DEFAULT_SRC_EXCLUDES {
+            PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
+                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Expected default exclude to be valid glob but adding it failed with: {err}"
+                    )
+                });
+        }
+
+        Self {
+            include: includes
+                .build()
+                .expect("default include filter to be infallible"),
+            exclude: excludes
+                .build()
+                .expect("default exclude filter to be infallible"),
+        }
+    }
+}
+
 impl std::fmt::Display for IncludeExcludeFilter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "include={}, exclude={}", &self.include, &self.exclude)
@@ -90,7 +127,7 @@ pub(crate) enum GlobFilterCheckMode {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum IncludeResult {
+pub enum IncludeResult {
     /// The path matches or at least is a prefix of an include pattern.
     ///
     /// For directories: This isn't a guarantee that any file in this directory gets included
@@ -103,4 +140,24 @@ pub(crate) enum IncludeResult {
     /// The path matches neither an include nor an exclude pattern and, therefore,
     /// isn't included.
     NotIncluded,
+}
+
+impl IncludeResult {
+    pub fn is_included(self) -> bool {
+        matches!(self, Self::Included { .. })
+    }
+
+    /// Returns `true` if an included file should be indexed.
+    pub(crate) fn should_index_file(self, system: &dyn System, path: &SystemPath) -> bool {
+        let Self::Included { literal_match } = self else {
+            return false;
+        };
+
+        literal_match == Some(true)
+            || path
+                .extension()
+                .and_then(PySourceType::try_from_extension)
+                .or_else(|| system.source_type(path))
+                .is_some()
+    }
 }

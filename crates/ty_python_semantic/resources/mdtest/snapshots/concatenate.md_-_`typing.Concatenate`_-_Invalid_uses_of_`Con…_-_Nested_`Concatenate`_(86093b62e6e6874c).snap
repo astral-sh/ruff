@@ -1,0 +1,68 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: concatenate.md - `typing.Concatenate` - Invalid uses of `Concatenate` - Nested `Concatenate`
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/concatenate.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Callable, Concatenate
+ 2 | 
+ 3 | def invalid[**P](
+ 4 |     # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context"
+ 5 |     c: Callable[Concatenate[Concatenate[int, ...], P], None],
+ 6 |     # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
+ 7 |     d: Callable[Concatenate[Concatenate, P], int],
+ 8 |     # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
+ 9 |     e: Callable[Concatenate[int, Concatenate[int, ...]], None],
+10 | ):
+11 |     pass
+```
+
+# Diagnostics
+
+```
+error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:5:29
+  |
+5 |     c: Callable[Concatenate[Concatenate[int, ...], P], None],
+  |                             ^^^^^^^^^^^^^^^^^^^^^
+  |
+info: `typing.Concatenate` is only valid:
+info:  - as the first argument to `typing.Callable`
+info:  - as a type argument for a `ParamSpec` parameter
+
+```
+
+```
+error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:7:29
+  |
+7 |     d: Callable[Concatenate[Concatenate, P], int],
+  |                             ^^^^^^^^^^^
+  |
+info: `typing.Concatenate` is only valid:
+info:  - as the first argument to `typing.Callable`
+info:  - as a type argument for a `ParamSpec` parameter
+
+```
+
+```
+error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:9:34
+  |
+9 |     e: Callable[Concatenate[int, Concatenate[int, ...]], None],
+  |                                  ^^^^^^^^^^^^^^^^^^^^^
+  |
+info: `typing.Concatenate` is only valid:
+info:  - as the first argument to `typing.Callable`
+info:  - as a type argument for a `ParamSpec` parameter
+
+```

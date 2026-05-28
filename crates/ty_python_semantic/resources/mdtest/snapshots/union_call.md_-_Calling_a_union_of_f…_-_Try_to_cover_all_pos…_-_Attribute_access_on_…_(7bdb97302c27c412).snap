@@ -35,54 +35,43 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 # Diagnostics
 
 ```
-error[invalid-argument-type]: Argument to bound method `foo` is incorrect
+error[invalid-argument-type]: Argument to bound method `A.foo` is incorrect
   --> src/mdtest_snippet.py:17:12
    |
-15 |     # error: [invalid-argument-type]
-16 |     # error: [invalid-argument-type]
 17 |     return x.foo(y)
    |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `A` of type variable `Self`
    |
 info: Union variant `bound method T@_.foo(x: int) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
 ```
-error[invalid-argument-type]: Argument to bound method `foo` is incorrect
+error[invalid-argument-type]: Argument to bound method `B.foo` is incorrect
   --> src/mdtest_snippet.py:17:12
    |
-15 |     # error: [invalid-argument-type]
-16 |     # error: [invalid-argument-type]
 17 |     return x.foo(y)
    |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `B` of type variable `Self`
    |
 info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
 ```
-error[invalid-argument-type]: Argument to bound method `foo` is incorrect
+error[invalid-argument-type]: Argument to bound method `B.foo` is incorrect
   --> src/mdtest_snippet.py:17:18
    |
-15 |     # error: [invalid-argument-type]
-16 |     # error: [invalid-argument-type]
 17 |     return x.foo(y)
    |                  ^ Expected `str`, found `int`
    |
 info: Method defined here
  --> src/mdtest_snippet.py:8:9
   |
-7 | class B:
 8 |     def foo(self, x: str) -> Self:
   |         ^^^       ------ Parameter declared here
-9 |         return self
   |
 info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
-info: rule `invalid-argument-type` is enabled by default
 
 ```

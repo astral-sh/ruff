@@ -1,8 +1,8 @@
 import sys
 from _typeshed import FileDescriptorLike, Incomplete
 from collections.abc import Callable
-from typing import Any, ClassVar, Final, Literal, final, overload
-from typing_extensions import TypeAlias, deprecated
+from typing import Any, ClassVar, Final, Literal, TypeAlias, final, overload
+from typing_extensions import deprecated
 
 # _tkinter is meant to be only used internally by tkinter, but some tkinter
 # functions e.g. return _tkinter.Tcl_Obj objects. Tcl_Obj represents a Tcl
@@ -94,6 +94,7 @@ class TkappType:
 
     def splitlist(self, arg, /) -> tuple[Incomplete, ...]: ...
     def unsetvar(self, *args, **kwargs): ...
+
     if sys.version_info >= (3, 14):
         @overload
         def wantobjects(self) -> Literal[0, 1]: ...
@@ -103,6 +104,7 @@ class TkappType:
 
     @overload
     def wantobjects(self, wantobjects: Literal[0, 1] | bool, /) -> None: ...
+
     def willdispatch(self) -> None: ...
     if sys.version_info >= (3, 12):
         def gettrace(self, /) -> _TkinterTraceFunc | None:

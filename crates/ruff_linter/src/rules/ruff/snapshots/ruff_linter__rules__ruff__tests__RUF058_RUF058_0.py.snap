@@ -11,14 +11,14 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 8 | starmap(func, zip([]))
   |
 help: Use `map` instead
-4  | 
+4  |
 5  | # Errors
-6  | 
+6  |
    - starmap(func, zip())
 7  + map(func, [])
 8  | starmap(func, zip([]))
-9  | 
-10 | 
+9  |
+10 |
 
 RUF058 [*] `itertools.starmap` called on `zip` iterable
  --> RUF058_0.py:8:1
@@ -29,12 +29,12 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
   |
 help: Use `map` instead
 5  | # Errors
-6  | 
+6  |
 7  | starmap(func, zip())
    - starmap(func, zip([]))
 8  + map(func, [])
-9  | 
-10 | 
+9  |
+10 |
 11 | starmap(func, zip(a, b, c,),)
 
 RUF058 [*] `itertools.starmap` called on `zip` iterable
@@ -45,12 +45,12 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
    |
 help: Use `map` instead
 8  | starmap(func, zip([]))
-9  | 
-10 | 
+9  |
+10 |
    - starmap(func, zip(a, b, c,),)
 11 + map(func, a, b, c,)
-12 | 
-13 | 
+12 |
+13 |
 14 | starmap(
 
 RUF058 [*] `itertools.starmap` called on `zip` iterable
@@ -69,19 +69,19 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
    |
 help: Use `map` instead
 11 | starmap(func, zip(a, b, c,),)
-12 | 
-13 | 
+12 |
+13 |
    - starmap(
 14 + map(
 15 |     func,  # Foo
    -     zip(
 16 +     []
 17 |         # Foo
-18 | 
+18 |
    -     )
 19 +     
 20 | )
-21 | 
+21 |
 22 | (  # Foo
 note: This is an unsafe fix and may change runtime behavior
 
@@ -105,19 +105,19 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 help: Use `map` instead
 19 |     )
 20 | )
-21 | 
+21 |
    - (  # Foo
    -     itertools
    -     ) . starmap (
 22 + map (
-23 | 
+23 |
    -     func,  zip (
 24 +     func,   
 25 |         a, b, c,
    -     ),
 26 +     
 27 | )
-28 | 
+28 |
 29 | (  # Foobar
 note: This is an unsafe fix and may change runtime behavior
 
@@ -151,7 +151,7 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
    |
 help: Use `map` instead
 29 | )
-30 | 
+30 |
 31 | (  # Foobar
    -   (  starmap  )
 32 +   (  map  )
@@ -175,7 +175,7 @@ help: Use `map` instead
    -    ),
 40 +    
 41 | )
-42 | 
+42 |
 43 | starmap(
 note: This is an unsafe fix and may change runtime behavior
 
@@ -199,7 +199,7 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 help: Use `map` instead
 48 |    ),
 49 | )
-50 | 
+50 |
    - starmap(
 51 + map(
 52 |     func \
@@ -214,8 +214,8 @@ help: Use `map` instead
    -         )
 59 +         
 60 | )
-61 | 
-62 | 
+61 |
+62 |
 
 RUF058 [*] `itertools.starmap` called on `zip` iterable
   --> RUF058_0.py:71:1
@@ -230,12 +230,12 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 help: Use `map` instead
 68 | starmap(func, zip(a, b, c, lorem=ipsum))
 69 | starmap(func, zip(a, b, c), lorem=ipsum)
-70 | 
+70 |
    - starmap(func, zip(a, b, c, strict=True))
 71 + map(func, a, b, c, strict=True)
 72 | starmap(func, zip(a, b, c, strict=False))
 73 | starmap(func, zip(a, b, c, strict=strict))
-74 | 
+74 |
 
 RUF058 [*] `itertools.starmap` called on `zip` iterable
   --> RUF058_0.py:72:1
@@ -247,12 +247,12 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
    |
 help: Use `map` instead
 69 | starmap(func, zip(a, b, c), lorem=ipsum)
-70 | 
+70 |
 71 | starmap(func, zip(a, b, c, strict=True))
    - starmap(func, zip(a, b, c, strict=False))
 72 + map(func, a, b, c, strict=False)
 73 | starmap(func, zip(a, b, c, strict=strict))
-74 | 
+74 |
 75 | # https://github.com/astral-sh/ruff/issues/15742
 
 RUF058 [*] `itertools.starmap` called on `zip` iterable
@@ -266,11 +266,11 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 75 | # https://github.com/astral-sh/ruff/issues/15742
    |
 help: Use `map` instead
-70 | 
+70 |
 71 | starmap(func, zip(a, b, c, strict=True))
 72 | starmap(func, zip(a, b, c, strict=False))
    - starmap(func, zip(a, b, c, strict=strict))
 73 + map(func, a, b, c, strict=strict)
-74 | 
+74 |
 75 | # https://github.com/astral-sh/ruff/issues/15742
 76 | starmap(func, zip(*a))

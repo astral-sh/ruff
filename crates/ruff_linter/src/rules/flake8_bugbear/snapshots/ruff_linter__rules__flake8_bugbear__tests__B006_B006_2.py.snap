@@ -14,7 +14,7 @@ B006 [*] Do not use mutable data structures for argument defaults
 help: Replace with `None`; initialize within function
 1 | # Docstring followed by whitespace with no newline
 2 | # Regression test for https://github.com/astral-sh/ruff/issues/7155
-3 | 
+3 |
   - def foobar(foor, bar={}):    
 4 + def foobar(foor, bar=None):    
 5 |     """

@@ -10,6 +10,7 @@ use itertools::Itertools;
 use log::warn;
 
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_python_trivia::PythonWhitespace;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -958,6 +959,7 @@ struct NoqaEdit<'a> {
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
+    blank_line: bool,
 }
 
 impl NoqaEdit<'_> {
@@ -969,7 +971,10 @@ impl NoqaEdit<'_> {
     }
 
     fn write(&self, writer: &mut impl std::fmt::Write) {
-        write!(writer, "  # noqa: ").unwrap();
+        if !self.blank_line {
+            write!(writer, "  ").unwrap();
+        }
+        write!(writer, "# noqa: ").unwrap();
         match self.codes {
             Some(codes) => {
                 push_codes(
@@ -1010,11 +1015,13 @@ fn generate_noqa_edit<'a>(
 
     let edit_range;
     let codes;
+    let blank_line;
 
     // Add codes.
     match directive {
         None => {
             let trimmed_line = locator.slice(line_range).trim_end();
+            blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = None;
         }
@@ -1023,6 +1030,7 @@ fn generate_noqa_edit<'a>(
             let trimmed_line = locator
                 .slice(TextRange::new(line_range.start(), existing_codes.start()))
                 .trim_end();
+            blank_line = false;
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = Some(existing_codes);
         }
@@ -1035,6 +1043,7 @@ fn generate_noqa_edit<'a>(
         codes,
         line_ending,
         reason,
+        blank_line,
     })
 }
 

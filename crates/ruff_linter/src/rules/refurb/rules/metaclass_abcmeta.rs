@@ -117,7 +117,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         let has_abc = analyze::class::any_qualified_base_class(
             class_def,
             checker.semantic(),
-            &|qualified_name| matches!(qualified_name.segments(), ["abc", "ABC"]),
+            |qualified_name| matches!(qualified_name.segments(), ["abc", "ABC"]),
         );
 
         let delete_metaclass_keyword = remove_argument(

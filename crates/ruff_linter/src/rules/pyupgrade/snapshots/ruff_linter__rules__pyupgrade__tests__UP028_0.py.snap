@@ -14,8 +14,8 @@ help: Replace with `yield from`
   -     for x in y:
   -         yield x
 2 +     yield from y
-3 | 
-4 | 
+3 |
+4 |
 5 | def g():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,14 +28,14 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
   | |____________________^
   |
 help: Replace with `yield from`
-4  | 
-5  | 
+4  |
+5  |
 6  | def g():
    -     for x, y in z:
    -         yield (x, y)
 7  +     yield from z
-8  | 
-9  | 
+8  |
+9  |
 10 | def h():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,14 +48,14 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
    | |_______________^
    |
 help: Replace with `yield from`
-9  | 
-10 | 
+9  |
+10 |
 11 | def h():
    -     for x in [1, 2, 3]:
    -         yield x
 12 +     yield from [1, 2, 3]
-13 | 
-14 | 
+13 |
+14 |
 15 | def i():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -68,14 +68,14 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
    | |_______________^
    |
 help: Replace with `yield from`
-14 | 
-15 | 
+14 |
+15 |
 16 | def i():
    -     for x in {x for x in y}:
    -         yield x
 17 +     yield from {x for x in y}
-18 | 
-19 | 
+18 |
+19 |
 20 | def j():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,14 +88,14 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
    | |_______________^
    |
 help: Replace with `yield from`
-19 | 
-20 | 
+19 |
+20 |
 21 | def j():
    -     for x in (1, 2, 3):
    -         yield x
 22 +     yield from (1, 2, 3)
-23 | 
-24 | 
+23 |
+24 |
 25 | def k():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,14 +108,14 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
    | |__________________^
    |
 help: Replace with `yield from`
-24 | 
-25 | 
+24 |
+25 |
 26 | def k():
    -     for x, y in {3: "x", 6: "y"}:
    -         yield x, y
 27 +     yield from {3: "x", 6: "y"}
-28 | 
-29 | 
+28 |
+29 |
 30 | def f():  # Comment one\n'
 note: This is an unsafe fix and may change runtime behavior
 
@@ -135,7 +135,7 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 40 |           # Comment ten',
    |
 help: Replace with `yield from`
-30 | 
+30 |
 31 | def f():  # Comment one\n'
 32 |     # Comment two\n'
    -     for x, y in {  # Comment three\n'
@@ -148,8 +148,8 @@ help: Replace with `yield from`
    -         yield x, y  # Comment nine\n'
 37 +     }  # Comment nine\n'
 38 |         # Comment ten',
-39 | 
-40 | 
+39 |
+40 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
@@ -161,14 +161,14 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
    | |__________________^
    |
 help: Replace with `yield from`
-41 | 
-42 | 
+41 |
+42 |
 43 | def f():
    -     for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
    -         yield x, y
 44 +     yield from [{3: (3, [44, "long ss"]), 6: "y"}]
-45 | 
-46 | 
+45 |
+46 |
 47 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -183,13 +183,13 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 52 |   def f():
    |
 help: Replace with `yield from`
-46 | 
-47 | 
+46 |
+47 |
 48 | def f():
    -     for x, y in z():
    -         yield x, y
 49 +     yield from z()
-50 | 
+50 |
 51 | def f():
 52 |     def func():
 note: This is an unsafe fix and may change runtime behavior
@@ -235,8 +235,8 @@ help: Replace with `yield from`
    -     for z in x:
    -         yield z
 67 +     yield from x
-68 | 
-69 | 
+68 |
+69 |
 70 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -250,15 +250,15 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 74 |       x = 1
    |
 help: Replace with `yield from`
-69 | 
-70 | 
+69 |
+70 |
 71 | def f():
    -     for x, y in z():
    -         yield x, y
 72 +     yield from z()
 73 |     x = 1
-74 | 
-75 | 
+74 |
+75 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
@@ -274,7 +274,7 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
    | |_______________^
    |
 help: Replace with `yield from`
-76 | 
+76 |
 77 | # Regression test for: https://github.com/astral-sh/ruff/issues/7103
 78 | def _serve_method(fn):
    -     for h in (
@@ -284,8 +284,8 @@ help: Replace with `yield from`
    -     ):
    -         yield h
 82 +     )
-83 | 
-84 | 
+83 |
+84 |
 85 | # UP028: The later loop variable is not a reference to the earlier loop variable
 note: This is an unsafe fix and may change runtime behavior
 
@@ -301,7 +301,7 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 100 |       try:
     |
 help: Replace with `yield from`
-94  | 
+94  |
 95  | # UP028: The exception binding is not a reference to the loop variable
 96  | def f():
     -     for x in (1, 2, 3):
@@ -324,7 +324,7 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 111 |       with contextlib.nullcontext() as x:
     |
 help: Replace with `yield from`
-105 | 
+105 |
 106 | # UP028: The context binding is not a reference to the loop variable
 107 | def f():
     -     for x in (1, 2, 3):
@@ -347,7 +347,7 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 121 |       x: int
     |
 help: Replace with `yield from`
-115 | 
+115 |
 116 | # UP028: The type annotation binding is not a reference to the loop variable
 117 | def f():
     -     for x in (1, 2, 3):
@@ -355,7 +355,7 @@ help: Replace with `yield from`
 118 +     yield from (1, 2, 3)
 119 |     # Shadowing with a type annotation
 120 |     x: int
-121 | 
+121 |
 note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
@@ -370,7 +370,7 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 137 |       try:
     |
 help: Replace with `yield from`
-131 | 
+131 |
 132 | # UP028: The exception bindings are not a reference to the loop variable
 133 | def f():
     -     for x in (1, 2, 3):
@@ -391,14 +391,14 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
     | |_______________^
     |
 help: Replace with `yield from`
-167 | 
+167 |
 168 | # https://github.com/astral-sh/ruff/issues/15540
 169 | def f():
     -     for a in 1,:
     -         yield a
 170 +     yield from (1,)
-171 | 
-172 | 
+171 |
+172 |
 173 | SOME_GLOBAL = None
 note: This is an unsafe fix and may change runtime behavior
 

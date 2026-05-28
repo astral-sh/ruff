@@ -16,8 +16,8 @@ help: Remove commented-out code
 6 |     # "key2": 456,  # noqa
   -     # "key3": 789,
 7 | }
-8 | 
-9 | 
+8 |
+9 |
 note: This is a display-only fix and is likely to be incorrect
 
 ERA001 [*] Found commented-out code
@@ -30,10 +30,10 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
 8  | }
-9  | 
-10 | 
+9  |
+10 |
    - #import os  # noqa: E501
-11 | 
+11 |
 12 | def f():
 13 |     data = 1
 note: This is a display-only fix and is likely to be incorrect
@@ -48,11 +48,11 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 help: Remove unused `noqa` directive
 8  | }
-9  | 
-10 | 
+9  |
+10 |
    - #import os  # noqa: E501
 11 + #import os
-12 | 
+12 |
 13 | def f():
 14 |     data = 1
 
@@ -72,7 +72,7 @@ help: Remove unused `noqa` directive
 15 |     # line below should autofix to `return data  # fmt: skip`
    -     return data  # noqa: RET504 # fmt: skip
 16 +     return data  # fmt: skip
-17 | 
+17 |
 18 | def f():
 19 |     data = 1
 

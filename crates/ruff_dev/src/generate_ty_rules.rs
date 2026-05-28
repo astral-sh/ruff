@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use itertools::Itertools as _;
 use pretty_assertions::StrComparison;
+use regex::{Captures, Regex};
 
 use crate::ROOT_DIR;
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
@@ -65,6 +66,10 @@ fn generate_markdown() -> String {
     let mut lints: Vec<_> = registry.lints().iter().collect();
     lints.sort_by_key(|a| a.name());
 
+    // Replace `rule-name` with [`rule-name`](url) for any known rule names,
+    // turning them into inline links automatically.
+    let rule_link_re = Regex::new(r"`([^`]+)`").unwrap();
+
     for lint in lints {
         let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());
 
@@ -77,11 +82,22 @@ fn generate_markdown() -> String {
                 if line.starts_with("```") {
                     in_code_fence = !in_code_fence;
                 }
-                if !in_code_fence && line.starts_with('#') {
-                    Cow::Owned(format!(
-                        "**{line}**\n",
-                        line = line.trim_start_matches('#').trim_start()
-                    ))
+                if !in_code_fence {
+                    if line.starts_with('#') {
+                        Cow::Owned(format!(
+                            "**{line}**\n",
+                            line = line.trim_start_matches('#').trim_start()
+                        ))
+                    } else {
+                        rule_link_re.replace_all(line, |caps: &Captures| {
+                            let name = &caps[1];
+                            if registry.get(name).is_ok() {
+                                format!("[`{name}`](#{name})")
+                            } else {
+                                caps[0].to_string()
+                            }
+                        })
+                    }
                 } else {
                     Cow::Borrowed(line)
                 }
@@ -116,7 +132,7 @@ fn generate_markdown() -> String {
             r#"<small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
 {status_text} ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name}" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22{encoded_name}%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
 </small>
 

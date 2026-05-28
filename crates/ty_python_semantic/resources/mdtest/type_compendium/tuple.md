@@ -55,7 +55,7 @@ def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncom
 
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-reveal_type(tuple([1]))  # revealed: tuple[Unknown | int, ...]
+reveal_type(tuple([1]))  # revealed: tuple[int, ...]
 
 x1: tuple[int, ...] = tuple([1])
 reveal_type(x1)  # revealed: tuple[int, ...]
@@ -555,7 +555,7 @@ reveal_type((42, *[], 56, *[]))  # revealed: tuple[Literal[42], Literal[56]]
 tup: Sequence[str] = (*{"foo": 42, "bar": 56},)
 
 # TODO: `tuple[str, str]` would be better, given the type annotation
-reveal_type(tup)  # revealed: tuple[Unknown | str, Unknown | str]
+reveal_type(tup)  # revealed: tuple[str, str]
 
 def f(x: list[int]):
     reveal_type((42, 56, *x, 97))  # revealed: tuple[Literal[42], Literal[56], *tuple[int, ...], Literal[97]]

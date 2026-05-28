@@ -422,7 +422,7 @@ help: Remove the inner `list()` call
 26 + set()
 27 | set(tuple())
 28 | sorted(reversed())
-29 | 
+29 |
 note: This is an unsafe fix and may change runtime behavior
 
 C414 [*] Unnecessary `tuple()` call within `set()`
@@ -441,7 +441,7 @@ help: Remove the inner `tuple()` call
    - set(tuple())
 27 + set()
 28 | sorted(reversed())
-29 | 
+29 |
 30 | # Nested sorts with differing keyword arguments. Not flagged.
 note: This is an unsafe fix and may change runtime behavior
 
@@ -461,7 +461,7 @@ help: Remove the inner `reversed()` call
 27 | set(tuple())
    - sorted(reversed())
 28 + sorted()
-29 | 
+29 |
 30 | # Nested sorts with differing keyword arguments. Not flagged.
 31 | sorted(sorted(x, key=lambda y: y))
 note: This is an unsafe fix and may change runtime behavior
@@ -482,7 +482,7 @@ C414 [*] Unnecessary `list()` call within `sorted()`
 44 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    |
 help: Remove the inner `list()` call
-35 | 
+35 |
 36 | # Preserve trailing comments.
 37 | xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    -     list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),
@@ -506,7 +506,7 @@ C414 [*] Unnecessary `list()` call within `sorted()`
    |
 help: Remove the inner `list()` call
 42 | )
-43 | 
+43 |
 44 | xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    -     list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
 45 +     x_xxxx_xxxxxxxxxxx_xxxxx.xxxx(),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx

@@ -11,8 +11,8 @@ E225 [*] Missing whitespace around operator
 56 | submitted+= 1
    |
 help: Add missing whitespace
-51 | 
-52 | 
+51 |
+52 |
 53 | #: E225
    - submitted +=1
 54 + submitted += 1

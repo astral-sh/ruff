@@ -16,11 +16,22 @@ impl super::RequestHandler for FormatRange {
 
 impl super::BackgroundDocumentRequestHandler for FormatRange {
     super::define_document_url!(params: &types::DocumentRangeFormattingParams);
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         params: types::DocumentRangeFormattingParams,
     ) -> Result<super::FormatResponse> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(url) => {
+                tracing::warn!(
+                    "Returning no range formatting edits because document `{url}` isn't open."
+                );
+                return Ok(None);
+            }
+        };
+
         format_document_range(&snapshot, params.range)
     }
 }
@@ -53,6 +64,7 @@ fn format_text_document_range(
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
     let file_path = query.virtual_file_path();
+    let source_type = query.source_type_for_format();
 
     // If the document is excluded, return early.
     if is_document_excluded_for_formatting(
@@ -69,7 +81,7 @@ fn format_text_document_range(
     let range = range.to_text_range(text, index, encoding);
     let formatted_range = crate::format::format_range(
         text_document,
-        query.source_type(),
+        source_type,
         &settings.formatter,
         range,
         &file_path,

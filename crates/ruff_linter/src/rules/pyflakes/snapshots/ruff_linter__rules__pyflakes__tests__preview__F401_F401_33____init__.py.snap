@@ -10,7 +10,7 @@ F401 [*] `F401_33.other.Ham` imported but unused
   |                                   ^^^
   |
 help: Remove unused import: `F401_33.other.Ham`
-5 | 
+5 |
 6 | class Spam:
 7 |     def __init__(self) -> None:
   -         from F401_33.other import Ham

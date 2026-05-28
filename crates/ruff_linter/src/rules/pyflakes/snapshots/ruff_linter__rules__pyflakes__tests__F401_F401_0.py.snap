@@ -66,11 +66,11 @@ F401 [*] `shelve` imported but unused
    |
 help: Remove unused import: `shelve`
 29 |     from models import Fruit, Nut, Vegetable
-30 | 
+30 |
 31 | if TYPE_CHECKING:
    -     import shelve
 32 |     import importlib
-33 | 
+33 |
 34 | if TYPE_CHECKING:
 
 F401 [*] `importlib` imported but unused
@@ -84,11 +84,11 @@ F401 [*] `importlib` imported but unused
 35 | if TYPE_CHECKING:
    |
 help: Remove unused import: `importlib`
-30 | 
+30 |
 31 | if TYPE_CHECKING:
 32 |     import shelve
    -     import importlib
-33 | 
+33 |
 34 | if TYPE_CHECKING:
 35 |     """Hello, world!"""
 
@@ -103,13 +103,13 @@ F401 [*] `pathlib` imported but unused
 39 |     z = 1
    |
 help: Remove unused import: `pathlib`
-34 | 
+34 |
 35 | if TYPE_CHECKING:
 36 |     """Hello, world!"""
    -     import pathlib
-37 | 
+37 |
 38 |     z = 1
-39 | 
+39 |
 
 F401 [*] `pickle` imported but unused
   --> F401_0.py:52:16
@@ -120,12 +120,12 @@ F401 [*] `pickle` imported but unused
    |
 help: Remove unused import: `pickle`
 49 |         z = multiprocessing.pool.ThreadPool()
-50 | 
+50 |
 51 |     def b(self) -> None:
    -         import pickle
 52 +         pass
-53 | 
-54 | 
+53 |
+54 |
 55 | __all__ = ["ClassA"] + ["ClassB"]
 
 F401 [*] `x` imported but unused
@@ -143,8 +143,8 @@ help: Remove unused import: `x`
 92 |     case 0,:
    -         import x
 93 |         import y
-94 | 
-95 | 
+94 |
+95 |
 
 F401 [*] `y` imported but unused
   --> F401_0.py:94:16
@@ -159,8 +159,8 @@ help: Remove unused import: `y`
 92 |     case 0,:
 93 |         import x
    -         import y
-94 | 
-95 | 
+94 |
+95 |
 96 | # Test: access a sub-importation via an alias.
 
 F401 [*] `foo.bar.baz` imported but unused
@@ -174,13 +174,13 @@ F401 [*] `foo.bar.baz` imported but unused
 101 | print(bop.baz.read_csv("test.csv"))
     |
 help: Remove unused import: `foo.bar.baz`
-96  | 
+96  |
 97  | # Test: access a sub-importation via an alias.
 98  | import foo.bar as bop
     - import foo.bar.baz
-99  | 
+99  |
 100 | print(bop.baz.read_csv("test.csv"))
-101 | 
+101 |
 
 F401 [*] `a1` imported but unused
    --> F401_0.py:105:12
@@ -193,13 +193,13 @@ F401 [*] `a1` imported but unused
 107 |     import a2
     |
 help: Remove unused import: `a1`
-102 | 
+102 |
 103 | # Test: isolated deletions.
 104 | if TYPE_CHECKING:
     -     import a1
-105 | 
+105 |
 106 |     import a2
-107 | 
+107 |
 
 F401 [*] `a2` imported but unused
    --> F401_0.py:107:12
@@ -212,10 +212,10 @@ F401 [*] `a2` imported but unused
 help: Remove unused import: `a2`
 104 | if TYPE_CHECKING:
 105 |     import a1
-106 | 
+106 |
     -     import a2
-107 | 
-108 | 
+107 |
+108 |
 109 | match *0, 1, *2:
 
 F401 [*] `b1` imported but unused
@@ -229,13 +229,13 @@ F401 [*] `b1` imported but unused
 114 |         import b2
     |
 help: Remove unused import: `b1`
-109 | 
+109 |
 110 | match *0, 1, *2:
 111 |     case 0,:
     -         import b1
-112 | 
+112 |
 113 |         import b2
-114 | 
+114 |
 
 F401 [*] `b2` imported but unused
    --> F401_0.py:114:16
@@ -248,10 +248,10 @@ F401 [*] `b2` imported but unused
 help: Remove unused import: `b2`
 111 |     case 0,:
 112 |         import b1
-113 | 
+113 |
     -         import b2
-114 | 
-115 | 
+114 |
+115 |
 116 | # Regression test for: https://github.com/astral-sh/ruff/issues/7244
 
 F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
@@ -264,6 +264,6 @@ F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
 help: Remove unused import: `datameta_client_lib.model_helpers.noqa`
 118 | from datameta_client_lib.model_utils import (  # noqa: F401
 119 | noqa )
-120 | 
+120 |
     - from datameta_client_lib.model_helpers import (
     - noqa )

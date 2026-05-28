@@ -28,8 +28,8 @@ class Point:
         self.x, self.y = other.x, other.y
 
 p = Point()
-reveal_type(p.x)  # revealed: Unknown | int
-reveal_type(p.y)  # revealed: Unknown | int
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
 ```
 
 ## Self-referential bare type alias
@@ -42,7 +42,7 @@ python-version = "3.12"  # typing.TypeAliasType
 ```py
 from typing import Union, TypeAliasType, Sequence, Mapping
 
-A = list["A" | None]
+A = list["A | None"]
 
 def f(x: A):
     # TODO: should be `list[A | None]`?
@@ -113,7 +113,7 @@ We do, however, still check assignability of the default value to the parameter 
 ```py
 class D:
     def f(self: "D"):
-        # error: [invalid-parameter-default] "Default value of type `Unknown | (def inner_a(a: int = ...) -> Unknown)` is not assignable to annotated parameter type `int`"
+        # error: [invalid-parameter-default] "Default value of type `(a: int = ...) -> Unknown` is not assignable to annotated parameter type `int`"
         def inner_a(a: int = self.a): ...
         self.a = inner_a
 ```
@@ -128,16 +128,16 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional=...) -> Unknown
+        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent) | ((positional=...) -> Divergent)
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only=..., /) -> Unknown
+        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent) | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
         reveal_type(self.d)
 ```
 
@@ -152,8 +152,81 @@ class Cyclic:
         if isinstance(self.data, str):
             self.data = {"url": self.data}
 
-# revealed: Unknown | str | dict[Unknown, Unknown] | dict[Unknown | str, Unknown | str]
+# revealed: str | dict[Unknown, Unknown] | dict[str, str]
 reveal_type(Cyclic("").data)
+```
+
+## Decorated methods with implicit class attributes
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+class A: ...
+
+T = TypeVar("T")
+U = TypeVar("U", bound=A)
+C = Callable[[T, U], object]
+
+def d() -> Callable[[C[U, A]], object]:
+    raise NotImplementedError
+
+class B:
+    @d()
+    def m1(self, p):
+        pass
+
+    @d()
+    def m2(self, p):
+        self.__slots__  # error: [unresolved-attribute]
+```
+
+## Function annotation and dynamic `NamedTuple` / `NewType`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3485>. Recursive type
+normalization should not force the lazy base of a `NewType` while Salsa is recovering the cycle
+created by the forward reference to `T`.
+
+```py
+class C:
+    pass
+
+def f():
+    pass
+
+def g() -> T:  # error: [unresolved-reference]
+    pass
+
+g()
+
+from typing import NamedTuple, NewType
+
+X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
+
+list(X)
+T = f()
+
+X = NewType("X", C)
+```
+
+## Lazy cached property behind `hasattr`
+
+This pattern used to panic with "too many cycle iterations".
+
+```py
+class Cached:
+    def get(self) -> int:
+        return 0
+
+    @property
+    def metadata(self) -> int:
+        if not hasattr(self, "_metadata"):
+            self._metadata = self.get()
+        return self._metadata
+
+reveal_type(Cached().metadata)  # revealed: int
 ```
 
 ## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters

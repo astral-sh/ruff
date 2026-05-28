@@ -17,23 +17,22 @@ def RawValue(typecode_or_type: type[_CT], *args: Any) -> _CT:
     """
     Returns a ctypes object allocated from shared memory
     """
-
 @overload
 def RawValue(typecode_or_type: str, *args: Any) -> Any: ...
+
 @overload
 def RawArray(typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]:
     """
     Returns a ctypes array allocated from shared memory
     """
-
 @overload
 def RawArray(typecode_or_type: str, size_or_initializer: int | Sequence[Any]) -> Any: ...
+
 @overload
 def Value(typecode_or_type: type[_CT], *args: Any, lock: Literal[False], ctx: BaseContext | None = None) -> _CT:
     """
     Return a synchronization wrapper for a Value
     """
-
 @overload
 def Value(
     typecode_or_type: type[_CT], *args: Any, lock: Literal[True] | _LockLike = True, ctx: BaseContext | None = None
@@ -46,6 +45,7 @@ def Value(
 def Value(
     typecode_or_type: str | type[_CData], *args: Any, lock: bool | _LockLike = True, ctx: BaseContext | None = None
 ) -> Any: ...
+
 @overload
 def Array(
     typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any], *, lock: Literal[False], ctx: BaseContext | None = None
@@ -53,7 +53,6 @@ def Array(
     """
     Return a synchronization wrapper for a RawArray
     """
-
 @overload
 def Array(
     typecode_or_type: type[c_char],
@@ -86,7 +85,9 @@ def Array(
     lock: bool | _LockLike = True,
     ctx: BaseContext | None = None,
 ) -> Any: ...
+
 def copy(obj: _CT) -> _CT: ...
+
 @overload
 def synchronized(obj: _SimpleCData[_T], lock: _LockLike | None = None, ctx: Any | None = None) -> Synchronized[_T]: ...
 @overload
@@ -97,6 +98,7 @@ def synchronized(
 ) -> SynchronizedArray[_T]: ...
 @overload
 def synchronized(obj: _CT, lock: _LockLike | None = None, ctx: Any | None = None) -> SynchronizedBase[_CT]: ...
+
 @type_check_only
 class _AcquireFunc(Protocol):
     def __call__(self, block: bool = ..., timeout: float | None = ..., /) -> bool: ...
@@ -118,14 +120,17 @@ class Synchronized(SynchronizedBase[_SimpleCData[_T]], Generic[_T]):
 
 class SynchronizedArray(SynchronizedBase[ctypes.Array[_SimpleCData[_T]]], Generic[_T]):
     def __len__(self) -> int: ...
+
     @overload
     def __getitem__(self, i: slice[SupportsIndex | None]) -> list[_T]: ...
     @overload
     def __getitem__(self, i: SupportsIndex) -> _T: ...
+
     @overload
     def __setitem__(self, i: slice[SupportsIndex | None], value: Iterable[_T]) -> None: ...
     @overload
     def __setitem__(self, i: SupportsIndex, value: _T) -> None: ...
+
     def __getslice__(self, start: SupportsIndex, stop: SupportsIndex) -> list[_T]: ...
     def __setslice__(self, start: SupportsIndex, stop: SupportsIndex, values: Iterable[_T]) -> None: ...
 
@@ -134,10 +139,12 @@ class SynchronizedString(SynchronizedArray[bytes]):
     def __getitem__(self, i: slice[SupportsIndex | None]) -> bytes: ...
     @overload
     def __getitem__(self, i: SupportsIndex) -> bytes: ...
+
     @overload  # type: ignore[override]
     def __setitem__(self, i: slice[SupportsIndex | None], value: bytes) -> None: ...
     @overload
     def __setitem__(self, i: SupportsIndex, value: bytes) -> None: ...
+
     def __getslice__(self, start: SupportsIndex, stop: SupportsIndex) -> bytes: ...  # type: ignore[override]
     def __setslice__(self, start: SupportsIndex, stop: SupportsIndex, values: bytes) -> None: ...  # type: ignore[override]
 

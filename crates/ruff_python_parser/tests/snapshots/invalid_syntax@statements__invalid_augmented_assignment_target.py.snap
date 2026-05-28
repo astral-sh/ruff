@@ -470,13 +470,15 @@ Module(
                         ExprDictComp {
                             node_index: NodeIndex(None),
                             range: 255..277,
-                            key: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 256..257,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
+                            key: Some(
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 256..257,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
                             ),
                             value: BinOp(
                                 ExprBinOp {

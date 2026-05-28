@@ -219,6 +219,6 @@ help: Remove duplicate item
    -     # B033
    -     "value1",
 26 | }
-27 | 
+27 |
 28 | ###
 note: This is an unsafe fix and may change runtime behavior

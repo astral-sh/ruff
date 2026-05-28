@@ -12,7 +12,7 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 help: Replace with comprehension
 6  | ]
-7  | 
+7  |
 8  | # Errors.
    - dict.fromkeys(pierogi_fillings, [])
 9  + {key: [] for key in pierogi_fillings}
@@ -32,7 +32,7 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
 12 | dict.fromkeys(pierogi_fillings, set())
    |
 help: Replace with comprehension
-7  | 
+7  |
 8  | # Errors.
 9  | dict.fromkeys(pierogi_fillings, [])
    - dict.fromkeys(pierogi_fillings, list())
@@ -123,7 +123,7 @@ help: Replace with comprehension
 14 + {key: dict() for key in pierogi_fillings}
 15 | import builtins
 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
-17 | 
+17 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
@@ -142,7 +142,23 @@ help: Replace with comprehension
 15 | import builtins
    - builtins.dict.fromkeys(pierogi_fillings, dict())
 16 + {key: dict() for key in pierogi_fillings}
-17 | 
+17 |
 18 | # Okay.
 19 | dict.fromkeys(pierogi_fillings)
+note: This is an unsafe fix and may change runtime behavior
+
+RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+  --> RUF024.py:39:1
+   |
+37 | key = "xy"
+38 | key_0 = "z"
+39 | dict.fromkeys("ABC", list(key))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace with comprehension
+36 |
+37 | key = "xy"
+38 | key_0 = "z"
+   - dict.fromkeys("ABC", list(key))
+39 + {key_1: list(key) for key_1 in "ABC"}
 note: This is an unsafe fix and may change runtime behavior

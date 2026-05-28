@@ -32,22 +32,19 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 
 ```
 error[abstract-method-in-final-class]: Final class `Child` has unimplemented abstract methods
-  --> src/mdtest_snippet.py:12:7
+  --> src/mdtest_snippet.py:5:5
    |
-11 | @final
-12 | class Child(Parent):  # error: [abstract-method-in-final-class]
-   |       ^^^^^ `method` is unimplemented
-13 |     pass
-   |
-  ::: src/mdtest_snippet.py:6:9
-   |
- 4 | class GrandParent(ABC):
- 5 |     @abstractmethod
- 6 |     def method(self) -> int: ...
-   |         ------ `method` declared as abstract on superclass `GrandParent`
+ 5 | /     @abstractmethod
+ 6 | |     def method(self) -> int: ...
+   | |________________________________- `method` declared as abstract on superclass `GrandParent`
  7 |
- 8 | class Parent(GrandParent):
+ 8 |   class Parent(GrandParent):
+ 9 |       pass
+10 |
+11 |   @final
+   |   ------
+12 |   class Child(Parent):  # error: [abstract-method-in-final-class]
+   |         ^^^^^ `method` is unimplemented
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

@@ -62,9 +62,21 @@ impl AlwaysFixableViolation for IncorrectDictIterator {
     }
 }
 
-/// PERF102
+/// PERF102 for `for` loops.
 pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor) {
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
+    check_dict_items_usage(checker, stmt_for.target.as_ref(), stmt_for.iter.as_ref());
+}
+
+/// PERF102 for comprehensions and generators.
+pub(crate) fn incorrect_dict_iterator_comprehension(
+    checker: &Checker,
+    comprehension: &ast::Comprehension,
+) {
+    check_dict_items_usage(checker, &comprehension.target, &comprehension.iter);
+}
+
+fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr) {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
         return;
     };
     let [key, value] = elts.as_slice() else {
@@ -74,7 +86,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
         func,
         arguments: Arguments { args, .. },
         ..
-    }) = stmt_for.iter.as_ref()
+    }) = iter
     else {
         return;
     };
@@ -110,10 +122,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(value).to_string(),
-                    stmt_for.target.range(),
+                    target.range(),
                     checker.locator(),
                 ),
-                stmt_for.target.range(),
+                target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
         }
@@ -129,10 +141,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(key).to_string(),
-                    stmt_for.target.range(),
+                    target.range(),
                     checker.locator(),
                 ),
-                stmt_for.target.range(),
+                target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
         }

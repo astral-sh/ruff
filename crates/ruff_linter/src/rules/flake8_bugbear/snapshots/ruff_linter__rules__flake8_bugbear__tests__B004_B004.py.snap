@@ -81,12 +81,12 @@ help: Replace with `callable()`
 --------------------------------------------------------------------------------
 22 |     def callable(x):
 23 |         return True
-24 | 
+24 |
    -     if hasattr(o, "__call__"):
 25 +     if builtins.callable(o):
 26 |         print("STILL a bug!")
-27 | 
-28 | 
+27 |
+28 |
 note: This is an unsafe fix and may change runtime behavior
 
 B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
@@ -106,7 +106,7 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
 43 |   import operator
    |
 help: Replace with `callable()`
-32 | 
+32 |
 33 | # https://github.com/astral-sh/ruff/issues/18741
 34 | # The autofix for this is unsafe due to the comments.
    - hasattr(
@@ -117,9 +117,9 @@ help: Replace with `callable()`
    -     # comment 5
    - )
 35 + callable(obj)
-36 | 
+36 |
 37 | import operator
-38 | 
+38 |
 note: This is an unsafe fix and may change runtime behavior
 
 B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
@@ -132,14 +132,14 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
 46 | assert callable(operator) is False
    |
 help: Replace with `callable()`
-42 | 
+42 |
 43 | import operator
-44 | 
+44 |
    - assert hasattr(operator, "__call__")
 45 + assert callable(operator)
 46 | assert callable(operator) is False
-47 | 
-48 | 
+47 |
+48 |
 note: This is an unsafe fix and may change runtime behavior
 
 B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
@@ -151,11 +151,11 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
    |
 help: Replace with `callable()`
 50 |     def __init__(self): self.__call__ = None
-51 | 
-52 | 
+51 |
+52 |
    - assert hasattr(A(), "__call__")
 53 + assert callable(A())
 54 | assert callable(A()) is False
-55 | 
+55 |
 56 | # https://github.com/astral-sh/ruff/issues/20440
 note: This is an unsafe fix and may change runtime behavior

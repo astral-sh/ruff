@@ -3,7 +3,7 @@ use aho_corasick::AhoCorasick;
 use itertools::Itertools;
 use regex::{Regex, RegexSet};
 use ruff_python_parser::parse_module;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
 use ruff_text_size::TextSize;
 use std::sync::LazyLock;
 
@@ -25,6 +25,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         |   ruff\s*:\s*(disable|enable)
         |   mypy:
         |   type:\s*ignore
+        |   ty:\s*ignore
         |   SPDX-License-Identifier:
         |   fmt:\s*(on|off|skip)
         |   region|endregion
@@ -75,7 +76,9 @@ static POSITIVE_CASES: LazyLock<RegexSet> = LazyLock::new(|| {
 
 /// Returns `true` if a comment contains Python code.
 pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
-    let line = line.trim_start_matches([' ', '#']).trim_end();
+    let line = line
+        .trim_start_matches(|char| char == '#' || is_python_whitespace(char))
+        .trim_end();
 
     // Fast path: if none of the indicators are present, the line is not code.
     if !CODE_INDICATORS.is_match(line) {
@@ -149,6 +152,7 @@ mod tests {
         assert!(!comment_contains_code("# 123", &[]));
         assert!(!comment_contains_code("# 123.1", &[]));
         assert!(!comment_contains_code("# 1, 2, 3", &[]));
+        assert!(!comment_contains_code("\t# testing: Foo Bar Baz", &[]));
         assert!(!comment_contains_code("# ruff: disable[E501]", &[]));
         assert!(!comment_contains_code("#ruff:enable[E501, F84]", &[]));
         assert!(!comment_contains_code(
@@ -164,6 +168,7 @@ mod tests {
             "# SPDX-License-Identifier: MIT",
             &[]
         ));
+        assert!(comment_contains_code("\t# x = 1", &[]));
 
         // TODO(charlie): This should be `true` under aggressive mode.
         assert!(!comment_contains_code("#},", &[]));
@@ -322,6 +327,15 @@ mod tests {
         assert!(!comment_contains_code("# type:ignore", &[]));
         assert!(!comment_contains_code("# type: ignore[import]", &[]));
         assert!(!comment_contains_code("# type:ignore[import]", &[]));
+        assert!(!comment_contains_code("# ty: ignore", &[]));
+        assert!(!comment_contains_code("# ty:ignore", &[]));
+        assert!(!comment_contains_code("# ty: ignore[import]", &[]));
+        assert!(!comment_contains_code("# ty:ignore[import]", &[]));
+        assert!(!comment_contains_code(
+            "# ty: ignore[missing-argument, invalid-argument-type]",
+            &[]
+        ));
+        assert!(!comment_contains_code("# ty: ignore[]", &[]));
         assert!(!comment_contains_code(
             "# TODO: Do that",
             &["TODO".to_string()]

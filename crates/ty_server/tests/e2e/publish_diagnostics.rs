@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use lsp_types::{
-    DidOpenTextDocumentParams, FileChangeType, FileEvent, TextDocumentItem, Url,
+    DidOpenTextDocumentParams, FileChangeType, FileEvent, Position, Range, TextDocumentItem, Url,
     notification::{DidOpenTextDocument, PublishDiagnostics},
 };
 use ruff_db::system::SystemPath;
@@ -215,6 +215,80 @@ def foo() -> str:
 }
 
 #[test]
+fn on_did_change_invalid_tuple_assignment_target_does_not_panic() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+something, somethingelse = (1, 2)
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    server.change_text_document(
+        foo,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 11), Position::new(0, 24))),
+            range_length: None,
+            text: "not".to_string(),
+        }],
+        2,
+    );
+
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+
+    assert_eq!(diagnostics.version, Some(2));
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change_nested_invalid_tuple_assignment_target_does_not_panic() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+something, somethingelse = (1, 2)
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    server.change_text_document(
+        foo,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 11), Position::new(0, 24))),
+            range_length: None,
+            text: "not x".to_string(),
+        }],
+        2,
+    );
+
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+
+    assert_eq!(diagnostics.version, Some(2));
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn on_did_change_diagnostics_off() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
@@ -408,6 +482,36 @@ def foo() -> str:
     Ok(())
 }
 
+/// `JupyterLab` presents notebook virtual documents to language servers as simple text files:
+/// <https://github.com/jupyterlab/jupyterlab/blob/f51404192bf6d0ff79187c884f21e1f91b928146/packages/lsp/src/virtual/document.ts#L308-L314>
+#[test]
+fn on_did_open_ipynb_file_with_python_language() -> Result<()> {
+    let foo = SystemPath::new("src/foo.ipynb");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    let [diagnostic] = diagnostics.diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:#?}");
+    };
+
+    insta::assert_snapshot!(
+        diagnostic.message,
+        @"Return type does not match returned value: expected `str`, found `Literal[42]`"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn changing_language_of_file_without_extension() -> Result<()> {
     let foo = SystemPath::new("src/foo");
@@ -429,6 +533,8 @@ def foo() -> str:
     insta::assert_debug_snapshot!(diagnostics);
 
     server.close_text_document(foo);
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    insta::assert_debug_snapshot!(diagnostics);
 
     let params = DidOpenTextDocumentParams {
         text_document: TextDocumentItem {
