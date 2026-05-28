@@ -271,6 +271,20 @@ def _(normalizing: Normalizing):
     normalizing["mapping"] = {"a": 1}
     reveal_type(normalizing["mapping"]["a"])  # revealed: object
 
+class NormalizingDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> dict[str, object]:
+        return {}
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class WithNormalizingDescriptor:
+    mapping: NormalizingDescriptor = NormalizingDescriptor()
+
+def _(normalizing: WithNormalizingDescriptor):
+    # A data descriptor may likewise transform the assigned value.
+    normalizing.mapping = {"a": 1}
+    reveal_type(normalizing.mapping["a"])  # revealed: object
+
 class Y:
     inner: dict[str, object]
 
