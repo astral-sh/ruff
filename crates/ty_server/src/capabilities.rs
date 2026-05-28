@@ -489,7 +489,7 @@ pub(crate) fn server_capabilities(
                 supported: Some(true),
                 change_notifications: Some(true.into()),
             }),
-            file_operations: Some(lsp_types::WorkspaceFileOperationsServerCapabilities {
+            file_operations: Some(lsp_types::FileOperationOptions {
                 will_rename: Some(lsp_types::FileOperationRegistrationOptions {
                     filters: vec![lsp_types::FileOperationFilter {
                         scheme: Some("file".to_string()),
@@ -502,6 +502,7 @@ pub(crate) fn server_capabilities(
                 }),
                 ..Default::default()
             }),
+            text_document_content: None,
         }),
         type_hierarchy_provider: Some(true.into()),
         call_hierarchy_provider: Some(true.into()),
