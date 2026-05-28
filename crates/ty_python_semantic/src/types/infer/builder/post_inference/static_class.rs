@@ -4,7 +4,7 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
@@ -1040,6 +1040,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
     // Metaclass-populated members are generally sparse, while class namespaces such as enums can
     // be large. Collect possible members first rather than probing the metaclass for every binding.
     let mut metaclass_instance_members = FxHashSet::default();
+    let mut metaclass_assigned_members = FxHashSet::default();
     for metaclass in metaclass
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
@@ -1052,13 +1053,26 @@ fn check_class_namespace_against_metaclass_members<'db>(
         let metaclass_use_def = metaclass_index.use_def_map(body_scope);
 
         for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
-            metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().to_string());
+            metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().clone());
         }
 
         for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
             for member in metaclass_index.place_table(function_scope).members() {
                 if let Some(name) = member.as_instance_attribute() {
-                    metaclass_instance_members.insert(name.to_string());
+                    // A method-scope member may only be declared, as in `cls.attr: int`.
+                    // Only an assignment such as `cls.attr: int = 1` writes a value onto the
+                    // newly created class object, potentially overwriting a class-body value.
+                    let is_assigned = attribute_assignments(db, metaclass.body_scope(db), name)
+                        .any(|(bindings, _)| {
+                            bindings
+                                .into_iter()
+                                .any(|binding| binding.binding.definition().is_some())
+                        });
+                    let name = Name::new(name);
+                    if is_assigned {
+                        metaclass_assigned_members.insert(name.clone());
+                    }
+                    metaclass_instance_members.insert(name);
                 }
             }
         }
@@ -1104,6 +1118,12 @@ fn check_class_namespace_against_metaclass_members<'db>(
             if reported_incompatible_binding {
                 continue;
             }
+        }
+
+        // A declaration on the metaclass constrains class-object access, but does not itself
+        // populate a replacement value into the constructed class's namespace.
+        if !metaclass_assigned_members.contains(name.as_str()) {
+            continue;
         }
 
         let result =
