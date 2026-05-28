@@ -1,11 +1,8 @@
 use crate::goto::GotoTarget;
 use crate::references::{ReferencesMode, references};
 use ruff_db::files::{File, system_path_to_file};
-use ruff_db::parsed::parsed_module;
 use ruff_db::system::SystemPath;
-use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
-use ruff_python_ast::{self as ast};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 use ty_module_resolver::{Module, ModuleName, file_to_module};
 use ty_project::Db;
 
@@ -19,10 +16,14 @@ pub struct FileRenameEdit {
 
 /// Compute the edits needed when renaming a Python file.
 ///
-/// Uses the find-references infrastructure for identifier-level references
-/// (e.g., `import old_module`, `old_module.foo()`, `from pkg import old_sub`)
-/// and a lightweight import-path scanner for module paths in import statements
-/// (e.g., `from old_module import x`, `import pkg.old_sub`).
+/// Uses the find-references infrastructure to locate all references to the old
+/// module name across the project, including:
+///   - `import old_module` (alias declaration)
+///   - `old_module.foo()` (name expression usage)
+///   - `from pkg import old_sub` (alias declaration)
+///   - `from old_module import x` (module path in from-import)
+///   - `import pkg.old_sub` (dotted import name component)
+///   - `pkg.old_sub.x` (attribute access on the module)
 pub fn will_rename_file(
     db: &dyn Db,
     old_path: &SystemPath,
@@ -49,14 +50,6 @@ pub fn will_rename_file(
         .unwrap_or(new_name_str)
         .to_string();
 
-    let mut edits = Vec::new();
-
-    // Use the find-references infrastructure to locate all identifier-level
-    // references to the old module across the project. This covers:
-    //   - `import old_module` (alias declaration)
-    //   - `old_module.foo()` (name expression usage)
-    //   - `from pkg import old_sub` (alias declaration)
-    //   - attribute access on the module
     let goto_target = GotoTarget::ImportModuleComponent {
         module_name: old_name_str.to_string(),
         level: 0,
@@ -64,26 +57,19 @@ pub fn will_rename_file(
         component_range: TextRange::default(),
     };
 
-    if let Some(refs) = references(db, old_file, &goto_target, ReferencesMode::RenameMultiFile) {
-        edits.extend(refs.into_iter().map(|r| FileRenameEdit {
+    let Some(refs) = references(db, old_file, &goto_target, ReferencesMode::RenameMultiFile)
+    else {
+        return vec![];
+    };
+
+    refs.into_iter()
+        .filter(|r| r.file() != old_file)
+        .map(|r| FileRenameEdit {
             file: r.file(),
             range: r.range(),
             new_text: new_last.clone(),
-        }));
-    }
-
-    // Handle import module-path references not covered by find-references.
-    // The references infrastructure doesn't visit the module-path portion of
-    // `from <module> import ...` or dotted names in `import pkg.old_sub`.
-    let project = db.project();
-    for file in project.files(db).iter() {
-        if *file == old_file {
-            continue;
-        }
-        collect_import_path_edits(db, *file, &old_module_name, &new_module_name, &mut edits);
-    }
-
-    edits
+        })
+        .collect()
 }
 
 /// Infer the new module name from old/new file paths.
@@ -130,176 +116,6 @@ fn infer_new_module_name(
             .collect()
     };
     ModuleName::from_components(components)
-}
-
-/// Scan a file for import module-path references to the old module.
-///
-/// This handles cases where the module name appears as a path in an import
-/// statement rather than as an identifier reference:
-/// - `from old_module import x` (the `old_module` is a module path, not an identifier)
-/// - `from .old_module import x` (relative import module path)
-/// - `import pkg.old_sub` (dotted import name)
-fn collect_import_path_edits(
-    db: &dyn Db,
-    file: File,
-    old_module_name: &ModuleName,
-    new_module_name: &ModuleName,
-    edits: &mut Vec<FileRenameEdit>,
-) {
-    let parsed = parsed_module(db, file);
-    let module = parsed.load(db);
-
-    let mut scanner = ImportPathScanner {
-        db,
-        file,
-        old_module_name,
-        new_module_name,
-        edits,
-    };
-    scanner.visit_body(module.suite());
-}
-
-struct ImportPathScanner<'a> {
-    db: &'a dyn Db,
-    file: File,
-    old_module_name: &'a ModuleName,
-    new_module_name: &'a ModuleName,
-    edits: &'a mut Vec<FileRenameEdit>,
-}
-
-impl<'a> Visitor<'a> for ImportPathScanner<'_> {
-    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
-        match stmt {
-            ast::Stmt::ImportFrom(import_from) => {
-                self.handle_import_from(import_from);
-            }
-            ast::Stmt::Import(import) => {
-                self.handle_dotted_import(import);
-            }
-            _ => {}
-        }
-        walk_stmt(self, stmt);
-    }
-
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        if let ast::Expr::Attribute(attr_expr) = expr {
-            self.handle_dotted_usage(attr_expr);
-        }
-        walk_expr(self, expr);
-    }
-}
-
-impl ImportPathScanner<'_> {
-    /// Handle `from <module> import ...` where the module path matches the old module.
-    fn handle_import_from(&mut self, import_from: &ast::StmtImportFrom) {
-        let Ok(resolved_name) = ModuleName::from_import_statement(self.db, self.file, import_from)
-        else {
-            return;
-        };
-
-        if &resolved_name != self.old_module_name {
-            return;
-        }
-
-        let Some(module_id) = &import_from.module else {
-            return;
-        };
-
-        let Some(new_from) = self.compute_new_from_module(import_from) else {
-            return;
-        };
-
-        self.edits.push(FileRenameEdit {
-            file: self.file,
-            range: module_id.range(),
-            new_text: new_from,
-        });
-    }
-
-    fn compute_new_from_module(&self, import_from: &ast::StmtImportFrom) -> Option<String> {
-        if import_from.level > 0 {
-            let old_suffix = import_from
-                .module
-                .as_ref()
-                .map(ast::Identifier::as_str)
-                .unwrap_or("");
-            let old_full = self.old_module_name.as_str();
-            let new_full = self.new_module_name.as_str();
-
-            old_full
-                .strip_suffix(old_suffix)
-                .and_then(|prefix| new_full.strip_prefix(prefix))
-                .map(str::to_string)
-        } else {
-            Some(self.new_module_name.to_string())
-        }
-    }
-
-    /// Handle attribute access chains like `pkg.old_sub.x` where `pkg.old_sub`
-    /// matches the old module name from a dotted import.
-    fn handle_dotted_usage(&mut self, attr_expr: &ast::ExprAttribute) {
-        let old_components: Vec<&str> = self.old_module_name.components().collect();
-        if old_components.len() < 2
-            || !expr_matches_module_components(
-                &ast::Expr::Attribute(attr_expr.clone()),
-                &old_components,
-            )
-        {
-            return;
-        }
-
-        let new_last = self
-            .new_module_name
-            .components()
-            .last()
-            .unwrap_or(self.new_module_name.as_str());
-        self.edits.push(FileRenameEdit {
-            file: self.file,
-            range: attr_expr.attr.range(),
-            new_text: new_last.to_string(),
-        });
-    }
-
-    /// Handle `import pkg.old_sub` where the dotted name matches the old module.
-    ///
-    /// Single-component imports (`import old_module`) are already handled by
-    /// the find-references infrastructure, so we only process dotted names.
-    fn handle_dotted_import(&mut self, import: &ast::StmtImport) {
-        for alias in &import.names {
-            let name = alias.name.as_str();
-            if !name.contains('.') {
-                continue;
-            }
-
-            let Some(imported_name) = ModuleName::new(name) else {
-                continue;
-            };
-
-            if &imported_name == self.old_module_name {
-                self.edits.push(FileRenameEdit {
-                    file: self.file,
-                    range: alias.name.range(),
-                    new_text: self.new_module_name.to_string(),
-                });
-            }
-        }
-    }
-}
-
-/// Check whether an expression is an attribute access chain matching the given
-/// module name components (e.g., `pkg.old_sub` matches `["pkg", "old_sub"]`).
-fn expr_matches_module_components(expr: &ast::Expr, components: &[&str]) -> bool {
-    match components.split_last() {
-        None => false,
-        Some((last, [])) => {
-            matches!(expr, ast::Expr::Name(name) if name.id.as_str() == *last)
-        }
-        Some((last, rest)) => matches!(
-            expr,
-            ast::Expr::Attribute(attr) if attr.attr.as_str() == *last
-                && expr_matches_module_components(&attr.value, rest)
-        ),
-    }
 }
 
 #[cfg(test)]

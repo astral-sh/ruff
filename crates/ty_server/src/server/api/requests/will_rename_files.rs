@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use lsp_types::request::WillRenameFiles;
-use lsp_types::{RenameFilesParams, TextEdit, Url, WorkspaceEdit};
+use lsp_types::WillRenameFilesRequest;
+use lsp_types::{RenameFilesParams, TextEdit, Uri, WorkspaceEdit};
 use ruff_db::system::SystemPathBuf;
 use ty_ide::will_rename_file;
 
@@ -11,12 +11,12 @@ use crate::server::api::traits::{
 };
 use crate::session::SessionSnapshot;
 use crate::session::client::Client;
-use crate::system::file_to_url;
+use crate::system::file_to_uri;
 
 pub(crate) struct WillRenameFilesHandler;
 
 impl RequestHandler for WillRenameFilesHandler {
-    type RequestType = WillRenameFiles;
+    type RequestType = WillRenameFilesRequest;
 }
 
 impl BackgroundRequestHandler for WillRenameFilesHandler {
@@ -26,20 +26,20 @@ impl BackgroundRequestHandler for WillRenameFilesHandler {
         params: RenameFilesParams,
     ) -> crate::server::Result<Option<WorkspaceEdit>> {
         let encoding = snapshot.position_encoding();
-        let mut all_changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
+        let mut all_changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
         for file_rename in &params.files {
-            let Ok(old_url) = Url::parse(&file_rename.old_uri) else {
+            let Ok(old_uri) = Uri::parse(&file_rename.old_uri) else {
                 continue;
             };
-            let Ok(new_url) = Url::parse(&file_rename.new_uri) else {
+            let Ok(new_uri) = Uri::parse(&file_rename.new_uri) else {
                 continue;
             };
 
-            let Ok(old_std_path) = old_url.to_file_path() else {
+            let Ok(old_std_path) = old_uri.to_file_path() else {
                 continue;
             };
-            let Ok(new_std_path) = new_url.to_file_path() else {
+            let Ok(new_std_path) = new_uri.to_file_path() else {
                 continue;
             };
 
@@ -54,7 +54,7 @@ impl BackgroundRequestHandler for WillRenameFilesHandler {
                 let rename_edits = will_rename_file(db, &old_path, &new_path);
 
                 for edit in rename_edits {
-                    let Some(url) = file_to_url(db, edit.file) else {
+                    let Some(uri) = file_to_uri(db, edit.file) else {
                         continue;
                     };
 
@@ -62,7 +62,7 @@ impl BackgroundRequestHandler for WillRenameFilesHandler {
                         continue;
                     };
 
-                    all_changes.entry(url).or_default().push(TextEdit {
+                    all_changes.entry(uri).or_default().push(TextEdit {
                         range: lsp_range.local_range(),
                         new_text: edit.new_text,
                     });
