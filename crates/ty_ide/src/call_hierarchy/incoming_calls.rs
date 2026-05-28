@@ -233,24 +233,14 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
                     self.check_call_site(leaf, AnyNodeRef::from(&decorator.expression));
                 }
             }
-            // `obj.attr` references that aren't already the callee of an
-            // enclosing `ExprCall` / `Decorator` (those arms recorded them).
-            // Examples this catches:
-            //   - `self.prop` where `prop` is a `@property` (descriptor invokes
-            //     the getter body),
-            //   - `make_async(self.method, ...)` where `self.method` is a
-            //     bound-method reference passed as a callable,
-            //   - `cb = self.method` assignment of a bound method.
-            //
-            // Bare `ExprName` references (e.g. `cb = foo` for a free function)
-            // are deliberately *not* added here — pyright doesn't count them
-            // either, and the `incoming_non_call_reference_filtered_out`
-            // test depends on the bare-name filter staying in place.
+            // A property access is an implicit invocation of its matching
+            // accessor. Skip attributes used as explicit callees because the
+            // `ExprCall` / `Decorator` arms already record those sites.
             AnyNodeRef::ExprAttribute(attribute) => {
                 if !attribute_is_callee_of_parent(&self.ancestors, attribute)
                     && self.attribute_name_could_match(attribute.attr.as_str())
                 {
-                    self.check_attribute_reference(attribute);
+                    self.check_property_access(attribute);
                 }
             }
             _ => {}
@@ -309,12 +299,16 @@ impl<'a> CallSitesFinder<'a, '_> {
         });
     }
 
-    /// Handle `obj.attr` reads/writes/dels that aren't already the callee of
-    /// an enclosing `ExprCall` or `Decorator`. Treats `@property` access as an
-    /// implicit invocation of the matching accessor (read → getter,
-    /// write → setter, `del` → deleter), and treats unparenthesised bound-method
-    /// references like `make_async(self.m, ...)` as call sites of `m`.
-    fn check_attribute_reference(&mut self, attribute: &'a ast::ExprAttribute) {
+    /// Record `@property` accesses as implicit invocations of their matching
+    /// accessor: a read calls the getter, a write calls the setter, and a
+    /// `del` calls the deleter.
+    fn check_property_access(&mut self, attribute: &'a ast::ExprAttribute) {
+        let Some(Type::PropertyInstance(property)) =
+            static_member_type_for_attribute(self.model, attribute)
+        else {
+            return;
+        };
+
         let leaf = CalleeLeaf::AttrIdentifier {
             attribute,
             identifier: &attribute.attr,
@@ -335,55 +329,39 @@ impl<'a> CallSitesFinder<'a, '_> {
             return;
         };
 
-        // If the descriptor protocol is in play (the attribute resolves
-        // statically to a `property` instance), route the site by access kind:
-        // a read points at the getter, a write points at the setter, a `del`
-        // points at the deleter. Without this filter, a read of `c.prop` would
-        // also match the setter (when both accessors are co-definitions in
-        // `target_definitions`) and pollute incoming-calls of the setter with
-        // every read site. Non-property attributes (regular methods, attribute
-        // reads of class names, …) pass through unchanged.
-        let property = match static_member_type_for_attribute(self.model, attribute) {
-            Some(Type::PropertyInstance(property)) => Some(property),
-            _ => None,
-        };
-        if let Some(property) = property {
-            let intersects = current_definitions.iter().any(|resolved| {
-                let role = resolved
-                    .definition()
-                    .and_then(|def| property.accessor_role(self.db, def));
-                // (1) Site-context filter: a read points at the getter, a
-                //     write at the setter, a `del` at the deleter. Regular
-                //     methods (role `None`) appear only on reads — writes
-                //     and deletes of a non-property attribute aren't calls.
-                let matches_site_kind = match attribute.ctx {
-                    ast::ExprContext::Load => {
-                        matches!(role, Some(PropertyAccessorRole::Getter) | None)
-                    }
-                    ast::ExprContext::Store => matches!(role, Some(PropertyAccessorRole::Setter)),
-                    ast::ExprContext::Del => matches!(role, Some(PropertyAccessorRole::Deleter)),
-                    ast::ExprContext::Invalid => false,
-                };
-                if !matches_site_kind {
-                    return false;
+        // Route the site by access kind. Without this filter, a read of
+        // `c.prop` would also match the setter when both accessors are
+        // co-definitions in `target_definitions`.
+        let intersects = current_definitions.iter().any(|resolved| {
+            let role = resolved
+                .definition()
+                .and_then(|def| property.accessor_role(self.db, def));
+            let matches_site_kind = match attribute.ctx {
+                ast::ExprContext::Load => {
+                    matches!(role, Some(PropertyAccessorRole::Getter) | None)
                 }
-                // (2) Queried-role filter: setter and deleter definitions
-                //     include the getter as a co-definition (added by
-                //     `property_getter_definitions`). Only the requested
-                //     accessor should contribute incoming call sites.
-                if matches!(
-                    self.target_role,
-                    Some(PropertyAccessorRole::Setter | PropertyAccessorRole::Deleter)
-                ) && role != self.target_role
-                {
-                    return false;
-                }
-                self.target_definitions.iter().any(|t| t == resolved)
-            });
-            if !intersects {
-                return;
+                ast::ExprContext::Store => matches!(role, Some(PropertyAccessorRole::Setter)),
+                ast::ExprContext::Del => matches!(role, Some(PropertyAccessorRole::Deleter)),
+                ast::ExprContext::Invalid => false,
+            };
+            if !matches_site_kind {
+                return false;
             }
-        } else if !self.target_definitions.intersects(&current_definitions) {
+
+            // Setter and deleter definitions include the getter as a
+            // co-definition. Only the queried accessor contributes sites.
+            if matches!(
+                self.target_role,
+                Some(PropertyAccessorRole::Setter | PropertyAccessorRole::Deleter)
+            ) && role != self.target_role
+            {
+                return false;
+            }
+            self.target_definitions
+                .iter()
+                .any(|target| target == resolved)
+        });
+        if !intersects {
             return;
         }
 
@@ -961,11 +939,9 @@ def make() -> C:
 
     // --- incoming: attribute-reference call sites --------------------------
     //
-    // Beyond `ExprCall` and `Decorator`, an `ExprAttribute` reference can be
-    // an implicit call: a `@property` access invokes the getter/setter/
-    // deleter through the descriptor protocol; a bare bound-method reference
-    // like `make_async(self.m, ...)` is the callee even though no parens
-    // appear at the reference site.
+    // Beyond `ExprCall` and `Decorator`, a `@property` access is an implicit
+    // invocation of the getter, setter, or deleter through the descriptor
+    // protocol.
 
     #[test]
     fn property_getter_read() {
@@ -1071,7 +1047,8 @@ def make() -> C:
     }
 
     #[test]
-    fn method_reference_passed_as_arg() {
+    fn bound_method_reference_passed_as_arg_is_not_a_call() {
+        // Passing a bound-method value does not execute the method body.
         let test = cursor_test(
             r#"
             def make_async(fn, executor=None):
@@ -1085,24 +1062,12 @@ def make() -> C:
                     self._async = make_async(self.method)
             "#,
         );
-        assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls to `method`
-          --> main.py:10:39
-           |
-        10 |         self._async = make_async(self.method)
-           |                                       ^^^^^^ Call site
-           |
-        info: Method: `__init__` (`main`)
-         --> main.py:9:9
-          |
-        9 |     def __init__(self) -> None:
-          |         ^^^^^^^^
-          |
-        ");
+        assert_snapshot!(test.incoming_calls(), @"No incoming calls found");
     }
 
     #[test]
-    fn method_reference_assigned() {
+    fn bound_method_reference_assigned_is_not_a_call() {
+        // Binding a method for later invocation is a reference, not a call.
         let test = cursor_test(
             r#"
             class C:
@@ -1113,26 +1078,11 @@ def make() -> C:
                     cb = self.method
             "#,
         );
-        assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls to `method`
-         --> main.py:7:19
-          |
-        7 |         cb = self.method
-          |                   ^^^^^^ Call site
-          |
-        info: Method: `setup` (`main`)
-         --> main.py:6:9
-          |
-        6 |     def setup(self) -> None:
-          |         ^^^^^
-          |
-        ");
+        assert_snapshot!(test.incoming_calls(), @"No incoming calls found");
     }
 
     #[test]
-    fn attribute_call_not_double_counted() {
-        // `c.method()` is one site, not two — the `ExprCall` arm and the
-        // `ExprAttribute` arm must not both record the same range.
+    fn method_call() {
         let test = cursor_test(
             r#"
             class C:
