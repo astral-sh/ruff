@@ -11,8 +11,8 @@
 pub(crate) mod incoming_calls;
 pub(crate) mod outgoing_calls;
 
-use crate::Db;
 use crate::goto::{GotoTarget, find_goto_target};
+use crate::{Db, SymbolKind};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::CoveringNode;
@@ -56,21 +56,6 @@ pub fn prepare_call_hierarchy(
     if items.is_empty() { None } else { Some(items) }
 }
 
-/// What kind of callable an item represents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CallHierarchyItemKind {
-    /// A free function (top-level or nested) — `def`/`async def`.
-    Function,
-    /// A method defined inside a class body. Includes `@property`, `@staticmethod`,
-    /// `@classmethod`, and `async def` methods.
-    Method,
-    /// A class. When this is a *callee*, it represents a constructor invocation.
-    Class,
-    /// A module — used only for the "enclosing scope" of a top-level call site
-    /// in incoming-calls.
-    Module,
-}
-
 /// One node in a call hierarchy.
 ///
 /// Mirrors `lsp_types::CallHierarchyItem` but in ty's domain types — the LSP-layer
@@ -78,7 +63,7 @@ pub enum CallHierarchyItemKind {
 #[derive(Debug, Clone)]
 pub struct CallHierarchyItem {
     pub name: Name,
-    pub kind: CallHierarchyItemKind,
+    pub kind: SymbolKind,
     /// The file containing the callable definition.
     pub file: File,
     /// Full range of the definition (or full file range for `Module`).
@@ -109,13 +94,13 @@ impl CallHierarchyItem {
         let kind = match def_kind {
             DefinitionKind::Function(_) => {
                 let item_kind = if def.scope(db).scope(db).kind().is_class() {
-                    CallHierarchyItemKind::Method
+                    SymbolKind::Method
                 } else {
-                    CallHierarchyItemKind::Function
+                    SymbolKind::Function
                 };
                 item_kind
             }
-            DefinitionKind::Class(_) => CallHierarchyItemKind::Class,
+            DefinitionKind::Class(_) => SymbolKind::Class,
 
             _ => return None,
         };
@@ -128,11 +113,6 @@ impl CallHierarchyItem {
             selection_range: def.focus_range(db, module).range(),
         })
     }
-}
-
-struct RawCallSite {
-    from: CallHierarchyItem,
-    call_site_range: TextRange,
 }
 
 /// The relevant node + offset for resolving the callee of a call site. For
@@ -197,15 +177,6 @@ mod tests {
     use super::*;
     use crate::tests::{CursorTest, cursor_test};
 
-    fn kind_str(kind: CallHierarchyItemKind) -> &'static str {
-        match kind {
-            CallHierarchyItemKind::Function => "function",
-            CallHierarchyItemKind::Method => "method",
-            CallHierarchyItemKind::Class => "class",
-            CallHierarchyItemKind::Module => "module",
-        }
-    }
-
     pub(super) fn snapshot_item(db: &dyn Db, item: &CallHierarchyItem) -> String {
         format!(
             "{path}:{start}:{end} {name} ({kind})",
@@ -213,7 +184,7 @@ mod tests {
             start = item.selection_range.start().to_usize(),
             end = item.selection_range.end().to_usize(),
             name = item.name,
-            kind = kind_str(item.kind),
+            kind = item.kind.to_string(),
         )
     }
 
@@ -240,7 +211,7 @@ mod tests {
             "#,
         );
         let items = test.prepare_calls().unwrap();
-        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:5:8 foo (function)");
+        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:5:8 foo (Function)");
     }
 
     #[test]
@@ -252,7 +223,7 @@ mod tests {
             "#,
         );
         let items = test.prepare_calls().unwrap();
-        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:7:14 MyClass (class)");
+        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:7:14 MyClass (Class)");
     }
 
     #[test]
@@ -265,7 +236,7 @@ mod tests {
             "#,
         );
         let items = test.prepare_calls().unwrap();
-        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:18:24 method (method)");
+        insta::assert_snapshot!(snapshot_items(&test.db, &items), @"/main.py:18:24 method (Method)");
     }
 
     #[test]
@@ -280,8 +251,8 @@ mod tests {
         );
         let items = test.prepare_calls().unwrap();
         insta::assert_snapshot!(snapshot_items(&test.db, &items), @"
-        /main.py:5:8 foo (function)
-        /main.py:5:8 foo (function)
+        /main.py:5:8 foo (Function)
+        /main.py:5:8 foo (Function)
         ");
     }
 
@@ -331,7 +302,7 @@ mod tests {
         );
         let items = test.prepare_calls().unwrap();
         assert_eq!(items.len(), 1, "got {items:?}");
-        assert_eq!(items[0].kind, CallHierarchyItemKind::Function);
+        assert_eq!(items[0].kind, SymbolKind::Function);
         assert_eq!(items[0].name.as_str(), "foo");
     }
 
@@ -347,7 +318,7 @@ mod tests {
         );
         let items = test.prepare_calls().unwrap();
         assert_eq!(items.len(), 1, "got {items:?}");
-        assert_eq!(items[0].kind, CallHierarchyItemKind::Method);
+        assert_eq!(items[0].kind, SymbolKind::Method);
     }
 
     #[test]
@@ -362,6 +333,6 @@ mod tests {
         );
         let items = test.prepare_calls().unwrap();
         assert_eq!(items.len(), 1, "got {items:?}");
-        assert_eq!(items[0].kind, CallHierarchyItemKind::Method);
+        assert_eq!(items[0].kind, SymbolKind::Method);
     }
 }

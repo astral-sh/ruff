@@ -1,7 +1,7 @@
-use crate::call_hierarchy::{CalleeLeaf, RawCallSite, callee_leaf, resolve_callee};
+use crate::call_hierarchy::{CalleeLeaf, callee_leaf, resolve_callee};
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::references::{contains_identifier, has_any_external_visible_definitions};
-use crate::{CallHierarchyItem, CallHierarchyItemKind, Db};
+use crate::{CallHierarchyItem, Db, SymbolKind};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::helpers::is_dunder;
@@ -430,6 +430,11 @@ impl<'a> CallSitesFinder<'a, '_> {
     }
 }
 
+struct RawCallSite {
+    from: CallHierarchyItem,
+    call_site_range: TextRange,
+}
+
 /// Build the enclosing-scope item by walking the ancestor stack outwards from
 /// a call site until we find a `StmtFunctionDef` / `StmtClassDef` / `ExprLambda`;
 /// if none is found, the enclosing scope is the module itself. Comprehensions
@@ -467,9 +472,9 @@ fn enclosing_scope_item(
         EnclosingNode::Function(func) => CallHierarchyItem {
             name: Name::from(func.name.as_str().to_string()),
             kind: if outer.unwrap_or(false) {
-                CallHierarchyItemKind::Method
+                SymbolKind::Method
             } else {
-                CallHierarchyItemKind::Function
+                SymbolKind::Function
             },
 
             file,
@@ -478,7 +483,7 @@ fn enclosing_scope_item(
         },
         EnclosingNode::Class(class) => CallHierarchyItem {
             name: Name::from(class.name.as_str().to_string()),
-            kind: CallHierarchyItemKind::Class,
+            kind: SymbolKind::Class,
             file,
             full_range: class.range(),
             selection_range: class.name.range(),
@@ -487,7 +492,7 @@ fn enclosing_scope_item(
             let start = lambda.range().start();
             CallHierarchyItem {
                 name: Name::from("(lambda)"),
-                kind: CallHierarchyItemKind::Function,
+                kind: SymbolKind::Function,
                 file,
                 full_range: lambda.range(),
                 selection_range: TextRange::at(start, TextSize::of("lambda")),
@@ -515,7 +520,7 @@ fn module_item(db: &dyn Db, file: File) -> CallHierarchyItem {
         .unwrap_or_else(|| "<module>".to_string());
     CallHierarchyItem {
         name: Name::from(name),
-        kind: CallHierarchyItemKind::Module,
+        kind: SymbolKind::Module,
         file,
         full_range: TextRange::default(),
         selection_range: TextRange::default(),
@@ -546,6 +551,7 @@ fn attribute_is_callee_of_parent<'a>(
 #[cfg(test)]
 mod tests {
     use crate::{
+        SymbolKind,
         call_hierarchy::tests::snapshot_item,
         outgoing_calls,
         tests::{CursorTest, cursor_test},
@@ -591,7 +597,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(snapshot_incoming(&test.db, &test.incoming()), @"
-        /main.py:26:32 caller (function)
+        /main.py:26:32 caller (Function)
           call @ 40..43
         ");
     }
@@ -701,7 +707,7 @@ def use():
         );
         let incoming = test.incoming();
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
-        assert_eq!(incoming[0].from.kind, CallHierarchyItemKind::Module);
+        assert_eq!(incoming[0].from.kind, SymbolKind::Module);
     }
 
     #[test]
@@ -986,7 +992,7 @@ def use():
         let incoming = test.incoming();
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
         assert_eq!(incoming[0].from.name.as_str(), "(lambda)");
-        assert_eq!(incoming[0].from.kind, CallHierarchyItemKind::Function);
+        assert_eq!(incoming[0].from.kind, SymbolKind::Function);
         // selection_range must anchor at the `lambda` keyword (6 chars).
         let sel = incoming[0].from.selection_range;
         let source = test.cursor.source.as_str();
@@ -1015,7 +1021,7 @@ def use():
         assert_eq!(incoming.len(), 2, "got {incoming:?}");
         for call in &incoming {
             assert_eq!(call.from.name.as_str(), "(lambda)");
-            assert_eq!(call.from.kind, CallHierarchyItemKind::Function);
+            assert_eq!(call.from.kind, SymbolKind::Function);
             assert_eq!(call.from_ranges.len(), 1);
         }
         assert_ne!(
@@ -1042,7 +1048,7 @@ def use():
         let incoming = test.incoming();
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
         assert_eq!(incoming[0].from.name.as_str(), "(lambda)");
-        assert_eq!(incoming[0].from.kind, CallHierarchyItemKind::Function);
+        assert_eq!(incoming[0].from.kind, SymbolKind::Function);
     }
 
     #[test]
@@ -1062,7 +1068,7 @@ def use():
         let incoming = test.incoming();
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
         assert_eq!(incoming[0].from.name.as_str(), "caller");
-        assert_eq!(incoming[0].from.kind, CallHierarchyItemKind::Function);
+        assert_eq!(incoming[0].from.kind, SymbolKind::Function);
     }
 
     #[test]

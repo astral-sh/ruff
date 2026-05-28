@@ -347,7 +347,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(snapshot_outgoing(&test.db, &test.outgoing()), @"
-        /main.py:5:11 helper (function)
+        /main.py:5:11 helper (Function)
           call @ 40..46
         ");
     }
@@ -365,7 +365,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(snapshot_outgoing(&test.db, &test.outgoing()), @"
-        /main.py:18:19 m (method)
+        /main.py:18:19 m (Method)
           call @ 62..63
         ");
     }
@@ -382,7 +382,7 @@ mod tests {
             "#,
         );
         insta::assert_snapshot!(snapshot_outgoing(&test.db, &test.outgoing()), @"
-        /main.py:7:8 C (class)
+        /main.py:7:8 C (Class)
           call @ 35..36
         ");
     }

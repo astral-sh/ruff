@@ -5,9 +5,7 @@
 //! queries that round-trip the symbol identity via the item's `uri` and
 //! `selection_range.start`.
 
-use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, SymbolKind,
-};
+use lsp_types::{CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall};
 use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::SystemPathBuf;
 use ruff_text_size::TextSize;
@@ -15,6 +13,7 @@ use ty_project::ProjectDatabase;
 
 use crate::PositionEncoding;
 use crate::document::{PositionExt, ToRangeExt};
+use crate::server::api::symbols::convert_symbol_kind;
 use crate::session::SessionSnapshot;
 use crate::system::file_to_url;
 
@@ -137,12 +136,7 @@ pub(crate) fn convert_to_lsp_item(
     let full_range = item.full_range.to_lsp_range(db, item.file, encoding)?;
     let selection_range = item.selection_range.to_lsp_range(db, item.file, encoding)?;
 
-    let kind = match item.kind {
-        ty_ide::CallHierarchyItemKind::Function => SymbolKind::FUNCTION,
-        ty_ide::CallHierarchyItemKind::Method => SymbolKind::METHOD,
-        ty_ide::CallHierarchyItemKind::Class => SymbolKind::CLASS,
-        ty_ide::CallHierarchyItemKind::Module => SymbolKind::MODULE,
-    };
+    let kind = convert_symbol_kind(item.kind);
 
     Some(CallHierarchyItem {
         name: item.name.into(),

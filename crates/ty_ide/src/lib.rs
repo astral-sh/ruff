@@ -33,7 +33,7 @@ mod workspace_symbols;
 pub use all_symbols::{AllSymbolInfo, all_symbols};
 pub use call_hierarchy::incoming_calls::{IncomingCall, incoming_calls};
 pub use call_hierarchy::outgoing_calls::{OutgoingCall, outgoing_calls};
-pub use call_hierarchy::{CallHierarchyItem, CallHierarchyItemKind, prepare_call_hierarchy};
+pub use call_hierarchy::{CallHierarchyItem, prepare_call_hierarchy};
 pub use code_action::{QuickFix, code_actions};
 pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
