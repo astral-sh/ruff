@@ -551,7 +551,7 @@ fn attribute_is_callee_of_parent<'a>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        CallHierarchyItem, outgoing_calls,
+        outgoing_calls,
         tests::{CursorTest, IntoDiagnostic, cursor_test},
     };
     use insta::assert_snapshot;
@@ -574,43 +574,47 @@ mod tests {
             if calls.is_empty() {
                 return "No incoming calls found".to_string();
             }
+            let target_name = target.name.to_string();
 
-            self.render_diagnostics([IncomingCallsDiagnostic { target, calls }])
+            self.render_diagnostics(calls.into_iter().map(|call| IncomingCallDiagnostic {
+                target_name: target_name.clone(),
+                call,
+            }))
         }
     }
 
-    struct IncomingCallsDiagnostic {
-        target: CallHierarchyItem,
-        calls: Vec<IncomingCall>,
+    struct IncomingCallDiagnostic {
+        target_name: String,
+        call: IncomingCall,
     }
 
-    impl IntoDiagnostic for IncomingCallsDiagnostic {
+    impl IntoDiagnostic for IncomingCallDiagnostic {
         fn into_diagnostic(self) -> Diagnostic {
+            let IncomingCall { from, from_ranges } = self.call;
             let mut diagnostic = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("incoming-calls")),
                 Severity::Info,
-                "Incoming calls".to_string(),
-            );
-            diagnostic.annotate(
-                Annotation::primary(
-                    Span::from(self.target.file).with_range(self.target.selection_range),
-                )
-                .message("Target"),
+                format!("Incoming calls to `{}`", self.target_name),
             );
 
-            for call in self.calls {
-                let mut caller = SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    format!("{} ({})", call.from.name, call.from.kind.to_string()),
+            for range in from_ranges {
+                diagnostic.annotate(
+                    Annotation::primary(Span::from(from.file).with_range(range))
+                        .message("Call site"),
                 );
-                for range in call.from_ranges {
-                    caller.annotate(
-                        Annotation::secondary(Span::from(call.from.file).with_range(range))
-                            .message("Call site"),
-                    );
-                }
-                diagnostic.sub(caller);
             }
+
+            let mut caller = SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("Caller: `{}` ({})", from.name, from.kind.to_string()),
+            );
+            let mut caller_annotation =
+                Annotation::primary(Span::from(from.file).with_range(from.selection_range));
+            if matches!(&from.kind, SymbolKind::Module) {
+                caller_annotation.hide_snippet(true);
+            }
+            caller.annotate(caller_annotation);
+            diagnostic.sub(caller);
 
             diagnostic
         }
@@ -628,17 +632,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def foo():
-          |     ^^^ Target
-          |
-        info: caller (Function)
+        info[incoming-calls]: Incoming calls to `foo`
          --> main.py:6:5
           |
         6 |     foo()
-          |     --- Call site
+          |     ^^^ Call site
+          |
+        info: Caller: `caller` (Function)
+         --> main.py:5:5
+          |
+        5 | def caller():
+          |     ^^^^^^
           |
         ");
     }
@@ -656,17 +660,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def foo():
-          |     ^^^ Target
-          |
-        info: caller (Function)
+        info[incoming-calls]: Incoming calls to `foo`
          --> main.py:7:5
           |
         7 |     foo()     # this is a call — should appear once
-          |     --- Call site
+          |     ^^^ Call site
+          |
+        info: Caller: `caller` (Function)
+         --> main.py:5:5
+          |
+        5 | def caller():
+          |     ^^^^^^
           |
         ");
     }
@@ -692,17 +696,17 @@ def use():
             )
             .build();
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> utils.py:2:5
-          |
-        2 | def foo():
-          |     ^^^ Target
-          |
-        info: use (Function)
+        info[incoming-calls]: Incoming calls to `foo`
          --> caller.py:5:5
           |
         5 |     foo()
-          |     --- Call site
+          |     ^^^ Call site
+          |
+        info: Caller: `use` (Function)
+         --> caller.py:4:5
+          |
+        4 | def use():
+          |     ^^^
           |
         ");
     }
@@ -728,17 +732,17 @@ def use():
             )
             .build();
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> utils.py:2:5
-          |
-        2 | def foo():
-          |     ^^^ Target
-          |
-        info: use (Function)
+        info[incoming-calls]: Incoming calls to `foo`
          --> caller.py:5:5
           |
         5 |     bar()
-          |     --- Call site
+          |     ^^^ Call site
+          |
+        info: Caller: `use` (Function)
+         --> caller.py:4:5
+          |
+        4 | def use():
+          |     ^^^
           |
         ");
     }
@@ -755,17 +759,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def foo(x):
-          |     ^^^ Target
-          |
-        info: caller (Function)
+        info[incoming-calls]: Incoming calls to `foo`
          --> main.py:6:5
           |
         6 |     foo(x=1)
-          |     --- Call site
+          |     ^^^ Call site
+          |
+        info: Caller: `caller` (Function)
+         --> main.py:5:5
+          |
+        5 | def caller():
+          |     ^^^^^^
           |
         ");
     }
@@ -781,18 +785,14 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def foo():
-          |     ^^^ Target
-          |
-        info: main (Module)
+        info[incoming-calls]: Incoming calls to `foo`
          --> main.py:5:1
           |
         5 | foo()
-          | --- Call site
+          | ^^^ Call site
           |
+        info: Caller: `main` (Module)
+        --> main.py:1:1
         ");
     }
 
@@ -810,17 +810,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def foo(f):
-          |     ^^^ Target
-          |
-        info: bar (Function)
+        info[incoming-calls]: Incoming calls to `foo`
          --> main.py:5:2
           |
         5 | @foo
-          |  --- Call site
+          |  ^^^ Call site
+          |
+        info: Caller: `bar` (Function)
+         --> main.py:6:5
+          |
+        6 | def bar():
+          |     ^^^
           |
         ");
     }
@@ -844,17 +844,17 @@ def use():
         );
         // Should only record the `a.foo()` site, not `b.foo()`.
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:3:9
-          |
-        3 |     def foo(self):
-          |         ^^^ Target
-          |
-        info: use (Function)
+        info[incoming-calls]: Incoming calls to `foo`
           --> main.py:11:7
            |
         11 |     a.foo()
-           |       --- Call site
+           |       ^^^ Call site
+           |
+        info: Caller: `use` (Function)
+          --> main.py:10:5
+           |
+        10 | def use(a: A, b: B):
+           |     ^^^
            |
         ");
     }
@@ -875,17 +875,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:3:9
-          |
-        3 |     def m(self):
-          |         ^ Target
-          |
-        info: m (Method)
+        info[incoming-calls]: Incoming calls to `m`
          --> main.py:8:17
           |
         8 |         super().m()
-          |                 - Call site
+          |                 ^ Call site
+          |
+        info: Caller: `m` (Method)
+         --> main.py:7:9
+          |
+        7 |     def m(self):
+          |         ^
           |
         ");
     }
@@ -912,17 +912,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:4:9
-          |
-        4 |     def prop(self) -> int:
-          |         ^^^^ Target
-          |
-        info: read (Function)
+        info[incoming-calls]: Incoming calls to `prop`
          --> main.py:8:14
           |
         8 |     return c.prop
-          |              ---- Call site
+          |              ^^^^ Call site
+          |
+        info: Caller: `read` (Function)
+         --> main.py:7:5
+          |
+        7 | def read(c: C) -> int:
+          |     ^^^^
           |
         ");
     }
@@ -950,17 +950,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:8:9
-          |
-        8 |     def prop(self, v: int) -> None:
-          |         ^^^^ Target
-          |
-        info: write (Function)
+        info[incoming-calls]: Incoming calls to `prop`
           --> main.py:12:7
            |
         12 |     c.prop = 5
-           |       ---- Call site
+           |       ^^^^ Call site
+           |
+        info: Caller: `write` (Function)
+          --> main.py:11:5
+           |
+        11 | def write(c: C) -> None:
+           |     ^^^^^
            |
         ");
     }
@@ -986,17 +986,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:8:9
-          |
-        8 |     def prop(self) -> None:
-          |         ^^^^ Target
-          |
-        info: remove (Function)
+        info[incoming-calls]: Incoming calls to `prop`
           --> main.py:12:11
            |
         12 |     del c.prop
-           |           ---- Call site
+           |           ^^^^ Call site
+           |
+        info: Caller: `remove` (Function)
+          --> main.py:11:5
+           |
+        11 | def remove(c: C) -> None:
+           |     ^^^^^^
            |
         ");
     }
@@ -1017,18 +1017,18 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:6:9
-          |
-        6 |     def method(self) -> int:
-          |         ^^^^^^ Target
-          |
-        info: __init__ (Method)
+        info[incoming-calls]: Incoming calls to `method`
           --> main.py:10:39
            |
         10 |         self._async = make_async(self.method)
-           |                                       ------ Call site
+           |                                       ^^^^^^ Call site
            |
+        info: Caller: `__init__` (Method)
+         --> main.py:9:9
+          |
+        9 |     def __init__(self) -> None:
+          |         ^^^^^^^^
+          |
         ");
     }
 
@@ -1045,17 +1045,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:3:9
-          |
-        3 |     def method(self) -> int:
-          |         ^^^^^^ Target
-          |
-        info: setup (Method)
+        info[incoming-calls]: Incoming calls to `method`
          --> main.py:7:19
           |
         7 |         cb = self.method
-          |                   ------ Call site
+          |                   ^^^^^^ Call site
+          |
+        info: Caller: `setup` (Method)
+         --> main.py:6:9
+          |
+        6 |     def setup(self) -> None:
+          |         ^^^^^
           |
         ");
     }
@@ -1075,17 +1075,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:3:9
-          |
-        3 |     def method(self) -> int:
-          |         ^^^^^^ Target
-          |
-        info: use (Function)
+        info[incoming-calls]: Incoming calls to `method`
          --> main.py:7:14
           |
         7 |     return c.method()
-          |              ------ Call site
+          |              ^^^^^^ Call site
+          |
+        info: Caller: `use` (Function)
+         --> main.py:6:5
+          |
+        6 | def use(c: C) -> int:
+          |     ^^^
           |
         ");
     }
@@ -1123,17 +1123,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def target(x):
-          |     ^^^^^^ Target
-          |
-        info: (lambda) (Function)
+        info[incoming-calls]: Incoming calls to `target`
          --> main.py:5:15
           |
         5 | f = lambda x: target(x)
-          |               ------ Call site
+          |               ^^^^^^ Call site
+          |
+        info: Caller: `(lambda)` (Function)
+         --> main.py:5:5
+          |
+        5 | f = lambda x: target(x)
+          |     ^^^^^^
           |
         ");
         let Some(target) = test
@@ -1167,23 +1167,30 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def target(x):
-          |     ^^^^^^ Target
-          |
-        info: (lambda) (Function)
+        info[incoming-calls]: Incoming calls to `target`
          --> main.py:5:15
           |
         5 | a = lambda x: target(x)
-          |               ------ Call site
+          |               ^^^^^^ Call site
           |
-        info: (lambda) (Function)
+        info: Caller: `(lambda)` (Function)
+         --> main.py:5:5
+          |
+        5 | a = lambda x: target(x)
+          |     ^^^^^^
+          |
+
+        info[incoming-calls]: Incoming calls to `target`
          --> main.py:6:15
           |
         6 | b = lambda y: target(y)
-          |               ------ Call site
+          |               ^^^^^^ Call site
+          |
+        info: Caller: `(lambda)` (Function)
+         --> main.py:6:5
+          |
+        6 | b = lambda y: target(y)
+          |     ^^^^^^
           |
         ");
     }
@@ -1204,17 +1211,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def target(x):
-          |     ^^^^^^ Target
-          |
-        info: (lambda) (Function)
+        info[incoming-calls]: Incoming calls to `target`
          --> main.py:6:19
           |
         6 |     f = lambda x: target(x)
-          |                   ------ Call site
+          |                   ^^^^^^ Call site
+          |
+        info: Caller: `(lambda)` (Function)
+         --> main.py:6:9
+          |
+        6 |     f = lambda x: target(x)
+          |         ^^^^^^
           |
         ");
     }
@@ -1234,17 +1241,17 @@ def use():
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
-        info[incoming-calls]: Incoming calls
-         --> main.py:2:5
-          |
-        2 | def target(x):
-          |     ^^^^^^ Target
-          |
-        info: caller (Function)
+        info[incoming-calls]: Incoming calls to `target`
          --> main.py:6:13
           |
         6 |     return [target(x) for x in xs]
-          |             ------ Call site
+          |             ^^^^^^ Call site
+          |
+        info: Caller: `caller` (Function)
+         --> main.py:5:5
+          |
+        5 | def caller(xs):
+          |     ^^^^^^
           |
         ");
     }

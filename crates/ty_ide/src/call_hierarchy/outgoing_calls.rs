@@ -300,10 +300,7 @@ fn walk_class_signature<'a, V>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        CallHierarchyItem,
-        tests::{CursorTest, IntoDiagnostic, cursor_test},
-    };
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
@@ -324,45 +321,46 @@ mod tests {
             if calls.is_empty() {
                 return "No outgoing calls found".to_string();
             }
+            let caller_name = target.name.to_string();
 
-            self.render_diagnostics([OutgoingCallsDiagnostic { target, calls }])
+            self.render_diagnostics(calls.into_iter().map(|call| OutgoingCallDiagnostic {
+                caller_name: caller_name.clone(),
+                caller_file: target.file,
+                call,
+            }))
         }
     }
 
-    struct OutgoingCallsDiagnostic {
-        target: CallHierarchyItem,
-        calls: Vec<OutgoingCall>,
+    struct OutgoingCallDiagnostic {
+        caller_name: String,
+        caller_file: File,
+        call: OutgoingCall,
     }
 
-    impl IntoDiagnostic for OutgoingCallsDiagnostic {
+    impl IntoDiagnostic for OutgoingCallDiagnostic {
         fn into_diagnostic(self) -> Diagnostic {
-            let caller_file = self.target.file;
+            let OutgoingCall { to, from_ranges } = self.call;
             let mut diagnostic = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("outgoing-calls")),
                 Severity::Info,
-                "Outgoing calls".to_string(),
-            );
-            diagnostic.annotate(
-                Annotation::primary(
-                    Span::from(caller_file).with_range(self.target.selection_range),
-                )
-                .message("Caller"),
+                format!("Outgoing calls from `{}`", self.caller_name),
             );
 
-            for call in self.calls {
-                let call_message = format!("Calls {}", call.to.name);
-                let mut callee = SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    format!("{} ({})", call.to.name, call.to.kind.to_string()),
+            for range in from_ranges {
+                diagnostic.annotate(
+                    Annotation::primary(Span::from(self.caller_file).with_range(range))
+                        .message("Call site"),
                 );
-                for range in call.from_ranges {
-                    callee.annotate(
-                        Annotation::secondary(Span::from(caller_file).with_range(range))
-                            .message(call_message.clone()),
-                    );
-                }
-                diagnostic.sub(callee);
             }
+
+            let mut callee = SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("Callee: `{}` ({})", to.name, to.kind.to_string()),
+            );
+            callee.annotate(Annotation::primary(
+                Span::from(to.file).with_range(to.selection_range),
+            ));
+            diagnostic.sub(callee);
 
             diagnostic
         }
@@ -380,17 +378,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:5:5
-          |
-        5 | def foo():
-          |     ^^^ Caller
-          |
-        info: helper (Function)
+        info[outgoing-calls]: Outgoing calls from `foo`
          --> main.py:6:5
           |
         6 |     helper()
-          |     ------ Calls helper
+          |     ^^^^^^ Call site
+          |
+        info: Callee: `helper` (Function)
+         --> main.py:2:5
+          |
+        2 | def helper():
+          |     ^^^^^^
           |
         ");
     }
@@ -408,17 +406,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:6:5
-          |
-        6 | def foo(c: C):
-          |     ^^^ Caller
-          |
-        info: m (Method)
+        info[outgoing-calls]: Outgoing calls from `foo`
          --> main.py:7:7
           |
         7 |     c.m()
-          |       - Calls m
+          |       ^ Call site
+          |
+        info: Callee: `m` (Method)
+         --> main.py:3:9
+          |
+        3 |     def m(self):
+          |         ^
           |
         ");
     }
@@ -435,17 +433,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:5:5
-          |
-        5 | def foo():
-          |     ^^^ Caller
-          |
-        info: C (Class)
+        info[outgoing-calls]: Outgoing calls from `foo`
          --> main.py:6:5
           |
         6 |     C()
-          |     - Calls C
+          |     ^ Call site
+          |
+        info: Callee: `C` (Class)
+         --> main.py:2:7
+          |
+        2 | class C:
+          |       ^
           |
         ");
     }
@@ -463,19 +461,19 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:5:5
-          |
-        5 | def foo():
-          |     ^^^ Caller
-          |
-        info: helper (Function)
+        info[outgoing-calls]: Outgoing calls from `foo`
          --> main.py:6:5
           |
         6 |     helper()
-          |     ------ Calls helper
+          |     ^^^^^^ Call site
         7 |     helper()
-          |     ------ Calls helper
+          |     ^^^^^^ Call site
+          |
+        info: Callee: `helper` (Function)
+         --> main.py:2:5
+          |
+        2 | def helper():
+          |     ^^^^^^
           |
         ");
     }
@@ -533,41 +531,69 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-          --> main.py:18:7
-           |
-        18 | class Cls(base_factory()):
-           |       ^^^ Caller
-           |
-        info: cls_deco (Function)
+        info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:17:2
            |
         17 | @cls_deco
-           |  -------- Calls cls_deco
+           |  ^^^^^^^^ Call site
            |
-        info: base_factory (Function)
+        info: Callee: `cls_deco` (Function)
+         --> main.py:2:5
+          |
+        2 | def cls_deco(cls):
+          |     ^^^^^^^^
+          |
+
+        info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:18:11
            |
         18 | class Cls(base_factory()):
-           |           ------------ Calls base_factory
+           |           ^^^^^^^^^^^^ Call site
            |
-        info: class_body_helper (Function)
+        info: Callee: `base_factory` (Function)
+         --> main.py:5:5
+          |
+        5 | def base_factory():
+          |     ^^^^^^^^^^^^
+          |
+
+        info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:19:12
            |
         19 |     attr = class_body_helper()
-           |            ----------------- Calls class_body_helper
+           |            ^^^^^^^^^^^^^^^^^ Call site
            |
-        info: method_deco (Function)
+        info: Callee: `class_body_helper` (Function)
+         --> main.py:8:5
+          |
+        8 | def class_body_helper():
+          |     ^^^^^^^^^^^^^^^^^
+          |
+
+        info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:21:6
            |
         21 |     @method_deco
-           |      ----------- Calls method_deco
+           |      ^^^^^^^^^^^ Call site
            |
-        info: default_factory (Function)
+        info: Callee: `method_deco` (Function)
+          --> main.py:11:5
+           |
+        11 | def method_deco(fn):
+           |     ^^^^^^^^^^^
+           |
+
+        info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:22:19
            |
         22 |     def m(self, x=default_factory()):
-           |                   --------------- Calls default_factory
+           |                   ^^^^^^^^^^^^^^^ Call site
+           |
+        info: Callee: `default_factory` (Function)
+          --> main.py:14:5
+           |
+        14 | def default_factory():
+           |     ^^^^^^^^^^^^^^^
            |
         ");
     }
@@ -589,17 +615,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:5:5
-          |
-        5 | def outer():
-          |     ^^^^^ Caller
-          |
-        info: nested (Function)
+        info[outgoing-calls]: Outgoing calls from `outer`
          --> main.py:8:5
           |
         8 |     nested()
-          |     ------ Calls nested
+          |     ^^^^^^ Call site
+          |
+        info: Callee: `nested` (Function)
+         --> main.py:6:9
+          |
+        6 |     def nested():
+          |         ^^^^^^
           |
         ");
     }
@@ -618,17 +644,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:5:5
-          |
-        5 | def foo(x=default_factory()):
-          |     ^^^ Caller
-          |
-        info: default_factory (Function)
+        info[outgoing-calls]: Outgoing calls from `foo`
          --> main.py:5:11
           |
         5 | def foo(x=default_factory()):
-          |           --------------- Calls default_factory
+          |           ^^^^^^^^^^^^^^^ Call site
+          |
+        info: Callee: `default_factory` (Function)
+         --> main.py:2:5
+          |
+        2 | def default_factory():
+          |     ^^^^^^^^^^^^^^^
           |
         ");
     }
@@ -647,17 +673,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:5:7
-          |
-        5 | class Derived(base_factory()):
-          |       ^^^^^^^ Caller
-          |
-        info: base_factory (Function)
+        info[outgoing-calls]: Outgoing calls from `Derived`
          --> main.py:5:15
           |
         5 | class Derived(base_factory()):
-          |               ------------ Calls base_factory
+          |               ^^^^^^^^^^^^ Call site
+          |
+        info: Callee: `base_factory` (Function)
+         --> main.py:2:5
+          |
+        2 | def base_factory():
+          |     ^^^^^^^^^^^^
           |
         ");
     }
@@ -682,17 +708,17 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:8:5
-          |
-        8 | def outer():
-          |     ^^^^^ Caller
-          |
-        info: default_factory (Function)
+        info[outgoing-calls]: Outgoing calls from `outer`
          --> main.py:9:18
           |
         9 |     f = lambda x=default_factory(): lambda_body_helper()
-          |                  --------------- Calls default_factory
+          |                  ^^^^^^^^^^^^^^^ Call site
+          |
+        info: Callee: `default_factory` (Function)
+         --> main.py:2:5
+          |
+        2 | def default_factory():
+          |     ^^^^^^^^^^^^^^^
           |
         ");
     }
@@ -707,24 +733,31 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @r#"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:2:5
-          |
-        2 | def foo():
-          |     ^^^ Caller
-          |
-        info: print (Function)
+        info[outgoing-calls]: Outgoing calls from `foo`
          --> main.py:3:5
           |
         3 |     print("hi")  # builtins resolve via stubs, so this *does* appear
-          |     ----- Calls print
+          |     ^^^^^ Call site
           |
-        info: print (Function)
+        info: Callee: `print` (Function)
+            --> stdlib/builtins.pyi:4367:5
+             |
+        4367 | def print(
+             |     ^^^^^
+             |
+
+        info[outgoing-calls]: Outgoing calls from `foo`
          --> main.py:3:5
           |
         3 |     print("hi")  # builtins resolve via stubs, so this *does* appear
-          |     ----- Calls print
+          |     ^^^^^ Call site
           |
+        info: Callee: `print` (Function)
+            --> stdlib/builtins.pyi:4386:5
+             |
+        4386 | def print(
+             |     ^^^^^
+             |
         "#);
     }
 
@@ -744,24 +777,31 @@ mod tests {
             "#,
         );
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:7:9
-          |
-        7 |     def m(self):
-          |         ^ Caller
-          |
-        info: m (Method)
+        info[outgoing-calls]: Outgoing calls from `m`
          --> main.py:8:17
           |
         8 |         super().m()
-          |                 - Calls m
+          |                 ^ Call site
           |
-        info: super (Class)
+        info: Callee: `m` (Method)
+         --> main.py:3:9
+          |
+        3 |     def m(self):
+          |         ^
+          |
+
+        info[outgoing-calls]: Outgoing calls from `m`
          --> main.py:8:9
           |
         8 |         super().m()
-          |         ----- Calls super
+          |         ^^^^^ Call site
           |
+        info: Callee: `super` (Class)
+           --> stdlib/builtins.pyi:316:7
+            |
+        316 | class super:
+            |       ^^^^^
+            |
         ");
     }
 
@@ -787,17 +827,17 @@ def f<CURSOR>oo():
             )
             .build();
         assert_snapshot!(test.outgoing_calls(), @"
-        info[outgoing-calls]: Outgoing calls
-         --> main.py:4:5
-          |
-        4 | def foo():
-          |     ^^^ Caller
-          |
-        info: helper (Function)
+        info[outgoing-calls]: Outgoing calls from `foo`
          --> main.py:5:5
           |
         5 |     helper()
-          |     ------ Calls helper
+          |     ^^^^^^ Call site
+          |
+        info: Callee: `helper` (Function)
+         --> lib.py:2:5
+          |
+        2 | def helper():
+          |     ^^^^^^
           |
         ");
     }
