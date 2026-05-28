@@ -21,7 +21,6 @@ bitflags::bitflags! {
         const TYPE_DEFINITION_LINK_SUPPORT = 1 << 3;
         const DEFINITION_LINK_SUPPORT = 1 << 4;
         const DECLARATION_LINK_SUPPORT = 1 << 5;
-        const IMPLEMENTATION_LINK_SUPPORT = 1 << 19;
         const PREFER_MARKDOWN_IN_HOVER = 1 << 6;
         const MULTILINE_SEMANTIC_TOKENS = 1 << 7;
         const SIGNATURE_LABEL_OFFSET_SUPPORT = 1 << 8;
@@ -36,6 +35,7 @@ bitflags::bitflags! {
         const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
+        const IMPLEMENTATION_LINK_SUPPORT = 1 << 20;
     }
 }
 
