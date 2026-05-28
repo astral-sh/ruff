@@ -3,14 +3,15 @@ use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::references::{contains_identifier, has_any_external_visible_definitions};
 use crate::{CallHierarchyItem, Db, SymbolKind};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
+use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
 use ty_python_semantic::types::{PropertyAccessorRole, Type};
 use ty_python_semantic::{HasDefinition as _, HasType as _, ImportAliasResolution, SemanticModel};
@@ -51,43 +52,15 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
         _ => None,
     };
 
-    // Pre-compute the set of attribute names that *could* resolve to one of
-    // `target_definitions`: the needle itself plus every distinct name carried
-    // by the resolved definitions. Used as a cheap text-level prefilter at
-    // attribute-leaf call sites (`obj.X` / `obj.X()` / `@obj.X`) — attribute
-    // names are invariant under import aliasing, so a leaf whose `attr` is
-    // outside this set cannot possibly resolve to the target. Bare-name leaves
-    // (`X()`) can still route through aliases / rebindings and are deliberately
-    // excluded from this filter so the existing alias support is preserved
-    // (see `incoming_via_import_alias` and the comment on `CallSitesFinder`).
-    //
-    // The filter is disabled (left empty) when any candidate name is a
-    // dunder method, because dunders are implicitly invoked through arbitrary
-    // attribute syntax: `obj.fbank(...)` triggers `fbank.__call__`, and
-    // `mod.MyClass(...)` triggers `MyClass.__init__`. In both cases the
-    // textual leaf is the receiver name, not the dunder.
-    let mut candidate_attribute_names: Vec<String> = Vec::new();
-    candidate_attribute_names.push(needle.to_string());
-    for resolved in &target_definitions {
-        if let Some(def) = resolved.definition()
-            && let Some(name) = def.name(db)
-            && !candidate_attribute_names.iter().any(|n| n == &name)
-        {
-            candidate_attribute_names.push(name);
-        }
-    }
-    if candidate_attribute_names.iter().any(|name| is_dunder(name)) {
-        candidate_attribute_names.clear();
-    }
+    // Attribute leaves for an ordinary target can only match the queried name.
+    // Bare-name calls may route through aliases and are checked semantically.
+    // Dunder methods may be invoked without spelling their name (`value()`
+    // invokes `__call__`, and `C()` invokes `__init__`), so do not use a
+    // text filter for them.
+    let needle = (!is_dunder(needle)).then_some(needle);
 
     // Collect raw `(caller_file, call_site_range, enclosing_scope)` triples.
-    let mut raw = call_sites_for_file(
-        db,
-        file,
-        &target_definitions,
-        target_role,
-        &candidate_attribute_names,
-    );
+    let mut raw = call_sites_for_file(db, file, &target_definitions, target_role, needle);
 
     if is_externally_visible {
         let result = std::sync::Mutex::new(Vec::<RawCallSite>::new());
@@ -97,13 +70,13 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
             let target_definitions = &target_definitions;
             let files = &files;
             let result = &result;
-            let candidate_attribute_names = &candidate_attribute_names;
             // The byte-level text prefilter still pays off as a coarse gate:
             // files that don't contain the target name (or an import of it)
             // textually are skipped before any AST work. Files that route the
             // call through an alias (`from m import foo as bar; bar()`) still
-            // pass the gate because they contain `foo` in the import line, and
-            // the in-file walk now resolves aliases semantically.
+            // pass the gate because they contain `foo` in the import line.
+            // Dunder calls have no required textual spelling, so the filter
+            // is disabled for them.
             rayon::scope(move |s| {
                 for other_file in files {
                     if other_file == file {
@@ -113,7 +86,9 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
                     s.spawn(move |_| {
                         let db = &*db;
                         let source = ruff_db::source::source_text(db, other_file);
-                        if !contains_identifier(&source, needle) {
+                        if let Some(name) = needle
+                            && !contains_identifier(&source, name)
+                        {
                             return;
                         }
                         let sites = call_sites_for_file(
@@ -121,7 +96,7 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
                             other_file,
                             target_definitions,
                             target_role,
-                            candidate_attribute_names,
+                            needle,
                         );
                         result.lock().unwrap().extend(sites);
                     });
@@ -154,6 +129,7 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
             IncomingCall { from, from_ranges }
         })
         .collect();
+
     results.sort_by(|a, b| {
         let a_path = a.from.file.path(db).as_str();
         let b_path = b.from.file.path(db).as_str();
@@ -188,7 +164,7 @@ fn call_sites_for_file(
     file: File,
     target_definitions: &Definitions<'_>,
     target_role: Option<PropertyAccessorRole>,
-    candidate_attribute_names: &[String],
+    needle: Option<&str>,
 ) -> Vec<RawCallSite> {
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
@@ -198,10 +174,11 @@ fn call_sites_for_file(
     let mut finder = CallSitesFinder {
         db,
         model: &model,
+        module: &module,
         tokens: module.tokens(),
         target_definitions,
         target_role,
-        candidate_attribute_names,
+        needle,
         sites: &mut sites,
         ancestors: Vec::new(),
     };
@@ -213,6 +190,7 @@ fn call_sites_for_file(
 struct CallSitesFinder<'a, 'db> {
     db: &'db dyn Db,
     model: &'a SemanticModel<'db>,
+    module: &'a ParsedModuleRef,
     tokens: &'a Tokens,
     target_definitions: &'a Definitions<'db>,
     /// Property accessor role the user originally queried (the definition the
@@ -221,14 +199,10 @@ struct CallSitesFinder<'a, 'db> {
     /// `target_definitions` are eligible matches. Without this, querying a
     /// setter would also match reads (via the getter co-definition).
     target_role: Option<PropertyAccessorRole>,
-    /// Names that an attribute leaf could textually match before any
-    /// semantic resolution. `obj.X` cannot resolve to a definition with a
-    /// different name (attribute names are invariant under import aliasing),
-    /// so leaves whose identifier is outside this set are skipped without a
-    /// semantic query. Bare-name leaves are deliberately *not* gated by this
-    /// (they may route through aliases / rebindings) and always go through
-    /// the semantic check.
-    candidate_attribute_names: &'a [String],
+    /// Name an attribute leaf must spell before semantic resolution, or
+    /// `None` for dunders that can be invoked without spelling their name.
+    /// Bare-name leaves are not gated by this and always resolve semantically.
+    needle: Option<&'a str>,
     sites: &'a mut Vec<RawCallSite>,
     ancestors: Vec<AnyNodeRef<'a>>,
 }
@@ -245,18 +219,18 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
             // semantically without needing the alias name in the text needle.
             AnyNodeRef::ExprCall(call) => {
                 if let Some(leaf) = CalleeLeaf::from_expr(&call.func)
-                    && self.leaf_could_match(leaf)
+                    && self.leaf_matches_needle(leaf)
                 {
-                    self.check_call_site(leaf);
+                    self.check_call_site(leaf, AnyNodeRef::from(call));
                 }
             }
             AnyNodeRef::Decorator(decorator) => {
                 // `@foo` without parens is a runtime call; `@foo()` is handled
                 // by the `ExprCall` arm above.
                 if let Some(leaf) = CalleeLeaf::from_expr(&decorator.expression)
-                    && self.leaf_could_match(leaf)
+                    && self.leaf_matches_needle(leaf)
                 {
-                    self.check_call_site(leaf);
+                    self.check_call_site(leaf, AnyNodeRef::from(&decorator.expression));
                 }
             }
             // `obj.attr` references that aren't already the callee of an
@@ -292,11 +266,10 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
 }
 
 impl<'a> CallSitesFinder<'a, '_> {
-    /// Text-level prefilter for call-site leaves. Attribute leaves whose name
-    /// is outside `candidate_attribute_names` cannot resolve to the target;
-    /// bare-name leaves always go through the semantic check because they can
-    /// route through aliases.
-    fn leaf_could_match(&self, leaf: CalleeLeaf<'_>) -> bool {
+    /// Text-level prefilter for call-site leaves. Ordinary attribute leaves
+    /// must spell the queried name; bare-name leaves always resolve
+    /// semantically because they can route through aliases.
+    fn leaf_matches_needle(&self, leaf: CalleeLeaf<'_>) -> bool {
         match leaf {
             CalleeLeaf::Name(_) => true,
             CalleeLeaf::AttrIdentifier { identifier, .. } => {
@@ -306,23 +279,22 @@ impl<'a> CallSitesFinder<'a, '_> {
     }
 
     fn attribute_name_could_match(&self, name: &str) -> bool {
-        // An empty candidate set means the prefilter is disabled (the target
-        // includes a dunder method, which can be implicitly invoked through
-        // any receiver name).
-        self.candidate_attribute_names.is_empty()
-            || self.candidate_attribute_names.iter().any(|n| n == name)
+        self.needle.is_none_or(|target_name| target_name == name)
     }
 
-    fn check_call_site(&mut self, leaf: CalleeLeaf<'a>) {
+    fn check_call_site(&mut self, leaf: CalleeLeaf<'a>, scope_node: AnyNodeRef<'a>) {
         let Some((goto_target, call_site_range)) =
             leaf.resolve(self.model, self.tokens, &self.ancestors)
         else {
             return;
         };
 
-        let Some(current_definitions) = goto_target
-            .definitions(self.model, ImportAliasResolution::ResolveAliases)
-            .and_then(|d| d.goto_declaration(self.model, &goto_target))
+        // Keep callable implementations here rather than applying
+        // `goto_declaration`: clicking the name in `C()` deliberately navigates
+        // to `C`, but the expression is also an incoming call to `C.__init__`
+        // or `C.__new__`.
+        let Some(current_definitions) =
+            goto_target.definitions(self.model, ImportAliasResolution::ResolveAliases)
         else {
             return;
         };
@@ -330,7 +302,7 @@ impl<'a> CallSitesFinder<'a, '_> {
             return;
         }
 
-        let from = enclosing_scope_item(self.db, self.model.file(), &self.ancestors);
+        let from = self.enclosing_scope_item(scope_node);
         self.sites.push(RawCallSite {
             from,
             call_site_range,
@@ -395,22 +367,15 @@ impl<'a> CallSitesFinder<'a, '_> {
                 if !matches_site_kind {
                     return false;
                 }
-                // (2) Queried-role filter: discard co-definitions of the
-                //     wrong role. When the user queried a setter,
-                //     `target_definitions` also includes the getter (added by
-                //     `property_getter_definitions`); without this filter,
-                //     read sites would match through the getter co-def and
-                //     pollute the setter's caller list.
-                let matches_queried_role = match self.target_role {
-                    None | Some(PropertyAccessorRole::Getter) => true,
-                    Some(PropertyAccessorRole::Setter) => {
-                        role == Some(PropertyAccessorRole::Setter)
-                    }
-                    Some(PropertyAccessorRole::Deleter) => {
-                        role == Some(PropertyAccessorRole::Deleter)
-                    }
-                };
-                if !matches_queried_role {
+                // (2) Queried-role filter: setter and deleter definitions
+                //     include the getter as a co-definition (added by
+                //     `property_getter_definitions`). Only the requested
+                //     accessor should contribute incoming call sites.
+                if matches!(
+                    self.target_role,
+                    Some(PropertyAccessorRole::Setter | PropertyAccessorRole::Deleter)
+                ) && role != self.target_role
+                {
                     return false;
                 }
                 self.target_definitions.iter().any(|t| t == resolved)
@@ -422,11 +387,85 @@ impl<'a> CallSitesFinder<'a, '_> {
             return;
         }
 
-        let from = enclosing_scope_item(self.db, self.model.file(), &self.ancestors);
+        let from = self.enclosing_scope_item(AnyNodeRef::from(attribute));
         self.sites.push(RawCallSite {
             from,
             call_site_range,
         });
+    }
+
+    /// Build the item for the semantic scope in which a call site is evaluated.
+    ///
+    /// This differs from taking the nearest syntactic function/class ancestor for
+    /// expressions attached to definitions: a method decorator or parameter
+    /// default is evaluated in its class scope, even though it is nested below the
+    /// method's AST node. Comprehension and annotation scopes have no callable
+    /// hierarchy item of their own, so walk outward until reaching one that does.
+    fn enclosing_scope_item(&self, scope_node: AnyNodeRef<'_>) -> CallHierarchyItem {
+        let file = self.model.file();
+        let mut ancestors = self.model.ancestor_scopes(scope_node);
+        let Some((_, enclosing)) = ancestors.find(|(_, ancestor)| {
+            matches!(
+                ancestor.kind(),
+                ScopeKind::Module | ScopeKind::Function | ScopeKind::Class | ScopeKind::Lambda
+            )
+        }) else {
+            return module_item(self.db, file);
+        };
+
+        match enclosing.node() {
+            NodeWithScopeKind::Module => module_item(self.db, file),
+            NodeWithScopeKind::Function(func) => {
+                let func = func.node(self.module);
+                let is_method = ancestors
+                    .find_map(|(_, ancestor)| match ancestor.kind() {
+                        ScopeKind::Class => Some(true),
+                        ScopeKind::Module | ScopeKind::Function | ScopeKind::Lambda => Some(false),
+                        ScopeKind::TypeParams | ScopeKind::Comprehension | ScopeKind::TypeAlias => {
+                            None
+                        }
+                    })
+                    .unwrap_or(false);
+                CallHierarchyItem {
+                    name: Name::new(func.name.as_str()),
+                    kind: if is_method {
+                        SymbolKind::Method
+                    } else {
+                        SymbolKind::Function
+                    },
+                    file,
+                    full_range: func.range(),
+                    selection_range: func.name.range(),
+                }
+            }
+            NodeWithScopeKind::Class(class) => {
+                let class = class.node(self.module);
+                CallHierarchyItem {
+                    name: Name::new(class.name.as_str()),
+                    kind: SymbolKind::Class,
+                    file,
+                    full_range: class.range(),
+                    selection_range: class.name.range(),
+                }
+            }
+            NodeWithScopeKind::Lambda(lambda) => {
+                let lambda = lambda.node(self.module);
+                let end = lambda
+                    .parameters
+                    .as_deref()
+                    .map(Ranged::end)
+                    .unwrap_or(lambda.start() + "lambda".text_len());
+
+                CallHierarchyItem {
+                    name: Name::new_static("(lambda)"),
+                    kind: SymbolKind::Function,
+                    file,
+                    full_range: lambda.range(),
+                    selection_range: TextRange::new(lambda.start(), end),
+                }
+            }
+            _ => module_item(self.db, file),
+        }
     }
 }
 
@@ -435,91 +474,13 @@ struct RawCallSite {
     call_site_range: TextRange,
 }
 
-/// Build the enclosing-scope item by walking the ancestor stack outwards from
-/// a call site until we find a `StmtFunctionDef` / `StmtClassDef` / `ExprLambda`;
-/// if none is found, the enclosing scope is the module itself. Comprehensions
-/// are deliberately skipped — they have no addressable identifier. Lambdas are
-/// synthesized as `(lambda)` items (matching pyright) so the tree view can
-/// attribute calls inside them to their source location instead of collapsing
-/// them onto the enclosing named scope.
-fn enclosing_scope_item(
-    db: &dyn Db,
-    file: File,
-    ancestors: &[AnyNodeRef<'_>],
-) -> CallHierarchyItem {
-    // Find the innermost function/class/lambda ancestor.
-    let mut iter = ancestors.iter().rev().enumerate();
-    let innermost = iter.by_ref().find_map(|(idx, node)| match node {
-        AnyNodeRef::StmtFunctionDef(func) => Some((idx, EnclosingNode::Function(func))),
-        AnyNodeRef::StmtClassDef(class) => Some((idx, EnclosingNode::Class(class))),
-        AnyNodeRef::ExprLambda(lambda) => Some((idx, EnclosingNode::Lambda(lambda))),
-        _ => None,
-    });
-    let Some((_, innermost_node)) = innermost else {
-        return module_item(db, file);
-    };
-
-    // Reuse the iterator (already advanced past `innermost`) to find what's
-    // outside it. For a function, the nearest outer function-or-class tells us
-    // method vs. nested function.
-    let outer = iter.find_map(|(_, node)| match node {
-        AnyNodeRef::StmtFunctionDef(_) => Some(false), // nested in another function
-        AnyNodeRef::StmtClassDef(_) => Some(true),     // method on a class
-        _ => None,
-    });
-
-    match innermost_node {
-        EnclosingNode::Function(func) => CallHierarchyItem {
-            name: Name::from(func.name.as_str().to_string()),
-            kind: if outer.unwrap_or(false) {
-                SymbolKind::Method
-            } else {
-                SymbolKind::Function
-            },
-
-            file,
-            full_range: func.range(),
-            selection_range: func.name.range(),
-        },
-        EnclosingNode::Class(class) => CallHierarchyItem {
-            name: Name::from(class.name.as_str().to_string()),
-            kind: SymbolKind::Class,
-            file,
-            full_range: class.range(),
-            selection_range: class.name.range(),
-        },
-        EnclosingNode::Lambda(lambda) => {
-            let start = lambda.range().start();
-            CallHierarchyItem {
-                name: Name::from("(lambda)"),
-                kind: SymbolKind::Function,
-                file,
-                full_range: lambda.range(),
-                selection_range: TextRange::at(start, TextSize::of("lambda")),
-            }
-        }
-    }
-}
-
-enum EnclosingNode<'a> {
-    Function(&'a ast::StmtFunctionDef),
-    Class(&'a ast::StmtClassDef),
-    Lambda(&'a ast::ExprLambda),
-}
-
 /// Build an item for the module-level enclosing scope (no enclosing function).
 fn module_item(db: &dyn Db, file: File) -> CallHierarchyItem {
     let name = ty_module_resolver::file_to_module(db, file)
-        .and_then(|m| {
-            m.name(db)
-                .to_string()
-                .rsplit('.')
-                .next()
-                .map(str::to_string)
-        })
-        .unwrap_or_else(|| "<module>".to_string());
+        .map(|module| Name::new(module.name(db).last_component()))
+        .unwrap_or_else(|| Name::new_static("<module>"));
     CallHierarchyItem {
-        name: Name::from(name),
+        name,
         kind: SymbolKind::Module,
         file,
         full_range: TextRange::default(),
@@ -748,6 +709,43 @@ def use():
     }
 
     #[test]
+    fn multi_file_dunder_call_without_textual_method_name() {
+        let test = CursorTest::builder()
+            .source(
+                "model.py",
+                r#"
+class Callable:
+    def __ca<CURSOR>ll__(self) -> int:
+        return 1
+"#,
+            )
+            .source(
+                "caller.py",
+                r#"
+from model import Callable
+
+def invoke(value: Callable) -> int:
+    return value()
+"#,
+            )
+            .build();
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls to `__call__`
+         --> caller.py:5:12
+          |
+        5 |     return value()
+          |            ^^^^^ Call site
+          |
+        info: Caller: `invoke` (Function)
+         --> caller.py:4:5
+          |
+        4 | def invoke(value: Callable) -> int:
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
     fn keyword_call() {
         let test = cursor_test(
             r#"
@@ -816,11 +814,42 @@ def use():
         5 | @foo
           |  ^^^ Call site
           |
-        info: Caller: `bar` (Function)
-         --> main.py:6:5
+        info: Caller: `main` (Module)
+        --> main.py:1:1
+        ");
+    }
+
+    #[test]
+    fn default_on_version_gated_method_attributed_to_class() {
+        let test = CursorTest::builder()
+            .python_version(ast::PythonVersion::PY311)
+            .source(
+                "main.py",
+                r#"
+import sys
+
+def defa<CURSOR>ult() -> int:
+    return 1
+
+class C:
+    if sys.version_info >= (3, 11):
+        def method(self, value=default()):
+            pass
+"#,
+            )
+            .build();
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls to `default`
+         --> main.py:9:32
           |
-        6 | def bar():
-          |     ^^^
+        9 |         def method(self, value=default()):
+          |                                ^^^^^^^ Call site
+          |
+        info: Caller: `C` (Class)
+         --> main.py:7:7
+          |
+        7 | class C:
+          |       ^
           |
         ");
     }
@@ -886,6 +915,43 @@ def use():
           |
         7 |     def m(self):
           |         ^
+          |
+        ");
+    }
+
+    #[test]
+    fn multi_file_constructor_call_resolves_to_init_without_textual_method_name() {
+        let test = CursorTest::builder()
+            .source(
+                "model.py",
+                r#"
+class C:
+    def __in<CURSOR>it__(self) -> None:
+        pass
+"#,
+            )
+            .source(
+                "caller.py",
+                r#"
+from model import C
+
+def make() -> C:
+    return C()
+"#,
+            )
+            .build();
+        assert_snapshot!(test.incoming_calls(), @"
+        info[incoming-calls]: Incoming calls to `__init__`
+         --> caller.py:5:12
+          |
+        5 |     return C()
+          |            ^ Call site
+          |
+        info: Caller: `make` (Function)
+         --> caller.py:4:5
+          |
+        4 | def make() -> C:
+          |     ^^^^
           |
         ");
     }
@@ -1113,7 +1179,8 @@ def use():
     #[test]
     fn lambda_caller_is_synthesized_item() {
         // A call inside a top-level lambda should be attributed to a
-        // synthetic `(lambda)` item, not to the module.
+        // synthetic `(lambda)` item, selecting its callable header rather
+        // than inventing an identifier range.
         let test = cursor_test(
             r#"
             def tar<CURSOR>get(x):
@@ -1133,7 +1200,7 @@ def use():
          --> main.py:5:5
           |
         5 | f = lambda x: target(x)
-          |     ^^^^^^
+          |     ^^^^^^^^
           |
         ");
         let Some(target) = test
@@ -1143,27 +1210,26 @@ def use():
             panic!("expected a call hierarchy target");
         };
         let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
-        // selection_range must anchor at the `lambda` keyword (6 chars).
+        // The selection identifies the anonymous callable header.
         let sel = incoming[0].from.selection_range;
         let source = test.cursor.source.as_str();
         assert_eq!(
             &source[sel.start().to_usize()..sel.end().to_usize()],
-            "lambda",
+            "lambda x",
         );
     }
 
     #[test]
     fn two_lambdas_calling_same_function_two_distinct_items() {
-        // Two separate lambdas, both calling `target`, must surface as
-        // two distinct `(lambda)` items with different selection_ranges
-        // — not collapsed into one entry.
+        // Two separate lambdas, including one without parameters, must
+        // surface as distinct `(lambda)` items with real selection ranges.
         let test = cursor_test(
             r#"
             def tar<CURSOR>get(x):
                 pass
 
             a = lambda x: target(x)
-            b = lambda y: target(y)
+            b = lambda: target(0)
             "#,
         );
         assert_snapshot!(test.incoming_calls(), @"
@@ -1177,19 +1243,19 @@ def use():
          --> main.py:5:5
           |
         5 | a = lambda x: target(x)
-          |     ^^^^^^
+          |     ^^^^^^^^
           |
 
         info[incoming-calls]: Incoming calls to `target`
-         --> main.py:6:15
+         --> main.py:6:13
           |
-        6 | b = lambda y: target(y)
-          |               ^^^^^^ Call site
+        6 | b = lambda: target(0)
+          |             ^^^^^^ Call site
           |
         info: Caller: `(lambda)` (Function)
          --> main.py:6:5
           |
-        6 | b = lambda y: target(y)
+        6 | b = lambda: target(0)
           |     ^^^^^^
           |
         ");
@@ -1221,7 +1287,7 @@ def use():
          --> main.py:6:9
           |
         6 |     f = lambda x: target(x)
-          |         ^^^^^^
+          |         ^^^^^^^^
           |
         ");
     }
@@ -1259,7 +1325,7 @@ def use():
     #[test]
     fn lambda_follow_up_requests_are_leaves() {
         // Round-trip guard: the synthetic `(lambda)` item surfaced as a
-        // caller has a `selection_range` anchored at the `lambda` keyword.
+        // caller has a `selection_range` whose start is the `lambda` keyword.
         // A follow-up `incomingCalls` / `outgoingCalls` request that lands
         // on that position has no `Definition` to resolve to, so both must
         // return empty — matching pyright's "lambda is a leaf" behavior.

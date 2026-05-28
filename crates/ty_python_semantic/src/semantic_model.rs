@@ -21,7 +21,7 @@ use crate::types::{
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
-use ty_python_core::scope::FileScopeId;
+use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
 
@@ -78,13 +78,9 @@ impl<'db> SemanticModel<'db> {
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
-        let index = semantic_index(self.db, self.file);
         let mut members = FxHashMap::default();
-        let Some(file_scope) = self.scope(node) else {
-            return members;
-        };
 
-        for (file_scope, _) in index.ancestor_scopes(file_scope) {
+        for (file_scope, _) in self.ancestor_scopes(node) {
             for memberdef in
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file))
             {
@@ -192,9 +188,7 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for submodule in module.all_submodules(self.db) {
             let ty = Type::module_literal(self.db, self.file, *submodule);
-            let Some(base) = submodule.name(self.db).components().next_back() else {
-                continue;
-            };
+            let base = submodule.name(self.db).last_component();
             completions.push(Completion {
                 name: Name::new(base),
                 ty: Some(ty),
@@ -227,7 +221,6 @@ impl<'db> SemanticModel<'db> {
     /// scope of this model's `File` are returned.
     pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
         let index = semantic_index(self.db, self.file);
-
         let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
@@ -324,6 +317,20 @@ impl<'db> SemanticModel<'db> {
                 Some(expr) => index.try_expression_scope_id(&expr),
             },
         }
+    }
+
+    /// Returns the scopes enclosing `node`, starting with the scope containing
+    /// the node itself.
+    ///
+    /// Like [`Self::scope`], this handles nodes inside string annotations.
+    pub fn ancestor_scopes(
+        &self,
+        node: ast::AnyNodeRef<'_>,
+    ) -> impl Iterator<Item = (FileScopeId, &Scope)> + '_ {
+        let index = semantic_index(self.db, self.file);
+        self.scope(node)
+            .into_iter()
+            .flat_map(move |scope| index.ancestor_scopes(scope))
     }
 
     /// Returns the first local definition created by `covering_node`, if any.

@@ -7482,9 +7482,7 @@ impl<'db> InvalidTypeExpression<'db> {
             self
         {
             let module = module.module(db);
-            let Some(module_name_final_part) = module.name(db).components().next_back() else {
-                return;
-            };
+            let module_name_final_part = module.name(db).last_component();
             let Some(module_member_with_same_name) = ty
                 .member(db, module_name_final_part)
                 .place

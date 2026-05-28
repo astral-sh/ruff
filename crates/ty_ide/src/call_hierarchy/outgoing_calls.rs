@@ -18,18 +18,17 @@ use rustc_hash::FxHashMap;
 use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
-/// Find every function/method/class that the symbol at `offset` calls.
+/// Find the callees associated with the function, method, or class at `offset`.
 ///
-/// "Calls" means the callables evaluated when the symbol's own definition
-/// statement runs — for a function: its decorators, type parameters, parameter
-/// defaults and annotations, return-type annotation, and direct calls in the
-/// body; for a class: its decorators, type parameters, base-class expressions
-/// and keyword arguments, and direct calls in the class body (including
-/// decorators / parameter defaults on its methods, which are evaluated at
-/// class-body time). Nested function / class / lambda *bodies* are
-/// deliberately not transited: each nested callable is its own
-/// `CallHierarchyItem` with its own outgoing edges, expandable separately by
-/// the LSP client.
+/// Calls in the item's body are reported as outgoing calls of that item. Calls
+/// in a declaration attached to the item, such as a decorator, annotation,
+/// parameter default, type-parameter bound or default, or base-class
+/// expression, are also reported for that item.
+///
+/// Nested function, class, and lambda bodies are not traversed; those calls
+/// are reported when the nested callable is expanded separately. Declaration
+/// expressions attached to a nested callable are still included while
+/// traversing the containing item's body.
 pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<OutgoingCall> {
     let module = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
@@ -60,7 +59,7 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
             db,
             model: &model,
             tokens: parsed.tokens(),
-            groups: &mut groups,
+            by_callee: &mut groups,
             ancestors: Vec::new(),
         };
 
@@ -121,7 +120,8 @@ struct OutgoingCallsFinder<'a, 'db> {
     db: &'db dyn Db,
     model: &'a SemanticModel<'db>,
     tokens: &'a Tokens,
-    groups: &'a mut FxHashMap<CalleeKey, (CallHierarchyItem, Vec<TextRange>)>,
+    /// Calls grouped by the callee. The value is the callee item alongside with all calls to it.
+    by_callee: &'a mut FxHashMap<CalleeKey, (CallHierarchyItem, Vec<TextRange>)>,
     ancestors: Vec<AnyNodeRef<'a>>,
 }
 
@@ -160,7 +160,7 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
                 selection_range,
             };
 
-            match self.groups.entry(key) {
+            match self.by_callee.entry(key) {
                 Entry::Occupied(mut occupied) => {
                     occupied.get_mut().1.push(call_site_range);
                 }
