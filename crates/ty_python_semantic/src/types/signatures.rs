@@ -3153,6 +3153,8 @@ impl<'db> Parameters<'db> {
             }
         }
 
+        value.shrink_to_fit();
+
         Parameters { value, kind }
     }
 

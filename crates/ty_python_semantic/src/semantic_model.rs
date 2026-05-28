@@ -119,7 +119,8 @@ impl<'db> SemanticModel<'db> {
         let is_typing_extensions_available = self.file.is_stub(self.db)
             || resolve_real_shadowable_module(self.db, self.file, &typing_extensions).is_some();
         list_modules(self.db)
-            .into_iter()
+            .iter()
+            .copied()
             .filter(|module| {
                 is_typing_extensions_available || module.name(self.db) != &typing_extensions
             })

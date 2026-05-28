@@ -71,7 +71,7 @@ pub struct UnusedBinding {
 /// without broader reference analysis. Bare local annotations (`x: int`) are also
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
+pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBinding]> {
     let parsed = parsed_module(db, file).load(db);
     let is_stub_file = file.is_stub(db);
     let index = semantic_index(db, file);
@@ -180,7 +180,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
     unused.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
     unused.dedup_by_key(|binding| binding.range);
 
-    unused
+    unused.into_boxed_slice()
 }
 
 #[cfg(test)]

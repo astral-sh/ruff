@@ -97,9 +97,7 @@ impl<'db> Module<'db> {
     /// The names returned correspond to the "base" name of the module.
     /// That is, `{self.name}.{basename}` should give the full module name.
     pub fn all_submodules(self, db: &'db dyn Db) -> &'db [Module<'db>] {
-        all_submodule_names_for_package(db, self)
-            .as_deref()
-            .unwrap_or_default()
+        all_submodule_names_for_package(db, self).unwrap_or_default()
     }
 }
 
@@ -118,12 +116,11 @@ impl std::fmt::Debug for Module<'_> {
     }
 }
 
-#[allow(clippy::ref_option)]
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
 fn all_submodule_names_for_package<'db>(
     db: &'db dyn Db,
     module: Module<'db>,
-) -> Option<Vec<Module<'db>>> {
+) -> Option<Box<[Module<'db>]>> {
     fn is_submodule(
         is_dir: bool,
         is_file: bool,
