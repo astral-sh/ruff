@@ -462,6 +462,12 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     resolved
 }
 
+/// Returns the method implementation family rooted at `root`.
+///
+/// The first entry is the method that would be selected for the root class itself, using MRO
+/// lookup. That matters for concrete subclasses that inherit a method without overriding it. After
+/// that, we add same-named methods defined directly on known transitive subclasses, which are the
+/// concrete overrides a user expects from "go to implementation".
 fn implementation_definitions_for_class_family<'db>(
     db: &'db dyn Db,
     root: ClassLiteral<'db>,
@@ -477,6 +483,10 @@ fn implementation_definitions_for_class_family<'db>(
     definitions
 }
 
+/// Finds the method definition selected by normal Python MRO lookup for `class`.
+///
+/// This intentionally stops at the first class in the MRO that defines `method_name`; inherited
+/// methods should navigate to the definition that actually provides the behavior for the receiver.
 fn mro_method_definitions<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -492,6 +502,11 @@ fn mro_method_definitions<'db>(
         .unwrap_or_default()
 }
 
+/// Returns function definitions for `method_name` that are declared directly in `class`.
+///
+/// This does not walk base classes. It is used for subclass override collection, where inherited
+/// methods are already represented by the root MRO lookup and should not be repeated for every
+/// subclass that merely inherits them.
 fn own_method_definitions<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -537,6 +552,12 @@ fn extend_unique_definitions<'db>(
     }
 }
 
+/// Normalizes a receiver type into the class roots used for implementation lookup.
+///
+/// Attribute receivers can be unions, finite intersections, `TypeVars`, instances, class objects, or
+/// aliases over those forms. This recursively expands the forms that can represent multiple
+/// possible receiver classes and deduplicates roots so downstream implementation collection can be
+/// order-preserving without returning duplicate targets.
 fn collect_implementation_root_classes<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
