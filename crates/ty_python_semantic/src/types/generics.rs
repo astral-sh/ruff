@@ -232,11 +232,13 @@ pub(crate) enum InferableTypeVars<'db> {
 impl<'db> InferableTypeVars<'db> {
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
-        typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
+        mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
     ) -> Self {
         if typevars.is_empty() {
             return InferableTypeVars::None;
         }
+
+        typevars.shrink_to_fit();
         Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
     }
 }

@@ -370,7 +370,7 @@ pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathI
 ///
 /// We exclude `__init__.py(i)` dirs to avoid truncating packages.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<SearchPath>> {
+fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Box<[SearchPath]>> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
@@ -425,7 +425,7 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
     if search_paths.is_empty() {
         None
     } else {
-        Some(search_paths)
+        Some(search_paths.into_boxed_slice())
     }
 }
 

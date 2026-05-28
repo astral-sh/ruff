@@ -1683,10 +1683,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachable_symbol_definitions.shrink_to_fit();
         self.reachable_member_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
-        self.multi_bindings_by_use.shrink_to_fit();
         self.range_reachability.shrink_to_fit();
-        self.declarations_by_binding.shrink_to_fit();
-        self.bindings_by_definition.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
         let mut interned_bindings = IndexVec::with_capacity(self.bindings_by_definition.len());
@@ -1808,7 +1805,6 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_definition.insert(definition, interned_id);
         }
 
-        interned_ids_by_definition.shrink_to_fit();
         interned_ids_by_definition
     }
 
@@ -1832,7 +1828,6 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_binding.insert(binding, interned_id);
         }
 
-        interned_ids_by_binding.shrink_to_fit();
         interned_ids_by_binding
     }
 
