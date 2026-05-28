@@ -30,7 +30,7 @@ impl<'a> SortedDiagnostics<'a> {
                     .primary_span()
                     .and_then(|span| span.range())
                     .map(line_start)
-                    .unwrap_or_else(|| OneIndexed::from_zero_indexed(0)),
+                    .unwrap_or_default(),
                 diagnostic,
             })
             .collect();
