@@ -11,7 +11,8 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBounds, Solutions,
+    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -1833,9 +1834,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// typevar.
     ///
     /// The `choose` hook is called for each typevar on the generic context with the typevar's
-    /// materialized lower and upper bounds.
-    /// Unmapped typevars have bounds of `None,` and fallback
-    /// to their default specialization if an alternative default type is not chosen.
+    /// explicit lower and upper bounds.
+    /// Unmapped typevars receive `None` for their bounds and fall back to their default
+    /// specialization if an alternative default type is not chosen.
     ///
     /// The hook should return `Some(ty)` to use `ty` as the specialization for this typevar, or
     /// `None` to use the inferred type unchanged.
@@ -1844,7 +1845,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         mut choose: impl FnMut(
             BoundTypeVarInstance<'db>,
-            Option<(Type<'db>, Type<'db>)>,
+            Option<ConstraintBounds<'db>>,
         ) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let types = self.solve_pending_with(generic_context, &mut choose);
@@ -1867,7 +1868,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         choose: &mut impl FnMut(
             BoundTypeVarInstance<'db>,
-            Option<(Type<'db>, Type<'db>)>,
+            Option<ConstraintBounds<'db>>,
         ) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         if generic_context
@@ -1893,22 +1894,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let pending = self
             .pending
             .remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions = match pending.solutions_with(
-            self.db,
-            self.constraints,
-            |typevar, _variance, lower, upper| {
-                if let Some(ty) = choose(typevar, Some((lower, upper))) {
+        let solutions =
+            match pending.solutions_with(self.db, self.constraints, |typevar, _variance, bounds| {
+                if let Some(ty) = choose(typevar, Some(bounds)) {
                     return Ok(Some(ty));
                 }
 
-                PathBounds::default_solve(self.db, self.constraints, typevar, lower, upper)
-            },
-        ) {
-            Solutions::Unsatisfiable | Solutions::Unconstrained => {
-                return self.solve_hash_map_with(generic_context, choose);
-            }
-            Solutions::Constrained(solutions) => solutions,
-        };
+                PathBounds::default_solve(self.db, self.constraints, typevar, bounds)
+            }) {
+                Solutions::Unsatisfiable | Solutions::Unconstrained => {
+                    return self.solve_hash_map_with(generic_context, choose);
+                }
+                Solutions::Constrained(solutions) => solutions,
+            };
 
         let mut types = FxHashMap::default();
         for solution in solutions {
@@ -1921,31 +1919,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             UnionType::from_two_elements(self.db, *existing, binding.solution);
                     })
                     .or_insert(binding.solution);
-            }
-        }
-
-        for (identity, variable) in generic_context.variables_inner(self.db) {
-            if types.contains_key(identity) {
-                continue;
-            }
-
-            // TODO: This is a temporary heuristic that attempts to not overzealously select Never
-            // or object as a solution. Our constraint set representation currently requires every
-            // constraint to have both a lower and upper bound, using Never and object as the
-            // "default" if that bound is not actually provided. That means we cannot distinguish
-            // between "no lower bound" and "an explicit lower bound of Never". We plan to rework
-            // the constraint set representation to treat lower and upper bounds separately, which
-            // would allow us to distinguish those two cases; at that point, we would not need this
-            // heuristic anymore.
-            if let Some(mapped_ty) = self
-                .types
-                .get_mut(identity)
-                .map(|accumulator| accumulator.get_or_build(self.db))
-                && (mapped_ty.is_never()
-                    || (mapped_ty == Type::object()
-                        && variable.variance(self.db).is_contravariant()))
-            {
-                types.insert(*identity, mapped_ty);
             }
         }
 
@@ -2051,7 +2024,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         choose: &mut impl FnMut(
             BoundTypeVarInstance<'db>,
-            Option<(Type<'db>, Type<'db>)>,
+            Option<ConstraintBounds<'db>>,
         ) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         generic_context
@@ -2063,9 +2036,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .get_mut(identity)
                     .map(|accumulator| accumulator.get_or_build(self.db));
                 let chosen = match mapped_ty {
-                    Some(mapped_ty) => {
-                        choose(*variable, Some((mapped_ty, mapped_ty))).unwrap_or(mapped_ty)
-                    }
+                    Some(mapped_ty) => choose(*variable, Some(ConstraintBounds::exact(mapped_ty)))
+                        .unwrap_or(mapped_ty),
                     None => choose(*variable, None)?,
                 };
                 Some((*identity, chosen))
@@ -2102,20 +2074,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn intersect_pending_typevar_constraint(
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
-        lower: Type<'db>,
-        upper: Type<'db>,
+        bounds: ConstraintBounds<'db>,
     ) {
         let identity = bound_typevar.identity(self.db);
         if bound_typevar.is_paramspec(self.db) && !self.paramspec_seen.insert(identity) {
             return;
         }
 
-        let constraint = ConstraintSet::constrain_typevar(
+        let constraint = ConstraintSet::constrain_typevar_with_bounds(
             self.db,
             self.constraints,
             bound_typevar,
-            lower,
-            upper,
+            bounds.lower(),
+            bounds.upper(),
         );
         self.pending
             .intersect(self.db, self.constraints, constraint);
@@ -2145,14 +2116,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) {
         self.insert_hash_map_type_mapping(bound_typevar, ty);
 
-        let (lower, upper) = match variance {
-            TypeVarVariance::Covariant => (ty, Type::object()),
-            TypeVarVariance::Contravariant => (Type::Never, ty),
-            TypeVarVariance::Invariant => (ty, ty),
+        let bounds = match variance {
+            TypeVarVariance::Covariant => ConstraintBounds::new(Some(ty), None),
+            TypeVarVariance::Contravariant => ConstraintBounds::new(None, Some(ty)),
+            TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
             TypeVarVariance::Bivariant => return,
         };
 
-        self.intersect_pending_typevar_constraint(bound_typevar, lower, upper);
+        self.intersect_pending_typevar_constraint(bound_typevar, bounds);
     }
 
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to

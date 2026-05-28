@@ -61,11 +61,10 @@
 //! def _[U: (int, str)](u: U) -> None: ...
 //! ```
 //!
-//! The typevar `T` has an upper bound of `B`, which would translate into the constraint `Never ≤ T
-//! ≤ B`. (Every type is a supertype of `Never`, so having `Never` as a lower bound means that
-//! there is effectively no lower bound. Similarly, an upper bound of `object` means that there is
-//! effectively no upper bound.) The `T ≤ B` part expresses that the type can specialize to any
-//! type that is a subtype of B.
+//! The typevar `T` has an upper bound of `B`, which would translate into the constraint `T ≤ B`.
+//! (A missing lower bound is logically materialized as `Never`, since every type is a supertype of
+//! `Never`. Similarly, a missing upper bound is logically materialized as `object`.) The `T ≤ B`
+//! part expresses that the type can specialize to any type that is a subtype of B.
 //!
 //! The typevar `U` is constrained to be either `int` or `str`, which would translate into the
 //! constraint `(int ≤ T ≤ int) ∪ (str ≤ T ≤ str)`. When the lower and upper bounds are the same,
@@ -163,9 +162,9 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
 pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
     ///
-    /// This method short-circuits; if we encounter any element that
-    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied], then the overall result
-    /// must be as well, and we stop consuming elements from the iterator.
+    /// This method short-circuits if we encounter a structurally `always` constraint set. It does
+    /// not short-circuit on evidence-bearing constraints that are only semantically always true,
+    /// since those constraints can still be relevant for inference.
     fn when_any<'db, 'c>(
         self,
         db: &'db dyn Db,
@@ -346,7 +345,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         }
     }
 
-    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    /// Returns a constraint set that constrains a typevar to an explicit range of types.
     pub(crate) fn constrain_typevar(
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
@@ -354,10 +353,41 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
+        Self::constrain_typevar_with_bounds(db, builder, typevar, Some(lower), Some(upper))
+    }
+
+    /// Returns a constraint set that constrains a typevar with explicit lower and/or upper bounds.
+    pub(crate) fn constrain_typevar_with_bounds(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Option<Type<'db>>,
+        upper: Option<Type<'db>>,
+    ) -> Self {
         Self::from_node(
             builder,
-            Constraint::new_node(db, builder, typevar, lower, upper),
+            Constraint::new_node_with_bounds(db, builder, typevar, lower, upper),
         )
+    }
+
+    /// Returns a constraint set that constrains a typevar to be a supertype of `lower`.
+    pub(crate) fn constrain_typevar_lower_bound(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+    ) -> Self {
+        Self::constrain_typevar_with_bounds(db, builder, typevar, Some(lower), None)
+    }
+
+    /// Returns a constraint set that constrains a typevar to be a subtype of `upper`.
+    pub(crate) fn constrain_typevar_upper_bound(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        upper: Type<'db>,
+    ) -> Self {
+        Self::constrain_typevar_with_bounds(db, builder, typevar, None, Some(upper))
     }
 
     /// Verifies that this constraint set was created by `builder`
@@ -473,7 +503,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns the union of this constraint set and another. The other constraint set is provided
     /// as a thunk, to implement short-circuiting: the thunk is not forced if the constraint set is
-    /// already saturated.
+    /// structurally `always`.
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
@@ -484,11 +514,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_always_satisfied(db) {
-            let other = other();
-            other.verify_builder(builder);
-            self.union(db, builder, other);
+        if self.node == ALWAYS_TRUE {
+            return self;
         }
+
+        let other = other();
+        other.verify_builder(builder);
+        self.union(db, builder, other);
         self
     }
 
@@ -549,8 +581,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
-    /// The `choose` hook is called for each typevar on each BDD path with the typevar's
-    /// materialized lower and upper bounds. It returns:
+    /// The `choose` hook is called for each typevar on each BDD path with the typevar's explicit
+    /// lower and upper bounds. It returns:
     /// - `Some(ty)` to use `ty` as the solution for this typevar on this path
     /// - `None` to fall back to the default solution selection logic
     ///
@@ -561,8 +593,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        self.solutions_with(db, builder, |bound_typevar, _variance, lower, upper| {
-            PathBounds::default_solve(db, builder, bound_typevar, lower, upper)
+        self.solutions_with(db, builder, |bound_typevar, _variance, bounds| {
+            PathBounds::default_solve(db, builder, bound_typevar, bounds)
         })
     }
 
@@ -573,8 +605,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
-            Type<'db>,
-            Type<'db>,
+            ConstraintBounds<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         self.verify_builder(builder);
@@ -991,6 +1022,64 @@ pub(crate) struct Constraint<'db> {
     pub(crate) upper: Option<Type<'db>>,
 }
 
+/// The explicit lower and upper bounds inferred for a typevar on one constraint path.
+///
+/// Missing bounds are represented as `None`; callers can materialize them to the logical defaults
+/// (`Never` for lower bounds, `object` for upper bounds) when they need to reason about
+/// satisfiability.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct ConstraintBounds<'db> {
+    lower: Option<Type<'db>>,
+    upper: Option<Type<'db>>,
+}
+
+impl<'db> ConstraintBounds<'db> {
+    pub(crate) fn new(lower: Option<Type<'db>>, upper: Option<Type<'db>>) -> Self {
+        Self { lower, upper }
+    }
+
+    pub(crate) fn exact(ty: Type<'db>) -> Self {
+        Self::new(Some(ty), Some(ty))
+    }
+
+    pub(crate) fn lower(self) -> Option<Type<'db>> {
+        self.lower
+    }
+
+    pub(crate) fn upper(self) -> Option<Type<'db>> {
+        self.upper
+    }
+
+    fn has_lower(self) -> bool {
+        self.lower.is_some()
+    }
+
+    fn has_upper(self) -> bool {
+        self.upper.is_some()
+    }
+
+    pub(crate) fn materialized_lower(self) -> Type<'db> {
+        self.lower.unwrap_or(Type::Never)
+    }
+
+    pub(crate) fn materialized_upper(self) -> Type<'db> {
+        self.upper.unwrap_or(Type::object())
+    }
+
+    pub(crate) fn materialized(self) -> (Type<'db>, Type<'db>) {
+        (self.materialized_lower(), self.materialized_upper())
+    }
+
+    pub(crate) fn variance(self) -> TypeVarVariance {
+        match (self.lower, self.upper) {
+            (None, Some(_)) => TypeVarVariance::Covariant,
+            (Some(_), None) => TypeVarVariance::Contravariant,
+            (Some(_), Some(_)) => TypeVarVariance::Invariant,
+            (None, None) => TypeVarVariance::Bivariant,
+        }
+    }
+}
+
 impl ConstraintId {
     fn new<'db>(
         db: &'db dyn Db,
@@ -1021,20 +1110,24 @@ impl ConstraintId {
 }
 
 impl<'db> Constraint<'db> {
+    fn bounds(self) -> ConstraintBounds<'db> {
+        ConstraintBounds::new(self.lower, self.upper)
+    }
+
     fn lower(self) -> Type<'db> {
-        self.lower.unwrap_or(Type::Never)
+        self.bounds().materialized_lower()
     }
 
     fn upper(self) -> Type<'db> {
-        self.upper.unwrap_or(Type::object())
+        self.bounds().materialized_upper()
     }
 
     fn has_lower(self) -> bool {
-        self.lower.is_some()
+        self.bounds().has_lower()
     }
 
     fn has_upper(self) -> bool {
-        self.upper.is_some()
+        self.bounds().has_upper()
     }
 
     /// Returns a new range constraint.
@@ -1933,8 +2026,7 @@ impl NodeId {
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
-            Type<'db>,
-            Type<'db>,
+            ConstraintBounds<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let path_bounds = PathBounds::compute(db, builder, self);
@@ -2096,12 +2188,15 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
+        // Only short-circuit on structural `always`. A constraint can be semantically always
+        // satisfied while still carrying inference evidence, such as an explicit `Never` lower
+        // bound. Dropping that node would lose a valid solution path.
         Self::tree_fold(
             db,
             builder,
             nodes,
             ALWAYS_FALSE,
-            Self::is_always_satisfied,
+            |node, _db, _builder| node == ALWAYS_TRUE,
             Self::or_with_offset,
         )
     }
@@ -2111,6 +2206,9 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
+        // Unlike `distributed_or`, semantic short-circuiting is still safe here: once a conjunct
+        // has no satisfying paths, later conjuncts cannot add useful solution evidence. Returning
+        // that unsatisfiable node also preserves the first contradiction for display/debugging.
         Self::tree_fold(
             db,
             builder,
@@ -2285,19 +2383,19 @@ impl NodeId {
         // perform. So we have to take the appropriate materialization when translating the check
         // into a constraint.
         let constraint = match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => Constraint::new_node(
+            (Type::TypeVar(bound_typevar), _) => Constraint::new_node_with_bounds(
                 db,
                 builder,
                 bound_typevar,
-                Type::Never,
-                rhs.bottom_materialization(db),
+                None,
+                Some(rhs.bottom_materialization(db)),
             ),
-            (_, Type::TypeVar(bound_typevar)) => Constraint::new_node(
+            (_, Type::TypeVar(bound_typevar)) => Constraint::new_node_with_bounds(
                 db,
                 builder,
                 bound_typevar,
-                lhs.top_materialization(db),
-                Type::object(),
+                Some(lhs.top_materialization(db)),
+                None,
             ),
             _ => panic!("at least one type should be a typevar"),
         };
@@ -2971,8 +3069,8 @@ pub(crate) enum PathBounds<'db> {
 impl<'db> PathBounds<'db> {
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
     ///
-    /// Returns a list of paths, where each path contains the materialized lower/upper bounds for
-    /// each typevar that appears in the path's constraints.
+    /// Returns a list of paths, where each path contains the explicit lower/upper bounds for each
+    /// typevar that appears in the path's constraints.
     fn compute(db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>, node: NodeId) -> Self {
         match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
@@ -3047,14 +3145,14 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        self.solve_with(|bound_typevar, _variance, lower, upper| {
-            PathBounds::default_solve(db, builder, bound_typevar, lower, upper)
+        self.solve_with(|bound_typevar, _variance, bounds| {
+            PathBounds::default_solve(db, builder, bound_typevar, bounds)
         })
     }
 
     /// Solves each path by applying a per-typevar solver function, collecting valid solutions.
     ///
-    /// The solver receives the typevar and its materialized lower/upper bounds, and returns:
+    /// The solver receives the typevar and its explicit lower/upper bounds, and returns:
     /// - `Ok(Some(solution))` to add a solution for this typevar on this path
     /// - `Ok(None)` to leave this typevar unsolved on this path
     /// - `Err(())` to invalidate the entire path
@@ -3063,8 +3161,7 @@ impl<'db> PathBounds<'db> {
         mut choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
-            Type<'db>,
-            Type<'db>,
+            ConstraintBounds<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let paths = match self {
@@ -3077,28 +3174,11 @@ impl<'db> PathBounds<'db> {
         'paths: for path in paths {
             let mut solution = Vec::with_capacity(path.len());
             for bounds in path {
-                let TypeVarBounds {
-                    bound_typevar,
-                    lower,
-                    upper,
-                } = *bounds;
+                let bound_typevar = bounds.bound_typevar;
+                let bounds = ConstraintBounds::new(bounds.lower, bounds.upper);
+                let variance = bounds.variance();
 
-                let lower = lower.unwrap_or(Type::Never);
-                let upper = upper.unwrap_or(Type::object());
-
-                // Determine variance from the constraint bounds:
-                // - Only upper bound (lower = Never) → covariant position
-                // - Only lower bound (upper = object) → contravariant position
-                // - Both bounds set → invariant position
-                let variance = if lower.is_never() {
-                    TypeVarVariance::Covariant
-                } else if upper == Type::object() {
-                    TypeVarVariance::Contravariant
-                } else {
-                    TypeVarVariance::Invariant
-                };
-
-                match choose(bound_typevar, variance, lower, upper) {
+                match choose(bound_typevar, variance, bounds) {
                     Ok(Some(ty)) => solution.push(TypeVarSolution {
                         bound_typevar,
                         solution: ty,
@@ -3118,7 +3198,9 @@ impl<'db> PathBounds<'db> {
 
     /// The default solution selection logic for a single typevar on a single BDD path.
     ///
-    /// Given the materialized lower and upper bounds for a typevar, selects the solution type.
+    /// Given the explicit lower and upper bounds for a typevar, selects the solution type.
+    /// Missing bounds are materialized to their logical defaults only for satisfiability checks;
+    /// they are not selected as inferred solutions.
     /// Returns:
     /// - `Ok(Some(solution))` if the typevar is solved on this path
     /// - `Ok(None)` if the typevar is unsolved (no solution added)
@@ -3127,9 +3209,9 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
-        lower: Type<'db>,
-        upper: Type<'db>,
+        bounds: ConstraintBounds<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
+        let (lower, upper) = bounds.materialized();
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let bound = bound.top_materialization(db);
@@ -3144,19 +3226,15 @@ impl<'db> PathBounds<'db> {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
-                if !lower.is_never() {
+                if let Some(lower) = bounds.lower() {
                     return Ok(Some(lower));
                 }
 
-                let upper = IntersectionType::from_elements(
-                    db,
-                    std::iter::once(upper).chain(std::iter::once(bound)),
-                );
-                if upper != bound {
-                    Ok(Some(upper))
-                } else {
-                    Ok(None)
+                if let Some(upper) = bounds.upper() {
+                    return Ok(Some(IntersectionType::from_elements(db, [upper, bound])));
                 }
+
+                Ok(None)
             }
 
             TypeVarBoundOrConstraints::Constraints(constraints) => {
@@ -6173,7 +6251,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => ALWAYS_TRUE,
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.top_materialization(db);
-                Constraint::new_node(db, builder, self, Type::Never, bound)
+                Constraint::new_node_with_bounds(db, builder, self, None, Some(bound))
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut specializations = ALWAYS_FALSE;
@@ -6218,7 +6296,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.bottom_materialization(db);
                 (
-                    Constraint::new_node(db, builder, self, Type::Never, bound),
+                    Constraint::new_node_with_bounds(db, builder, self, None, Some(bound)),
                     Vec::new(),
                 )
             }

@@ -54,6 +54,10 @@ Use a less-invasive representation than the prior `dcreager/separate-constraints
 - [x] Created this plan.
 - [x] Phase 1 implementation is complete.
 - [x] Validation for Phase 1 completed: `cargo check -p ty_python_semantic`, `cargo test -p ty_python_semantic types::constraints`, `cargo test -p ty_python_semantic --test mdtest -- type_properties/implies_subtype_of.md`, and `jpk` all passed.
+- [x] Phase 2 construction-site audit is complete.
+- [x] Phase 4 solving API/caller update is complete, including preserving evidence-bearing tautologies through `or` / `distributed_or` instead of short-circuiting them away.
+- [x] Phase 5 target tests are complete: `cargo check -p ty_python_semantic`, `cargo test -p ty_python_semantic types::constraints`, `cargo test -p ty_python_semantic --test mdtest -- type_properties/implies_subtype_of.md`, targeted issue mdtests, and `jpk` all passed.
+- [x] Feature scope in this plan is complete.
 
 ## Proposed implementation phases
 
@@ -72,17 +76,17 @@ Use a less-invasive representation than the prior `dcreager/separate-constraints
 
 ### Phase 2: Audit construction sites
 
-- [ ] Update `ConstraintSet::constrain_typevar` / `Constraint::new_node` to accept or internally derive bound presence deliberately.
-- [ ] Add helper constructors where needed so call sites can say whether a `Never`/`object` bound is missing or explicit.
-- [ ] Audit important current `Type::Never` / `Type::object()` uses in `constraints.rs`, especially:
+- [x] Update `ConstraintSet::constrain_typevar` / `Constraint::new_node` to accept or internally derive bound presence deliberately.
+- [x] Add helper constructors where needed so call sites can say whether a `Never`/`object` bound is missing or explicit.
+- [x] Audit important current `Type::Never` / `Type::object()` uses in `constraints.rs`, especially:
     - typevar-to-typevar canonicalization
     - `implies_subtype_of`
     - `valid_specializations` / `required_specializations`
     - sequent-derived constraints
     - owned constraint-set loading
-- [ ] Audit `SpecializationBuilder::add_type_mapping` in `generics.rs`:
-    - covariant mapping should probably be explicit lower-only (`Some(ty), None`)
-    - contravariant mapping should probably be upper-only (`None, Some(ty)`)
+- [x] Audit `SpecializationBuilder::add_type_mapping` in `generics.rs`:
+    - covariant mapping is explicit lower-only (`Some(ty), None`)
+    - contravariant mapping is upper-only (`None, Some(ty)`)
     - invariant mapping remains both explicit (`Some(ty), Some(ty)`)
 
 ### Phase 3: Preserve presence during path-bound extraction
@@ -90,32 +94,32 @@ Use a less-invasive representation than the prior `dcreager/separate-constraints
 - [x] Change `Bounds` so an empty lower set remains `None` rather than becoming `Never` too early.
 - [x] Change `Bounds` so an empty upper set remains `None` rather than becoming `object` too early.
 - [x] Ensure derived reverse bounds from top-level typevar bounds preserve intended presence.
-- [ ] Update sorting/stable accumulation behavior without regressing deterministic output.
+- [x] Reviewed sorting/stable accumulation behavior; existing source-order path sorting and stable per-bound accumulation still apply, so no further code change was needed.
 
 ### Phase 4: Update solving APIs and callers
 
-- [ ] Change `PathBounds::solve_with` and `ConstraintSet::solutions_with` to pass lower/upper presence to the solver hook.
-- [ ] Update variance calculation to use presence, not `lower.is_never()` / `upper == object`.
-- [ ] Update `PathBounds::default_solve`:
+- [x] Change `PathBounds::solve_with` and `ConstraintSet::solutions_with` to pass lower/upper presence to the solver hook.
+- [x] Update variance calculation to use presence, not `lower.is_never()` / `upper == object`.
+- [x] Update `PathBounds::default_solve`:
     - explicit `Some(Never)` lower should be a valid selected solution when appropriate
     - missing lower should not force `Never`
     - missing upper should not force `object`
     - declared typevar upper bounds/constraints still validate paths correctly using effective bounds
-- [ ] Update hook callers in:
+- [x] Update hook callers in:
     - `generics.rs` (`solve_pending_with`, `build_with` path)
     - `types/call/bind.rs`
     - `types/infer/builder.rs`
-- [ ] Remove the temporary `solve_pending_with` heuristic only once the Option-backed solver preserves explicit `Never`/`object` correctly.
+- [x] Remove the temporary `solve_pending_with` heuristic once the Option-backed solver preserves explicit `Never`/`object` correctly.
 
 ### Phase 5: Tests and snapshots
 
-- [ ] Update mdtests for issue #3558 targets:
+- [x] Update mdtests for issue #3558 targets:
     - `generics/pep695/functions.md`
     - `generics/pep695/paramspec.md`
-- [ ] Add narrower tests if needed for explicit `Some(Never)` lower vs missing lower.
-- [ ] Run targeted mdtests first.
-- [ ] Review all updated snapshots and any `.pending-snap` files.
-- [ ] Run `jpk` after changing files. (`jpk` wraps prek in a way that is aware of the jj repo.)
+- [x] No narrower tests were needed; the target mdtests now cover explicit `Never` lower-bound inference.
+- [x] Run targeted mdtests first.
+- [x] Review all updated snapshots and any `.pending-snap` files.
+- [x] Run `jpk` after changing files. (`jpk` wraps prek in a way that is aware of the jj repo.)
 
 ## Testing commands
 

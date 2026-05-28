@@ -6508,13 +6508,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let path_bounds =
                     identity_instance.assignable_solutions_with_inferable(db, tcx, inferable);
-                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
+                let solutions = path_bounds.solve_with(|typevar, variance, bounds| {
                     let identity = typevar.identity(db);
                     elt_tcx_variance
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::default_solve(db, &constraints, typevar, lower, upper)
+                    PathBounds::default_solve(db, &constraints, typevar, bounds)
                 });
 
                 match solutions {
@@ -6773,7 +6773,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .origin(self.db())
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
-                    let (lower, _upper) = bounds?;
+                    let lower = bounds?.lower()?;
 
                     let lower = if tcx.annotation.is_none() {
                         // Constraints learned from later collection uses should follow the same
