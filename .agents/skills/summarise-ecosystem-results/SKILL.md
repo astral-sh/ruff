@@ -1,6 +1,6 @@
 ---
 name: summarise-ecosystem-results
-description: Use when asked to summarise or summarize ty ecosystem results for a Ruff PR, including from a PR number, PR URL, GitHub ecosystem-results comment, or full detailed HTML report.
+description: Use when a user says "summarise ecosystem results", "summarize this ty ecosystem report", "what changed in this ecosystem run?", or asks to summarise or summarize ty ecosystem results for a Ruff PR from a PR number, PR URL, GitHub ecosystem-results comment, or detailed HTML report.
 ---
 
 # Summarise Ecosystem Results
@@ -26,7 +26,7 @@ Use the PR comment as the change list and the full detailed HTML report as the s
 
 Before minimizing, load and apply the `minimizing-ty-ecosystem-changes` skill to each ecosystem change.
 
-If possible, use subagents to parallelize this work. Decide how to batch changes so the overall task finishes as quickly as possible while still allowing each subagent to work methodically. Reasonable batching strategies include grouping related changes by project, diagnostic code, suspected cause, or report section, while keeping large groups split enough to avoid one slow subagent blocking the whole task.
+If possible, use subagents to parallelize this work. Decide how to batch changes so the overall task finishes as quickly as possible while still allowing each subagent to work methodically. Reasonable batching strategies include grouping related changes by project, diagnostic code, suspected cause, or report section, while keeping large groups split enough to avoid one slow subagent blocking the whole task. DO NOT spawn more subagents than you can run in parallel.
 
 If subagents are not available, batch the minimization work manually and minimize the batches sequentially. Keep batches small enough that each pass can still be checked carefully.
 
@@ -37,7 +37,7 @@ Give each subagent a self-contained assignment:
 - The requirement to use the `minimizing-ty-ecosystem-changes` process rigorously.
 - The expected Markdown output format for each minimized change.
 
-Each subagent should proceed methodically through all assigned changes. If a subagent moves on to a new change and that change appears very similar to one it has already minimized, it may skip the new change, but it must record why the skipped change appears to demonstrate the same behavior.
+Each subagent should proceed methodically through all assigned changes. If a subagent moves on to a new change and that change appears very similar to one it has already minimized, it may skip the new change without completing the full minimisation skill, but it must record why the skipped change appears to demonstrate the same behavior.
 
 ## Collect Results
 
@@ -57,6 +57,7 @@ For each retained minimization, include:
 - The diagnostic or behavior change on `main` versus the PR.
 - The minimized code.
 - The commands or comparison method used to verify the minimization.
-- Any source links needed to trace the example back to the PR comment or full report.
+
+ALL references to exact line numbers in source code should use GitHub permalinks so that readers can jump to the exact line in the original source code that led to the diagnostic changing. The finished report should NEVER include "raw" URL links; it should ALWAYS use inline Markdown links with square brackets and parentheses.
 
 Present `PR_<number>_ECOSYSTEM_SUMMARY.md` as the finished product.

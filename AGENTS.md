@@ -54,9 +54,7 @@ Run ty:
 cargo run --bin ty -- check path/to/file.py
 ```
 
-## Pull Requests
-
-When working on ty, PR titles should start with `[ty]` and be tagged with the `ty` GitHub label.
+When working on ty, first read `.agents/skills/working-on-ty/SKILL.md`, then also read and follow any more specific ty skills it points to.
 
 ## Development Guidelines
 
@@ -72,9 +70,7 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability. At the end of a task, always check your work to see if you missed opportunities to use `let` chains.
 - If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible. But if a lint is complaining about unused/dead code, it's usually best to just delete the unused code.
 - Use comments purposefully. Don't use comments to narrate code, but do use them to explain invariants and why something unusual was done a particular way.
-- **Salsa incrementality (ty):** Any method that accesses `.node()` must be `#[salsa::tracked]`, or it will break incrementality. Prefer higher-level semantic APIs over raw AST access.
 - Run `cargo dev generate-all` after changing configuration options, CLI arguments, lint rules, or environment variable definitions, as these changes require regeneration of schemas, docs, and CLI references.
 - Don't prefix tests with `test_`.
 - Don't separate struct definitions from their `impl` blocks unless the `impl` is deliberately placed in a separate file, as for large structs.
-- The `db` parameter should always be the first, or second, if it's a method taking a `self` argument
-- For Salsa-cached values, avoid retaining excess collection capacity. Prefer boxed slices; otherwise shrink collections that may have spare capacity before returning them. In particular, inspect `HashMap` and `HashSet` values constructed via `extend`, `collect`, explicit reservation, or removal, since those operations can leave capacity that insert-only construction does not.
+- Avoid running `uv run` for any scripts from the repository root unless you use `--no-project`, `--script` or similar. Using `uv run` from the Ruff repo root without these flags will build Ruff from source, which is very slow and usually unnecessary.
