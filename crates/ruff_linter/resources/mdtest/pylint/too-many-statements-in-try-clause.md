@@ -38,8 +38,6 @@ Avoid emitting a diagnostic when the `try` statement is being used like a contex
 catches no exceptions and just ensures that some kind of cleanup is run in a `finally` clause:
 
 ```py
-# TODO false positive
-# error: [too-many-statements-in-try-clause]
 try:
     call1()
     call2()
