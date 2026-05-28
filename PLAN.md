@@ -52,22 +52,23 @@ Use a less-invasive representation than the prior `dcreager/separate-constraints
 - [x] Read issue #3558 and summarized the intended fix.
 - [x] Assessed the Option-backed approach against the current constraint-set code.
 - [x] Created this plan.
-- [ ] No implementation has started yet.
+- [x] Phase 1 implementation is complete.
+- [x] Validation for Phase 1 completed: `cargo check -p ty_python_semantic`, `cargo test -p ty_python_semantic types::constraints`, `cargo test -p ty_python_semantic --test mdtest -- type_properties/implies_subtype_of.md`, and `jpk` all passed.
 
 ## Proposed implementation phases
 
 ### Phase 1: Introduce explicit bound-presence types
 
-- [ ] Add a small representation for materialized bounds-with-presence, likely by changing:
-    - `Constraint<'db> { lower: Type<'db>, upper: Type<'db> }`
-    - `Bounds<'db>` accumulation
-    - `TypeVarBounds<'db>`
-- [ ] Provide helper methods for:
+- [x] Add a small representation for materialized bounds-with-presence:
+    - `Constraint<'db>` now stores `Option<Type<'db>>` for `lower` and `upper`.
+    - `TypeVarBounds<'db>` now stores optional materialized lower/upper bounds.
+    - `Bounds<'db>` still accumulates explicit bounds in sets, and empty sets now become `None` during path-bound extraction.
+- [x] Provide helper methods for:
     - effective lower (`None` -> `Never`)
     - effective upper (`None` -> `object`)
     - checking whether a lower/upper bound is present
-    - constructing explicit lower-only, upper-only, and full range constraints
-- [ ] Keep public API shape small; prefer local helper methods over broad refactors.
+    - constructing constraints from explicit optional bounds internally (`new_with_bounds` / `new_node_with_bounds`)
+- [x] Keep public API shape small; existing external callers still use the existing range-style API pending the Phase 2 audit.
 
 ### Phase 2: Audit construction sites
 
@@ -86,9 +87,9 @@ Use a less-invasive representation than the prior `dcreager/separate-constraints
 
 ### Phase 3: Preserve presence during path-bound extraction
 
-- [ ] Change `Bounds` so an empty lower set remains `None` rather than becoming `Never` too early.
-- [ ] Change `Bounds` so an empty upper set remains `None` rather than becoming `object` too early.
-- [ ] Ensure derived reverse bounds from top-level typevar bounds preserve intended presence.
+- [x] Change `Bounds` so an empty lower set remains `None` rather than becoming `Never` too early.
+- [x] Change `Bounds` so an empty upper set remains `None` rather than becoming `object` too early.
+- [x] Ensure derived reverse bounds from top-level typevar bounds preserve intended presence.
 - [ ] Update sorting/stable accumulation behavior without regressing deterministic output.
 
 ### Phase 4: Update solving APIs and callers
@@ -114,7 +115,7 @@ Use a less-invasive representation than the prior `dcreager/separate-constraints
 - [ ] Add narrower tests if needed for explicit `Some(Never)` lower vs missing lower.
 - [ ] Run targeted mdtests first.
 - [ ] Review all updated snapshots and any `.pending-snap` files.
-- [ ] Run `uvx prek run --files <changed files>` for every changed file.
+- [ ] Run `jpk` after changing files. (`jpk` wraps prek in a way that is aware of the jj repo.)
 
 ## Testing commands
 
@@ -138,8 +139,8 @@ MDTEST_UPDATE_SNAPSHOTS=1 \
 cargo test -p ty_python_semantic --test mdtest -- generics/pep695/paramspec.md
 ```
 
-After code changes, run pre-commit hooks only over changed files, for example:
+After code changes, run the jj-aware pre-commit wrapper:
 
 ```sh
-uvx prek run --files PLAN.md <other changed files>
+jpk
 ```
