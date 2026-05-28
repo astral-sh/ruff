@@ -35,6 +35,7 @@ mod folding_range;
 mod initialize;
 mod inlay_hints;
 mod notebook;
+mod on_type_formatting;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;

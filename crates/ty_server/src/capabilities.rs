@@ -1,12 +1,12 @@
 use lsp_types::{
     self as types, ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
     DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
-    HoverProviderCapability, InlayHintOptions, InlayHintServerCapabilities, MarkupKind,
-    NotebookCellSelector, NotebookSelector, OneOf, RenameOptions, SelectionRangeProviderCapability,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+    DocumentOnTypeFormattingOptions, HoverProviderCapability, InlayHintOptions,
+    InlayHintServerCapabilities, MarkupKind, NotebookCellSelector, NotebookSelector, OneOf,
+    RenameOptions, SelectionRangeProviderCapability, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
 use std::str::FromStr;
 
@@ -445,6 +445,10 @@ pub(crate) fn server_capabilities(
         completion_provider: Some(CompletionOptions {
             trigger_characters: Some(vec!['.'.to_string(), '"'.to_string(), '\''.to_string()]),
             ..Default::default()
+        }),
+        document_on_type_formatting_provider: Some(DocumentOnTypeFormattingOptions {
+            first_trigger_character: "\"".to_string(),
+            more_trigger_character: Some(vec!["'".to_string()]),
         }),
         selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
         folding_range_provider: Some(types::FoldingRangeProviderCapability::Simple(true)),

@@ -50,6 +50,12 @@ expression: initialization_result
         "quickfix"
       ]
     },
+    "documentOnTypeFormattingProvider": {
+      "firstTriggerCharacter": "\"",
+      "moreTriggerCharacter": [
+        "'"
+      ]
+    },
     "renameProvider": {
       "prepareProvider": true
     },
