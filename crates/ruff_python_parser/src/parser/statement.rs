@@ -195,7 +195,7 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_statements(&mut self) -> Suite {
-        let mut stmts = Suite::with_capacity(1);
+        let mut stmts = self.take_simple_statement_buffer();
         let mut progress = ParserProgress::default();
 
         loop {
@@ -258,8 +258,7 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
-        stmts.shrink_to_fit();
-        stmts
+        self.finish_statement_list(stmts)
     }
 
     /// Parses a simple statement.
@@ -3091,10 +3090,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Indent);
 
         let statements = if let Some(statements) = self.with_recursion(|parser| {
-            parser.parse_list_into_thin_vec(
-                RecoveryContextKind::BlockStatements,
-                Parser::parse_statement,
-            )
+            parser.parse_statement_list(RecoveryContextKind::BlockStatements)
         }) {
             statements
         } else {
