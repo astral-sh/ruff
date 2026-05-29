@@ -220,6 +220,24 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         }
     }
 
+    // A `lambda` defers evaluation of its body until it is called. If the called
+    // function references a symbol that is only bound *after* the lambda (a
+    // forward reference), inlining the call would move that reference before its
+    // binding and raise `NameError`. In that case the lambda is necessary.
+    // Ex) `x = lambda y: f(y)` followed by `def f(y): ...`
+    //
+    // We compare against the *end* of the lambda so that names bound within the
+    // lambda body itself (e.g. `lambda x: (string := str)(x)`) are not mistaken
+    // for forward references.
+    for name in &names {
+        if let Some(binding_id) = checker.semantic().lookup_symbol(name.id()) {
+            let binding = checker.semantic().binding(binding_id);
+            if binding.range().start() > lambda.range().end() {
+                return;
+            }
+        }
+    }
+
     let mut diagnostic = checker.report_diagnostic(UnnecessaryLambda, lambda.range());
     // Suppress the fix if the assignment expression target shadows one of the lambda's parameters.
     // This is necessary to avoid introducing a change in the behavior of the program.

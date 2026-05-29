@@ -61,3 +61,12 @@ _ = lambda *args: f(*args, y=x)
 # https://github.com/astral-sh/ruff/issues/18675
 _ = lambda x: (string := str)(x)
 _ = lambda x: ((x := 1) and str)(x)
+
+# https://github.com/astral-sh/ruff/issues/24704
+# the called function is bound later, so the lambda defers the lookup and is
+# necessary (inlining would raise `NameError`)
+_ = lambda y: forward_reference(y)
+
+
+def forward_reference(y):
+    pass
