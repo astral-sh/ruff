@@ -195,7 +195,7 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_statements(&mut self) -> Suite {
-        let mut stmts = self.take_simple_statement_buffer();
+        let mut stmts = Suite::with_capacity(1);
         let mut progress = ParserProgress::default();
 
         loop {
@@ -258,7 +258,8 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
-        self.finish_statement_list(stmts)
+        stmts.shrink_to_fit();
+        stmts
     }
 
     /// Parses a simple statement.
@@ -3089,14 +3090,13 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = if let Some(statements) = self.with_recursion(|parser| {
-            parser.parse_statement_list(RecoveryContextKind::BlockStatements)
-        }) {
-            statements
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            Suite::new()
-        };
+        let statements =
+            if let Some(statements) = self.with_recursion(Parser::parse_block_statements) {
+                statements
+            } else {
+                self.report_recursion_limit_exceeded(self.current_token_range());
+                Suite::new()
+            };
 
         self.expect(TokenKind::Dedent);
 

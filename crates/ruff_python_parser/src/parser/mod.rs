@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule, Stmt, Suite};
+use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use thin_vec::ThinVec;
 
@@ -27,35 +27,6 @@ mod recovery;
 mod statement;
 #[cfg(test)]
 mod tests;
-
-#[derive(Debug)]
-struct VecPool<T> {
-    // Nested collections require multiple builders to be live at the same time.
-    available: Vec<Vec<T>>,
-}
-
-impl<T> VecPool<T> {
-    fn new() -> Self {
-        Self {
-            available: Vec::new(),
-        }
-    }
-
-    fn take(&mut self) -> Vec<T> {
-        self.take_or_with_capacity(0)
-    }
-
-    fn take_or_with_capacity(&mut self, capacity: usize) -> Vec<T> {
-        self.available
-            .pop()
-            .unwrap_or_else(|| Vec::with_capacity(capacity))
-    }
-
-    fn recycle(&mut self, buffer: Vec<T>) {
-        debug_assert!(buffer.is_empty());
-        self.available.push(buffer);
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
@@ -91,9 +62,6 @@ pub(crate) struct Parser<'src> {
 
     /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
     max_nesting_depth: u32,
-
-    /// Reusable temporary storage for statement-list builders.
-    statement_pool: VecPool<Stmt>,
 }
 
 impl<'src> Parser<'src> {
@@ -124,7 +92,6 @@ impl<'src> Parser<'src> {
             current_token_id: TokenId::default(),
             depth_remaining,
             max_nesting_depth,
-            statement_pool: VecPool::new(),
         }
     }
 
@@ -556,24 +523,37 @@ impl<'src> Parser<'src> {
         elements
     }
 
-    /// Parses statements through reusable temporary storage and returns a compact suite.
-    fn parse_statement_list(&mut self, recovery_context_kind: RecoveryContextKind) -> Suite {
-        let mut statements = self.statement_pool.take();
-        self.parse_list(recovery_context_kind, |parser| {
+    /// Defers allocating singleton block suites so they do not need to resize when shrinking.
+    fn parse_block_statements(&mut self) -> Suite {
+        if !RecoveryContextKind::BlockStatements.is_list_element(self) {
+            return self.parse_list_into_thin_vec(
+                RecoveryContextKind::BlockStatements,
+                Parser::parse_statement,
+            );
+        }
+
+        let saved_context = self.recovery_context;
+        self.recovery_context = self.recovery_context.union(RecoveryContext::from_kind(
+            RecoveryContextKind::BlockStatements,
+        ));
+
+        let statement = self.parse_statement();
+
+        self.recovery_context = saved_context;
+
+        if RecoveryContextKind::BlockStatements.is_regular_list_terminator(self) {
+            let mut statements = Suite::with_capacity(1);
+            statements.push(statement);
+            return statements;
+        }
+
+        let mut statements = Suite::new();
+        statements.push(statement);
+        self.parse_list(RecoveryContextKind::BlockStatements, |parser| {
             statements.push(parser.parse_statement());
         });
-        self.finish_statement_list(statements)
-    }
-
-    fn take_simple_statement_buffer(&mut self) -> Vec<Stmt> {
-        self.statement_pool.take_or_with_capacity(1)
-    }
-
-    fn finish_statement_list(&mut self, mut statements: Vec<Stmt>) -> Suite {
-        let mut suite = Suite::with_capacity(statements.len());
-        suite.extend(statements.drain(..));
-        self.statement_pool.recycle(statements);
-        suite
+        statements.shrink_to_fit();
+        statements
     }
 
     /// Parses a list of elements where each element is parsed using the given
