@@ -24,7 +24,7 @@ use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
-use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
 use ty_python_core::program::UseDefaultStrategy;
@@ -34,7 +34,7 @@ pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceO
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
-use crate::server::{Action, publish_settings_diagnostics};
+use crate::server::{Action, publish_diagnostics_if_needed, publish_settings_diagnostics};
 use crate::session::client::Client;
 use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
@@ -311,13 +311,6 @@ impl Session {
         &self.project_state(path).db
     }
 
-    /// Returns a reference to the project's [`ProjectDatabase`] in which the given `path`
-    /// belongs, if the session has any projects.
-    pub(crate) fn try_project_db(&self, path: &AnySystemPath) -> Option<&ProjectDatabase> {
-        self.try_project_state(path)
-            .map(|project_state| &project_state.db)
-    }
-
     /// Returns an iterator, in arbitrary order, over all project databases
     /// in this session.
     pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> {
@@ -336,16 +329,6 @@ impl Session {
         &mut self.project_state_mut(path).db
     }
 
-    /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given
-    /// `path` belongs, if the session has any projects.
-    pub(crate) fn try_project_db_mut(
-        &mut self,
-        path: &AnySystemPath,
-    ) -> Option<&mut ProjectDatabase> {
-        self.try_project_state_mut(path)
-            .map(|project_state| &mut project_state.db)
-    }
-
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
@@ -353,17 +336,10 @@ impl Session {
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
-        self.try_project_state(path)
-            .expect("To always have at least one project")
-    }
-
-    /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs,
-    /// if the session has any projects.
-    pub(crate) fn try_project_state(&self, path: &AnySystemPath) -> Option<&ProjectState> {
         match path {
             AnySystemPath::System(system_path) => self
                 .project_state_for_path(system_path)
-                .or_else(|| self.project_state_virtual_fallback()),
+                .unwrap_or_else(|| self.project_state_virtual_fallback()),
             AnySystemPath::SystemVirtual(_virtual_path) => self.project_state_virtual_fallback(),
         }
     }
@@ -375,16 +351,6 @@ impl Session {
     ///
     /// [`project_db`]: Session::project_db
     pub(crate) fn project_state_mut(&mut self, path: &AnySystemPath) -> &mut ProjectState {
-        self.try_project_state_mut(path)
-            .expect("To always have at least one project")
-    }
-
-    /// Returns a mutable reference to the project's [`ProjectState`] in which the given `path`
-    /// belongs, if the session has any projects.
-    pub(crate) fn try_project_state_mut(
-        &mut self,
-        path: &AnySystemPath,
-    ) -> Option<&mut ProjectState> {
         match path {
             AnySystemPath::System(system_path) => {
                 let range = ..=system_path.to_path_buf();
@@ -398,13 +364,12 @@ impl Session {
                     .range(range.clone())
                     .any(|(workspace_root, _)| system_path.starts_with(workspace_root))
                 {
-                    return Some(
-                        self.projects
-                            .range_mut(range)
-                            .rfind(|(workspace_root, _)| system_path.starts_with(workspace_root))
-                            .unwrap()
-                            .1,
-                    );
+                    return self
+                        .projects
+                        .range_mut(range)
+                        .rfind(|(workspace_root, _)| system_path.starts_with(workspace_root))
+                        .unwrap()
+                        .1;
                 }
 
                 self.project_state_virtual_fallback_mut()
@@ -432,12 +397,15 @@ impl Session {
     // need to figure out which project should this virtual path
     // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
     // look for the first project with an overlapping search path?)
-    fn project_state_virtual_fallback(&self) -> Option<&ProjectState> {
-        self.projects.values().next()
+    fn project_state_virtual_fallback(&self) -> &ProjectState {
+        self.projects
+            .values()
+            .next()
+            .expect("To always have at least one project")
     }
 
-    fn project_state_virtual_fallback_mut(&mut self) -> Option<&mut ProjectState> {
-        self.projects.values_mut().next()
+    fn project_state_virtual_fallback_mut(&mut self) -> &mut ProjectState {
+        self.projects.values_mut().next().unwrap()
     }
 
     pub(crate) fn apply_changes(
@@ -445,10 +413,6 @@ impl Session {
         path: &AnySystemPath,
         changes: &[ChangeEvent],
     ) -> ChangeResult {
-        if self.try_project_db(path).is_none() {
-            return ChangeResult::default();
-        }
-
         let overrides = path.as_system().and_then(|root| {
             self.workspaces()
                 .for_path(root)?
@@ -461,6 +425,61 @@ impl Session {
 
         self.project_db_mut(path)
             .apply_changes(changes, overrides.as_ref())
+    }
+
+    /// Creates a fallback project after the last workspace is removed.
+    ///
+    /// The fallback stays in `OpenFiles` mode so document requests keep working without
+    /// reintroducing full-workspace diagnostics for the removed folder.
+    fn fallback_project_state(&self, root: SystemPathBuf) -> ProjectState {
+        let system = LSPSystem::new(
+            self.index.as_ref().unwrap().clone(),
+            self.native_system.clone(),
+        );
+        let metadata =
+            ProjectMetadata::from_options(Options::default(), root, None, &UseDefaultStrategy)
+                .expect("default project metadata should always be valid");
+        let mut db = ProjectDatabase::use_defaults(metadata, system);
+        db.set_check_mode(CheckMode::OpenFiles);
+        ProjectState {
+            db,
+            untracked_files_with_pushed_diagnostics: Vec::new(),
+        }
+    }
+
+    fn replay_open_documents_for_workspace(
+        &mut self,
+        workspace_root: &SystemPath,
+    ) -> Vec<DocumentHandle> {
+        let open_documents: Vec<_> = self
+            .index()
+            .text_documents()
+            .filter_map(|(_, document)| {
+                let handle = DocumentHandle::from_text_document(document);
+                if let AnySystemPath::System(path) = handle.notebook_or_file_path()
+                    && path.starts_with(workspace_root)
+                {
+                    Some((handle, document.language_id()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for (document, language_id) in &open_documents {
+            self.open_document_in_db(document, Some(*language_id));
+        }
+
+        open_documents
+            .into_iter()
+            .map(|(document, _)| document)
+            .collect()
+    }
+
+    fn republish_open_documents_if_needed(&self, documents: &[DocumentHandle], client: &Client) {
+        for document in documents {
+            publish_diagnostics_if_needed(document, self, client);
+        }
     }
 
     /// Returns a mutable iterator over all project databases.
@@ -686,6 +705,7 @@ impl Session {
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
+        let should_replay_open_documents = previous.is_some();
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
@@ -697,7 +717,12 @@ impl Session {
             },
         );
 
-        publish_settings_diagnostics(self, client, root);
+        publish_settings_diagnostics(self, client, root.clone());
+
+        if should_replay_open_documents {
+            let replayed_documents = self.replay_open_documents_for_workspace(&root);
+            self.republish_open_documents_if_needed(&replayed_documents, client);
+        }
     }
 
     /// Adds an uninitialized workspace to this session.
@@ -871,6 +896,14 @@ impl Session {
             }
         }
 
+        let replayed_documents = if self.projects.is_empty() {
+            let fallback = self.fallback_project_state(workspace_path.clone());
+            self.projects.insert(workspace_path.clone(), fallback);
+            self.replay_open_documents_for_workspace(&workspace_path)
+        } else {
+            Vec::new()
+        };
+
         // Collect all of the documents to clear upfront to
         // work around borrowck.
         let documents_to_clear: Vec<DocumentHandle> = self
@@ -888,6 +921,8 @@ impl Session {
         for doc in documents_to_clear {
             self.clear_diagnostics_if_needed(&doc, client);
         }
+
+        self.republish_open_documents_if_needed(&replayed_documents, client);
 
         self.bump_revision();
 
@@ -1161,7 +1196,7 @@ impl Session {
         match path {
             AnySystemPath::System(system_path) => self.workspaces.settings_for_path(system_path),
             AnySystemPath::SystemVirtual(_) => {
-                let project = self.try_project_state(path)?;
+                let project = self.project_state(path);
                 self.workspaces
                     .settings_for_path(project.db.project().root(&project.db))
                     .or_else(|| self.workspaces.settings_virtual_fallback())
@@ -1230,10 +1265,6 @@ impl Session {
 
     fn open_document_in_db(&mut self, document: &DocumentHandle, language_id: Option<LanguageId>) {
         let path = document.notebook_or_file_path();
-
-        if self.try_project_db(path).is_none() {
-            return;
-        }
 
         // This is a "maybe" because the `File` might've not been interned yet i.e., the
         // `try_system` call will return `None` which doesn't mean that the file is new, it's just
@@ -1930,10 +1961,7 @@ impl DocumentHandle {
         let requires_clear_diagnostics = if is_cell {
             true
         } else {
-            let Some(db) = session.try_project_db_mut(path) else {
-                session.bump_revision();
-                return Ok(true);
-            };
+            let db = session.project_db_mut(path);
 
             match path {
                 AnySystemPath::System(system_path) => {

@@ -18,7 +18,7 @@ mod type_hierarchy;
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
-pub(crate) use diagnostics::publish_settings_diagnostics;
+pub(crate) use diagnostics::{publish_diagnostics_if_needed, publish_settings_diagnostics};
 pub use requests::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 use ruff_db::panic::PanicError;
 
@@ -278,7 +278,6 @@ fn background_document_request_task<R: traits::BackgroundDocumentRequestHandler>
 ) -> Result<Task>
 where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
-    <<R as RequestHandler>::RequestType as Request>::Result: traits::NoProjectResult,
 {
     let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
     let (id, params) = cast_request::<R>(req)?;
@@ -312,16 +311,7 @@ where
         };
 
         let path = document.notebook_or_file_path();
-        let Some(db) = session.try_project_db(path).cloned() else {
-            let reason = format!("Document {url} is not part of an active workspace");
-            tracing::debug!(
-                "Running request id={id} method={} without a project because {reason}",
-                R::METHOD
-            );
-            return Box::new(move |client| {
-                R::handle_request_without_db(&id, document, client, params);
-            });
-        };
+        let db = session.project_db(path).clone();
         let log_guidance = document.client_name().log_guidance();
 
         Box::new(move |client| {
