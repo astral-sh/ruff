@@ -1737,7 +1737,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let end_of_scope_symbols = Self::intern_place_states(
             self.symbol_states,
-            |state| (state.bindings(), state.declarations()),
+            PlaceState::into_parts,
             &mut interned_bindings,
             &mut interned_ids_by_bindings,
             &mut interned_declarations,
@@ -1745,7 +1745,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let end_of_scope_members = Self::intern_place_states(
             self.member_states,
-            |state| (state.bindings(), state.declarations()),
+            PlaceState::into_parts,
             &mut interned_bindings,
             &mut interned_ids_by_bindings,
             &mut interned_declarations,
@@ -1753,7 +1753,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let reachable_definitions_by_symbol = Self::intern_place_states(
             self.reachable_symbol_definitions,
-            |definitions| (&definitions.bindings, &definitions.declarations),
+            |definitions| (definitions.bindings, definitions.declarations),
             &mut interned_bindings,
             &mut interned_ids_by_bindings,
             &mut interned_declarations,
@@ -1761,7 +1761,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let reachable_definitions_by_member = Self::intern_place_states(
             self.reachable_member_definitions,
-            |definitions| (&definitions.bindings, &definitions.declarations),
+            |definitions| (definitions.bindings, definitions.declarations),
             &mut interned_bindings,
             &mut interned_ids_by_bindings,
             &mut interned_declarations,
@@ -1908,7 +1908,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_place_states<I: Idx, T>(
         place_states: IndexVec<I, T>,
-        get_parts: impl for<'a> Fn(&'a T) -> (&'a Bindings, &'a Declarations),
+        get_parts: impl Fn(T) -> (Bindings, Declarations),
         interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
         interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
         interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
@@ -1917,7 +1917,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut interned_ids_by_place = IndexVec::with_capacity(place_states.len());
 
         for place_state in place_states {
-            let (bindings, declarations) = get_parts(&place_state);
+            let (bindings, declarations) = get_parts(place_state);
             let interned_id = Self::intern_place_state(
                 bindings,
                 declarations,
@@ -1934,26 +1934,26 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     fn intern_place_state(
-        bindings: &Bindings,
-        declarations: &Declarations,
+        bindings: Bindings,
+        declarations: Declarations,
         interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
         interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
         interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
         interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
     ) -> InternedPlaceStateId {
-        let bindings_id = if let Some(bindings_id) = interned_ids_by_bindings.get(bindings) {
+        let bindings_id = if let Some(bindings_id) = interned_ids_by_bindings.get(&bindings) {
             *bindings_id
         } else {
             let bindings_id = interned_bindings.push(bindings.clone());
-            interned_ids_by_bindings.insert(bindings.clone(), bindings_id);
+            interned_ids_by_bindings.insert(bindings, bindings_id);
             bindings_id
         };
         let declarations_id =
-            if let Some(declarations_id) = interned_ids_by_declarations.get(declarations) {
+            if let Some(declarations_id) = interned_ids_by_declarations.get(&declarations) {
                 *declarations_id
             } else {
                 let declarations_id = interned_declarations.push(declarations.clone());
-                interned_ids_by_declarations.insert(declarations.clone(), declarations_id);
+                interned_ids_by_declarations.insert(declarations, declarations_id);
                 declarations_id
             };
         InternedPlaceStateId(bindings_id, declarations_id)

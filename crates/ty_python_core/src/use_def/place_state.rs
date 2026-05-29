@@ -445,6 +445,10 @@ impl PlaceState {
     pub(super) fn declarations(&self) -> &Declarations {
         &self.declarations
     }
+
+    pub(super) fn into_parts(self) -> (Bindings, Declarations) {
+        (self.bindings, self.declarations)
+    }
 }
 
 #[cfg(test)]
