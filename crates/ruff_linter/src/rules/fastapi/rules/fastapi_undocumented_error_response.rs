@@ -1,9 +1,11 @@
 use std::collections::BTreeSet;
 
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{Expr, ExprCall, Number, Stmt};
+use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -75,19 +77,11 @@ impl Violation for FastApiUndocumentedErrorResponse {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { codes } = self;
-        let codes_str = codes
-            .iter()
-            .map(u16::to_string)
-            .collect::<Vec<_>>()
-            .join(", ");
-        if codes.len() == 1 {
-            format!(
-                "FastAPI route raises HTTP {codes_str} but does not document it in `responses=`"
-            )
+        if let [code] = codes.as_slice() {
+            format!("FastAPI route raises HTTP {code} but does not document it in `responses=`")
         } else {
-            format!(
-                "FastAPI route raises HTTP {codes_str} but does not document them in `responses=`"
-            )
+            let codes = codes.iter().join(", ");
+            format!("FastAPI route raises HTTP {codes} but does not document them in `responses=`")
         }
     }
 }
@@ -128,9 +122,7 @@ pub(crate) fn fastapi_undocumented_error_response(
     }
 
     for (decorator, call) in route_decorators {
-        let mut documented = DocumentedCodes::default();
-        collect_decorator_documented(call, semantic, &mut documented);
-        collect_router_documented(call, semantic, &mut documented);
+        let documented = DocumentedCodes::from_route_call(call, semantic);
 
         let missing: Vec<u16> = raised
             .iter()
@@ -187,8 +179,7 @@ impl<'a> RaisedCodeVisitor<'a> {
         if let Some(code) = call
             .arguments
             .find_argument_value("status_code", 0)
-            .and_then(|expr| resolve_status_code(expr, self.semantic))
-            && is_error_status(code)
+            .and_then(|expr| resolve_error_status_code(expr, self.semantic))
         {
             self.codes.insert(code);
         }
@@ -200,8 +191,7 @@ impl<'a> RaisedCodeVisitor<'a> {
                 if is_response_class(&call.func, self.semantic)
                     && let Some(status_code_expr) =
                         call.arguments.find_argument_value("status_code", 1)
-                    && let Some(code) = resolve_status_code(status_code_expr, self.semantic)
-                    && is_error_status(code)
+                    && let Some(code) = resolve_error_status_code(status_code_expr, self.semantic)
                 {
                     self.codes.insert(code);
                 }
@@ -239,17 +229,7 @@ impl<'a> StatementVisitor<'a> for RaisedCodeVisitor<'a> {
     }
 }
 
-/// Cheap pre-filter that skips qualified-name resolution for things that obviously
-/// cannot be a class call. Literals, subscripts, computed values, etc. never match
-/// a fastapi/starlette qualified name, so resolving them is wasted work.
-fn is_possibly_imported_class(expr: &Expr) -> bool {
-    matches!(expr, Expr::Name(_) | Expr::Attribute(_))
-}
-
 fn is_http_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
-    if !is_possibly_imported_class(expr) {
-        return false;
-    }
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
@@ -262,9 +242,6 @@ fn is_http_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 fn is_response_class(expr: &Expr, semantic: &SemanticModel) -> bool {
-    if !is_possibly_imported_class(expr) {
-        return false;
-    }
     let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
         return false;
     };
@@ -290,6 +267,10 @@ fn is_error_status(code: u16) -> bool {
     (400..=599).contains(&code)
 }
 
+fn resolve_error_status_code(expr: &Expr, semantic: &SemanticModel) -> Option<u16> {
+    resolve_status_code(expr, semantic).filter(|code| is_error_status(*code))
+}
+
 /// Try to statically resolve an `Expr` to an HTTP status code integer.
 ///
 /// Handles integer literals, `fastapi.status.HTTP_*`, `starlette.status.HTTP_*`, and
@@ -300,7 +281,7 @@ fn resolve_status_code(expr: &Expr, semantic: &SemanticModel) -> Option<u16> {
         ..
     }) = expr
     {
-        return int_value.as_u64().and_then(|n| u16::try_from(n).ok());
+        return int_value.as_u16();
     }
 
     let qualified_name = semantic.resolve_qualified_name(expr)?;
@@ -401,6 +382,13 @@ struct DocumentedCodes {
 }
 
 impl DocumentedCodes {
+    fn from_route_call(call: &ExprCall, semantic: &SemanticModel) -> Self {
+        let mut documented = Self::default();
+        documented.add_decorator_documentation(call, semantic);
+        documented.add_router_documentation(call, semantic);
+        documented
+    }
+
     fn covers(&self, code: u16) -> bool {
         if self.has_unknown || self.has_default {
             return true;
@@ -413,62 +401,114 @@ impl DocumentedCodes {
         }
         self.explicit.contains(&code)
     }
-}
 
-/// Look at the route decorator for `responses=` and `openapi_extra={"responses": ...}`.
-fn collect_decorator_documented(
-    call: &ExprCall,
-    semantic: &SemanticModel,
-    documented: &mut DocumentedCodes,
-) {
-    if has_variadic_keyword(call) {
-        documented.has_unknown = true;
+    /// Look at the route decorator for `responses=` and
+    /// `openapi_extra={"responses": ...}`.
+    fn add_decorator_documentation(&mut self, call: &ExprCall, semantic: &SemanticModel) {
+        if has_variadic_keyword(call) {
+            self.has_unknown = true;
+        }
+        if let Some(keyword) = call.arguments.find_keyword("responses") {
+            self.add_response_mapping(&keyword.value, semantic);
+        }
+        if let Some(keyword) = call.arguments.find_keyword("openapi_extra") {
+            self.add_openapi_extra(&keyword.value, semantic);
+        }
     }
-    if let Some(keyword) = call.arguments.find_keyword("responses") {
-        collect_codes_from_dict(&keyword.value, semantic, documented);
-    }
-    if let Some(keyword) = call.arguments.find_keyword("openapi_extra") {
-        let Expr::Dict(ast::ExprDict { items, .. }) = &keyword.value else {
-            if may_be_mapping(&keyword.value) {
-                documented.has_unknown = true;
+
+    /// Look up the router instance in the same module and read its `responses=` kwarg.
+    fn add_router_documentation(&mut self, call: &ExprCall, semantic: &SemanticModel) {
+        match resolve_router_call(call, semantic) {
+            Some(RouterCall::Direct(router_call)) => {
+                if has_variadic_keyword(router_call) {
+                    self.has_unknown = true;
+                }
+                if let Some(keyword) = router_call.arguments.find_keyword("responses") {
+                    self.add_response_mapping(&keyword.value, semantic);
+                }
             }
+            Some(RouterCall::Unknown) => {
+                self.has_unknown = true;
+            }
+            None => {}
+        }
+    }
+
+    fn add_openapi_extra(&mut self, expr: &Expr, semantic: &SemanticModel) {
+        if is_none_literal(expr) {
+            return;
+        }
+
+        let Expr::Dict(ast::ExprDict { items, .. }) = expr else {
+            self.has_unknown = true;
             return;
         };
+
         for item in items {
             let Some(key) = item.key.as_ref() else {
-                documented.has_unknown = true;
+                self.has_unknown = true;
                 continue;
             };
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key {
-                if value.to_str() == "responses" {
-                    collect_codes_from_dict(&item.value, semantic, documented);
-                }
-            } else if may_be_string_key(key) {
-                collect_codes_from_dict(&item.value, semantic, documented);
+
+            match resolve_string_literal(key, semantic).as_deref() {
+                Some("responses") => self.add_response_mapping(&item.value, semantic),
+                Some(_) => {}
+                None => self.has_unknown = true,
             }
         }
     }
-}
 
-/// Look up the router instance in the same module and read its `responses=` kwarg.
-fn collect_router_documented(
-    call: &ExprCall,
-    semantic: &SemanticModel,
-    documented: &mut DocumentedCodes,
-) {
-    match resolve_router_call(call, semantic) {
-        Some(RouterCall::Direct(router_call)) => {
-            if has_variadic_keyword(router_call) {
-                documented.has_unknown = true;
-            }
-            if let Some(keyword) = router_call.arguments.find_keyword("responses") {
-                collect_codes_from_dict(&keyword.value, semantic, documented);
+    /// Parse a `{<status>: ..., ...}` dict literal and record what's covered.
+    fn add_response_mapping(&mut self, expr: &Expr, semantic: &SemanticModel) {
+        if is_none_literal(expr) {
+            return;
+        }
+
+        let Expr::Dict(ast::ExprDict { items, .. }) = expr else {
+            self.has_unknown = true;
+            return;
+        };
+
+        for item in items {
+            let Some(key) = item.key.as_ref() else {
+                self.has_unknown = true;
+                continue;
+            };
+
+            match key {
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Int(int_value),
+                    ..
+                }) => {
+                    if let Some(code) = int_value.as_u16() {
+                        self.explicit.insert(code);
+                    }
+                }
+                Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                    self.add_string_key(value.to_str());
+                }
+                _ => {
+                    let Some(code) = resolve_documented_status_code(key, semantic) else {
+                        self.has_unknown = true;
+                        continue;
+                    };
+                    self.explicit.insert(code);
+                }
             }
         }
-        Some(RouterCall::Unknown) => {
-            documented.has_unknown = true;
+    }
+
+    fn add_string_key(&mut self, key: &str) {
+        match key {
+            "4XX" | "4xx" => self.has_4xx_wildcard = true,
+            "5XX" | "5xx" => self.has_5xx_wildcard = true,
+            "default" => self.has_default = true,
+            _ => {
+                if let Ok(code) = key.parse::<u16>() {
+                    self.explicit.insert(code);
+                }
+            }
         }
-        None => {}
     }
 }
 
@@ -488,8 +528,7 @@ enum RouterCall<'a> {
 }
 
 /// Resolve `@router.get(...)` to the `APIRouter(...)` (or `FastAPI(...)`) call site that
-/// bound `router` in the same module. Handles both plain `router = APIRouter(...)` and
-/// annotated `router: APIRouter = APIRouter(...)` bindings.
+/// bound `router` in the same module.
 fn resolve_router_call<'a>(
     call: &'a ExprCall,
     semantic: &'a SemanticModel,
@@ -500,15 +539,7 @@ fn resolve_router_call<'a>(
     let name = value.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let binding = semantic.binding(binding_id);
-    let source = binding.source?;
-
-    let value = match semantic.statement(source) {
-        Stmt::Assign(ast::StmtAssign { value, .. }) => value.as_ref(),
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        }) => value.as_ref(),
-        _ => return None,
-    };
+    let value = find_binding_value(binding, semantic)?;
     let Expr::Call(router_call) = value else {
         return Some(RouterCall::Unknown);
     };
@@ -530,56 +561,39 @@ fn is_fastapi_router_constructor(expr: &Expr, semantic: &SemanticModel) -> bool 
         })
 }
 
-/// Parse a `{<status>: ..., ...}` dict literal and record what's covered.
-fn collect_codes_from_dict(
-    expr: &Expr,
-    semantic: &SemanticModel,
-    documented: &mut DocumentedCodes,
-) {
-    let Expr::Dict(ast::ExprDict { items, .. }) = expr else {
-        if may_be_mapping(expr) {
-            documented.has_unknown = true;
-        }
-        return;
-    };
-    for item in items {
-        let Some(key) = item.key.as_ref() else {
-            documented.has_unknown = true;
-            continue;
-        };
-        match key {
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: Number::Int(int_value),
-                ..
-            }) => {
-                if let Some(code) = int_value.as_u64().and_then(|n| u16::try_from(n).ok()) {
-                    documented.explicit.insert(code);
-                }
-            }
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                let s = value.to_str();
-                match s {
-                    "4XX" | "4xx" => documented.has_4xx_wildcard = true,
-                    "5XX" | "5xx" => documented.has_5xx_wildcard = true,
-                    "default" => documented.has_default = true,
-                    _ => {
-                        if let Ok(code) = s.parse::<u16>() {
-                            documented.explicit.insert(code);
-                        }
-                    }
-                }
-            }
-            _ => {
-                let Some(code) = resolve_status_code(key, semantic) else {
-                    if may_be_status_code_key(key) {
-                        documented.has_unknown = true;
-                    }
-                    continue;
-                };
-                documented.explicit.insert(code);
-            }
-        }
+fn resolve_documented_status_code(expr: &Expr, semantic: &SemanticModel) -> Option<u16> {
+    if let Some(code) = resolve_status_code(expr, semantic) {
+        return Some(code);
     }
+
+    let Expr::Name(name) = expr else {
+        return None;
+    };
+    let binding_id = semantic.resolve_name(name)?;
+    let binding = semantic.binding(binding_id);
+    let value = find_binding_value(binding, semantic)?;
+    resolve_status_code(value, semantic)
+}
+
+fn resolve_string_literal(expr: &Expr, semantic: &SemanticModel) -> Option<String> {
+    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+        return Some(value.to_str().to_string());
+    }
+
+    let Expr::Name(name) = expr else {
+        return None;
+    };
+    let binding_id = semantic.resolve_name(name)?;
+    let binding = semantic.binding(binding_id);
+    let value = find_binding_value(binding, semantic)?;
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = value else {
+        return None;
+    };
+    Some(value.to_str().to_string())
+}
+
+fn is_none_literal(expr: &Expr) -> bool {
+    matches!(expr, Expr::NoneLiteral(_))
 }
 
 fn has_variadic_keyword(call: &ExprCall) -> bool {
@@ -587,49 +601,4 @@ fn has_variadic_keyword(call: &ExprCall) -> bool {
         .keywords
         .iter()
         .any(|keyword| keyword.arg.is_none())
-}
-
-fn may_be_mapping(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::BoolOp(_)
-            | Expr::Named(_)
-            | Expr::If(_)
-            | Expr::DictComp(_)
-            | Expr::Await(_)
-            | Expr::Call(_)
-            | Expr::Attribute(_)
-            | Expr::Subscript(_)
-            | Expr::Name(_)
-    )
-}
-
-fn may_be_string_key(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::BoolOp(_)
-            | Expr::Named(_)
-            | Expr::If(_)
-            | Expr::Await(_)
-            | Expr::Call(_)
-            | Expr::Attribute(_)
-            | Expr::Subscript(_)
-            | Expr::Name(_)
-    )
-}
-
-fn may_be_status_code_key(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::BoolOp(_)
-            | Expr::Named(_)
-            | Expr::BinOp(_)
-            | Expr::UnaryOp(_)
-            | Expr::If(_)
-            | Expr::Await(_)
-            | Expr::Call(_)
-            | Expr::Attribute(_)
-            | Expr::Subscript(_)
-            | Expr::Name(_)
-    )
 }

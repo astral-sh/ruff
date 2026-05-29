@@ -1,3 +1,10 @@
+# FAST004
+
+```toml
+rules = ["FAST004"]
+```
+
+```py
 from http import HTTPStatus
 
 from fastapi import APIRouter, FastAPI, HTTPException, status
@@ -16,13 +23,13 @@ annotated_router: APIRouter = APIRouter(responses={404: {"description": "Missing
 
 
 # Violation: literal int raised but not documented.
-@app.get("/missing-literal")
+@app.get("/missing-literal")  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def missing_literal():
     raise HTTPException(status_code=404, detail="missing")
 
 
 # Violation: positional literal int.
-@app.get("/missing-positional")
+@app.get("/missing-positional")  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def missing_positional():
     raise HTTPException(404, detail="missing")
 
@@ -34,13 +41,13 @@ async def documented_literal():
 
 
 # Violation: HTTPStatus resolves to an error code.
-@app.get("/missing-http-status")
+@app.get("/missing-http-status")  # error: [fast-api-undocumented-error-response] "raises HTTP 409"
 async def missing_http_status():
     raise HTTPException(status_code=HTTPStatus.CONFLICT, detail="conflict")
 
 
 # Violation: fastapi.status constant resolves to an error code.
-@app.get("/missing-fastapi-status")
+@app.get("/missing-fastapi-status")  # error: [fast-api-undocumented-error-response] "raises HTTP 403"
 async def missing_fastapi_status():
     raise HTTPException(status.HTTP_403_FORBIDDEN, detail="forbidden")
 
@@ -73,13 +80,13 @@ async def hidden():
 
 
 # Violation: returned JSONResponse error code is not documented.
-@app.get("/missing-json-response")
+@app.get("/missing-json-response")  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def missing_json_response():
     return JSONResponse({"detail": "missing"}, status_code=404)
 
 
 # Violation: 422 always flagged (auto-422 schema is for Pydantic, not user body).
-@app.get("/explicit-422")
+@app.get("/explicit-422")  # error: [fast-api-undocumented-error-response] "raises HTTP 422"
 async def explicit_422(item_id: int):
     raise HTTPException(status_code=422, detail="domain validation failed")
 
@@ -100,7 +107,7 @@ async def nested_scope():
 
 
 # Violation: raise inside try/except still counts.
-@app.get("/raise-in-try")
+@app.get("/raise-in-try")  # error: [fast-api-undocumented-error-response] "raises HTTP 503"
 async def raise_in_try():
     try:
         raise HTTPException(status_code=503, detail="degraded")
@@ -109,13 +116,13 @@ async def raise_in_try():
 
 
 # Violation: starlette's HTTPException is treated the same as fastapi's.
-@app.get("/starlette-exception")
+@app.get("/starlette-exception")  # error: [fast-api-undocumented-error-response] "raises HTTP 418"
 async def starlette_exception():
     raise StarletteHTTPException(status_code=418, detail="teapot")
 
 
 # Violation: starlette.status constants resolve too.
-@app.get("/starlette-status-const")
+@app.get("/starlette-status-const")  # error: [fast-api-undocumented-error-response] "raises HTTP 500"
 async def starlette_status_const():
     raise HTTPException(starlette_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -139,7 +146,7 @@ async def string_key():
 
 
 # Violation: two different codes raised, both missing from responses.
-@app.get("/multiple-violations")
+@app.get("/multiple-violations")  # error: [fast-api-undocumented-error-response] "raises HTTP 400, 503"
 async def multiple_violations(user_id: int):
     if user_id < 0:
         raise HTTPException(status_code=400, detail="bad id")
@@ -147,13 +154,13 @@ async def multiple_violations(user_id: int):
 
 
 # Violation: rule fires on sync routes too.
-@app.get("/sync-route")
+@app.get("/sync-route")  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 def sync_route():
     raise HTTPException(status_code=404, detail="missing")
 
 
 # Violation: non-GET methods are also routes (POST in this case).
-@app.post("/create")
+@app.post("/create")  # error: [fast-api-undocumented-error-response] "raises HTTP 409"
 async def create():
     raise HTTPException(status_code=409, detail="already exists")
 
@@ -172,7 +179,7 @@ async def indirect_status():
 
 
 # Violation: include_in_schema=True does not suppress the rule (only False does).
-@app.get("/explicit-include-true", include_in_schema=True)
+@app.get("/explicit-include-true", include_in_schema=True)  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def explicit_include_true():
     raise HTTPException(status_code=404, detail="missing")
 
@@ -184,7 +191,7 @@ async def two_hundred_status():
 
 
 # Violation: status_code as a positional argument to a Response constructor.
-@app.get("/positional-response-status")
+@app.get("/positional-response-status")  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def positional_response_status():
     return JSONResponse({"detail": "missing"}, 404)
 
@@ -204,7 +211,7 @@ async def router_level_hidden():
 
 
 # Violation: HTTPStatus members also expose `.value` for the int form.
-@app.get("/missing-http-status-value")
+@app.get("/missing-http-status-value")  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def missing_http_status_value():
     raise HTTPException(status_code=HTTPStatus.NOT_FOUND.value, detail="missing")
 
@@ -221,10 +228,42 @@ async def documented_http_status_value():
 COMMON_RESPONSES = {404: {"description": "Missing"}}
 
 
+def get_responses():
+    return COMMON_RESPONSES
+
+
+def get_status_code():
+    return 404
+
+
 # OK: responses passed through a variable cannot be resolved statically, so
 # assume it may document the raised code rather than reporting a false positive.
 @app.get("/indirect-responses", responses=COMMON_RESPONSES)
 async def indirect_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: non-dict responses may be dynamic enough to document the raised code.
+@app.get("/non-dict-responses", responses=[])
+async def non_dict_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: dynamic responses may document the raised code.
+@app.get("/dynamic-responses", responses=get_responses())
+async def dynamic_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: dict unions may document the raised code.
+@app.get("/union-responses", responses={} | COMMON_RESPONSES)
+async def union_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: computed response keys may document the raised code.
+@app.get("/computed-response-key", responses={get_status_code(): {"description": "Missing"}})
+async def computed_response_key():
     raise HTTPException(status_code=404, detail="missing")
 
 
@@ -243,9 +282,31 @@ async def indirect_openapi_extra():
     raise HTTPException(status_code=404, detail="missing")
 
 
+def get_openapi_extra():
+    return {"responses": COMMON_RESPONSES}
+
+
+# OK: non-dict openapi_extra may document the raised code.
+@app.get("/non-dict-openapi-extra", openapi_extra=[])
+async def non_dict_openapi_extra():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: dynamic openapi_extra may document the raised code.
+@app.get("/dynamic-openapi-extra", openapi_extra=get_openapi_extra())
+async def dynamic_openapi_extra():
+    raise HTTPException(status_code=404, detail="missing")
+
+
 # OK: a dict unpack may document any response code.
 @app.get("/unpacked-responses", responses={**COMMON_RESPONSES})
 async def unpacked_responses():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: a dict unpack inside openapi_extra responses may document any response code.
+@app.get("/unpacked-openapi-extra-responses", openapi_extra={"responses": {**COMMON_RESPONSES}})
+async def unpacked_openapi_extra_responses():
     raise HTTPException(status_code=404, detail="missing")
 
 
@@ -276,19 +337,19 @@ async def indirect_hidden_kwargs():
 
 
 # Violation: None is known not to document any responses.
-@app.get("/none-responses", responses=None)
+@app.get("/none-responses", responses=None)  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def none_responses():
     raise HTTPException(status_code=404, detail="missing")
 
 
 # Violation: None is known not to provide openapi_extra responses.
-@app.get("/none-openapi-extra", openapi_extra=None)
+@app.get("/none-openapi-extra", openapi_extra=None)  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def none_openapi_extra():
     raise HTTPException(status_code=404, detail="missing")
 
 
 # Violation: documenting a non-error HTTPStatus does not cover a raised 404.
-@app.get("/http-status-ok-key", responses={HTTPStatus.OK: {"description": "OK"}})
+@app.get("/http-status-ok-key", responses={HTTPStatus.OK: {"description": "OK"}})  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
 async def http_status_ok_key():
     raise HTTPException(status_code=404, detail="missing")
 
@@ -313,10 +374,37 @@ async def factory_responses_router_route():
     raise HTTPException(status_code=404, detail="missing")
 
 
-DYNAMIC_EXTRA_KEY = "not-responses"
+RESPONSES_EXTRA_KEY = "responses"
+NOT_RESPONSES_EXTRA_KEY = "not-responses"
 
 
-# Violation: a dynamic openapi_extra key with a known-empty value cannot document responses.
-@app.get("/dynamic-openapi-extra-key", openapi_extra={DYNAMIC_EXTRA_KEY: None})
-async def dynamic_openapi_extra_key():
+def get_extra_key():
+    return "responses"
+
+
+# OK: a resolvable dynamic openapi_extra key can document responses.
+@app.get(
+    "/resolved-openapi-extra-key",
+    openapi_extra={RESPONSES_EXTRA_KEY: {404: {"description": "Missing"}}},
+)
+async def resolved_openapi_extra_key():
     raise HTTPException(status_code=404, detail="missing")
+
+
+# Violation: a dynamic openapi_extra key that resolves away from "responses" cannot document responses.
+@app.get(  # error: [fast-api-undocumented-error-response] "raises HTTP 404"
+    "/resolved-non-responses-openapi-extra-key",
+    openapi_extra={NOT_RESPONSES_EXTRA_KEY: None},
+)
+async def resolved_non_responses_openapi_extra_key():
+    raise HTTPException(status_code=404, detail="missing")
+
+
+# OK: an unresolvable dynamic openapi_extra key may be "responses".
+@app.get(
+    "/unresolved-openapi-extra-key",
+    openapi_extra={get_extra_key(): None},
+)
+async def unresolved_openapi_extra_key():
+    raise HTTPException(status_code=404, detail="missing")
+```
