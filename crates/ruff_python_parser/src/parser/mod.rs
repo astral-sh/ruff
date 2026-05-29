@@ -2,9 +2,8 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule, Stmt, Suite};
+use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
 use crate::error::UnsupportedSyntaxError;
@@ -522,18 +521,6 @@ impl<'src> Parser<'src> {
         self.parse_list(recovery_context_kind, |p| elements.push(parse_element(p)));
         elements.shrink_to_fit();
         elements
-    }
-
-    /// Builds block suites inline when possible before creating the exact-sized AST vector.
-    fn parse_block_statements(&mut self) -> Suite {
-        let mut statements: SmallVec<[Stmt; 4]> = SmallVec::new();
-        self.parse_list(RecoveryContextKind::BlockStatements, |parser| {
-            statements.push(parser.parse_statement());
-        });
-
-        let mut suite = Suite::with_capacity(statements.len());
-        suite.extend(statements);
-        suite
     }
 
     /// Parses a list of elements where each element is parsed using the given
