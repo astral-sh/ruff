@@ -62,3 +62,16 @@ def for_else_no_false_positive(result: dict[str, float]) -> dict[str, float]:
             if result[res_glob] <= 0:  # okay, res_glob from loop may be unbound
                 result.pop(res_glob)
     return result
+
+
+def inner_loop_shadowing(d: dict):
+    # `k` from the outer loop is shadowed by the inner `for k in ...`.
+    # Lookups inside the inner loop body refer to the inner `k`, not the outer
+    # one, so they must NOT be flagged.
+    for k, v in d.items():
+        for k in range(3):    # shadows outer `k`
+            print(d[k])       # OK - not the same `k`
+        for v in range(3):    # shadows outer `v`
+            print(d[k])       # OK - not the same `v`
+        # After the inner loops, the outer variable is still live; do flag.
+        print(d[k])           # PLR1733

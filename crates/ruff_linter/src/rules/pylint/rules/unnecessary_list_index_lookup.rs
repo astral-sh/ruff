@@ -57,7 +57,8 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &Checker, stmt_for: &StmtFo
     let ranges = {
         let mut visitor = SequenceIndexVisitor::new(&sequence.id, &index_name.id, &value_name.id);
         visitor.visit_body(&stmt_for.body);
-        visitor.visit_body(&stmt_for.orelse);
+        // Do not visit `orelse`: the loop variable may be unbound there if the iterable
+        // is empty (the `else` branch runs even when the loop body never executes).
         visitor.into_accesses()
     };
 

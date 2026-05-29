@@ -112,6 +112,23 @@ impl SequenceIndexVisitor<'_> {
             _ => false,
         }
     }
+
+    /// Returns `true` if the given loop target rebinds `index_name` or `value_name`.
+    ///
+    /// When an inner `for` loop uses the same variable name as the outer loop's key or
+    /// value binding, any `sequence[index]` lookups inside the inner loop body refer to
+    /// the *inner* binding, not the outer one, so they must not be flagged.
+    fn rebinds_loop_var(&self, target: &Expr) -> bool {
+        match target {
+            Expr::Name(ast::ExprName { id, .. }) => {
+                id == self.index_name || id == self.value_name
+            }
+            Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+                elts.iter().any(|elt| self.rebinds_loop_var(elt))
+            }
+            _ => false,
+        }
+    }
 }
 
 impl Visitor<'_> for SequenceIndexVisitor<'_> {
@@ -136,6 +153,28 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
             }
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
                 self.modified = targets.iter().any(|target| self.is_assignment(target));
+            }
+            // If an inner `for` loop rebinds `index_name` or `value_name`, any lookups
+            // inside its body refer to the *inner* binding, not the outer loop's variable.
+            // Skip the inner body entirely; the `else` clause is unaffected.
+            Stmt::For(ast::StmtFor {
+                target,
+                body,
+                orelse,
+                ..
+            }) => {
+                if self.rebinds_loop_var(target) {
+                    for s in orelse {
+                        self.visit_stmt(s);
+                    }
+                } else {
+                    for s in body {
+                        self.visit_stmt(s);
+                    }
+                    for s in orelse {
+                        self.visit_stmt(s);
+                    }
+                }
             }
             _ => visitor::walk_stmt(self, stmt),
         }

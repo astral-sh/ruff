@@ -83,3 +83,26 @@ def nested_index_lookup():
     column_names = ["a", "b"]
     for index, column_name in enumerate(column_names):
         _ = data[column_names[index]]  # PLR1736
+
+
+def for_else_no_false_positive(letters):
+    # The `else` branch runs even when the loop body never executes (empty
+    # iterable), so `index` and `letter` may be unbound there. No PLR1736.
+    for index, letter in enumerate(letters):
+        if letter == "z":
+            break
+    else:
+        print(letters[index])  # OK - index may be unbound
+
+
+def inner_loop_shadowing(letters):
+    # `index` from the outer loop is shadowed by the inner `for index in ...`.
+    # The lookup `letters[index]` inside the inner loop refers to the inner
+    # `index`, not the outer one, so it must NOT be flagged.
+    for index, letter in enumerate(letters):
+        for index in range(3):       # shadows outer `index`
+            print(letters[index])    # OK - not the same `index`
+        for letter in range(3):      # shadows outer `letter`
+            print(letters[index])    # OK - not the same `letter`
+        # After the inner loops, the outer variable is still live; do flag.
+        print(letters[index])        # PLR1736
