@@ -3,10 +3,12 @@
 //!
 //! Inspired by [rustc_index](https://github.com/rust-lang/rust/blob/master/compiler/rustc_index/src/lib.rs).
 
+mod boxed;
 mod idx;
 mod slice;
 mod vec;
 
+pub use boxed::IndexBox;
 pub use idx::Idx;
 pub use ruff_macros::newtype_index;
 pub use slice::IndexSlice;

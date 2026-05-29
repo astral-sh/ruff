@@ -163,12 +163,11 @@
 //! The data structure we build to answer these questions is the `UseDefMap`. It has a
 //! `bindings_by_use` vector of [`InternedBindingsId`] indexed by [`ScopedUseId`]
 //! (plus an interned bindings table), a
-//! `declarations_by_binding` vector of [`InternedDeclarationsId`] indexed by [`ScopedDefinitionId`], a
-//! `bindings_by_declaration` vector of [`Bindings`] indexed by [`ScopedDefinitionId`], and
-//! `end_of_scope_symbols` and `end_of_scope_members` vectors indexed by [`ScopedSymbolId`]/[`ScopedMemberId`]. The values in
-//! each of these vectors are (in principle) a list of live bindings at that use/definition, or at
-//! the end of the scope for that place, with a list of the dominating constraints for each
-//! binding.
+//! `declarations_by_binding` map of [`InternedDeclarationsId`], a `bindings_by_definition` map of
+//! [`InternedBindingsId`], and `symbol_states` and `member_states` vectors indexed by
+//! [`ScopedSymbolId`]/[`ScopedMemberId`]. The values are (in principle) a list of live bindings at
+//! that use/definition, or at the end of the scope for that place, with a list of the dominating
+//! constraints for each binding.
 //!
 //! In order to avoid vectors-of-vectors-of-vectors and all the allocations that would entail, we
 //! don't actually store these "list of visible definitions" as a vector of [`Definition`].
@@ -241,7 +240,7 @@
 //! [`SemanticIndexBuilder`](crate::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
 
-use ruff_index::{Idx, IndexVec, newtype_index};
+use ruff_index::{Idx, IndexBox, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
@@ -291,6 +290,12 @@ impl InternedPlaceStateId {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct InternedPlaceStates {
+    end_of_scope: InternedPlaceStateId,
+    reachable: InternedPlaceStateId,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum InternedEnclosingSnapshotId {
     Constraint(ScopedNarrowingConstraint),
@@ -302,12 +307,12 @@ enum InternedEnclosingSnapshotId {
 pub struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be [`DefinitionState::Undefined`];
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
-    all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
+    all_definitions: IndexBox<ScopedDefinitionId, DefinitionState<'db>>,
 
     /// A bitset-like map indicating whether each binding definition has at least one use.
     ///
     /// This uses the same index as `all_definitions`.
-    used_bindings: IndexVec<ScopedDefinitionId, bool>,
+    used_bindings: IndexBox<ScopedDefinitionId, bool>,
 
     /// Array of predicates in this scope.
     predicates: Predicates<'db>,
@@ -316,23 +321,23 @@ pub struct UseDefMap<'db> {
     reachability_constraints: ReachabilityConstraints,
 
     /// Interned [`Bindings`] values.
-    interned_bindings: IndexVec<InternedBindingsId, Bindings>,
+    interned_bindings: IndexBox<InternedBindingsId, Bindings>,
     /// Interned [`Declarations`] values.
-    interned_declarations: IndexVec<InternedDeclarationsId, Declarations>,
+    interned_declarations: IndexBox<InternedDeclarationsId, Declarations>,
 
     /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: IndexVec<ScopedUseId, InternedBindingsId>,
+    bindings_by_use: IndexBox<ScopedUseId, InternedBindingsId>,
 
     /// [`Bindings`] for each member reaching a [`ScopedUseId`].
     ///
     /// This is only used for kwargs expressions, whose corresponding `bindings_by_use` entry
     /// is empty.
-    multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
+    multi_bindings_by_use: MultiBindingsByUse,
 
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
     /// Used to suppress diagnostics in unreachable code.
-    range_reachability: Vec<(TextRange, RangeInfo)>,
+    range_reachability: Box<[(TextRange, RangeInfo)]>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -354,21 +359,15 @@ pub struct UseDefMap<'db> {
     /// bindings to that symbol. If there are any, the assignment is invalid.
     bindings_by_definition: FxHashMap<Definition<'db>, InternedBindingsId>,
 
-    /// [`PlaceState`] visible at end of scope for each symbol.
-    end_of_scope_symbols: IndexVec<ScopedSymbolId, InternedPlaceStateId>,
+    /// Retained [`PlaceState`] values for each symbol.
+    symbol_states: IndexBox<ScopedSymbolId, InternedPlaceStates>,
 
-    /// [`PlaceState`] visible at end of scope for each member.
-    end_of_scope_members: IndexVec<ScopedMemberId, InternedPlaceStateId>,
-
-    /// All potentially reachable bindings and declarations, for each symbol.
-    reachable_definitions_by_symbol: IndexVec<ScopedSymbolId, InternedPlaceStateId>,
-
-    /// All potentially reachable bindings and declarations, for each member.
-    reachable_definitions_by_member: IndexVec<ScopedMemberId, InternedPlaceStateId>,
+    /// Retained [`PlaceState`] values for each member.
+    member_states: IndexBox<ScopedMemberId, InternedPlaceStates>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// scope.
-    enclosing_snapshots: IndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
+    enclosing_snapshots: IndexBox<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
 
     /// Whether or not the end of the scope is reachable.
     ///
@@ -395,6 +394,27 @@ pub struct UseDefMap<'db> {
 struct RangeInfo {
     reachability: ScopedReachabilityConstraintId,
     in_type_checking_block: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct MultiBindingsByUse(Box<[(ScopedUseId, Box<[Bindings]>)]>);
+
+impl MultiBindingsByUse {
+    fn from_map(map: FxHashMap<ScopedUseId, Vec<Bindings>>) -> Self {
+        let mut entries = map
+            .into_iter()
+            .map(|(use_id, bindings)| (use_id, bindings.into_boxed_slice()))
+            .collect::<Vec<_>>();
+        entries.sort_unstable_by_key(|(use_id, _)| *use_id);
+        Self(entries.into_boxed_slice())
+    }
+
+    fn get(&self, use_id: ScopedUseId) -> Option<&[Bindings]> {
+        self.0
+            .binary_search_by_key(&use_id, |(candidate, _)| *candidate)
+            .ok()
+            .map(|index| self.0[index].1.as_ref())
+    }
 }
 
 pub enum ApplicableConstraints<'map, 'db> {
@@ -444,7 +464,7 @@ impl<'db> UseDefMap<'db> {
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = BindingWithConstraintsIterator<'_, 'db>> {
         self.multi_bindings_by_use
-            .get(&use_id)
+            .get(use_id)
             .map(|member_bindings| {
                 member_bindings.iter().map(|bindings| {
                     self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
@@ -522,7 +542,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.end_of_scope_symbols[symbol];
+        let place_state_id = self.symbol_states[symbol].end_of_scope;
         self.bindings_iterator(
             &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -533,7 +553,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.end_of_scope_members[member];
+        let place_state_id = self.member_states[member].end_of_scope;
         self.bindings_iterator(
             &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -554,7 +574,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.reachable_definitions_by_symbol[symbol];
+        let place_state_id = self.symbol_states[symbol].reachable;
         let bindings = &self.interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
@@ -563,7 +583,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.reachable_definitions_by_member[member];
+        let place_state_id = self.member_states[member].reachable;
         let bindings = &self.interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
@@ -632,7 +652,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.end_of_scope_symbols[symbol];
+        let place_state_id = self.symbol_states[symbol].end_of_scope;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
@@ -641,7 +661,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.end_of_scope_members[member];
+        let place_state_id = self.member_states[member].end_of_scope;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
@@ -650,7 +670,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.reachable_definitions_by_symbol[symbol];
+        let place_state_id = self.symbol_states[symbol].reachable;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
@@ -659,7 +679,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.reachable_definitions_by_member[member];
+        let place_state_id = self.member_states[member].reachable;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
@@ -674,7 +694,7 @@ impl<'db> UseDefMap<'db> {
     pub fn all_end_of_scope_symbol_declarations<'map>(
         &'map self,
     ) -> impl Iterator<Item = (ScopedSymbolId, DeclarationsIterator<'map, 'db>)> + 'map {
-        self.end_of_scope_symbols
+        self.symbol_states
             .indices()
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_declarations(symbol_id)))
     }
@@ -683,7 +703,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
     ) -> impl Iterator<Item = (ScopedSymbolId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
     {
-        self.end_of_scope_symbols
+        self.symbol_states
             .indices()
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_bindings(symbol_id)))
     }
@@ -697,14 +717,14 @@ impl<'db> UseDefMap<'db> {
             BindingWithConstraintsIterator<'map, 'db>,
         ),
     > + 'map {
-        self.reachable_definitions_by_symbol.iter_enumerated().map(
-            |(symbol_id, &place_state_id)| {
+        self.symbol_states.iter_enumerated().map(
+            |(symbol_id, &InternedPlaceStates { reachable, .. })| {
                 let declarations = self.declarations_iterator(
-                    &self.interned_declarations[place_state_id.declarations_id()],
+                    &self.interned_declarations[reachable.declarations_id()],
                     BoundnessAnalysis::AssumeBound,
                 );
                 let bindings = self.bindings_iterator(
-                    &self.interned_bindings[place_state_id.bindings_id()],
+                    &self.interned_bindings[reachable.bindings_id()],
                     BoundnessAnalysis::AssumeBound,
                 );
                 (symbol_id, declarations, bindings)
@@ -773,7 +793,7 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 
 #[derive(Clone, Debug)]
 pub struct BindingWithConstraintsIterator<'map, 'db> {
-    all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
+    all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
     predicates: &'map Predicates<'db>,
     reachability_constraints: &'map ReachabilityConstraints,
     boundness_analysis: BoundnessAnalysis,
@@ -845,7 +865,7 @@ impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
 
 #[derive(Clone)]
 pub struct DeclarationsIterator<'map, 'db> {
-    all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
+    all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
     predicates: &'map Predicates<'db>,
     reachability_constraints: &'map ReachabilityConstraints,
     boundness_analysis: BoundnessAnalysis,
@@ -1776,26 +1796,46 @@ impl<'db> UseDefMapBuilder<'db> {
             }
         }
         self.reachability_constraints.mark_used(self.reachability);
+        let symbol_states =
+            Self::zip_place_states(end_of_scope_symbols, reachable_definitions_by_symbol);
+        let member_states =
+            Self::zip_place_states(end_of_scope_members, reachable_definitions_by_member);
+        let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
 
         UseDefMap {
-            all_definitions: self.all_definitions,
-            used_bindings: self.used_bindings,
+            all_definitions: self.all_definitions.into(),
+            used_bindings: self.used_bindings.into(),
             predicates: self.predicates.build(),
             reachability_constraints: self.reachability_constraints.build(),
-            interned_bindings,
-            interned_declarations,
-            bindings_by_use,
-            multi_bindings_by_use: self.multi_bindings_by_use,
-            range_reachability: self.range_reachability,
-            end_of_scope_symbols,
-            end_of_scope_members,
-            reachable_definitions_by_symbol,
-            reachable_definitions_by_member,
+            interned_bindings: interned_bindings.into(),
+            interned_declarations: interned_declarations.into(),
+            bindings_by_use: bindings_by_use.into(),
+            multi_bindings_by_use,
+            range_reachability: self.range_reachability.into_boxed_slice(),
+            symbol_states,
+            member_states,
             declarations_by_binding,
             bindings_by_definition,
-            enclosing_snapshots,
+            enclosing_snapshots: enclosing_snapshots.into(),
             end_of_scope_reachability: self.reachability,
         }
+    }
+
+    fn zip_place_states<I: Idx>(
+        end_of_scope: IndexVec<I, InternedPlaceStateId>,
+        reachable: IndexVec<I, InternedPlaceStateId>,
+    ) -> IndexBox<I, InternedPlaceStates> {
+        assert_eq!(end_of_scope.len(), reachable.len());
+
+        end_of_scope
+            .into_iter()
+            .zip(reachable)
+            .map(|(end_of_scope, reachable)| InternedPlaceStates {
+                end_of_scope,
+                reachable,
+            })
+            .collect::<IndexVec<_, _>>()
+            .into()
     }
 
     fn intern_bindings_by_definition(

@@ -1,6 +1,6 @@
 use itertools::Either;
 use ruff_db::files::File;
-use ruff_index::IndexVec;
+use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
@@ -1096,7 +1096,7 @@ enum DeclarationsBoundnessEvaluator<'map, 'db> {
     BasedOnUnboundVisibility {
         unbound_visibility: Option<DeclarationWithConstraint<'db>>,
         reachability_constraints: &'map ReachabilityConstraints,
-        predicates: &'map IndexVec<ScopedPredicateId, Predicate<'db>>,
+        predicates: &'map IndexSlice<ScopedPredicateId, Predicate<'db>>,
         requires_explicit_reexport: RequiresExplicitReExport,
     },
 }
