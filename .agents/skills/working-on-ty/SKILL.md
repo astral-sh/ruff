@@ -13,6 +13,10 @@ When the task matches a more specific ty workflow, also read and follow that ski
 - Ecosystem report summaries: `.agents/skills/summarise-ecosystem-results/SKILL.md`.
 - Reproducing, investigating, or minimizing ecosystem or primer differences: `.agents/skills/minimizing-ty-ecosystem-changes/SKILL.md`.
 
+## Ad hoc reproductions
+
+When running ty against a temporary Python reproduction file, create it outside the Ruff checkout (for example, under `/tmp`). A file inside the checkout discovers Ruff's root `pyproject.toml`, whose `requires-python = ">=3.7"` causes ty to infer Python 3.7 as the default Python version.
+
 ## PR conventions
 
 When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label if you have permission to do so;
