@@ -404,3 +404,113 @@ fn recursion_limit_nested_lambda_chain() {
         err.error
     );
 }
+
+#[test]
+fn recursion_limit_left_assoc_binary_chain() {
+    // `1+1+1+...+1` — left-associative binary operators are parsed iteratively
+    // (precedence climbing), so the left spine grows one level per operator
+    // *without* recursing into `parse_binary_expression_or_higher`. The tree
+    // builds fine but its depth equals the operator count, which overflows the
+    // native stack when the tree is later traversed or dropped. The chain
+    // length must be bounded by `max_recursion_depth`.
+    let depth = 5_000;
+    let mut src = String::with_capacity(depth * 2 + 1);
+    for _ in 0..depth {
+        src.push_str("1+");
+    }
+    src.push('1');
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(
+        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
+        "expected RecursionLimitExceeded, got {:?}",
+        err.error
+    );
+}
+
+#[test]
+fn recursion_limit_attribute_chain() {
+    // `a.b.b.b...` — attribute access is a postfix operator parsed in a loop
+    // and introduces no bracket nesting, so it bypasses the postfix
+    // `nesting()` guard entirely. Each `.b` adds one level to the left spine.
+    let depth = 5_000;
+    let mut src = String::from("a");
+    for _ in 0..depth {
+        src.push_str(".b");
+    }
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(
+        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
+        "expected RecursionLimitExceeded, got {:?}",
+        err.error
+    );
+}
+
+#[test]
+fn recursion_limit_call_chain() {
+    // `f()()()...` — chained calls return the lexer bracket nesting to zero
+    // between each `()`, so the postfix `nesting()` guard never fires; the
+    // chain length must instead be bounded directly.
+    let depth = 5_000;
+    let mut src = String::from("f");
+    for _ in 0..depth {
+        src.push_str("()");
+    }
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(
+        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
+        "expected RecursionLimitExceeded, got {:?}",
+        err.error
+    );
+}
+
+#[test]
+fn recursion_limit_subscript_chain() {
+    // `a[0][0][0]...` — like chained calls, the brackets are balanced between
+    // each subscript, so `nesting()` returns to zero and the chain length must
+    // be bounded directly.
+    let depth = 5_000;
+    let mut src = String::from("a");
+    for _ in 0..depth {
+        src.push_str("[0]");
+    }
+    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
+    let err = parse(&src, opts).unwrap_err();
+    assert!(
+        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
+        "expected RecursionLimitExceeded, got {:?}",
+        err.error
+    );
+}
+
+#[test]
+fn recursion_limit_flat_chains_not_rejected() {
+    // Boolean and comparison chains flatten into a single `BoolOp` / `Compare`
+    // node with a flat operand list rather than a deep tree, so they are safe
+    // to drop at any length and must NOT count against the recursion limit,
+    // even far beyond `max_recursion_depth`. Guards against a regression where
+    // the chain guard is applied to these flattened operators too.
+    let depth = 5_000;
+
+    let mut bool_chain = String::from("x = 1");
+    for _ in 0..depth {
+        bool_chain.push_str(" and 1");
+    }
+    parse(
+        &bool_chain,
+        ParseOptions::from(Mode::Module).with_max_recursion_depth(100),
+    )
+    .expect("flat boolean chain should parse regardless of length");
+
+    let mut cmp_chain = String::from("x = 1");
+    for _ in 0..depth {
+        cmp_chain.push_str(" < 1");
+    }
+    parse(
+        &cmp_chain,
+        ParseOptions::from(Mode::Module).with_max_recursion_depth(100),
+    )
+    .expect("flat comparison chain should parse regardless of length");
+}

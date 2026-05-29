@@ -261,6 +261,16 @@ impl<'src> Parser<'src> {
     ) -> ParsedExpr {
         let mut progress = ParserProgress::default();
 
+        // Each iteration of this loop deepens the left-associative spine of the
+        // resulting tree by one level (`((a op b) op c) op ...`). Because the
+        // loop is iterative it bypasses the `with_recursion` guard, so without
+        // an explicit bound a chain such as `1 + 1 + ... + 1` builds a tree of
+        // unbounded depth. That tree parses fine but overflows the native stack
+        // when it is later traversed or dropped (the derived drop glue recurses
+        // once per level). Counting the spine against `depth_remaining` keeps
+        // the total tree depth within `max_recursion_depth`.
+        let mut chain_depth: u16 = 0;
+
         loop {
             progress.assert_progressing(self);
 
@@ -289,6 +299,12 @@ impl<'src> Parser<'src> {
             };
 
             if stop_at_current_operator {
+                break;
+            }
+
+            chain_depth += 1;
+            if chain_depth >= self.depth_remaining {
+                self.report_recursion_limit_exceeded(self.current_token_range());
                 break;
             }
 
@@ -757,7 +773,18 @@ impl<'src> Parser<'src> {
         start: TextSize,
         context: ExpressionContext,
     ) -> Expr {
+        // Chained postfix (`f()()...`, `a[0][0]...`, `a.b.c...`) keeps bracket
+        // nesting balanced (and `.` has none), so it slips past the `nesting()`
+        // guards below and builds a left spine deep enough to overflow the
+        // stack on drop. Bound the chain length against the recursion budget.
+        let mut chain_depth: u16 = 0;
         loop {
+            chain_depth += 1;
+            if chain_depth >= self.depth_remaining {
+                self.report_recursion_limit_exceeded(self.current_token_range());
+                break lhs;
+            }
+
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => {
                     if self.tokens.nesting() > self.max_nesting_depth {
