@@ -629,21 +629,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
                 Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
                 Id::AMBIGUOUS => return Truthiness::Ambiguous,
                 Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => {
-                    // `id` gives us the index of this node in the IndexVec that we used when
-                    // constructing this BDD. When finalizing the builder, we threw away any
-                    // interior nodes that weren't marked as used. The `used_indices` bit vector
-                    // lets us verify that this node was marked as used, and the rank of that bit
-                    // in the bit vector tells us where this node lives in the "condensed"
-                    // `used_interiors` vector.
-                    let raw_index = id.as_u32() as usize;
-                    debug_assert!(
-                        self.used_indices().get_bit(raw_index).unwrap_or(false),
-                        "all used reachability constraints should have been marked as used",
-                    );
-                    let index = self.used_indices().rank(raw_index) as usize;
-                    self.used_interiors()[index]
-                }
+                _ => self.get_interior_node(id),
             };
             let predicate = &predicates[node.atom()];
             match analyze_single(db, predicate) {
