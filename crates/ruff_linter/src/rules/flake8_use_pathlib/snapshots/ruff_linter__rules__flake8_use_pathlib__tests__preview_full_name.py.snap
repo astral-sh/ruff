@@ -1176,3 +1176,25 @@ help: Replace with `Path(...).readlink()`
 172 |         break
 173 | except TypeError as e:
 note: This is an unsafe fix and may change runtime behavior
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:187:1
+    |
+186 | os.chmod(_AttrHolder.fd, 0o644)    # Suppressed: resolved as `int`
+187 | os.chmod(_AttrHolder.name, 0o644)  # Diagnostic + fix: resolved as `str`
+    | ^^^^^^^^
+    |
+help: Replace with `Path(...).chmod(...)`
+140 |
+141 | # See: https://github.com/astral-sh/ruff/issues/21794
+142 | import sys
+143 + import pathlib
+144 |
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+146 |     print("rename: truthy")
+--------------------------------------------------------------------------------
+185 |     name: str = ""
+186 |
+187 | os.chmod(_AttrHolder.fd, 0o644)    # Suppressed: resolved as `int`
+    - os.chmod(_AttrHolder.name, 0o644)  # Diagnostic + fix: resolved as `str`
+188 + pathlib.Path(_AttrHolder.name).chmod(0o644)  # Diagnostic + fix: resolved as `str`

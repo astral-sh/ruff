@@ -9,7 +9,10 @@ mod shutdown;
 
 use super::{
     define_document_url,
-    traits::{BackgroundDocumentRequestHandler, RequestHandler, SyncRequestHandler},
+    traits::{
+        BackgroundDocumentRequestHandler, BackgroundRequestHandler, RequestHandler,
+        SyncRequestHandler,
+    },
 };
 pub(super) use code_action::CodeActions;
 pub(super) use code_action_resolve::CodeActionResolve;

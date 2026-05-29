@@ -185,6 +185,230 @@ class Foo:
     def bar(self): ...  # error: [invalid-explicit-override]
 ```
 
+## Missing `@override` decorator
+
+```toml
+[rules]
+missing-override-decorator = "error"
+```
+
+This rule requires the `@override` decorator on any method that overrides a superclass member, with
+the exception of `__init__`, `__new__`, `__init_subclass__`, or `__post_init__`.
+
+```py
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing_extensions import Any, Protocol, overload, override
+
+class Parent:
+    attr = None
+
+    def method(self) -> int:
+        return 1
+
+    @property
+    def prop(self) -> int:
+        return 1
+
+    @classmethod
+    def class_method(cls) -> int:
+        return 1
+
+    @staticmethod
+    def static_method() -> int:
+        return 1
+
+    @overload
+    def overloaded(self, value: int) -> int: ...
+    @overload
+    def overloaded(self, value: str) -> str: ...
+    def overloaded(self, value: int | str) -> int | str:
+        return value
+
+class Child(Parent):
+    def method(self) -> int:  # error: [missing-override-decorator]
+        return 2
+
+    @property
+    def prop(self) -> int:  # error: [missing-override-decorator]
+        return 2
+
+    @classmethod
+    def class_method(cls) -> int:  # error: [missing-override-decorator]
+        return 2
+
+    @staticmethod
+    def static_method() -> int:  # error: [missing-override-decorator]
+        return 2
+
+class AttributeChild(Parent):
+    def attr(self) -> None:  # error: [missing-override-decorator]
+        pass
+
+class OverloadChild(Parent):
+    @overload
+    def overloaded(self, value: int) -> int: ...
+    @overload
+    def overloaded(self, value: str) -> str: ...
+    def overloaded(self, value: int | str) -> int | str:  # error: [missing-override-decorator]
+        return value
+
+# Implementing an interface-only protocol member requires `@override`.
+class ProtocolInterface(Protocol):
+    def method(self) -> int: ...
+
+class ProtocolImplementation(ProtocolInterface):
+    def method(self) -> int:  # error: [missing-override-decorator]
+        return 1
+
+# Implementing an abstract interface method requires `@override`.
+class AbstractInterface(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+class AbstractImplementation(AbstractInterface):
+    def method(self) -> int:  # error: [missing-override-decorator]
+        return 1
+
+class ExplicitChild(Parent):
+    @override
+    def method(self) -> int:
+        return 2
+
+    @property
+    @override
+    def prop(self) -> int:
+        return 2
+
+    @override
+    def attr(self) -> None:
+        pass
+
+    @overload
+    def overloaded(self, value: int) -> int: ...
+    @overload
+    def overloaded(self, value: str) -> str: ...
+    @override
+    def overloaded(self, value: int | str) -> int | str:
+        return value
+
+class OverrideOnOverload(Parent):
+    @overload
+    @override
+    def overloaded(self, value: int) -> int: ...  # error: [invalid-overload]
+    @overload
+    def overloaded(self, value: str) -> str: ...
+    def overloaded(self, value: int | str) -> int | str:  # error: [missing-override-decorator]
+        return value
+
+class OverrideOnImplementation(Parent):
+    @overload
+    def overloaded(self, value: int) -> int: ...
+    @overload
+    def overloaded(self, value: str) -> str: ...
+    @override
+    def overloaded(self, value: int | str) -> int | str:
+        return value
+
+class ConstructorParent:
+    def __init__(self, value: int) -> None:
+        pass
+
+    def __new__(cls, value: int) -> "ConstructorParent":
+        raise NotImplementedError
+
+    def __init_subclass__(cls, value: int = 0) -> None:
+        pass
+
+    def __post_init__(self) -> None:
+        pass
+
+class ConstructorChild(ConstructorParent):
+    def __init__(self, value: str) -> None:
+        pass
+
+    def __new__(cls, value: str) -> "ConstructorChild":
+        raise NotImplementedError
+
+    def __init_subclass__(cls, value: str = "") -> None:
+        pass
+
+    def __post_init__(self) -> None:
+        pass
+
+# Overrides of ty-generated dataclass members require `@override`, except for constructor-like
+# methods.
+@dataclass(order=True)
+class DataClassParent:
+    field: int
+
+class DataClassChild(DataClassParent):  # error: [subclass-of-dataclass-with-order]
+    def __init__(self, field: str) -> None:
+        self.field = 1
+
+    def __lt__(self, other: DataClassParent) -> bool:  # error: [missing-override-decorator]
+        return True
+
+class DynamicParent(Any): ...
+
+class DynamicChild(DynamicParent):
+    def method(self) -> int:
+        return 1
+```
+
+`stub.pyi`:
+
+```pyi
+from abc import ABC, abstractmethod
+from typing_extensions import Protocol, overload, override
+
+class StubParent:
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+
+class StubChild(StubParent):
+    @overload
+    def method(self, value: int) -> int: ...  # error: [missing-override-decorator]
+    @overload
+    def method(self, value: str) -> str: ...
+
+class ExplicitStubChild(StubParent):
+    @overload
+    @override
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+
+class OverrideOnSecondOverload(StubParent):
+    @overload
+    def method(self, value: int) -> int: ...  # error: [missing-override-decorator]
+    @overload
+    @override
+    def method(self, value: str) -> str: ...  # error: [invalid-overload]
+
+class OverrideOnFirstOverload(StubParent):
+    @overload
+    @override
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+
+class StubProtocolInterface(Protocol):
+    def method(self) -> int: ...
+
+class StubProtocolImplementation(StubProtocolInterface):
+    def method(self) -> int: ...  # error: [missing-override-decorator]
+
+class StubAbstractInterface(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+class StubAbstractImplementation(StubAbstractInterface):
+    def method(self) -> int: ...  # error: [missing-override-decorator]
+```
+
 ## Possibly-unbound definitions
 
 ```py
@@ -308,17 +532,13 @@ class Foo:
     elif coinflip():
         @overload
         @override
-        def method2(self, x: str) -> str: ...
+        def method2(self, x: str) -> str: ...  # error: [invalid-explicit-override]
         @overload
         def method2(self, x: int) -> int: ...
 
     else:
-        # TODO: not sure why this is being emitted on this line rather than on
-        # the first overload in the `elif` block? Ideally it would be emitted
-        # on the first reachable definition, but perhaps this is due to the way
-        # name lookups are deferred in stub files...? -- AW
         @override
-        def method2(self, x): ...  # error: [invalid-explicit-override]
+        def method2(self, x): ...
 ```
 
 ## Definitions in statically known branches
@@ -502,7 +722,7 @@ from dataclasses import dataclass
 class ParentDataclass:
     x: int
 
-class Child(ParentDataclass):
+class Child(ParentDataclass):  # error: [subclass-of-dataclass-with-order]
     @override
     def __lt__(self, other: ParentDataclass) -> bool: ...  # fine
 

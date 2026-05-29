@@ -89,6 +89,41 @@ def get_int[T]() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Generic callable chains
+
+Inferring a chain of generic callable parameters should discard internal typevar artifacts from
+transitive constraints instead of expanding them recursively.
+
+```py
+from typing import Callable, TypeVar
+
+_A = TypeVar("_A")
+_B = TypeVar("_B")
+_C = TypeVar("_C")
+_D = TypeVar("_D")
+_E = TypeVar("_E")
+_F = TypeVar("_F")
+_G = TypeVar("_G")
+_H = TypeVar("_H")
+
+def compose(
+    fn1: Callable[[_A], _B],
+    fn2: Callable[[_B], _C],
+    fn3: Callable[[_C], _D],
+    fn4: Callable[[_D], _E],
+    fn5: Callable[[_E], _F],
+    fn6: Callable[[_F], _G],
+    fn7: Callable[[_G], _H],
+) -> Callable[[_A], _H]:
+    raise NotImplementedError
+
+Func = Callable[[int], int]
+fn: Func = lambda x: x + 42
+
+cn = compose(fn, fn, fn, fn, fn, fn, fn)
+reveal_type(cn)  # revealed: (int, /) -> int
+```
+
 ## Decorated
 
 ```py
@@ -847,13 +882,11 @@ Regression test for <https://github.com/astral-sh/ty/issues/2734>.
 
 ```py
 def f5(x: int | None = None, y: str = "") -> None: ...
-def f6(flag: bool) -> None:
-    args = () if flag else (1,)
+def f6(args: tuple[()] | tuple[int]) -> None:
     f5(*args)
 
 def f7(x: int | None = None, y: str = "") -> None: ...
-def f8(flag: bool) -> None:
-    args = () if flag else ("bad",)
+def f8(args: tuple[()] | tuple[str]) -> None:
     f7(*args)  # error: [invalid-argument-type]
 
 def f11(*args: int) -> None: ...
@@ -1227,6 +1260,13 @@ from ty_extensions import static_assert
 
 # error: [missing-argument] "No argument provided for required parameter `condition` of function `static_assert`"
 static_assert()
+
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(condition=False)
+
+# error: [static-assert-error] "Static assertion error: argument of type `Unknown` has an ambiguous static truthiness"
+# error: [invalid-syntax]
+static_assert(**)
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"
 # error: [invalid-argument-type] "Argument to function `static_assert` is incorrect: Expected `LiteralString | None`, found `Literal[2]`"

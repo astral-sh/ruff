@@ -14,6 +14,7 @@ use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
 use bitflags::bitflags;
+use thin_vec::ThinVec;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -51,7 +52,7 @@ pub struct ElifElseClause {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
     pub test: Option<Expr>,
-    pub body: Vec<Stmt>,
+    pub body: Suite,
 }
 
 impl Expr {
@@ -116,7 +117,7 @@ impl ExprRef<'_> {
     }
 
     pub fn precedence(&self) -> OperatorPrecedence {
-        OperatorPrecedence::from(self)
+        OperatorPrecedence::from(*self)
     }
 }
 
@@ -2781,7 +2782,7 @@ pub struct ExceptHandlerExceptHandler {
     pub node_index: AtomicNodeIndex,
     pub type_: Option<Box<Expr>>,
     pub name: Option<Identifier>,
-    pub body: Vec<Stmt>,
+    pub body: Suite,
 }
 
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
@@ -2842,7 +2843,7 @@ pub struct MatchCase {
     pub node_index: AtomicNodeIndex,
     pub pattern: Pattern,
     pub guard: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub body: Suite,
 }
 
 impl Pattern {
@@ -2929,7 +2930,7 @@ pub enum IrrefutablePatternKind {
 pub struct PatternArguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub patterns: Vec<Pattern>,
+    pub patterns: ThinVec<Pattern>,
     pub keywords: Vec<PatternKeyword>,
 }
 
@@ -3096,10 +3097,10 @@ impl Ranged for AnyParameterRef<'_> {
 pub struct Parameters {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub posonlyargs: Vec<ParameterWithDefault>,
-    pub args: Vec<ParameterWithDefault>,
+    pub posonlyargs: ThinVec<ParameterWithDefault>,
+    pub args: ThinVec<ParameterWithDefault>,
     pub vararg: Option<Box<Parameter>>,
-    pub kwonlyargs: Vec<ParameterWithDefault>,
+    pub kwonlyargs: ThinVec<ParameterWithDefault>,
     pub kwarg: Option<Box<Parameter>>,
 }
 
@@ -3685,10 +3686,18 @@ impl<'a> IntoIterator for &'a TypeParams {
     }
 }
 
-/// A suite represents a [Vec] of [Stmt].
+/// A suite represents a sequence of [`Stmt`].
 ///
 /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
-pub type Suite = Vec<Stmt>;
+pub type Suite = ThinVec<Stmt>;
+
+pub type DecoratorList = ThinVec<Decorator>;
+
+pub type Patterns = ThinVec<Pattern>;
+
+pub type PatternKeys = ThinVec<Expr>;
+
+pub type ParameterWithDefaults = ThinVec<ParameterWithDefault>;
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
@@ -3881,18 +3890,19 @@ impl From<bool> for Singleton {
 
 #[cfg(test)]
 mod tests {
-    use crate::Mod;
     use crate::generated::*;
+    use crate::{Mod, Parameters};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Stmt>(), 128);
-        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 128);
-        assert_eq!(std::mem::size_of::<StmtClassDef>(), 120);
-        assert_eq!(std::mem::size_of::<StmtTry>(), 112);
-        assert_eq!(std::mem::size_of::<Mod>(), 40);
-        assert_eq!(std::mem::size_of::<Pattern>(), 104);
+        assert_eq!(std::mem::size_of::<Stmt>(), 96);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 96);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 88);
+        assert_eq!(std::mem::size_of::<StmtTry>(), 64);
+        assert_eq!(std::mem::size_of::<Mod>(), 32);
+        assert_eq!(std::mem::size_of::<Pattern>(), 80);
+        assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Expr>(), 80);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);

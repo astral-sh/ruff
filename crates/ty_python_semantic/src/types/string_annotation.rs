@@ -1,7 +1,7 @@
 use ruff_db::parsed::parsed_string_annotation;
 use ruff_db::source::source_text;
-use ruff_python_ast::{self as ast, ModExpression};
-use ruff_python_parser::Parsed;
+use ruff_python_ast::{self as ast, ModExpression, StringFlags};
+use ruff_python_parser::{ParseError, ParseErrorType, Parsed};
 use ruff_text_size::Ranged;
 
 use crate::declare_lint;
@@ -151,18 +151,34 @@ pub(crate) fn parse_string_annotation(
         } else if &source[string_literal.content_range()] == string_literal.as_str() {
             match parsed_string_annotation(source.as_str(), string_literal) {
                 Ok(parsed) => return Some(parsed),
-                Err(parse_error) => {
+                Err(ParseError { error, location }) => {
                     if let Some(builder) =
-                        context.report_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION, string_literal)
+                        context.report_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION, location)
                     {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Syntax error in forward annotation: {}",
-                            parse_error.error
-                        ));
-                        diagnostic.set_primary_message(format_args!(
-                            "Did you mean `typing.Literal[\"{}\"]`?",
-                            string_literal.as_str()
-                        ));
+                        let mut diagnostic =
+                            builder.into_diagnostic("Syntax error in forward annotation");
+
+                        diagnostic.set_primary_message(&error);
+
+                        let possible_secondary = string_literal
+                            .range()
+                            .add_start(string_literal.flags.opener_len())
+                            .sub_end(string_literal.flags.closer_len());
+                        if possible_secondary.contains_range(location)
+                            && (possible_secondary.start() < location.start()
+                                || possible_secondary.end() > location.end())
+                        {
+                            diagnostic.annotate(context.secondary(possible_secondary));
+                        }
+
+                        if !matches!(error, ParseErrorType::StringAnnotationError(_))
+                            && !string_literal.contains('\n')
+                        {
+                            diagnostic.help(format_args!(
+                                "Did you mean `typing.Literal[\"{}\"]`?",
+                                string_literal.as_str()
+                            ));
+                        }
                     }
                 }
             }

@@ -1863,7 +1863,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
             }
 
-            if checker.is_rule_enabled(Rule::UnnecessaryComprehension) {
+            if checker.is_rule_enabled(Rule::UnnecessaryComprehension)
+                && let Some(key) = key
+            {
                 flake8_comprehensions::rules::unnecessary_dict_comprehension(
                     checker, expr, key, value, generators,
                 );

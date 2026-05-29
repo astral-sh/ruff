@@ -4,8 +4,7 @@ from collections.abc import Callable
 from email._policybase import _MessageT
 from email.message import Message
 from email.policy import Policy
-from typing import IO, overload
-from typing_extensions import TypeAlias
+from typing import IO, TypeAlias, overload
 
 # At runtime, listing submodules in __all__ without them being imported is
 # valid, and causes them to be included in a star import. See #6523
@@ -40,42 +39,41 @@ def message_from_string(s: str) -> Message:
 
     Optional _class and strict are passed to the Parser constructor.
     """
-
 @overload
 def message_from_string(s: str, _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload
 def message_from_string(s: str, _class: Callable[[], _MessageT] = ..., *, policy: Policy[_MessageT]) -> _MessageT: ...
+
 @overload
 def message_from_bytes(s: bytes | bytearray) -> Message:
     """Parse a bytes string into a Message object model.
 
     Optional _class and strict are passed to the Parser constructor.
     """
-
 @overload
 def message_from_bytes(s: bytes | bytearray, _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload
 def message_from_bytes(
     s: bytes | bytearray, _class: Callable[[], _MessageT] = ..., *, policy: Policy[_MessageT]
 ) -> _MessageT: ...
+
 @overload
 def message_from_file(fp: IO[str]) -> Message:
     """Read a file and parse its contents into a Message object model.
 
     Optional _class and strict are passed to the Parser constructor.
     """
-
 @overload
 def message_from_file(fp: IO[str], _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload
 def message_from_file(fp: IO[str], _class: Callable[[], _MessageT] = ..., *, policy: Policy[_MessageT]) -> _MessageT: ...
+
 @overload
 def message_from_binary_file(fp: IO[bytes]) -> Message:
     """Read a binary file and parse its contents into a Message object model.
 
     Optional _class and strict are passed to the Parser constructor.
     """
-
 @overload
 def message_from_binary_file(fp: IO[bytes], _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload

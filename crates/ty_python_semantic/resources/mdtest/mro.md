@@ -461,15 +461,13 @@ For a union base where one member lacks `__mro_entries__`, `invalid-base` should
 sub-diagnostic identifying the problematic union member:
 
 ```py
-def _(flag: bool):
-    class HasMroEntries:
-        def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
-            return ()
+class HasMroEntries:
+    def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+        return ()
 
-    class NoMroEntries: ...
+class NoMroEntries: ...
 
-    base = HasMroEntries() if flag else NoMroEntries()
-
+def _(base: HasMroEntries | NoMroEntries):
     class Foo(base): ...  # error: [invalid-base]
 ```
 

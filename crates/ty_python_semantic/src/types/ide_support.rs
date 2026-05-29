@@ -1268,6 +1268,7 @@ mod resolve_definition {
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
     use ruff_python_stdlib::sys::is_builtin_module;
+    use ruff_text_size::TextRange;
     use rustc_hash::FxHashSet;
     use tracing::trace;
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
@@ -1275,7 +1276,7 @@ mod resolve_definition {
     use crate::Db;
     use crate::module_docstring;
     use crate::types::binding_type;
-    use ty_python_core::definition::{Definition, DefinitionKind};
+    use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
@@ -1295,6 +1296,31 @@ mod resolve_definition {
     }
 
     impl<'db> ResolvedDefinition<'db> {
+        pub fn focus_range(&self, db: &dyn Db) -> FileRange {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    let parsed = parsed_module(db, definition.file(db)).load(db);
+                    definition.focus_range(db, &parsed)
+                }
+                // For modules, navigate to the start of the file
+                ResolvedDefinition::Module(module) => FileRange::new(*module, TextRange::default()),
+                ResolvedDefinition::FileWithRange(file_range) => *file_range,
+            }
+        }
+
+        pub fn category(&self, db: &dyn Db) -> DefinitionCategory {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    let file = definition.file(db);
+                    let parsed = parsed_module(db, file).load(db);
+                    definition.kind(db).category(file.is_stub(db), &parsed)
+                }
+                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => {
+                    DefinitionCategory::DeclarationAndBinding
+                }
+            }
+        }
+
         pub fn definition(&self) -> Option<Definition<'db>> {
             match self {
                 ResolvedDefinition::Definition(definition) => Some(*definition),
@@ -1543,23 +1569,29 @@ mod resolve_definition {
         let definitions_in_module = find_symbol_in_scope(db, global_scope, symbol_name);
 
         // Recursively resolve any import definitions found in the target module
-        if definitions_in_module.is_empty() {
-            // This might be importing a submodule, try that
-            return Vec::from_iter(resolve_from_import_submodule_definitions(
-                db,
-                file,
-                symbol_name,
-                module_name,
-            ));
-        }
-
         let mut resolved_definitions = Vec::new();
         for def in definitions_in_module {
             let resolved =
                 resolve_definition_recursive(db, def, visited, Some(symbol_name), alias_resolution);
             resolved_definitions.extend(resolved);
         }
-        resolved_definitions
+
+        if resolved_definitions.is_empty() {
+            // In `pkg/__init__.py`, `from . import child` resolves `.` to
+            // `pkg/__init__.py`. Looking up `child` there can find an import definition
+            // that recursively resolves back here (possibly through `from . import *`),
+            // so recursive resolution bottoms out before reaching the `pkg.child`
+            // submodule target. Fall back to the same submodule candidate we use when
+            // `child` has no binding in `pkg/__init__.py`.
+            Vec::from_iter(resolve_from_import_submodule_definitions(
+                db,
+                file,
+                symbol_name,
+                module_name,
+            ))
+        } else {
+            resolved_definitions
+        }
     }
 
     // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
@@ -1750,7 +1782,14 @@ mod resolve_definition {
                     definitions.extend(
                         find_symbol_in_scope(db, scope, component)
                             .into_iter()
-                            .map(ResolvedDefinition::Definition),
+                            .flat_map(|definition| {
+                                resolve_definition(
+                                    db,
+                                    definition,
+                                    Some(component),
+                                    ImportAliasResolution::ResolveAliases,
+                                )
+                            }),
                     );
                 } else {
                     // We're in the middle of the path, look for scopes that match the current component

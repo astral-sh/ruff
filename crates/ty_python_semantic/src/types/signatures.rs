@@ -18,7 +18,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -44,6 +44,16 @@ use crate::types::{
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::definition::Definition;
+
+/// Selects which binding context to use for type variables that only appear in a return-position
+/// `Callable`.
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub(super) enum ReturnCallableTypeVarScope {
+    /// Keep the type variables bound to the function's lexical generic context.
+    Lexical,
+    /// Move the type variables to the returned `Callable`'s generic context.
+    Public,
+}
 
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
@@ -136,6 +146,24 @@ impl<'db> CallableSignature<'db> {
         Self::single(Signature::bottom())
     }
 
+    pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
+        Self::single(Signature::new(
+            Parameters::bottom(),
+            Type::divergent(id).bottom_materialization(db),
+        ))
+    }
+
+    fn is_cycle_initial(&self) -> bool {
+        matches!(
+            self.overloads.as_slice(),
+            [signature]
+                if signature.generic_context.is_none()
+                    && signature.definition.is_none()
+                    && signature.parameters == Parameters::bottom()
+                    && signature.return_ty.is_divergent()
+        )
+    }
+
     /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
     /// non-callable signature if the iterator is empty.
     pub(crate) fn from_overloads<I>(overloads: I) -> Self
@@ -212,7 +240,7 @@ impl<'db> CallableSignature<'db> {
                     .collect(),
             }
         } else {
-            debug_assert_eq!(previous, &Self::bottom());
+            debug_assert!(previous.is_cycle_initial());
             self.clone()
         }
     }
@@ -637,6 +665,7 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         has_implicitly_positional_first_parameter: bool,
+        return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Self {
         let parameters = Parameters::from_parameters(
             db,
@@ -657,16 +686,21 @@ impl<'db> Signature<'db> {
             legacy_generic_context,
         );
 
-        // Look for any typevars bound by this function that are only mentioned in a Callable
-        // return type. (We do this after merging the legacy and PEP-695 contexts because we need
-        // to apply this heuristic to PEP-695 typevars as well.)
-        let (generic_context, return_ty) = GenericContext::remove_callable_only_typevars(
-            db,
-            full_generic_context,
-            &parameters,
-            return_ty,
-            definition,
-        );
+        let (generic_context, return_ty) = match return_callable_typevar_scope {
+            ReturnCallableTypeVarScope::Lexical => (full_generic_context, return_ty),
+            ReturnCallableTypeVarScope::Public => {
+                // Look for any typevars bound by this function that are only mentioned in a
+                // Callable return type. (We do this after merging the legacy and PEP-695 contexts
+                // because we need to apply this heuristic to PEP-695 typevars as well.)
+                GenericContext::remove_callable_only_typevars(
+                    db,
+                    full_generic_context,
+                    &parameters,
+                    return_ty,
+                    definition,
+                )
+            }
+        };
 
         Self {
             generic_context,
@@ -1187,6 +1221,7 @@ impl<'db> Signature<'db> {
                     )
                 })),
                 CallableTypeKind::ParamSpecValue,
+                CallableFunctionProvenance::None,
             ));
             let param_spec_matches = ConstraintSet::constrain_typevar(
                 db,
@@ -1429,6 +1464,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1481,6 +1517,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }),
                         ),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1833,6 +1870,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1863,6 +1901,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1985,6 +2024,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 Type::unknown(),
                             )),
                             CallableTypeKind::ParamSpecValue,
+                            CallableFunctionProvenance::None,
                         ));
                         let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                             db,
@@ -2009,6 +2049,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 Type::unknown(),
                             )),
                             CallableTypeKind::ParamSpecValue,
+                            CallableFunctionProvenance::None,
                         ));
                         let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                             db,
@@ -2043,6 +2084,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2180,6 +2222,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2204,6 +2247,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2313,6 +2357,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2594,6 +2639,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // `target`, then the non-variadic parameters in `source` must have a default
                         // value.
                         if default_type.is_none() {
+                            let parameter =
+                                ParameterDescription::new(target_index, source_parameter.name());
+                            self.provide_context(|| ErrorContext::ExtraRequiredParameter {
+                                parameter,
+                            });
                             return self.never();
                         }
                     }
@@ -3102,6 +3152,8 @@ impl<'db> Parameters<'db> {
                 _ => {}
             }
         }
+
+        value.shrink_to_fit();
 
         Parameters { value, kind }
     }

@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    self as ast, DecoratorList, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
     ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
@@ -208,7 +208,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<Vec<_>>();
+                .collect::<ast::ParameterWithDefaults>();
             let new_args = parameters
                 .args
                 .iter()
@@ -222,7 +222,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<Vec<_>>();
+                .collect::<ast::ParameterWithDefaults>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
                 name: Identifier::new(name.to_string(), TextRange::default()),
@@ -231,8 +231,8 @@ fn function(
                     args: new_args,
                     ..parameters
                 }),
-                body: vec![body],
-                decorator_list: vec![],
+                body: ast::Suite::from([body]),
+                decorator_list: ast::DecoratorList::new(),
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
@@ -247,8 +247,8 @@ fn function(
         is_async: false,
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters),
-        body: vec![body],
-        decorator_list: vec![],
+        body: ast::Suite::from([body]),
+        decorator_list: DecoratorList::new(),
         returns: None,
         type_params: None,
         range: TextRange::default(),

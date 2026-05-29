@@ -561,8 +561,24 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
+        self.solutions_with(db, builder, |bound_typevar, _variance, lower, upper| {
+            PathBounds::default_solve(db, builder, bound_typevar, lower, upper)
+        })
+    }
+
+    pub(crate) fn solutions_with(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
+    ) -> Solutions<'db> {
         self.verify_builder(builder);
-        self.node.solutions(db, builder)
+        self.node.solutions_with(db, builder, choose)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -675,7 +691,12 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
-        let storage = self.storage.into_inner();
+        let mut storage = self.storage.into_inner();
+
+        storage.nodes.shrink_to_fit();
+        storage.typevars.shrink_to_fit();
+        storage.constraints.shrink_to_fit();
+
         OwnedConstraintSet {
             node,
             constraints: storage.constraints,
@@ -1094,10 +1115,9 @@ impl<'db> Constraint<'db> {
         // `upper`. We use an existential check here ("is there *some* assignment where
         // `lower ≤ upper`?") rather than a universal check, because the bounds may mention
         // typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable when `int ≤ T`.
-        if lower
-            .when_constraint_set_assignable_to(db, upper, builder)
-            .is_never_satisfied(db)
-        {
+        let when = lower.when_constraint_set_assignable_to_owned(db, upper);
+        let is_never_satisfied = when.query(|_builder, when| when.is_never_satisfied(db));
+        if is_never_satisfied {
             return ALWAYS_FALSE;
         }
 
@@ -1294,10 +1314,9 @@ impl ConstraintId {
         // rather than a universal check ("is `lower ≤ upper` for *all* assignments?"), because the
         // bounds may mention typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable
         // when `int ≤ T`, even though it's not universally true for all `T`.
-        if lower
-            .when_constraint_set_assignable_to(db, upper, builder)
-            .is_never_satisfied(db)
-        {
+        let when = lower.when_constraint_set_assignable_to_owned(db, upper);
+        let is_never_satisfied = when.query(|_builder, when| when.is_never_satisfied(db));
+        if is_never_satisfied {
             return IntersectionResult::Disjoint;
         }
 
@@ -1634,6 +1653,14 @@ impl NodeId {
                     interior.source_order,
                     |path, _| {
                         interior.if_true.for_each_path_inner(db, builder, f, path);
+                    },
+                );
+                path.walk_edge(
+                    db,
+                    builder,
+                    interior.constraint.when_unconstrained(),
+                    interior.source_order,
+                    |path, _| {
                         interior
                             .if_uncertain
                             .for_each_path_inner(db, builder, f, path);
@@ -1646,9 +1673,6 @@ impl NodeId {
                     interior.source_order,
                     |path, _| {
                         interior.if_false.for_each_path_inner(db, builder, f, path);
-                        interior
-                            .if_uncertain
-                            .for_each_path_inner(db, builder, f, path);
                     },
                 );
             }
@@ -1797,13 +1821,19 @@ impl NodeId {
         }
     }
 
-    fn solutions<'db>(
+    fn solutions_with<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let path_bounds = PathBounds::compute(db, builder, self);
-        path_bounds.solve(db, builder)
+        path_bounds.solve_with(choose)
     }
 
     /// Returns the negation of this BDD.
@@ -2830,7 +2860,7 @@ impl<'db> Type<'db> {
 pub(crate) enum PathBounds<'db> {
     Unsatisfiable,
     Unconstrained,
-    Constrained(Vec<Vec<TypeVarBounds<'db>>>),
+    Constrained(Box<[Box<[TypeVarBounds<'db>]>]>),
 }
 
 impl<'db> PathBounds<'db> {
@@ -2898,7 +2928,7 @@ impl<'db> PathBounds<'db> {
             result.push(path_bounds);
         }
 
-        PathBounds::Constrained(result)
+        PathBounds::Constrained(result.into_boxed_slice())
     }
 
     pub(crate) fn solve(
@@ -2989,8 +3019,9 @@ impl<'db> PathBounds<'db> {
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let bound = bound.top_materialization(db);
-                let when = lower.when_constraint_set_assignable_to(db, bound, builder);
-                if when.is_never_satisfied(db) {
+                let when = lower.when_constraint_set_assignable_to_owned(db, bound);
+                let is_never_satisfied = when.query(|_builder, when| when.is_never_satisfied(db));
+                if is_never_satisfied {
                     // This path does not satisfy the typevar's upper bound, and is
                     // therefore not a valid specialization.
                     return Err(());
@@ -3019,11 +3050,13 @@ impl<'db> PathBounds<'db> {
                 let compatible_constraints = constraints.elements(db).iter().filter(|constraint| {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    let when = lower
-                        .when_constraint_set_assignable_to(db, constraint_lower, builder)
-                        .and(db, builder, || {
-                            constraint_upper.when_constraint_set_assignable_to(db, upper, builder)
-                        });
+                    let when_lower =
+                        lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
+                    let when_upper =
+                        constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
+                    let when = builder
+                        .load(db, when_lower)
+                        .and(db, builder, || builder.load(db, when_upper));
                     !when.is_never_satisfied(db)
                 });
 
@@ -5689,13 +5722,13 @@ impl PathAssignments {
 
         let mut new_constraints = Vec::new();
         for ((ante1, ante2), posts) in &self.map.pair_implications {
-            for post in posts {
-                if !self.assignment_holds(ante1.when_true())
-                    || !self.assignment_holds(ante2.when_true())
-                {
-                    continue;
-                }
+            if !self.assignment_holds(ante1.when_true())
+                || !self.assignment_holds(ante2.when_true())
+            {
+                continue;
+            }
 
+            for post in posts {
                 // Nested-typevar sequents are the mechanism that preserves cross-typevar facts when
                 // we later existentially quantify away one of the typevars. However, once we've
                 // applied a particular substitution site on the current path, reapplying it with a
@@ -5714,10 +5747,8 @@ impl PathAssignments {
         }
 
         for (ante, posts) in &self.map.single_implications {
-            for post in posts {
-                if self.assignment_holds(ante.when_true()) {
-                    new_constraints.push(*post);
-                }
+            if self.assignment_holds(ante.when_true()) {
+                new_constraints.extend(posts.iter().copied());
             }
         }
 

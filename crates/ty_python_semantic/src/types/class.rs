@@ -19,7 +19,7 @@ use super::{
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -98,7 +98,7 @@ impl<'db> CodeGeneratorKind<'db> {
         class: StaticClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Option<Self> {
-        #[salsa::tracked(cycle_initial=code_generator_of_static_class_initial,
+        #[salsa::tracked(cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_static_class<'db>(
@@ -146,15 +146,6 @@ impl<'db> CodeGeneratorKind<'db> {
             } else {
                 None
             }
-        }
-
-        fn code_generator_of_static_class_initial<'db>(
-            _db: &'db dyn Db,
-            _id: salsa::Id,
-            _class: StaticClassLiteral<'db>,
-            _specialization: Option<Specialization<'db>>,
-        ) -> Option<CodeGeneratorKind<'db>> {
-            None
         }
 
         code_generator_of_static_class(db, class, specialization)
@@ -301,38 +292,33 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
         let specialization = self.specialization(db);
 
-        // if the class is the thing defining the variable, then it can
-        // reference it without it being applied to the specialization
-        std::iter::once(origin.variance_of(db, typevar))
-            .chain(
-                specialization
-                    .generic_context(db)
-                    .variables(db)
-                    .zip(specialization.types(db))
-                    .map(|(generic_typevar, ty)| {
-                        if let Some(explicit_variance) =
-                            generic_typevar.typevar(db).explicit_variance(db)
-                        {
-                            ty.with_polarity(explicit_variance).variance_of(db, typevar)
-                        } else {
-                            // `with_polarity` composes the passed variance with the
-                            // inferred one. The inference is done lazily, as we can
-                            // sometimes determine the result just from the passed
-                            // variance. This operation is commutative, so we could
-                            // infer either first.  We choose to make the `StaticClassLiteral`
-                            // variance lazy, as it is known to be expensive, requiring
-                            // that we traverse all members.
-                            //
-                            // If salsa let us look at the cache, we could check first
-                            // to see if the class literal query was already run.
+        // Note that we only care about the variance of the specialized generic alias with respect
+        // to the given type variable, not the unspecialized class literal origin.
+        specialization
+            .generic_context(db)
+            .variables(db)
+            .zip(specialization.types(db))
+            .map(|(generic_typevar, ty)| {
+                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
+                    ty.with_polarity(explicit_variance).variance_of(db, typevar)
+                } else {
+                    // `with_polarity` composes the passed variance with the
+                    // inferred one. The inference is done lazily, as we can
+                    // sometimes determine the result just from the passed
+                    // variance. This operation is commutative, so we could
+                    // infer either first.  We choose to make the `StaticClassLiteral`
+                    // variance lazy, as it is known to be expensive, requiring
+                    // that we traverse all members.
+                    //
+                    // If salsa let us look at the cache, we could check first
+                    // to see if the class literal query was already run.
 
-                            let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
-                            origin
-                                .with_polarity(typevar_variance_in_substituted_type)
-                                .variance_of(db, generic_typevar)
-                        }
-                    }),
-            )
+                    let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
+                    origin
+                        .with_polarity(typevar_variance_in_substituted_type)
+                        .variance_of(db, generic_typevar)
+                }
+            })
             .collect()
     }
 }
@@ -1179,6 +1165,8 @@ impl<'db> ClassType<'db> {
             }
         }
 
+        abstract_methods.shrink_to_fit();
+
         abstract_methods
     }
 
@@ -1225,7 +1213,10 @@ impl<'db> ClassType<'db> {
     /// Return the [`DisjointBase`] that appears first in the MRO of this class.
     ///
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -1598,6 +1589,7 @@ impl<'db> ClassType<'db> {
                             db,
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
+                            CallableFunctionProvenance::None,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -1767,7 +1759,10 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
-    #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|db, _, _| CallableTypes::one(CallableType::bottom(db)),
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
@@ -1836,6 +1831,7 @@ impl<'db> ClassType<'db> {
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
                 CallableTypeKind::Regular,
+                CallableFunctionProvenance::None,
             );
 
             if returns_non_subclass {
@@ -1906,6 +1902,7 @@ impl<'db> ClassType<'db> {
                     db,
                     synthesized_dunder_init_signature,
                     CallableTypeKind::Regular,
+                    CallableFunctionProvenance::None,
                 ))
             } else {
                 None
@@ -1976,14 +1973,6 @@ impl<'db> ClassType<'db> {
     pub(super) fn definition_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).header_span(db)
     }
-}
-
-fn into_callable_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: ClassType<'db>,
-) -> CallableTypes<'db> {
-    CallableTypes::one(CallableType::bottom(db))
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -2581,15 +2570,17 @@ impl<'db> DisjointBase<'db> {
 
     /// Two disjoint bases can only coexist in a class's MRO if one is a subclass of the other
     fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
+        // CPython's layout check operates on runtime classes. Type arguments are irrelevant here:
+        // a generic disjoint base and any specialization of that base share the same layout.
         self == other
             || self
                 .class
                 .default_specialization(db)
-                .is_subclass_of(db, other.class.default_specialization(db))
+                .is_subtype_of_class_literal(db, other.class)
             || other
                 .class
                 .default_specialization(db)
-                .is_subclass_of(db, self.class.default_specialization(db))
+                .is_subtype_of_class_literal(db, self.class)
     }
 }
 

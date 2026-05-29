@@ -555,6 +555,8 @@ reveal_type(C().declared_and_bound)  # revealed: str | None
 class C:
     def __init__(self) -> None:
         this = self
+        # error: [invalid-type-form]
+        # error: [unresolved-attribute]
         this.declared_and_bound: str | None = "a"
 
 # This would ideally be `str | None`, but mypy/pyright don't support this either,
@@ -1029,6 +1031,183 @@ class Meta1:
 class C1(metaclass=Meta1): ...
 
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
+```
+
+Assignments in instance methods of a metaclass are also attributes on its class-object instances. In
+particular, a metaclass `__init__` assignment happens after the initial class namespace has been
+converted into a class object, so it shadows an attribute from that namespace:
+
+```py
+class InitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: int = 1
+
+class CCreated(metaclass=InitializingMeta): ...
+
+reveal_type(CCreated.attr)  # revealed: int
+
+class CInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment] "Object of type `Literal["initial class value"]` is not assignable to attribute `attr` of type `int`"
+    attr = "initial class value"
+
+reveal_type(CInitialized.attr)  # revealed: int
+CInitialized.attr = 2
+# error: [invalid-assignment] "Object of type `Literal["invalid"]` is not assignable to attribute `attr` of type `int`"
+CInitialized.attr = "invalid"
+
+class LiteralInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: Literal[1] = 1
+
+class CAugmentedInitialized(metaclass=LiteralInitializingMeta):
+    attr = 1
+    attr += 1  # error: [invalid-assignment]
+
+class CLoopInitialized(metaclass=LiteralInitializingMeta):
+    for attr in ("invalid",):  # error: [invalid-assignment]
+        pass
+
+class CNamedInitialized(metaclass=LiteralInitializingMeta):
+    if attr := "invalid":  # error: [invalid-assignment]
+        pass
+
+class InvalidContextManager:
+    def __enter__(self) -> str:
+        return "invalid"
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        pass
+
+class CWithInitialized(metaclass=LiteralInitializingMeta):
+    with InvalidContextManager() as attr:  # error: [invalid-assignment]
+        pass
+
+class CAnnotatedInitialized(metaclass=InitializingMeta):
+    attr: str = "invalid"  # error: [invalid-assignment]
+
+class CMethodInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment]
+    def attr(self) -> None:
+        pass
+
+class CNestedClassInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment]
+    class attr:
+        pass
+
+class CImportInitialized(metaclass=InitializingMeta):
+    import sys as attr  # error: [invalid-assignment]
+
+# Exception-handler targets are removed from the namespace on leaving the handler.
+class CExceptionBindingCleared(metaclass=InitializingMeta):
+    try:
+        raise RuntimeError
+    except RuntimeError as attr:
+        pass
+
+class BroadInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        value: object = object()
+        cls.attr = value
+
+class CDeclared(metaclass=BroadInitializingMeta):
+    attr: str  # error: [invalid-assignment]
+
+# A class-body declaration is a contract for an attribute populated by metaclass initialization.
+reveal_type(CDeclared.attr)  # revealed: str
+
+class DeclaredBroadInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: object = object()
+
+class CDeclaredAgainstDeclaredMeta(metaclass=DeclaredBroadInitializingMeta):
+    attr: str  # error: [invalid-assignment]
+
+reveal_type(CDeclaredAgainstDeclaredMeta.attr)  # revealed: str
+
+from collections.abc import Callable
+from typing import ClassVar
+
+class DeclaredCallableMeta(type):
+    factory: Callable[[str], str]
+
+def identity(value: str) -> str:
+    return value
+
+class CStoredDescriptor(metaclass=DeclaredCallableMeta):
+    # A metaclass declaration constrains access without replacing this stored descriptor.
+    factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
+
+class CIncompatibleStoredValue(metaclass=DeclaredCallableMeta):
+    factory: ClassVar[int] = 1  # error: [invalid-assignment]
+
+class CIncompatibleInferredValue(metaclass=DeclaredCallableMeta):
+    factory = 1  # error: [invalid-assignment]
+
+class CIncompatibleDeclaredAccess(metaclass=DeclaredCallableMeta):
+    # TODO: This should be an `invalid-assignment` error, analogous to an incompatible
+    # mutable attribute redeclaration on a subclass.
+    factory: ClassVar[int]
+
+class MethodDeclaredCallableMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory: Callable[[str], str]
+
+class CStoredDescriptorAgainstMethodDeclaration(metaclass=MethodDeclaredCallableMeta):
+    factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
+
+class CompatibleInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: int | str = 1
+
+def _(flag: bool):
+    class CConditionallyDeclared(metaclass=CompatibleInitializingMeta):
+        if flag:
+            attr: str = "class value"  # error: [invalid-assignment]
+
+    # On paths without the class-body value, the metaclass-populated value remains available.
+    reveal_type(CConditionallyDeclared.attr)  # revealed: int | str
+
+class ReplacingMethodsMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory = lambda: object()
+        cls.arguments = lambda: ()
+
+class MethodsReplacedAtConstruction(metaclass=ReplacingMethodsMeta):
+    def factory(self, value: int) -> str:
+        return ""
+
+    def arguments(self, value: int) -> str:
+        return ""
+
+class TypedReplacingMethodsMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory: object = object()
+
+class MethodReplacedByTypedMeta(metaclass=TypedReplacingMethodsMeta):
+    def factory(self) -> str:
+        return ""
+
+class PopulatingMetaclass(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.populated_on_meta: int = 1
+
+class PopulatedMeta(type, metaclass=PopulatingMetaclass): ...
+class ConstructedByPopulatedMeta(metaclass=PopulatedMeta): ...
+
+reveal_type(PopulatedMeta.populated_on_meta)  # revealed: int
+reveal_type(ConstructedByPopulatedMeta.populated_on_meta)  # revealed: int
+
+class DerivedInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.inherited_attr: int = 1
+
+class DeclaringBase:
+    inherited_attr: str
+
+class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
+
+reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 ```
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data
@@ -2603,6 +2782,33 @@ class C:
 # TODO: ideally, this would be `str`. Mypy supports this, pyright does not.
 # error: [unresolved-attribute]
 reveal_type(C().x)  # revealed: Unknown
+```
+
+### Non-receiver annotated assignments from nested functions
+
+```py
+class Other:
+    x: str
+
+receiver = Other()
+
+class C:
+    def __init__(self) -> None:
+        def set_shadowed(self: Other, value: str) -> None:
+            # error: [invalid-type-form]
+            self.x: str = value
+
+    @staticmethod
+    def set_static(self: Other) -> None:
+        def nested(value: str) -> None:
+            # error: [invalid-type-form]
+            self.x: str = value
+
+    def set_global(receiver) -> None:
+        def nested(value: str) -> None:
+            global receiver
+            # error: [invalid-type-form]
+            receiver.x: str = value
 ```
 
 ### Accessing attributes on `Never`

@@ -1168,8 +1168,9 @@ When one element returns `Never`, the intersection of return types simplifies to
 from ty_extensions import Intersection
 from typing import Callable, NoReturn
 
-def _(x: Intersection[Callable[[], NoReturn], Callable[[], str]]) -> None:
-    reveal_type(x())  # revealed: Never
+def _(x: Intersection[Callable[[bool], NoReturn], Callable[[int], str]]) -> None:
+    reveal_type(x)  # revealed: ((bool, /) -> Never) & ((int, /) -> str)
+    reveal_type(x(True))  # revealed: Never
 ```
 
 ### Variadic arguments

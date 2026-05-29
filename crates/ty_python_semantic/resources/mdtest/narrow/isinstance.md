@@ -5,9 +5,9 @@ Narrowing for `isinstance(object, classinfo)` expressions.
 ## `classinfo` is a single type
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"]):
     if isinstance(x, int):
         reveal_type(x)  # revealed: Literal[1]
 
@@ -26,9 +26,9 @@ Note: `isinstance(x, (int, str))` should not be confused with `isinstance(x, tup
 The former is equivalent to `isinstance(x, int | str)`:
 
 ```py
-def _(flag: bool, flag1: bool, flag2: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"], y: Literal[1, "a", b"b"]):
     if isinstance(x, (int, str)):
         reveal_type(x)  # revealed: Literal[1, "a"]
     else:
@@ -47,7 +47,6 @@ def _(flag: bool, flag1: bool, flag2: bool):
     else:
         reveal_type(x)  # revealed: Never
 
-    y = 1 if flag1 else "a" if flag2 else b"b"
     if isinstance(y, (int, str)):
         reveal_type(y)  # revealed: Literal[1, "a"]
 
@@ -61,9 +60,9 @@ def _(flag: bool, flag1: bool, flag2: bool):
 ## `classinfo` is a nested tuple of types
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"]):
     if isinstance(x, (bool, (bytes, int))):
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -246,27 +245,6 @@ info: A `UnionType` instance can only be used as the second argument to `isinsta
 info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 ```
 
-## PEP-604 unions on Python \<3.10
-
-PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to
-any type narrowing.
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-from __future__ import annotations
-
-def _(x: int | str | bytes):
-    # error: [unsupported-operator]
-    if isinstance(x, int | str):
-        reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
-    else:
-        reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
-```
-
 ## `classinfo` is a `types.UnionType`
 
 Python 3.10 added the ability to use `Union[int, str]` as the second argument to `isinstance()`:
@@ -363,9 +341,9 @@ else:
 ## No narrowing for instances of `builtins.type`
 
 ```py
-def _(flag: bool, t: type):
-    x = 1 if flag else "foo"
+from typing import Literal
 
+def _(x: Literal[1, "foo"], t: type):
     if isinstance(x, t):
         reveal_type(x)  # revealed: Literal[1, "foo"]
 ```
@@ -373,10 +351,11 @@ def _(flag: bool, t: type):
 ## Do not use custom `isinstance` for narrowing
 
 ```py
-def _(flag: bool):
+from typing import Literal
+
+def _(x: Literal[1, "a"]):
     def isinstance(x, t):
         return True
-    x = 1 if flag else "a"
 
     if isinstance(x, int):
         reveal_type(x)  # revealed: Literal[1, "a"]
@@ -385,10 +364,10 @@ def _(flag: bool):
 ## Do support narrowing if `isinstance` is aliased
 
 ```py
-def _(flag: bool):
-    isinstance_alias = isinstance
+from typing import Literal
 
-    x = 1 if flag else "a"
+def _(x: Literal[1, "a"]):
+    isinstance_alias = isinstance
 
     if isinstance_alias(x, int):
         reveal_type(x)  # revealed: Literal[1]
@@ -398,10 +377,9 @@ def _(flag: bool):
 
 ```py
 from builtins import isinstance as imported_isinstance
+from typing import Literal
 
-def _(flag: bool):
-    x = 1 if flag else "a"
-
+def _(x: Literal[1, "a"]):
     if imported_isinstance(x, int):
         reveal_type(x)  # revealed: Literal[1]
 ```
@@ -409,9 +387,9 @@ def _(flag: bool):
 ## Do not narrow if second argument is not a type
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"]):
     # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
@@ -424,9 +402,9 @@ def _(flag: bool):
 ## Do not narrow if there are keyword arguments
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"]):
     # error: [unknown-argument]
     if isinstance(x, int, foo="bar"):
         reveal_type(x)  # revealed: Literal[1, "a"]

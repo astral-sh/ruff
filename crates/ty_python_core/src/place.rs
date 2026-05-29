@@ -43,9 +43,13 @@ impl PlaceExpr {
     pub fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
         let expr = expr.into();
 
-        // For named expressions (walrus operator), extract the target.
+        // For named expressions (walrus operator), extract the target. The grammar only permits
+        // names as targets; parser recovery may still produce other expressions here.
         let expr = match expr {
-            ast::ExprRef::Named(named) => named.target.as_ref().into(),
+            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
+                named.target.as_ref().into()
+            }
+            ast::ExprRef::Named(_) => return None,
             _ => expr,
         };
 

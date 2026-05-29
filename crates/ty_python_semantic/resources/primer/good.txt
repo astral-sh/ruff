@@ -46,9 +46,11 @@ dedupe
 discord.py
 django-stubs
 django-test-migrations
+docstring-adder
 downforeveryone
 dragonchain
 dulwich
+ecosystem-analyzer
 egglog-python
 flake8
 flake8-pyi

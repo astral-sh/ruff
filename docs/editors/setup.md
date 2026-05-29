@@ -161,9 +161,17 @@ file with the [`logFile`](./settings.md#logfile) setting.
 
 To view the trace logs between Neovim and Ruff, set the log level for Neovim's LSP client to `debug`:
 
-```lua
-vim.lsp.set_log_level('debug')
-```
+=== "Neovim 0.12+"
+
+    ```lua
+    vim.lsp.log.set_level('debug')
+    ```
+
+=== "Neovim 0.11"
+
+    ```lua
+    vim.lsp.set_log_level('debug')
+    ```
 
 <details>
 <summary>With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim.</summary>

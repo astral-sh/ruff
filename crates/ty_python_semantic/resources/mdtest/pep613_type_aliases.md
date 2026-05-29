@@ -361,7 +361,7 @@ NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```
 
-## Conditionally imported on Python < 3.10
+## Conditionally imported
 
 ```toml
 [environment]
@@ -370,7 +370,8 @@ python-version = "3.9"
 
 ```py
 try:
-    # error: [unresolved-import]
+    # this fails at runtime, but we don't emit an error for it
+    # because typeshed has removed its <3.10 branches for the stdlib
     from typing import TypeAlias
 except ImportError:
     from typing_extensions import TypeAlias

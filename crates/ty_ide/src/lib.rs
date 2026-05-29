@@ -3,6 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod call_hierarchy;
 mod code_action;
 mod completion;
 mod doc_highlights;
@@ -30,8 +31,14 @@ mod type_hierarchy;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use call_hierarchy::incoming_calls::{IncomingCall, incoming_calls};
+pub use call_hierarchy::outgoing_calls::{OutgoingCall, outgoing_calls};
+pub use call_hierarchy::{CallHierarchyItem, prepare_call_hierarchy};
 pub use code_action::{QuickFix, code_actions};
-pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
+pub use completion::{
+    Completion, CompletionCapabilities, CompletionInsertTextFormat, CompletionKind,
+    CompletionSettings, completion,
+};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
 pub use find_references::find_references;
@@ -282,6 +289,13 @@ impl HasNavigationTargets for Type<'_> {
                 .collect(),
 
             Type::Intersection(intersection) => {
+                if let Some(alternatives) = intersection.finite_alternatives(db) {
+                    return alternatives
+                        .iter()
+                        .flat_map(|alternative| alternative.navigation_targets(db))
+                        .collect();
+                }
+
                 // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
                 let mut targets = intersection.iter_positive(db).filter(|ty| !ty.is_unknown());
 
@@ -298,6 +312,12 @@ impl HasNavigationTargets for Type<'_> {
                     None => first.navigation_targets(db),
                 }
             }
+
+            Type::EnumComplement(complement) => complement
+                .remaining_literal_types(db)
+                .iter()
+                .flat_map(|alternative| alternative.navigation_targets(db))
+                .collect(),
 
             ty => ty
                 .definition(db)

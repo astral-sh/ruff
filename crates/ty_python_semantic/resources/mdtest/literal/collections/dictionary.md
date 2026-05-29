@@ -208,6 +208,7 @@ x3["inner"] = {"inner": {"a": 1}}
 f1(**x3["inner"])
 
 def _(x: dict[str, object]):
+    # error: [invalid-type-form]
     x["inner"]: dict[str, float | str] = {"a": 1, "b": "a"}
 
     f2(**x["inner"])  # ok

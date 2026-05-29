@@ -76,9 +76,9 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:487:1
+           --> stdlib/typing.pyi:492:1
             |
-        487 | Literal: _SpecialForm
+        492 | Literal: _SpecialForm
             | -------
             |
         ");
@@ -104,9 +104,9 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:166:7
+           --> stdlib/typing.pyi:172:7
             |
-        166 | class Any:
+        172 | class Any:
             |       ---
             |
         ");
@@ -131,9 +131,9 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/typing.pyi:1268:1
+            --> stdlib/typing.pyi:1261:1
              |
-        1268 | Generic: type[_Generic]
+        1261 | Generic: type[_Generic]
              | -------
              |
         ");
@@ -228,6 +228,77 @@ mod tests {
           |     ---
           |
         ");
+    }
+
+    #[test]
+    fn goto_type_of_narrowed_singleton_enum_complement() {
+        let test = cursor_test(
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                BLUE = 2
+
+            def f(color: Color):
+                if color is Color.RED:
+                    return
+
+                color<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:12:5
+           |
+        12 |     color
+           |     ^^^^^ Clicking here
+           |
+        info: Found 1 type definition
+         --> main.py:6:5
+          |
+        6 |     BLUE = 2
+          |     ----
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_of_narrowed_multi_member_enum_complement() {
+        let test = cursor_test(
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                GREEN = 2
+                BLUE = 3
+
+            def f(color: Color):
+                if color is Color.RED:
+                    return
+
+                color<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:13:5
+           |
+        13 |     color
+           |     ^^^^^ Clicking here
+           |
+        info: Found 2 type definitions
+         --> main.py:6:5
+          |
+        6 |     GREEN = 2
+          |     -----
+        7 |     BLUE = 3
+          |     ----
+          |
+        "#);
     }
 
     #[test]
@@ -567,9 +638,9 @@ mod tests {
           | ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:914:7
             |
-        915 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -590,9 +661,9 @@ mod tests {
           |          ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:914:7
             |
-        915 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         "#);
@@ -766,10 +837,10 @@ mod tests {
           4 | class MyClass:
             |       -------
             |
-           ::: stdlib/types.pyi:969:11
+           ::: stdlib/types.pyi:959:7
             |
-        969 |     class NoneType:
-            |           --------
+        959 | class NoneType:
+            |       --------
             |
         "#);
     }
@@ -825,10 +896,10 @@ mod tests {
           4 | class MyClass:
             |       -------
             |
-           ::: stdlib/types.pyi:969:11
+           ::: stdlib/types.pyi:959:7
             |
-        969 |     class NoneType:
-            |           --------
+        959 | class NoneType:
+            |       --------
             |
         "#);
     }
@@ -1440,9 +1511,9 @@ mod tests {
           |      ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:914:7
             |
-        915 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         "#);
@@ -1469,9 +1540,9 @@ mod tests {
           |      ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:344:7
             |
-        348 | class int:
+        344 | class int:
             |       ---
             |
         ");
@@ -1497,9 +1568,9 @@ f(**kwargs<CURSOR>)
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/builtins.pyi:2947:7
+            --> stdlib/builtins.pyi:2986:7
              |
-        2947 | class dict(MutableMapping[_KT, _VT]):
+        2986 | class dict(MutableMapping[_KT, _VT]):
              |       ----
              |
         ");
@@ -1530,9 +1601,9 @@ def outer():
           |                ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:914:7
             |
-        915 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1580,9 +1651,9 @@ def function():
           |            ^^^^^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:914:7
             |
-        915 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1622,9 +1693,9 @@ def function():
           |     ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:914:7
             |
-        915 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1703,9 +1774,9 @@ def function():
           |               ^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:914:7
             |
-        915 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
         ");
@@ -1728,15 +1799,15 @@ def function():
           |     ^ Clicking here
           |
         info: Found 2 type definitions
-           --> stdlib/builtins.pyi:915:7
+           --> stdlib/builtins.pyi:914:7
             |
-        915 | class str(Sequence[str]):
+        914 | class str(Sequence[str]):
             |       ---
             |
-           ::: stdlib/types.pyi:969:11
+           ::: stdlib/types.pyi:959:7
             |
-        969 |     class NoneType:
-            |           --------
+        959 | class NoneType:
+            |       --------
             |
         ");
     }
@@ -1951,9 +2022,9 @@ def function():
           |                     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:344:7
             |
-        348 | class int:
+        344 | class int:
             |       ---
             |
         ");
@@ -1987,9 +2058,9 @@ def function():
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:344:7
             |
-        348 | class int:
+        344 | class int:
             |       ---
             |
         ");

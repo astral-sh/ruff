@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -44,9 +44,9 @@ error[invalid-typed-dict-header]: TypedDict class `Foo` can only inherit from Ty
   3 | class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
     |                      ^^^ `int` is not a `TypedDict` class
     |
-   ::: stdlib/builtins.pyi:348:7
+   ::: stdlib/builtins.pyi:344:7
     |
-348 | class int:
+344 | class int:
     |       --- `int` defined here
     |
 
@@ -59,9 +59,9 @@ error[invalid-typed-dict-header]: TypedDict class `Foo2` can only inherit from T
   6 | class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
     |                       ^^^^^^ `object` is not a `TypedDict` class
     |
-   ::: stdlib/builtins.pyi:121:7
+   ::: stdlib/builtins.pyi:113:7
     |
-121 | class object:
+113 | class object:
     |       ------ `object` defined here
     |
 

@@ -186,6 +186,11 @@ class CustomLenEnum(Enum):
 reveal_type(bool(NormalEnum.NO))  # revealed: Literal[True]
 reveal_type(bool(NormalEnum.YES))  # revealed: Literal[True]
 
+def normal_enum_complement(value: NormalEnum):
+    if value is NormalEnum.NO:
+        return
+    reveal_type(bool(value))  # revealed: Literal[True]
+
 reveal_type(bool(FalsyEnum.NO))  # revealed: Literal[False]
 reveal_type(bool(FalsyEnum.YES))  # revealed: Literal[False]
 

@@ -82,6 +82,9 @@ def adler32(data: ReadableBuffer, value: int = 1, /) -> int:
     The returned checksum is an integer.
     """
 
+if sys.version_info >= (3, 15):
+    def adler32_combine(adler1: int, adler2: int, len2: int, /) -> int: ...
+
 if sys.version_info >= (3, 11):
     def compress(data: ReadableBuffer, /, level: int = -1, wbits: int = 15) -> bytes:
         """Returns a bytes object containing compressed data.
@@ -140,6 +143,9 @@ def crc32(data: ReadableBuffer, value: int = 0, /) -> int:
 
     The returned checksum is an integer.
     """
+
+if sys.version_info >= (3, 15):
+    def crc32_combine(crc1: int, crc2: int, len2: int, /) -> int: ...
 
 def decompress(data: ReadableBuffer, /, wbits: int = 15, bufsize: int = 16384) -> bytes:
     """Returns a bytes object containing the uncompressed data.

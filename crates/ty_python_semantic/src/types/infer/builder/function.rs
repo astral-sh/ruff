@@ -23,8 +23,11 @@ use crate::{
                 validate_paramspec_components,
             },
             function_known_decorators, infer_statement_types, nearest_enclosing_function,
+            original_class_type,
         },
-        infer_definition_types, infer_scope_types, todo_type,
+        infer_definition_types, infer_scope_types,
+        signatures::ReturnCallableTypeVarScope,
+        todo_type,
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
 };
@@ -49,6 +52,63 @@ fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
             .kwarg
             .as_deref()
             .is_some_and(|param| param.annotation.is_some())
+}
+
+/// Return type policy for checking explicit `return` statements in a function body.
+#[derive(Debug, Copy, Clone)]
+struct ExpectedReturnType<'db> {
+    /// The externally-visible return type.
+    public: Type<'db>,
+    /// The lexical return type, if it differs for a generic PEP 695 function.
+    lexical: Option<Type<'db>>,
+}
+
+impl<'db> ExpectedReturnType<'db> {
+    /// Creates the expected return type policy for `function_node`.
+    fn from_function(
+        db: &'db dyn Db,
+        function: FunctionType<'db>,
+        function_node: &ast::StmtFunctionDef,
+    ) -> Self {
+        /// Normalizes special return annotations to the type actually returned by expressions.
+        fn normalize<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+            match ty {
+                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db),
+                ty => ty,
+            }
+        }
+
+        let public = normalize(
+            db,
+            function
+                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
+                .return_ty,
+        );
+        let lexical = function_node.type_params.is_some().then(|| {
+            normalize(
+                db,
+                function
+                    .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
+                    .return_ty,
+            )
+        });
+
+        Self { public, lexical }
+    }
+
+    /// Returns the externally-visible return type.
+    fn public(self) -> Type<'db> {
+        self.public
+    }
+
+    /// Returns `true` if `ty` is accepted by either the public return type or the lexical return
+    /// type.
+    fn accepts(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        ty.is_assignable_to(db, self.public)
+            || self
+                .lexical
+                .is_some_and(|lexical| ty.is_assignable_to(db, lexical))
+    }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -108,12 +168,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
                 .expect("should be in a function body scope");
             let declared_ty = enclosing_function
-                .last_definition_raw_signature(db)
+                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
                 .return_ty;
-            let expected_ty = match declared_ty {
-                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db),
-                ty => ty,
-            };
+            let expected_return =
+                ExpectedReturnType::from_function(db, enclosing_function, function);
+            let expected_ty = expected_return.public();
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
             if scope_id.is_generator_function(self.index) {
@@ -195,7 +254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty if ty.is_notimplemented(db) => None,
                     _ => Some(ty_range),
                 })
-                .filter(|ty_range| !ty_range.ty.is_assignable_to(db, expected_ty))
+                .filter(|ty_range| !expected_return.accepts(db, ty_range.ty))
             {
                 report_invalid_return_type(
                     &self.context,
@@ -249,12 +308,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (!decorator_list.is_empty()).then(|| function_known_decorators(db, definition));
         if let Some(decorator_inference) = decorator_inference.as_ref() {
             self.context.extend(decorator_inference.diagnostics());
-            self.expressions.extend(
-                decorator_inference
-                    .expression_types()
-                    .iter()
-                    .map(|(expression, ty)| (*expression, *ty)),
-            );
+            self.expressions
+                .extend(decorator_inference.expression_types());
             self.bindings.extend(decorator_inference.bindings());
             self.called_functions
                 .extend(decorator_inference.called_functions().iter().copied());
@@ -360,6 +415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function_decorators,
             deprecated,
             dataclass_transformer_params,
+            function.returns.is_some(),
         );
         let function_literal = FunctionLiteral {
             last_definition: overload_literal,
@@ -936,10 +992,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let class_definition = self.index.expect_single_definition(class);
-        let class_literal = infer_definition_types(db, class_definition)
-            .declaration_type(class_definition)
-            .inner_type()
-            .as_class_literal()?;
+        let class_literal = original_class_type(db, class_definition)?;
 
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
         if is_classmethod || function_name == "__new__" {

@@ -219,9 +219,10 @@ impl MemberExprBuilder {
                 path: name.id.clone(),
                 segments: smallvec::SmallVec::new_const(),
             }),
-            ast::ExprRef::Named(named) => {
+            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
                 MemberExprBuilder::visit_expr(ast::ExprRef::from(named.target.as_ref()))
             }
+            ast::ExprRef::Named(_) => None,
 
             ast::ExprRef::Attribute(attribute) => {
                 let mut builder =
