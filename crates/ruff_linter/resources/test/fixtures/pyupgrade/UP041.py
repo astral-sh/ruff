@@ -1,4 +1,4 @@
-import asyncio, socket
+import asyncio, socket, concurrent.futures
 # These should be fixed
 try:
     pass
@@ -8,6 +8,11 @@ except asyncio.TimeoutError:
 try:
     pass
 except socket.timeout:
+    pass
+
+try:
+    pass
+except concurrent.futures.TimeoutError:
     pass
 
 # Should NOT be in parentheses when replaced
@@ -24,14 +29,19 @@ except (socket.timeout,):
 
 try:
     pass
-except (asyncio.TimeoutError, socket.timeout,):
+except (concurrent.futures.TimeoutError,):
+    pass
+
+try:
+    pass
+except (asyncio.TimeoutError, socket.timeout, concurrent.futures.TimeoutError):
     pass
 
 # Should be kept in parentheses (because multiple)
 
 try:
     pass
-except (asyncio.TimeoutError, socket.timeout, KeyError, TimeoutError):
+except (asyncio.TimeoutError, socket.timeout, concurrent.futures.TimeoutError, KeyError, TimeoutError):
     pass
 
 # First should change, second should not
