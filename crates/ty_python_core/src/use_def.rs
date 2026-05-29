@@ -240,6 +240,8 @@
 //! [`SemanticIndexBuilder`](crate::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
 
+use std::collections::hash_map::Entry;
+
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -1713,12 +1715,21 @@ impl<'db> UseDefMapBuilder<'db> {
         self.range_reachability.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
-        let mut interned_bindings = IndexVec::with_capacity(self.bindings_by_definition.len());
+        let place_state_count = self.symbol_states.len()
+            + self.member_states.len()
+            + self.reachable_symbol_definitions.len()
+            + self.reachable_member_definitions.len();
+        let interned_bindings_capacity = self.bindings_by_definition.len()
+            + self.bindings_by_use.len()
+            + self.enclosing_snapshots.len()
+            + place_state_count;
+        let interned_declarations_capacity = self.declarations_by_binding.len() + place_state_count;
+        let mut interned_bindings = IndexVec::with_capacity(interned_bindings_capacity);
         let mut interned_ids_by_bindings =
-            FxHashMap::with_capacity_and_hasher(self.bindings_by_definition.len(), FxBuildHasher);
-        let mut interned_declarations = IndexVec::with_capacity(self.declarations_by_binding.len());
+            FxHashMap::with_capacity_and_hasher(interned_bindings_capacity, FxBuildHasher);
+        let mut interned_declarations = IndexVec::with_capacity(interned_declarations_capacity);
         let mut interned_ids_by_declarations =
-            FxHashMap::with_capacity_and_hasher(self.declarations_by_binding.len(), FxBuildHasher);
+            FxHashMap::with_capacity_and_hasher(interned_declarations_capacity, FxBuildHasher);
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
         let bindings_by_definition = Self::intern_bindings_by_definition(
             self.bindings_by_definition,
@@ -1743,9 +1754,8 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut interned_declarations,
             &mut interned_ids_by_declarations,
         );
-        let end_of_scope_members = Self::intern_place_states(
+        let end_of_scope_members = Self::intern_end_of_scope_members(
             self.member_states,
-            PlaceState::into_parts,
             &mut interned_bindings,
             &mut interned_ids_by_bindings,
             &mut interned_declarations,
@@ -1933,6 +1943,41 @@ impl<'db> UseDefMapBuilder<'db> {
         interned_ids_by_place
     }
 
+    fn intern_end_of_scope_members(
+        end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
+        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
+        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
+    ) -> IndexVec<ScopedMemberId, InternedPlaceStateId> {
+        let mut interned_ids_by_member = IndexVec::with_capacity(end_of_scope_members.len());
+        let mut interned_ids_by_place_state =
+            FxHashMap::with_capacity_and_hasher(end_of_scope_members.len(), FxBuildHasher);
+
+        for place_state in end_of_scope_members {
+            let interned_id = match interned_ids_by_place_state.entry(place_state) {
+                Entry::Occupied(entry) => *entry.get(),
+                Entry::Vacant(entry) => {
+                    let place_state = entry.key();
+                    let interned_id = Self::intern_place_state(
+                        place_state.bindings().clone(),
+                        place_state.declarations().clone(),
+                        interned_bindings,
+                        interned_ids_by_bindings,
+                        interned_declarations,
+                        interned_ids_by_declarations,
+                    );
+                    entry.insert(interned_id);
+                    interned_id
+                }
+            };
+            interned_ids_by_member.push(interned_id);
+        }
+
+        interned_ids_by_member.shrink_to_fit();
+        interned_ids_by_member
+    }
+
     fn intern_place_state(
         bindings: Bindings,
         declarations: Declarations,
@@ -1941,21 +1986,22 @@ impl<'db> UseDefMapBuilder<'db> {
         interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
         interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
     ) -> InternedPlaceStateId {
-        let bindings_id = if let Some(bindings_id) = interned_ids_by_bindings.get(&bindings) {
-            *bindings_id
-        } else {
-            let bindings_id = interned_bindings.push(bindings.clone());
-            interned_ids_by_bindings.insert(bindings, bindings_id);
-            bindings_id
+        let bindings_id = match interned_ids_by_bindings.entry(bindings) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let bindings_id = interned_bindings.push(entry.key().clone());
+                entry.insert(bindings_id);
+                bindings_id
+            }
         };
-        let declarations_id =
-            if let Some(declarations_id) = interned_ids_by_declarations.get(&declarations) {
-                *declarations_id
-            } else {
-                let declarations_id = interned_declarations.push(declarations.clone());
-                interned_ids_by_declarations.insert(declarations, declarations_id);
+        let declarations_id = match interned_ids_by_declarations.entry(declarations) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let declarations_id = interned_declarations.push(entry.key().clone());
+                entry.insert(declarations_id);
                 declarations_id
-            };
+            }
+        };
         InternedPlaceStateId(bindings_id, declarations_id)
     }
 
