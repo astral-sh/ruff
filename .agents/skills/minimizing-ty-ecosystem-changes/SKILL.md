@@ -9,6 +9,10 @@ Use this skill when asked to reproduce a ty ecosystem change, investigate a beha
 
 ## Building ty
 
+If a primary agent supplies paths to a copied merge-base ty binary, copied PR ty binary, and copied PR ecosystem config that it freshly prepared at the start of the current task, reuse those artifacts as read-only inputs. Do not rebuild ty, switch refs in the Ruff checkout, or overwrite the supplied artifacts. Use a separate transient ecosystem-project directory from any concurrent subagents. If a supplied artifact is missing, stop and report that to the primary agent instead of mutating the Ruff checkout.
+
+Otherwise, prepare the artifacts as follows.
+
 Build ty on both the PR branch and the PR's merge base by running `CARGO_PROFILE_PROFILING_DEBUG=line-tables-only cargo build --package ty --profile profiling` from the repository root on both refs, matching ecosystem CI. Copy each built executable to a stable path before checking out the other ref; otherwise, the second build overwrites `target/profiling/ty`.
 
 From the PR branch, also copy `.github/ty-ecosystem.toml` to a stable path before checking out another ref. Use that copied file for every comparison, matching ecosystem CI's behavior of reusing the PR config.
@@ -46,9 +50,9 @@ You should only need to build ty twice at the start of the investigation. Reuse 
 
 ## Reproduce First
 
-From the repository root, export the ecosystem config that was copied from the PR branch, then use the following script to clone the ecosystem project, check out the relevant revision, and install its dependencies into `.venv`. Keep `TY_CONFIG_FILE` set when running ty comparisons; this applies the same rule configuration as ecosystem CI without overwriting the user's ty config. Shell exports may not persist between agent tool calls, so re-export `TY_CONFIG_FILE` in every new shell before invoking either ty binary.
+From the repository root, export the ecosystem config that was copied from the PR branch, then use the following script to clone the ecosystem project, check out the relevant revision, and install its dependencies into `.venv`. Keep `TY_CONFIG_FILE` set when running ty comparisons; this applies the same rule configuration as ecosystem CI without overwriting the user's ty config. Shell exports may not persist between agent tool calls, so re-export `TY_CONFIG_FILE` in every new shell before invoking either ty binary. The examples below use the default artifact paths; substitute supplied artifact paths when a primary agent provides them.
 
-If `target/ty-ecosystem-bins/ty-ecosystem.toml` does not exist yet, check out the PR branch and copy `.github/ty-ecosystem.toml` from there before continuing. Do not copy `.github/ty-ecosystem.toml` while on the merge base, because ecosystem CI compares both binaries with the PR branch's config.
+When preparing artifacts yourself, if `target/ty-ecosystem-bins/ty-ecosystem.toml` does not exist yet, check out the PR branch and copy `.github/ty-ecosystem.toml` from there before continuing. Do not copy `.github/ty-ecosystem.toml` while on the merge base, because ecosystem CI compares both binaries with the PR branch's config.
 
 ```bash
 set -euo pipefail
@@ -110,4 +114,8 @@ Keep a reduction only when the behavior difference still reproduces.
 
 DO NOT stop looping until no further reductions could be applied without making the behavior difference disappear.
 
+Before retaining the final reproducer, perform an import audit: attempt to delete every import, inline third-party definitions where possible, and explain why each surviving third-party import is necessary.
+
 If the minimized behavior change is a diagnostic change, the final minimized Python snippet MUST include the full diagnostic message and error code on both branches, as a comment above or on the relevant line of code.
+
+ANY reference to a line number in an external project MUST use a permalink in the form `[project file.py:123](permalink)`. Referring to an external line number without a permalink is unacceptable.
