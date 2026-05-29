@@ -1906,7 +1906,7 @@ impl<'db> UseDefMapBuilder<'db> {
         interned_ids_by_use
     }
 
-    fn intern_place_states<I: Idx, T: Eq + std::hash::Hash>(
+    fn intern_place_states<I: Idx, T>(
         place_states: IndexVec<I, T>,
         get_parts: impl for<'a> Fn(&'a T) -> (&'a Bindings, &'a Declarations),
         interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
@@ -1915,26 +1915,17 @@ impl<'db> UseDefMapBuilder<'db> {
         interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
     ) -> IndexVec<I, InternedPlaceStateId> {
         let mut interned_ids_by_place = IndexVec::with_capacity(place_states.len());
-        let mut interned_ids_by_place_state =
-            FxHashMap::with_capacity_and_hasher(place_states.len(), FxBuildHasher);
 
         for place_state in place_states {
-            let interned_id =
-                if let Some(interned_id) = interned_ids_by_place_state.get(&place_state) {
-                    *interned_id
-                } else {
-                    let (bindings, declarations) = get_parts(&place_state);
-                    let place_state_id = Self::intern_place_state(
-                        bindings,
-                        declarations,
-                        interned_bindings,
-                        interned_ids_by_bindings,
-                        interned_declarations,
-                        interned_ids_by_declarations,
-                    );
-                    interned_ids_by_place_state.insert(place_state, place_state_id);
-                    place_state_id
-                };
+            let (bindings, declarations) = get_parts(&place_state);
+            let interned_id = Self::intern_place_state(
+                bindings,
+                declarations,
+                interned_bindings,
+                interned_ids_by_bindings,
+                interned_declarations,
+                interned_ids_by_declarations,
+            );
             interned_ids_by_place.push(interned_id);
         }
 
