@@ -180,127 +180,134 @@ fn test_tstring_fstring_middle_fuzzer() {
     insta::assert_debug_snapshot!(error);
 }
 
-#[test]
-fn stack_growth_nested_parens() {
-    let source = format!("{}1{}", "(".repeat(5_000), ")".repeat(5_000));
-    parse_module(&source).unwrap();
-}
+// `stacker` is a no-op on unsupported platforms, so only require stack
+// growth where its native support is well established.
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+mod stack_growth {
+    use super::*;
 
-#[test]
-fn stack_growth_nested_def_blocks() {
-    // Nested function definitions exercise stack-growth instrumentation on
-    // `parse_block` rather than `parse_lhs_expression`. Each level
-    // needs one more leading tab to make indentation valid.
-    let depth = 1_000;
-    let mut source = String::new();
-    for i in 0..depth {
-        source.push_str(&"\t".repeat(i));
-        source.push_str("def f():\n");
+    #[test]
+    fn nested_parens() {
+        let source = format!("{}1{}", "(".repeat(5_000), ")".repeat(5_000));
+        parse_module(&source).unwrap();
     }
-    source.push_str(&"\t".repeat(depth));
-    source.push_str("pass\n");
-    parse_module(&source).unwrap();
-}
 
-#[test]
-fn stack_growth_nested_lists() {
-    let source = format!("{}1{}", "[".repeat(5_000), "]".repeat(5_000));
-    parse_module(&source).unwrap();
-}
-
-#[test]
-fn stack_growth_unclosed_lists() {
-    let source = "[".repeat(5_000);
-    assert!(parse_module(&source).is_err());
-}
-
-#[test]
-fn stack_growth_nested_calls() {
-    let source = format!("x = {}1{}", "f(".repeat(5_000), ")".repeat(5_000));
-    parse_module(&source).unwrap();
-}
-
-#[test]
-fn stack_growth_nested_subscripts() {
-    let source = format!("x = {}1{}", "a[".repeat(5_000), "]".repeat(5_000));
-    parse_module(&source).unwrap();
-}
-
-#[test]
-fn stack_growth_nested_match_patterns() {
-    // Deeply parenthesised match patterns exercise pattern-parsing
-    // stack-growth instrumentation in addition to statement / expression paths.
-    let source = format!(
-        "match x:\n case {}y{}: pass\n",
-        "(".repeat(5_000),
-        ")".repeat(5_000),
-    );
-    parse_module(&source).unwrap();
-}
-
-#[test]
-fn stack_growth_binary_paren_interplay() {
-    // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
-    // parenthesised sub-expression, exactly like the pattern described in
-    // the tracking issue.
-    let depth = 5_000;
-    let mut source = String::new();
-    for _ in 0..depth {
-        source.push_str("1+(");
+    #[test]
+    fn nested_def_blocks() {
+        // Nested function definitions exercise stack-growth instrumentation on
+        // `parse_block` rather than `parse_lhs_expression`. Each level
+        // needs one more leading tab to make indentation valid.
+        let depth = 1_000;
+        let mut source = String::new();
+        for i in 0..depth {
+            source.push_str(&"\t".repeat(i));
+            source.push_str("def f():\n");
+        }
+        source.push_str(&"\t".repeat(depth));
+        source.push_str("pass\n");
+        parse_module(&source).unwrap();
     }
-    source.push('1');
-    for _ in 0..depth {
-        source.push(')');
+
+    #[test]
+    fn nested_lists() {
+        let source = format!("{}1{}", "[".repeat(5_000), "]".repeat(5_000));
+        parse_module(&source).unwrap();
     }
-    parse_module(&source).unwrap();
+
+    #[test]
+    fn unclosed_lists() {
+        let source = "[".repeat(5_000);
+        assert!(parse_module(&source).is_err());
+    }
+
+    #[test]
+    fn nested_calls() {
+        let source = format!("x = {}1{}", "f(".repeat(5_000), ")".repeat(5_000));
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn nested_subscripts() {
+        let source = format!("x = {}1{}", "a[".repeat(5_000), "]".repeat(5_000));
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn nested_match_patterns() {
+        // Deeply parenthesised match patterns exercise pattern-parsing
+        // stack-growth instrumentation in addition to statement / expression paths.
+        let source = format!(
+            "match x:\n case {}y{}: pass\n",
+            "(".repeat(5_000),
+            ")".repeat(5_000),
+        );
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn binary_paren_interplay() {
+        // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
+        // parenthesised sub-expression, exactly like the pattern described in
+        // the tracking issue.
+        let depth = 5_000;
+        let mut source = String::new();
+        for _ in 0..depth {
+            source.push_str("1+(");
+        }
+        source.push('1');
+        for _ in 0..depth {
+            source.push(')');
+        }
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn right_assoc_pow_chain() {
+        // `1**1**1**...**1` — `**` is right-associative, so the right operand
+        // is parsed by a recursive `parse_binary_expression_or_higher` call
+        // *without* any intervening parentheses or atom nesting. This exercises
+        // the binary-expression recursion path directly, unlike the
+        // `1+(1+(...))` interplay test which recurses through parenthesised
+        // atoms.
+        let depth = 5_000;
+        let mut source = String::with_capacity(depth * 3 + 1);
+        for _ in 0..depth {
+            source.push_str("1**");
+        }
+        source.push('1');
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn ternary_else_chain() {
+        // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
+        // conditional layer (`parse_if_expression` -> `orelse`), which is not
+        // covered by stack growth in `parse_lhs_expression`.
+        let depth = 5_000;
+        let mut source = String::with_capacity(depth * 12 + 1);
+        for _ in 0..depth {
+            source.push_str("1 if 1 else ");
+        }
+        source.push('1');
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn nested_lambda_chain() {
+        // `lambda: lambda: lambda: ...` — the lambda body recurses at the
+        // conditional layer (`parse_lambda_expr` -> body), bypassing stack
+        // growth in `parse_lhs_expression` entirely.
+        let mut source = String::from("x = ");
+        for _ in 0..5_000 {
+            source.push_str("lambda: ");
+        }
+        source.push('1');
+        parse_module(&source).unwrap();
+    }
 }
 
 #[test]
-fn stack_growth_right_assoc_pow_chain() {
-    // `1**1**1**...**1` — `**` is right-associative, so the right operand
-    // is parsed by a recursive `parse_binary_expression_or_higher` call
-    // *without* any intervening parentheses or atom nesting. This exercises
-    // the binary-expression recursion path directly, unlike the
-    // `1+(1+(...))` interplay test which recurses through parenthesised
-    // atoms.
-    let depth = 5_000;
-    let mut source = String::with_capacity(depth * 3 + 1);
-    for _ in 0..depth {
-        source.push_str("1**");
-    }
-    source.push('1');
-    parse_module(&source).unwrap();
-}
-
-#[test]
-fn stack_growth_ternary_else_chain() {
-    // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
-    // conditional layer (`parse_if_expression` -> `orelse`), which is not
-    // covered by stack growth in `parse_lhs_expression`.
-    let depth = 5_000;
-    let mut source = String::with_capacity(depth * 12 + 1);
-    for _ in 0..depth {
-        source.push_str("1 if 1 else ");
-    }
-    source.push('1');
-    parse_module(&source).unwrap();
-}
-
-#[test]
-fn stack_growth_nested_lambda_chain() {
-    // `lambda: lambda: lambda: ...` — the lambda body recurses at the
-    // conditional layer (`parse_lambda_expr` -> body), bypassing stack
-    // growth in `parse_lhs_expression` entirely.
-    let mut source = String::from("x = ");
-    for _ in 0..5_000 {
-        source.push_str("lambda: ");
-    }
-    source.push('1');
-    parse_module(&source).unwrap();
-}
-
-#[test]
-fn stack_growth_invalid_async_chain() {
+fn invalid_async_chain_is_iterative() {
     // Invalid repeated `async` prefixes are recovered iteratively.
     let source = format!("{}x = 1\n", "async ".repeat(5_000));
     let parsed = crate::parse_unchecked(&source, ParseOptions::from(Mode::Module));

@@ -537,6 +537,9 @@ mod tests {
         parse_module(source).map(Parsed::into_suite)
     }
 
+    // `stacker` is a no-op on unsupported platforms, so only require stack
+    // growth where its native support is well established.
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     fn nested_format_spec(prefix: char, depth: usize) -> String {
         let mut replacement_field = String::from("{spec}");
         for _ in 0..depth {
@@ -582,6 +585,7 @@ mod tests {
         insta::assert_debug_snapshot!(suite);
     }
 
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     #[test]
     fn fstring_nested_spec_stack_growth() {
         parse_suite(&nested_format_spec('f', 5_000)).unwrap();
@@ -699,6 +703,7 @@ mod tests {
         insta::assert_debug_snapshot!(suite);
     }
 
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     #[test]
     fn tstring_nested_spec_stack_growth() {
         parse_suite(&nested_format_spec('t', 5_000)).unwrap();
