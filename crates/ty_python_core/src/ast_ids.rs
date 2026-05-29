@@ -1,21 +1,20 @@
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use ruff_index::newtype_index;
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
 use crate::Db;
-use crate::scope::ScopeId;
+use crate::scope::{FileScopeId, ScopeId};
 use crate::semantic_index;
 
 pub use node_key::ExpressionNodeKey;
 
-/// AST ids for a single scope.
+/// AST ids for a file.
 ///
-/// The motivation for building the AST ids per scope isn't about reducing invalidation because
-/// the struct changes whenever the parsed AST changes. Instead, it's mainly that we can
-/// build the AST ids struct when building the place table and also keep the property that
-/// IDs of outer scopes are unaffected by changes in inner scopes.
+/// Use IDs are assigned per scope while building the semantic index. This keeps the property that
+/// IDs of outer scopes are unaffected by changes in inner scopes. Node IDs are unique within a
+/// file, so the final reverse lookup can merge the per-scope maps into a single map.
 ///
 /// For example, we don't want that adding new statements to `foo` changes the statement id of `x = foo()` in:
 ///
@@ -32,13 +31,29 @@ pub(crate) struct AstIds {
 }
 
 impl AstIds {
+    pub(super) fn from_builders(builders: IndexVec<FileScopeId, AstIdsBuilder>) -> Self {
+        let capacity = builders.iter().map(|builder| builder.uses_map.len()).sum();
+        let mut uses_map = FxHashMap::with_capacity_and_hasher(capacity, FxBuildHasher);
+
+        for builder in builders {
+            for (key, use_id) in builder.uses_map {
+                let previous = uses_map.insert(key, use_id);
+                debug_assert!(previous.is_none());
+            }
+        }
+
+        uses_map.shrink_to_fit();
+
+        Self { uses_map }
+    }
+
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
     }
 }
 
 fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
-    semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
+    semantic_index(db, scope.file(db)).ast_ids()
 }
 
 /// Uniquely identifies a use of a name in a [`crate::FileScopeId`].
@@ -108,12 +123,6 @@ impl AstIdsBuilder {
 
     pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
         self.uses_map.get(&key.into()).copied()
-    }
-
-    pub(super) fn finish(self) -> AstIds {
-        AstIds {
-            uses_map: self.uses_map,
-        }
     }
 }
 

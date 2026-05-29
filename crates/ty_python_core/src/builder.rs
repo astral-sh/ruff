@@ -2220,16 +2220,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .map(|builder| Arc::new(builder.finish()))
             .collect();
 
-        let mut ast_ids: IndexVec<_, _> = self
-            .ast_ids
-            .into_iter()
-            .map(super::ast_ids::AstIdsBuilder::finish)
-            .collect();
+        let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);
 
         self.scopes.shrink_to_fit();
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
-        ast_ids.shrink_to_fit();
         self.enclosing_lambda_statements.shrink_to_fit();
         self.imported_modules.shrink_to_fit();
         self.scope_ids_by_scope.shrink_to_fit();
