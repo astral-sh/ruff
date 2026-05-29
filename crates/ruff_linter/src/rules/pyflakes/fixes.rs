@@ -66,13 +66,12 @@ pub(super) fn remove_unused_keyword_arguments_from_format_call(
 
 /// Generate a [`Edit`] to remove unused positional arguments from a `format` call.
 ///
-/// When the rewrite would leave `.format(...)` with zero arguments and the
-/// format string has no replacement fields, the call itself is dropped and any
-/// `{{` / `}}` escapes in the literal are reduced to single braces so the
-/// result matches what `.format()` would have produced. When the string still
-/// has replacement fields (or the literal cannot be unescaped textually) the
-/// empty `.format()` call is kept so that runtime behaviour, including any
-/// `KeyError`, is preserved.
+/// When removing the arguments would leave `.format()` with nothing left to do
+/// (no remaining arguments and no replacement fields), the `.format(...)` call
+/// itself is dropped, but only when the receiver string has no braces, where
+/// `.format()` is a genuine no-op. If the string contains any `{` or `}`, the
+/// now-argumentless `.format()` call is kept instead so that runtime behaviour,
+/// including any `KeyError` from a named placeholder, is preserved.
 pub(crate) fn remove_unused_positional_arguments_from_format_call(
     unused_arguments: &[usize],
     call: &ast::ExprCall,
@@ -80,13 +79,18 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
+    // Deciding whether the `.format(...)` call can be dropped is independent of
+    // removing the unused arguments: we only drop it when no arguments remain,
+    // there are no replacement fields, and the receiver string has no braces.
     if unused_arguments.len() == call.arguments.len()
         && summary.autos.is_empty()
         && summary.indices.is_empty()
         && summary.keywords.is_empty()
         && let Expr::Attribute(attribute) = &*call.func
-        && let Some(replacement) = literal_source_without_format_call(&attribute.value, locator)
+        && let Expr::StringLiteral(string_expr) = &*attribute.value
+        && !string_expr.value.to_str().contains(['{', '}'])
     {
+        let replacement = locator.slice(string_expr).to_string();
         return Ok(Edit::range_replacement(replacement, call.range()));
     }
 
@@ -105,71 +109,6 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
         Ok(expression)
     })
     .map(|output| Edit::range_replacement(output, call.range()))
-}
-
-/// Returns the source text to substitute for `expr.format(...)` when the
-/// `.format(...)` call is being dropped because it has no replacement fields
-/// and no remaining arguments.
-///
-/// Returns `None` when the rewrite cannot be done safely, in which case the
-/// caller should keep the `.format(...)` call (with no args) instead.
-///
-/// If the literal's decoded value has no braces, `.format()` is a no-op on it
-/// and the original source can be reused verbatim. When the value contains
-/// `{{` / `}}` escapes, those are reduced to single braces, but only when the
-/// literal's source content equals its decoded value: an escape such as
-/// `\x7b` could otherwise interact with a neighbouring literal brace and
-/// silently change the resulting string.
-fn literal_source_without_format_call(expr: &Expr, locator: &Locator) -> Option<String> {
-    let Expr::StringLiteral(string_expr) = expr else {
-        return None;
-    };
-    if string_expr.value.is_implicit_concatenated() {
-        return None;
-    }
-    let literal = string_expr.value.iter().next()?;
-
-    if !literal.value.contains(['{', '}']) {
-        // `.format()` would not have changed anything in the resulting
-        // string, so reuse the original source as-is.
-        return Some(locator.slice(string_expr).to_string());
-    }
-
-    let content_range = literal.content_range();
-    let source_content = locator.slice(content_range);
-
-    // The textual `{{` -> `{` rewrite below is only safe when the source
-    // content matches the decoded value: otherwise a Python escape sequence
-    // such as `\x7b` could combine with a neighbouring literal brace and
-    // change the resulting string.
-    if source_content != &*literal.value {
-        return None;
-    }
-
-    let unescaped = unescape_format_braces(source_content);
-    let prefix_and_opener = locator.slice(ruff_text_size::TextRange::new(
-        literal.start(),
-        content_range.start(),
-    ));
-    let closer = locator.slice(ruff_text_size::TextRange::new(
-        content_range.end(),
-        literal.end(),
-    ));
-
-    Some(format!("{prefix_and_opener}{unescaped}{closer}"))
-}
-
-/// Replaces every `{{` with `{` and every `}}` with `}` in `text`.
-fn unescape_format_braces(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if (ch == '{' || ch == '}') && chars.peek() == Some(&ch) {
-            chars.next();
-        }
-        out.push(ch);
-    }
-    out
 }
 
 /// Generate a [`Edit`] to remove the binding from an exception handler.
