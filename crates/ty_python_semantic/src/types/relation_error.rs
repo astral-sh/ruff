@@ -265,7 +265,7 @@ impl<'db> ErrorContext<'db> {
                 target,
                 parameter,
             } => {
-                // reversed order due to covariance
+                // reversed order due to contravariance of parameter types
                 format!(
                     "{parameter} has an incompatible type: `{target}` is not assignable to `{source}`",
                     source = source.display(db),
