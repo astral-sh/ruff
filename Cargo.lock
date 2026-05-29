@@ -3526,6 +3526,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_ruby_spo"
+version = "0.1.0"
+dependencies = [
+ "ruff_spo_triplet",
+]
+
+[[package]]
 name = "ruff_server"
 version = "0.2.2"
 dependencies = [
@@ -3574,6 +3581,14 @@ dependencies = [
  "memchr",
  "ruff_text_size",
  "serde",
+]
+
+[[package]]
+name = "ruff_spo_triplet"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

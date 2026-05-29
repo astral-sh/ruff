@@ -1,0 +1,23 @@
+[package]
+name = "ruff_ruby_spo"
+version = "0.1.0"
+publish = false
+edition = "2024"
+rust-version = "1.86"
+description = "SCAFFOLD: Ruby/Rails (OpenProject) frontend for ruff_spo_triplet. Walks an app/models tree and fills a language-agnostic ModelGraph, which expands to the same SPO triples as the Python/Odoo frontend. Extraction points are todo!() stubs documented with the exact Rails construct to read; the target triple shape is already locked by a passing test."
+license = "MIT"
+
+[lib]
+name = "ruff_ruby_spo"
+
+[dependencies]
+ruff_spo_triplet = { workspace = true }
+
+# TODO(frontend): add a Ruby parser when wiring real extraction. Recommended:
+#   lib-ruby-parser = "0.x"   # pure-Rust typed AST, no Ruby runtime
+# or tree-sitter + tree-sitter-ruby for a structural sweep. Neither is
+# pulled in yet — the scaffold compiles with zero external parser deps so
+# the target shape can be locked first.
+
+[lints]
+workspace = true

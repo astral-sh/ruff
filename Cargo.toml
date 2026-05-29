@@ -37,8 +37,10 @@ ruff_python_parser = { path = "crates/ruff_python_parser" }
 ruff_python_semantic = { path = "crates/ruff_python_semantic" }
 ruff_python_stdlib = { path = "crates/ruff_python_stdlib" }
 ruff_python_trivia = { path = "crates/ruff_python_trivia" }
+ruff_ruby_spo = { path = "crates/ruff_ruby_spo" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }
+ruff_spo_triplet = { path = "crates/ruff_spo_triplet" }
 ruff_mdtest = { path = "crates/ruff_mdtest" }
 ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
