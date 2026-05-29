@@ -13,7 +13,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use salsa::{Database, Event, Setter};
+use salsa::{Database, Durability, Event, Setter};
 use ty_module_resolver::SearchPaths;
 use ty_python_core::program::{
     FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
@@ -167,10 +167,10 @@ impl ProjectDatabase {
     ///
     /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.
     pub fn system_mut(&mut self) -> &mut dyn System {
-        self.trigger_cancellation();
+        self.synthetic_write(Durability::LOW);
 
         Arc::get_mut(&mut self.system).expect(
-            "ref count should be 1 because `trigger_cancellation` drops all other DB references.",
+            "ref count should be 1 because `synthetic_write` drops all other DB references.",
         )
     }
 
@@ -775,4 +775,105 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
+}
+
+#[cfg(test)]
+pub(crate) mod cancellation_tests {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::{Duration, Instant};
+
+    use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_python_ast::name::Name;
+    use salsa::Cancelled;
+
+    use crate::db::Db;
+    use crate::{ProjectDatabase, ProjectMetadata};
+
+    #[derive(Debug, Default)]
+    struct CancellationGate {
+        started: AtomicBool,
+        resume: AtomicBool,
+    }
+
+    impl CancellationGate {
+        fn wait_until_started(&self) {
+            let start = Instant::now();
+            while !self.started.load(Ordering::Acquire) {
+                assert!(
+                    start.elapsed() < Duration::from_secs(10),
+                    "timed out waiting for fixpoint query"
+                );
+                std::thread::yield_now();
+            }
+        }
+    }
+
+    #[salsa::input]
+    struct FixpointInput {
+        #[returns(ref)]
+        gate: Arc<CancellationGate>,
+    }
+
+    #[salsa::tracked(cycle_initial=fixpoint_initial)]
+    fn interruptible_fixpoint_query(db: &dyn Db, input: FixpointInput) -> u32 {
+        let gate = input.gate(db);
+        gate.started.store(true, Ordering::Release);
+        while !gate.resume.load(Ordering::Acquire) {
+            db.unwind_if_revision_cancelled();
+            std::thread::yield_now();
+        }
+        42
+    }
+
+    fn fixpoint_initial(_db: &dyn Db, _id: salsa::Id, _input: FixpointInput) -> u32 {
+        0
+    }
+
+    pub(crate) fn assert_cancelled_fixpoint_recomputes<D, F>(mut db: D, mutate: F)
+    where
+        D: Db + Clone + Send + 'static,
+        F: FnOnce(&mut D),
+    {
+        let input = FixpointInput::new(&db, Arc::new(CancellationGate::default()));
+        let gate = Arc::clone(input.gate(&db));
+        let db_worker = db.clone();
+        let worker = std::thread::spawn(move || {
+            catch_unwind(AssertUnwindSafe(|| {
+                interruptible_fixpoint_query(&db_worker, input)
+            }))
+        });
+
+        gate.wait_until_started();
+        mutate(&mut db);
+
+        let cancelled = worker.join().unwrap().unwrap_err();
+        assert!(matches!(
+            cancelled.downcast_ref::<Cancelled>(),
+            Some(Cancelled::PendingWrite)
+        ));
+
+        gate.resume.store(true, Ordering::Release);
+        let recomputed = catch_unwind(AssertUnwindSafe(|| {
+            interruptible_fixpoint_query(&db, input)
+        }))
+        .unwrap_or_else(|error| {
+            panic!(
+                "fixpoint query failed after cancellation: {:?}",
+                error.downcast_ref::<Cancelled>()
+            )
+        });
+        assert_eq!(recomputed, 42);
+    }
+
+    #[test]
+    fn cancelling_fixpoint_while_mutably_accessing_system_allows_recomputation() {
+        let metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/test"));
+        let db = ProjectDatabase::use_defaults(metadata, TestSystem::default());
+
+        assert_cancelled_fixpoint_recomputes(db, |db| {
+            db.system_mut();
+        });
+    }
 }

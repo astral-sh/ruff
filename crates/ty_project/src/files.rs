@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use rustc_hash::FxHashSet;
-use salsa::Setter;
+use salsa::{Durability, Setter};
 
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
@@ -20,7 +20,9 @@ use crate::db::Db;
 /// without triggering a new salsa revision. This is safe because the initial indexing happens on first access,
 /// so no query can be depending on the contents of the indexed files before that. All subsequent mutations to
 /// the indexed files must go through `IndexedMut`, which uses the Salsa setter `project.set_file_set` to
-/// ensure that Salsa always knows when the set of indexed files have changed.
+/// ensure that Salsa always knows when the set of indexed files have changed. Mutations that
+/// do not set a new file set use a synthetic write because acquiring mutable access cancels
+/// pending queries.
 #[derive(Debug, get_size2::GetSize)]
 pub struct IndexedFiles {
     state: std::sync::Mutex<State>,
@@ -83,8 +85,11 @@ impl IndexedFiles {
 
         let indexed = match state {
             // If it's already lazy, just return. We also don't need to restore anything because the
-            // replace above was a no-op.
-            State::Lazy => return None,
+            // replace above was a no-op. The preceding cancellation still requires a new revision.
+            State::Lazy => {
+                db.synthetic_write(Durability::LOW);
+                return None;
+            }
             State::Indexed(indexed) => indexed,
         };
 
@@ -241,6 +246,7 @@ impl IndexedMut<'_> {
         } else {
             // The `indexed_mut` replaced the `state` with Lazy. Restore it back to the indexed state.
             *self.project.file_set(db).state.lock().unwrap() = State::Indexed(indexed);
+            db.synthetic_write(Durability::LOW);
         }
     }
 }
@@ -257,11 +263,41 @@ mod tests {
 
     use crate::ProjectMetadata;
     use crate::db::Db;
+    use crate::db::cancellation_tests::assert_cancelled_fixpoint_recomputes;
     use crate::db::tests::TestDb;
     use crate::files::Index;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
     use ruff_python_ast::name::Name;
+
+    #[test]
+    fn cancelling_fixpoint_while_files_are_lazy_allows_recomputation() {
+        let metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/test"));
+        let db = TestDb::new(metadata);
+        let project = db.project();
+
+        assert_cancelled_fixpoint_recomputes(db, |db| {
+            project.replace_index_diagnostics(db, Vec::new());
+        });
+    }
+
+    #[test]
+    fn cancelling_fixpoint_while_restoring_unchanged_files_allows_recomputation() {
+        let metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/test"));
+        let db = TestDb::new(metadata);
+        let project = db.project();
+
+        match project.file_set(&db).get() {
+            Index::Lazy(lazy) => {
+                lazy.set(FxHashSet::default(), Vec::new());
+            }
+            Index::Indexed(_) => panic!("expected lazy file set"),
+        }
+
+        assert_cancelled_fixpoint_recomputes(db, |db| {
+            project.replace_index_diagnostics(db, Vec::new());
+        });
+    }
 
     #[test]
     fn re_entrance() -> anyhow::Result<()> {
