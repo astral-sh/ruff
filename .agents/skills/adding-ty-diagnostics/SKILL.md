@@ -1,6 +1,6 @@
 ---
 name: adding-ty-diagnostics
-description: Use when adding, updating, or reviewing ty checks, diagnostics, diagnostic messages, subdiagnostics, or concise output behavior.
+description: Use when a user says "add a ty diagnostic", "write this new ty diagnostic", "change a ty error message", "review ty diagnostics", or asks to add, update, or review ty checks, diagnostic messages, subdiagnostics, or concise output behavior.
 ---
 
 # Adding Ty Diagnostics
