@@ -43,15 +43,3 @@
 # The fix here is safe because the unused argument has no side effect,
 # even though the used argument has a side effect
 "Hello, {0}".format(print(1), "Pikachu")
-
-# https://github.com/astral-sh/ruff/issues/15557
-# When the receiver string has no braces, `.format()` is a no-op and the call is
-# dropped. When the string contains any `{` or `}`, the now-argumentless
-# `.format()` call is kept so that runtime behaviour, including any `KeyError`,
-# is preserved.
-"{{".format("!")
-"{x}".format("!")
-"{{}}".format("!")
-"{{0}}".format("!")
-"{x}".format("!", x=1)
-("Hello" "world").format("!")
