@@ -258,6 +258,7 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
+        stmts.shrink_to_fit();
         stmts
     }
 
