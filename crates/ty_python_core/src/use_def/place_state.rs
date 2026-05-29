@@ -445,11 +445,6 @@ impl PlaceState {
     pub(super) fn declarations(&self) -> &Declarations {
         &self.declarations
     }
-
-    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
-        self.declarations.finish(reachability_constraints);
-        self.bindings.finish(reachability_constraints);
-    }
 }
 
 #[cfg(test)]
