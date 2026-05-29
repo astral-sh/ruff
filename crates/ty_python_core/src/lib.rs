@@ -305,7 +305,7 @@ pub struct SemanticIndex<'db> {
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
-    ast_ids: IndexVec<FileScopeId, AstIds>,
+    ast_ids: AstIds,
 
     /// The set of modules that are imported anywhere within this file.
     imported_modules: Arc<FrozenSet<ModuleName>>,
@@ -371,8 +371,8 @@ impl<'db> SemanticIndex<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
-        &self.ast_ids[scope_id]
+    pub(crate) fn ast_ids(&self) -> &AstIds {
+        &self.ast_ids
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
