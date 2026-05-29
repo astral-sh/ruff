@@ -269,7 +269,7 @@ def _(
     reveal_type(i)  # revealed: object
 ```
 
-## Cannot use an argument as both a value and a type form
+## A `TypeForm` parameter is a value parameter
 
 ```py
 from ty_extensions import is_singleton
@@ -279,7 +279,7 @@ def _(flag: bool):
         f = repr
     else:
         f = is_singleton
-    # error: [conflicting-argument-forms] "Argument is used as both a value and a type form in call"
+    # `int` is both a regular value for `repr` and a valid `TypeForm` value for `is_singleton`.
     reveal_type(f(int))  # revealed: str | Literal[False]
 ```
 

@@ -5,7 +5,7 @@ use crate::{
     Db,
     types::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
-        PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
+        PropertyInstanceType, Signature, StringLiteralType, Type, TypeFormType, UnionType,
         callable::{CallableFunctionProvenance, CallableTypeKind},
         constraints::ConstraintSet,
         function::FunctionType,
@@ -256,6 +256,8 @@ impl<'db> KnownBoundMethodType<'db> {
     ///
     /// If the bound method type is overloaded, it may have multiple signatures.
     pub(super) fn signatures(self, db: &'db dyn Db) -> impl Iterator<Item = Signature<'db>> {
+        let object_type_form = || TypeFormType::from_type_expression(db, Type::object());
+
         match self {
             // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
             // This is required because we need to return more precise types than what the signature in
@@ -377,14 +379,11 @@ impl<'db> KnownBoundMethodType<'db> {
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("lower_bound")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                             Parameter::positional_only(Some(Name::new_static("typevar")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                             Parameter::positional_only(Some(Name::new_static("upper_bound")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                         ],
                     ),
                     KnownClass::ConstraintSet.to_instance(db),
@@ -405,11 +404,9 @@ impl<'db> KnownBoundMethodType<'db> {
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("ty")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                             Parameter::positional_only(Some(Name::new_static("of")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                         ],
                     ),
                     KnownClass::ConstraintSet.to_instance(db),
@@ -432,10 +429,12 @@ impl<'db> KnownBoundMethodType<'db> {
                     Parameters::new(
                         db,
                         [Parameter::keyword_only(Name::new_static("inferable"))
-                            .type_form()
                             .with_annotated_type(UnionType::from_two_elements(
                                 db,
-                                Type::homogeneous_tuple(db, Type::any()),
+                                TypeFormType::from_type_expression(
+                                    db,
+                                    Type::homogeneous_tuple(db, Type::object()),
+                                ),
                                 Type::none(db),
                             ))
                             .with_default_type(Type::none(db))],
