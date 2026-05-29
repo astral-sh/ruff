@@ -195,7 +195,7 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_statements(&mut self) -> Suite {
-        let mut stmts = Suite::new();
+        let mut stmts = Suite::with_capacity(1);
         let mut progress = ParserProgress::default();
 
         loop {
