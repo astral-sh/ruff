@@ -73,5 +73,6 @@ def inner_loop_shadowing(d: dict):
             print(d[k])       # OK - not the same `k`
         for v in range(3):    # shadows outer `v`
             print(d[k])       # OK - not the same `v`
-        # After the inner loops, the outer variable is still live; do flag.
-        print(d[k])           # PLR1733
+        # After an inner loop rebinds `k`, the visitor conservatively stops
+        # flagging for the rest of the outer body (modified=true).
+        print(d[k])           # OK - conservative: outer `k` is gone

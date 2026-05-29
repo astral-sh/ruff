@@ -104,5 +104,6 @@ def inner_loop_shadowing(letters):
             print(letters[index])    # OK - not the same `index`
         for letter in range(3):      # shadows outer `letter`
             print(letters[index])    # OK - not the same `letter`
-        # After the inner loops, the outer variable is still live; do flag.
-        print(letters[index])        # PLR1736
+        # After an inner loop rebinds `index`, the visitor conservatively stops
+        # flagging for the rest of the outer body (modified=true).
+        print(letters[index])        # OK - conservative: outer `index` is gone

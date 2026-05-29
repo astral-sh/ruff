@@ -126,6 +126,7 @@ impl SequenceIndexVisitor<'_> {
             Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
                 elts.iter().any(|elt| self.rebinds_loop_var(elt))
             }
+            Expr::Starred(ast::ExprStarred { value, .. }) => self.rebinds_loop_var(value),
             _ => false,
         }
     }
@@ -154,26 +155,47 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
                 self.modified = targets.iter().any(|target| self.is_assignment(target));
             }
-            // If an inner `for` loop rebinds `index_name` or `value_name`, any lookups
-            // inside its body refer to the *inner* binding, not the outer loop's variable.
-            // Skip the inner body entirely; the `else` clause is unaffected.
+            // If an inner `for` loop rebinds `index_name` or `value_name`, skip the body:
+            // any `sequence[index]` inside refers to the *inner* variable, not the outer
+            // one. Mark `modified` so the outer loop also stops flagging after this point
+            // (the rebinding is visible in the outer scope after the inner loop finishes).
+            // Always visit `iter` and `orelse` — those still use the outer binding.
             Stmt::For(ast::StmtFor {
                 target,
+                iter,
                 body,
                 orelse,
                 ..
             }) => {
+                self.visit_expr(iter);
                 if self.rebinds_loop_var(target) {
-                    for s in orelse {
-                        self.visit_stmt(s);
-                    }
+                    self.modified = true;
                 } else {
                     for s in body {
                         self.visit_stmt(s);
                     }
-                    for s in orelse {
+                }
+                for s in orelse {
+                    self.visit_stmt(s);
+                }
+            }
+            Stmt::AsyncFor(ast::StmtAsyncFor {
+                target,
+                iter,
+                body,
+                orelse,
+                ..
+            }) => {
+                self.visit_expr(iter);
+                if self.rebinds_loop_var(target) {
+                    self.modified = true;
+                } else {
+                    for s in body {
                         self.visit_stmt(s);
                     }
+                }
+                for s in orelse {
+                    self.visit_stmt(s);
                 }
             }
             _ => visitor::walk_stmt(self, stmt),
