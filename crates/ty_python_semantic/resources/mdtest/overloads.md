@@ -329,6 +329,10 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
 
     def put(self, x: str) -> None: ...
 
+# TODO: The first overload should be eliminated, leaving `bound method
+# BaseWithProtocolSelf.method() -> bytes`.
+reveal_type(ProtocolSelfImplementation().method)  # revealed: Overload[[ProtocolSelfT]() -> ProtocolSelfT, () -> bytes]
+
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
 # TODO: error: [invalid-assignment]
 bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method
