@@ -44,6 +44,7 @@ dacite
 dd-trace-py
 dedupe
 discord.py
+django-modern-rest
 django-stubs
 django-test-migrations
 docstring-adder
@@ -115,6 +116,7 @@ pyp
 pyppeteer
 pyproject-metadata
 pytest
+pytest-autoprofile
 pytest-robotframework
 python-chess
 python-htmlgen
