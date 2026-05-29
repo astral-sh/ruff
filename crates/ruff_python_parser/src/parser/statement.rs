@@ -8,7 +8,6 @@ use ruff_python_ast::{
     Operator, PythonVersion, Stmt, Suite, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use smallvec::SmallVec;
 
 use crate::error::StarTupleKind;
 use crate::parser::expression::{EXPR_SET, ParsedExpr};
@@ -3092,14 +3091,10 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Indent);
 
         let statements = if let Some(statements) = self.with_recursion(|parser| {
-            let mut statements: SmallVec<[Stmt; 4]> = SmallVec::new();
-            parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
-                statements.push(parser.parse_statement());
-            });
-
-            let mut suite = Suite::with_capacity(statements.len());
-            suite.extend(statements);
-            suite
+            parser.parse_list_into_thin_vec(
+                RecoveryContextKind::BlockStatements,
+                Parser::parse_statement,
+            )
         }) {
             statements
         } else {
