@@ -614,7 +614,7 @@ impl<'src> Parser<'src> {
         // import ,
         // import x, y,
 
-        let names = self
+        let mut names = self
             .parse_comma_separated_list_into_vec(RecoveryContextKind::ImportNames, |p| {
                 p.parse_alias(ImportStyle::Import)
             });
@@ -624,6 +624,8 @@ impl<'src> Parser<'src> {
             // import
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
+
+        names.shrink_to_fit();
 
         ast::StmtImport {
             names,
@@ -739,6 +741,8 @@ impl<'src> Parser<'src> {
             // 2 + 2
             self.expect(TokenKind::Rpar);
         }
+
+        names.shrink_to_fit();
 
         ast::StmtImportFrom {
             module,
@@ -1444,6 +1448,8 @@ impl<'src> Parser<'src> {
             elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
         }
 
+        elif_else_clauses.shrink_to_fit();
+
         ast::StmtIf {
             test: Box::new(test.expr),
             body,
@@ -1539,7 +1545,7 @@ impl<'src> Parser<'src> {
         // except* ExceptionGroup:
         //     pass
         let mut mixed_except_ranges = Vec::new();
-        let handlers = self.parse_clauses(Clause::Except, |p| {
+        let mut handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
             if let ExceptClauseKind::Star(range) = kind {
                 p.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
@@ -1551,6 +1557,8 @@ impl<'src> Parser<'src> {
             }
             handler
         });
+        handlers.shrink_to_fit();
+
         // Empty handler has `is_star` false.
         let is_star = is_star.unwrap_or_default();
         for handler_err_range in mixed_except_ranges {
@@ -2170,7 +2178,9 @@ impl<'src> Parser<'src> {
     fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
         self.bump(TokenKind::With);
 
-        let items = self.parse_with_items();
+        let mut items = self.parse_with_items();
+        items.shrink_to_fit();
+
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::With);
@@ -2985,6 +2995,8 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Newline);
         }
 
+        decorators.shrink_to_fit();
+
         match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
             TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
@@ -3527,6 +3539,10 @@ impl<'src> Parser<'src> {
         if matches!(function_kind, FunctionKind::FunctionDef) {
             self.expect(TokenKind::Rpar);
         }
+
+        parameters.args.shrink_to_fit();
+        parameters.kwonlyargs.shrink_to_fit();
+        parameters.posonlyargs.shrink_to_fit();
 
         parameters.range = self.node_range(start);
 
