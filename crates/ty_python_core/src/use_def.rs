@@ -243,6 +243,8 @@
 use ruff_index::{Idx, IndexBox, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use salsa::plumbing::AsId;
+use std::hash::Hash;
 
 use crate::ast_ids::ScopedUseId;
 use crate::definition::{Definition, DefinitionState};
@@ -345,7 +347,7 @@ pub struct UseDefMap<'db> {
     /// If the definition is both a declaration and a binding -- `x: int = 1` for example -- then
     /// we don't actually need anything here, all we'll need to validate is that our own RHS is a
     /// valid assignment to our own annotation.
-    declarations_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId>,
+    declarations_by_binding: RetainedDefinitionMap<Definition<'db>, InternedDeclarationsId>,
 
     /// If the definition is a declaration (only) -- `x: int` for example -- then we need
     /// [`Bindings`] to know whether this declaration is consistent with the previously
@@ -357,7 +359,7 @@ pub struct UseDefMap<'db> {
     ///
     /// If we see a binding to a `Final`-qualified symbol, we also need this map to find previous
     /// bindings to that symbol. If there are any, the assignment is invalid.
-    bindings_by_definition: FxHashMap<Definition<'db>, InternedBindingsId>,
+    bindings_by_definition: RetainedDefinitionMap<Definition<'db>, InternedBindingsId>,
 
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: IndexBox<ScopedSymbolId, InternedPlaceStates>,
@@ -414,6 +416,56 @@ impl MultiBindingsByUse {
             .binary_search_by_key(&use_id, |(candidate, _)| *candidate)
             .ok()
             .map(|index| self.0[index].1.as_ref())
+    }
+}
+
+/// An immutable map optimized for the small per-scope definition maps that dominate in practice.
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+enum RetainedDefinitionMap<K: Eq + Hash, V> {
+    Small(Box<[(K, V)]>),
+    Large(Box<FxHashMap<K, V>>),
+}
+
+impl<K, V> RetainedDefinitionMap<K, V>
+where
+    K: AsId + Eq + Hash,
+{
+    const SMALL_MAP_THRESHOLD: usize = 16;
+
+    fn from_entries(mut entries: Vec<(K, V)>) -> Self {
+        if entries.len() <= Self::SMALL_MAP_THRESHOLD {
+            entries.sort_unstable_by_key(|(key, _)| key.as_id());
+            Self::Small(entries.into_boxed_slice())
+        } else {
+            let mut map = FxHashMap::with_capacity_and_hasher(entries.len(), FxBuildHasher);
+            map.extend(entries);
+            Self::Large(Box::new(map))
+        }
+    }
+
+    fn get(&self, key: &K) -> Option<&V> {
+        match self {
+            Self::Small(entries) => {
+                let key_id = key.as_id();
+                entries
+                    .binary_search_by_key(&key_id, |(candidate, _)| candidate.as_id())
+                    .ok()
+                    .map(|index| &entries[index].1)
+            }
+            Self::Large(map) => map.get(key),
+        }
+    }
+}
+
+impl<K, V> std::ops::Index<&K> for RetainedDefinitionMap<K, V>
+where
+    K: AsId + Eq + Hash,
+{
+    type Output = V;
+
+    #[track_caller]
+    fn index(&self, index: &K) -> &Self::Output {
+        self.get(index).expect("key not found")
     }
 }
 
@@ -1842,9 +1894,8 @@ impl<'db> UseDefMapBuilder<'db> {
         bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
         interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
         interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
-    ) -> FxHashMap<Definition<'db>, InternedBindingsId> {
-        let mut interned_ids_by_definition: FxHashMap<Definition<'db>, InternedBindingsId> =
-            FxHashMap::with_capacity_and_hasher(bindings_by_definition.len(), FxBuildHasher);
+    ) -> RetainedDefinitionMap<Definition<'db>, InternedBindingsId> {
+        let mut interned_ids_by_definition = Vec::with_capacity(bindings_by_definition.len());
 
         for (definition, bindings) in bindings_by_definition {
             let interned_id = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
@@ -1854,19 +1905,18 @@ impl<'db> UseDefMapBuilder<'db> {
                 interned_ids_by_bindings.insert(bindings, interned_id);
                 interned_id
             };
-            interned_ids_by_definition.insert(definition, interned_id);
+            interned_ids_by_definition.push((definition, interned_id));
         }
 
-        interned_ids_by_definition
+        RetainedDefinitionMap::from_entries(interned_ids_by_definition)
     }
 
     fn intern_declarations_by_binding(
         declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
         interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
         interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
-    ) -> FxHashMap<Definition<'db>, InternedDeclarationsId> {
-        let mut interned_ids_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId> =
-            FxHashMap::with_capacity_and_hasher(declarations_by_binding.len(), FxBuildHasher);
+    ) -> RetainedDefinitionMap<Definition<'db>, InternedDeclarationsId> {
+        let mut interned_ids_by_binding = Vec::with_capacity(declarations_by_binding.len());
 
         for (binding, declarations) in declarations_by_binding {
             let interned_id =
@@ -1877,10 +1927,10 @@ impl<'db> UseDefMapBuilder<'db> {
                     interned_ids_by_declarations.insert(declarations, interned_id);
                     interned_id
                 };
-            interned_ids_by_binding.insert(binding, interned_id);
+            interned_ids_by_binding.push((binding, interned_id));
         }
 
-        interned_ids_by_binding
+        RetainedDefinitionMap::from_entries(interned_ids_by_binding)
     }
 
     fn intern_bindings_by_use(
