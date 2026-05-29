@@ -37,6 +37,7 @@ bitflags::bitflags! {
         const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 16;
         const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
+        const DID_CHANGE_CONFIGURATION = 1 << 19;
     }
 }
 
@@ -81,6 +82,11 @@ impl FromStr for SupportedCommand {
 }
 
 impl ResolvedClientCapabilities {
+    /// Returns `true` if the client supports configuration change notifications.
+    pub(crate) const fn supports_change_conf_notifications(self) -> bool {
+        self.contains(Self::DID_CHANGE_CONFIGURATION)
+    }
+
     /// Returns `true` if the client supports workspace diagnostic refresh.
     pub(crate) const fn supports_workspace_diagnostic_refresh(self) -> bool {
         self.contains(Self::WORKSPACE_DIAGNOSTIC_REFRESH)
@@ -184,6 +190,10 @@ impl ResolvedClientCapabilities {
 
         let workspace = client_capabilities.workspace.as_ref();
         let text_document = client_capabilities.text_document.as_ref();
+
+        if workspace.is_some_and(|workspace| workspace.did_change_configuration.is_some()) {
+            flags |= Self::DID_CHANGE_CONFIGURATION;
+        }
 
         if workspace
             .and_then(|workspace| workspace.diagnostics.as_ref()?.refresh_support)

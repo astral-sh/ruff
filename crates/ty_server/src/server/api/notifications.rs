@@ -1,5 +1,6 @@
 mod cancel;
 mod did_change;
+mod did_change_configuration;
 mod did_change_notebook;
 mod did_change_watched_files;
 mod did_change_workspace_folders;
@@ -10,6 +11,7 @@ mod did_open_notebook;
 
 pub(super) use cancel::CancelNotificationHandler;
 pub(super) use did_change::DidChangeTextDocumentHandler;
+pub(super) use did_change_configuration::DidChangeConfiguration;
 pub(super) use did_change_notebook::DidChangeNotebookHandler;
 pub(super) use did_change_watched_files::DidChangeWatchedFiles;
 pub(super) use did_change_workspace_folders::DidChangeWorkspaceFoldersHandler;
