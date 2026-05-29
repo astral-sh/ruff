@@ -4,10 +4,10 @@
 lint.select = ["RET504"]
 ```
 
-## Variable read in the enclosing `finally` (no diagnostic)
+RET504 only fires when the assigned binding has no reference after the `return` expression, since
+a `finally` suite (or, conservatively, an `except` handler) is read after the `return`.
 
-The `finally` clause runs after the `return`, so the assignment is observable
-even though it looks redundant.
+## Variable read in the enclosing `finally`
 
 ```py
 def f():
@@ -21,7 +21,7 @@ def f():
         log(out)
 ```
 
-A closure captured in `finally` counts as observation, conservatively.
+A closure captured in `finally` reads the name from another scope:
 
 ```py
 def f():
@@ -34,7 +34,7 @@ def f():
         _cleanup()
 ```
 
-Outer `finally` reads the name across a nested `try`.
+Outer `finally` reads the name across a nested `try`:
 
 ```py
 def f():
@@ -49,8 +49,7 @@ def f():
         log(x)
 ```
 
-When the `return` lives in an inner `finally`, the outer `finally` still
-runs after it and observes the assignment.
+The outer `finally` runs after a `return` in an inner `finally`:
 
 ```py
 def f():
@@ -65,11 +64,7 @@ def f():
         log(x)
 ```
 
-## `x += 1` in `finally` reads `x` (no diagnostic)
-
-An augmented assignment loads the target before writing it, but the AST
-encodes the target with `Store` context. RET504 must still recognize it
-as a read.
+## Augmented assignment in `finally` reads the name
 
 ```py
 def f():
@@ -79,8 +74,6 @@ def f():
     finally:
         x += 1
 ```
-
-Nested augmented assignment is also a read:
 
 ```py
 def f():
@@ -92,47 +85,77 @@ def f():
             x += 1
 ```
 
-## `finally` rebinds the name before reading it (RET504 fires)
+## `del` of the name in `finally`
 
-An unconditional top-level rebind in `finally` kills the `try`'s value, so
-later reads in `finally` no longer observe it and the assignment is
-genuinely redundant.
+Removing the assignment would leave the name unbound, so `del x` would raise `UnboundLocalError`:
 
 ```py
 def f():
     try:
         x = foo()
-        return x  # error: [unnecessary-assign]
+        return x
+    finally:
+        del x
+```
+
+```py
+def f():
+    try:
+        x = foo()
+        return x
+    finally:
+        if cond():
+            del x
+```
+
+## A read after a `finally` rebind still suppresses
+
+Distinguishing a rebind that kills the value from a plain read needs control-flow analysis, so we
+conservatively treat the later read as observing the assignment:
+
+```py
+def f():
+    try:
+        x = foo()
+        return x
     finally:
         x = "done"
         log(x)
 ```
 
-Annotated assignment with a value also rebinds:
-
 ```py
 def f():
     try:
         x = foo()
-        return x  # error: [unnecessary-assign]
+        return x
     finally:
         x: str = "done"
         log(x)
 ```
 
-Tuple-unpacking assignment rebinds the targets it lists:
-
 ```py
 def f():
     try:
         x = foo()
-        return x  # error: [unnecessary-assign]
+        return x
     finally:
         x, _ = ("done", 0)
         log(x)
 ```
 
-## `finally` doesn't read the name (RET504 fires)
+## A read in an `except` handler suppresses
+
+```py
+def f():
+    result = None
+    try:
+        result = compute()
+        return result
+    except Exception as e:
+        log(result)
+```
+
+## `finally` doesn't read the name
 
 ```py
 def f():
@@ -142,8 +165,6 @@ def f():
     finally:
         log("done")
 ```
-
-Write-only in `finally` (no read of `x` before the rebind):
 
 ```py
 def f():
@@ -156,9 +177,6 @@ def f():
 
 ## Assignment and return both inside `finally`
 
-The currently-executing `finally` has no second pass, so its body can't
-re-read the assignment after the return.
-
 ```py
 def f():
     try:
@@ -168,23 +186,7 @@ def f():
         return x  # error: [unnecessary-assign]
 ```
 
-## `except` handler reads the name (RET504 fires)
-
-The handler is an alternative path: if it runs, the `try` assignment never
-completed, so removing the assignment doesn't change what the handler
-observes.
-
-```py
-def f():
-    result = None
-    try:
-        result = compute()
-        return result  # error: [unnecessary-assign]
-    except Exception as e:
-        log(result)
-```
-
-Return inside an `except` handler with no `finalbody`:
+## `return` in an `except` handler with no later read
 
 ```py
 def f():

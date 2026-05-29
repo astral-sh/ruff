@@ -8,8 +8,8 @@ use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
-use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_property;
+use ruff_python_semantic::{BindingKind, SemanticModel};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -617,6 +617,27 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
         else {
             continue;
         };
+        // A `finally` suite runs after the `return`, so a reference past the return expression
+        // observes the assignment. Conservatively leave it in place.
+        if assigned_binding
+            .references()
+            .map(|reference_id| checker.semantic().reference(reference_id))
+            .any(|reference| reference.range().start() > value.end())
+        {
+            continue;
+        }
+        // An unconditional `del` after the return (e.g. in `finally`) would raise
+        // `UnboundLocalError` once the assignment is removed. It shadows the name with a
+        // `Deletion` binding; conditional deletions instead leave a `Del` reference caught above.
+        if function_scope
+            .get_all(assigned_id)
+            .map(|binding_id| checker.semantic().binding(binding_id))
+            .any(|binding| {
+                matches!(binding.kind, BindingKind::Deletion) && binding.range.start() > value.end()
+            })
+        {
+            continue;
+        }
         // Check if there's any reference made to `assigned_binding` in another scope, e.g, nested
         // functions. If there is, ignore them.
         if assigned_binding
