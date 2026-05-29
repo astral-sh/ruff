@@ -1,0 +1,18 @@
+[package]
+name = "ruff_spo_triplet"
+version = "0.1.0"
+publish = false
+edition = "2024"
+rust-version = "1.86"
+description = "Language-agnostic SPO (Subject-Predicate-Object) triplet expansion. Turns a neutral ModelGraph IR — entities, properties, functions, and their compute/guard/traversal edges — into deterministic NARS-weighted RDF-shape triples (ndjson). The Python/Odoo frontend (ruff_python_dto_check) and a future Ruby/Rails frontend (OpenProject) both fill the same IR and call the same expander, so the downstream SPO graph is identical regardless of source language."
+license = "MIT"
+
+[lib]
+name = "ruff_spo_triplet"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
