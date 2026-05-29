@@ -526,7 +526,7 @@ impl<'src> Parser<'src> {
 
     /// Builds block suites inline when possible before creating the exact-sized AST vector.
     fn parse_block_statements(&mut self) -> Suite {
-        let mut statements: SmallVec<[Stmt; 8]> = SmallVec::new();
+        let mut statements: SmallVec<[Stmt; 4]> = SmallVec::new();
         self.parse_list(RecoveryContextKind::BlockStatements, |parser| {
             statements.push(parser.parse_statement());
         });
