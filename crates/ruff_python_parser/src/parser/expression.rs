@@ -1163,11 +1163,36 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::from(op));
 
-        let operand = self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
+        // Consecutive unary operators at the same precedence can be consumed
+        // iteratively and rebuilt after parsing the operand. Operators at
+        // differing precedences must retain the recursive path so binary
+        // expression binding and its diagnostics remain unchanged.
+        let precedence = OperatorPrecedence::from(op);
+        let mut nested_operators = Vec::new();
+        while let Some(nested_op) = self.current_token_kind().as_unary_operator()
+            && OperatorPrecedence::from(nested_op) == precedence
+        {
+            nested_operators.push((nested_op, self.node_start()));
+            self.bump(TokenKind::from(nested_op));
+        }
+
+        let operand = self.parse_binary_expression_or_higher(precedence, context);
+        let operand =
+            nested_operators
+                .into_iter()
+                .rev()
+                .fold(operand.expr, |operand, (op, start)| {
+                    Expr::UnaryOp(ast::ExprUnaryOp {
+                        op,
+                        operand: Box::new(operand),
+                        range: self.node_range(start),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                });
 
         ast::ExprUnaryOp {
             op,
-            operand: Box::new(operand.expr),
+            operand: Box::new(operand),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

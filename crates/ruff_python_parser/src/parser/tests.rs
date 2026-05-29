@@ -313,3 +313,13 @@ fn invalid_async_chain_is_iterative() {
     let parsed = crate::parse_unchecked(&source, ParseOptions::from(Mode::Module));
     assert!(!parsed.errors().is_empty());
 }
+
+#[test]
+fn nested_equal_precedence_unary_chains_are_iterative() {
+    // Consecutive unary operators sharing precedence do not require stack growth.
+    let source = format!("{}1\n", "-~+".repeat(5_000));
+    parse_module(&source).unwrap();
+
+    let source = format!("{}True\n", "not ".repeat(5_000));
+    parse_module(&source).unwrap();
+}
