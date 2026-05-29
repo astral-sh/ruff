@@ -244,6 +244,7 @@
 use ruff_index::{IndexVec, newtype_index};
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use thin_vec::ThinVec;
 
 use crate::ast_ids::ScopedUseId;
 use crate::definition::{Definition, DefinitionState};
@@ -327,7 +328,7 @@ pub struct UseDefMap<'db> {
     ///
     /// This is only used for kwargs expressions, whose corresponding `bindings_by_use` entry
     /// is empty.
-    multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
+    multi_bindings_by_use: MultiBindingsByUse,
 
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
@@ -397,6 +398,27 @@ struct RangeInfo {
     in_type_checking_block: bool,
 }
 
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct MultiBindingsByUse(ThinVec<(ScopedUseId, Box<[Bindings]>)>);
+
+impl MultiBindingsByUse {
+    fn from_map(map: FxHashMap<ScopedUseId, Vec<Bindings>>) -> Self {
+        let mut entries = map
+            .into_iter()
+            .map(|(use_id, bindings)| (use_id, bindings.into_boxed_slice()))
+            .collect::<Vec<_>>();
+        entries.sort_unstable_by_key(|(use_id, _)| use_id.as_u32());
+        Self(entries.into_iter().collect())
+    }
+
+    fn get(&self, use_id: ScopedUseId) -> Option<&[Bindings]> {
+        self.0
+            .binary_search_by_key(&use_id.as_u32(), |(candidate, _)| candidate.as_u32())
+            .ok()
+            .map(|index| self.0[index].1.as_ref())
+    }
+}
+
 pub enum ApplicableConstraints<'map, 'db> {
     UnboundBinding(NarrowingEvaluator<'map, 'db>),
     ConstrainedBindings(BindingWithConstraintsIterator<'map, 'db>),
@@ -444,7 +466,7 @@ impl<'db> UseDefMap<'db> {
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = BindingWithConstraintsIterator<'_, 'db>> {
         self.multi_bindings_by_use
-            .get(&use_id)
+            .get(use_id)
             .map(|member_bindings| {
                 member_bindings.iter().map(|bindings| {
                     self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
@@ -1764,6 +1786,7 @@ impl<'db> UseDefMapBuilder<'db> {
             }
         }
         self.reachability_constraints.mark_used(self.reachability);
+        let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -1773,7 +1796,7 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_bindings,
             interned_declarations,
             bindings_by_use,
-            multi_bindings_by_use: self.multi_bindings_by_use,
+            multi_bindings_by_use,
             range_reachability: self.range_reachability,
             end_of_scope_symbols: self.symbol_states,
             end_of_scope_members,
