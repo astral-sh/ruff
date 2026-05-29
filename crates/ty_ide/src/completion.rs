@@ -472,7 +472,7 @@ impl<'db> CompletionBuilder<'db> {
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
         let label = self.insert.as_ref().unwrap_or(&self.name).clone();
-        let (insert, insert_text_format) = if ctx.should_complete_function_parentheses(kind) {
+        let (insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind) {
             if ctx.capabilities.snippets {
                 let insert = Name::new(format!("{label}($0)"));
                 (Some(insert), CompletionInsertTextFormat::Snippet)
@@ -702,6 +702,8 @@ impl<'m> Context<'m> {
             ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
                 let exception_ty = self.cursor.exception_ty(db);
+                let complete_callable_parentheses = settings.complete_function_parentheses
+                    && !self.cursor.suppress_callable_parentheses();
                 let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
                     let mut bases = extract_base_class_names(class_def);
                     // Exclude the class being defined from its own base class
@@ -716,10 +718,12 @@ impl<'m> Context<'m> {
                 CollectionContext {
                     exception_ty,
                     is_raising_exception: exception_ty.is_some(),
+                    complete_class_parentheses: complete_callable_parentheses
+                        && existing_class_bases.is_none()
+                        && !self.cursor.suppress_class_parentheses(model),
                     existing_class_bases,
                     valid_keywords: self.cursor.valid_keywords(),
-                    complete_function_parentheses: settings.complete_function_parentheses
-                        && !self.cursor.suppress_function_parentheses(),
+                    complete_function_and_method_parentheses: complete_callable_parentheses,
                     capabilities,
                 }
             }
@@ -870,10 +874,8 @@ impl<'m> ContextCursor<'m> {
             .map(|token| token.string_quote_style())
     }
 
-    fn suppress_function_parentheses(&self) -> bool {
-        self.next_token_is_open_parenthesis()
-            || self.is_in_decorator_name()
-            || self.is_in_type_expression()
+    fn suppress_callable_parentheses(&self) -> bool {
+        self.next_token_is_open_parenthesis() || self.is_in_decorator_name()
     }
 
     fn next_token_is_open_parenthesis(&self) -> bool {
@@ -895,11 +897,18 @@ impl<'m> ContextCursor<'m> {
             .any(|node| matches!(node, ast::AnyNodeRef::Decorator(_)))
     }
 
-    fn is_in_type_expression(&self) -> bool {
+    fn suppress_class_parentheses(&self, model: &SemanticModel<'_>) -> bool {
         let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
 
         self.covering_node.ancestors().any(|node| match node {
-            ast::AnyNodeRef::StmtAnnAssign(stmt) => contains(&stmt.annotation),
+            ast::AnyNodeRef::StmtAnnAssign(stmt) => {
+                contains(&stmt.annotation)
+                    || (stmt.value.as_deref().is_some_and(contains)
+                        && matches!(
+                            stmt.annotation.inferred_type(model),
+                            Some(Type::SpecialForm(SpecialFormType::TypeAlias))
+                        ))
+            }
             ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
             ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
             ast::AnyNodeRef::Parameter(param) => param.annotation.as_deref().is_some_and(contains),
@@ -912,6 +921,9 @@ impl<'m> ContextCursor<'m> {
             }
             ast::AnyNodeRef::TypeParamParamSpec(type_param) => {
                 type_param.default.as_deref().is_some_and(contains)
+            }
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
+                handler.type_.as_deref().is_some_and(contains)
             }
             _ => false,
         })
@@ -1255,8 +1267,10 @@ struct CollectionContext<'db> {
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
-    /// Whether callable completions should insert call parentheses.
-    complete_function_parentheses: bool,
+    /// Whether function and method completions should insert call parentheses.
+    complete_function_and_method_parentheses: bool,
+    /// Whether class completions should insert constructor parentheses.
+    complete_class_parentheses: bool,
     /// The supported completion capabilities
     capabilities: CompletionCapabilities,
 }
@@ -1308,13 +1322,14 @@ impl<'db> CollectionContext<'db> {
         false
     }
 
-    fn should_complete_function_parentheses(&self, kind: Option<CompletionKind>) -> bool {
-        self.complete_function_parentheses
-            && matches!(
-                kind,
-                Some(CompletionKind::Function | CompletionKind::Method | CompletionKind::Class)
-            )
-            && !(kind == Some(CompletionKind::Class) && self.is_in_class_def())
+    fn should_complete_callable_parentheses(&self, kind: Option<CompletionKind>) -> bool {
+        match kind {
+            Some(CompletionKind::Function | CompletionKind::Method) => {
+                self.complete_function_and_method_parentheses
+            }
+            Some(CompletionKind::Class) => self.complete_class_parentheses,
+            _ => false,
+        }
     }
 }
 
@@ -9427,6 +9442,41 @@ call<CURSOR>(
     }
 
     #[test]
+    fn complete_class_parentheses() {
+        let builder = completion_test_builder(
+            "\
+class CallableType: ...
+
+value = Call<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"CallableType()",
+        );
+    }
+
+    #[test]
+    fn complete_class_parentheses_disabled_by_default() {
+        let builder = completion_test_builder(
+            "\
+class CallableType: ...
+
+value = Call<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().skip_builtins().build().snapshot(),
+            @"CallableType",
+        );
+    }
+
+    #[test]
     fn complete_function_parentheses_type_expression() {
         let builder = completion_test_builder(
             "\
@@ -9443,6 +9493,95 @@ value: Call<CURSOR>
                 .build()
                 .snapshot(),
             @"CallableType",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_function_in_annotation_metadata() {
+        let builder = completion_test_builder(
+            "\
+from typing import Annotated
+
+def validator(): ...
+
+value: Annotated[int, vali<CURSOR>]
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"validator()",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_pep_613_type_alias() {
+        let builder = completion_test_builder(
+            "\
+from typing import TypeAlias
+
+class CallableType: ...
+
+MyAlias: TypeAlias = Call<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"CallableType",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_except_handler() {
+        let builder = completion_test_builder(
+            "\
+try:
+    pass
+except Value<CURSOR>:
+    pass
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .complete_function_parentheses()
+                .filter(|completion| completion.name == "ValueError")
+                .build()
+                .snapshot(),
+            @"ValueError",
+        );
+    }
+
+    #[test]
+    fn complete_function_parentheses_except_handler_factory() {
+        let builder = completion_test_builder(
+            "\
+def exception_factory() -> type[Exception]:
+    return ValueError
+
+try:
+    pass
+except exception_f<CURSOR>:
+    pass
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .skip_builtins()
+                .complete_function_parentheses()
+                .build()
+                .snapshot(),
+            @"exception_factory()",
         );
     }
 
