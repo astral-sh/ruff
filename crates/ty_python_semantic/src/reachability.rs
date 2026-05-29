@@ -203,6 +203,7 @@ use crate::{
         infer_narrowing_constraint,
     },
 };
+use ruff_index::IndexSlice;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -215,7 +216,7 @@ use ty_python_core::{
     place_table,
     predicate::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        Predicates, ScopedPredicateId,
+        ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
@@ -557,7 +558,7 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
     fn narrow_by_constraint(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
@@ -567,7 +568,7 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness;
 }
@@ -597,7 +598,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     fn narrow_by_constraint(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
@@ -618,7 +619,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         mut id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
         type Id = ScopedReachabilityConstraintId;
@@ -826,7 +827,7 @@ impl ProjectedNarrowingGraph<'_> {
 struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
     constraints: &'a ReachabilityConstraints,
-    predicates: &'a Predicates<'db>,
+    predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
     project_cache: FxHashMap<ScopedReachabilityConstraintId, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
@@ -837,7 +838,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         constraints: &'a ReachabilityConstraints,
-        predicates: &'a Predicates<'db>,
+        predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
     ) -> Self {
         Self {
