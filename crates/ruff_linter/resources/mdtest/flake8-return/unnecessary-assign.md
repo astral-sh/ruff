@@ -4,8 +4,9 @@
 lint.select = ["RET504"]
 ```
 
-RET504 only fires when the assigned binding has no reference after the `return` expression, since
-a `finally` suite (or, conservatively, an `except` handler) is read after the `return`.
+RET504 is suppressed only when the assigned name is read in an enclosing `finally` suite, which
+runs after the `return`. Reads elsewhere (sibling branches, `except` handlers) don't run after the
+`return`, so they don't keep the assignment alive.
 
 ## Variable read in the enclosing `finally`
 
@@ -60,6 +61,46 @@ def f():
         finally:
             x = foo()
             return x
+    finally:
+        log(x)
+```
+
+The `finally` also runs after a `return` in the `else` clause:
+
+```py
+def f():
+    try:
+        pass
+    except Exception:
+        pass
+    else:
+        x = compute()
+        return x
+    finally:
+        log(x)
+```
+
+And after a `return` in an `except` handler:
+
+```py
+def f():
+    try:
+        pass
+    except Exception:
+        x = recover()
+        return x
+    finally:
+        log(x)
+```
+
+The assignment may also come from a `with` body inside the `try`:
+
+```py
+def f():
+    try:
+        with open("f") as fh:
+            x = fh.read()
+        return x
     finally:
         log(x)
 ```
@@ -143,14 +184,30 @@ def f():
         log(x)
 ```
 
-## A read in an `except` handler suppresses
+A conditional rebind may not run, so the later read can still observe the `try`'s value:
+
+```py
+def f():
+    try:
+        x = foo()
+        return x
+    finally:
+        if cond():
+            x = "done"
+        log(x)
+```
+
+## A read in an `except` handler fires
+
+An `except` handler is an alternative path: if it runs, the `try` assignment never completed, so
+removing the assignment doesn't change what the handler reads.
 
 ```py
 def f():
     result = None
     try:
         result = compute()
-        return result
+        return result  # error: [unnecessary-assign]
     except Exception as e:
         log(result)
 ```
@@ -196,4 +253,31 @@ def f():
         entry = lookup()
         result = to_dict(entry)
         return result  # error: [unnecessary-assign]
+```
+
+## Same name assigned and returned in sibling branches
+
+Each branch's assignment is independently redundant. A later branch reusing the name doesn't
+observe an earlier branch's value, so both fire.
+
+```py
+def f(cond):
+    if cond:
+        x = compute()
+        return x  # error: [unnecessary-assign]
+    else:
+        x = other()
+        return x  # error: [unnecessary-assign]
+```
+
+The same holds when the branches are `try` arms without a `finally`:
+
+```py
+def f():
+    try:
+        x = compute()
+        return x  # error: [unnecessary-assign]
+    except Exception:
+        x = fallback()
+        return x  # error: [unnecessary-assign]
 ```

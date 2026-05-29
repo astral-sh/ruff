@@ -8,8 +8,8 @@ use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_property;
-use ruff_python_semantic::{BindingKind, SemanticModel};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -568,7 +568,7 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
     let Some(function_scope) = checker.semantic().function_scope(function_def) else {
         return;
     };
-    for (assign, return_, stmt) in &stack.assignment_return {
+    for (assign, return_, stmt, enclosing_finally) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = return_.value.as_ref() else {
             continue;
@@ -617,24 +617,23 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
         else {
             continue;
         };
-        // A `finally` suite runs after the `return`, so a reference past the return expression
-        // observes the assignment. Conservatively leave it in place.
-        if assigned_binding
-            .references()
-            .map(|reference_id| checker.semantic().reference(reference_id))
-            .any(|reference| reference.range().start() > value.end())
-        {
-            continue;
-        }
-        // An unconditional `del` after the return (e.g. in `finally`) would raise
-        // `UnboundLocalError` once the assignment is removed. It shadows the name with a
-        // `Deletion` binding; conditional deletions instead leave a `Del` reference caught above.
-        if function_scope
-            .get_all(assigned_id)
-            .map(|binding_id| checker.semantic().binding(binding_id))
-            .any(|binding| {
-                matches!(binding.kind, BindingKind::Deletion) && binding.range.start() > value.end()
-            })
+        // Ignore assignments whose name is read or deleted in an enclosing `finally`, which runs
+        // after the `return`. The read may resolve to a rebinding in the `finally` rather than to
+        // this assignment, so check every binding of the name.
+        if !enclosing_finally.is_empty()
+            && function_scope
+                .get_all(assigned_id)
+                .map(|binding_id| checker.semantic().binding(binding_id))
+                .any(|binding| {
+                    binding
+                        .references()
+                        .map(|reference_id| checker.semantic().reference(reference_id))
+                        .any(|reference| {
+                            enclosing_finally.iter().any(|finally_range| {
+                                finally_range.contains_range(reference.range())
+                            })
+                        })
+                })
         {
             continue;
         }
