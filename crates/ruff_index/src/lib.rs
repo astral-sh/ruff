@@ -8,7 +8,7 @@ mod idx;
 mod slice;
 mod vec;
 
-pub use frozen::{FrozenIndexVec, FrozenMap};
+pub use frozen::FrozenIndexVec;
 pub use idx::Idx;
 pub use ruff_macros::newtype_index;
 pub use slice::IndexSlice;

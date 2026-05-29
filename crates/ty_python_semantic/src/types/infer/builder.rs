@@ -6,7 +6,6 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_index::FrozenMap;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -25,7 +24,7 @@ use ty_python_core::statement::StatementInner;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
+    FrozenMap, FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
     infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_same_file_expression_type, infer_unpack_types,
 };
@@ -9900,7 +9899,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         ExpressionInference {
-            expressions: FrozenMap::from_iter(expressions),
+            expressions: FrozenMap::from(expressions),
             extra,
             #[cfg(debug_assertions)]
             scope,
@@ -9992,7 +9991,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         StatementInferenceInner {
-            expressions: FrozenMap::from_iter(expressions),
+            expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -10049,7 +10048,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let diagnostics = context.finish();
 
         FunctionDecoratorInference {
-            expression_types: FrozenMap::from_iter(expressions),
+            expression_types: FrozenMap::from(expressions),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
                 .into_iter()
@@ -10142,7 +10141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         DefinitionInference {
-            expressions: FrozenMap::from_iter(expressions),
+            expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -10209,7 +10208,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: FrozenMap::from_iter(expressions),
+            expressions: FrozenMap::from(expressions),
             extra,
         }
     }
