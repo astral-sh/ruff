@@ -57,7 +57,7 @@ jobs:
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@6b618bea2380ebd787efd3a650a65523774865b8"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@82a56ffa4c6670f5cefde767bf6f98cfafcbbacc"
 
           ecosystem-analyzer \
             --verbose \
