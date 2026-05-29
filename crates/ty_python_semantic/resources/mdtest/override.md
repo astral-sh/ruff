@@ -756,3 +756,85 @@ class Child(Parent):
     @override
     def foo(self): ...  # fine because `Any` is in the MRO
 ```
+
+## Overloaded methods with explicit receiver annotations
+
+When checking an override, overloads with explicit receiver annotations only need to be considered
+if the receiver can be an instance of the subclass. For example, `Child` cannot also be an instance
+of the unrelated `@final` class `Restricted`, so the `Restricted`-specific overload does not
+constrain `Child.method`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator, MutableMapping
+from typing import Protocol, TypeVar, final, overload
+
+class Base:
+    @overload
+    def method(self: Restricted, extra: str) -> None: ...
+    @overload
+    def method(self) -> None: ...
+    def method(self, extra: str = "") -> None: ...
+
+@final
+class Restricted(Base): ...
+
+class Child(Base):
+    def method(self) -> None: ...
+
+# Regression test for https://github.com/astral-sh/ty/issues/2612: the
+# `LiteralString`-specific overload of `str.__iter__` does not constrain a
+# method override on a user-defined `str` subclass.
+class MyStr(str):
+    def __iter__(self) -> Iterator[str]:
+        raise NotImplementedError
+
+# Regression test for https://github.com/astral-sh/ty/issues/2693: the
+# receiver-specific overloads of `MutableMapping.update` that use protocols
+# should not cause a false-positive Liskov violation.
+KT = TypeVar("KT")
+VT = TypeVar("VT")
+VT_co = TypeVar("VT_co", covariant=True)
+
+class Maplike(Protocol[KT, VT_co]):
+    def keys(self) -> Iterable[KT]: ...
+    def __getitem__(self, key: KT, /) -> VT_co: ...
+
+MapOrItems = Maplike[KT, VT] | Iterable[tuple[KT, VT]]
+
+class MyMapping(MutableMapping[KT, VT]):
+    def __getitem__(self, key: KT) -> VT:
+        raise NotImplementedError
+    def __setitem__(self, key: KT, value: VT) -> None: ...
+    def __delitem__(self, key: KT) -> None: ...
+    def __iter__(self) -> Iterator[KT]:
+        raise NotImplementedError
+    def __len__(self) -> int:
+        raise NotImplementedError
+    def update(self, arg: MapOrItems[KT, VT] = (), /, **kw: VT) -> None: ...
+
+# TODO: We should emit an `invalid-method-override` diagnostic on
+# `DeferredChild1.method`. The `DeferredChild1`-specific overload applies to
+# this subclass, so its override cannot remove the `extra` parameter.
+class DeferredBase:
+    @overload
+    def method(self) -> None: ...
+    @overload
+    def method(self: DeferredChild1, extra: str) -> None: ...
+    def method(self, extra: str = "") -> None: ...
+
+class DeferredChild1(DeferredBase):
+    def method(self) -> None: ...
+
+# TODO: A strict Liskov check would emit an `invalid-method-override`
+# diagnostic here too. A subclass could inherit from both `DeferredChild1`
+# and `DeferredChild2`, making the receiver-specific overload applicable.
+class DeferredChild2(DeferredBase):
+    def method(self) -> None: ...
+```
