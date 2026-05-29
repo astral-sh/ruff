@@ -924,7 +924,6 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
             let edit = remove_unused_positional_arguments_from_format_call(
                 &missing,
                 call,
-                summary,
                 checker.locator(),
                 checker.stylist(),
             )?;

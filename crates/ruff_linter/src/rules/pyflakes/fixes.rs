@@ -10,7 +10,6 @@ use ruff_text_size::Ranged;
 use crate::Edit;
 use crate::Locator;
 use crate::cst::matchers::{match_call_mut, match_dict, transform_expression};
-use crate::rules::pyflakes::format::FormatSummary;
 
 /// Generate a [`Edit`] to remove unused keys from format dict.
 pub(super) fn remove_unused_format_arguments_from_dict(
@@ -65,33 +64,27 @@ pub(super) fn remove_unused_keyword_arguments_from_format_call(
 }
 
 /// Generate a [`Edit`] to remove unused positional arguments from a `format` call.
-///
-/// When removing the arguments would leave `.format()` with nothing left to do
-/// (no remaining arguments and no replacement fields), the `.format(...)` call
-/// itself is dropped, but only when the receiver string has no braces, where
-/// `.format()` is a genuine no-op. If the string contains any `{` or `}`, the
-/// now-argumentless `.format()` call is kept instead so that runtime behaviour,
-/// including any `KeyError` from a named placeholder, is preserved.
 pub(crate) fn remove_unused_positional_arguments_from_format_call(
     unused_arguments: &[usize],
     call: &ast::ExprCall,
-    summary: &FormatSummary,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    // Deciding whether the `.format(...)` call can be dropped is independent of
-    // removing the unused arguments: we only drop it when no arguments remain,
-    // there are no replacement fields, and the receiver string has no braces.
+    // If we're removing _all_ arguments, we can remove the entire call.
+    //
+    // For example, `"Hello".format(", world!")` -> `"Hello"`, as opposed to `"Hello".format()`.
+    //
+    // However, if the `format` call has other effects, like escaping `{{` to `{` or would raise a
+    // `KeyError` for a missing field name, we preserve the empty call to avoid changing behavior.
     if unused_arguments.len() == call.arguments.len()
-        && summary.autos.is_empty()
-        && summary.indices.is_empty()
-        && summary.keywords.is_empty()
         && let Expr::Attribute(attribute) = &*call.func
         && let Expr::StringLiteral(string_expr) = &*attribute.value
         && !string_expr.value.to_str().contains(['{', '}'])
     {
-        let replacement = locator.slice(string_expr).to_string();
-        return Ok(Edit::range_replacement(replacement, call.range()));
+        return Ok(Edit::range_replacement(
+            locator.slice(string_expr).to_string(),
+            call.range(),
+        ));
     }
 
     let source_code = locator.slice(call);
