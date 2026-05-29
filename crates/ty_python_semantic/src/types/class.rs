@@ -1564,12 +1564,12 @@ impl<'db> ClassType<'db> {
                         // Fallback overloads: for `tuple[int, str]`, we will generate the following overloads:
                         //
                         //    __getitem__(self, index: int, /) -> int | str
-                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[int | str, ...]
+                        //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | str, ...]
                         //
                         // and for `tuple[str, *tuple[float, ...], bytes]`, we will generate the following overloads:
                         //
                         //    __getitem__(self, index: int, /) -> str | float | bytes
-                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[str | float | bytes, ...]
+                        //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[str | float | bytes, ...]
                         //
                         overload_signatures.push(synthesize_getitem_overload_signature(
                             db,
@@ -1577,9 +1577,16 @@ impl<'db> ClassType<'db> {
                             all_elements_unioned,
                         ));
 
+                        let slice_bound = UnionType::from_elements(
+                            db,
+                            [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                        );
                         overload_signatures.push(synthesize_getitem_overload_signature(
                             db,
-                            KnownClass::Slice.to_instance(db),
+                            KnownClass::Slice.to_specialized_instance(
+                                db,
+                                &[slice_bound, slice_bound, slice_bound],
+                            ),
                             Type::homogeneous_tuple(db, all_elements_unioned),
                         ));
 
