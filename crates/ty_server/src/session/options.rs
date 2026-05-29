@@ -128,6 +128,15 @@ impl ClientOptions {
     }
 
     #[must_use]
+    pub fn with_complete_function_parentheses(mut self, enabled: bool) -> Self {
+        self.workspace
+            .completions
+            .get_or_insert_default()
+            .complete_function_parentheses = Some(enabled);
+        self
+    }
+
+    #[must_use]
     pub fn with_show_syntax_errors(mut self, show_syntax_errors: bool) -> Self {
         self.global.show_syntax_errors = Some(show_syntax_errors);
         self
@@ -360,6 +369,8 @@ impl InlayHintOptions {
 #[serde(rename_all = "camelCase")]
 pub struct CompletionOptions {
     auto_import: Option<bool>,
+    /// Whether callable completions should insert parentheses.
+    complete_function_parentheses: Option<bool>,
 }
 
 impl CompletionOptions {
@@ -372,6 +383,7 @@ impl CompletionOptions {
     fn into_settings(self) -> CompletionSettings {
         CompletionSettings {
             auto_import: self.auto_import.unwrap_or(true),
+            complete_function_parentheses: self.complete_function_parentheses.unwrap_or(false),
         }
     }
 }
