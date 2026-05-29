@@ -293,6 +293,85 @@ impl InternedPlaceStateId {
     }
 }
 
+struct PlaceStateInterner {
+    interned_bindings: IndexVec<InternedBindingsId, Bindings>,
+    interned_ids_by_bindings: FxHashMap<Bindings, InternedBindingsId>,
+    interned_declarations: IndexVec<InternedDeclarationsId, Declarations>,
+    interned_ids_by_declarations: FxHashMap<Declarations, InternedDeclarationsId>,
+    // These values are extremely common, so avoid repeatedly hashing their small vectors.
+    always_unbound_bindings: Option<InternedBindingsId>,
+    always_undeclared_declarations: Option<InternedDeclarationsId>,
+}
+
+impl PlaceStateInterner {
+    fn with_capacity(bindings: usize, declarations: usize) -> Self {
+        Self {
+            interned_bindings: IndexVec::with_capacity(bindings),
+            interned_ids_by_bindings: FxHashMap::with_capacity_and_hasher(bindings, FxBuildHasher),
+            interned_declarations: IndexVec::with_capacity(declarations),
+            interned_ids_by_declarations: FxHashMap::with_capacity_and_hasher(
+                declarations,
+                FxBuildHasher,
+            ),
+            always_unbound_bindings: None,
+            always_undeclared_declarations: None,
+        }
+    }
+
+    fn intern_bindings(&mut self, bindings: Bindings) -> InternedBindingsId {
+        if bindings.is_always_unbound() {
+            if let Some(interned_id) = self.always_unbound_bindings {
+                return interned_id;
+            }
+
+            let interned_id = self.interned_bindings.push(bindings);
+            self.always_unbound_bindings = Some(interned_id);
+            return interned_id;
+        }
+
+        match self.interned_ids_by_bindings.entry(bindings) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let interned_id = self.interned_bindings.push(entry.key().clone());
+                entry.insert(interned_id);
+                interned_id
+            }
+        }
+    }
+
+    fn intern_declarations(&mut self, declarations: Declarations) -> InternedDeclarationsId {
+        if declarations.is_always_undeclared() {
+            if let Some(interned_id) = self.always_undeclared_declarations {
+                return interned_id;
+            }
+
+            let interned_id = self.interned_declarations.push(declarations);
+            self.always_undeclared_declarations = Some(interned_id);
+            return interned_id;
+        }
+
+        match self.interned_ids_by_declarations.entry(declarations) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let interned_id = self.interned_declarations.push(entry.key().clone());
+                entry.insert(interned_id);
+                interned_id
+            }
+        }
+    }
+
+    fn intern_place_state(
+        &mut self,
+        bindings: Bindings,
+        declarations: Declarations,
+    ) -> InternedPlaceStateId {
+        InternedPlaceStateId(
+            self.intern_bindings(bindings),
+            self.intern_declarations(declarations),
+        )
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 struct RetainedPlaceStates<T> {
     end_of_scope: T,
@@ -1724,64 +1803,45 @@ impl<'db> UseDefMapBuilder<'db> {
             + self.enclosing_snapshots.len()
             + place_state_count;
         let interned_declarations_capacity = self.declarations_by_binding.len() + place_state_count;
-        let mut interned_bindings = IndexVec::with_capacity(interned_bindings_capacity);
-        let mut interned_ids_by_bindings =
-            FxHashMap::with_capacity_and_hasher(interned_bindings_capacity, FxBuildHasher);
-        let mut interned_declarations = IndexVec::with_capacity(interned_declarations_capacity);
-        let mut interned_ids_by_declarations =
-            FxHashMap::with_capacity_and_hasher(interned_declarations_capacity, FxBuildHasher);
+        let mut place_state_interner = PlaceStateInterner::with_capacity(
+            interned_bindings_capacity,
+            interned_declarations_capacity,
+        );
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
         let bindings_by_definition = Self::intern_bindings_by_definition(
             self.bindings_by_definition,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
+            &mut place_state_interner,
         );
         let declarations_by_binding = Self::intern_declarations_by_binding(
             self.declarations_by_binding,
-            &mut interned_declarations,
-            &mut interned_ids_by_declarations,
+            &mut place_state_interner,
         );
-        let bindings_by_use = Self::intern_bindings_by_use(
-            self.bindings_by_use,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-        );
+        let bindings_by_use =
+            Self::intern_bindings_by_use(self.bindings_by_use, &mut place_state_interner);
         let end_of_scope_symbols = Self::intern_place_states(
             self.symbol_states,
             PlaceState::into_parts,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-            &mut interned_declarations,
-            &mut interned_ids_by_declarations,
+            &mut place_state_interner,
         );
-        let end_of_scope_members = Self::intern_end_of_scope_members(
-            self.member_states,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-            &mut interned_declarations,
-            &mut interned_ids_by_declarations,
-        );
+        let end_of_scope_members =
+            Self::intern_end_of_scope_members(self.member_states, &mut place_state_interner);
         let reachable_definitions_by_symbol = Self::intern_place_states(
             self.reachable_symbol_definitions,
             |definitions| (definitions.bindings, definitions.declarations),
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-            &mut interned_declarations,
-            &mut interned_ids_by_declarations,
+            &mut place_state_interner,
         );
         let reachable_definitions_by_member = Self::intern_place_states(
             self.reachable_member_definitions,
             |definitions| (definitions.bindings, definitions.declarations),
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-            &mut interned_declarations,
-            &mut interned_ids_by_declarations,
+            &mut place_state_interner,
         );
-        let enclosing_snapshots = Self::intern_enclosing_snapshots(
-            self.enclosing_snapshots,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-        );
+        let enclosing_snapshots =
+            Self::intern_enclosing_snapshots(self.enclosing_snapshots, &mut place_state_interner);
+        let PlaceStateInterner {
+            mut interned_bindings,
+            mut interned_declarations,
+            ..
+        } = place_state_interner;
 
         interned_bindings.shrink_to_fit();
         interned_declarations.shrink_to_fit();
@@ -1850,20 +1910,13 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_bindings_by_definition(
         bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
-        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+        place_state_interner: &mut PlaceStateInterner,
     ) -> FxHashMap<Definition<'db>, InternedBindingsId> {
         let mut interned_ids_by_definition: FxHashMap<Definition<'db>, InternedBindingsId> =
             FxHashMap::with_capacity_and_hasher(bindings_by_definition.len(), FxBuildHasher);
 
         for (definition, bindings) in bindings_by_definition {
-            let interned_id = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
-                *interned_id
-            } else {
-                let interned_id = interned_bindings.push(bindings.clone());
-                interned_ids_by_bindings.insert(bindings, interned_id);
-                interned_id
-            };
+            let interned_id = place_state_interner.intern_bindings(bindings);
             interned_ids_by_definition.insert(definition, interned_id);
         }
 
@@ -1872,21 +1925,13 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_declarations_by_binding(
         declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
-        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
-        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
+        place_state_interner: &mut PlaceStateInterner,
     ) -> FxHashMap<Definition<'db>, InternedDeclarationsId> {
         let mut interned_ids_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId> =
             FxHashMap::with_capacity_and_hasher(declarations_by_binding.len(), FxBuildHasher);
 
         for (binding, declarations) in declarations_by_binding {
-            let interned_id =
-                if let Some(interned_id) = interned_ids_by_declarations.get(&declarations) {
-                    *interned_id
-                } else {
-                    let interned_id = interned_declarations.push(declarations.clone());
-                    interned_ids_by_declarations.insert(declarations, interned_id);
-                    interned_id
-                };
+            let interned_id = place_state_interner.intern_declarations(declarations);
             interned_ids_by_binding.insert(binding, interned_id);
         }
 
@@ -1895,20 +1940,13 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_bindings_by_use(
         bindings_by_use: IndexVec<ScopedUseId, Bindings>,
-        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+        place_state_interner: &mut PlaceStateInterner,
     ) -> IndexVec<ScopedUseId, InternedBindingsId> {
         let mut interned_ids_by_use: IndexVec<ScopedUseId, InternedBindingsId> =
             IndexVec::with_capacity(bindings_by_use.len());
 
         for bindings in bindings_by_use {
-            let interned_id = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
-                *interned_id
-            } else {
-                let interned_id = interned_bindings.push(bindings.clone());
-                interned_ids_by_bindings.insert(bindings, interned_id);
-                interned_id
-            };
+            let interned_id = place_state_interner.intern_bindings(bindings);
             interned_ids_by_use.push(interned_id);
         }
 
@@ -1919,23 +1957,13 @@ impl<'db> UseDefMapBuilder<'db> {
     fn intern_place_states<I: Idx, T>(
         place_states: IndexVec<I, T>,
         get_parts: impl Fn(T) -> (Bindings, Declarations),
-        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
-        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
-        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
+        place_state_interner: &mut PlaceStateInterner,
     ) -> IndexVec<I, InternedPlaceStateId> {
         let mut interned_ids_by_place = IndexVec::with_capacity(place_states.len());
 
         for place_state in place_states {
             let (bindings, declarations) = get_parts(place_state);
-            let interned_id = Self::intern_place_state(
-                bindings,
-                declarations,
-                interned_bindings,
-                interned_ids_by_bindings,
-                interned_declarations,
-                interned_ids_by_declarations,
-            );
+            let interned_id = place_state_interner.intern_place_state(bindings, declarations);
             interned_ids_by_place.push(interned_id);
         }
 
@@ -1945,10 +1973,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_end_of_scope_members(
         end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
-        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
-        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
-        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
+        place_state_interner: &mut PlaceStateInterner,
     ) -> IndexVec<ScopedMemberId, InternedPlaceStateId> {
         let mut interned_ids_by_member = IndexVec::with_capacity(end_of_scope_members.len());
         let mut interned_ids_by_place_state =
@@ -1959,13 +1984,9 @@ impl<'db> UseDefMapBuilder<'db> {
                 Entry::Occupied(entry) => *entry.get(),
                 Entry::Vacant(entry) => {
                     let place_state = entry.key();
-                    let interned_id = Self::intern_place_state(
+                    let interned_id = place_state_interner.intern_place_state(
                         place_state.bindings().clone(),
                         place_state.declarations().clone(),
-                        interned_bindings,
-                        interned_ids_by_bindings,
-                        interned_declarations,
-                        interned_ids_by_declarations,
                     );
                     entry.insert(interned_id);
                     interned_id
@@ -1978,37 +1999,9 @@ impl<'db> UseDefMapBuilder<'db> {
         interned_ids_by_member
     }
 
-    fn intern_place_state(
-        bindings: Bindings,
-        declarations: Declarations,
-        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
-        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
-        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
-    ) -> InternedPlaceStateId {
-        let bindings_id = match interned_ids_by_bindings.entry(bindings) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => {
-                let bindings_id = interned_bindings.push(entry.key().clone());
-                entry.insert(bindings_id);
-                bindings_id
-            }
-        };
-        let declarations_id = match interned_ids_by_declarations.entry(declarations) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => {
-                let declarations_id = interned_declarations.push(entry.key().clone());
-                entry.insert(declarations_id);
-                declarations_id
-            }
-        };
-        InternedPlaceStateId(bindings_id, declarations_id)
-    }
-
     fn intern_enclosing_snapshots(
         enclosing_snapshots: EnclosingSnapshots,
-        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+        place_state_interner: &mut PlaceStateInterner,
     ) -> IndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId> {
         let mut interned_ids_by_snapshot: IndexVec<
             ScopedEnclosingSnapshotId,
@@ -2018,14 +2011,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for snapshot in enclosing_snapshots {
             let interned_id = match snapshot {
                 EnclosingSnapshot::Bindings(bindings) => {
-                    let interned_bindings_id =
-                        if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
-                            *interned_id
-                        } else {
-                            let interned_id = interned_bindings.push(bindings.clone());
-                            interned_ids_by_bindings.insert(bindings, interned_id);
-                            interned_id
-                        };
+                    let interned_bindings_id = place_state_interner.intern_bindings(bindings);
                     InternedEnclosingSnapshotId::Bindings(interned_bindings_id)
                 }
                 EnclosingSnapshot::Constraint(constraint) => {

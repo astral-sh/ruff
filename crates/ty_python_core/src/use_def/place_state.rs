@@ -98,6 +98,16 @@ impl PreviousDefinitions {
 }
 
 impl Declarations {
+    pub(super) fn is_always_undeclared(&self) -> bool {
+        matches!(
+            self.live_declarations.as_slice(),
+            [LiveDeclaration {
+                declaration: ScopedDefinitionId::UNBOUND,
+                reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            }]
+        )
+    }
+
     pub(super) fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_declaration = LiveDeclaration {
             declaration: ScopedDefinitionId::UNBOUND,
@@ -203,6 +213,18 @@ pub(super) struct Bindings {
 }
 
 impl Bindings {
+    pub(super) fn is_always_unbound(&self) -> bool {
+        self.unbound_narrowing_constraint.is_none()
+            && matches!(
+                self.live_bindings.as_slice(),
+                [LiveBinding {
+                    binding: ScopedDefinitionId::UNBOUND,
+                    narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+                    reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+                }]
+            )
+    }
+
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
