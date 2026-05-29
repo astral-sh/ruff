@@ -304,13 +304,21 @@ struct PlaceStateInterner {
 }
 
 impl PlaceStateInterner {
-    fn with_capacity(bindings: usize, declarations: usize) -> Self {
+    fn with_capacity(
+        interned_bindings: usize,
+        interned_ids_by_bindings: usize,
+        interned_declarations: usize,
+        interned_ids_by_declarations: usize,
+    ) -> Self {
         Self {
-            interned_bindings: IndexVec::with_capacity(bindings),
-            interned_ids_by_bindings: FxHashMap::with_capacity_and_hasher(bindings, FxBuildHasher),
-            interned_declarations: IndexVec::with_capacity(declarations),
+            interned_bindings: IndexVec::with_capacity(interned_bindings),
+            interned_ids_by_bindings: FxHashMap::with_capacity_and_hasher(
+                interned_ids_by_bindings,
+                FxBuildHasher,
+            ),
+            interned_declarations: IndexVec::with_capacity(interned_declarations),
             interned_ids_by_declarations: FxHashMap::with_capacity_and_hasher(
-                declarations,
+                interned_ids_by_declarations,
                 FxBuildHasher,
             ),
             always_unbound_bindings: None,
@@ -1803,9 +1811,13 @@ impl<'db> UseDefMapBuilder<'db> {
             + self.enclosing_snapshots.len()
             + place_state_count;
         let interned_declarations_capacity = self.declarations_by_binding.len() + place_state_count;
+        // Most place states are handled by the common-case fields, so don't size the lookup tables
+        // for every candidate entry.
         let mut place_state_interner = PlaceStateInterner::with_capacity(
             interned_bindings_capacity,
+            self.bindings_by_definition.len(),
             interned_declarations_capacity,
+            self.declarations_by_binding.len(),
         );
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
         let bindings_by_definition = Self::intern_bindings_by_definition(
