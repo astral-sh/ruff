@@ -28,7 +28,10 @@ use crate::{
     UnsupportedSyntaxErrorKind,
 };
 
-use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
+use super::{
+    InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind,
+    STACK_GROWTH_NESTING_THRESHOLD,
+};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -343,14 +346,10 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        if !Self::token_starts_recursive_lhs(token) {
+        if self.tokens.nesting() < STACK_GROWTH_NESTING_THRESHOLD
+            && !Self::token_starts_unnested_recursive_lhs(token)
+        {
             return self.parse_lhs_expression_inner(left_precedence, context, token);
-        }
-
-        if matches!(token, TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace) {
-            return self.with_grown_delimited_stack(|parser| {
-                parser.parse_lhs_expression_inner(left_precedence, context, token)
-            });
         }
 
         self.with_grown_stack(|parser| {
@@ -358,10 +357,10 @@ impl<'src> Parser<'src> {
         })
     }
 
-    /// Returns whether parsing an expression that starts with `token` can
-    /// immediately recurse through another expression parse.
+    /// Returns whether parsing an expression that starts with `token` can recurse without
+    /// first increasing delimiter nesting.
     #[inline]
-    fn token_starts_recursive_lhs(token: TokenKind) -> bool {
+    fn token_starts_unnested_recursive_lhs(token: TokenKind) -> bool {
         token.as_unary_operator().is_some()
             || matches!(
                 token,
@@ -371,9 +370,6 @@ impl<'src> Parser<'src> {
                     | TokenKind::Yield
                     | TokenKind::FStringStart
                     | TokenKind::TStringStart
-                    | TokenKind::Lpar
-                    | TokenKind::Lsqb
-                    | TokenKind::Lbrace
             )
     }
 
@@ -740,19 +736,14 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> Expr {
         loop {
-            lhs =
-                match self.current_token_kind() {
-                    TokenKind::Lpar => Expr::Call(self.with_grown_delimited_stack(|parser| {
-                        parser.parse_call_expression(lhs, start)
-                    })),
-                    TokenKind::Lsqb => Expr::Subscript(self.with_grown_delimited_stack(|parser| {
-                        parser.parse_subscript_expression(lhs, start)
-                    })),
-                    TokenKind::Dot => {
-                        Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
-                    }
-                    _ => break lhs,
-                };
+            lhs = match self.current_token_kind() {
+                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
+                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
+                TokenKind::Dot => {
+                    Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
+                }
+                _ => break lhs,
+            };
         }
     }
 

@@ -28,10 +28,13 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
-// Keep enough stack for parser code between explicitly instrumented recursion edges.
+// `STACK_RED_ZONE` is the required headroom at an instrumented recursion edge; `STACK_SIZE`
+// is the stack segment allocated when that threshold is crossed. These values match rustc's
+// `ensure_sufficient_stack` helper.
 const STACK_RED_ZONE: usize = 100 * 1024;
 const STACK_SIZE: usize = 1024 * 1024;
-// Avoid stack checks on normal, shallow delimiter use such as calls and subscripts.
+// Avoid stack checks on ordinary shallow expressions inside delimiters such as calls and
+// subscripts. Nested content re-enters `parse_lhs_expression` after the opening delimiter.
 const STACK_GROWTH_NESTING_THRESHOLD: u32 = 64;
 
 #[derive(Debug)]
@@ -95,15 +98,6 @@ impl<'src> Parser<'src> {
     #[inline]
     fn with_grown_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         stacker::maybe_grow(STACK_RED_ZONE, STACK_SIZE, || f(self))
-    }
-
-    #[inline]
-    fn with_grown_delimited_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        if self.tokens.nesting() < STACK_GROWTH_NESTING_THRESHOLD {
-            f(self)
-        } else {
-            self.with_grown_stack(f)
-        }
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
