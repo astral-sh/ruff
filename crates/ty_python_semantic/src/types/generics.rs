@@ -2634,10 +2634,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 if matches!(formal, Type::ProtocolInstance(_))
                     && (literal.is_string() || literal.is_literal_string())
                 {
-                    // TODO: Replace this old-solver special case by preserving the constraint set
-                    // from overload receiver matching. `Signature::can_bind_self_to` currently
-                    // reduces matching to a boolean; instead, each retained overload should keep
-                    // its receiver constraints so later specialization can apply them.
                     // Preserve literal-string receiver information while selecting string method
                     // overloads. In particular, `str.__iter__` exposes `LiteralString` elements
                     // only for receivers that satisfy its `self: LiteralString` overload.

@@ -295,6 +295,9 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
+# TODO: `Signature::can_bind_self_to` currently reduces receiver matching to a boolean. Instead,
+# each retained overload should preserve its receiver constraints so later specialization can apply
+# them.
 # TODO: revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
 reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
 ```
