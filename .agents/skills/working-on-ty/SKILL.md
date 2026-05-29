@@ -31,8 +31,10 @@ Adding `#[salsa::tracked]` to a function or method means that the Salsa framewor
 This can sometimes be done for performance reasons, and can also be done to ensure incremental computation in an
 IDE context.
 
-ANY method that accesses `.node()` must be `#[salsa::tracked]`, or it will break incrementality.
-Prefer higher-level semantic APIs over raw AST access.
+Methods that access `.node()` should usually be `#[salsa::tracked]`, or ty's incrementality will suffer:
+we don't want to accidentally introduce a dependency on module `a`'s AST in a Salsa query that would be
+called when type-checking module `b`. Prefer higher-level semantic APIs over raw AST access where possible,
+but ask for guidance from the user if this would require significant refactoring.
 
 ### Reduce memory usage where possible
 

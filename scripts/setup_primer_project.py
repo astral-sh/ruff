@@ -57,6 +57,30 @@ def _project_not_found(name: str, projects: list[Project]) -> NoReturn:
     sys.exit(1)
 
 
+class _FormatMap:
+    def __init__(self, **values: str | list[str] | None) -> None:
+        self.values = values
+
+    def __getitem__(self, key: str) -> str:
+        if key not in self.values:
+            raise KeyError(key)
+        value = self.values[key]
+        if value is None:
+            raise ValueError(f"Required {key} to be specified")
+        if isinstance(value, list):
+            return " ".join(value)
+        return value
+
+
+def get_ty_command(project: Project, *, ty_binary: str, venv_dir: Path) -> str:
+    ty_cmd = project.ty_cmd
+    if ty_cmd is None:
+        ty_cmd = "{ty} check {paths}" if project.paths else "{ty} check"
+    assert "{ty}" in ty_cmd
+    ty_cmd = ty_cmd.format_map(_FormatMap(ty=ty_binary, paths=project.paths))
+    return f"{ty_cmd} --python {shlex.quote(str(venv_dir))} --output-format concise"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("project", help="Name of a mypy-primer project")
@@ -131,6 +155,9 @@ def main() -> None:
 
     print(f"\nDone! Project set up at {target_dir}")
     print(f"Activate the venv with: source {venv_dir}/bin/activate")
+    print("\nProject-specific ty command:")
+    print("  ty_binary=/path/to/ty")
+    print(f"  {get_ty_command(project, ty_binary='"$ty_binary"', venv_dir=venv_dir)}")
 
 
 if __name__ == "__main__":

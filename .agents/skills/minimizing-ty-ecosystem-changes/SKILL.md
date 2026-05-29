@@ -1,6 +1,6 @@
 ---
 name: minimizing-ty-ecosystem-changes
-description: Use when a user says "minimize this ty ecosystem change", "reproduce this ecosystem result", "investigate a primer difference", or asks to reproduce, investigate, or minimize behavior changes in ty ecosystem or primer projects.
+description: Use when a user says "minimize this ty ecosystem change", "reproduce this ecosystem result", "investigate a primer difference", "investigate a mypy_primer difference", "investigate a mypy-primer difference", or asks to reproduce, investigate, or minimize behavior changes in ty ecosystem/primer/mypy_primer/mypy-primer projects.
 ---
 
 # Minimizing Ty Ecosystem Changes
@@ -9,7 +9,7 @@ Use this skill when asked to reproduce a ty ecosystem change, investigate a beha
 
 ## Building ty
 
-Build ty on both the PR branch and the PR's merge base by running `cargo build --package ty --profile profiling` from the repository root on both refs, matching ecosystem CI. Copy each built executable to a stable path before checking out the other ref; otherwise, the second build overwrites `target/profiling/ty`.
+Build ty on both the PR branch and the PR's merge base by running `CARGO_PROFILE_PROFILING_DEBUG=line-tables-only cargo build --package ty --profile profiling` from the repository root on both refs, matching ecosystem CI. Copy each built executable to a stable path before checking out the other ref; otherwise, the second build overwrites `target/profiling/ty`.
 
 From the PR branch, also copy `.github/ty-ecosystem.toml` to a stable path before checking out another ref. Use that copied file for every comparison, matching ecosystem CI's behavior of reusing the PR config.
 
@@ -29,6 +29,7 @@ fi
 mkdir -p target/ty-ecosystem-bins
 cp .github/ty-ecosystem.toml target/ty-ecosystem-bins/ty-ecosystem.toml
 export TY_CONFIG_FILE="$PWD/target/ty-ecosystem-bins/ty-ecosystem.toml"
+export CARGO_PROFILE_PROFILING_DEBUG=line-tables-only
 
 git checkout <merge-base>
 cargo build --package ty --profile profiling
@@ -61,16 +62,21 @@ ALWAYS confirm the behavior difference reproduces before minimizing or explainin
 ALWAYS use this script before attempting to reproduce the change.
 NEVER try to confirm the behaviour difference without first setting up the project's virtual environment using this script.
 
-When comparing the copied ty binaries, pass the cloned project's virtual environment explicitly with `--python`:
+When comparing the copied ty binaries, use the project-specific ty command printed by `setup_primer_project.py`. That command includes the project's mypy-primer metadata such as `paths` and any custom `ty_cmd`, matching ecosystem CI. Keep `TY_CONFIG_FILE` exported in the same shell that runs the comparison, and set `ty_binary` to each copied binary before running the printed command:
 
 ```bash
+export TY_CONFIG_FILE="$PWD/target/ty-ecosystem-bins/ty-ecosystem.toml"
+test -f "$TY_CONFIG_FILE" || { echo "missing $TY_CONFIG_FILE" >&2; exit 1; }
+
 project_dir="$PWD/<some-temp-dir>"
 ty_base="$PWD/target/ty-ecosystem-bins/ty-base"
 ty_pr="$PWD/target/ty-ecosystem-bins/ty-pr"
 
 cd "$project_dir"
-"$ty_base" check --python .venv --output-format concise
-"$ty_pr" check --python .venv --output-format concise
+ty_binary="$ty_base"
+<project-specific ty command printed by setup_primer_project.py>
+ty_binary="$ty_pr"
+<project-specific ty command printed by setup_primer_project.py>
 ```
 
 If the ecosystem report gives an exact project revision, pass it to the script with `--revision`. If the report gives a timestamp, pass it to the script with `--exclude-newer`. Do not install dependencies before checking out the report revision. Do not use current upstream or the current mypy-primer revision as evidence for a historical report when the report provides a pinned revision. If running `ecosystem-analyzer` directly, also pass the report timestamp as `--exclude-newer`, matching ecosystem CI.
@@ -89,7 +95,7 @@ An ideal minimized reproducer:
 - Uses an absolute minimum of "advanced"/complex typing or language features. For example, if the original code
   uses a walrus operator, but the behavior difference still reproduces without it, remove the walrus operator. If the original code uses a `Protocol` from `typing_extensions`, but the behavior difference still reproduces without it, remove the `Protocol`.
 
-Use a systematic loop. You do not need to apply every tool in every iteration, but keep looping until none of the available minimization tools can reduce the reproducer further while preserving the behavior difference.
+Use a systematic loop. You do not need to apply every tool in every iteration, but keep looping until none of the available minimization tools can reduce the reproducer further while preserving the behavior difference. Your clones of ecosystem projects and/or their dependencies should be treated as transient artifacts of the investigation: they should be deleted after the minimization is complete, and you SHOULD NOT ask for permission to modify them during the minimization process. If the user has asked for an ecosystem change to be minimized, ANY of the changes below should be understood as automatically having been approved by the user.
 
 Available minimization tools include:
 

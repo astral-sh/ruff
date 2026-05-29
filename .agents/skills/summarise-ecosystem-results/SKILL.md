@@ -58,6 +58,6 @@ For each retained minimization, include:
 - The minimized code.
 - The commands or comparison method used to verify the minimization.
 
-ALL references to exact line numbers in source code should use GitHub permalinks so that readers can jump to the exact line in the original source code that led to the diagnostic changing. The finished report should NEVER include "raw" URL links; it should ALWAYS use inline Markdown links with square brackets and parentheses.
+ALL references to exact line numbers in source code should use GitHub/GitLab/Codeberg/etc. permalinks so that readers can jump to the exact line in the original source code that led to the diagnostic changing. The finished report should NEVER include "raw" URL links; it should ALWAYS use inline Markdown links with square brackets and parentheses.
 
 Present `PR_<number>_ECOSYSTEM_SUMMARY.md` as the finished product.
