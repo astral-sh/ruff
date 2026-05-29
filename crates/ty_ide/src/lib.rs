@@ -35,7 +35,10 @@ pub use call_hierarchy::incoming_calls::{IncomingCall, incoming_calls};
 pub use call_hierarchy::outgoing_calls::{OutgoingCall, outgoing_calls};
 pub use call_hierarchy::{CallHierarchyItem, prepare_call_hierarchy};
 pub use code_action::{QuickFix, code_actions};
-pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
+pub use completion::{
+    Completion, CompletionCapabilities, CompletionInsertTextFormat, CompletionKind,
+    CompletionSettings, completion,
+};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
 pub use find_references::find_references;

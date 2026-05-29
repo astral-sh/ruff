@@ -5,7 +5,7 @@ use std::sync::Arc;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_index::{IndexSlice, IndexVec};
+use ruff_index::{FrozenIndexVec, IndexSlice, IndexVec};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
@@ -260,10 +260,10 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
 #[derive(Debug, Update, get_size2::GetSize)]
 pub struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
-    place_tables: IndexVec<FileScopeId, Arc<PlaceTable>>,
+    place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
 
     /// List of all scopes in this file.
-    scopes: IndexVec<FileScopeId, Scope>,
+    scopes: FrozenIndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
     scopes_by_expression: ExpressionsScopeMap,
@@ -290,10 +290,10 @@ pub struct SemanticIndex<'db> {
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
-    scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
+    scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+    use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///

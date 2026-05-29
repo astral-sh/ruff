@@ -69,6 +69,20 @@ use ty_python_core::{EvaluationMode, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
+fn type_form_argument<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    match ty {
+        Type::TypeForm(type_form) => type_form.type_argument(db),
+        Type::SpecialForm(special_form) => special_form.type_form_argument(db).unwrap_or(ty),
+        Type::KnownInstance(instance) if instance.is_type_form_value() => {
+            instance.type_form_argument(db).unwrap_or(ty)
+        }
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+            ty.to_instance(db).unwrap_or(ty)
+        }
+        _ => ty,
+    }
+}
+
 /// Priority levels for call errors in intersection types.
 /// Higher values indicate more specific errors that should take precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1768,9 +1782,11 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
-                                    ty_a.when_equivalent_to(db, *ty_b, constraints)
+                                    ty_a.when_equivalent_to(db, ty_b, constraints)
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -1781,11 +1797,13 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
                                     ty_a.when_subtype_of(
                                         db,
-                                        *ty_b,
+                                        ty_b,
                                         constraints,
                                         InferableTypeVars::None,
                                     )
@@ -1799,11 +1817,13 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
                                     ty_a.when_assignable_to(
                                         db,
-                                        *ty_b,
+                                        ty_b,
                                         constraints,
                                         InferableTypeVars::None,
                                     )
@@ -1817,11 +1837,13 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
                                     ty_a.when_disjoint_from(
                                         db,
-                                        *ty_b,
+                                        ty_b,
                                         constraints,
                                         InferableTypeVars::None,
                                     )
@@ -1835,14 +1857,17 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSingleton) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(Type::bool_literal(ty.is_singleton(db)));
+                                overload.set_return_type(Type::bool_literal(
+                                    type_form_argument(db, *ty).is_singleton(db),
+                                ));
                             }
                         }
 
                         Some(KnownFunction::IsSingleValued) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload
-                                    .set_return_type(Type::bool_literal(ty.is_single_valued(db)));
+                                overload.set_return_type(Type::bool_literal(
+                                    type_form_argument(db, *ty).is_single_valued(db),
+                                ));
                             }
                         }
 
@@ -2383,20 +2408,19 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
-                        let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] =
-                            overload.parameter_types()
+                        let [Some(lower), Some(typevar), Some(upper)] = overload.parameter_types()
                         else {
+                            return;
+                        };
+                        let lower = type_form_argument(db, *lower);
+                        let typevar = type_form_argument(db, *typevar);
+                        let upper = type_form_argument(db, *upper);
+                        let Type::TypeVar(typevar) = typevar else {
                             return;
                         };
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
-                            ConstraintSet::constrain_typevar(
-                                db,
-                                constraints,
-                                *typevar,
-                                *lower,
-                                *upper,
-                            )
+                            ConstraintSet::constrain_typevar(db, constraints, typevar, lower, upper)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -2436,12 +2460,14 @@ impl<'db> Bindings<'db> {
                         let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
                             continue;
                         };
+                        let ty_a = type_form_argument(db, *ty_a);
+                        let ty_b = type_form_argument(db, *ty_b);
 
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
                             ty_a.when_subtype_of_assuming(
                                 db,
-                                *ty_b,
+                                ty_b,
                                 constraints.load(db, tracked.constraints(db)),
                                 constraints,
                                 InferableTypeVars::None,
@@ -2498,8 +2524,12 @@ impl<'db> Bindings<'db> {
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
                             [None] => InferableTypeVars::None,
-                            [Some(Type::NominalInstance(instance))] => {
-                                match extract_inferable(instance) {
+                            [Some(ty)] => {
+                                let Type::NominalInstance(instance) = type_form_argument(db, *ty)
+                                else {
+                                    continue;
+                                };
+                                match extract_inferable(&instance) {
                                     Some(inferable) => inferable,
                                     None => continue,
                                 }

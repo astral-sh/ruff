@@ -1341,8 +1341,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::TooManyStatementsInTryClause) {
                 pylint::rules::too_many_try_statements(
                     checker,
-                    stmt,
-                    body,
+                    try_stmt,
                     checker.settings().pylint.max_statements_in_try,
                 );
             }
