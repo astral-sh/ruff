@@ -584,8 +584,7 @@ mod tests {
 
     #[test]
     fn fstring_nested_spec_stack_growth() {
-        let suite = parse_suite(&nested_format_spec('f', 5_000)).unwrap();
-        std::mem::forget(suite);
+        parse_suite(&nested_format_spec('f', 5_000)).unwrap();
     }
 
     #[test]
@@ -702,8 +701,7 @@ mod tests {
 
     #[test]
     fn tstring_nested_spec_stack_growth() {
-        let suite = parse_suite(&nested_format_spec('t', 5_000)).unwrap();
-        std::mem::forget(suite);
+        parse_suite(&nested_format_spec('t', 5_000)).unwrap();
     }
 
     #[test]

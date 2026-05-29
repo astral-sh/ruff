@@ -303,6 +303,10 @@ impl<'src> Parser<'src> {
                     self.bump(TokenKind::from(bin_op));
 
                     let right = if new_precedence.is_right_associative() {
+                        // For right-associative operators (`**`), the right
+                        // operand recursion is unbounded in `a**a**a**...`,
+                        // and it bypasses stack growth in `parse_lhs_expression`
+                        // (that scope is exited once the atom is parsed).
                         self.with_grown_stack(|parser| {
                             parser.parse_binary_expression_or_higher(new_precedence, context)
                         })
@@ -2966,6 +2970,8 @@ impl<'src> Parser<'src> {
         // lambda x: yield y
         // lambda x: yield from y
 
+        // `lambda: lambda: lambda: ...` recurses through the lambda body at
+        // the conditional layer, bypassing stack growth in `parse_lhs_expression`.
         let body = self.with_grown_stack(Self::parse_conditional_expression_or_higher);
 
         ast::ExprLambda {
@@ -2990,6 +2996,9 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
+        // `a if b else a if b else ...` recurses through `orelse` at the
+        // conditional layer, which is not covered by stack growth in
+        // `parse_lhs_expression` (that scope is released once each atom is parsed).
         let orelse = self.with_grown_stack(Self::parse_conditional_expression_or_higher);
 
         ast::ExprIf {
