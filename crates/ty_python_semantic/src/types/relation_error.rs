@@ -100,6 +100,10 @@ pub(crate) enum ErrorContext<'db> {
         target: Type<'db>,
         parameter: ParameterDescription,
     },
+    InferredCallableType {
+        source: Type<'db>,
+        callable: Type<'db>,
+    },
     ExtraRequiredParameter {
         parameter: ParameterDescription,
     },
@@ -261,13 +265,18 @@ impl<'db> ErrorContext<'db> {
                 target,
                 parameter,
             } => {
-                // reversed order due to covariance
+                // reversed order due to contravariance of parameter types
                 format!(
                     "{parameter} has an incompatible type: `{target}` is not assignable to `{source}`",
                     source = source.display(db),
                     target = target.display(db),
                 )
             }
+            Self::InferredCallableType { source, callable } => format!(
+                "type `{}` has inferred callable type `{}`",
+                source.display(db),
+                callable.display(db),
+            ),
             Self::ExtraRequiredParameter { parameter } => match parameter {
                 ParameterDescription::Named(name) => format!("unexpected extra parameter `{name}`"),
                 ParameterDescription::Index(_) => "unexpected extra parameter".to_string(),
