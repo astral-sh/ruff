@@ -2239,16 +2239,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         semantic_syntax_errors.shrink_to_fit();
 
         SemanticIndex {
-            place_tables,
-            scopes: self.scopes,
+            place_tables: place_tables.into(),
+            scopes: self.scopes.into(),
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             statements_by_node: self.statements_by_node,
-            scope_ids_by_scope: self.scope_ids_by_scope,
+            scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
-            use_def_maps,
+            use_def_maps: use_def_maps.into(),
             enclosing_lambda_statements: self.enclosing_lambda_statements,
             collections_by_use: self.collections_by_use,
             uses_by_collection: self.uses_by_collection,

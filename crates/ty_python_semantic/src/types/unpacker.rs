@@ -1,13 +1,14 @@
 use std::borrow::Cow;
 
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_index::FrozenMap;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
-use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::infer::ExpressionInference;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use ty_python_core::ExpressionNodeKey;
@@ -272,7 +273,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn finish(self) -> UnpackResult<'db> {
         UnpackResult {
             diagnostics: self.context.finish(),
-            targets: FrozenMap::from(self.targets),
+            targets: FrozenMap::from_iter(self.targets),
             cycle_recovery: None,
         }
     }
