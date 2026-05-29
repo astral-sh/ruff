@@ -28,6 +28,12 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
+// Keep enough stack for parser code between explicitly instrumented recursion edges.
+const STACK_RED_ZONE: usize = 100 * 1024;
+const STACK_SIZE: usize = 1024 * 1024;
+// Avoid stack checks on normal, shallow delimiter use such as calls and subscripts.
+const STACK_GROWTH_NESTING_THRESHOLD: u32 = 64;
+
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
@@ -56,12 +62,6 @@ pub(crate) struct Parser<'src> {
 
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
-
-    /// Current parser recursion depth remaining before the depth limit is exceeded.
-    depth_remaining: u16,
-
-    /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
-    max_nesting_depth: u32,
 }
 
 impl<'src> Parser<'src> {
@@ -77,8 +77,6 @@ impl<'src> Parser<'src> {
         options: ParseOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
-        let depth_remaining = options.max_recursion_depth;
-        let max_nesting_depth = u32::from(options.max_recursion_depth.saturating_sub(2));
 
         Parser {
             options,
@@ -90,38 +88,21 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
-            depth_remaining,
-            max_nesting_depth,
         }
     }
 
-    /// Runs `f` if the recursive parser depth limit has not been hit.
-    ///
-    /// # Note
-    ///
-    /// This recursion guard is a temporary fix for #22930.
-    #[must_use]
+    /// Runs a recursive parser edge on a stack with sufficient remaining space.
     #[inline]
-    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
-        if self.depth_remaining == 0 {
-            return None;
-        }
-
-        self.depth_remaining -= 1;
-        let result = f(self);
-        self.depth_remaining += 1;
-        Some(result)
+    fn with_grown_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        stacker::maybe_grow(STACK_RED_ZONE, STACK_SIZE, || f(self))
     }
 
-    #[cold]
-    #[inline(never)]
-    fn report_recursion_limit_exceeded<R: Ranged>(&mut self, ranged: R) {
-        self.add_error(ParseErrorType::RecursionLimitExceeded, ranged);
-        // Skip to end-of-file so outer parser frames unwind quickly and our
-        // `ParserProgress` infinite-loop guards don't fire when they see the
-        // same `(` / `[` etc. that this frame failed to consume.
-        while self.current_token_kind() != TokenKind::EndOfFile {
-            self.bump_any();
+    #[inline]
+    fn with_grown_delimited_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        if self.tokens.nesting() < STACK_GROWTH_NESTING_THRESHOLD {
+            f(self)
+        } else {
+            self.with_grown_stack(f)
         }
     }
 

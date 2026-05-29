@@ -527,10 +527,7 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
-    use crate::{
-        InterpolatedStringErrorType, Mode, ParseError, ParseErrorType, ParseOptions, Parsed, parse,
-        parse_module,
-    };
+    use crate::{InterpolatedStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
@@ -538,17 +535,6 @@ mod tests {
 
     fn parse_suite(source: &str) -> Result<Suite, ParseError> {
         parse_module(source).map(Parsed::into_suite)
-    }
-
-    fn parse_suite_with_recursion_limit(
-        source: &str,
-        max_recursion_depth: u16,
-    ) -> Result<Suite, ParseError> {
-        parse(
-            source,
-            ParseOptions::from(Mode::Module).with_max_recursion_depth(max_recursion_depth),
-        )
-        .map(|parsed| parsed.try_into_module().unwrap().into_suite())
     }
 
     fn nested_format_spec(prefix: char, depth: usize) -> String {
@@ -597,11 +583,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_fstring_nested_spec_recursion_limit() {
-        assert!(parse_suite_with_recursion_limit(r#"f"{foo:{spec}}""#, 8).is_ok());
-
-        let err = parse_suite_with_recursion_limit(&nested_format_spec('f', 200), 8).unwrap_err();
-        assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+    fn fstring_nested_spec_stack_growth() {
+        let suite = parse_suite(&nested_format_spec('f', 5_000)).unwrap();
+        std::mem::forget(suite);
     }
 
     #[test]
@@ -717,11 +701,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_tstring_nested_spec_recursion_limit() {
-        assert!(parse_suite_with_recursion_limit(r#"t"{foo:{spec}}""#, 8).is_ok());
-
-        let err = parse_suite_with_recursion_limit(&nested_format_spec('t', 200), 8).unwrap_err();
-        assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+    fn tstring_nested_spec_stack_growth() {
+        let suite = parse_suite(&nested_format_spec('t', 5_000)).unwrap();
+        std::mem::forget(suite);
     }
 
     #[test]
