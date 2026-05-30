@@ -35,6 +35,52 @@ use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
 
+/// Maximum length to materialize when narrowing a variable-length tuple using `len`.
+///
+/// Larger lengths remain represented by an `ExactlySized` intersection to avoid allocating a
+/// tuple element for every position from a source-controlled integer literal.
+const MAX_TUPLE_LENGTH_FOR_LEN_NARROWING: usize = 64;
+
+/// Return the distinct non-negative integer values represented by an int-like literal union.
+///
+/// Boolean literals are int-like at runtime, so this collapses `Literal[1, True]` to one value.
+fn exact_len_alternatives<'db>(db: &'db dyn Db, ty: Type<'db>) -> SmallVec<[(i64, usize); 2]> {
+    fn collect<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        lengths: &mut SmallVec<[(i64, usize); 2]>,
+    ) -> bool {
+        match ty.resolve_type_alias(db) {
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    if !collect(db, *element, lengths) {
+                        return false;
+                    }
+                }
+            }
+            ty => {
+                let Some(literal) = ty.as_int_like_literal() else {
+                    return false;
+                };
+                let Ok(length) = usize::try_from(literal) else {
+                    return false;
+                };
+                if !lengths.iter().any(|(_, existing)| *existing == length) {
+                    lengths.push((literal, length));
+                }
+            }
+        }
+        true
+    }
+
+    let mut lengths = SmallVec::new();
+    if collect(db, ty, &mut lengths) {
+        lengths
+    } else {
+        SmallVec::new()
+    }
+}
+
 fn is_union_of_single_valued<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
     ty.as_union().is_some_and(|union| {
@@ -1038,9 +1084,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     /// Narrow a type using an equality or inequality comparison against an exact length.
     ///
     /// Exact tuples can be resized because their shape is immutable. Other types receive an
-    /// `ExactlySized` constraint only if their declared `len()` result is already a single
-    /// literal: the comparison may filter a fixed-length type, but must not make an observed
-    /// length persistent for mutable values or arbitrary stateful `__len__` implementations.
+    /// `ExactlySized` constraint representing the observed length.
     fn narrow_type_by_exact_len(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -1062,10 +1106,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .add_negative(exactly_sized)
                     .build()
             }
-        }
-
-        fn has_declared_fixed_length<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-            ty.len(db).and_then(Type::as_int_literal).is_some()
         }
 
         let resolved = ty.resolve_type_alias(db);
@@ -1110,25 +1150,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             },
             Type::NominalInstance(instance) => {
                 if let Some(tuple) = instance.own_tuple_spec(db) {
-                    if constrain_with_equality {
+                    if constrain_with_equality
+                        && (!tuple.len().is_variable()
+                            || length <= MAX_TUPLE_LENGTH_FOR_LEN_NARROWING)
+                    {
                         tuple
                             .resize(db, TupleLength::Fixed(length))
                             .ok()
                             .map(|tuple| Type::tuple(TupleType::new(db, &tuple)))
                             .unwrap_or(Type::Never)
                     } else {
-                        constrain(db, resolved, exactly_sized, false)
+                        constrain(db, resolved, exactly_sized, constrain_with_equality)
                     }
-                } else if has_declared_fixed_length(db, resolved) {
-                    constrain(db, resolved, exactly_sized, constrain_with_equality)
                 } else {
-                    resolved
+                    constrain(db, resolved, exactly_sized, constrain_with_equality)
                 }
             }
-            ty if has_declared_fixed_length(db, ty) => {
-                constrain(db, ty, exactly_sized, constrain_with_equality)
-            }
-            ty => ty,
+            ty => constrain(db, ty, exactly_sized, constrain_with_equality),
         };
         if narrowed == resolved { ty } else { narrowed }
     }
@@ -1585,37 +1623,42 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let [arg] = &*call.arguments.args else {
                     return;
                 };
-                let Some(length_literal) = length_type.as_int_like_literal() else {
+                let lengths = exact_len_alternatives(self.db, length_type);
+                if lengths.is_empty() || (!constrain_with_equality && lengths.len() > 1) {
                     return;
-                };
-                let Ok(length) = usize::try_from(length_literal) else {
-                    return;
-                };
+                }
                 let Some(target) = PlaceExpr::try_from_expr(arg) else {
                     return;
                 };
 
-                let protocol_length = match length_literal {
-                    0 => UnionType::from_elements(
+                let narrow_to_length = |(length_literal, length)| {
+                    let protocol_length = match length_literal {
+                        0 => UnionType::from_elements(
+                            self.db,
+                            [Type::int_literal(0), Type::bool_literal(false)],
+                        ),
+                        1 => UnionType::from_elements(
+                            self.db,
+                            [Type::int_literal(1), Type::bool_literal(true)],
+                        ),
+                        _ => Type::int_literal(length_literal),
+                    };
+                    let exactly_sized = KnownClass::ExactlySized
+                        .to_specialized_instance(self.db, &[protocol_length]);
+                    Self::narrow_type_by_exact_len(
                         self.db,
-                        [Type::int_literal(0), Type::bool_literal(false)],
-                    ),
-                    1 => UnionType::from_elements(
-                        self.db,
-                        [Type::int_literal(1), Type::bool_literal(true)],
-                    ),
-                    _ => Type::int_literal(length_literal),
+                        inference.expression_type(arg),
+                        length,
+                        exactly_sized,
+                        constrain_with_equality,
+                    )
                 };
-                let exactly_sized =
-                    KnownClass::ExactlySized.to_specialized_instance(self.db, &[protocol_length]);
                 let arg_type = inference.expression_type(arg);
-                let narrowed = Self::narrow_type_by_exact_len(
-                    self.db,
-                    arg_type,
-                    length,
-                    exactly_sized,
-                    constrain_with_equality,
-                );
+                let narrowed = if lengths.len() == 1 {
+                    narrow_to_length(lengths[0])
+                } else {
+                    UnionType::from_elements(self.db, lengths.into_iter().map(narrow_to_length))
+                };
                 if narrowed == arg_type {
                     return;
                 }

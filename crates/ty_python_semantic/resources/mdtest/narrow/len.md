@@ -107,6 +107,33 @@ def _(val: tuple[()] | tuple[int]):
         empty: tuple[()] = val
 ```
 
+Large exact lengths remain symbolic instead of materializing a tuple element for every position:
+
+```py
+def _(val: tuple[int, ...]):
+    if len(val) == 65:
+        reveal_type(val)  # revealed: tuple[int, ...] & ExactlySized[Literal[65]]
+```
+
+Finite literal unions can also narrow exact tuple lengths. A failed comparison against distinct
+literal lengths cannot narrow the tuple, because the runtime value of the comparator is unknown:
+
+```py
+from typing import Literal
+
+def _(val: tuple[int] | tuple[str, str, str], n: Literal[1, 2]):
+    if len(val) == n:
+        reveal_type(val)  # revealed: tuple[int]
+    else:
+        reveal_type(val)  # revealed: tuple[int] | tuple[str, str, str]
+
+def _(val: tuple[int] | tuple[str, str], n: Literal[1, True]):
+    if len(val) == n:
+        reveal_type(val)  # revealed: tuple[int]
+    else:
+        reveal_type(val)  # revealed: tuple[str, str]
+```
+
 Literal string and bytes values can be filtered directly because their lengths are known:
 
 ```py
@@ -130,7 +157,7 @@ def _(value: Literal[b"a", b"bb", b"ccc"]):
 Types that define a precise `__len__` method can also be narrowed by an exact length comparison:
 
 ```py
-from typing import Literal
+from typing import Literal, Sized
 
 class LengthThree:
     def __len__(self) -> Literal[3]:
@@ -162,38 +189,50 @@ def _(value: TrueLength | FalseLength):
 
 def _(value: LengthThree | list[int]):
     if len(value) == 3:
-        reveal_type(value)  # revealed: (LengthThree & ExactlySized[Literal[3]]) | list[int]
+        # revealed: (LengthThree & ExactlySized[Literal[3]]) | (list[int] & ExactlySized[Literal[3]])
+        reveal_type(value)
     else:
-        reveal_type(value)  # revealed: list[int]
+        reveal_type(value)  # revealed: list[int] & ~ExactlySized[Literal[3]]
 ```
 
-A length check does not make the current length of an arbitrary mutable or stateful value
-persistent:
+An exact length comparison intersects arbitrary `Sized` values with `ExactlySized`:
 
 ```py
-class StatefulLength:
-    def __len__(self) -> int:
-        return 1
+def _(value: Sized):
+    if len(value) == 3:
+        reveal_type(value)  # revealed: ExactlySized[Literal[3]]
+        reveal_type(len(value))  # revealed: Literal[3]
+    else:
+        reveal_type(value)  # revealed: Sized & ~ExactlySized[Literal[3]]
+```
 
-class VaryingLength:
-    def __len__(self) -> Literal[0, 1]:
-        return 1
+Exact-length constraints currently remain after mutation. This is a known limitation:
 
+```py
 def _(items: list[int]):
     if len(items) == 3:
-        reveal_type(items)  # revealed: list[int]
+        reveal_type(items)  # revealed: list[int] & ExactlySized[Literal[3]]
         items.clear()
-        reveal_type(len(items))  # revealed: int
+        reveal_type(len(items))  # revealed: Literal[3]
+```
 
-def _(value: StatefulLength):
-    if len(value) == 1:
-        reveal_type(value)  # revealed: StatefulLength
-        reveal_type(len(value))  # revealed: int
+## Aliased exact lengths
 
-def _(value: VaryingLength):
-    if len(value) == 1:
-        reveal_type(value)  # revealed: VaryingLength
-        reveal_type(len(value))  # revealed: Literal[0, 1]
+PEP 695 aliases are resolved before extracting literal lengths:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+type Two = Literal[2]
+
+def _(val: tuple[int, ...], n: Two):
+    if len(val) == n:
+        reveal_type(val)  # revealed: tuple[int, int]
 ```
 
 ## Unions of narrowable types
