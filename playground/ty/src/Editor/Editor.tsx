@@ -463,9 +463,52 @@ class PlaygroundServer
   private getPlaygroundFileForUri(uri: Uri): PlaygroundFile | null {
     return (
       Object.values(this.props.files.metadata).find((file) => {
-        return file.uri.toString() === uri.toString();
+        return (
+          file.uri.toString() === uri.toString() ||
+          (uri.scheme === "file" && file.handle?.path() === uri.fsPath)
+        );
       }) ?? null
     );
+  }
+
+  private getDiagnosticDetailResource(
+    detail: Diagnostic["details"][number],
+  ): Uri | null {
+    const path = detail.path;
+
+    if (path == null) {
+      return null;
+    }
+
+    const uri = path.startsWith("vendored:") ? Uri.parse(path) : Uri.file(path);
+
+    return uri.scheme === "vendored"
+      ? uri
+      : (this.getPlaygroundFileForUri(uri)?.uri ?? uri);
+  }
+
+  private diagnosticRelatedInformation(
+    diagnostic: Diagnostic,
+  ): editor.IRelatedInformation[] {
+    return diagnostic.details.flatMap((detail) => {
+      const range = detail.range;
+      const resource = this.getDiagnosticDetailResource(detail);
+
+      if (range == null || resource == null) {
+        return [];
+      }
+
+      return [
+        {
+          resource,
+          message: detail.message,
+          startLineNumber: range.start.line,
+          startColumn: range.start.column,
+          endLineNumber: range.end.line,
+          endColumn: range.end.column,
+        },
+      ];
+    });
   }
 
   private getOrCreateVendoredFileHandle(vendoredPath: string): FileHandle {
@@ -569,7 +612,8 @@ class PlaygroundServer
           startColumn: range?.start?.column ?? 0,
           endLineNumber: range?.end?.line ?? 0,
           endColumn: range?.end?.column ?? 0,
-          message: diagnostic.message,
+          message: diagnosticDisplayMessage(diagnostic),
+          relatedInformation: this.diagnosticRelatedInformation(diagnostic),
           severity: mapSeverity(diagnostic.severity),
           tags: [],
         };
@@ -761,10 +805,16 @@ class PlaygroundServer
   ): boolean {
     const files = this.props.files;
 
-    // Model should already exist from mapNavigationTargets for both vendored and regular files
-    const model = this.monaco.editor.getModel(resource);
+    let model = this.monaco.editor.getModel(resource);
+
+    if (model == null && resource.scheme === "vendored") {
+      const vendoredPath = this.getVendoredPath(resource);
+      const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
+      const content = this.props.workspace.sourceText(fileHandle);
+      model = this.monaco.editor.createModel(content, "python", resource);
+    }
+
     if (model == null) {
-      // Model should have been created by mapNavigationTargets
       return false;
     }
 
@@ -965,6 +1015,18 @@ function tyRangeToMonacoRange(range: TyRange): IRange {
     endLineNumber: range.end.line,
     endColumn: range.end.column,
   };
+}
+
+function diagnosticDisplayMessage(diagnostic: Diagnostic): string {
+  const details = diagnostic.details.filter(
+    (detail) => detail.range == null || detail.path == null,
+  );
+
+  if (details.length === 0) {
+    return diagnostic.message;
+  }
+
+  return `${diagnostic.message}\n\n${details.map((detail) => detail.message).join("\n")}`;
 }
 
 function monacoRangeToTyRange(range: IRange): TyRange {

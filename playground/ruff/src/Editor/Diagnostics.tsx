@@ -90,9 +90,61 @@ function Items({
                 Col {column}]
               </span>
             </button>
+            {diagnostic.details.length > 0 ? (
+              <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
+                {diagnostic.details.map((detail, index) => (
+                  <li key={index}>
+                    <Detail detail={detail} onGoTo={onGoTo} />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </li>
         );
       })}
     </ul>
   );
+}
+
+function Detail({
+  detail,
+  onGoTo,
+}: {
+  detail: Diagnostic["details"][number];
+  onGoTo(line: number, column: number): void;
+}) {
+  const start = detail.start_location;
+  const [prefix, message] = splitSubdiagnosticMessage(detail.message);
+
+  if (start == null) {
+    return <span>{detail.message}</span>;
+  }
+
+  return (
+    <>
+      {prefix}
+      <button
+        onClick={() => onGoTo(start.row, start.column)}
+        className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
+      >
+        {message}
+        <span className="text-gray-500">
+          {" "}
+          [Ln {start.row}, Col {start.column}]
+        </span>
+      </button>
+    </>
+  );
+}
+
+function splitSubdiagnosticMessage(message: string): [string, string] {
+  const separator = ": ";
+  const separatorIndex = message.indexOf(separator);
+
+  if (separatorIndex === -1) {
+    return ["", message];
+  }
+
+  const prefixEnd = separatorIndex + separator.length;
+  return [message.slice(0, prefixEnd), message.slice(prefixEnd)];
 }

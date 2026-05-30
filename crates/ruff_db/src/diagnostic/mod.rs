@@ -1,5 +1,5 @@
-use std::fmt::Display;
-use std::{borrow::Cow, fmt::Formatter, path::Path, sync::Arc};
+use std::fmt::{Display, Formatter};
+use std::{borrow::Cow, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -688,6 +688,11 @@ impl SubDiagnostic {
         self.inner.annotations.iter().find(|ann| ann.is_primary)
     }
 
+    /// Returns a reference to the primary span of this sub-diagnostic.
+    pub fn primary_span_ref(&self) -> Option<&Span> {
+        self.primary_annotation().map(Annotation::get_span)
+    }
+
     /// Introspects this diagnostic and returns what kind of "primary" message
     /// it contains for concise formatting.
     ///
@@ -715,6 +720,12 @@ impl SubDiagnostic {
 
     pub fn severity(&self) -> SubDiagnosticSeverity {
         self.inner.severity
+    }
+}
+
+impl Display for SubDiagnostic {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.severity(), self.concise_message())
     }
 }
 

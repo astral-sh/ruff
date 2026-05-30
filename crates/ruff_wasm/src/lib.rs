@@ -31,6 +31,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
+    details: DiagnosticDetail[];
     start_location: {
         row: number;
         column: number;
@@ -54,15 +55,35 @@ export interface Diagnostic {
         }[];
     } | null;
 }
+
+export interface DiagnosticDetail {
+    message: string;
+    start_location: {
+        row: number;
+        column: number;
+    } | null;
+    end_location: {
+        row: number;
+        column: number;
+    } | null;
+}
 "#;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
+    pub details: Vec<ExpandedDiagnosticDetail>,
     pub start_location: Location,
     pub end_location: Location,
     pub fix: Option<ExpandedFix>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedDiagnosticDetail {
+    pub message: String,
+    pub start_location: Option<Location>,
+    pub end_location: Option<Location>,
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -274,9 +295,40 @@ impl Workspace {
             .into_iter()
             .map(|msg| {
                 let range = msg.range().unwrap_or_default();
+                let details = msg
+                    .sub_diagnostics()
+                    .iter()
+                    .map(|sub_diagnostic| {
+                        let (start_location, end_location) = sub_diagnostic
+                            .primary_span_ref()
+                            .and_then(|span| {
+                                let source_code = span.as_ruff_file()?.to_source_code();
+                                let range = span.range()?;
+
+                                Some((
+                                    source_code
+                                        .source_location(range.start(), self.position_encoding)
+                                        .into(),
+                                    source_code
+                                        .source_location(range.end(), self.position_encoding)
+                                        .into(),
+                                ))
+                            })
+                            .map(|(start, end)| (Some(start), Some(end)))
+                            .unwrap_or_default();
+
+                        ExpandedDiagnosticDetail {
+                            message: sub_diagnostic.to_string(),
+                            start_location,
+                            end_location,
+                        }
+                    })
+                    .collect();
+
                 ExpandedMessage {
                     code: msg.secondary_code_or_id().to_string(),
                     message: msg.concise_message().to_string(),
+                    details,
                     start_location: source_code
                         .source_location(range.start(), self.position_encoding)
                         .into(),

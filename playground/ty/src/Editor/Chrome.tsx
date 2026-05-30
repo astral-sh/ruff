@@ -28,7 +28,7 @@ import SecondaryPanel, {
 import Diagnostics, { Diagnostic } from "./Diagnostics";
 import VendoredFileBanner from "./VendoredFileBanner";
 import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
-import type { editor } from "monaco-editor";
+import { Uri, type editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
 
 const Editor = lazy(() => import("./Editor"));
@@ -132,22 +132,73 @@ export default function Chrome({
     [],
   );
 
-  const handleGoTo = useCallback((line: number, column: number) => {
-    const editor = editorRef.current?.editor;
+  const handleGoTo = useCallback(
+    (line: number, column: number, path?: string | null) => {
+      const editorRefValue = editorRef.current;
 
-    if (editor == null) {
-      return;
-    }
+      if (editorRefValue == null) {
+        return;
+      }
 
-    const range = {
-      startLineNumber: line,
-      startColumn: column,
-      endLineNumber: line,
-      endColumn: column,
-    };
-    editor.revealRange(range);
-    editor.setSelection(range);
-  }, []);
+      const { editor, monaco } = editorRefValue;
+
+      if (path != null) {
+        const uri = path.startsWith("vendored:")
+          ? Uri.parse(path)
+          : Uri.file(path);
+        let model = monaco.editor.getModel(uri);
+
+        if (uri.scheme === "vendored") {
+          const vendoredPath = uri.authority
+            ? `${uri.authority}${uri.path}`
+            : uri.path;
+          const fileHandle = workspace.getVendoredFile(vendoredPath);
+          onSelectVendoredFile(fileHandle);
+
+          if (model == null) {
+            model = monaco.editor.createModel(
+              workspace.sourceText(fileHandle),
+              "python",
+              uri,
+            );
+          }
+        } else {
+          const file = Object.values(files.metadata).find((file) => {
+            return (
+              file.handle?.path() === path ||
+              file.uri.toString() === uri.toString()
+            );
+          });
+
+          if (file != null) {
+            onClearVendoredFile();
+            onSelectFile(file.id);
+            model = monaco.editor.getModel(file.uri) ?? model;
+          }
+        }
+
+        if (model != null) {
+          editor.setModel(model);
+        }
+      }
+
+      const range = {
+        startLineNumber: line,
+        startColumn: column,
+        endLineNumber: line,
+        endColumn: column,
+      };
+      editor.revealRange(range);
+      editor.setSelection(range);
+    },
+    [
+      files.metadata,
+      onClearVendoredFile,
+      onSelectFile,
+      onSelectVendoredFile,
+      workspace,
+    ],
+  );
 
   const handleRemoved = useCallback(
     (id: FileId) => {
@@ -344,6 +395,11 @@ function useCheckResult(
       const serializedDiagnostics = diagnostics.map((diagnostic) => ({
         id: diagnostic.id(),
         message: diagnostic.message(),
+        details: diagnostic.details(workspace).map((detail) => ({
+          message: detail.message,
+          path: detail.path ?? null,
+          range: detail.range ?? null,
+        })),
         severity: diagnostic.severity(),
         range: diagnostic.toRange(workspace) ?? null,
         textRange: diagnostic.textRange() ?? null,

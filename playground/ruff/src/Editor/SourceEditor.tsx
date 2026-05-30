@@ -182,20 +182,61 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
   editor.setModelMarkers(
     model,
     "owner",
-    diagnostics.map((diagnostic) => ({
-      code: diagnostic.code ?? undefined,
-      startLineNumber: diagnostic.start_location.row,
-      startColumn: diagnostic.start_location.column,
-      endLineNumber: diagnostic.end_location.row,
-      endColumn: diagnostic.end_location.column,
-      message: diagnostic.code
-        ? `${diagnostic.code}: ${diagnostic.message}`
-        : diagnostic.message,
-      severity: MarkerSeverity.Error,
-      tags:
-        diagnostic.code === "F401" || diagnostic.code === "F841"
-          ? [MarkerTag.Unnecessary]
-          : [],
-    })),
+    diagnostics.map((diagnostic) => {
+      const message = diagnosticDisplayMessage(diagnostic);
+
+      return {
+        code: diagnostic.code ?? undefined,
+        startLineNumber: diagnostic.start_location.row,
+        startColumn: diagnostic.start_location.column,
+        endLineNumber: diagnostic.end_location.row,
+        endColumn: diagnostic.end_location.column,
+        message: diagnostic.code ? `${diagnostic.code}: ${message}` : message,
+        relatedInformation: diagnosticRelatedInformation(diagnostic, model.uri),
+        severity: MarkerSeverity.Error,
+        tags:
+          diagnostic.code === "F401" || diagnostic.code === "F841"
+            ? [MarkerTag.Unnecessary]
+            : [],
+      };
+    }),
   );
+}
+
+function diagnosticDisplayMessage(diagnostic: Diagnostic): string {
+  const details = diagnostic.details.filter(
+    (detail) => detail.start_location == null,
+  );
+
+  if (details.length === 0) {
+    return diagnostic.message;
+  }
+
+  return `${diagnostic.message}\n\n${details.map((detail) => detail.message).join("\n")}`;
+}
+
+function diagnosticRelatedInformation(
+  diagnostic: Diagnostic,
+  resource: editor.ITextModel["uri"],
+): editor.IRelatedInformation[] {
+  return diagnostic.details.flatMap((detail) => {
+    const start = detail.start_location;
+
+    if (start == null) {
+      return [];
+    }
+
+    const end = detail.end_location ?? start;
+
+    return [
+      {
+        resource,
+        message: detail.message,
+        startLineNumber: start.row,
+        startColumn: start.column,
+        endLineNumber: end.row,
+        endColumn: end.column,
+      },
+    ];
+  });
 }
