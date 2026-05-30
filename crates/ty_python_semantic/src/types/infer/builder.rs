@@ -24,8 +24,8 @@ use ty_python_core::statement::StatementInner;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
-    infer_deferred_types, infer_definition_types, infer_expression_types,
+    FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
@@ -439,10 +439,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
-            self.qualifiers.extend(extra.qualifiers.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
+            self.qualifiers.extend(extra.qualifiers.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
 
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
@@ -481,10 +482,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
-            self.qualifiers.extend(extra.qualifiers.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
+            self.qualifiers.extend(extra.qualifiers.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
         }
     }
 
@@ -504,9 +506,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
 
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
@@ -530,9 +533,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
 
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
@@ -9847,10 +9851,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             qualifiers: _,
-            mut type_expression_flags,
+            type_expression_flags,
             mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -9900,14 +9904,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
 
-                type_expression_flags.shrink_to_fit();
-                expected_types.shrink_to_fit();
-                string_annotations.shrink_to_fit();
                 collection_use_constraints.shrink_to_fit();
                 Box::new(ExpressionInferenceExtra {
-                    string_annotations,
-                    expected_types,
-                    type_expression_flags,
+                    string_annotations: FrozenSet::from(string_annotations),
+                    expected_types: FrozenMap::from(expected_types),
+                    type_expression_flags: FrozenMap::from(type_expression_flags),
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
                     cycle_recovery,
@@ -9929,11 +9930,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             expressions,
-            mut qualifiers,
-            mut type_expression_flags,
+            qualifiers,
+            type_expression_flags,
             mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -9970,25 +9971,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !collection_use_constraints.is_empty())
         .then(|| {
             collection_use_constraints.shrink_to_fit();
-            qualifiers.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            type_expression_flags.shrink_to_fit();
-            string_annotations.shrink_to_fit();
             return_types_and_ranges.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
-                string_annotations,
-                expected_types,
+                string_annotations: FrozenSet::from(string_annotations),
+                expected_types: FrozenMap::from(expected_types),
                 called_functions: called_functions
                     .into_iter()
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
                 return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
-                type_expression_flags,
+                type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
                 cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
-                qualifiers,
+                qualifiers: FrozenMap::from(qualifiers),
             })
         });
 
@@ -10084,11 +10081,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             expressions,
-            mut qualifiers,
-            mut type_expression_flags,
+            qualifiers,
+            type_expression_flags,
             mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -10124,25 +10121,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || discards_dict_key_assignments)
             .then(|| {
                 collection_use_constraints.shrink_to_fit();
-                qualifiers.shrink_to_fit();
-                type_expression_flags.shrink_to_fit();
-                expected_types.shrink_to_fit();
-                string_annotations.shrink_to_fit();
                 Box::new(DefinitionInferenceExtra {
-                    string_annotations,
-                    expected_types,
+                    string_annotations: FrozenSet::from(string_annotations),
+                    expected_types: FrozenMap::from(expected_types),
                     collection_use_constraints,
                     called_functions: called_functions
                         .into_iter()
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
-                    type_expression_flags,
+                    type_expression_flags: FrozenMap::from(type_expression_flags),
                     cycle_recovery,
                     deferred: deferred.into_boxed_slice(),
                     diagnostics,
                     undecorated_type,
                     discards_dict_key_assignments,
-                    qualifiers,
+                    qualifiers: FrozenMap::from(qualifiers),
                 })
             });
 
@@ -10177,9 +10170,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut string_annotations,
-            mut expected_types,
-            mut type_expression_flags,
+            string_annotations,
+            expected_types,
+            type_expression_flags,
             mut collection_use_constraints,
             expressions,
             scope,
@@ -10216,14 +10209,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !type_expression_flags.is_empty()
             || !collection_use_constraints.is_empty())
         .then(|| {
-            type_expression_flags.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            string_annotations.shrink_to_fit();
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
-                string_annotations,
-                expected_types,
-                type_expression_flags,
+                string_annotations: FrozenSet::from(string_annotations),
+                expected_types: FrozenMap::from(expected_types),
+                type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
                 cycle_recovery,
                 diagnostics,
