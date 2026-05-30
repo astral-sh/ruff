@@ -10,9 +10,14 @@ use crate::checkers::ast::Checker;
 /// Checks for `pytest` fixtures that set the parameter `autouse=True` in the decorator constructor.
 ///
 /// ## Why is this bad?
-/// Autouse fixtures are run implicitly, which can make test behavior hard to reason about.
-/// Instead, prefer to explicitly request/inject fixtures in tests or test classes that need them,
-/// or use `@pytest.mark.usefixtures` to make the dependency explicit.
+/// Autouse fixtures are run implicitly, which can make test behavior hard to
+/// reason about in general, but especially when defined in `conftest.py` files.
+/// When defined in a `conftest.py` file, autouse fixtures are automatically run for
+/// all tests in the directory structure, which can introduce hidden side effects,
+/// make test suites slower, and make debugging difficult.
+///
+/// Instead, prefer to explicitly request/inject fixtures in tests, test classes,
+/// or other fixtures (by declaring them in the function parameters) that need them.
 ///
 /// ## Example
 /// ```python
