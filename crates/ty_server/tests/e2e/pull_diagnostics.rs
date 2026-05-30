@@ -353,7 +353,12 @@ def foo(
     Ok(())
 }
 
-/// Regression test for <https://github.com/astral-sh/ty/issues/2310>
+/// Regression test for <https://github.com/astral-sh/ty/issues/2310>.
+///
+/// A very large flat expression (`1 + 1 + ... + 1`) builds a deeply nested AST
+/// that could overflow the stack when traversed or dropped. The parser now
+/// bounds the chain length against `max_recursion_depth` and reports a syntax
+/// error, so the server returns a diagnostic instead of crashing.
 #[test]
 fn stack_size() -> Result<()> {
     use std::fmt::Write;

@@ -815,8 +815,13 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Very large flat expressions such as `1 + 1 + ... + 1` build a deeply nested
+/// AST (one `BinOp` per operator). The parser bounds the chain length against
+/// `max_recursion_depth` so the tree can never grow deep enough to overflow the
+/// stack when it is later traversed or dropped, reporting a syntax error
+/// instead. See the `recursion_limit_*` tests in `ruff_python_parser`.
 #[test]
-fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
+fn large_binop_expressions_are_bounded() -> anyhow::Result<()> {
     let mut content = String::new();
     writeln!(
         &mut content,
@@ -831,14 +836,14 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
 
     assert_cmd_snapshot!(case.command(), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    info[revealed-type]: Revealed type
-     --> test.py:4:13
+    error[invalid-syntax]: Source is too deeply nested
+     --> test.py:3:815
       |
-    4 | reveal_type(total)
-      |             ^^^^^ `Literal[2000]`
+    3 | …1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 …
+      |                                                                    ^
       |
 
     Found 1 diagnostic

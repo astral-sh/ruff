@@ -9,18 +9,18 @@ expression: diagnostics
     {
       "range": {
         "start": {
-          "line": 3,
-          "character": 12
+          "line": 2,
+          "character": 814
         },
         "end": {
-          "line": 3,
-          "character": 17
+          "line": 2,
+          "character": 815
         }
       },
-      "severity": 3,
-      "code": "revealed-type",
+      "severity": 1,
+      "code": "invalid-syntax",
       "source": "ty",
-      "message": "Revealed type: `Literal[2000]`"
+      "message": "Source is too deeply nested"
     }
   ]
 }
