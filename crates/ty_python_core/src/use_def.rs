@@ -283,9 +283,6 @@ struct InternedDeclarationsId;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 struct InternedPlaceStateId(InternedBindingsId, InternedDeclarationsId);
 
-// Small scopes rarely contain duplicate constrained undeclared states.
-const MIN_PLACE_STATE_COUNT_TO_REUSE_RETAINED_UNDECLARED: usize = 16;
-
 impl InternedPlaceStateId {
     fn bindings_id(self) -> InternedBindingsId {
         self.0
@@ -301,20 +298,16 @@ struct PlaceStateInterner {
     interned_ids_by_bindings: FxHashMap<Bindings, InternedBindingsId>,
     interned_declarations: IndexVec<InternedDeclarationsId, Declarations>,
     interned_ids_by_declarations: FxHashMap<Declarations, InternedDeclarationsId>,
-    last_retained_undeclared: Option<(ScopedReachabilityConstraintId, InternedDeclarationsId)>,
-    reuse_retained_undeclared: bool,
+    // Undeclared states are common and can be interned by their dense constraint IDs.
+    undeclared_declarations_by_constraint:
+        IndexVec<ScopedReachabilityConstraintId, Option<InternedDeclarationsId>>,
     // These values are extremely common, so avoid repeatedly hashing their small vectors.
     always_unbound_bindings: Option<InternedBindingsId>,
     always_undeclared_declarations: Option<InternedDeclarationsId>,
 }
 
 impl PlaceStateInterner {
-    fn with_capacity(
-        bindings: usize,
-        declaration_map: usize,
-        declarations: usize,
-        reuse_retained_undeclared: bool,
-    ) -> Self {
+    fn with_capacity(bindings: usize, declaration_map: usize, declarations: usize) -> Self {
         Self {
             interned_bindings: IndexVec::with_capacity(bindings),
             interned_ids_by_bindings: FxHashMap::with_capacity_and_hasher(bindings, FxBuildHasher),
@@ -323,8 +316,7 @@ impl PlaceStateInterner {
                 declaration_map,
                 FxBuildHasher,
             ),
-            last_retained_undeclared: None,
-            reuse_retained_undeclared,
+            undeclared_declarations_by_constraint: IndexVec::new(),
             always_unbound_bindings: None,
             always_undeclared_declarations: None,
         }
@@ -362,6 +354,25 @@ impl PlaceStateInterner {
             return interned_id;
         }
 
+        if let Some(reachability_constraint) = declarations.undeclared_reachability_constraint()
+            && !reachability_constraint.is_terminal()
+        {
+            let index = reachability_constraint.index();
+            let len = self.undeclared_declarations_by_constraint.len();
+            if index >= len {
+                self.undeclared_declarations_by_constraint
+                    .resize(index + 1, None);
+            } else if let Some(interned_id) =
+                self.undeclared_declarations_by_constraint[reachability_constraint]
+            {
+                return interned_id;
+            }
+
+            let interned_id = self.interned_declarations.push(declarations);
+            self.undeclared_declarations_by_constraint[reachability_constraint] = Some(interned_id);
+            return interned_id;
+        }
+
         match self.interned_ids_by_declarations.entry(declarations) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
@@ -390,20 +401,8 @@ impl PlaceStateInterner {
     ) -> InternedPlaceStateId {
         // Other retained declarations rarely repeat. Keep the compact IDs without hashing every
         // declaration vector to find the occasional duplicate.
-        let declarations_id = if declarations.is_always_undeclared() {
+        let declarations_id = if declarations.undeclared_reachability_constraint().is_some() {
             self.intern_declarations(declarations)
-        } else if self.reuse_retained_undeclared
-            && let Some(reachability_constraint) = declarations.undeclared_reachability_constraint()
-        {
-            if let Some((last_constraint, interned_id)) = self.last_retained_undeclared
-                && last_constraint == reachability_constraint
-            {
-                interned_id
-            } else {
-                let interned_id = self.interned_declarations.push(declarations);
-                self.last_retained_undeclared = Some((reachability_constraint, interned_id));
-                interned_id
-            }
         } else {
             self.interned_declarations.push(declarations)
         };
@@ -1848,7 +1847,6 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_bindings_capacity,
             interned_ids_by_declarations_capacity,
             interned_declarations_capacity,
-            place_state_count >= MIN_PLACE_STATE_COUNT_TO_REUSE_RETAINED_UNDECLARED,
         );
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
         let bindings_by_definition = Self::intern_bindings_by_definition(
