@@ -6584,7 +6584,7 @@ type U<CURSOR> = MyType
         type Alias = Target
         ```
         ---
-        aTarget implementation docs.
+        Target implementation docs.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:4
@@ -6637,13 +6637,12 @@ type U<CURSOR> = MyType
         Target implementation docs.
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:3:4
+         --> main.py:2:21
           |
-        3 | x: Alias
-          |    ^^^-^
-          |    |  |
-          |    |  Cursor offset
-          |    source
+        2 | from library import Alias
+          |                     ^^^^^- Cursor offset
+          |                     |
+          |                     source
           |
         ");
     }
