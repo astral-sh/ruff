@@ -304,13 +304,13 @@ struct PlaceStateInterner {
 }
 
 impl PlaceStateInterner {
-    fn with_capacity(bindings: usize, declarations: usize) -> Self {
+    fn with_capacity(bindings: usize, declaration_map: usize, declarations: usize) -> Self {
         Self {
             interned_bindings: IndexVec::with_capacity(bindings),
             interned_ids_by_bindings: FxHashMap::with_capacity_and_hasher(bindings, FxBuildHasher),
             interned_declarations: IndexVec::with_capacity(declarations),
             interned_ids_by_declarations: FxHashMap::with_capacity_and_hasher(
-                declarations,
+                declaration_map,
                 FxBuildHasher,
             ),
             always_unbound_bindings: None,
@@ -369,6 +369,21 @@ impl PlaceStateInterner {
             self.intern_bindings(bindings),
             self.intern_declarations(declarations),
         )
+    }
+
+    fn retain_place_state(
+        &mut self,
+        bindings: Bindings,
+        declarations: Declarations,
+    ) -> InternedPlaceStateId {
+        // Apart from the always-undeclared state, retained declarations rarely repeat. Keep the
+        // compact IDs without hashing every declaration vector to find the occasional duplicate.
+        let declarations_id = if declarations.is_always_undeclared() {
+            self.intern_declarations(declarations)
+        } else {
+            self.interned_declarations.push(declarations)
+        };
+        InternedPlaceStateId(self.intern_bindings(bindings), declarations_id)
     }
 }
 
@@ -1803,8 +1818,11 @@ impl<'db> UseDefMapBuilder<'db> {
             + self.enclosing_snapshots.len()
             + place_state_count;
         let interned_declarations_capacity = self.declarations_by_binding.len() + place_state_count;
+        let interned_ids_by_declarations_capacity =
+            self.declarations_by_binding.len() + self.member_states.len();
         let mut place_state_interner = PlaceStateInterner::with_capacity(
             interned_bindings_capacity,
+            interned_ids_by_declarations_capacity,
             interned_declarations_capacity,
         );
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
@@ -1963,7 +1981,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         for place_state in place_states {
             let (bindings, declarations) = get_parts(place_state);
-            let interned_id = place_state_interner.intern_place_state(bindings, declarations);
+            let interned_id = place_state_interner.retain_place_state(bindings, declarations);
             interned_ids_by_place.push(interned_id);
         }
 
