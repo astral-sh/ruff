@@ -946,55 +946,6 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
     });
 }
 
-/// Benchmark for simplifying a disjoint singleton before distributing a large union.
-///
-/// This is modeled after event rendering code that assigns the rendered output in each arm of a
-/// large `match` over a union of event classes.
-fn benchmark_disjoint_singleton_union_conjunction(criterion: &mut Criterion) {
-    const NUM_CLASSES: usize = 48;
-    const NUM_MATCH_BRANCHES: usize = 47;
-
-    setup_rayon();
-
-    let mut code = String::new();
-
-    for i in 0..NUM_CLASSES {
-        writeln!(&mut code, "class Event{i}:\n    value: int\n").ok();
-    }
-    code.push_str("class OtherEvent:\n    value: int\n\n");
-
-    code.push_str("Event = ");
-    for i in 0..NUM_CLASSES {
-        if i > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "Event{i}").ok();
-    }
-    code.push_str("\n\n");
-
-    code.push_str("def render(event: Event) -> int:\n    match event:\n");
-    for i in 0..NUM_MATCH_BRANCHES {
-        writeln!(
-            &mut code,
-            "        case (Event{i}() | OtherEvent() | None) as matched:\n            data = event.value"
-        )
-        .ok();
-    }
-    code.push_str("        case _:\n            data = event.value\n    return data\n\n");
-
-    criterion.bench_function("ty_micro[disjoint_singleton_union_conjunction]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::LargeInput,
-        );
-    });
-}
-
 /// Benchmark for narrowing through a long `isinstance` elif chain.
 ///
 /// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
@@ -1568,7 +1519,6 @@ criterion_group!(
     benchmark_typevar_mapping_small_accumulations,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
-    benchmark_disjoint_singleton_union_conjunction,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
