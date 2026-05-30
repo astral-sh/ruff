@@ -121,7 +121,6 @@ mod tests {
     #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
     #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
     #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF074.py"))]
-    #[test_case(Rule::PytestFixtureAutouse, Path::new("RUF076.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -808,6 +807,7 @@ mod tests {
     #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     #[test_case(Rule::UselessFinally, Path::new("RUF072.py"))]
     #[test_case(Rule::FStringPercentFormat, Path::new("RUF073.py"))]
+    #[test_case(Rule::PytestFixtureAutouse, Path::new("RUF076.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
