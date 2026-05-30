@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+assertion_line: 59
 ---
 SIM114 [*] Combine `if` branches using logical `or` operator
  --> SIM114.py:2:1
@@ -387,84 +388,86 @@ help: Combine `if` branches
 135 |
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:138:1
+   --> SIM114.py:140:1
     |
-138 | / if a:  # we preserve comments, too!
-139 | |     b
-140 | | elif c:  # but not on the second branch
+138 |   # Known gap: inline comments on the elif header are silently deleted.
+139 |   # See https://github.com/astral-sh/ruff/issues/25470
+140 | / if a:  # we preserve comments, too!
 141 | |     b
+142 | | elif c:  # but not on the second branch
+143 | |     b
     | |_____^
     |
 help: Combine `if` branches
-135 |         return 3
-136 |
 137 |
+138 | # Known gap: inline comments on the elif header are silently deleted.
+139 | # See https://github.com/astral-sh/ruff/issues/25470
     - if a:  # we preserve comments, too!
     -     b
     - elif c:  # but not on the second branch
-138 + if a or c:  # we preserve comments, too!
-139 |     b
-140 |
-141 |
-
-SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:144:1
-    |
-144 | / if a: b  # here's a comment
-145 | | elif c: b
-    | |_________^
-    |
-help: Combine `if` branches
+140 + if a or c:  # we preserve comments, too!
 141 |     b
 142 |
 143 |
-    - if a: b  # here's a comment
-    - elif c: b
-144 + if a or c: b  # here's a comment
-145 |
-146 |
-147 | if(x > 200): pass
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:148:1
+   --> SIM114.py:146:1
     |
-148 | / if(x > 200): pass
-149 | | elif(100 < x and x < 200 and 300 < y and y < 800):
-150 | |     pass
+146 | / if a: b  # here's a comment
+147 | | elif c: b
+    | |_________^
+    |
+help: Combine `if` branches
+143 |     b
+144 |
+145 |
+    - if a: b  # here's a comment
+    - elif c: b
+146 + if a or c: b  # here's a comment
+147 |
+148 |
+149 | if(x > 200): pass
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+   --> SIM114.py:150:1
+    |
+150 | / if(x > 200): pass
+151 | | elif(100 < x and x < 200 and 300 < y and y < 800):
+152 | |     pass
     | |________^
     |
 help: Combine `if` branches
-145 | elif c: b
-146 |
-147 |
+147 | elif c: b
+148 |
+149 |
     - if(x > 200): pass
     - elif(100 < x and x < 200 and 300 < y and y < 800):
     - 	pass
-148 + if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
-149 |
-150 |
-151 | # See: https://github.com/astral-sh/ruff/issues/12732
-
-SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:154:1
-    |
-153 |   # See: https://github.com/astral-sh/ruff/issues/12732
-154 | / if False if True else False:
-155 | |     print(1)
-156 | | elif True:
-157 | |     print(1)
-    | |____________^
-158 |   else:
-159 |       print(2)
-    |
-help: Combine `if` branches
+150 + if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
 151 |
 152 |
 153 | # See: https://github.com/astral-sh/ruff/issues/12732
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+   --> SIM114.py:156:1
+    |
+155 |   # See: https://github.com/astral-sh/ruff/issues/12732
+156 | / if False if True else False:
+157 | |     print(1)
+158 | | elif True:
+159 | |     print(1)
+    | |____________^
+160 |   else:
+161 |       print(2)
+    |
+help: Combine `if` branches
+153 |
+154 |
+155 | # See: https://github.com/astral-sh/ruff/issues/12732
     - if False if True else False:
     -     print(1)
     - elif True:
-154 + if (False if True else False) or True:
-155 |     print(1)
-156 | else:
-157 |     print(2)
+156 + if (False if True else False) or True:
+157 |     print(1)
+158 | else:
+159 |     print(2)

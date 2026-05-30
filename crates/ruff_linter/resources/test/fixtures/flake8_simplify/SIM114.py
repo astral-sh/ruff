@@ -135,6 +135,8 @@ def func():
         return 3
 
 
+# Known gap: inline comments on the elif header are silently deleted.
+# See https://github.com/astral-sh/ruff/issues/25470
 if a:  # we preserve comments, too!
     b
 elif c:  # but not on the second branch
@@ -157,3 +159,20 @@ elif True:
     print(1)
 else:
     print(2)
+
+
+# Comments between branches prevent merging
+if a:
+    pass
+
+# This comment separates the branches
+elif b:
+    pass
+
+if a:
+    pass
+
+# Multi-line comment
+# between branches
+elif b:
+    pass

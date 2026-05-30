@@ -88,6 +88,19 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
+        // Don't merge if there are comments between the branches that would be lost
+        let inter_branch = TextRange::new(
+            checker.locator().full_line_end(current_branch.end()),
+            following_branch.range().start(),
+        );
+        if !checker
+            .comment_ranges()
+            .comments_in_range(inter_branch)
+            .is_empty()
+        {
+            continue;
+        }
+
         let mut diagnostic = checker.report_diagnostic(
             IfWithSameArms,
             TextRange::new(current_branch.start(), following_branch.end()),
