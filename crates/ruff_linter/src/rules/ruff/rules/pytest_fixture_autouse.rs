@@ -115,6 +115,10 @@ impl Violation for PytestFixtureAutouse {
 
 /// RUF076
 pub(crate) fn pytest_fixture_autouse(checker: &Checker, decorators: &[Decorator]) {
+    // TODO: Consider adding configuration options to:
+    // 1. Only flag this rule when the fixture is defined inside a `conftest.py` file.
+    // 2. Only flag this rule when the fixture has a specific scope (e.g. `function`, `session`, etc),
+    //    supporting a whitelist or blacklist approach.
     let semantic = checker.semantic();
     for decorator in decorators {
         // Resolve the qualified name to see if it is a pytest.fixture
