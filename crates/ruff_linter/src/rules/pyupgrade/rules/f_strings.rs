@@ -139,6 +139,9 @@ enum FormatContext {
 
 /// Returns `true` if the expression should be parenthesized when used in an f-string.
 fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
+    if text.starts_with('{') || matches!(expr, Expr::Lambda(_)) {
+        return true;
+    }
     match (context, expr) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
@@ -148,7 +151,6 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             | Expr::BoolOp(_)
             | Expr::Compare(_)
             | Expr::If(_)
-            | Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
