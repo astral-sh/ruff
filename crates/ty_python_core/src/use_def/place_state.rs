@@ -380,13 +380,20 @@ impl Bindings {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PlaceState {
     declarations: Declarations,
     bindings: Bindings,
 }
 
 impl PlaceState {
+    pub(super) fn from_parts(bindings: Bindings, declarations: Declarations) -> Self {
+        Self {
+            declarations,
+            bindings,
+        }
+    }
+
     /// Return a new [`PlaceState`] representing an unbound, undeclared place.
     pub(super) fn undefined(reachability: ScopedReachabilityConstraintId) -> Self {
         Self {
@@ -468,8 +475,13 @@ impl PlaceState {
         &self.declarations
     }
 
-    pub(super) fn into_parts(self) -> (Bindings, Declarations) {
-        (self.bindings, self.declarations)
+    pub(super) fn is_always_undefined(&self) -> bool {
+        self.bindings.is_always_unbound() && self.declarations.is_always_undeclared()
+    }
+
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.bindings.finish(reachability_constraints);
+        self.declarations.finish(reachability_constraints);
     }
 }
 
