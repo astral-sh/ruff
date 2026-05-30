@@ -168,8 +168,13 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 }
 
 /// ## What it does
-/// Checks for the presence of trailing commas on bare (i.e., unparenthesized)
-/// tuples.
+/// Checks for trailing commas that create a bare (i.e., unparenthesized) tuple
+/// at the end of a statement.
+///
+/// More precisely, this rule flags a trailing comma when it is followed by a
+/// statement-ending newline. Comments between the comma and the newline are
+/// ignored, so `foo = 1,  # note` is also flagged. This matches the behavior
+/// of the upstream [`flake8-commas`] plugin.
 ///
 /// ## Why is this bad?
 /// The presence of a misplaced comma will cause Python to interpret the value
@@ -198,6 +203,21 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 ///
 /// foo = (json.dumps({"bar": 1}),)
 /// ```
+///
+/// ## Known limitations
+/// Because this rule only fires when a trailing comma is followed by a
+/// statement-ending newline (ignoring any intervening comment), the following
+/// cases are **not** flagged:
+///
+/// - Bare tuples inside subscripts (e.g., `x[1, 2,]`), where the trailing
+///   comma is followed by `]`. The related rule [RUF031] addresses subscript
+///   tuple parenthesization from a different angle.
+/// - Bare tuples followed by a semicolon (e.g., `foo = 1,;`).
+/// - Bare tuples whose trailing comma is followed by `)` rather than a
+///   statement-ending newline (e.g., `f((yield x,))`).
+///
+/// [`flake8-commas`]: https://pypi.org/project/flake8-commas/
+/// [RUF031]: https://docs.astral.sh/ruff/rules/incorrectly-parenthesized-tuple-in-subscript/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.223")]
 pub(crate) struct TrailingCommaOnBareTuple;
