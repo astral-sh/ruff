@@ -404,3 +404,58 @@ fn recursion_limit_nested_lambda_chain() {
         err.error
     );
 }
+
+/// Depth for the drop-on-overflow regression tests below. The chains they build
+/// are formed by *iterative* parser loops, so they bypass the recursion-depth
+/// guard and produce a spine far deeper than a default thread stack can absorb
+/// with the derived (recursive) drop glue — i.e. deep enough that they overflow
+/// on drop without the manual `Drop` impls in `ruff_python_ast::expr_drop`.
+const DROP_CHAIN_DEPTH: usize = 100_000;
+
+#[test]
+fn deep_left_assoc_binop_chain_parses_and_drops() {
+    // `1 + 1 + ... + 1` — a left-associative `ExprBinOp` spine.
+    let src = format!("1{}", " + 1".repeat(DROP_CHAIN_DEPTH));
+    let parsed = parse_expression(&src).unwrap();
+    assert!(parsed.errors().is_empty());
+    // The drop at the end of this scope must not overflow the stack.
+    drop(parsed);
+}
+
+#[test]
+fn deep_call_chain_parses_and_drops() {
+    // `f()()()...` — a balanced postfix spine that keeps bracket nesting at
+    // zero, so the parser's `nesting()` guard never trips.
+    let src = format!("f{}", "()".repeat(DROP_CHAIN_DEPTH));
+    let parsed = parse_expression(&src).unwrap();
+    assert!(parsed.errors().is_empty());
+    drop(parsed);
+}
+
+#[test]
+fn deep_subscript_chain_parses_and_drops() {
+    // `x[0][0][0]...` — likewise balanced.
+    let src = format!("x{}", "[0]".repeat(DROP_CHAIN_DEPTH));
+    let parsed = parse_expression(&src).unwrap();
+    assert!(parsed.errors().is_empty());
+    drop(parsed);
+}
+
+#[test]
+fn deep_attribute_chain_parses_and_drops() {
+    // `x.a.a.a...` — attribute access has no brackets at all.
+    let src = format!("x{}", ".a".repeat(DROP_CHAIN_DEPTH));
+    let parsed = parse_expression(&src).unwrap();
+    assert!(parsed.errors().is_empty());
+    drop(parsed);
+}
+
+#[test]
+fn deep_mixed_postfix_chain_parses_and_drops() {
+    // `x[0].a()[0].a()...` mixes all three postfix node kinds, exercising the
+    // single shared `iter_expr_drop` loop across kinds within one spine.
+    let src = format!("x{}", "[0].a()".repeat(DROP_CHAIN_DEPTH / 3));
+    let parsed = parse_expression(&src).unwrap();
+    assert!(parsed.errors().is_empty());
+    drop(parsed);
+}
