@@ -46,7 +46,7 @@
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 
@@ -150,6 +150,42 @@ impl<K: Ord, V> FrozenMap<K, V> {
 }
 
 impl<K, V> Default for FrozenMap<K, V> {
+    fn default() -> Self {
+        Self(Box::default())
+    }
+}
+
+/// Compact structurally immutable keys stored in ascending order.
+///
+/// This is intended for collections that are constructed once and retained for membership tests
+/// and iteration. Lookup is O(log n), iteration is O(n), and collection from a
+/// [`HashSet`](std::collections::HashSet) is O(n log n).
+///
+/// Use a mutable set instead if entries need to be inserted or removed after construction.
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct FrozenSet<K>(Box<[K]>);
+
+impl<K: Ord, S> From<std::collections::HashSet<K, S>> for FrozenSet<K> {
+    fn from(set: std::collections::HashSet<K, S>) -> Self {
+        let mut entries = set.into_iter().collect::<Vec<_>>();
+        entries.sort_unstable();
+        Self(entries.into_boxed_slice())
+    }
+}
+
+impl<K: Ord> FrozenSet<K> {
+    fn contains(&self, key: &K) -> bool {
+        self.0.binary_search(key).is_ok()
+    }
+}
+
+impl<K> FrozenSet<K> {
+    fn iter(&self) -> std::slice::Iter<'_, K> {
+        self.0.iter()
+    }
+}
+
+impl<K> Default for FrozenSet<K> {
     fn default() -> Self {
         Self(Box::default())
     }
@@ -847,13 +883,13 @@ pub(crate) struct ScopeInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
-    string_annotations: FxHashSet<ExpressionNodeKey>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Metadata for type expressions in this region.
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -974,16 +1010,16 @@ pub(crate) struct DefinitionInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct DefinitionInferenceExtra<'db> {
     /// String annotations found in this region
-    string_annotations: FxHashSet<ExpressionNodeKey>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Functions called while inferring this definition.
     called_functions: Box<[FunctionType<'db>]>,
 
     /// Metadata for type expressions in this region.
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -1006,7 +1042,7 @@ struct DefinitionInferenceExtra<'db> {
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
-    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
+    qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1222,13 +1258,13 @@ pub(crate) struct ExpressionInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize, Default)]
 struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
-    string_annotations: FxHashSet<ExpressionNodeKey>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Metadata for type expressions in this region.
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -1379,10 +1415,10 @@ pub(crate) struct StatementInferenceInner<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct StatementInferenceInnerExtra<'db> {
     /// String annotations found in this region
-    string_annotations: FxHashSet<ExpressionNodeKey>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Functions called while inferring this statement.
     called_functions: Box<[FunctionType<'db>]>,
@@ -1391,7 +1427,7 @@ struct StatementInferenceInnerExtra<'db> {
     return_types_and_ranges: Box<[TypeAndRange<'db>]>,
 
     /// Metadata for type expressions in this region.
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -1407,7 +1443,7 @@ struct StatementInferenceInnerExtra<'db> {
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
-    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
+    qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 }
 
 impl<'db> StatementInferenceInner<'db> {
