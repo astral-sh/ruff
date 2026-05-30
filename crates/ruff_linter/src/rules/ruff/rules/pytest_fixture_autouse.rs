@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Decorator, Expr};
 use ruff_python_ast::helpers::{is_const_true, map_callable};
+use ruff_python_ast::{Decorator, Expr};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
