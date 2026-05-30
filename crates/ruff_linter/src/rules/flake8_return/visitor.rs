@@ -52,8 +52,7 @@ pub(super) struct ReturnVisitor<'semantic, 'data> {
     sibling: Option<&'data Stmt>,
     /// The parent nodes of the current node.
     parents: Vec<&'data Stmt>,
-    /// Ranges of the `finally` suites that would run after a `return` here. Pushed before walking a
-    /// `try`'s `body`/`handlers`/`orelse`, popped before its own `finalbody`.
+    /// Ranges of the `finally` suites that would run after a `return` reached here.
     enclosing_finally: Vec<TextRange>,
 }
 
@@ -188,10 +187,11 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                 // The `finally` runs after a `return` in the `body`, `handlers`, or `orelse`, so
                 // track its range while visiting those. Not the `finalbody` itself: its own
                 // statements can't re-read a `return`.
-                let finally_range = match (stmt_try.finalbody.first(), stmt_try.finalbody.last()) {
-                    (Some(first), Some(last)) => Some(TextRange::new(first.start(), last.end())),
-                    _ => None,
-                };
+                let finally_range = stmt_try
+                    .finalbody
+                    .first()
+                    .zip(stmt_try.finalbody.last())
+                    .map(|(first, last)| TextRange::new(first.start(), last.end()));
                 if let Some(finally_range) = finally_range {
                     self.enclosing_finally.push(finally_range);
                 }

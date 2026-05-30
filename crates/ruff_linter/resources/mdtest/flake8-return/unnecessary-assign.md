@@ -151,8 +151,9 @@ def f():
 
 ## A read after a `finally` rebind still suppresses
 
-Distinguishing a rebind that kills the value from a plain read needs control-flow analysis, so we
-conservatively treat the later read as observing the assignment:
+A rebind in `finally` makes the assignment redundant, but distinguishing a rebind that kills the
+value from a plain read needs control-flow analysis we don't do here. We conservatively treat the
+later read as observing the assignment.
 
 ```py
 def f():
@@ -183,8 +184,6 @@ def f():
         x, _ = ("done", 0)
         log(x)
 ```
-
-A conditional rebind may not run, so the later read can still observe the `try`'s value:
 
 ```py
 def f():

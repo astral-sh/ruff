@@ -618,21 +618,17 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
             continue;
         };
         // Ignore assignments whose name is read or deleted in an enclosing `finally`, which runs
-        // after the `return`. The read may resolve to a rebinding in the `finally` rather than to
-        // this assignment, so check every binding of the name.
+        // after the `return`. A reference resolving to a later rebinding in the `finally` counts
+        // too, so check every binding of the name.
         if !enclosing_finally.is_empty()
             && function_scope
                 .get_all(assigned_id)
-                .map(|binding_id| checker.semantic().binding(binding_id))
-                .any(|binding| {
-                    binding
-                        .references()
-                        .map(|reference_id| checker.semantic().reference(reference_id))
-                        .any(|reference| {
-                            enclosing_finally.iter().any(|finally_range| {
-                                finally_range.contains_range(reference.range())
-                            })
-                        })
+                .flat_map(|binding_id| checker.semantic().binding(binding_id).references())
+                .map(|reference_id| checker.semantic().reference(reference_id))
+                .any(|reference| {
+                    enclosing_finally
+                        .iter()
+                        .any(|finally_range| finally_range.contains_range(reference.range()))
                 })
         {
             continue;
