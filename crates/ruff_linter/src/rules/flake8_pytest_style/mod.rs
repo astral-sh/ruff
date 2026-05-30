@@ -377,4 +377,19 @@ mod tests {
         assert_diagnostics!("PT006_and_PT007", diagnostics);
         Ok(())
     }
+
+    #[test_case(Rule::PytestExtraneousScopeFunction, Path::new("PT003.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_pytest_style").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
 }

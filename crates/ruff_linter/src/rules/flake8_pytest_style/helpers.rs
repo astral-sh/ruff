@@ -7,6 +7,7 @@ use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_python_trivia::PythonWhitespace;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_pytest_asyncio_enabled;
 
 pub(super) fn get_mark_decorators<'a>(
     decorators: &'a [Decorator],
@@ -28,14 +29,13 @@ pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fail"]))
 }
 
-pub(super) fn is_pytest_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
-    semantic
+pub(super) fn is_pytest_fixture(decorator: &Decorator, checker: &Checker) -> bool {
+    checker
+        .semantic()
         .resolve_qualified_name(map_callable(&decorator.expression))
         .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["pytest" | "pytest_asyncio", "fixture"]
-            )
+            matches!(qualified_name.segments(), ["pytest", "fixture"]) ||
+            matches!(qualified_name.segments(), ["pytest" | "pytest_asyncio", "fixture"] if is_pytest_asyncio_enabled(checker.settings()))
         })
 }
 
