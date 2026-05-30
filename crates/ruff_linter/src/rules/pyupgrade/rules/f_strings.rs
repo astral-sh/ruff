@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
@@ -247,6 +247,7 @@ impl FStringConversion {
         range: TextRange,
         summary: &mut FormatSummaryValues,
         locator: &Locator,
+        is_builtin: impl Fn(&str) -> bool,
     ) -> Result<Self> {
         let contents = locator.slice(range);
 
@@ -327,10 +328,8 @@ impl FStringConversion {
                     // string, we can't convert the format string to an f-string. For example,
                     // converting `"{x} {x}".format(x=foo())` would result in `f"{foo()} {foo()}"`,
                     // which would call `foo()` twice.
-                    if !seen.insert(specifier) {
-                        if any_over_expr(arg, &Expr::is_call_expr) {
-                            return Ok(Self::SideEffects);
-                        }
+                    if !seen.insert(specifier) && contains_effect(arg, &is_builtin) {
+                        return Ok(Self::SideEffects);
                     }
 
                     converted.push_str(&formatted_expr(
@@ -440,8 +439,12 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
                 break token.start();
             }
             TokenKind::String if !token.unwrap_string_flags().is_unclosed() => {
-                match FStringConversion::try_convert(token.range(), &mut summary, checker.locator())
-                {
+                match FStringConversion::try_convert(
+                    token.range(),
+                    &mut summary,
+                    checker.locator(),
+                    |id| checker.semantic().has_builtin_binding(id),
+                ) {
                     // If the format string contains side effects that would need to be repeated,
                     // we can't convert it to an f-string.
                     Ok(FStringConversion::SideEffects) => return,
