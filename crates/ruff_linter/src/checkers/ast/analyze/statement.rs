@@ -366,6 +366,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::PropertyWithoutReturn) {
                 ruff::rules::property_without_return(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::PytestFixtureAutouse) {
+                ruff::rules::pytest_fixture_autouse(checker, decorator_list);
+            }
         }
         Stmt::Return(_) => {
             if checker.is_rule_enabled(Rule::ReturnInInit) {
