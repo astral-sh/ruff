@@ -212,6 +212,16 @@ def _(items: list[int]):
         items.clear()
         reveal_type(len(items))  # revealed: int
 
+def _(items: list[int]):
+    assert len(items) == 1
+    items.append(1)
+    assert len(items) == 2
+    1 + ""  # error: [unsupported-operator]
+
+def _(items: set[int]):
+    if len(items) == 1:
+        items[0]  # error: [not-subscriptable]
+
 def _(value: StatefulLength):
     if len(value) == 1:
         reveal_type(value)  # revealed: StatefulLength
@@ -221,26 +231,6 @@ def _(value: VaryingLength):
     if len(value) == 1:
         reveal_type(value)  # revealed: VaryingLength
         reveal_type(len(value))  # revealed: Literal[0, 1]
-```
-
-## Regressions
-
-Exact-length narrowing must not retain stale constraints for arbitrary mutable values:
-
-```py
-def _(items: list[int]):
-    assert len(items) == 1
-    items.append(1)
-    assert len(items) == 2
-    1 + ""  # error: [unsupported-operator]
-```
-
-It must not introduce synthetic diagnostics when the original value does not support an operation:
-
-```py
-def _(items: set[int]):
-    if len(items) == 1:
-        items[0]  # error: [not-subscriptable]
 ```
 
 ## Aliased exact lengths
