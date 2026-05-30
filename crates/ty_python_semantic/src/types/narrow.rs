@@ -1682,10 +1682,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .or_insert(constraint);
             };
 
+            // E.g., `len(items) == 2`
             if let ast::Expr::Call(call) = left.expression_value() {
                 narrow_len_call(call, inference.expression_type(&comparators[0]));
             }
 
+            // E.g., `2 == len(items)`
             if let ast::Expr::Call(call) = comparators[0].expression_value() {
                 narrow_len_call(call, inference.expression_type(&**left));
             }
