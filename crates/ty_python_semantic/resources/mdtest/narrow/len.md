@@ -216,6 +216,26 @@ def _(items: list[int]):
         reveal_type(len(items))  # revealed: Literal[3]
 ```
 
+## Regressions
+
+Exact-length narrowing must not retain stale constraints for arbitrary mutable values:
+
+```py
+def _(items: list[int]):
+    assert len(items) == 1
+    items.append(1)
+    assert len(items) == 2
+    1 + ""  # error: [unsupported-operator]
+```
+
+It must not introduce synthetic diagnostics when the original value does not support an operation:
+
+```py
+def _(items: set[int]):
+    if len(items) == 1:
+        items[0]  # error: [not-subscriptable]
+```
+
 ## Aliased exact lengths
 
 PEP 695 aliases are resolved before extracting literal lengths:
