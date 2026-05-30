@@ -298,6 +298,9 @@ struct PlaceStateInterner {
     interned_ids_by_bindings: FxHashMap<Bindings, InternedBindingsId>,
     interned_declarations: IndexVec<InternedDeclarationsId, Declarations>,
     interned_ids_by_declarations: FxHashMap<Declarations, InternedDeclarationsId>,
+    // Undeclared states are common and can be interned by their dense constraint IDs.
+    undeclared_declarations_by_constraint:
+        IndexVec<ScopedReachabilityConstraintId, Option<InternedDeclarationsId>>,
     // These values are extremely common, so avoid repeatedly hashing their small vectors.
     always_unbound_bindings: Option<InternedBindingsId>,
     always_undeclared_declarations: Option<InternedDeclarationsId>,
@@ -313,6 +316,7 @@ impl PlaceStateInterner {
                 declaration_map,
                 FxBuildHasher,
             ),
+            undeclared_declarations_by_constraint: IndexVec::new(),
             always_unbound_bindings: None,
             always_undeclared_declarations: None,
         }
@@ -350,6 +354,25 @@ impl PlaceStateInterner {
             return interned_id;
         }
 
+        if let Some(reachability_constraint) = declarations.undeclared_reachability_constraint()
+            && !reachability_constraint.is_terminal()
+        {
+            let index = reachability_constraint.index();
+            let len = self.undeclared_declarations_by_constraint.len();
+            if index >= len {
+                self.undeclared_declarations_by_constraint
+                    .resize(index + 1, None);
+            } else if let Some(interned_id) =
+                self.undeclared_declarations_by_constraint[reachability_constraint]
+            {
+                return interned_id;
+            }
+
+            let interned_id = self.interned_declarations.push(declarations);
+            self.undeclared_declarations_by_constraint[reachability_constraint] = Some(interned_id);
+            return interned_id;
+        }
+
         match self.interned_ids_by_declarations.entry(declarations) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
@@ -376,9 +399,9 @@ impl PlaceStateInterner {
         bindings: Bindings,
         declarations: Declarations,
     ) -> InternedPlaceStateId {
-        // Apart from the always-undeclared state, retained declarations rarely repeat. Keep the
-        // compact IDs without hashing every declaration vector to find the occasional duplicate.
-        let declarations_id = if declarations.is_always_undeclared() {
+        // Other retained declarations rarely repeat. Keep the compact IDs without hashing every
+        // declaration vector to find the occasional duplicate.
+        let declarations_id = if declarations.undeclared_reachability_constraint().is_some() {
             self.intern_declarations(declarations)
         } else {
             self.interned_declarations.push(declarations)

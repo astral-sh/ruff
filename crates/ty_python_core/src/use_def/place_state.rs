@@ -98,14 +98,24 @@ impl PreviousDefinitions {
 }
 
 impl Declarations {
-    pub(super) fn is_always_undeclared(&self) -> bool {
-        matches!(
-            self.live_declarations.as_slice(),
-            [LiveDeclaration {
+    pub(super) fn undeclared_reachability_constraint(
+        &self,
+    ) -> Option<ScopedReachabilityConstraintId> {
+        let [
+            LiveDeclaration {
                 declaration: ScopedDefinitionId::UNBOUND,
-                reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            }]
-        )
+                reachability_constraint,
+            },
+        ] = self.live_declarations.as_slice()
+        else {
+            return None;
+        };
+        Some(*reachability_constraint)
+    }
+
+    pub(super) fn is_always_undeclared(&self) -> bool {
+        self.undeclared_reachability_constraint()
+            == Some(ScopedReachabilityConstraintId::ALWAYS_TRUE)
     }
 
     pub(super) fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
