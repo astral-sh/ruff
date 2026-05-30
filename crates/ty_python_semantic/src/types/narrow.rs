@@ -2167,10 +2167,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .map(|element| self.narrow_with_present_key(*element, key)),
             ),
             resolved if typeddict_declares_key(self.db, resolved, key) => resolved,
-            resolved if is_or_contains_typeddict(self.db, resolved) => constrain(
-                ty,
-                Type::TypedDict(required_typeddict_key(self.db, key, Type::object())),
-            ),
+            resolved if is_or_contains_typeddict(self.db, resolved) => {
+                constrain(ty, typeddict_key_getitem_protocol(self.db, key))
+            }
             _ => constrain(ty, key_membership_contains_protocol(self.db, key)),
         }
     }
@@ -2316,12 +2315,12 @@ fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> boo
     }
 }
 
-/// Return a synthesized `TypedDict` that represents safe subscript access for a present key on a
+/// Return a synthesized protocol that represents safe subscript access for a present key on a
 /// `TypedDict`-containing type.
 ///
 /// For `TypedDict`s, a positive key-membership test proves more than containment: it also makes
 /// string-literal subscript access with that key valid. In the `if` branch below, the `Bar` arm
-/// keeps its original shape but is intersected with this schema so `u["foo"]` is accepted:
+/// keeps its original shape but is intersected with this protocol so `u["foo"]` is accepted:
 ///
 /// ```python
 /// class Foo(TypedDict):
@@ -2334,17 +2333,23 @@ fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> boo
 ///     if "foo" in u:
 ///         reveal_type(u["foo"])  # object
 /// ```
-fn required_typeddict_key<'db>(
-    db: &'db dyn Db,
-    key: &str,
-    value_ty: Type<'db>,
-) -> TypedDictType<'db> {
-    let field = TypedDictFieldBuilder::new(value_ty)
-        .required(true)
-        .read_only(true)
-        .build();
-    let schema = TypedDictSchema::from_iter([(Name::from(key), field)]);
-    TypedDictType::from_schema_items(db, schema)
+fn typeddict_key_getitem_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
+    let signature = Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self"))),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(Type::string_literal(db, key)),
+            ],
+        ),
+        Type::object(),
+    );
+
+    Type::refinement_protocol_with_methods(
+        db,
+        [("__getitem__", CallableType::function_like(db, signature))],
+    )
 }
 
 /// Return a synthesized protocol that records a true key-membership test without implying
@@ -2360,7 +2365,7 @@ fn required_typeddict_key<'db>(
 /// ```
 ///
 /// Non-`TypedDict` union arms therefore receive this `__contains__` protocol instead of the
-/// synthesized `TypedDict` used for `TypedDict` arms.
+/// `__getitem__` protocol used for `TypedDict` arms.
 fn key_membership_contains_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
     let signature = Signature::new(
         Parameters::new(

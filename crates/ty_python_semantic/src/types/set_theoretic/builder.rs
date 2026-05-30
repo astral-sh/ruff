@@ -1482,12 +1482,24 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_positive) in self.positive.iter().enumerate() {
+                    // Flow-refinement protocols carry evidence for later operations even when
+                    // their structural interface is redundant with another positive element.
                     // S & T = S    if S <: T
-                    if existing_positive.is_redundant_with(db, new_positive) {
+                    if existing_positive.is_redundant_with(db, new_positive)
+                        && !matches!(
+                            new_positive,
+                            Type::ProtocolInstance(protocol) if protocol.is_refinement()
+                        )
+                    {
                         return;
                     }
                     // same rule, reverse order
-                    if new_positive.is_redundant_with(db, *existing_positive) {
+                    if new_positive.is_redundant_with(db, *existing_positive)
+                        && !matches!(
+                            existing_positive,
+                            Type::ProtocolInstance(protocol) if protocol.is_refinement()
+                        )
+                    {
                         to_remove.push(index);
                     }
                     // A & B = Never    if A and B are disjoint
