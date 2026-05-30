@@ -42,6 +42,62 @@ use crate::checkers::ast::Checker;
 /// def test_foo(my_fixture):
 ///     ...
 /// ```
+///
+/// Or, for complex test environments with multiple dependency fixtures:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture(autouse=True)
+/// def db():
+///     return Database()
+///
+///
+/// @pytest.fixture(autouse=True)
+/// def cache():
+///     return Cache()
+///
+///
+/// @pytest.fixture(autouse=True)
+/// def mock_email_client():
+///     return MockEmailClient()
+///
+/// # relying on the autouse fixture which might be defined elsewhere makes the test
+/// # harder to reason about and debug
+/// def test_user_creation():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture
+/// def db():
+///     return Database()
+///
+///
+/// @pytest.fixture
+/// def cache():
+///     return Cache()
+///
+///
+/// @pytest.fixture
+/// def mock_email_client():
+///     return MockEmailClient()
+///
+///
+/// # Combine related dependencies into a single high-level fixture
+/// @pytest.fixture
+/// def app_context(db, cache, mock_email_client):
+///     return AppContext(db=db, cache=cache, email=mock_email_client)
+///
+///
+/// # Declare only the combining fixture in the test
+/// def test_user_creation(app_context):
+///     ...
+/// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.15.15")]
 pub(crate) struct PytestFixtureAutouse;
