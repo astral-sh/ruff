@@ -99,7 +99,7 @@ use crate::types::{
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -329,6 +329,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
+    /// If the inference region refers to a definition, whether synthesized dictionary-key
+    /// assignments derived from its right-hand side should be discarded.
+    discards_dict_key_assignments: bool,
+
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
@@ -374,7 +378,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
+            discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
+        }
+    }
+
+    fn discard_dict_key_assignments_for(&mut self, definition: Definition<'db>) {
+        if matches!(self.region, InferenceRegion::Definition(d) if d == definition) {
+            self.discards_dict_key_assignments = true;
         }
     }
 
@@ -1428,6 +1439,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         (declared_ty, inferred_ty)
                     }
                 } else {
+                    self.discard_dict_key_assignments_for(definition);
                     report_invalid_assignment(
                         &self.context,
                         node,
@@ -8407,13 +8419,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
                         match binding.binding {
-                            DefinitionState::Defined(definition) => {
+                            DefinitionState::Defined(definition)
+                                if !is_discarded_dict_key_assignment(db, definition) =>
+                            {
                                 let binding_ty = binding_type(db, definition);
                                 union = union.add(
                                     binding.narrowing_constraint.narrow(db, binding_ty, place),
                                 );
                             }
-                            DefinitionState::Undefined | DefinitionState::Deleted => {
+                            DefinitionState::Defined(_)
+                            | DefinitionState::Undefined
+                            | DefinitionState::Deleted => {
                                 union =
                                     union.add(binding.narrowing_constraint.narrow(db, ty, place));
                             }
@@ -9844,6 +9860,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
@@ -9927,6 +9944,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
@@ -10037,6 +10055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: _,
             dataclass_field_specifiers: _,
             undecorated_type: _,
+            discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
             index: _,
@@ -10076,6 +10095,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             undecorated_type,
+            discards_dict_key_assignments,
             called_functions,
 
             // builder only state
@@ -10100,29 +10120,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !called_functions.is_empty()
             || !qualifiers.is_empty()
             || !type_expression_flags.is_empty()
-            || !collection_use_constraints.is_empty())
-        .then(|| {
-            collection_use_constraints.shrink_to_fit();
-            qualifiers.shrink_to_fit();
-            type_expression_flags.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            string_annotations.shrink_to_fit();
-            Box::new(DefinitionInferenceExtra {
-                string_annotations,
-                expected_types,
-                collection_use_constraints,
-                called_functions: called_functions
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
-                type_expression_flags,
-                cycle_recovery,
-                deferred: deferred.into_boxed_slice(),
-                diagnostics,
-                undecorated_type,
-                qualifiers,
-            })
-        });
+            || !collection_use_constraints.is_empty()
+            || discards_dict_key_assignments)
+            .then(|| {
+                collection_use_constraints.shrink_to_fit();
+                qualifiers.shrink_to_fit();
+                type_expression_flags.shrink_to_fit();
+                expected_types.shrink_to_fit();
+                string_annotations.shrink_to_fit();
+                Box::new(DefinitionInferenceExtra {
+                    string_annotations,
+                    expected_types,
+                    collection_use_constraints,
+                    called_functions: called_functions
+                        .into_iter()
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                    type_expression_flags,
+                    cycle_recovery,
+                    deferred: deferred.into_boxed_slice(),
+                    diagnostics,
+                    undecorated_type,
+                    discards_dict_key_assignments,
+                    qualifiers,
+                })
+            });
 
         if bindings.len() > 20 {
             tracing::debug!(
@@ -10171,6 +10193,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // Builder only state
             expression_cache: _,
@@ -10246,6 +10269,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             called_functions: _,
             undecorated_type: _,
+            discards_dict_key_assignments: _,
             qualifiers: _,
             type_expression_flags: _,
         } = *self;
@@ -10289,6 +10313,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
@@ -10792,6 +10817,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         }
 
         if !bound_ty.is_assignable_to(db, declared_ty) {
+            builder.discard_dict_key_assignments_for(self.binding);
             report_invalid_assignment(
                 &builder.context,
                 self.node,
@@ -10815,6 +10841,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))
             {
+                builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = self.node {
@@ -10823,6 +10850,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 .unwrap_or_else(|| builder.infer_expression(value, TypeContext::default()));
 
             if !value_ty.is_typed_dict() && !Self::is_safe_mutable_class(db, value_ty) {
+                builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
         }
