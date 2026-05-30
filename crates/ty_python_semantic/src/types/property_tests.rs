@@ -83,6 +83,38 @@ mod stable {
     use super::union;
     use crate::types::{CallableType, IntersectionBuilder, KnownClass, Type};
 
+    /// Callable disjointness deliberately ignores the bottom callable witness. This means that
+    /// subtype and assignability relations can differ for negated callables.
+    ///
+    /// Walk through unions and positive intersections because their simplification can apply the
+    /// same pragmatic relation to one element at a time.
+    fn is_assignable_or_pragmatic_callable_negation<'db>(
+        db: &'db dyn crate::Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        source.is_assignable_to(db, target)
+            || match (source, target) {
+                (Type::Union(source), _) => source.elements(db).iter().all(|source| {
+                    is_assignable_or_pragmatic_callable_negation(db, *source, target)
+                }),
+                (_, Type::Union(target)) => target.elements(db).iter().any(|target| {
+                    is_assignable_or_pragmatic_callable_negation(db, source, *target)
+                }),
+                (Type::Intersection(source), _) => source.positive(db).iter().any(|source| {
+                    is_assignable_or_pragmatic_callable_negation(db, *source, target)
+                }),
+                (Type::Callable(_), Type::Intersection(target)) => {
+                    source.is_subtype_of(db, Type::Intersection(target))
+                        && target
+                            .negative(db)
+                            .iter()
+                            .any(|negative| matches!(negative, Type::Callable(_)))
+                }
+                _ => false,
+            }
+    }
+
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
         equivalent_to_is_reflexive, db,
@@ -134,7 +166,7 @@ mod stable {
     // `S <: T` implies that `S` can be assigned to `T`.
     type_property_test!(
         subtype_of_implies_assignable_to, db,
-        forall types s, t. s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
+        forall types s, t. s.is_subtype_of(db, t) => is_assignable_or_pragmatic_callable_negation(db, s, t)
     );
 
     // If `T` is a singleton, it is also single-valued.
@@ -183,7 +215,11 @@ mod stable {
     // For *any* pair of types, each of the pair should be assignable to the union of the two.
     type_property_test!(
         all_type_pairs_are_assignable_to_their_union, db,
-        forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
+        forall types s, t. {
+            let union = union(db, [s, t]);
+            is_assignable_or_pragmatic_callable_negation(db, s, union)
+                && is_assignable_or_pragmatic_callable_negation(db, t, union)
+        }
     );
 
     // Only `Never` is a subtype of `Any`.

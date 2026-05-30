@@ -1392,10 +1392,9 @@ class FinalFoo:
 static_assert(is_disjoint_from(Proto, FinalFoo))
 ```
 
-Method members delegate to callable disjointness, which considers callables with disjoint
-non-`Never` return types to be disjoint. This is a pragmatic approximation: strictly speaking, an
-implementation returning `Never` could satisfy method signatures with otherwise disjoint return
-types.
+Method members establish disjointness when their non-`Never` return types are disjoint. This is a
+pragmatic approximation: strictly speaking, an implementation returning `Never` could satisfy method
+signatures with otherwise disjoint return types.
 
 ```toml
 [environment]
