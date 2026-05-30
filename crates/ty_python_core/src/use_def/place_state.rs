@@ -98,6 +98,10 @@ impl PreviousDefinitions {
 }
 
 impl Declarations {
+    pub(super) fn into_live_declarations(self) -> impl Iterator<Item = LiveDeclaration> {
+        self.live_declarations.into_iter()
+    }
+
     pub(super) fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_declaration = LiveDeclaration {
             declaration: ScopedDefinitionId::UNBOUND,
@@ -199,10 +203,14 @@ pub(super) struct Bindings {
     /// "unbound" binding.
     unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this place, sorted by their `ScopedDefinitionId`
-    live_bindings: SmallVec<[LiveBinding; 2]>,
+    live_bindings: SmallVec<[LiveBinding; 1]>,
 }
 
 impl Bindings {
+    pub(super) fn into_live_bindings(self) -> impl Iterator<Item = LiveBinding> {
+        self.live_bindings.into_iter()
+    }
+
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
@@ -365,6 +373,10 @@ pub(crate) struct PlaceState {
 }
 
 impl PlaceState {
+    pub(super) fn into_parts(self) -> (Bindings, Declarations) {
+        (self.bindings, self.declarations)
+    }
+
     /// Return a new [`PlaceState`] representing an unbound, undeclared place.
     pub(super) fn undefined(reachability: ScopedReachabilityConstraintId) -> Self {
         Self {

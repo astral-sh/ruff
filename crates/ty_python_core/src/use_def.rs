@@ -294,7 +294,69 @@ impl InternedPlaceStateId {
 #[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 struct RetainedPlaceStates<T> {
     end_of_scope: T,
-    reachable: ReachableDefinitions,
+    reachable: RetainedDefinitions,
+}
+
+/// Compact immutable list optimized for the common singleton case.
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+enum CompactList<T> {
+    Empty,
+    One(T),
+    Many(ThinVec<T>),
+}
+
+impl<T> CompactList<T> {
+    fn iter(&self) -> std::slice::Iter<'_, T> {
+        match self {
+            Self::Empty => [].iter(),
+            Self::One(value) => std::slice::from_ref(value).iter(),
+            Self::Many(values) => values.iter(),
+        }
+    }
+}
+
+impl<T> FromIterator<T> for CompactList<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut iter = iter.into_iter();
+        let Some(first) = iter.next() else {
+            return Self::Empty;
+        };
+        let Some(second) = iter.next() else {
+            return Self::One(first);
+        };
+        Self::Many(std::iter::once(first).chain([second]).chain(iter).collect())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct RetainedDefinitions {
+    bindings: CompactList<LiveBinding>,
+    declarations: CompactList<LiveDeclaration>,
+}
+
+impl From<PlaceState> for RetainedDefinitions {
+    fn from(state: PlaceState) -> Self {
+        let (bindings, declarations) = state.into_parts();
+        Self {
+            bindings: bindings.into_live_bindings().collect(),
+            declarations: declarations.into_live_declarations().collect(),
+        }
+    }
+}
+
+impl From<ReachableDefinitions> for RetainedDefinitions {
+    fn from(state: ReachableDefinitions) -> Self {
+        Self {
+            bindings: state.bindings.into_live_bindings().collect(),
+            declarations: state.declarations.into_live_declarations().collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct RetainedSymbolStates {
+    end_of_scope: RetainedDefinitions,
+    reachable: RetainedDefinitions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -360,10 +422,10 @@ pub struct UseDefMap<'db> {
     /// bindings to that symbol. If there are any, the assignment is invalid.
     bindings_by_definition: FxHashMap<Definition<'db>, InternedBindingsId>,
 
-    /// Retained [`PlaceState`] values for each symbol.
-    symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<PlaceState>>,
+    /// Retained definition states for each symbol.
+    symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedSymbolStates>,
 
-    /// Retained [`PlaceState`] values for each member.
+    /// Retained definition states for each member.
     member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates<InternedPlaceStateId>>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
@@ -543,8 +605,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(
-            self.symbol_states[symbol].end_of_scope.bindings(),
+        self.bindings_iterator_from_live(
+            self.symbol_states[symbol].end_of_scope.bindings.iter(),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -574,16 +636,20 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings = &self.symbol_states[symbol].reachable.bindings;
-        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
+        self.bindings_iterator_from_live(
+            self.symbol_states[symbol].reachable.bindings.iter(),
+            BoundnessAnalysis::AssumeBound,
+        )
     }
 
     pub fn reachable_member_bindings(
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings = &self.member_states[member].reachable.bindings;
-        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
+        self.bindings_iterator_from_live(
+            self.member_states[member].reachable.bindings.iter(),
+            BoundnessAnalysis::AssumeBound,
+        )
     }
 
     pub(crate) fn enclosing_snapshot(
@@ -650,8 +716,10 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let declarations = self.symbol_states[symbol].end_of_scope.declarations();
-        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+        self.declarations_iterator_from_live(
+            self.symbol_states[symbol].end_of_scope.declarations.iter(),
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
     pub(crate) fn end_of_scope_member_declarations<'map>(
@@ -667,16 +735,20 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = &self.symbol_states[symbol].reachable.declarations;
-        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+        self.declarations_iterator_from_live(
+            self.symbol_states[symbol].reachable.declarations.iter(),
+            BoundnessAnalysis::AssumeBound,
+        )
     }
 
     pub fn reachable_member_declarations(
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = &self.member_states[member].reachable.declarations;
-        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+        self.declarations_iterator_from_live(
+            self.member_states[member].reachable.declarations.iter(),
+            BoundnessAnalysis::AssumeBound,
+        )
     }
 
     pub fn reachable_declarations(&self, place: ScopedPlaceId) -> DeclarationsIterator<'_, 'db> {
@@ -713,11 +785,15 @@ impl<'db> UseDefMap<'db> {
         ),
     > + 'map {
         self.symbol_states.iter_enumerated().map(
-            |(symbol_id, RetainedPlaceStates { reachable, .. })| {
-                let declarations = self
-                    .declarations_iterator(&reachable.declarations, BoundnessAnalysis::AssumeBound);
-                let bindings =
-                    self.bindings_iterator(&reachable.bindings, BoundnessAnalysis::AssumeBound);
+            |(symbol_id, RetainedSymbolStates { reachable, .. })| {
+                let declarations = self.declarations_iterator_from_live(
+                    reachable.declarations.iter(),
+                    BoundnessAnalysis::AssumeBound,
+                );
+                let bindings = self.bindings_iterator_from_live(
+                    reachable.bindings.iter(),
+                    BoundnessAnalysis::AssumeBound,
+                );
                 (symbol_id, declarations, bindings)
             },
         )
@@ -728,12 +804,20 @@ impl<'db> UseDefMap<'db> {
         bindings: &'map Bindings,
         boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
+        self.bindings_iterator_from_live(bindings.iter(), boundness_analysis)
+    }
+
+    fn bindings_iterator_from_live<'map>(
+        &'map self,
+        bindings: LiveBindingsIterator<'map>,
+        boundness_analysis: BoundnessAnalysis,
+    ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             reachability_constraints: &self.reachability_constraints,
             boundness_analysis,
-            inner: bindings.iter(),
+            inner: bindings,
         }
     }
 
@@ -742,12 +826,20 @@ impl<'db> UseDefMap<'db> {
         declarations: &'map Declarations,
         boundness_analysis: BoundnessAnalysis,
     ) -> DeclarationsIterator<'map, 'db> {
+        self.declarations_iterator_from_live(declarations.iter(), boundness_analysis)
+    }
+
+    fn declarations_iterator_from_live<'map>(
+        &'map self,
+        declarations: LiveDeclarationsIterator<'map>,
+        boundness_analysis: BoundnessAnalysis,
+    ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             reachability_constraints: &self.reachability_constraints,
             boundness_analysis,
-            inner: declarations.iter(),
+            inner: declarations,
         }
     }
 }
@@ -1782,7 +1874,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
         self.reachability_constraints.mark_used(self.reachability);
         let symbol_states =
-            Self::zip_place_states(self.symbol_states, self.reachable_symbol_definitions);
+            Self::retain_symbol_states(self.symbol_states, self.reachable_symbol_definitions);
         let member_states =
             Self::zip_place_states(end_of_scope_members, self.reachable_member_definitions);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
@@ -1817,7 +1909,23 @@ impl<'db> UseDefMapBuilder<'db> {
             .zip(reachable)
             .map(|(end_of_scope, reachable)| RetainedPlaceStates {
                 end_of_scope,
-                reachable,
+                reachable: reachable.into(),
+            })
+            .collect()
+    }
+
+    fn retain_symbol_states(
+        end_of_scope: IndexVec<ScopedSymbolId, PlaceState>,
+        reachable: IndexVec<ScopedSymbolId, ReachableDefinitions>,
+    ) -> FrozenIndexVec<ScopedSymbolId, RetainedSymbolStates> {
+        assert_eq!(end_of_scope.len(), reachable.len());
+
+        end_of_scope
+            .into_iter()
+            .zip(reachable)
+            .map(|(end_of_scope, reachable)| RetainedSymbolStates {
+                end_of_scope: end_of_scope.into(),
+                reachable: reachable.into(),
             })
             .collect()
     }
