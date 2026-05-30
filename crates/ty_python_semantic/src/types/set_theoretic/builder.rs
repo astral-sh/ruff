@@ -1238,6 +1238,40 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
+    /// Adds a batch of positive elements that are known to form a single conjunction.
+    ///
+    /// Once `IntersectionBuilder` sees a union, it maintains one intersection per union
+    /// element. Add non-union conjuncts first so their simplification work happens once before
+    /// that state is distributed, instead of once per union element.
+    pub(crate) fn positive_conjunction(self, conjuncts: SmallVec<[Type<'db>; 2]>) -> Self {
+        let Some(deferred_union) = conjuncts
+            .iter()
+            .find(|conjunct| conjunct.is_union())
+            .copied()
+        else {
+            return self.positive_elements(conjuncts);
+        };
+
+        // A single-valued conjunct cannot partially reduce a union: it either survives or
+        // makes the entire conjunction impossible. Check that before materializing one
+        // `Never` intersection per union element, e.g. for `(A | B | C) & None`.
+        if conjuncts.iter().copied().any(|conjunct| {
+            conjunct != deferred_union
+                && conjunct.is_single_valued(self.db)
+                && deferred_union.is_disjoint_from(self.db, conjunct)
+        }) {
+            return self.add_positive(Type::Never);
+        }
+
+        self.positive_elements(
+            conjuncts
+                .iter()
+                .filter(|conjunct| !conjunct.is_union())
+                .chain(conjuncts.iter().filter(|conjunct| conjunct.is_union()))
+                .copied(),
+        )
+    }
+
     pub(crate) fn build(self) -> Type<'db> {
         UnionType::from_elements(
             self.db,
@@ -1785,6 +1819,7 @@ mod tests {
     use crate::types::{KnownClass, KnownInstanceType, Truthiness};
 
     use ruff_db::system::DbWithWritableSystem as _;
+    use smallvec::smallvec;
     use ty_module_resolver::KnownModule;
 
     #[test]
@@ -1877,6 +1912,20 @@ mod tests {
 
         let intersection = IntersectionBuilder::new(&db).build();
         assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn positive_conjunction_short_circuits_disjoint_singleton_for_union() {
+        let db = setup_db();
+
+        let union = UnionType::from_elements(&db, [Type::int_literal(0), Type::int_literal(1)])
+            .expect_union();
+
+        let intersection = IntersectionBuilder::new(&db)
+            .positive_conjunction(smallvec![Type::Union(union), Type::none(&db)])
+            .build();
+
+        assert_eq!(intersection, Type::Never);
     }
 
     #[test]
