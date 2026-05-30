@@ -1642,13 +1642,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 let narrow_to_length = |(length_literal, length)| {
                     let protocol_length = match length_literal {
-                        0 => UnionType::from_elements(
+                        0 => UnionType::from_two_elements(
                             self.db,
-                            [Type::int_literal(0), Type::bool_literal(false)],
+                            Type::int_literal(0),
+                            Type::bool_literal(false),
                         ),
-                        1 => UnionType::from_elements(
+                        1 => UnionType::from_two_elements(
                             self.db,
-                            [Type::int_literal(1), Type::bool_literal(true)],
+                            Type::int_literal(1),
+                            Type::bool_literal(true),
                         ),
                         _ => Type::int_literal(length_literal),
                     };
