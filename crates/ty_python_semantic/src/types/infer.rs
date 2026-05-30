@@ -241,7 +241,7 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 /// `@staticmethod`).
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| FunctionDecoratorInference::cycle_initial(),
+    cycle_initial=|_, _, _| FunctionDecoratorInference::default(),
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(crate) fn function_known_decorators<'db>(
@@ -273,7 +273,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// Unlike [`DefinitionInference`], this stores only decorator expression types and
 /// diagnostics, plus the expression-side state that needs to be merged back into
 /// function-definition inference.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, Default, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
@@ -283,16 +283,6 @@ pub(crate) struct FunctionDecoratorInference<'db> {
 }
 
 impl<'db> FunctionDecoratorInference<'db> {
-    fn cycle_initial() -> Self {
-        Self {
-            expression_types: FrozenMap::default(),
-            bindings: Box::default(),
-            called_functions: Box::default(),
-            known_decorators: FunctionDecorators::empty(),
-            diagnostics: TypeCheckDiagnostics::default(),
-        }
-    }
-
     pub(crate) fn expression_type(
         &self,
         expression: impl Into<ExpressionNodeKey>,
