@@ -1240,36 +1240,26 @@ impl<'db> IntersectionBuilder<'db> {
 
     /// Adds a batch of positive elements that are known to form a single conjunction.
     ///
-    /// Once `IntersectionBuilder` sees a union, it maintains one intersection per union
-    /// element. Add non-union conjuncts first so their simplification work happens once before
-    /// that state is distributed, instead of once per union element.
+    /// Before distributing a union, check whether another single-valued conjunct makes the
+    /// conjunction impossible, e.g. `(A | B | C) & None`.
     pub(crate) fn positive_conjunction(self, conjuncts: SmallVec<[Type<'db>; 2]>) -> Self {
-        let Some(deferred_union) = conjuncts
+        let Some(union) = conjuncts
             .iter()
-            .find(|conjunct| conjunct.is_union())
             .copied()
+            .find(|conjunct| conjunct.is_union())
         else {
             return self.positive_elements(conjuncts);
         };
 
-        // A single-valued conjunct cannot partially reduce a union: it either survives or
-        // makes the entire conjunction impossible. Check that before materializing one
-        // `Never` intersection per union element, e.g. for `(A | B | C) & None`.
         if conjuncts.iter().copied().any(|conjunct| {
-            conjunct != deferred_union
+            conjunct != union
                 && conjunct.is_single_valued(self.db)
-                && deferred_union.is_disjoint_from(self.db, conjunct)
+                && union.is_disjoint_from(self.db, conjunct)
         }) {
             return self.add_positive(Type::Never);
         }
 
-        self.positive_elements(
-            conjuncts
-                .iter()
-                .filter(|conjunct| !conjunct.is_union())
-                .chain(conjuncts.iter().filter(|conjunct| conjunct.is_union()))
-                .copied(),
-        )
+        self.positive_elements(conjuncts)
     }
 
     pub(crate) fn build(self) -> Type<'db> {
