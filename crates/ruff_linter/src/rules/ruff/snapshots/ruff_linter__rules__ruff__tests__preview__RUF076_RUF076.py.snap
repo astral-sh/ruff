@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF076 Avoid using `autouse=True` in `pytest.fixture` decorators
+ --> RUF076.py:4:17
+  |
+3 | # Positive cases (violations)
+4 | @pytest.fixture(autouse=True)
+  |                 ^^^^^^^^^^^^
+5 | def my_autouse_fixture():
+6 |     pass
+  |
+
+RUF076 Avoid using `autouse=True` in `pytest.fixture` decorators
+  --> RUF076.py:8:33
+   |
+ 6 |     pass
+ 7 |
+ 8 | @pytest.fixture(scope="module", autouse=True)
+   |                                 ^^^^^^^^^^^^
+ 9 | def my_scoped_autouse_fixture():
+10 |     pass
+   |
