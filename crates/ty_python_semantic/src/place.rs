@@ -1404,8 +1404,9 @@ fn place_from_bindings_impl<'db>(
                 DefinitionState::Defined(binding)
                     if is_discarded_dict_key_assignment(db, binding) =>
                 {
-                    // The enclosing write already invalidated earlier child refinements. This
-                    // rejected synthesized binding must not establish new RHS-derived precision.
+                    // This synthesized `d[key] = value` binding was derived from an assignment such
+                    // as `d = {key: value}`. If the RHS is not known to be stored unchanged, discard
+                    // the binding so that lookup of `d[key]` can fall back to `d`.
                     return None;
                 }
                 DefinitionState::Defined(binding) => binding,

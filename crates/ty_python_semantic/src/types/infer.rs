@@ -213,11 +213,15 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition()
 }
 
-/// Returns `true` if a synthesized dictionary-key binding has been discarded.
+/// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
 ///
-/// Such bindings describe refinement information derived from the right-hand side of their
-/// enclosing assignment. If inference discards RHS-derived refinements for that assignment, its
-/// synthesized descendants must not participate in place resolution either.
+/// For example, inference synthesizes an `x["a"] = "bad"` binding for:
+/// ```python
+/// def f(x: dict[str, int]):
+///     x = {"a": "bad"}  # invalid-assignment
+/// ```
+/// Since the enclosing assignment was rejected, place resolution must ignore that binding and fall
+/// back to the declared value type of `x`.
 pub(crate) fn is_discarded_dict_key_assignment<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -226,7 +230,7 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
         return false;
     };
 
-    infer_definition_types(db, dict_key_assignment.assignment()).discards_descendant_refinements()
+    infer_definition_types(db, dict_key_assignment.assignment()).discards_dict_key_assignments()
 }
 
 /// Infer decorator expression types for a function definition.
@@ -982,8 +986,9 @@ struct DefinitionInferenceExtra<'db> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
-    /// Whether refinements derived from the right-hand side of this definition were discarded.
-    discards_descendant_refinements: bool,
+    /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
+    /// discarded.
+    discards_dict_key_assignments: bool,
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
@@ -1169,10 +1174,10 @@ impl<'db> DefinitionInference<'db> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 
-    pub(crate) fn discards_descendant_refinements(&self) -> bool {
+    pub(crate) fn discards_dict_key_assignments(&self) -> bool {
         self.extra
             .as_deref()
-            .is_some_and(|extra| extra.discards_descendant_refinements)
+            .is_some_and(|extra| extra.discards_dict_key_assignments)
     }
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
