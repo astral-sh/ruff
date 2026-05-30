@@ -819,19 +819,18 @@ static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinal
 
 ## Callables
 
-No two callable types are disjoint because there exists a non-empty callable type
-`(*args: object, **kwargs: object) -> Never` that is a subtype of all fully static callable types.
-As such, for any two callable types, it is possible to conceive of a runtime callable object that
-would inhabit both types simultaneously.
+Callable types with disjoint non-`Never` return types are considered disjoint. This is a pragmatic
+approximation: strictly speaking, `(*args: object, **kwargs: object) -> Never` is a non-empty
+subtype of all fully static callable types, but nobody is ever likely to write such a callable.
 
 ```py
 from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
-from typing_extensions import Callable, Literal, Never
+from typing_extensions import Callable, Literal, Never, overload
 
 def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
 
 static_assert(not is_disjoint_from(Callable[[], Never], RegularCallableTypeOf[mixed]))
-static_assert(not is_disjoint_from(Callable[[int, str], float], RegularCallableTypeOf[mixed]))
+static_assert(is_disjoint_from(Callable[[int, str], float], RegularCallableTypeOf[mixed]))
 
 # Using gradual form
 static_assert(not is_disjoint_from(Callable[..., None], Callable[[], None]))
@@ -840,7 +839,19 @@ static_assert(not is_disjoint_from(Callable[..., None], Callable[[Literal[1]], N
 
 # Using `Never`
 static_assert(not is_disjoint_from(Callable[[], Never], Callable[[], Never]))
-static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int]))
+static_assert(is_disjoint_from(Callable[[Never], str], Callable[[Never], int]))
+
+Bottom = Never
+static_assert(not is_disjoint_from(Callable[[], Bottom], Callable[[], int]))
+
+@overload
+def overloaded(x: int) -> int: ...
+@overload
+def overloaded(x: str) -> Never: ...
+def overloaded(x: object) -> int:
+    return 1
+
+static_assert(not is_disjoint_from(RegularCallableTypeOf[overloaded], Callable[[], str]))
 ```
 
 A callable type is disjoint from all literal types.

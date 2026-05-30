@@ -498,6 +498,14 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    /// Return the possible output type of this callable unless any overload returns `Never`.
+    pub(crate) fn non_never_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.signatures(db)
+            .iter()
+            .all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
+            .then(|| self.signatures(db).overload_return_type_or_unknown(db))
+    }
+
     /// Returns the reduced callable produced by partially applying selected overloads.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,

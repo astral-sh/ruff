@@ -2954,13 +2954,22 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, KnownClass::WrapperDescriptorType.to_instance(db), other)
             }
 
-            (Type::Callable(_) | Type::FunctionLiteral(_), Type::Callable(_))
-            | (Type::Callable(_), Type::FunctionLiteral(_)) => {
-                // No two callable types are ever disjoint because
-                // `(*args: object, **kwargs: object) -> Never` is a subtype of all fully static
-                // callable types.
-                self.never()
-            }
+            (Type::Callable(left_callable), Type::Callable(right_callable)) => self
+                .with_recursion_guard(left, right, || {
+                    // Strictly speaking, no two callable types are disjoint because
+                    // `(*args: object, **kwargs: object) -> Never` is a subtype of all fully static
+                    // callable types. Pragmatically, treat callables with disjoint non-`Never`
+                    // return types as disjoint.
+                    left_callable
+                        .non_never_return_type(db)
+                        .zip(right_callable.non_never_return_type(db))
+                        .when_some_and(db, self.constraints, |(left_return, right_return)| {
+                            self.check_type_pair(db, left_return, right_return)
+                        })
+                }),
+
+            (Type::FunctionLiteral(_), Type::Callable(_))
+            | (Type::Callable(_), Type::FunctionLiteral(_)) => self.never(),
 
             (Type::Callable(_), Type::SpecialForm(special_form))
             | (Type::SpecialForm(special_form), Type::Callable(_)) => {

@@ -1013,11 +1013,11 @@ from ty_extensions import Intersection
 from typing import Callable
 
 def _(
-    x: Intersection[Callable[[int], str], Callable[[str], int]],
+    x: Intersection[Callable[[int], str], Callable[[str], str]],
 ) -> None:
     # Both callables reject a `float` argument:
     # - `Callable[[int], str]` expects `int`
-    # - `Callable[[str], int]` expects `str`
+    # - `Callable[[str], str]` expects `str`
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     x(1.0)
