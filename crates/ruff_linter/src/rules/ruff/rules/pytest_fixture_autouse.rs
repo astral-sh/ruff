@@ -98,6 +98,10 @@ use crate::checkers::ast::Checker;
 /// def test_user_creation(app_context):
 ///     ...
 /// ```
+///
+/// ## References
+/// - [`pytest` documentation: Sharing fixtures across classes, modules, packages or session](https://docs.pytest.org/en/stable/how-to/fixtures.html#scope-sharing-fixtures-across-classes-modules-packages-or-session)
+/// - [`pytest` documentation: Fixtures can request other fixtures](https://docs.pytest.org/en/stable/how-to/fixtures.html#fixtures-can-request-other-fixtures)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.15.15")]
 pub(crate) struct PytestFixtureAutouse;
