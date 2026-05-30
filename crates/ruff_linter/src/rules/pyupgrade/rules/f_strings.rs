@@ -461,6 +461,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
 
     let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
+    let mut emitted_part = false;
     for (range, conversion) in patches {
         let fstring = match conversion {
             FStringConversion::Convert(fstring) => Some(fstring),
@@ -473,12 +474,15 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
             FStringConversion::SideEffects => unreachable!(),
         };
         if let Some(fstring) = fstring {
-            contents.push_str(
-                checker
-                    .locator()
-                    .slice(TextRange::new(prev_end, range.start())),
-            );
+            if emitted_part || prev_end == call.start() {
+                contents.push_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(prev_end, range.start())),
+                );
+            }
             contents.push_str(&fstring);
+            emitted_part = true;
         }
         prev_end = range.end();
     }
