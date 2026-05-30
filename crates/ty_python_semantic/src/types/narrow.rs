@@ -1108,6 +1108,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
+        fn has_declared_fixed_length<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            ty.len(db).and_then(Type::as_int_literal).is_some()
+        }
+
         let resolved = ty.resolve_type_alias(db);
         let narrowed = match resolved {
             Type::Union(union) => UnionType::from_elements(
@@ -1162,11 +1166,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     } else {
                         constrain(db, resolved, exactly_sized, constrain_with_equality)
                     }
-                } else {
+                } else if has_declared_fixed_length(db, resolved) {
                     constrain(db, resolved, exactly_sized, constrain_with_equality)
+                } else {
+                    resolved
                 }
             }
-            ty => constrain(db, ty, exactly_sized, constrain_with_equality),
+            ty if has_declared_fixed_length(db, ty) => {
+                constrain(db, ty, exactly_sized, constrain_with_equality)
+            }
+            ty => ty,
         };
         if narrowed == resolved { ty } else { narrowed }
     }

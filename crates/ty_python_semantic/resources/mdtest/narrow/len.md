@@ -157,7 +157,7 @@ def _(value: Literal[b"a", b"bb", b"ccc"]):
 Types that define a precise `__len__` method can also be narrowed by an exact length comparison:
 
 ```py
-from typing import Literal, Sized
+from typing import Literal
 
 class LengthThree:
     def __len__(self) -> Literal[3]:
@@ -189,31 +189,38 @@ def _(value: TrueLength | FalseLength):
 
 def _(value: LengthThree | list[int]):
     if len(value) == 3:
-        # revealed: (LengthThree & ExactlySized[Literal[3]]) | (list[int] & ExactlySized[Literal[3]])
-        reveal_type(value)
+        reveal_type(value)  # revealed: (LengthThree & ExactlySized[Literal[3]]) | list[int]
     else:
-        reveal_type(value)  # revealed: list[int] & ~ExactlySized[Literal[3]]
+        reveal_type(value)  # revealed: list[int]
 ```
 
-An exact length comparison intersects arbitrary `Sized` values with `ExactlySized`:
+A length check does not make the current length of an arbitrary mutable or stateful value
+persistent:
 
 ```py
-def _(value: Sized):
-    if len(value) == 3:
-        reveal_type(value)  # revealed: ExactlySized[Literal[3]]
-        reveal_type(len(value))  # revealed: Literal[3]
-    else:
-        reveal_type(value)  # revealed: Sized & ~ExactlySized[Literal[3]]
-```
+class StatefulLength:
+    def __len__(self) -> int:
+        return 1
 
-Exact-length constraints currently remain after mutation. This is a known limitation:
+class VaryingLength:
+    def __len__(self) -> Literal[0, 1]:
+        return 1
 
-```py
 def _(items: list[int]):
     if len(items) == 3:
-        reveal_type(items)  # revealed: list[int] & ExactlySized[Literal[3]]
+        reveal_type(items)  # revealed: list[int]
         items.clear()
-        reveal_type(len(items))  # revealed: Literal[3]
+        reveal_type(len(items))  # revealed: int
+
+def _(value: StatefulLength):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: StatefulLength
+        reveal_type(len(value))  # revealed: int
+
+def _(value: VaryingLength):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: VaryingLength
+        reveal_type(len(value))  # revealed: Literal[0, 1]
 ```
 
 ## Regressions
