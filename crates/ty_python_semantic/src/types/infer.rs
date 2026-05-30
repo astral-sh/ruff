@@ -219,7 +219,11 @@ pub(crate) fn infer_definition_types<'db>(
 /// `infer_definition_types` when we need to check decorators while
 /// already inside definition inference (e.g. checking `Self` in a
 /// `@staticmethod`).
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, _, _| FunctionDecoratorInference::cycle_initial(),
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(crate) fn function_known_decorators<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -259,6 +263,16 @@ pub(crate) struct FunctionDecoratorInference<'db> {
 }
 
 impl<'db> FunctionDecoratorInference<'db> {
+    fn cycle_initial() -> Self {
+        Self {
+            expression_types: FrozenMap::default(),
+            bindings: Box::default(),
+            called_functions: Box::default(),
+            known_decorators: FunctionDecorators::empty(),
+            diagnostics: TypeCheckDiagnostics::default(),
+        }
+    }
+
     pub(crate) fn expression_type(
         &self,
         expression: impl Into<ExpressionNodeKey>,
