@@ -1392,6 +1392,76 @@ class FinalFoo:
 static_assert(is_disjoint_from(Proto, FinalFoo))
 ```
 
+Method members establish disjointness when their non-`Never` return types are disjoint. This is a
+pragmatic approximation: strictly speaking, an implementation returning `Never` could satisfy method
+signatures with otherwise disjoint return types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, Protocol
+from typing_extensions import Never
+from ty_extensions import is_assignable_to, is_disjoint_from, is_subtype_of, static_assert
+
+class HasLengthTwo(Protocol):
+    def __len__(self) -> Literal[2]: ...
+
+class LengthThree:
+    def __len__(self) -> Literal[3]:
+        return 3
+
+class NeverLengthSubclass(LengthThree):
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(is_subtype_of(NeverLengthSubclass, LengthThree))
+static_assert(is_subtype_of(NeverLengthSubclass, HasLengthTwo))
+
+# Intentionally unsound: `NeverLengthSubclass` inhabits both operands,
+# but pragmatically, nobody is ever likely to write such a class
+static_assert(is_disjoint_from(LengthThree, HasLengthTwo))
+```
+
+The same pragmatic approximation applies to fixed-length tuple types. A tuple subclass with a
+`Never`-returning override demonstrates that the disjointness assertion here is also intentionally
+unsound:
+
+```py
+class NeverLengthTupleSubclass(tuple[int, int, int]):
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(is_subtype_of(NeverLengthTupleSubclass, tuple[int, int, int]))
+static_assert(is_subtype_of(NeverLengthTupleSubclass, HasLengthTwo))
+
+# Intentionally unsound: `NeverLengthTupleSubclass` inhabits both operands.
+static_assert(is_disjoint_from(tuple[int, int, int], HasLengthTwo))
+static_assert(not is_disjoint_from(tuple[int, int], HasLengthTwo))
+```
+
+Methods returning `Never` directly cannot establish this pragmatic disjointness. The same applies
+when the return type is a type alias that resolves to `Never`:
+
+```py
+class NeverLength:
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(not is_disjoint_from(NeverLength, HasLengthTwo))
+
+type Bottom = Never
+
+class AliasedNeverLength:
+    def __len__(self) -> Bottom:
+        raise RuntimeError
+
+static_assert(is_assignable_to(AliasedNeverLength, HasLengthTwo))
+static_assert(not is_disjoint_from(AliasedNeverLength, HasLengthTwo))
+```
+
 ## Intersections of protocols with types that have possibly unbound attributes
 
 Note that if a `@final` class has a possibly unbound attribute corresponding to the protocol member,
