@@ -11,6 +11,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -303,6 +304,22 @@ impl FStringConversion {
 
                     let field = FieldName::parse(&field_name)?;
 
+                    // `usize::parse` accepts a leading `+`, so `"{+0}"` parses as index 0 here,
+                    // but Python reads `+0` as a name and raises `KeyError`.
+                    if matches!(field.field_type, FieldType::Index(_))
+                        && field_name.starts_with('+')
+                    {
+                        return Err(anyhow::anyhow!("signed index in field name"));
+                    }
+
+                    for part in &field.parts {
+                        if let FieldNamePart::Attribute(name) = part
+                            && !is_identifier(name)
+                        {
+                            return Err(anyhow::anyhow!("non-identifier attribute"));
+                        }
+                    }
+
                     // Map from field type to specifier.
                     let specifier = match field.field_type {
                         FieldType::Auto => IndexOrKeyword::Index(summary.arg_auto()),
@@ -360,6 +377,11 @@ impl FStringConversion {
                                     "\"" => '\'',
                                     _ => unreachable!("invalid trailing quote"),
                                 };
+                                if index.contains(quote) {
+                                    return Err(anyhow::anyhow!(
+                                        "string index contains the f-string quote"
+                                    ));
+                                }
                                 converted.push('[');
                                 converted.push(quote);
                                 converted.push_str(&index);
@@ -370,6 +392,9 @@ impl FStringConversion {
                     }
 
                     if let Some(conversion_spec) = conversion_spec {
+                        if !matches!(conversion_spec, 's' | 'r' | 'a') {
+                            return Err(anyhow::anyhow!("unknown conversion specifier"));
+                        }
                         converted.push('!');
                         converted.push(conversion_spec);
                     }
