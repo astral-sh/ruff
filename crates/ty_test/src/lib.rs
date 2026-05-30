@@ -300,6 +300,7 @@ fn run_test(
 
     Program::init_or_update(db, settings);
     db.update_analysis_options(configuration.analysis.as_ref());
+    db.update_mdtest_rule_selection(configuration.rules.as_ref());
     db.set_verbosity(test.configuration().verbose());
 
     let mut all_diagnostics = vec![];
@@ -480,7 +481,7 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    for from_list in list_modules(db) {
+    for from_list in list_modules(db).iter().copied() {
         // TODO: For now list_modules does not partake in desperate module resolution so
         // only compare against confident module resolution.
         errs.push(match resolve_module_confident(db, from_list.name(db)) {

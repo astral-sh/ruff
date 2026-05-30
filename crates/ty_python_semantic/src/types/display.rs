@@ -1221,14 +1221,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         string.display_with(self.db, self.settings.clone()),
                     )
                 }
-                // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
-                // which would mean users would be able to jump to the definition of `LiteralString` from the
-                // inlay hint, but that seems less useful than the definition of `str` for a variable that is
-                // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
-                // at runtime)
-                LiteralValueTypeKind::LiteralString => {
-                    f.with_type(self.ty).write_str("LiteralString")
-                }
+                // We used to return `str` as the type here because that feels generally more useful.
+                // However, the inoncistency between the type shown in the inlay hint and its hover, and the
+                // inconsistency to what's shown when hovering the backed inlay hint of a `LiteralString`
+                // convinvced us that we should change the type to `LiteralString`.
+                LiteralValueTypeKind::LiteralString => f
+                    .with_type(Type::SpecialForm(SpecialFormType::LiteralString))
+                    .write_str("LiteralString"),
                 LiteralValueTypeKind::Bytes(bytes) => {
                     let escape =
                         AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
@@ -1281,6 +1280,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::TypeIs(type_is) => fmt_type_guard_like(self.db, type_is, &self.settings, f),
             Type::TypeGuard(type_guard) => {
                 fmt_type_guard_like(self.db, type_guard, &self.settings, f)
+            }
+            Type::TypeForm(typeform) => {
+                f.with_type(Type::SpecialForm(SpecialFormType::TypeForm))
+                    .write_str("TypeForm")?;
+                f.write_char('[')?;
+                typeform
+                    .type_argument(self.db)
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
+                f.write_char(']')
             }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
                 ClassType::NonGeneric(class) => class

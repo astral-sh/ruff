@@ -1014,6 +1014,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
         | Type::BoundSuper(_)
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
+        | Type::TypeForm(_)
         | Type::NewTypeInstance(_) => None,
     }
 }

@@ -249,6 +249,51 @@ from ty_extensions import is_equivalent_to, static_assert
 static_assert(is_equivalent_to(Y, A | B | C | D))
 ```
 
+## Unions of enum literal aliases
+
+A union of aliases covering every member of an enum is equivalent to the enum itself, including when
+the aliases occur inside a larger type.
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Choice(Enum):
+    A = "A"
+    B = "B"
+
+type A = Literal[Choice.A]
+type B = Literal[Choice.B]
+type Either = A | B
+type Selector = A | B | tuple[A, B]
+
+def accept_either(value: Either) -> None: ...
+def accept_optional_either(value: Either | None) -> None: ...
+def accept_selector(value: Selector) -> None: ...
+
+class Config:
+    either: Either
+    selector: Selector
+
+def _(choice: Choice, config: Config) -> None:
+    direct: Either = choice
+    accept_either(choice)
+    accept_optional_either(config.either)
+    values: list[Selector] = []
+    accept_selector(config.selector)
+
+class ExtendedChoice(Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+
+type ExtendedA = Literal[ExtendedChoice.A]
+type ExtendedB = Literal[ExtendedChoice.B]
+
+def _(choice: ExtendedChoice) -> None:
+    partial: ExtendedA | ExtendedB = choice  # error: [invalid-assignment]
+```
+
 ## In binary ops
 
 ```py

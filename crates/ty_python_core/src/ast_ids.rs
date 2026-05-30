@@ -43,7 +43,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
 
 /// Uniquely identifies a use of a name in a [`crate::FileScopeId`].
 #[newtype_index]
-#[derive(get_size2::GetSize)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
@@ -110,9 +110,7 @@ impl AstIdsBuilder {
         self.uses_map.get(&key.into()).copied()
     }
 
-    pub(super) fn finish(mut self) -> AstIds {
-        self.uses_map.shrink_to_fit();
-
+    pub(super) fn finish(self) -> AstIds {
         AstIds {
             uses_map: self.uses_map,
         }

@@ -1,7 +1,7 @@
 //! An enumeration of special forms in the Python type system.
 //! Each of these is considered to inhabit a unique type in our model of the type system.
 
-use super::{ClassType, Type, class::KnownClass};
+use super::{ClassType, Type, TypeFormType, class::KnownClass};
 use crate::db::Db;
 use crate::types::IntersectionType;
 use crate::types::infer::InferenceFlags;
@@ -47,6 +47,10 @@ pub enum SpecialFormType {
     /// While this is technically an alias to `builtins.type`, it requires special handling
     /// for type-expression parsing.
     Type,
+
+    /// The special form `typing.TypeForm` (which can also be found as
+    /// `typing_extensions.TypeForm`).
+    TypeForm,
 
     /// The special form `Callable`.
     ///
@@ -137,6 +141,7 @@ impl SpecialFormType {
             | Self::Never
             | Self::Tuple
             | Self::Type
+            | Self::TypeForm
             | Self::TypingSelf
             | Self::Callable
             | Self::Concatenate
@@ -180,6 +185,30 @@ impl SpecialFormType {
         self.class().to_instance(db)
     }
 
+    /// Return the type denoted by this retained special-form value when it is valid without
+    /// parameters or a surrounding inference scope.
+    pub(crate) fn type_form_argument(self, db: &dyn Db) -> Option<Type<'_>> {
+        match self {
+            Self::Never | Self::NoReturn => Some(Type::Never),
+            Self::LiteralString => Some(Type::literal_string()),
+            Self::Any => Some(Type::any()),
+            Self::Unknown => Some(Type::unknown()),
+            Self::AlwaysTruthy => Some(Type::AlwaysTruthy),
+            Self::AlwaysFalsy => Some(Type::AlwaysFalsy),
+            Self::NamedTuple => Some(IntersectionType::from_two_elements(
+                db,
+                Type::homogeneous_tuple(db, Type::object()),
+                KnownClass::NamedTupleLike.to_instance(db),
+            )),
+            Self::Type => Some(KnownClass::Type.to_instance(db)),
+            Self::TypeForm => Some(TypeFormType::from_type_expression(db, Type::any())),
+            Self::Tuple => Some(Type::homogeneous_tuple(db, Type::unknown())),
+            Self::Callable => Some(Type::Callable(CallableType::unknown(db))),
+            Self::LegacyStdlibAlias(alias) => Some(alias.aliased_class().to_instance(db)),
+            _ => None,
+        }
+    }
+
     /// Return `true` if this symbol is an instance of `class`.
     pub(super) fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
         self.class().is_subclass_of(db, class)
@@ -207,6 +236,7 @@ impl SpecialFormType {
         enum SpecialFormTypeBuilder {
             Tuple,
             Type,
+            TypeForm,
             Callable,
             Any,
             Annotated,
@@ -276,6 +306,7 @@ impl SpecialFormType {
                     SpecialFormType::Optional => Self::Optional,
                     SpecialFormType::Protocol => Self::Protocol,
                     SpecialFormType::Type => Self::Type,
+                    SpecialFormType::TypeForm => Self::TypeForm,
                     SpecialFormType::TypeAlias => Self::TypeAlias,
                     SpecialFormType::TypeGuard => Self::TypeGuard,
                     SpecialFormType::TypeIs => Self::TypeIs,
@@ -333,6 +364,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::Optional => Self::Optional,
                 SpecialFormTypeBuilder::Protocol => Self::Protocol,
                 SpecialFormTypeBuilder::Type => Self::Type,
+                SpecialFormTypeBuilder::TypeForm => Self::TypeForm,
                 SpecialFormTypeBuilder::TypeAlias => Self::TypeAlias,
                 SpecialFormTypeBuilder::TypeGuard => Self::TypeGuard,
                 SpecialFormTypeBuilder::TypeIs => Self::TypeIs,
@@ -404,6 +436,7 @@ impl SpecialFormType {
             | Self::TypeGuard
             | Self::TypedDict
             | Self::TypeIs
+            | Self::TypeForm
             | Self::TypingSelf
             | Self::Protocol
             | Self::NamedTuple
@@ -446,6 +479,7 @@ impl SpecialFormType {
                 | LegacyStdlibAlias::OrderedDict
             )
             | Self::NamedTuple => true,
+            Self::TypeForm => true,
 
             // Unlike the aliases to `collections` classes,
             // the aliases to builtin classes are *not* callable...
@@ -530,6 +564,7 @@ impl SpecialFormType {
             | Self::TypeOf
             | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
             | Self::Unpack => false,
+            Self::TypeForm => false,
         }
     }
 
@@ -547,6 +582,7 @@ impl SpecialFormType {
             SpecialFormType::Never => "Never",
             SpecialFormType::Tuple => "Tuple",
             SpecialFormType::Type => "Type",
+            SpecialFormType::TypeForm => "TypeForm",
             SpecialFormType::TypingSelf => "Self",
             SpecialFormType::Callable => "Callable",
             SpecialFormType::Concatenate => "Concatenate",
@@ -593,6 +629,7 @@ impl SpecialFormType {
             | SpecialFormType::Never
             | SpecialFormType::Tuple
             | SpecialFormType::Type
+            | SpecialFormType::TypeForm
             | SpecialFormType::TypingSelf
             | SpecialFormType::Callable
             | SpecialFormType::Concatenate
@@ -753,6 +790,7 @@ impl SpecialFormType {
 
             // We treat `typing.Type` exactly the same as `builtins.type`:
             SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
+            SpecialFormType::TypeForm => Ok(TypeFormType::from_type_expression(db, Type::any())),
             SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
             SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
             SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),

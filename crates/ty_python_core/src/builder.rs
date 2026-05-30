@@ -2230,35 +2230,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
-        self.definitions_by_node.shrink_to_fit();
-        self.statements_by_node.shrink_to_fit();
         self.enclosing_lambda_statements.shrink_to_fit();
-        self.collections_by_use.shrink_to_fit();
-        self.uses_by_collection.shrink_to_fit();
-
+        self.imported_modules.shrink_to_fit();
         self.scope_ids_by_scope.shrink_to_fit();
-        self.scopes_by_node.shrink_to_fit();
-        self.generator_functions.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
+        let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
+        semantic_syntax_errors.shrink_to_fit();
+
         SemanticIndex {
-            place_tables,
-            scopes: self.scopes,
+            place_tables: place_tables.into(),
+            scopes: self.scopes.into(),
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             statements_by_node: self.statements_by_node,
-            scope_ids_by_scope: self.scope_ids_by_scope,
+            scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
-            use_def_maps,
+            use_def_maps: use_def_maps.into(),
             enclosing_lambda_statements: self.enclosing_lambda_statements,
             collections_by_use: self.collections_by_use,
             uses_by_collection: self.uses_by_collection,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
-            semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
+            semantic_syntax_errors,
             generator_functions: self.generator_functions,
             narrowing_alias_predicates: self.alias_predicates,
         }
@@ -3620,10 +3617,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // context the lambda is being inferred with, and so any statement
         // containing a lambda must be inferable as a standalone statement
         // to avoid large scope-level cycles.
-        for lambda in current_statement.lambda_expressions {
-            self.enclosing_lambda_statements
-                .insert(lambda.into(), standalone_statement);
-        }
+        self.enclosing_lambda_statements.extend(
+            current_statement
+                .lambda_expressions
+                .into_iter()
+                .map(|lambda| (lambda.into(), standalone_statement)),
+        );
 
         // The inferred element type of collection literal depends on uses of
         // the collection in its containing scope, and so each use must be part
@@ -4141,6 +4140,21 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 .all(|comprehension| !comprehension.is_async)
             {
                 return true;
+            }
+        }
+        false
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            match self.scopes[scope_info.file_scope_id].kind() {
+                ScopeKind::Comprehension => {}
+                ScopeKind::Class => return true,
+                ScopeKind::Module
+                | ScopeKind::TypeParams
+                | ScopeKind::Function
+                | ScopeKind::Lambda
+                | ScopeKind::TypeAlias => return false,
             }
         }
         false

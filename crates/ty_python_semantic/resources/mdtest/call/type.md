@@ -415,6 +415,15 @@ reveal_type(IntContainer)  # revealed: <class 'IntContainer'>
 container = IntContainer()
 reveal_type(container)  # revealed: IntContainer
 reveal_type(container.value)  # revealed: int
+
+class IntContainerBase(Container[int]): ...
+class StrContainerBase(Container[str]): ...
+
+# error: [invalid-generic-class]
+ConflictingContainer = type("ConflictingContainer", (IntContainerBase, StrContainerBase), {})
+
+# error: [invalid-generic-class]
+conflicting_container = type("InlineConflictingContainer", (IntContainerBase, StrContainerBase), {})()
 ```
 
 ## `type()` and `__class__` on dynamic instances

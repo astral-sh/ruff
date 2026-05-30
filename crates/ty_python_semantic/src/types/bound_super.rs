@@ -839,7 +839,8 @@ impl<'db> BoundSuperType<'db> {
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Callable(_)
-            | Type::DataclassTransformer(_) => {
+            | Type::DataclassTransformer(_)
+            | Type::TypeForm(_) => {
                 return Err(BoundSuperError::AbstractOwnerType {
                     owner_type,
                     pivot_class: pivot_class_type,

@@ -293,6 +293,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => false,
@@ -800,6 +801,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         result
     }
 
+    fn should_provide_callable_upcast_context(&self, source: Type<'db>) -> bool {
+        if !self.is_context_collection_enabled() {
+            return false;
+        }
+
+        // These displays already expose the signature being compared; wrapping them would
+        // duplicate the lower-level callable mismatch context.
+        !matches!(
+            source,
+            Type::Callable(_)
+                | Type::FunctionLiteral(_)
+                | Type::BoundMethod(_)
+                | Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+        )
+    }
+
     fn with_recursion_guard(
         &self,
         source: Type<'db>,
@@ -985,6 +1002,84 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
+
+            // Annotation unions retain type aliases so recursive aliases can be represented.
+            // Normalize direct alias elements together before checking the union so reductions
+            // that depend on multiple elements, such as all members of an enum, are visible.
+            (_, Type::Union(union))
+                if union
+                    .elements(db)
+                    .iter()
+                    .any(|element| matches!(element, Type::TypeAlias(_))) =>
+            {
+                self.with_recursion_guard(source, target, || {
+                    self.check_type_pair(
+                        db,
+                        source,
+                        UnionType::from_elements(db, union.elements(db).iter().copied()),
+                    )
+                })
+            }
+
+            (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
+                .with_recursion_guard(source, target, || {
+                    self.check_type_pair(
+                        db,
+                        source_typeform.type_argument(db),
+                        target_typeform.type_argument(db),
+                    )
+                }),
+
+            (Type::SubclassOf(source_subclass), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    source_subclass.to_instance(db),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::NominalInstance(source_instance), Type::TypeForm(target_typeform))
+                if source_instance.has_known_class(db, KnownClass::Type) =>
+            {
+                self.check_type_pair(db, Type::object(), target_typeform.type_argument(db))
+            }
+
+            (Type::ClassLiteral(source_class), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    Type::instance(db, source_class.default_specialization(db)),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::GenericAlias(source_alias), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    Type::instance(db, ClassType::Generic(source_alias)),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
+                if source_instance.is_type_form_value() =>
+            {
+                source_instance.type_form_argument(db).when_some_and(
+                    db,
+                    self.constraints,
+                    |source_argument| {
+                        self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
+                    },
+                )
+            }
+
+            (Type::SpecialForm(source_form), Type::TypeForm(target_typeform)) => source_form
+                .type_form_argument(db)
+                .when_some_and(db, self.constraints, |source_argument| {
+                    self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
+                }),
+
+            (Type::GenericAlias(_), Type::NominalInstance(target_instance))
+                if target_instance.has_known_class(db, KnownClass::GenericAlias) =>
+            {
+                self.always()
+            }
 
             (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
                 self.check_type_pair(db, complement.remaining_literal_union(db), target)
@@ -1611,11 +1706,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(source, target, || {
-                    source
+                    let Some(callables) = source
                         .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
-                        .when_some_and(db, self.constraints, |callables| {
-                            self.check_callables_vs_callable(db, &callables, target_callable)
-                        })
+                    else {
+                        return self.never();
+                    };
+
+                    let result = self.check_callables_vs_callable(db, &callables, target_callable);
+
+                    if self.should_provide_callable_upcast_context(source)
+                        && result.is_never_satisfied(db)
+                    {
+                        self.provide_context(|| ErrorContext::InferredCallableType {
+                            source,
+                            callable: callables.into_type(db),
+                        });
+                    }
+
+                    result
                 })
             }
 
@@ -1944,6 +2052,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
                 target,
             ),
+
+            (Type::TypeForm(_), _) => self.check_type_pair(db, Type::object(), target),
 
             // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
             // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
@@ -2928,6 +3038,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 self.check_type_pair(db, KnownClass::Super.to_instance(db), other)
             }
+
+            (Type::TypeForm(_), _) | (_, Type::TypeForm(_)) => self.never(),
 
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
 

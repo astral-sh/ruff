@@ -71,7 +71,7 @@ use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
+    GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -98,7 +98,7 @@ use crate::types::{
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SentinelInstance,
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, binding_type,
+    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
@@ -137,6 +137,7 @@ mod post_inference;
 mod subscript;
 mod type_call;
 mod type_expression;
+mod type_form;
 mod typed_dict;
 mod typevar;
 
@@ -246,7 +247,13 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// The constraints on any collection literals that are accessed in this region.
     //
-    // TODO: We should store constraint sets directly here.
+    // TODO: Store projected constraint sets directly here instead of specialized receiver types.
+    // Bound-method calls on unconstrained collection literals can introduce method-local typevars
+    // (for example, `list.sort` constrains `T@list` using `SupportsRichComparisonT@sort`). A
+    // principled representation would store an owned constraint set over the collection literal's
+    // generic context and existentially quantify away the method-local typevars, so combining
+    // `xs.append("x")` with `xs.sort()` yields `str ≤ T ≤ SupportsRichComparison` instead of
+    // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
 
     /// Expressions that are string annotations
@@ -1551,6 +1558,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|node_ref| node_ref.node(self.module()))
     }
 
+    fn function_type(&self, function: &ast::StmtFunctionDef) -> Option<FunctionType<'db>> {
+        let definition = self.index.expect_single_definition(function);
+        infer_definition_types(self.db(), definition).function_type(definition)
+    }
+
+    fn current_function_type(&self) -> Option<FunctionType<'db>> {
+        self.function_type(self.current_function_definition()?)
+    }
+
     fn function_decorator_types<'a>(
         &'a self,
         function: &'a ast::StmtFunctionDef,
@@ -2349,7 +2365,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !assignable && emit_diagnostics {
                     report_invalid_attribute_assignment(
                         &builder.context,
-                        target.into(),
+                        target.range(),
                         attr_ty,
                         value_ty,
                         attribute,
@@ -2520,6 +2536,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
                 // We may infer the value type multiple times with distinct type context during
@@ -3034,7 +3051,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if emit_diagnostics {
                             report_invalid_attribute_assignment(
                                 &self.context,
-                                target.into(),
+                                target.range(),
                                 attr_ty,
                                 value_ty,
                                 attribute,
@@ -3138,6 +3155,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
                 let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
@@ -3300,12 +3318,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::AlwaysFalsy
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                    object_ty.find_name_in_mro(db, attribute).expect(
-                        "called on Type::ClassLiteral, Type::GenericAlias, or Type::SubclassOf",
-                    )
+                    object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
                 }
                 Type::Union(..)
                 | Type::Intersection(..)
@@ -4092,6 +4109,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
+            }
+
+            // Disallow annotations on non-name targets unless they are valid receivers (e.g.
+            // `self.x: int` or `cls.x: int`).
+            let is_receiver_attribute = target
+                .as_attribute_expr()
+                .is_some_and(|target| self.is_receiver_attribute_annotation_target(target));
+            if !is_receiver_attribute {
+                let message = match target.as_ref() {
+                    ast::Expr::Attribute(_) => {
+                        "Type annotations are not allowed on this attribute expression"
+                    }
+                    ast::Expr::Subscript(_) => {
+                        "Type annotations are not allowed on subscripted expressions"
+                    }
+                    _ => {
+                        // For parser-recovered invalid targets, the syntax diagnostic is
+                        // sufficient.
+                        if let Some(value) = value {
+                            self.infer_maybe_standalone_expression(value, TypeContext::default());
+                        }
+                        self.infer_expression(target, TypeContext::default());
+                        return;
+                    }
+                };
+
+                // For syntactically valid non-name targets, reject the annotation and validate
+                // any accompanying assignment.
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
+                {
+                    builder.into_diagnostic(message);
+                }
+
+                if let Some(value) = value {
+                    self.infer_target(target, value, &|builder, tcx| {
+                        builder.infer_maybe_standalone_expression(value, tcx)
+                    });
+                } else {
+                    self.infer_expression(target, TypeContext::default());
+                }
+                return;
             }
 
             let value_ty = value.as_ref().map(|value| {
@@ -5063,6 +5123,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => None,
             }
@@ -5660,6 +5721,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
+        if let Some(target) = tcx.annotation
+            && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
+        {
+            self.store_expression_type(expression, ty);
+
+            if let Some(expression_cache) = &self.expression_cache {
+                expression_cache
+                    .borrow_mut()
+                    .insert((expression.into(), tcx), ty);
+            }
+
+            return ty;
+        }
+
+        self.infer_value_expression_impl(expression, tcx)
+    }
+
+    /// Infer an expression without implicitly treating this root as a `TypeForm`.
+    ///
+    /// Child expressions still use their normal contextual inference, so the
+    /// expression's existing bidirectional behavior is preserved.
+    fn infer_value_expression_impl(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let mut ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
@@ -6525,7 +6612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // our inference is compatible with subsequent additions to the collection), but it
             // matches the behavior of other type checkers and is usually the desired behavior.
             if let Some(elt_tcx) = elt_tcx {
-                builder.insert_type_mapping(elt_ty, elt_tcx);
+                builder.add_type_mapping(elt_ty, elt_tcx, TypeVarVariance::Invariant);
             }
         }
 
@@ -6571,15 +6658,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        builder
-                            .infer_map(
-                                identity_instance,
-                                *constraint,
-                                // We promote element literal types in invariant position by default, unless they
-                                // were inferred with an explicit literal annotation.
-                                |(_, _, inferred_ty)| Some(inferred_ty.promote(self.db())),
-                            )
-                            .ok()?;
+                        builder.infer(identity_instance, *constraint).ok()?;
                     }
                 }
             }
@@ -6695,6 +6774,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
                     let (lower, _upper) = bounds?;
+
+                    let lower = if tcx.annotation.is_none() {
+                        // Constraints learned from later collection uses should follow the same
+                        // promotion policy as literal elements: promote element literal types in
+                        // invariant position unless an explicit annotation made them unpromotable.
+                        lower.promote(self.db())
+                    } else {
+                        lower
+                    };
 
                     let lower = if tuple_size_promotion_constraints
                         .allow(current_typevar.identity(self.db()))
@@ -7551,6 +7639,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
+    // TODO: This should not be needed once we use constraint sets to track the usages of each
+    // container literal across a scope.
+    // https://github.com/astral-sh/ty/issues/3507
+    fn collection_use_constraint_from_specialization(
+        &self,
+        identity_instance: Type<'db>,
+        receiver_generic_context: Option<GenericContext<'db>>,
+        call_specialization: Specialization<'db>,
+    ) -> Option<Type<'db>> {
+        let constraint = identity_instance.apply_specialization(self.db(), call_specialization);
+        let Some(receiver_generic_context) = receiver_generic_context else {
+            return Some(constraint);
+        };
+
+        // Method-local typevars describe requirements imposed by the method, not concrete element
+        // types learned for the collection. Until collection-use constraints are represented as
+        // projected constraint sets, avoid leaking those method-local typevars into the inferred
+        // collection literal type.
+        if any_over_type(self.db(), constraint, false, |ty| {
+            ty.as_typevar().is_some_and(|typevar| {
+                !receiver_generic_context.contains(self.db(), typevar.identity(self.db()))
+            })
+        }) {
+            return None;
+        }
+
+        Some(constraint)
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -7642,6 +7759,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
             return self.infer_typeddict_call_expression(call_expression, None);
+        }
+
+        if callable_type == Type::SpecialForm(SpecialFormType::TypeForm) {
+            return self.infer_type_form_call_expression(call_expression);
         }
 
         if callable_type.is_notimplemented(self.db()) {
@@ -7965,13 +8086,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.db(),
                     collection_literal.identity_specialization(self.db()),
                 );
+                let collection_generic_context = collection_literal.generic_context(self.db());
 
                 let mut identity_bindings = self
                     .infer_attribute_load_impl(attribute, identity_instance)
                     .bindings(self.db())
                     .match_parameters(self.db(), &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
-                    .with_generic_context(self.db(), collection_literal.generic_context(self.db()));
+                    .with_generic_context(self.db(), collection_generic_context);
 
                 let call_result = self.speculate().infer_and_check_argument_types(
                     ArgumentsIter::from_ast(arguments),
@@ -7995,8 +8117,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         // Record the constraints on the receiver's generic context formed by
                         // the arguments to this bound method call.
-                        let constraints =
-                            identity_instance.apply_specialization(self.db(), call_specialization);
+                        let Some(constraints) = self.collection_use_constraint_from_specialization(
+                            identity_instance,
+                            collection_generic_context,
+                            call_specialization,
+                        ) else {
+                            continue;
+                        };
 
                         self.collection_use_constraints
                             .entry(collection_def)
@@ -8888,9 +9015,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let first_parameter_name = first_parameter.name();
 
-        let function_definition = self.index.expect_single_definition(current_function);
-        let Type::FunctionLiteral(function_type) = binding_type(self.db(), function_definition)
-        else {
+        let Some(function_type) = self.current_function_type() else {
             return;
         };
 
@@ -9362,7 +9487,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match (op, operand_type) {
-            (_, Type::Dynamic(_) | Type::Divergent(_)) => operand_type,
+            (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
+            | (_, Type::Divergent(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {
@@ -9522,6 +9648,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
             ) => fallback_unary_expression_type(),
