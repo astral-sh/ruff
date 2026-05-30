@@ -126,7 +126,9 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             },
         };
         contents.push(inferred_type_hover_content);
-        if let Some(docstring) = docstring {
+        if let Some(docstring) = docstring
+            && docs.is_none()
+        {
             contents.push(HoverContent::Docstring(docstring));
         }
     }
