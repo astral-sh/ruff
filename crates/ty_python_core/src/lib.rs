@@ -563,8 +563,7 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
     ///
     /// There will only ever be >1 `Definition` associated with a `definition_key`
-    /// if the definitions are created by a wildcard (`*`) import or synthesized
-    /// for a loop header.
+    /// if the definitions are created by a wildcard (`*`) import.
     #[track_caller]
     pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &[Definition<'db>] {
         self.definitions_by_node
@@ -589,9 +588,9 @@ impl<'db> SemanticIndex<'db> {
     /// the `debug_assertions` feature is enabled, this method will panic.
     ///
     /// It is generally safe to use this method for any AST node that does not
-    /// correspond to a `*` (wildcard) import or a loop statement, since those are
-    /// the only situations that can result in multiple definitions being
-    /// associated with a single AST node.
+    /// correspond to a `*` (wildcard) import, since those are the only situations
+    /// that can result in multiple definitions being associated with a single AST
+    /// node.
     #[track_caller]
     pub fn expect_single_definition(
         &self,
