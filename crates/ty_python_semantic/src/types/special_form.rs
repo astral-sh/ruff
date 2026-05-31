@@ -516,7 +516,6 @@ impl SpecialFormType {
                 | LegacyStdlibAlias::Deque
                 | LegacyStdlibAlias::OrderedDict
             )
-            | Self::CollectionsAbcCallable
             | Self::NamedTuple => true,
             Self::TypeForm => true,
 
@@ -552,6 +551,7 @@ impl SpecialFormType {
             | Self::CallableTypeOf
             | Self::RegularCallableTypeOf
             | Self::TypingCallable
+            | Self::CollectionsAbcCallable
             | Self::TypingSelf
             | Self::Concatenate
             | Self::Unpack
