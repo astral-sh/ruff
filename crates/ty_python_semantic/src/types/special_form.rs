@@ -222,43 +222,36 @@ impl SpecialFormType {
         file: File,
         symbol_name: &str,
     ) -> Option<Self> {
-        let module = file_to_module(db, file)?.known(db)?;
-        let candidate = Self::from_name(symbol_name, module)?;
-        candidate.check_module(module).then_some(candidate)
+        let candidate = Self::from_name(symbol_name)?;
+        candidate
+            .check_module(file_to_module(db, file)?.known(db)?)
+            .then_some(candidate)
     }
 
     /// Given the special form we resolved (`self`) and the module the user actually
     /// imported the symbol from (`import_module`), return the variant that matches the
     /// import path — or `self` if there's no better match.
     ///
-    /// This exists because typeshed defines `collections.abc.Callable` as
-    /// `from typing import Callable as Callable`. Following the alias chain to the
-    /// definition site lands on `SpecialFormType::TypingCallable` for *both*
-    /// `from typing import Callable` and `from collections.abc import Callable`,
-    /// erasing the distinction. This method substitutes `CollectionsAbcCallable` in
-    /// the latter case, restoring it.
+    /// This exists because typeshed defines `_collections_abc.Callable` as
+    /// `from typing import Callable as Callable`, then re-exports it from `collections.abc`.
+    /// Following the alias chain to the definition site lands on `SpecialFormType::TypingCallable`
+    /// for both `from typing import Callable` and `from collections.abc import Callable`, erasing
+    /// the distinction. This method substitutes `CollectionsAbcCallable` at the `_collections_abc`
+    /// module boundary, restoring it before `collections.abc` star-reexports it.
     ///
     /// Called at module-attribute resolution — the one boundary where the import-path
     /// module is still observable.
     pub(super) fn rewrap_for_import_module(self, name: &str, import_module: KnownModule) -> Self {
-        let Some(candidate) = Self::from_name(name, import_module) else {
-            return self;
-        };
-        if candidate != self
-            && candidate.name() == self.name()
-            && candidate.check_module(import_module)
-        {
-            candidate
-        } else {
-            self
+        match (self, name, import_module) {
+            (Self::TypingCallable, "Callable", KnownModule::CollectionsAbcInternal) => {
+                Self::CollectionsAbcCallable
+            }
+            _ => self,
         }
     }
 
-    /// Parse a `SpecialFormType` from its runtime symbol name in the context of `module`.
-    ///
-    /// The `module` parameter is needed to disambiguate symbols like `Callable`, which is exported by both
-    /// `typing` and `collections.abc` and inhabits a different `SpecialFormType` variant in each.
-    fn from_name(name: &str, module: KnownModule) -> Option<Self> {
+    /// Parse a `SpecialFormType` from its runtime symbol name.
+    fn from_name(name: &str) -> Option<Self> {
         /// An enum that maps 1:1 with `SpecialFormType`, but which holds no associated data
         /// (and therefore can have `EnumString` derived on it).
         /// This is much more robust than having a manual `from_string` method that matches
@@ -384,11 +377,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::AlwaysFalsy => Self::AlwaysFalsy,
                 SpecialFormTypeBuilder::AlwaysTruthy => Self::AlwaysTruthy,
                 SpecialFormTypeBuilder::Annotated => Self::Annotated,
-                SpecialFormTypeBuilder::Callable => match module {
-                    KnownModule::CollectionsAbc => Self::CollectionsAbcCallable,
-                    KnownModule::CollectionsAbcInternal => Self::CollectionsAbcCallable,
-                    _ => Self::TypingCallable,
-                },
+                SpecialFormTypeBuilder::Callable => Self::TypingCallable,
                 SpecialFormTypeBuilder::CallableTypeOf => Self::CallableTypeOf,
                 SpecialFormTypeBuilder::RegularCallableTypeOf => Self::RegularCallableTypeOf,
                 SpecialFormTypeBuilder::Concatenate => Self::Concatenate,
