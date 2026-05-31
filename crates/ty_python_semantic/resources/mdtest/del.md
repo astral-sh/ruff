@@ -356,13 +356,22 @@ def f(l: list[int]):
     # but if it was greater than that, it will not be an error.
     reveal_type(l[0])  # revealed: int
 
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     del l["string"]
 
     l[0] = 1
     reveal_type(l[0])  # revealed: Literal[1]
     del l[0]
     reveal_type(l[0])  # revealed: int
+```
+
+```snapshot
+error[invalid-argument-type]: Method `__delitem__` of type `bound method list[int].__delitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> None` cannot be called  with key of type `Literal["string"]` on object of type `list[int]`
+ --> src/mdtest_snippet.py:8:5
+  |
+8 |     del l["string"]
+  |     ^^^^^^^^^^^^^^^
+  |
 ```
 
 ### `__delitem__` without `__getitem__`

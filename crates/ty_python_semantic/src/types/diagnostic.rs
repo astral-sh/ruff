@@ -22,6 +22,7 @@ use crate::types::string_annotation::{
     ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
 };
+use crate::types::subscript::SubscriptKind;
 use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
@@ -3621,8 +3622,8 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
 /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
 pub(super) fn report_index_out_of_bounds(
     context: &InferContext,
-    kind: &'static str,
-    node: AnyNodeRef,
+    kind: SubscriptKind,
+    node: &ast::Expr,
     tuple_ty: Type,
     length: impl std::fmt::Display,
     index: i64,
@@ -3639,11 +3640,11 @@ pub(super) fn report_index_out_of_bounds(
 /// Emit a diagnostic declaring that a type does not support subscripting.
 pub(super) fn report_not_subscriptable(
     context: &InferContext,
-    node: &ast::ExprSubscript,
+    range: impl Ranged,
     not_subscriptable_ty: Type,
     method: &str,
 ) {
-    let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, node) else {
+    let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, range) else {
         return;
     };
     if method == "__delitem__" {

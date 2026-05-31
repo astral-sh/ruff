@@ -3,6 +3,7 @@
 use std::fmt::{self, Display};
 
 use itertools::Itertools;
+use ruff_db::diagnostic::Annotation;
 use ruff_python_ast as ast;
 
 use crate::Db;
@@ -14,9 +15,8 @@ use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
 use super::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
-    report_not_subscriptable, report_slice_step_size_zero,
+    INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE, report_index_out_of_bounds,
+    report_invalid_key_on_typed_dict, report_not_subscriptable, report_slice_step_size_zero,
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
@@ -207,7 +207,32 @@ impl<'db> SubscriptErrorKind<'db> {
         value_node: &ast::Expr,
         slice_node: &ast::Expr,
     ) {
+        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+        enum TermOfArt {
+            Index,
+            Key,
+        }
+
+        impl TermOfArt {
+            fn with_article(self) -> &'static str {
+                match self {
+                    TermOfArt::Index => "an index",
+                    TermOfArt::Key => "a key",
+                }
+            }
+        }
+
+        impl std::fmt::Display for TermOfArt {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(match self {
+                    TermOfArt::Index => "index",
+                    TermOfArt::Key => "key",
+                })
+            }
+        }
+
         let db = context.db();
+
         match self {
             Self::IndexOutOfBounds {
                 kind,
@@ -215,14 +240,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 length,
                 index,
             } => {
-                report_index_out_of_bounds(
-                    context,
-                    kind.as_str(),
-                    value_node.into(),
-                    *tuple_ty,
-                    length,
-                    *index,
-                );
+                report_index_out_of_bounds(context, *kind, value_node, *tuple_ty, length, *index);
             }
             Self::SliceStepSizeZero => {
                 report_slice_step_size_zero(context, value_node.into());
@@ -245,13 +263,21 @@ impl<'db> SubscriptErrorKind<'db> {
                 }
             }
             Self::DunderPossiblyUnbound { method, value_ty } => {
-                if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Method `{method}` of type `{}` may be missing",
-                        value_ty.display(db),
+                if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
+                    diagnostic.set_concise_message(format_args!(
+                        "Cannot subscript an object of type `{}` with a possibly missing `{method}` method",
+                        value_ty.display(db)
                     ));
+                    diagnostic.annotate(
+                        context
+                            .secondary(value_node)
+                            .message(format_args!("Has type `{}`", value_ty.display(db))),
+                    );
+                    diagnostic.annotate(
+                        Annotation::primary(context.span(slice_node))
+                            .message(format_args!("Method `{method}` may be missing")),
+                    );
                 }
             }
             Self::DunderCallError {
@@ -262,12 +288,26 @@ impl<'db> SubscriptErrorKind<'db> {
                 bindings,
             } => match kind {
                 CallErrorKind::NotCallable => {
-                    if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
-                        builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` is not callable on object of type `{}`",
-                            bindings.callable_type().display(db),
-                            value_ty.display(db),
+                    if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                        let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
+                        let value_type = value_ty.display(db);
+                        let method_type = bindings.callable_type().display(db);
+                        diagnostic.set_concise_message(format_args!(
+                            "Cannot subscript an object of type `{value_type}` with an invalid `{method}` method",
                         ));
+                        diagnostic.annotate(
+                            context
+                                .secondary(value_node)
+                                .message(format_args!("Has type `{}`", value_ty.display(db))),
+                        );
+                        for message in [
+                            format_args!("Method `{method}` has type `{method_type}`"),
+                            format_args!("An object of type `{method_type}` cannot be called"),
+                        ] {
+                            diagnostic.annotate(
+                                Annotation::primary(context.span(slice_node)).message(message),
+                            );
+                        }
                     }
                 }
                 CallErrorKind::BindingError => {
@@ -282,23 +322,58 @@ impl<'db> SubscriptErrorKind<'db> {
                             typed_dict.items(db),
                         );
                     } else if let Some(builder) =
-                        context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, subscript)
                     {
-                        builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` cannot be called with key of type `{}` on object of type `{}`",
-                            bindings.callable_type().display(db),
-                            slice_ty.display(db),
-                            value_ty.display(db),
+                        let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
+                        let term_of_art = if value_ty.is_redundant_with(
+                            db,
+                            KnownClass::Sequence.to_specialized_instance(db, &[Type::object()]),
+                        ) {
+                            TermOfArt::Index
+                        } else {
+                            TermOfArt::Key
+                        };
+                        let value_type = value_ty.display(db);
+                        let slice_type = slice_ty.display(db);
+                        diagnostic.set_concise_message(format_args!(
+                            "Cannot subscript an object of type `{value_type}` with {} of type `{slice_type}`",
+                            term_of_art.with_article()
+                        ));
+                        diagnostic.annotate(
+                            context
+                                .secondary(value_node)
+                                .message(format_args!("Has type `{value_type}`")),
+                        );
+                        diagnostic.annotate(Annotation::primary(context.span(slice_node)).message(
+                            format_args!(
+                                "Invalid {term_of_art} of type `{}`",
+                                slice_ty.display(db)
+                            ),
                         ));
                     }
                 }
                 CallErrorKind::PossiblyNotCallable => {
-                    if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
-                        builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` may not be callable on object of type `{}`",
-                            bindings.callable_type().display(db),
-                            value_ty.display(db),
+                    if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                        let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
+                        let value_type = value_ty.display(db);
+                        diagnostic.set_concise_message(format_args!(
+                            "Cannot subscript an object of type `{value_type}` \
+                            which may not have a valid `{method}` method",
                         ));
+                        diagnostic.annotate(
+                            context
+                                .secondary(value_node)
+                                .message(format_args!("Has type `{}`", value_ty.display(db))),
+                        );
+                        let method_type = bindings.callable_type().display(db);
+                        for message in [
+                            format_args!("Method `{method}` has type `{method_type}`"),
+                            format_args!("An object of type `{method_type}` may not be callable"),
+                        ] {
+                            diagnostic.annotate(
+                                Annotation::primary(context.span(slice_node)).message(message),
+                            );
+                        }
                     }
                 }
             },
@@ -325,7 +400,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 origin,
                 argument_ty,
             } => {
-                if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, value_node) {
+                if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, subscript) {
                     builder.into_diagnostic(format_args!(
                         "`{}` is not a valid argument to `{origin}`",
                         argument_ty.display(db),

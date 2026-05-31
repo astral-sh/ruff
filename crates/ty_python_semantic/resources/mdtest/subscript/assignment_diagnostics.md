@@ -147,7 +147,30 @@ def _(config: dict[str, int] | dict[str, str]) -> None:
 
 ```py
 def _(config: dict[str, int] | dict[str, str]) -> None:
-    # error: [invalid-assignment]
-    # error: [invalid-assignment]
+    # snapshot: invalid-assignment
+    # snapshot: invalid-assignment
     config["retries"] = 3.0
+```
+
+```snapshot
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["retries"]` and value of type `float` on object of type `dict[str, int]`
+ --> src/mdtest_snippet.py:4:5
+  |
+4 |     config["retries"] = 3.0
+  |     ^^^^^^^^^^^^^^^^^^^^---
+  |                         |
+  |                         Expected value of type `int`, got `float`
+  |
+info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
+
+
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["retries"]` and value of type `float` on object of type `dict[str, str]`
+ --> src/mdtest_snippet.py:4:5
+  |
+4 |     config["retries"] = 3.0
+  |     ^^^^^^^^^^^^^^^^^^^^---
+  |                         |
+  |                         Expected value of type `str`, got `float`
+  |
+info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
 ```

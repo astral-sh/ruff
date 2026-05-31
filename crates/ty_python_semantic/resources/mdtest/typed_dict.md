@@ -2072,10 +2072,10 @@ def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any)
     person[union_of_keys] = None
 
 def _(person: Person, str_key: str, literalstr_key: LiteralString):
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`."
+    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
     person[str_key] = None
 
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`."
+    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`"
     person[literalstr_key] = None
 
 def _(person: Person, unknown_key: Any):
@@ -5514,12 +5514,12 @@ class Extra2(TypedDict, extra_items=Super):
 def _(extra1: Extra1, extra2: Extra2, key: str) -> None:
     # TODO: the error message is wrong: `Super` is assignable to the value-type of `field`, but not to `extra_items`
     #
-    # error: [invalid-key] "TypedDict `Extra1` can only be subscripted with a string literal key, got key of type `str`."
+    # error: [invalid-key] "TypedDict `Extra1` can only be subscripted with a string literal key, got key of type `str`"
     extra1[key] = Super()
 
     # TODO: the error message is wrong: `Super` is assignable to `extra_items`, but not to the value type of `field`
     #
-    # error: [invalid-key] "TypedDict `Extra2` can only be subscripted with a string literal key, got key of type `str`."
+    # error: [invalid-key] "TypedDict `Extra2` can only be subscripted with a string literal key, got key of type `str`"
     extra2[key] = Super()
 
     # TODO: these should be fine
@@ -5625,10 +5625,17 @@ def _(extra: Extra, key: str) -> None:
     # error: [invalid-argument-type] "Cannot delete required key "name" from TypedDict `Extra`"
     del extra["name"]
 
-    # TODO: not the best error message...
-    #
-    # error: [invalid-argument-type] "Method `__delitem__` of type `(key: Never, /) -> None` cannot be called with key of type `str` on object of type `Extra`"
+    # snapshot: invalid-argument-type
     del extra[key]
+```
+
+```snapshot
+error[invalid-argument-type]: Method `__delitem__` of type `(key: Never, /) -> None` cannot be called  with key of type `str` on object of type `Extra`
+  --> src/mdtest_snippet.py:14:5
+   |
+14 |     del extra[key]
+   |     ^^^^^^^^^^^^^^
+   |
 ```
 
 ### Assignability between TypedDicts accounts for the type of extra items

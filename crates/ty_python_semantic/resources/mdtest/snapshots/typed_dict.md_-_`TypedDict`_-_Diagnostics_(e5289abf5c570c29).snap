@@ -158,7 +158,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```
-error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`.
+error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`
   --> src/mdtest_snippet.py:25:12
    |
 25 |     person[str_key] = "Alice"  # error: [invalid-key]

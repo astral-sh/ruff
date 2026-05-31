@@ -4933,12 +4933,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_delete_statement(&mut self, delete: &ast::StmtDelete) {
         let ast::StmtDelete {
-            range: _,
+            range,
             node_index: _,
             targets,
         } = delete;
         for target in targets {
             self.infer_expression(target, TypeContext::default());
+            match target {
+                ast::Expr::Subscript(subscript) => {
+                    self.validate_subscript_deletion(*range, subscript);
+                }
+                _ => {}
+            }
         }
     }
 

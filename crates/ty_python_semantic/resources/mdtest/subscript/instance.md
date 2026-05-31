@@ -28,8 +28,21 @@ class NotSubscriptable:
 # transformed into a `not-subscriptable` diagnostic with a subdiagnostic explaining
 # that this was because `__getitem__` was possibly not callable
 #
-# error: [call-non-callable] "Method `__getitem__` of type `None | Unknown` may not be callable on object of type `NotSubscriptable`"
+# snapshot: not-subscriptable
 a = NotSubscriptable()[0]
+```
+
+```snapshot
+error[not-subscriptable]: Invalid subscript read
+ --> src/mdtest_snippet.py:9:5
+  |
+9 | a = NotSubscriptable()[0]
+  |     ------------------^^^
+  |     |                  |
+  |     |                  Method `__getitem__` has type `None | Unknown`
+  |     |                  An object of type `None | Unknown` may not be callable
+  |     Has type `NotSubscriptable`
+  |
 ```
 
 ## Valid `__getitem__`
@@ -133,8 +146,20 @@ class Identity:
         return index
 
 a = Identity()
-# error: [invalid-argument-type] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` cannot be called with key of type `Literal["a"]` on object of type `Identity`"
+# snapshot: invalid-argument-type
 a["a"]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid subscript read
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | a["a"]
+  | -^^^^^
+  | | |
+  | | Invalid key of type `Literal["a"]`
+  | Has type `Identity`
+  |
 ```
 
 ## `__setitem__` with no `__getitem__`

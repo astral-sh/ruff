@@ -2,7 +2,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
@@ -114,8 +114,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Del => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 self.store_typed_dict_key_expected_type(slice, value_ty);
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
-                self.validate_subscript_deletion(subscript, value_ty, slice_ty);
+                self.infer_expression(slice, TypeContext::default());
                 Type::Never
             }
             ExprContext::Invalid => {
@@ -1475,7 +1474,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .report_lint(&INVALID_ASSIGNMENT, target.slice.as_ref())
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
+                                "Cannot assign value of type `{assigned_d}` \
+                                to key of type `{}` on TypedDict `{value_d}`",
                                 slice_ty.display(db)
                             ));
                             attach_original_type_info(&mut diagnostic);
@@ -1486,7 +1486,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .report_lint(&INVALID_KEY, target.slice.as_ref())
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "TypedDict `{value_d}` can only be subscripted with a string literal key, got key of type `{}`.",
+                                "TypedDict `{value_d}` can only be subscripted \
+                                with a string literal key, got key of type `{}`",
                                 slice_ty.display(db)
                             ));
                             attach_original_type_info(&mut diagnostic);
@@ -1608,7 +1609,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Method `__setitem__` of type `{}` is not callable \
-                                             on object of type `{}`",
+                                        on object of type `{}`",
                                         bindings.callable_type().display(db),
                                         object_ty.display(db),
                                     ));
@@ -1644,10 +1645,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         let object_d = object_ty.display(db);
 
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Invalid subscript assignment with key of type `{}` and value of \
-                                                     type `{assigned_d}` on object of type `{object_d}`",
-                                                    slice_ty.display(db),
-                                                ));
+                                            "Invalid subscript assignment with key of type `{}` \
+                                            and value of type `{assigned_d}` on object \
+                                            of type `{object_d}`",
+                                            slice_ty.display(db),
+                                        ));
 
                                         // Special diagnostic for dictionaries
                                         if let Some([expected_key_ty, expected_value_ty]) =
@@ -1692,10 +1694,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         self.context.report_lint(&CALL_NON_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__setitem__` of type `{}` may not be callable on object of type `{}`",
-                                            bindings.callable_type().display(db),
-                                            object_ty.display(db),
-                                        ));
+                                        "Method `__setitem__` of type `{}` \
+                                        may not be callable on object of type `{}`",
+                                        bindings.callable_type().display(db),
+                                        object_ty.display(db),
+                                    ));
                                     attach_original_type_info(&mut diagnostic);
                                 }
                             }
@@ -1742,17 +1745,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Validate a subscript deletion of the form `del object[key]`.
-    fn validate_subscript_deletion(
+    pub(super) fn validate_subscript_deletion(
         &self,
+        range: TextRange,
         target: &ast::ExprSubscript,
-        object_ty: Type<'db>,
-        slice_ty: Type<'db>,
     ) {
-        self.validate_subscript_deletion_impl(target, None, object_ty, slice_ty);
+        self.validate_subscript_deletion_impl(
+            range,
+            target,
+            None,
+            self.expression_type(&target.value),
+            self.expression_type(&target.slice),
+        );
     }
 
     fn validate_subscript_deletion_impl(
         &self,
+        range: TextRange,
         target: &'ast ast::ExprSubscript,
         full_object_ty: Option<Type<'db>>,
         object_ty: Type<'db>,
@@ -1773,6 +1782,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Union(union) => {
                 for element_ty in union.elements(db) {
                     self.validate_subscript_deletion_impl(
+                        range,
                         target,
                         full_object_ty.or(Some(object_ty)),
                         *element_ty,
@@ -1794,6 +1804,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If none are valid, emit a diagnostic for the first failing element
                 if !any_valid && let Some(element_ty) = intersection.positive(db).first() {
                     self.validate_subscript_deletion_impl(
+                        range,
                         target,
                         full_object_ty.or(Some(object_ty)),
                         *element_ty,
@@ -1803,6 +1814,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::EnumComplement(complement) => self.validate_subscript_deletion_impl(
+                range,
                 target,
                 full_object_ty,
                 complement.remaining_literal_union(db),
@@ -1821,7 +1833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         CallDunderError::PossiblyUnbound { .. } => {
                             if let Some(builder) = self
                                 .context
-                                .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                                .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, range)
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
                                     "Method `__delitem__` of type `{}` may be missing",
@@ -1834,7 +1846,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             match call_error_kind {
                                 CallErrorKind::NotCallable => {
                                     if let Some(builder) =
-                                        self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                        self.context.report_lint(&CALL_NON_CALLABLE, range)
                                     {
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
                                             "Method `__delitem__` of type `{}` is not callable \
@@ -1878,37 +1890,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             // Non-string-literal key on `TypedDict`.
                                             if let Some(builder) = self
                                                 .context
-                                                .report_lint(&INVALID_ARGUMENT_TYPE, target)
+                                                .report_lint(&INVALID_ARGUMENT_TYPE, range)
                                             {
-                                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Method `__delitem__` of type `{}` cannot be called \
-                                                     with key of type `{}` on object of type `{}`",
-                                                    bindings.callable_type().display(db),
-                                                    slice_ty.display(db),
-                                                    object_ty.display(db),
-                                                ));
+                                                let mut diagnostic =
+                                                    builder.into_diagnostic(format_args!(
+                                                        "Method `__delitem__` of type `{}` \
+                                                        cannot be called with key of type `{}` \
+                                                        on object of type `{}`",
+                                                        bindings.callable_type().display(db),
+                                                        slice_ty.display(db),
+                                                        object_ty.display(db),
+                                                    ));
                                                 attach_original_type_info(&mut diagnostic);
                                             }
                                         }
                                     } else {
                                         // Non-`TypedDict` object
                                         if let Some(builder) =
-                                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, target)
+                                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, range)
                                         {
-                                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                "Method `__delitem__` of type `{}` cannot be called \
-                                                 with key of type `{}` on object of type `{}`",
-                                                bindings.callable_type().display(db),
-                                                slice_ty.display(db),
-                                                object_ty.display(db),
-                                            ));
+                                            let mut diagnostic =
+                                                builder.into_diagnostic(format_args!(
+                                                    "Method `__delitem__` of type `{}` \
+                                                    cannot be called  with key of type `{}` \
+                                                    on object of type `{}`",
+                                                    bindings.callable_type().display(db),
+                                                    slice_ty.display(db),
+                                                    object_ty.display(db),
+                                                ));
                                             attach_original_type_info(&mut diagnostic);
                                         }
                                     }
                                 }
                                 CallErrorKind::PossiblyNotCallable => {
                                     if let Some(builder) =
-                                        self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                        self.context.report_lint(&CALL_NON_CALLABLE, range)
                                     {
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
                                             "Method `__delitem__` of type `{}` may not be callable \
@@ -1924,7 +1940,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         CallDunderError::MethodNotAvailable => {
                             report_not_subscriptable(
                                 &self.context,
-                                target,
+                                range,
                                 object_ty,
                                 "__delitem__",
                             );
