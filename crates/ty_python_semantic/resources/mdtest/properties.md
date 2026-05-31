@@ -303,7 +303,7 @@ del c.attr  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Cannot delete read-only property `attr` on object of type `C`
+error[invalid-deletion]: Cannot delete read-only property `attr` on object of type `C`
  --> src/mdtest_snippet.py:7:5
   |
 7 | del c.attr  # snapshot

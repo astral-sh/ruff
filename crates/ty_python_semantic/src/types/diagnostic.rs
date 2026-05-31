@@ -84,6 +84,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
+    registry.register_lint(&INVALID_DELETION);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
@@ -1067,6 +1068,38 @@ declare_lint! {
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid `del` statements.
+    ///
+    /// ## Why is this bad?
+    /// A `del` statement is only valid if the target can be deleted and its type allows deletion.
+    /// This rule catches code that may fail at runtime, as well as code that breaks promises made
+    /// by annotations, such as deleting a `Final` attribute or a required `TypedDict` key.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Final
+    ///
+    /// class ReadOnlyProperty:
+    ///     @property
+    ///     def value(self) -> int:
+    ///         return 1
+    ///
+    /// del ReadOnlyProperty().value  # error: [invalid-deletion]
+    ///
+    /// class FinalAttribute:
+    ///     value: Final[int] = 1
+    ///
+    /// del FinalAttribute.value  # error: [invalid-deletion]
+    /// ```
+    pub(crate) static INVALID_DELETION = {
+        summary: "detects invalid deletions",
+        status: LintStatus::stable("0.0.41"),
         default_level: Level::Error,
     }
 }
@@ -4002,7 +4035,7 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
     object_type: Type<'db>,
     target: &ast::ExprAttribute,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+    let Some(builder) = context.report_lint(&INVALID_DELETION, target) else {
         return;
     };
     let db = context.db();
@@ -4040,7 +4073,7 @@ pub(super) fn report_bad_dunder_delattr_call(
     target: &ast::ExprAttribute,
     binding_error: bool,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+    let Some(builder) = context.report_lint(&INVALID_DELETION, target) else {
         return;
     };
     let db = context.db();
@@ -5536,7 +5569,7 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     error_kind: TypedDictDeleteErrorKind,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) else {
+    let Some(builder) = context.report_lint(&INVALID_DELETION, key_node) else {
         return;
     };
 

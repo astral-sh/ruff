@@ -47,20 +47,20 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
-    INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
-    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
-    report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
-    report_invalid_type_checking_constant,
+    INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION, INVALID_DELETION,
+    INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
+    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_SUBMODULE, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_bad_dunder_set_call,
+    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_class_match_pattern, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
+    report_invalid_key_on_typed_dict, report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -75,7 +75,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
-use crate::types::infer::builder::subscript::DelDiagnosticRanges;
+use crate::types::infer::builder::subscript::DelDiagnosticInfo;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
@@ -3189,7 +3189,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 if returns_never {
                     if emit_diagnostics
-                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        && let Some(builder) = self.context.report_lint(&INVALID_DELETION, target)
                     {
                         builder.into_diagnostic(format_args!(
                             "Cannot delete attribute `{attribute}` on type `{}` \
@@ -3259,7 +3259,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if self.property_deleter_returns_never(attr_ty, object_ty) {
                         if emit_diagnostics
                             && let Some(builder) =
-                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                self.context.report_lint(&INVALID_DELETION, target)
                         {
                             builder.into_diagnostic(format_args!(
                                 "Cannot delete attribute `{attribute}` on type `{}` \
@@ -4942,21 +4942,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for target in targets {
             self.infer_expression(target, TypeContext::default());
             match target {
-                ast::Expr::Subscript(subscript) => {
+                ast::Expr::Subscript(target) => {
                     let diagnostic_ranges = if targets.len() == 1 {
-                        DelDiagnosticRanges::SingleTarget {
+                        DelDiagnosticInfo::SingleTarget {
                             full_statement_range: *range,
+                            target,
                         }
                     } else {
-                        DelDiagnosticRanges::MultipleTargets {
+                        DelDiagnosticInfo::MultipleTargets {
                             del_keyword_range: TextRange::new(
                                 range.start(),
                                 range.start() + "del".text_len(),
                             ),
-                            target_range: target.range(),
+                            target,
                         }
                     };
-                    self.validate_subscript_deletion(diagnostic_ranges, subscript);
+                    self.validate_subscript_deletion(diagnostic_ranges, target);
                 }
                 _ => {}
             }

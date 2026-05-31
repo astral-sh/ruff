@@ -84,7 +84,7 @@ reveal_type(Person.age)  # revealed: property
 alice.id = 42
 # error: [invalid-assignment]
 bob.age = None
-# error: [invalid-assignment]
+# error: [invalid-deletion]
 del alice.id
 ```
 

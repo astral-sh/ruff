@@ -129,6 +129,7 @@ error[not-subscriptable]: Invalid subscript read
    |                 |          Method `__getitem__` may be missing
    |                 Has type `ThisFails`
    |
+info: `__getitem__` is implicitly called due to this subscript expression
 ```
 
 ### Dunder methods as class-level annotations with no value
@@ -299,4 +300,5 @@ error[not-subscriptable]: Invalid subscript read
    |                 | Method `__getitem__` may be missing
    |                 Has type `C`
    |
+info: `__getitem__` is implicitly called due to this subscript expression
 ```

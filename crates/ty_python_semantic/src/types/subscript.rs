@@ -266,7 +266,8 @@ impl<'db> SubscriptErrorKind<'db> {
                 if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
                     let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
                     diagnostic.set_concise_message(format_args!(
-                        "Cannot subscript an object of type `{}` with a possibly missing `{method}` method",
+                        "Cannot subscript an object of type `{}` \
+                        with a possibly missing `{method}` method",
                         value_ty.display(db)
                     ));
                     diagnostic.annotate(
@@ -278,6 +279,9 @@ impl<'db> SubscriptErrorKind<'db> {
                         Annotation::primary(context.span(slice_node))
                             .message(format_args!("Method `{method}` may be missing")),
                     );
+                    diagnostic.info(format_args!(
+                        "`{method}` is implicitly called due to this subscript expression"
+                    ));
                 }
             }
             Self::DunderCallError {
@@ -308,6 +312,9 @@ impl<'db> SubscriptErrorKind<'db> {
                                 Annotation::primary(context.span(slice_node)).message(message),
                             );
                         }
+                        diagnostic.info(format_args!(
+                            "`{method}` is implicitly called due to this subscript expression"
+                        ));
                     }
                 }
                 CallErrorKind::BindingError => {
@@ -374,6 +381,9 @@ impl<'db> SubscriptErrorKind<'db> {
                                 Annotation::primary(context.span(slice_node)).message(message),
                             );
                         }
+                        diagnostic.info(format_args!(
+                            "`{method}` is implicitly called due to this subscript expression"
+                        ));
                     }
                 }
             },

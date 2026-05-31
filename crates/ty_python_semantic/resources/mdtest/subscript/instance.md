@@ -43,6 +43,7 @@ error[not-subscriptable]: Invalid subscript read
   |     |                  An object of type `None | Unknown` may not be callable
   |     Has type `NotSubscriptable`
   |
+info: `__getitem__` is implicitly called due to this subscript expression
 ```
 
 ## Valid `__getitem__`

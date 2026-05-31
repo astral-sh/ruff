@@ -3771,7 +3771,7 @@ def _(p: Person) -> None:
     p["name"] = 42
 
     # __delitem__ on required fields is an error
-    # error: [invalid-argument-type]
+    # error: [invalid-deletion]
     del p["name"]
 ```
 
@@ -5620,17 +5620,17 @@ class Extra(TypedDict, extra_items=int):
 
 def _(extra: Extra, key: str) -> None:
     # TODO: should be OK (extra items are non-required)
-    del extra["year"]  # error: [invalid-argument-type]
+    del extra["year"]  # error: [invalid-deletion]
 
-    # error: [invalid-argument-type] "Cannot delete required key "name" from TypedDict `Extra`"
+    # error: [invalid-deletion] "Cannot delete required key "name" from TypedDict `Extra`"
     del extra["name"]
 
-    # snapshot: invalid-argument-type
+    # snapshot: invalid-deletion
     del extra[key]
 ```
 
 ```snapshot
-error[invalid-argument-type]: Method `__delitem__` of type `(key: Never, /) -> None` cannot be called with key of type `str` on object of type `Extra`
+error[invalid-deletion]: Method `__delitem__` of type `(key: Never, /) -> None` cannot be called with key of type `str` on object of type `Extra`
   --> src/mdtest_snippet.py:14:5
    |
 14 |     del extra[key]
@@ -5779,7 +5779,7 @@ def _(int_dict_with_num: IntDictWithNum, key: str) -> None:
     # error: [unresolved-attribute]
     reveal_type(int_dict_with_num.popitem())  # revealed: Unknown
     int_dict_with_num[key] = 42  # error: [invalid-key]
-    del int_dict_with_num[key]  # error: [invalid-argument-type]
+    del int_dict_with_num[key]  # error: [invalid-deletion]
 
 class BoolDictWithNum(IntDict, extra_items=int):
     condition: NotRequired[bool]

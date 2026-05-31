@@ -205,20 +205,20 @@ class ExplicitNoneDeleter:
     positional = property(get, None, None)
 
 read_only = ReadOnlyProperty()
-# error: [invalid-assignment] "Cannot delete read-only property `x` on object of type `ReadOnlyProperty`"
+# error: [invalid-deletion] "Cannot delete read-only property `x` on object of type `ReadOnlyProperty`"
 del read_only.x
 
 supports_delete = SupportsDelete()
 del supports_delete.x
 
 rejects_descriptor_delete = RejectsDescriptorDelete()
-# error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDescriptorDelete` whose `__delete__` method returns `Never`/`NoReturn`"
+# error: [invalid-deletion] "Cannot delete attribute `x` on type `RejectsDescriptorDelete` whose `__delete__` method returns `Never`/`NoReturn`"
 del rejects_descriptor_delete.x
 
 explicit_none_deleter = ExplicitNoneDeleter()
-# error: [invalid-assignment] "Cannot delete read-only property `keyword` on object of type `ExplicitNoneDeleter`"
+# error: [invalid-deletion] "Cannot delete read-only property `keyword` on object of type `ExplicitNoneDeleter`"
 del explicit_none_deleter.keyword
-# error: [invalid-assignment] "Cannot delete read-only property `positional` on object of type `ExplicitNoneDeleter`"
+# error: [invalid-deletion] "Cannot delete read-only property `positional` on object of type `ExplicitNoneDeleter`"
 del explicit_none_deleter.positional
 ```
 
@@ -260,11 +260,11 @@ supports_custom_delete = SupportsCustomDelete()
 del supports_custom_delete.x
 
 rejects_delete = RejectsDelete()
-# error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDelete` whose `__delattr__` method returns `Never`/`NoReturn`"
+# error: [invalid-deletion] "Cannot delete attribute `x` on type `RejectsDelete` whose `__delattr__` method returns `Never`/`NoReturn`"
 del rejects_delete.x
 
 bad_delattr = BadDelAttr()
-# error: [invalid-assignment] "Cannot delete attribute `x` on type `BadDelAttr` with custom `__delattr__` method"
+# error: [invalid-deletion] "Cannot delete attribute `x` on type `BadDelAttr` with custom `__delattr__` method"
 del bad_delattr.x
 
 deletable_namedtuple = DeletableNamedTuple(1)
@@ -306,14 +306,14 @@ class FinalClassAttribute:
     x: Final[int] = 1
 
 final_attribute = FinalAttribute()
-# error: [invalid-assignment] "Cannot delete final attribute `x` on type `FinalAttribute`"
+# error: [invalid-deletion] "Cannot delete final attribute `x` on type `FinalAttribute`"
 del final_attribute.x
 
 final_attribute_with_delattr = FinalAttributeWithDelAttr()
-# error: [invalid-assignment] "Cannot delete final attribute `x` on type `FinalAttributeWithDelAttr`"
+# error: [invalid-deletion] "Cannot delete final attribute `x` on type `FinalAttributeWithDelAttr`"
 del final_attribute_with_delattr.x
 
-# error: [invalid-assignment] "Cannot delete final attribute `x` on type `<class 'FinalClassAttribute'>`"
+# error: [invalid-deletion] "Cannot delete final attribute `x` on type `<class 'FinalClassAttribute'>`"
 del FinalClassAttribute.x
 ```
 
@@ -338,7 +338,7 @@ class RejectsClassDelete(metaclass=RejectsClassDeleteMeta):
 
 del SupportsClassDelete.x
 
-# error: [invalid-assignment] "Cannot delete attribute `x` on type `<class 'RejectsClassDelete'>` whose `__delattr__` method returns `Never`/`NoReturn`"
+# error: [invalid-deletion] "Cannot delete attribute `x` on type `<class 'RejectsClassDelete'>` whose `__delattr__` method returns `Never`/`NoReturn`"
 del RejectsClassDelete.x
 ```
 
@@ -356,7 +356,7 @@ def f(l: list[int]):
     # but if it was greater than that, it will not be an error.
     reveal_type(l[0])  # revealed: int
 
-    # snapshot: invalid-argument-type
+    # snapshot: invalid-deletion
     del l["string"]
 
     l[0] = 1
@@ -366,7 +366,7 @@ def f(l: list[int]):
 ```
 
 ```snapshot
-error[invalid-argument-type]: Method `__delitem__` of type `bound method list[int].__delitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> None` cannot be called with key of type `Literal["string"]` on object of type `list[int]`
+error[invalid-deletion]: Method `__delitem__` of type `bound method list[int].__delitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> None` cannot be called with key of type `Literal["string"]` on object of type `list[int]`
  --> src/mdtest_snippet.py:8:5
   |
 8 |     del l["string"]
@@ -414,7 +414,7 @@ class OnlyGetItem:
 g = OnlyGetItem()
 reveal_type(g[0])  # revealed: str
 
-# error: [not-subscriptable] "Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method"
+# error: [invalid-deletion] "Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method"
 del g[0]
 ```
 
@@ -429,19 +429,19 @@ items = [1]
 not_deletable = OnlyGetItem()
 also_not_deletable = OnlyGetItem()
 
-# snapshot: not-subscriptable
+# snapshot: invalid-deletion
 del items[0], not_deletable[0]
 
-# snapshot: not-subscriptable
+# snapshot: invalid-deletion
 del not_deletable[0], items[0]
 
-# snapshot: not-subscriptable
-# snapshot: not-subscriptable
+# snapshot: invalid-deletion
+# snapshot: invalid-deletion
 del not_deletable[0], also_not_deletable[0]
 ```
 
 ```snapshot
-error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+error[invalid-deletion]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
   --> src/mdtest_snippet.py:10:1
    |
 10 | del items[0], not_deletable[0]
@@ -449,7 +449,7 @@ error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem
    |
 
 
-error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+error[invalid-deletion]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
   --> src/mdtest_snippet.py:13:1
    |
 13 | del not_deletable[0], items[0]
@@ -457,7 +457,7 @@ error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem
    |
 
 
-error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+error[invalid-deletion]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
   --> src/mdtest_snippet.py:17:1
    |
 17 | del not_deletable[0], also_not_deletable[0]
@@ -465,7 +465,7 @@ error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem
    |
 
 
-error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+error[invalid-deletion]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
   --> src/mdtest_snippet.py:17:1
    |
 17 | del not_deletable[0], also_not_deletable[0]
@@ -502,12 +502,12 @@ mixed: MixedMovie = {"name": "Test"}
 Required keys cannot be deleted.
 
 ```py
-# snapshot: invalid-argument-type
+# snapshot: invalid-deletion
 del m["name"]
 ```
 
 ```snapshot
-error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `Movie`
+error[invalid-deletion]: Cannot delete required key "name" from TypedDict `Movie`
   --> src/mdtest_snippet.py:19:7
    |
 19 | del m["name"]
@@ -542,12 +542,12 @@ del mixed["year"]
 But required keys in mixed `TypedDict` still cannot be deleted.
 
 ```py
-# snapshot: invalid-argument-type
+# snapshot: invalid-deletion
 del mixed["name"]
 ```
 
 ```snapshot
-error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `MixedMovie`
+error[invalid-deletion]: Cannot delete required key "name" from TypedDict `MixedMovie`
   --> src/mdtest_snippet.py:23:11
    |
 23 | del mixed["name"]
@@ -570,12 +570,12 @@ info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) c
 And keys that don't exist cannot be deleted.
 
 ```py
-# snapshot: invalid-argument-type
+# snapshot: invalid-deletion
 del mixed["non_existent"]
 ```
 
 ```snapshot
-error[invalid-argument-type]: Cannot delete unknown key "non_existent" from TypedDict `MixedMovie`
+error[invalid-deletion]: Cannot delete unknown key "non_existent" from TypedDict `MixedMovie`
   --> src/mdtest_snippet.py:25:11
    |
 25 | del mixed["non_existent"]

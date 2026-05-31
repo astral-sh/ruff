@@ -11,10 +11,10 @@ use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
-    report_invalid_arguments_to_annotated, report_invalid_key_on_typed_dict,
+    CALL_NON_CALLABLE, INVALID_ASSIGNMENT, INVALID_DELETION, INVALID_KEY, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, TypedDictDeleteErrorKind,
+    report_cannot_delete_typed_dict_key, report_invalid_arguments_to_annotated,
+    report_invalid_key_on_typed_dict,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
@@ -37,8 +37,8 @@ use ty_python_core::definition::Definition;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum DelDiagnosticRanges {
+#[derive(Debug, Clone, Copy)]
+pub(super) enum DelDiagnosticInfo<'ast> {
     /// A `del` statement with only one target.
     ///
     /// In this case, the diagnostic covers the full statement range because all
@@ -51,7 +51,10 @@ pub(super) enum DelDiagnosticRanges {
     ///   | ^^^^^^^^^^^^^^^^^^^^
     ///   |
     /// ```
-    SingleTarget { full_statement_range: TextRange },
+    SingleTarget {
+        full_statement_range: TextRange,
+        target: &'ast ast::ExprSubscript,
+    },
 
     /// A `del` statement with multiple targets.
     ///
@@ -68,17 +71,25 @@ pub(super) enum DelDiagnosticRanges {
     /// ```
     MultipleTargets {
         del_keyword_range: TextRange,
-        target_range: TextRange,
+        target: &'ast ast::ExprSubscript,
     },
 }
 
-impl DelDiagnosticRanges {
+impl<'ast> DelDiagnosticInfo<'ast> {
     fn lint_range(self) -> TextRange {
         match self {
             Self::SingleTarget {
                 full_statement_range,
+                ..
             } => full_statement_range,
-            Self::MultipleTargets { target_range, .. } => target_range,
+            Self::MultipleTargets { target, .. } => target.range(),
+        }
+    }
+
+    fn target(self) -> &'ast ast::ExprSubscript {
+        match self {
+            Self::SingleTarget { target, .. } => target,
+            Self::MultipleTargets { target, .. } => target,
         }
     }
 }
@@ -1792,7 +1803,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Validate a subscript deletion of the form `del object[key]`.
     pub(super) fn validate_subscript_deletion(
         &self,
-        diagnostic_ranges: DelDiagnosticRanges,
+        diagnostic_ranges: DelDiagnosticInfo,
         target: &ast::ExprSubscript,
     ) {
         self.validate_subscript_deletion_impl(
@@ -1806,7 +1817,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn validate_subscript_deletion_impl(
         &self,
-        diagnostic_ranges: DelDiagnosticRanges,
+        diagnostic_info: DelDiagnosticInfo,
         target: &'ast ast::ExprSubscript,
         full_object_ty: Option<Type<'db>>,
         object_ty: Type<'db>,
@@ -1823,20 +1834,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
         let attach_delete_keyword = |diagnostic: &mut LintDiagnosticGuard| {
-            if let DelDiagnosticRanges::MultipleTargets {
+            if let DelDiagnosticInfo::MultipleTargets {
                 del_keyword_range, ..
-            } = diagnostic_ranges
+            } = diagnostic_info
             {
                 diagnostic.annotate(self.context.secondary(del_keyword_range));
             }
         };
-        let lint_range = diagnostic_ranges.lint_range();
+        let lint_range = diagnostic_info.lint_range();
 
         match object_ty {
             Type::Union(union) => {
                 for element_ty in union.elements(db) {
                     self.validate_subscript_deletion_impl(
-                        diagnostic_ranges,
+                        diagnostic_info,
                         target,
                         full_object_ty.or(Some(object_ty)),
                         *element_ty,
@@ -1858,7 +1869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If none are valid, emit a diagnostic for the first failing element
                 if !any_valid && let Some(element_ty) = intersection.positive(db).first() {
                     self.validate_subscript_deletion_impl(
-                        diagnostic_ranges,
+                        diagnostic_info,
                         target,
                         full_object_ty.or(Some(object_ty)),
                         *element_ty,
@@ -1868,7 +1879,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::EnumComplement(complement) => self.validate_subscript_deletion_impl(
-                diagnostic_ranges,
+                diagnostic_info,
                 target,
                 full_object_ty,
                 complement.remaining_literal_union(db),
@@ -1885,9 +1896,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Ok(_) => {}
                     Err(err) => match err {
                         CallDunderError::PossiblyUnbound { .. } => {
-                            if let Some(builder) = self
-                                .context
-                                .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, lint_range)
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_DELETION, lint_range)
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
                                     "Method `__delitem__` of type `{}` may be missing",
@@ -1901,16 +1911,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             match call_error_kind {
                                 CallErrorKind::NotCallable => {
                                     if let Some(builder) =
-                                        self.context.report_lint(&CALL_NON_CALLABLE, lint_range)
+                                        self.context.report_lint(&INVALID_DELETION, lint_range)
                                     {
-                                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__delitem__` of type `{}` is not callable \
-                                             on object of type `{}`",
-                                            bindings.callable_type().display(db),
-                                            object_ty.display(db),
+                                        let mut diagnostic =
+                                            builder.into_diagnostic("Invalid `del` statement");
+                                        let object_type_display = object_ty.display(db);
+                                        diagnostic.set_concise_message(format_args!(
+                                            "Cannot delete a subscript on an object \
+                                            of type `{object_type_display}` \
+                                            with an invalid `__delitem__` method",
                                         ));
+                                        let full_object_type_display =
+                                            full_object_ty.unwrap_or(object_ty).display(db);
+
+                                        diagnostic.annotate(
+                                            self.context
+                                                .secondary(&*diagnostic_info.target().value)
+                                                .message(format_args!(
+                                                    "Has type `{full_object_type_display}`"
+                                                )),
+                                        );
+                                        let slice = &*diagnostic_info.target().slice;
+                                        let method_type = bindings.callable_type().display(db);
+                                        let mut first_annotation =
+                                            Annotation::primary(self.context.span(slice));
+
+                                        if full_object_ty.is_some() {
+                                            first_annotation =
+                                                first_annotation.message(format_args!(
+                                                    "Method `__delitem__` has type `{method_type}` \
+                                                    on an object of type `{}`",
+                                                    object_ty.display(db)
+                                                ));
+                                        } else {
+                                            first_annotation =
+                                                first_annotation.message(format_args!(
+                                                    "Method `__delitem__` has type `{method_type}`",
+                                                ));
+                                        }
+                                        diagnostic.annotate(first_annotation);
+
+                                        diagnostic.annotate(
+                                            Annotation::primary(self.context.span(slice)).message(
+                                                format_args!(
+                                                    "An object of type `{method_type}` \
+                                                    cannot be called"
+                                                ),
+                                            ),
+                                        );
+
                                         attach_delete_keyword(&mut diagnostic);
-                                        attach_original_type_info(&mut diagnostic);
                                     }
                                 }
                                 CallErrorKind::BindingError => {
@@ -1946,7 +1996,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             // Non-string-literal key on `TypedDict`.
                                             if let Some(builder) = self
                                                 .context
-                                                .report_lint(&INVALID_ARGUMENT_TYPE, lint_range)
+                                                .report_lint(&INVALID_DELETION, lint_range)
                                             {
                                                 let mut diagnostic =
                                                     builder.into_diagnostic(format_args!(
@@ -1963,9 +2013,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         }
                                     } else {
                                         // Non-`TypedDict` object
-                                        if let Some(builder) = self
-                                            .context
-                                            .report_lint(&INVALID_ARGUMENT_TYPE, lint_range)
+                                        if let Some(builder) =
+                                            self.context.report_lint(&INVALID_DELETION, lint_range)
                                         {
                                             let mut diagnostic =
                                                 builder.into_diagnostic(format_args!(
@@ -1983,10 +2032,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                                 CallErrorKind::PossiblyNotCallable => {
                                     if let Some(builder) =
-                                        self.context.report_lint(&CALL_NON_CALLABLE, lint_range)
+                                        self.context.report_lint(&INVALID_DELETION, lint_range)
                                     {
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__delitem__` of type `{}` may not be callable \
+                                            "Method `__delitem__` of type `{}` \
+                                            may not be callable \
                                              on object of type `{}`",
                                             bindings.callable_type().display(db),
                                             object_ty.display(db),
@@ -1999,10 +2049,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         CallDunderError::MethodNotAvailable => {
                             if let Some(builder) =
-                                self.context.report_lint(&NOT_SUBSCRIPTABLE, lint_range)
+                                self.context.report_lint(&INVALID_DELETION, lint_range)
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Cannot delete subscript on object of type `{}` with no `__delitem__` method",
+                                    "Cannot delete subscript on object of type `{}` \
+                                    with no `__delitem__` method",
                                     object_ty.display(db)
                                 ));
                                 attach_delete_keyword(&mut diagnostic);

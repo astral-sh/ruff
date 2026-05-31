@@ -6,7 +6,11 @@ use ruff_text_size::Ranged;
 use crate::place::place_from_declarations;
 use crate::{
     TypeQualifiers,
-    types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
+    types::{
+        Type,
+        diagnostic::{INVALID_ASSIGNMENT, INVALID_DELETION},
+        infer::TypeInferenceBuilder,
+    },
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
@@ -283,10 +287,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let db = self.db();
             let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
 
-            if let Some(builder) = self
-                .context
-                .report_lint(&INVALID_ASSIGNMENT, target.range())
-            {
+            if let Some(builder) = self.context.report_lint(&INVALID_DELETION, target.range()) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Cannot delete final attribute `{attribute}` on type `{}`",
                     object_ty.display(db)
