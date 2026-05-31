@@ -17,6 +17,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
+use thin_vec::ThinVec;
 use ty_module_resolver::ModuleName;
 
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -265,34 +266,39 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
 #[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
 struct DefinitionsByNode<'db> {
     single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
-    non_single: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+    non_single: ThinVec<(DefinitionNodeKey, Box<[Definition<'db>]>)>,
 }
 
 impl<'db> DefinitionsByNode<'db> {
     fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
         let mut single = FxHashMap::default();
-        let mut non_single = FxHashMap::default();
+        let mut non_single = Vec::new();
         single.reserve(definitions_by_node.len());
 
         for (key, definitions) in definitions_by_node {
             if definitions.len() == 1 {
                 single.insert(key, definitions[0]);
             } else {
-                non_single.insert(key, definitions.into_boxed_slice());
+                non_single.push((key, definitions.into_boxed_slice()));
             }
         }
 
         single.shrink_to_fit();
-        non_single.shrink_to_fit();
+        non_single.sort_unstable_by_key(|(key, _)| *key);
 
-        Self { single, non_single }
+        Self {
+            single,
+            non_single: non_single.into_iter().collect(),
+        }
     }
 
     fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
-        self.single
-            .get(&key)
-            .map(std::slice::from_ref)
-            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
+        self.single.get(&key).map(std::slice::from_ref).or_else(|| {
+            self.non_single
+                .binary_search_by_key(&key, |(candidate, _)| *candidate)
+                .ok()
+                .map(|index| self.non_single[index].1.as_ref())
+        })
     }
 }
 
