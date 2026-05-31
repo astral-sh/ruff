@@ -685,6 +685,24 @@ def _(x: F[int], y: F[str]):
     reveal_type(y)  # revealed: list[F[str]]
 ```
 
+### Recursive typevar union complement
+
+A recursive alias mentioning its own complement must terminate, including under syntax-error
+recovery in a subscript (regression for a stack overflow, ty issue #3195):
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A] | A]
+
+def _(x: A):
+    reveal_type(x)  # revealed: list[A]
+
+def _(x: A):
+    # error: [invalid-syntax] "Expected index or slice expression"
+    reveal_type(x[])  # revealed: list[A]
+```
+
 ### Subtyping of materializations of cyclic aliases
 
 ```py
