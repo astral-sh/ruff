@@ -545,9 +545,9 @@ static_assert(
 ## `typing.Callable` and `collections.abc.Callable` parity
 
 `typing.Callable` is a deprecated alias for `collections.abc.Callable`. Internally we model them as
-distinct `SpecialFormType` variants so that we can give different runtime behavior to each (calling
-`typing.Callable()` raises `TypeError`; calling `collections.abc.Callable()` does not), but in a
-type expression the two should be interchangeable.
+distinct `SpecialFormType` variants so that we can support usage of the latter in `match`
+statements, while disallowing the former, but otherwise they should be interchangeable in type
+expressions.
 
 ### Bare form
 
