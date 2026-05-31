@@ -303,7 +303,7 @@ pub struct SemanticIndex<'db> {
     place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
 
     /// List of all scopes in this file.
-    scopes: FrozenIndexVec<FileScopeId, Scope>,
+    scopes: FrozenIndexVec<FileScopeId, Scope<'db>>,
 
     /// Map expressions to their corresponding scope.
     scopes_by_expression: ExpressionsScopeMap,
@@ -328,9 +328,6 @@ pub struct SemanticIndex<'db> {
 
     // Map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
-
-    /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
-    scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
     use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
@@ -430,18 +427,18 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
     #[track_caller]
-    pub fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope {
+    pub fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope<'db> {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
     /// Returns the [`Scope`] with the given id.
     #[track_caller]
-    pub fn scope(&self, id: FileScopeId) -> &Scope {
+    pub fn scope(&self, id: FileScopeId) -> &Scope<'db> {
         &self.scopes[id]
     }
 
     pub fn scope_ids(&self) -> impl Iterator<Item = ScopeId<'db>> + '_ {
-        self.scope_ids_by_scope.iter().copied()
+        self.scopes.iter().map(Scope::scope_id)
     }
 
     pub fn symbol_is_global_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
@@ -460,7 +457,7 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the parent scope of `scope_id`.
     #[track_caller]
-    pub fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope> {
+    pub fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope<'db>> {
         Some(&self.scopes[self.parent_scope_id(scope_id)?])
     }
 
@@ -530,17 +527,17 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
+    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_, 'db> {
         DescendantsIter::new(&self.scopes, scope)
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
-    pub fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter<'_> {
+    pub fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter<'_, 'db> {
         ChildrenIter::new(&self.scopes, scope)
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
-    pub fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter<'_> {
+    pub fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter<'_, 'db> {
         AncestorsIter::new(&self.scopes, scope)
     }
 
@@ -558,7 +555,7 @@ impl<'db> SemanticIndex<'db> {
     ///         print(x)  # Refers to global x=1, not class x=2
     /// ```
     /// The `method` function can see the global scope but not the class scope.
-    pub fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
+    pub fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_, 'db> {
         VisibleAncestorsIter::new(&self.scopes, scope)
     }
 
@@ -733,13 +730,13 @@ impl<'db> SemanticIndex<'db> {
     }
 }
 
-pub struct AncestorsIter<'a> {
-    scopes: &'a IndexSlice<FileScopeId, Scope>,
+pub struct AncestorsIter<'a, 'db> {
+    scopes: &'a IndexSlice<FileScopeId, Scope<'db>>,
     next_id: Option<FileScopeId>,
 }
 
-impl<'a> AncestorsIter<'a> {
-    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
+impl<'a, 'db> AncestorsIter<'a, 'db> {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope<'db>>, start: FileScopeId) -> Self {
         Self {
             scopes,
             next_id: Some(start),
@@ -747,8 +744,8 @@ impl<'a> AncestorsIter<'a> {
     }
 }
 
-impl<'a> Iterator for AncestorsIter<'a> {
-    type Item = (FileScopeId, &'a Scope);
+impl<'a, 'db> Iterator for AncestorsIter<'a, 'db> {
+    type Item = (FileScopeId, &'a Scope<'db>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let current_id = self.next_id?;
@@ -759,16 +756,16 @@ impl<'a> Iterator for AncestorsIter<'a> {
     }
 }
 
-impl FusedIterator for AncestorsIter<'_> {}
+impl FusedIterator for AncestorsIter<'_, '_> {}
 
-pub struct VisibleAncestorsIter<'a> {
-    inner: AncestorsIter<'a>,
+pub struct VisibleAncestorsIter<'a, 'db> {
+    inner: AncestorsIter<'a, 'db>,
     starting_scope_kind: ScopeKind,
     yielded_count: usize,
 }
 
-impl<'a> VisibleAncestorsIter<'a> {
-    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
+impl<'a, 'db> VisibleAncestorsIter<'a, 'db> {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope<'db>>, start: FileScopeId) -> Self {
         let starting_scope = &scopes[start];
         Self {
             inner: AncestorsIter::new(scopes, start),
@@ -778,8 +775,8 @@ impl<'a> VisibleAncestorsIter<'a> {
     }
 }
 
-impl<'a> Iterator for VisibleAncestorsIter<'a> {
-    type Item = (FileScopeId, &'a Scope);
+impl<'a, 'db> Iterator for VisibleAncestorsIter<'a, 'db> {
+    type Item = (FileScopeId, &'a Scope<'db>);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -806,15 +803,15 @@ impl<'a> Iterator for VisibleAncestorsIter<'a> {
     }
 }
 
-impl FusedIterator for VisibleAncestorsIter<'_> {}
+impl FusedIterator for VisibleAncestorsIter<'_, '_> {}
 
-pub(crate) struct DescendantsIter<'a> {
+pub(crate) struct DescendantsIter<'a, 'db> {
     next_id: FileScopeId,
-    descendants: std::slice::Iter<'a, Scope>,
+    descendants: std::slice::Iter<'a, Scope<'db>>,
 }
 
-impl<'a> DescendantsIter<'a> {
-    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, scope_id: FileScopeId) -> Self {
+impl<'a, 'db> DescendantsIter<'a, 'db> {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope<'db>>, scope_id: FileScopeId) -> Self {
         let scope = &scopes[scope_id];
         let scopes = &scopes[scope.descendants()];
 
@@ -825,8 +822,8 @@ impl<'a> DescendantsIter<'a> {
     }
 }
 
-impl<'a> Iterator for DescendantsIter<'a> {
-    type Item = (FileScopeId, &'a Scope);
+impl<'a, 'db> Iterator for DescendantsIter<'a, 'db> {
+    type Item = (FileScopeId, &'a Scope<'db>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let descendant = self.descendants.next()?;
@@ -841,17 +838,17 @@ impl<'a> Iterator for DescendantsIter<'a> {
     }
 }
 
-impl FusedIterator for DescendantsIter<'_> {}
+impl FusedIterator for DescendantsIter<'_, '_> {}
 
-impl ExactSizeIterator for DescendantsIter<'_> {}
+impl ExactSizeIterator for DescendantsIter<'_, '_> {}
 
-pub struct ChildrenIter<'a> {
+pub struct ChildrenIter<'a, 'db> {
     parent: FileScopeId,
-    descendants: DescendantsIter<'a>,
+    descendants: DescendantsIter<'a, 'db>,
 }
 
-impl<'a> ChildrenIter<'a> {
-    pub fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
+impl<'a, 'db> ChildrenIter<'a, 'db> {
+    pub fn new(scopes: &'a IndexSlice<FileScopeId, Scope<'db>>, parent: FileScopeId) -> Self {
         let descendants = DescendantsIter::new(scopes, parent);
 
         Self {
@@ -861,8 +858,8 @@ impl<'a> ChildrenIter<'a> {
     }
 }
 
-impl<'a> Iterator for ChildrenIter<'a> {
-    type Item = (FileScopeId, &'a Scope);
+impl<'a, 'db> Iterator for ChildrenIter<'a, 'db> {
+    type Item = (FileScopeId, &'a Scope<'db>);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.descendants
@@ -870,7 +867,7 @@ impl<'a> Iterator for ChildrenIter<'a> {
     }
 }
 
-impl FusedIterator for ChildrenIter<'_> {}
+impl FusedIterator for ChildrenIter<'_, '_> {}
 
 /// Interval map that maps a range of expression node ids to their corresponding scopes.
 ///
@@ -1804,7 +1801,7 @@ class C[T]:
     #[test]
     fn scope_iterators() {
         fn scope_names<'a, 'db>(
-            scopes: impl Iterator<Item = (FileScopeId, &'db Scope)>,
+            scopes: impl Iterator<Item = (FileScopeId, &'db Scope<'db>)>,
             db: &'db dyn Db,
             file: File,
             module: &'a ParsedModuleRef,

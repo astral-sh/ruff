@@ -41,7 +41,7 @@ impl<'db> ScopeId<'db> {
         )
     }
 
-    pub fn scope(self, db: &dyn Db) -> &Scope {
+    pub fn scope(self, db: &dyn Db) -> &Scope<'_> {
         semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
     }
 
@@ -97,7 +97,7 @@ impl FileScopeId {
 
     pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
         let index = semantic_index(db, file);
-        index.scope_ids_by_scope[self]
+        index.scopes[self].scope_id()
     }
 
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {
@@ -106,7 +106,10 @@ impl FileScopeId {
 }
 
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
-pub struct Scope {
+pub struct Scope<'db> {
+    /// The Salsa ingredient for this scope.
+    scope_id: ScopeId<'db>,
+
     /// The parent scope, if any.
     parent: Option<FileScopeId>,
 
@@ -117,17 +120,23 @@ pub struct Scope {
     descendants: Range<FileScopeId>,
 }
 
-impl Scope {
+impl<'db> Scope<'db> {
     pub(super) fn new(
+        scope_id: ScopeId<'db>,
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
     ) -> Self {
         Scope {
+            scope_id,
             parent,
             node,
             descendants,
         }
+    }
+
+    pub fn scope_id(&self) -> ScopeId<'db> {
+        self.scope_id
     }
 
     pub fn parent(&self) -> Option<FileScopeId> {

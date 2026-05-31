@@ -327,7 +327,7 @@ impl<'db> SemanticModel<'db> {
     pub fn ancestor_scopes(
         &self,
         node: ast::AnyNodeRef<'_>,
-    ) -> impl Iterator<Item = (FileScopeId, &Scope)> + '_ {
+    ) -> impl Iterator<Item = (FileScopeId, &Scope<'_>)> + '_ {
         let index = semantic_index(self.db, self.file);
         self.scope(node)
             .into_iter()

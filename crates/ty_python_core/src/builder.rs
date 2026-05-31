@@ -173,8 +173,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     in_try: bool,
 
     // Semantic Index fields
-    scopes: IndexVec<FileScopeId, Scope>,
-    scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
+    scopes: IndexVec<FileScopeId, Scope<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
@@ -229,7 +228,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
             ast_ids: IndexVec::new(),
-            scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
             scopes_by_expression: ExpressionsScopeMapBuilder::new(),
@@ -305,7 +303,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///         print(x)  # Refers to global x=1, not class x=2
     /// ```
     /// The `method` function can see the global scope but not the class scope.
-    fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
+    fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_, 'db> {
         VisibleAncestorsIter::new(&self.scopes, scope)
     }
 
@@ -398,23 +396,28 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `node` is guaranteed to be a child of `self.module`
         let node_with_kind = node.to_kind(self.module);
 
-        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
+        let file_scope_id = self.scopes.next_index();
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
+        let scope = Scope::new(
+            scope_id,
+            parent,
+            node_with_kind,
+            children_start..children_start,
+        );
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
 
-        let file_scope_id = self.scopes.push(scope);
+        let pushed_scope_id = self.scopes.push(scope);
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
             .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
-        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
-
-        self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
         debug_assert_eq!(previous, None);
 
         debug_assert_eq!(ast_id_scope, file_scope_id);
+        debug_assert_eq!(pushed_scope_id, file_scope_id);
 
         // Save narrowing aliases. They will be restored with `pop_scope` after returning from inspecting the inner scope.
         // TODO: Cross-scope alias narrowing is not supported yet.
@@ -2219,7 +2222,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         ast_ids.shrink_to_fit();
         self.enclosing_lambda_statements.shrink_to_fit();
         self.imported_modules.shrink_to_fit();
-        self.scope_ids_by_scope.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
@@ -2231,7 +2233,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
             statements_by_node: self.statements_by_node,
-            scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
