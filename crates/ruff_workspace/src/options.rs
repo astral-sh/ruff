@@ -3308,7 +3308,6 @@ pub struct PydocstyleOptions {
     /// # On top of the Google convention, disable `D417`, which requires
     /// # documentation for every function parameter.
     /// ignore = ["D417"]
-    /// ```
     /// [tool.ruff.lint.pydocstyle]
     /// convention = "google"
     /// ```
