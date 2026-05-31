@@ -329,8 +329,9 @@ impl<'db> DefinitionsByNode<'db> {
     }
 
     fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
-        let index = key.index().as_u32()? as usize;
-        let definition = if sub_ast_level(index as u32) == 0 {
+        let index = key.index().as_u32()?;
+        let definition = if sub_ast_level(index) == 0 {
+            let index = index as usize;
             let word_index = index / 64;
             let bit = 1 << (index % 64);
             self.root_presence.get(word_index).and_then(|presence| {
