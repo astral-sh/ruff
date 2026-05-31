@@ -3288,7 +3288,7 @@ impl PycodestyleOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PydocstyleOptions {
-    /// Whether to use Google-style, NumPy-style conventions, or the [PEP 257] (https://peps.python.org/pep-0257/)
+    /// Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/)
     /// defaults when analyzing docstring sections.
     ///
     /// Enabling a convention will disable all rules that are not included in
