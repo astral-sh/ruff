@@ -3054,7 +3054,7 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown | list[Unknown]
+        reveal_type(self.x3)  # revealed: list[int] | list[Divergent]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -3173,8 +3173,8 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
-reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent]
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent]
 ```
 
 ### Builtin types attributes

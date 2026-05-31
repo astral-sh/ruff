@@ -3708,8 +3708,14 @@ impl<'db> CallableBinding<'db> {
         };
 
         if !are_return_types_equivalent_for_all_matching_overloads {
-            // Overload matching is ambiguous.
-            self.overload_call_return_type = Some(OverloadCallReturnType::Ambiguous);
+            // Prefer an ambiguous overload candidate that still carries the fixed-point marker;
+            // erasing it here can prevent recursive inference from converging.
+            let divergent_fallback = self
+                .matching_overloads()
+                .map(|(_, overload)| overload.return_type())
+                .find(|return_type| return_type.contains_any_divergent(db));
+            self.overload_call_return_type =
+                Some(OverloadCallReturnType::Ambiguous { divergent_fallback });
         }
     }
 
@@ -3839,8 +3845,10 @@ impl<'db> CallableBinding<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
+                OverloadCallReturnType::Ambiguous { divergent_fallback } => {
+                    divergent_fallback.unwrap_or(Type::Dynamic(DynamicType::AmbiguousOverload))
+                }
                 OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_) => Type::unknown(),
-                OverloadCallReturnType::Ambiguous => Type::Dynamic(DynamicType::AmbiguousOverload),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
@@ -4093,7 +4101,13 @@ impl<'db> IntoIterator for CallableBinding<'db> {
 enum OverloadCallReturnType<'db> {
     ArgumentTypeExpansion(Type<'db>),
     ArgumentTypeExpansionLimitReached(usize),
-    Ambiguous,
+    /// Overload resolution was ambiguous (multiple candidates with differing return types due to a
+    /// gradual argument). Normally evaluates to `Unknown`. `divergent_fallback` is `Some` when a
+    /// candidate return type carried a `Divergent` recursion marker; returning that type instead
+    /// preserves the marker so recursive-type fixed points still converge.
+    Ambiguous {
+        divergent_fallback: Option<Type<'db>>,
+    },
 }
 
 #[derive(Debug)]
