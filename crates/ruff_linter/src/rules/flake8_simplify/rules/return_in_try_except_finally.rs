@@ -30,12 +30,21 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// def squared(n):
 ///     try:
-///         return_value = n**2
+///         return n**2
 ///     except Exception:
-///         return_value = "An exception occurred"
+///         return "An exception occurred"
+/// ```
+///
+/// Or, if cleanup is needed, use a `finally` block for cleanup only
+/// (without modifying the return value):
+/// ```python
+/// def squared(n):
+///     try:
+///         return n**2
+///     except Exception:
+///         return "An exception occurred"
 ///     finally:
-///         return_value = -1
-///     return return_value
+///         cleanup()  # Cleanup without affecting the return value
 /// ```
 ///
 /// ## References
