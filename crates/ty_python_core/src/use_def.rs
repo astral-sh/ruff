@@ -277,6 +277,12 @@ struct InternedBindingsId;
 #[derive(salsa::Update, get_size2::GetSize)]
 struct InternedDeclarationsId;
 
+/// Uniquely identifies an interned [`DefinitionsAtDefinition`] entry in
+/// [`UseDefMap::interned_definitions_at_definition`].
+#[newtype_index]
+#[derive(salsa::Update, get_size2::GetSize)]
+struct InternedDefinitionsAtDefinitionId;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 struct InternedPlaceStateId(InternedBindingsId, InternedDeclarationsId);
 
@@ -296,7 +302,7 @@ struct RetainedPlaceStates<T> {
     reachable: ReachableDefinitions,
 }
 
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 struct DefinitionsAtDefinition<B, D> {
     bindings: B,
     declarations: Option<D>,
@@ -358,8 +364,9 @@ pub struct UseDefMap<'db> {
     ///
     /// If we see a binding to a `Final`-qualified symbol, we also need the bindings to find
     /// previous bindings to that symbol. If there are any, the assignment is invalid.
-    definitions_by_definition: FxHashMap<
-        Definition<'db>,
+    definitions_by_definition: FxHashMap<Definition<'db>, InternedDefinitionsAtDefinitionId>,
+    interned_definitions_at_definition: FrozenIndexVec<
+        InternedDefinitionsAtDefinitionId,
         DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
     >,
 
@@ -621,7 +628,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.definitions_by_definition[&definition].bindings;
+        let bindings_id = self.interned_definitions_at_definition
+            [self.definitions_by_definition[&definition]]
+            .bindings;
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -632,7 +641,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations_id = self.definitions_by_definition[&binding]
+        let declarations_id = self.interned_definitions_at_definition
+            [self.definitions_by_definition[&binding]]
             .declarations
             .expect("binding definition should have retained declarations");
         self.declarations_iterator(
@@ -1727,13 +1737,14 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut interned_ids_by_declarations =
             FxHashMap::with_capacity_and_hasher(declarations_capacity, FxBuildHasher);
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
-        let definitions_by_definition = Self::intern_definitions_by_definition(
-            self.definitions_by_definition,
-            &mut interned_declarations,
-            &mut interned_ids_by_declarations,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-        );
+        let (definitions_by_definition, interned_definitions_at_definition) =
+            Self::intern_definitions_by_definition(
+                self.definitions_by_definition,
+                &mut interned_declarations,
+                &mut interned_ids_by_declarations,
+                &mut interned_bindings,
+                &mut interned_ids_by_bindings,
+            );
         let bindings_by_use = Self::intern_bindings_by_use(
             self.bindings_by_use,
             &mut interned_bindings,
@@ -1814,6 +1825,7 @@ impl<'db> UseDefMapBuilder<'db> {
             symbol_states,
             member_states,
             definitions_by_definition,
+            interned_definitions_at_definition: interned_definitions_at_definition.into(),
             enclosing_snapshots: enclosing_snapshots.into(),
             end_of_scope_reachability: self.reachability,
         }
@@ -1844,11 +1856,18 @@ impl<'db> UseDefMapBuilder<'db> {
         interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
         interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
         interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
-    ) -> FxHashMap<
-        Definition<'db>,
-        DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
-    > {
+    ) -> (
+        FxHashMap<Definition<'db>, InternedDefinitionsAtDefinitionId>,
+        IndexVec<
+            InternedDefinitionsAtDefinitionId,
+            DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
+        >,
+    ) {
         let mut interned_ids_by_definition =
+            FxHashMap::with_capacity_and_hasher(definitions_by_definition.len(), FxBuildHasher);
+        let mut interned_definitions_at_definition =
+            IndexVec::with_capacity(definitions_by_definition.len());
+        let mut interned_ids_by_definitions_at_definition =
             FxHashMap::with_capacity_and_hasher(definitions_by_definition.len(), FxBuildHasher);
 
         for (
@@ -1875,16 +1894,30 @@ impl<'db> UseDefMapBuilder<'db> {
                     interned_id
                 }
             });
-            interned_ids_by_definition.insert(
-                definition,
-                DefinitionsAtDefinition {
-                    bindings,
-                    declarations,
-                },
-            );
+            let definitions_at_definition = DefinitionsAtDefinition {
+                bindings,
+                declarations,
+            };
+            let interned_id = if let Some(interned_id) =
+                interned_ids_by_definitions_at_definition.get(&definitions_at_definition)
+            {
+                *interned_id
+            } else {
+                let interned_id =
+                    interned_definitions_at_definition.push(definitions_at_definition);
+                interned_ids_by_definitions_at_definition
+                    .insert(definitions_at_definition, interned_id);
+                interned_id
+            };
+            interned_ids_by_definition.insert(definition, interned_id);
         }
 
-        interned_ids_by_definition
+        interned_definitions_at_definition.shrink_to_fit();
+
+        (
+            interned_ids_by_definition,
+            interned_definitions_at_definition,
+        )
     }
 
     fn intern_bindings_by_use(
