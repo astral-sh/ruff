@@ -353,9 +353,6 @@ pub struct SemanticIndex<'db> {
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
 
-    /// Set of all generator functions in this file.
-    generator_functions: FxHashSet<FileScopeId>,
-
     /// Narrowing alias metadata for predicate leaf names.
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.

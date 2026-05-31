@@ -192,10 +192,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
     // A map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
-    /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
-    ///
-    /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
-    generator_functions: FxHashSet<FileScopeId>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
@@ -244,8 +240,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
-            generator_functions: FxHashSet::default(),
-
             enclosing_snapshots: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
@@ -2243,7 +2237,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors,
-            generator_functions: self.generator_functions,
             narrowing_alias_predicates: self.alias_predicates,
         }
     }
@@ -3956,7 +3949,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
                 let scope = self.current_scope();
                 if self.scopes[scope].kind() == ScopeKind::Function {
-                    self.generator_functions.insert(scope);
+                    self.scopes[scope].mark_generator_function();
                 }
                 walk_expr(self, expr);
             }

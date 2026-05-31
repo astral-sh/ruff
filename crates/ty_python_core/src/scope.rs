@@ -101,7 +101,7 @@ impl FileScopeId {
     }
 
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {
-        index.generator_functions.contains(&self)
+        index.scopes[self].is_generator_function()
     }
 }
 
@@ -115,6 +115,9 @@ pub struct Scope {
 
     /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
+
+    /// Whether this scope is a generator function.
+    is_generator_function: bool,
 }
 
 impl Scope {
@@ -127,6 +130,7 @@ impl Scope {
             parent,
             node,
             descendants,
+            is_generator_function: false,
         }
     }
 
@@ -156,6 +160,14 @@ impl Scope {
 
     pub fn is_eager(&self) -> bool {
         self.kind().is_eager()
+    }
+
+    pub(super) fn mark_generator_function(&mut self) {
+        self.is_generator_function = true;
+    }
+
+    fn is_generator_function(&self) -> bool {
+        self.is_generator_function
     }
 }
 
