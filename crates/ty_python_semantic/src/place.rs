@@ -10,11 +10,12 @@ use crate::dunder_all::dunder_all_names;
 use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachability};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, declaration_type, is_discarded_dict_key_assignment,
+    DynamicType, KnownClass, MemberLookupPolicy, RecursivelyDefined, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
+    is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
-use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
@@ -24,8 +25,8 @@ use ty_python_core::reachability_constraints::{
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, Truthiness, get_loop_header, global_scope,
-    place_table, use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, LoopHeaderBinding, LoopToken, Truthiness,
+    get_loop_header, global_scope, place_table, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -1225,15 +1226,17 @@ fn place_impl<'db>(
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
-    cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
+    cycle_initial=|db, _, _, binding| loop_header_reachability_impl(db, binding, true),
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
 )]
 pub(crate) fn loop_header_reachability<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    loop_token: LoopToken<'db>,
+    binding: LoopHeaderBinding<'db>,
 ) -> LoopHeaderReachability<'db> {
-    loop_header_reachability_impl(db, definition, false)
+    debug_assert_eq!(loop_token, binding.loop_token());
+    loop_header_reachability_impl(db, binding, false)
 }
 
 fn loop_header_reachability_cycle_recover<'db>(
@@ -1241,28 +1244,25 @@ fn loop_header_reachability_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous: &LoopHeaderReachability<'db>,
     result: LoopHeaderReachability<'db>,
-    _definition: Definition<'db>,
+    _loop_token: LoopToken<'db>,
+    _binding: LoopHeaderBinding<'db>,
 ) -> LoopHeaderReachability<'db> {
     result.cycle_normalized(previous, cycle)
 }
 
 fn loop_header_reachability_impl<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    binding: LoopHeaderBinding<'db>,
     is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
     // This cutoff was chosen by benchmarking real isort to keep loop analysis
     // overhead minimal while preserving diagnostics.
     const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
 
-    let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
-        unreachable!("`loop_header_reachability` called with non-loop-header definition");
-    };
-
-    let scope = definition.scope(db);
+    let scope = binding.scope();
     let use_def = use_def_map(db, scope);
-    let loop_header = get_loop_header(db, loop_header_definition.loop_token());
-    let place = loop_header_definition.place();
+    let loop_header = get_loop_header(db, binding.loop_token());
+    let place = binding.place();
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
@@ -1289,12 +1289,14 @@ fn loop_header_reachability_impl<'db>(
 
         match use_def.definition(live_binding.binding()) {
             DefinitionState::Defined(def) => {
-                debug_assert_ne!(
-                    def, definition,
-                    "loop headers only include bindings from within the loop"
-                );
                 reachable_bindings.insert(ReachableLoopBinding {
-                    definition: def,
+                    binding: DefinitionState::Defined(def),
+                    narrowing_constraint: live_binding.narrowing_constraint(),
+                });
+            }
+            DefinitionState::LoopHeader(binding) => {
+                reachable_bindings.insert(ReachableLoopBinding {
+                    binding: DefinitionState::LoopHeader(binding),
                     narrowing_constraint: live_binding.narrowing_constraint(),
                 });
             }
@@ -1349,8 +1351,52 @@ impl<'db> LoopHeaderReachability<'db> {
 /// A single reachable loop-back binding with its narrowing constraint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachableLoopBinding<'db> {
-    pub(crate) definition: Definition<'db>,
+    pub(crate) binding: DefinitionState<'db>,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, id, _, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size,
+)]
+pub(crate) fn loop_header_binding_type<'db>(
+    db: &'db dyn Db,
+    loop_token: LoopToken<'db>,
+    binding: LoopHeaderBinding<'db>,
+) -> Type<'db> {
+    // This cutoff was chosen by benchmarking real isort to keep loop analysis
+    // overhead minimal while preserving diagnostics.
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
+
+    debug_assert_eq!(loop_token, binding.loop_token());
+    let loop_header = loop_header_reachability(db, binding.loop_token(), binding);
+    let use_def = use_def_map(db, binding.scope());
+    if use_def.reachability_constraints().used_interiors().len()
+        > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
+    {
+        return Type::unknown();
+    }
+
+    let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+    for reachable_binding in &loop_header.reachable_bindings {
+        let binding_ty = match reachable_binding.binding {
+            DefinitionState::Defined(definition) => binding_type(db, definition),
+            DefinitionState::LoopHeader(binding) => {
+                loop_header_binding_type(db, binding.loop_token(), binding)
+            }
+            DefinitionState::Deleted | DefinitionState::Undefined => {
+                unreachable!("loop headers only include bindings from within the loop")
+            }
+        };
+        let narrowed_ty = use_def
+            .narrowing_evaluator(reachable_binding.narrowing_constraint)
+            .narrow(db, binding_ty, binding.place());
+        union.add_in_place(narrowed_ty);
+    }
+    union.build()
 }
 
 /// Implementation of [`place_from_bindings`].
@@ -1410,6 +1456,29 @@ fn place_from_bindings_impl<'db>(
                     return None;
                 }
                 DefinitionState::Defined(binding) => binding,
+                DefinitionState::LoopHeader(binding) => {
+                    let static_reachability =
+                        reachability_constraints.evaluate(db, predicates, reachability_constraint);
+                    if static_reachability.is_always_false() {
+                        if unbound_visibility().is_none_or(Truthiness::is_always_false) {
+                            return Some((Type::Never, static_reachability));
+                        }
+                        return None;
+                    }
+
+                    let loop_header = loop_header_reachability(db, binding.loop_token(), binding);
+                    deleted_reachability =
+                        deleted_reachability.or(loop_header.deleted_reachability);
+                    if loop_header.reachable_bindings.is_empty() {
+                        return None;
+                    }
+
+                    let binding_ty = loop_header_binding_type(db, binding.loop_token(), binding);
+                    return Some((
+                        narrowing_constraint.narrow(db, binding_ty, binding.place()),
+                        static_reachability,
+                    ));
+                }
                 DefinitionState::Undefined => {
                     return None;
                 }
@@ -1482,22 +1551,7 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
-            // We need to "look through" loop header definitions to do boundness analysis. The
-            // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
-            // like all other bindings, so that it can participate in fixpoint iteration.
-            if binding.kind(db).is_loop_header() {
-                let loop_header = loop_header_reachability(db, binding);
-                deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
-                // If all the bindings in the loop are in statically false branches, it might be
-                // that none of them loop-back. In that case short-circuit, so that we don't
-                // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
-                // possibility below.
-                if loop_header.reachable_bindings.is_empty() {
-                    return None;
-                }
-            } else {
-                only_loop_header_bindings = false;
-            }
+            only_loop_header_bindings = false;
 
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);

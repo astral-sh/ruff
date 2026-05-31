@@ -32,7 +32,7 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
+    explicit_global_symbol, loop_header_binding_type, module_type_implicit_global_declaration,
     module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
     typing_extensions_symbol,
 };
@@ -83,7 +83,6 @@ use crate::types::infer::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
-use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
@@ -106,8 +105,8 @@ use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
-    ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
+    ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+    TargetKind, WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -1063,9 +1062,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::TypeVarTuple(node) => {
                 self.infer_typevartuple_definition(node.node(self.module()), definition);
-            }
-            DefinitionKind::LoopHeader(loop_header) => {
-                self.infer_loop_header_definition(loop_header, definition);
             }
         }
     }
@@ -2064,52 +2060,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
         )
         .insert(self, symbol_ty);
-    }
-
-    /// Infer the type for a loop header definition.
-    ///
-    /// The loop header sees all the bindings that originate in the loop and are visible at a
-    /// loop-back edge (either the end of the loop body or a `continue` statement). See `struct
-    /// LoopHeader` in the semantic index for more on how all this fits together.
-    fn infer_loop_header_definition(
-        &mut self,
-        loop_header_kind: &LoopHeaderDefinitionKind<'db>,
-        definition: Definition<'db>,
-    ) {
-        // This cutoff was chosen by benchmarking real isort to keep loop analysis
-        // overhead minimal while preserving diagnostics.
-        const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
-
-        let db = self.db();
-        let loop_header = loop_header_reachability(db, definition);
-        let use_def = self
-            .index
-            .use_def_map(self.scope().file_scope_id(self.db()));
-
-        // Loop-header types are an approximation point for loop fixpoint analysis. Inferring the
-        // exact union of every visible loop-back binding can recursively force inference of large
-        // boolean expressions and explode on real-world loops.
-        if use_def.reachability_constraints().used_interiors().len()
-            > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
-        {
-            self.bindings.insert(definition, Type::unknown());
-            return;
-        }
-
-        let place = loop_header_kind.place();
-
-        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
-
-        for reachable_binding in &loop_header.reachable_bindings {
-            let binding_ty = binding_type(db, reachable_binding.definition);
-            let narrowed_ty = use_def
-                .narrowing_evaluator(reachable_binding.narrowing_constraint)
-                .narrow(db, binding_ty, place);
-
-            union.add_in_place(narrowed_ty);
-        }
-
-        self.bindings.insert(definition, union.build());
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -8431,6 +8381,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     binding.narrowing_constraint.narrow(db, binding_ty, place),
                                 );
                             }
+                            DefinitionState::LoopHeader(loop_header_binding) => {
+                                let binding_ty = loop_header_binding_type(
+                                    db,
+                                    loop_header_binding.loop_token(),
+                                    loop_header_binding,
+                                );
+                                union = union.add(
+                                    binding.narrowing_constraint.narrow(db, binding_ty, place),
+                                );
+                            }
                             DefinitionState::Defined(_)
                             | DefinitionState::Undefined
                             | DefinitionState::Deleted => {
@@ -10760,9 +10720,17 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 
             // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
 
-            let previous_definition = previous_bindings.find_map(|r| r.binding.definition());
+            let mut previous_definition = None;
+            let has_previous_binding = previous_bindings.any(|binding| match binding.binding {
+                DefinitionState::Defined(definition) => {
+                    previous_definition.get_or_insert(definition);
+                    true
+                }
+                DefinitionState::LoopHeader(_) => true,
+                DefinitionState::Undefined | DefinitionState::Deleted => false,
+            });
 
-            if !self.is_local || previous_definition.is_some() {
+            if !self.is_local || has_previous_binding {
                 let place = place_table.place(self.binding.place(db));
                 if let Some(diag_builder) = builder.context.report_lint(
                     &INVALID_ASSIGNMENT,

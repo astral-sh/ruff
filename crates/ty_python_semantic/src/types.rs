@@ -135,6 +135,7 @@ mod protocol_class;
 pub(crate) mod relation;
 mod relation_error;
 mod set_theoretic;
+pub(crate) use set_theoretic::RecursivelyDefined;
 mod signatures;
 mod special_form;
 mod string_annotation;

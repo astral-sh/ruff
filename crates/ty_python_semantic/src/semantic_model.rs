@@ -356,12 +356,10 @@ impl<'db> SemanticModel<'db> {
             };
 
             if let Some(definition) = definitions.iter().copied().find(|definition| {
-                let kind = definition.kind(self.db);
-                kind.is_user_visible()
-                    && definition
-                        .focus_range(self.db, &parsed)
-                        .range()
-                        .contains_range(target_range)
+                definition
+                    .focus_range(self.db, &parsed)
+                    .range()
+                    .contains_range(target_range)
             }) {
                 return Some(definition);
             }

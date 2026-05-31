@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Db;
-use crate::LoopToken;
+use crate::LoopHeaderBinding;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::place::ScopedPlaceId;
@@ -223,9 +223,11 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum DefinitionState<'db> {
     Defined(Definition<'db>),
+    /// An internal binding that makes loop-back values visible from the top of a loop.
+    LoopHeader(LoopHeaderBinding<'db>),
     /// Represents the implicit "unbound"/"undeclared" definition of every place.
     Undefined,
     /// Represents a definition that has been deleted.
@@ -247,7 +249,9 @@ impl<'db> DefinitionState<'db> {
     pub fn definition(self) -> Option<Definition<'db>> {
         match self {
             DefinitionState::Defined(def) => Some(def),
-            DefinitionState::Deleted | DefinitionState::Undefined => None,
+            DefinitionState::LoopHeader(_)
+            | DefinitionState::Deleted
+            | DefinitionState::Undefined => None,
         }
     }
 }
@@ -276,7 +280,6 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     TypeVar(&'ast ast::TypeParamTypeVar),
     ParamSpec(&'ast ast::TypeParamParamSpec),
     TypeVarTuple(&'ast ast::TypeParamTypeVarTuple),
-    LoopHeader(LoopHeaderDefinitionNodeRef<'ast, 'db>),
 }
 
 impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
@@ -324,12 +327,6 @@ impl<'ast> From<&'ast ast::TypeParamParamSpec> for DefinitionNodeRef<'ast, '_> {
 impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_> {
     fn from(value: &'ast ast::TypeParamTypeVarTuple) -> Self {
         Self::TypeVarTuple(value)
-    }
-}
-
-impl<'ast, 'db> From<LoopHeaderDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(value: LoopHeaderDefinitionNodeRef<'ast, 'db>) -> Self {
-        Self::LoopHeader(value)
     }
 }
 
@@ -480,19 +477,6 @@ pub(crate) struct ForStmtDefinitionNodeRef<'ast, 'db> {
 pub(crate) struct ExceptHandlerDefinitionNodeRef<'ast> {
     pub(crate) handler: &'ast ast::ExceptHandlerExceptHandler,
     pub(crate) is_star: bool,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub(crate) struct LoopHeaderDefinitionNodeRef<'ast, 'db> {
-    pub(crate) loop_stmt: LoopStmtRef<'ast>,
-    pub(crate) place: ScopedPlaceId,
-    pub(crate) loop_token: LoopToken<'db>,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub(crate) enum LoopStmtRef<'ast> {
-    While(&'ast ast::StmtWhile),
-    For(&'ast ast::StmtFor),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -715,18 +699,6 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::TypeVarTuple(node) => {
                 DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
             }
-            DefinitionNodeRef::LoopHeader(LoopHeaderDefinitionNodeRef {
-                loop_stmt,
-                place,
-                loop_token,
-            }) => DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
-                loop_token,
-                loop_stmt: match loop_stmt {
-                    LoopStmtRef::While(stmt) => LoopStmtKind::While(AstNodeRef::new(parsed, stmt)),
-                    LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
-                },
-                place,
-            }),
         }
     }
 
@@ -795,10 +767,6 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::TypeVar(node) => node.into(),
             Self::ParamSpec(node) => node.into(),
             Self::TypeVarTuple(node) => node.into(),
-            Self::LoopHeader(LoopHeaderDefinitionNodeRef { loop_stmt, .. }) => match loop_stmt {
-                LoopStmtRef::While(stmt) => stmt.into(),
-                LoopStmtRef::For(stmt) => stmt.into(),
-            },
         }
     }
 }
@@ -869,7 +837,6 @@ pub enum DefinitionKind<'db> {
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
-    LoopHeader(LoopHeaderDefinitionKind<'db>),
 }
 
 impl<'db> DefinitionKind<'db> {
@@ -925,16 +892,6 @@ impl<'db> DefinitionKind<'db> {
         matches!(self, DefinitionKind::Parameter(_))
     }
 
-    pub const fn is_loop_header(&self) -> bool {
-        matches!(self, DefinitionKind::LoopHeader(_))
-    }
-
-    /// Returns `true` if this definition is user-visible (i.e., not an internal
-    /// control-flow construct like a loop header definition).
-    pub const fn is_user_visible(&self) -> bool {
-        !self.is_loop_header()
-    }
-
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,
@@ -978,7 +935,6 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::TypeVarTuple(type_var_tuple) => {
                 type_var_tuple.node(module).name.range()
             }
-            DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
         }
     }
 
@@ -1027,7 +983,6 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::TypeVar(type_var) => type_var.node(module).range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
-            DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
         }
     }
 
@@ -1067,8 +1022,7 @@ impl<'db> DefinitionKind<'db> {
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
-            | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
+            | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
         }
     }
 
@@ -1464,39 +1418,6 @@ impl ExceptHandlerDefinitionKind {
 
     pub fn is_star(&self) -> bool {
         self.is_star
-    }
-}
-
-/// Definition kind for a loop header entry.
-#[derive(Clone, Debug, get_size2::GetSize)]
-pub struct LoopHeaderDefinitionKind<'db> {
-    /// The `LoopHeader` struct isn't ready when this type of definition is created. Instead we
-    /// look it up later by passing this token to `get_loop_header`.
-    loop_token: LoopToken<'db>,
-    loop_stmt: LoopStmtKind,
-    place: ScopedPlaceId,
-}
-
-#[derive(Clone, Debug, get_size2::GetSize)]
-pub(crate) enum LoopStmtKind {
-    While(AstNodeRef<ast::StmtWhile>),
-    For(AstNodeRef<ast::StmtFor>),
-}
-
-impl<'db> LoopHeaderDefinitionKind<'db> {
-    pub fn loop_token(&self) -> LoopToken<'db> {
-        self.loop_token
-    }
-
-    pub fn place(&self) -> ScopedPlaceId {
-        self.place
-    }
-
-    pub fn range(&self, module: &ParsedModuleRef) -> TextRange {
-        match &self.loop_stmt {
-            LoopStmtKind::While(stmt) => stmt.node(module).range(),
-            LoopStmtKind::For(stmt) => stmt.node(module).range(),
-        }
     }
 }
 

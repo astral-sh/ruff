@@ -403,13 +403,10 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
 }
 
 fn reachable_definitions<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> FxIndexSet<Definition<'db>> {
-    definitions
-        .into_iter()
-        .filter(|definition| definition.kind(db).is_user_visible())
-        .collect()
+    definitions.into_iter().collect()
 }
 
 fn resolve_reachable_definitions<'db>(
@@ -1882,8 +1879,7 @@ mod resolve_definition {
             | DefinitionKind::ExceptHandler(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
-            | DefinitionKind::TypeVarTuple(_)
-            | DefinitionKind::LoopHeader(_) => {
+            | DefinitionKind::TypeVarTuple(_) => {
                 // Not yet implemented
                 return Err(());
             }

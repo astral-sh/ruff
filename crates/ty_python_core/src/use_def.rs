@@ -262,7 +262,10 @@ use crate::use_def::place_state::{
     Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
     LiveDeclarationsIterator, PlaceState,
 };
-use crate::{BoundnessAnalysis, EnclosingSnapshotResult, PossiblyNarrowedPlaces, SemanticIndex};
+use crate::{
+    BoundnessAnalysis, EnclosingSnapshotResult, LoopHeaderBinding, PossiblyNarrowedPlaces,
+    SemanticIndex,
+};
 
 mod place_state;
 
@@ -1220,7 +1223,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_definition
             .insert(binding, bindings.clone());
 
-        let def_id = self.push_definition(DefinitionState::Defined(binding));
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1228,6 +1230,36 @@ impl<'db> UseDefMapBuilder<'db> {
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
 
+        self.record_binding_state(
+            place,
+            DefinitionState::Defined(binding),
+            previous_definitions,
+        );
+    }
+
+    pub(super) fn record_loop_header_binding(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: LoopHeaderBinding<'db>,
+    ) {
+        self.record_binding_state(
+            place,
+            DefinitionState::LoopHeader(binding),
+            PreviousDefinitions::AreKept,
+        );
+    }
+
+    fn record_binding_state(
+        &mut self,
+        place: ScopedPlaceId,
+        state: DefinitionState<'db>,
+        previous_definitions: PreviousDefinitions,
+    ) {
+        let def_id = self.push_definition(state);
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
         place_state.record_binding(
             def_id,
             self.reachability,
@@ -1711,7 +1743,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         if matches!(
             self.all_definitions[definition_id],
-            DefinitionState::Defined(_)
+            DefinitionState::Defined(_) | DefinitionState::LoopHeader(_)
         ) {
             self.used_bindings[definition_id] = true;
         }

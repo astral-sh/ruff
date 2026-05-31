@@ -134,9 +134,9 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
 /// literals (`Literal[0, 1, 2, ...]`) until we eventually reach the threshold for widening to
 /// `int` and stop iterating. (See `should_widen` and `widen_literal_types`.)
 ///
-/// There's a chicken-and-egg problem with synthesizing the `DefinitionKind::LoopHeader`
-/// definitions at the top of the loop, and assembling all the bindings in the `LoopHeader` struct
-/// that they refer to. See `LoopToken` below for how we work around that.
+/// There's a chicken-and-egg problem with synthesizing the [`LoopHeaderBinding`]s at the top of the
+/// loop, and assembling all the bindings in the `LoopHeader` struct that they refer to. See
+/// `LoopToken` below for how we work around that.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
 pub struct LoopHeader {
     bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
@@ -171,9 +171,39 @@ pub struct LoopToken<'db> {}
 
 impl get_size2::GetSize for LoopToken<'_> {}
 
+/// A compact internal binding used to model values that flow around a loop back edge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Update, get_size2::GetSize)]
+pub struct LoopHeaderBinding<'db> {
+    scope: ScopeId<'db>,
+    loop_token: LoopToken<'db>,
+    place: ScopedPlaceId,
+}
+
+impl<'db> LoopHeaderBinding<'db> {
+    pub fn new(scope: ScopeId<'db>, loop_token: LoopToken<'db>, place: ScopedPlaceId) -> Self {
+        Self {
+            scope,
+            loop_token,
+            place,
+        }
+    }
+
+    pub fn scope(self) -> ScopeId<'db> {
+        self.scope
+    }
+
+    pub fn loop_token(self) -> LoopToken<'db> {
+        self.loop_token
+    }
+
+    pub fn place(self) -> ScopedPlaceId {
+        self.place
+    }
+}
+
 /// Look up a `LoopHeader` given a `LoopToken`.
 ///
-/// Loop header definitions are the very first things we encounter (synthesize) when we walk a
+/// Loop header bindings are the very first things we encounter (synthesize) when we walk a
 /// loop, and they need to refer to the corresponding the `LoopHeader` struct that records their
 /// bindings, but that struct isn't available until we've finished walking the loop. To make this
 /// work in the largely immutable world of Salsa, we add a layer of indirection using a Salsa
@@ -182,7 +212,7 @@ impl get_size2::GetSize for LoopToken<'_> {}
 ///
 /// When we first encounter a loop, we generate a `LoopToken` that uniquely identifies the loop but
 /// doesn't contain any data. We do a lightweight pre-walk to collect bound places (see
-/// `LoopBindingsVisitor`), and for each bound place we create a loop header definition that stores
+/// `LoopBindingsVisitor`), and for each bound place we create a loop header binding that stores
 /// the `LoopToken`. Then after we've finished visiting the loop, we call
 /// `get_loop_header::specify` to associate the token with the completed `LoopHeader`. All of this
 /// happens while we're building the semantic index, and nothing needs to call `get_loop_header`

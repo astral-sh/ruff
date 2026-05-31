@@ -38,8 +38,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::DictKeyAssignment(_)
         | DefinitionKind::TypeVar(_)
         | DefinitionKind::ParamSpec(_)
-        | DefinitionKind::TypeVarTuple(_)
-        | DefinitionKind::LoopHeader(_) => false,
+        | DefinitionKind::TypeVarTuple(_) => false,
     }
 }
 
@@ -103,17 +102,13 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
         let mut loop_header_used_definition_ids = FxHashSet::default();
 
         for (definition_id, state, is_used) in use_def_map.all_definitions_with_usage() {
-            let DefinitionState::Defined(definition) = state else {
-                continue;
-            };
-
             if is_used {
-                let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
+                let DefinitionState::LoopHeader(loop_header_binding) = state else {
                     continue;
                 };
 
-                let loop_header = get_loop_header(db, loop_header_definition.loop_token());
-                for live_binding in loop_header.bindings_for_place(loop_header_definition.place()) {
+                let loop_header = get_loop_header(db, loop_header_binding.loop_token());
+                for live_binding in loop_header.bindings_for_place(loop_header_binding.place()) {
                     if is_reachable(db, use_def_map, live_binding.reachability_constraint()) {
                         loop_header_used_definition_ids.insert(live_binding.binding());
                     }
@@ -121,6 +116,10 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 
                 continue;
             }
+
+            let DefinitionState::Defined(definition) = state else {
+                continue;
+            };
 
             if loop_header_used_definition_ids.contains(&definition_id) {
                 continue;

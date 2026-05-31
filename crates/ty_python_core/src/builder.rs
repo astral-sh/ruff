@@ -30,8 +30,8 @@ use crate::definition::{
     DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
     ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
     ImportFromSubmoduleDefinitionNodeRef, LambdaParameterDefinitionNodeRef,
-    LoopHeaderDefinitionNodeRef, LoopStmtRef, MatchPatternDefinitionNodeRef,
-    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, ParameterDefinitionNodeRef, StarImportDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -59,9 +59,9 @@ use crate::use_def::{
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
-    DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopToken,
-    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
-    get_loop_header,
+    DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopHeaderBinding,
+    LoopToken, NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex,
+    VisibleAncestorsIter, get_loop_header,
 };
 
 use super::place::PlaceExprRef;
@@ -1191,7 +1191,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
     /// `add_definition` above, which enforces that. This method should currently only be used with
-    /// `*` imports and loop headers.
+    /// `*` imports.
     fn push_additional_definition(
         &mut self,
         place: ScopedPlaceId,
@@ -1201,8 +1201,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Note `definition_node` is guaranteed to be a child of `self.module`
         let kind = definition_node.into_owned(self.module);
-        let is_loop_header = kind.is_loop_header();
-
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
@@ -1215,25 +1213,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             is_reexported,
         );
 
-        let num_definitions = if is_loop_header {
-            // Loop headers are internal use-def definitions. They are retrieved through the loop
-            // token rather than by their AST node.
-            0
-        } else {
-            let definitions = self.add_entry_for_definition_key(definition_node.key());
-            definitions.push(definition);
-            definitions.len()
-        };
+        let definitions = self.add_entry_for_definition_key(definition_node.key());
+        definitions.push(definition);
+        let num_definitions = definitions.len();
 
-        // We need to avoid marking places as bound as soon as we encounter a loop header
-        // definition for them, because that would lead to false-positive semantic syntax errors in
-        // cases like this:
-        // ```py
-        // while True:
-        //     global x  # [invalid-syntax] if `x` is already used or bound
-        //     x = 1
-        // ```
-        if category.is_binding() && !is_loop_header {
+        if category.is_binding() {
             self.mark_place_bound(place);
             self.invalidate_narrowing_aliases_for(place);
         }
@@ -1249,16 +1233,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
             DefinitionCategory::Binding => {
-                // Loop-header bindings don't shadow prior bindings.
-                let previous_definitions = if is_loop_header {
-                    PreviousDefinitions::AreKept
-                } else {
-                    PreviousDefinitions::AreShadowed
-                };
-                use_def.record_binding(place, definition, previous_definitions);
-                if !is_loop_header {
-                    self.delete_associated_bindings(place);
-                }
+                use_def.record_binding(place, definition, PreviousDefinitions::AreShadowed);
+                self.delete_associated_bindings(place);
             }
         }
 
@@ -1371,7 +1347,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// bound `ScopedDefinitionId` for definitions created within the loop.
     fn synthesize_loop_header_definitions(
         &mut self,
-        loop_stmt: LoopStmtRef<'ast>,
         bound_places: Vec<PlaceExpr>,
     ) -> (LoopToken<'db>, FxHashSet<ScopedPlaceId>, ScopedDefinitionId) {
         let loop_token = LoopToken::new(self.db);
@@ -1379,17 +1354,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         for place_expr in bound_places {
             let place_id = self.add_place(place_expr);
             if bound_place_ids.insert(place_id) {
-                let loop_header_ref = LoopHeaderDefinitionNodeRef {
-                    loop_stmt,
-                    place: place_id,
-                    loop_token,
-                };
-                // Note that `DefinitionKind::LoopHeader` doesn't shadow prior bindings.
-                self.push_additional_definition(place_id, loop_header_ref);
+                self.push_loop_header_binding(place_id, loop_token);
             }
         }
         let loop_min_definition_id = self.current_use_def_map_mut().next_definition_id();
         (loop_token, bound_place_ids, loop_min_definition_id)
+    }
+
+    fn push_loop_header_binding(&mut self, place: ScopedPlaceId, loop_token: LoopToken<'db>) {
+        let scope = self.current_scope();
+        let binding = LoopHeaderBinding::new(self.scope_ids_by_scope[scope], loop_token, place);
+        self.current_use_def_map_mut()
+            .record_loop_header_binding(place, binding);
+
+        if let Some(id) = place.as_symbol() {
+            self.update_lazy_snapshots(id);
+        }
+
+        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
+        try_node_stack_manager.record_definition(self);
+        self.try_node_context_stack_manager = try_node_stack_manager;
     }
 
     /// Build a `LoopHeader` that tracks all the variables bound in a loop, which will be visible
@@ -2879,17 +2863,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 },
             ) => {
                 // Pre-walk the loop to collect all the bound places, then create a loop header
-                // definition for each bound place. See `struct LoopHeader` for more on this. Loop
-                // header definitions stash a token to look up the `LoopHeader` later, so that we
-                // can populate the header lazily.
+                // binding for each bound place. See `struct LoopHeader` for more on this. Loop
+                // header bindings stash a token to look up the `LoopHeader` later, so that we can
+                // populate the header lazily.
                 let bound_places = loop_bindings_visitor::collect_while_loop_bindings(while_stmt);
                 let mut maybe_loop_header_info = None;
                 // Avoid allocating a `LoopToken` if there are no bound places in this loop.
                 if !bound_places.is_empty() {
-                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
-                        LoopStmtRef::While(while_stmt),
-                        bound_places,
-                    ));
+                    maybe_loop_header_info =
+                        Some(self.synthesize_loop_header_definitions(bound_places));
                 }
 
                 // Visit the test expression after creating loop headers, so that loop-back values
@@ -3001,17 +2983,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let pre_loop = self.flow_snapshot();
 
                 // Pre-walk the loop to collect all the bound places, then create a loop header
-                // definition for each bound place. See `struct LoopHeader` for more on this. Loop
-                // header definitions stash a token to look up the `LoopHeader` later, so that we
-                // can populate the header lazily.
+                // binding for each bound place. See `struct LoopHeader` for more on this. Loop
+                // header bindings stash a token to look up the `LoopHeader` later, so that we can
+                // populate the header lazily.
                 let bound_places = loop_bindings_visitor::collect_for_loop_bindings(for_stmt);
                 let mut maybe_loop_header_info = None;
                 // Avoid allocating a `LoopToken` if there are no bound places in this loop.
                 if !bound_places.is_empty() {
-                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
-                        LoopStmtRef::For(for_stmt),
-                        bound_places,
-                    ));
+                    maybe_loop_header_info =
+                        Some(self.synthesize_loop_header_definitions(bound_places));
                 }
 
                 self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);

@@ -1098,10 +1098,6 @@ fn check_class_namespace_against_metaclass_members<'db>(
                     continue;
                 };
                 let definition_kind = definition.kind(db);
-                if !definition_kind.is_user_visible() {
-                    continue;
-                }
-
                 let assigned_ty = binding_type(db, definition);
                 if !assigned_ty.is_assignable_to(db, metaclass_member_ty) {
                     reported_incompatible_binding = true;
