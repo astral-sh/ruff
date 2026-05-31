@@ -163,11 +163,10 @@
 //! The data structure we build to answer these questions is the `UseDefMap`. It has a
 //! `bindings_by_use` vector of [`InternedBindingsId`] indexed by [`ScopedUseId`]
 //! (plus an interned bindings table), a
-//! `declarations_by_binding` map of [`InternedDeclarationsId`], a `bindings_by_definition` map of
-//! [`InternedBindingsId`], and `symbol_states` and `member_states` vectors indexed by
-//! [`ScopedSymbolId`]/[`ScopedMemberId`]. The values are (in principle) a list of live bindings at
-//! that use/definition, or at the end of the scope for that place, with a list of the dominating
-//! constraints for each binding.
+//! `definitions_by_definition` map of [`DefinitionsAtDefinition`], and `symbol_states` and
+//! `member_states` vectors indexed by [`ScopedSymbolId`]/[`ScopedMemberId`]. The values are (in
+//! principle) a list of live bindings at that use/definition, or at the end of the scope for that
+//! place, with a list of the dominating constraints for each binding.
 //!
 //! In order to avoid vectors-of-vectors-of-vectors and all the allocations that would entail, we
 //! don't actually store these "list of visible definitions" as a vector of [`Definition`].
@@ -297,6 +296,12 @@ struct RetainedPlaceStates<T> {
     reachable: ReachableDefinitions,
 }
 
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct DefinitionsAtDefinition<B, D> {
+    bindings: B,
+    declarations: Option<D>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum InternedEnclosingSnapshotId {
     Constraint(ScopedNarrowingConstraint),
@@ -346,19 +351,17 @@ pub struct UseDefMap<'db> {
     /// If the definition is both a declaration and a binding -- `x: int = 1` for example -- then
     /// we don't actually need anything here, all we'll need to validate is that our own RHS is a
     /// valid assignment to our own annotation.
-    declarations_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId>,
-
+    ///
     /// If the definition is a declaration (only) -- `x: int` for example -- then we need
     /// [`Bindings`] to know whether this declaration is consistent with the previously
     /// inferred type.
     ///
-    /// If the definition is both a declaration and a binding -- `x: int = 1` for example -- then
-    /// we don't actually need anything here, all we'll need to validate is that our own RHS is a
-    /// valid assignment to our own annotation.
-    ///
-    /// If we see a binding to a `Final`-qualified symbol, we also need this map to find previous
-    /// bindings to that symbol. If there are any, the assignment is invalid.
-    bindings_by_definition: FxHashMap<Definition<'db>, InternedBindingsId>,
+    /// If we see a binding to a `Final`-qualified symbol, we also need the bindings to find
+    /// previous bindings to that symbol. If there are any, the assignment is invalid.
+    definitions_by_definition: FxHashMap<
+        Definition<'db>,
+        DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
+    >,
 
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<PlaceState>>,
@@ -618,7 +621,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.bindings_by_definition[&definition];
+        let bindings_id = self.definitions_by_definition[&definition].bindings;
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -629,7 +632,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations_id = self.declarations_by_binding[&binding];
+        let declarations_id = self.definitions_by_definition[&binding]
+            .declarations
+            .expect("binding definition should have retained declarations");
         self.declarations_iterator(
             &self.interned_declarations[declarations_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -967,11 +972,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// keyed by their text range.
     range_reachability: Vec<(TextRange, RangeInfo)>,
 
-    /// Live declarations for each so-far-recorded binding.
-    declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
-
-    /// Live bindings for each so-far-recorded definition.
-    bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
+    /// Live bindings for each so-far-recorded definition and, for binding-only definitions, the
+    /// live declarations.
+    definitions_by_definition:
+        FxHashMap<Definition<'db>, DefinitionsAtDefinition<Bindings, Declarations>>,
 
     /// Currently live bindings and declarations for each place.
     symbol_states: IndexVec<ScopedSymbolId, PlaceState>,
@@ -1002,8 +1006,7 @@ impl<'db> UseDefMapBuilder<'db> {
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
-            declarations_by_binding: FxHashMap::default(),
-            bindings_by_definition: FxHashMap::default(),
+            definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
             reachable_member_definitions: IndexVec::new(),
@@ -1084,20 +1087,22 @@ impl<'db> UseDefMapBuilder<'db> {
         previous_definitions: PreviousDefinitions,
     ) {
         let bindings = match place {
-            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
-            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings().clone(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings().clone(),
         };
-
-        self.bindings_by_definition
-            .insert(binding, bindings.clone());
 
         let def_id = self.push_definition(DefinitionState::Defined(binding));
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
         };
-        self.declarations_by_binding
-            .insert(binding, place_state.declarations().clone());
+        self.definitions_by_definition.insert(
+            binding,
+            DefinitionsAtDefinition {
+                bindings,
+                declarations: Some(place_state.declarations().clone()),
+            },
+        );
 
         place_state.record_binding(
             def_id,
@@ -1353,8 +1358,13 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
         };
 
-        self.bindings_by_definition
-            .insert(declaration, place_state.bindings().clone());
+        self.definitions_by_definition.insert(
+            declaration,
+            DefinitionsAtDefinition {
+                bindings: place_state.bindings().clone(),
+                declarations: None,
+            },
+        );
         place_state.record_declaration(def_id, self.reachability);
 
         let definitions = match place {
@@ -1374,8 +1384,8 @@ impl<'db> UseDefMapBuilder<'db> {
         place: ScopedPlaceId,
         definition: Definition<'db>,
     ) {
-        // We don't need to store anything in self.bindings_by_declaration or
-        // self.declarations_by_binding.
+        // We don't need to store prior state for a definition that is both a declaration and a
+        // binding.
         let def_id = self.push_definition(DefinitionState::Defined(definition));
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
@@ -1703,22 +1713,26 @@ impl<'db> UseDefMapBuilder<'db> {
         self.range_reachability.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
-        let mut interned_bindings = IndexVec::with_capacity(self.bindings_by_definition.len());
-        let mut interned_ids_by_bindings =
-            FxHashMap::with_capacity_and_hasher(self.bindings_by_definition.len(), FxBuildHasher);
-        let mut interned_declarations = IndexVec::with_capacity(self.declarations_by_binding.len());
-        let mut interned_ids_by_declarations =
-            FxHashMap::with_capacity_and_hasher(self.declarations_by_binding.len(), FxBuildHasher);
-        // These fields are manually interned because they have a statistically high duplication rate (>50%).
-        let bindings_by_definition = Self::intern_bindings_by_definition(
-            self.bindings_by_definition,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
+        let mut interned_bindings = IndexVec::with_capacity(self.definitions_by_definition.len());
+        let mut interned_ids_by_bindings = FxHashMap::with_capacity_and_hasher(
+            self.definitions_by_definition.len(),
+            FxBuildHasher,
         );
-        let declarations_by_binding = Self::intern_declarations_by_binding(
-            self.declarations_by_binding,
+        let declarations_capacity = self
+            .definitions_by_definition
+            .values()
+            .filter(|definitions| definitions.declarations.is_some())
+            .count();
+        let mut interned_declarations = IndexVec::with_capacity(declarations_capacity);
+        let mut interned_ids_by_declarations =
+            FxHashMap::with_capacity_and_hasher(declarations_capacity, FxBuildHasher);
+        // These fields are manually interned because they have a statistically high duplication rate (>50%).
+        let definitions_by_definition = Self::intern_definitions_by_definition(
+            self.definitions_by_definition,
             &mut interned_declarations,
             &mut interned_ids_by_declarations,
+            &mut interned_bindings,
+            &mut interned_ids_by_bindings,
         );
         let bindings_by_use = Self::intern_bindings_by_use(
             self.bindings_by_use,
@@ -1799,8 +1813,7 @@ impl<'db> UseDefMapBuilder<'db> {
             range_reachability: self.range_reachability.into_boxed_slice(),
             symbol_states,
             member_states,
-            declarations_by_binding,
-            bindings_by_definition,
+            definitions_by_definition,
             enclosing_snapshots: enclosing_snapshots.into(),
             end_of_scope_reachability: self.reachability,
         }
@@ -1822,49 +1835,56 @@ impl<'db> UseDefMapBuilder<'db> {
             .collect()
     }
 
-    fn intern_bindings_by_definition(
-        bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
+    fn intern_definitions_by_definition(
+        definitions_by_definition: FxHashMap<
+            Definition<'db>,
+            DefinitionsAtDefinition<Bindings, Declarations>,
+        >,
+        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
+        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
         interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
         interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
-    ) -> FxHashMap<Definition<'db>, InternedBindingsId> {
-        let mut interned_ids_by_definition: FxHashMap<Definition<'db>, InternedBindingsId> =
-            FxHashMap::with_capacity_and_hasher(bindings_by_definition.len(), FxBuildHasher);
+    ) -> FxHashMap<
+        Definition<'db>,
+        DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
+    > {
+        let mut interned_ids_by_definition =
+            FxHashMap::with_capacity_and_hasher(definitions_by_definition.len(), FxBuildHasher);
 
-        for (definition, bindings) in bindings_by_definition {
-            let interned_id = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
+        for (
+            definition,
+            DefinitionsAtDefinition {
+                bindings,
+                declarations,
+            },
+        ) in definitions_by_definition
+        {
+            let bindings = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
                 *interned_id
             } else {
                 let interned_id = interned_bindings.push(bindings.clone());
                 interned_ids_by_bindings.insert(bindings, interned_id);
                 interned_id
             };
-            interned_ids_by_definition.insert(definition, interned_id);
-        }
-
-        interned_ids_by_definition
-    }
-
-    fn intern_declarations_by_binding(
-        declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
-        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
-        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
-    ) -> FxHashMap<Definition<'db>, InternedDeclarationsId> {
-        let mut interned_ids_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId> =
-            FxHashMap::with_capacity_and_hasher(declarations_by_binding.len(), FxBuildHasher);
-
-        for (binding, declarations) in declarations_by_binding {
-            let interned_id =
+            let declarations = declarations.map(|declarations| {
                 if let Some(interned_id) = interned_ids_by_declarations.get(&declarations) {
                     *interned_id
                 } else {
                     let interned_id = interned_declarations.push(declarations.clone());
                     interned_ids_by_declarations.insert(declarations, interned_id);
                     interned_id
-                };
-            interned_ids_by_binding.insert(binding, interned_id);
+                }
+            });
+            interned_ids_by_definition.insert(
+                definition,
+                DefinitionsAtDefinition {
+                    bindings,
+                    declarations,
+                },
+            );
         }
 
-        interned_ids_by_binding
+        interned_ids_by_definition
     }
 
     fn intern_bindings_by_use(
