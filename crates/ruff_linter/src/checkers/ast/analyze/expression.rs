@@ -1293,6 +1293,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::DecimalFromFloatLiteral) {
                 ruff::rules::decimal_from_float_literal_syntax(checker, call);
             }
+            if checker.is_rule_enabled(Rule::DecimalFromNonStringArg) {
+                ruff::rules::decimal_from_non_string_arg(checker, call);
+            }
             if checker.is_rule_enabled(Rule::IntOnSlicedStr) {
                 refurb::rules::int_on_sliced_str(checker, call);
             }

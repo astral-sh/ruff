@@ -1,0 +1,106 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 824
+---
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:26:14
+   |
+25 | # Integer literals
+26 | d8 = Decimal(1)  # RUF076
+   |              ^
+27 | d9 = Decimal(0)  # RUF076
+28 | d10 = Decimal(0xAB)  # RUF076
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:27:14
+   |
+25 | # Integer literals
+26 | d8 = Decimal(1)  # RUF076
+27 | d9 = Decimal(0)  # RUF076
+   |              ^
+28 | d10 = Decimal(0xAB)  # RUF076
+29 | d11 = decimal.Decimal(42)  # RUF076
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:28:15
+   |
+26 | d8 = Decimal(1)  # RUF076
+27 | d9 = Decimal(0)  # RUF076
+28 | d10 = Decimal(0xAB)  # RUF076
+   |               ^^^^
+29 | d11 = decimal.Decimal(42)  # RUF076
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:29:23
+   |
+27 | d9 = Decimal(0)  # RUF076
+28 | d10 = Decimal(0xAB)  # RUF076
+29 | d11 = decimal.Decimal(42)  # RUF076
+   |                       ^^
+30 |
+31 | # Unary ops on integers
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:32:15
+   |
+31 | # Unary ops on integers
+32 | d12 = Decimal(+1)  # RUF076
+   |               ^^
+33 | d13 = Decimal(-1)  # RUF076
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:33:15
+   |
+31 | # Unary ops on integers
+32 | d12 = Decimal(+1)  # RUF076
+33 | d13 = Decimal(-1)  # RUF076
+   |               ^^
+34 |
+35 | # Variables with int annotation
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:37:15
+   |
+35 | # Variables with int annotation
+36 | x: int = 42
+37 | d14 = Decimal(x)  # RUF076
+   |               ^
+38 |
+39 | # Variables with float annotation
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:41:15
+   |
+39 | # Variables with float annotation
+40 | y: float = 3.14
+41 | d15 = Decimal(y)  # RUF076
+   |               ^
+42 |
+43 | # Untyped variable (assigned int literal - type is Unknown, no str annotation)
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:45:15
+   |
+43 | # Untyped variable (assigned int literal - type is Unknown, no str annotation)
+44 | z = 100
+45 | d16 = Decimal(z)  # RUF076
+   |               ^
+46 |
+47 | # ===== Edge cases =====
+   |
+
+RUF076 `Decimal()` called with a non-string argument
+  --> RUF076.py:57:23
+   |
+56 | # Re-test with fully qualified after shadow
+57 | d18 = decimal.Decimal(1)  # RUF076: still resolves to real decimal.Decimal
+   |                       ^
+   |
