@@ -3292,27 +3292,24 @@ pub struct PydocstyleOptions {
     /// [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing
     /// docstring sections.
     ///
-    /// Enabling a convention will disable any rules that are not included
-    /// in the specified convention. As such, the intended workflow is to
-    /// enable a convention and then selectively enable or disable any
-    /// additional rules on top of it.
+    /// Enabling a convention will disable all rules that are not included in
+    /// the specified convention. As such, the intended workflow is to enable a
+    /// convention and then selectively enable or disable any additional rules
+    /// on top of it.
     ///
-    /// For example, here's how to configure a convention and customize
-    /// its rules by selecting and ignoring specific violations:
+    /// For example, to use Google-style conventions but avoid requiring
+    /// documentation for every function parameter:
     ///
     /// ```toml
     /// [tool.ruff.lint]
-    /// select = [
-    ///     "D",
-    ///     # Augment the convention by requiring an imperative mood for all docstrings.
-    ///     "D401",
-    /// ]
+    /// # Enable all `pydocstyle` rules, limiting to those that adhere to the
+    /// # Google convention via `convention = "google"`, below.
+    /// select = ["D"]
     ///
-    /// ignore = [
-    ///     # Relax the convention by _not_ requiring documentation for every function parameter.
-    ///     "D417",
-    /// ]
-    ///
+    /// # On top of the Google convention, disable `D417`, which requires
+    /// # documentation for every function parameter.
+    /// ignore = ["D417"]
+    /// ```
     /// [tool.ruff.lint.pydocstyle]
     /// convention = "google"
     /// ```
