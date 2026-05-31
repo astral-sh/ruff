@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
-use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -11,9 +12,14 @@ use crate::checkers::ast::Checker;
 /// Checks for `Decimal` calls that pass a non-string argument.
 ///
 /// ## Why is this bad?
-/// The `Decimal` class is designed to handle numbers with fixed-point precision.
-/// Passing numeric literals or variables can lead to precision loss or unexpected
-/// behavior. Using a string argument ensures the exact decimal value is preserved.
+/// Constructing `Decimal` from a string literal ensures the exact decimal value
+/// is preserved and makes the intended value explicit in code. Passing integer
+/// literals or integer-typed variables bypasses this explicitness — while integers
+/// don't lose precision, enforcing string construction provides consistency and
+/// prevents accidental use of float variables.
+///
+/// This rule does **not** fire on float literals (use `RUF032` for that), tuple
+/// constructor forms, or expressions whose type cannot be determined.
 ///
 /// ## Example
 ///
@@ -49,7 +55,18 @@ impl Violation for DecimalFromNonStringArg {
 
 /// RUF076
 pub(crate) fn decimal_from_non_string_arg(checker: &Checker, call: &ast::ExprCall) {
-    let Some(arg) = call.arguments.args.first() else {
+    // Extract the effective `value` argument: positional first, then keyword `value=`.
+    let arg = call
+        .arguments
+        .args
+        .first()
+        .or_else(|| {
+            call.arguments
+                .find_keyword("value")
+                .map(|kw| &kw.value)
+        });
+
+    let Some(arg) = arg else {
         return;
     };
 
@@ -69,33 +86,44 @@ pub(crate) fn decimal_from_non_string_arg(checker: &Checker, call: &ast::ExprCal
     match resolved_type {
         // String literals, f-strings, string concatenations → allowed
         ResolvedPythonType::Atom(PythonType::String) => {}
-        // Numeric literals (int, float, complex, bool) → reject
+
+        // Tuple literals → allowed (valid Decimal sign/digits/exponent form)
+        ResolvedPythonType::Atom(PythonType::Tuple) => {}
+
+        // Float literals → defer to RUF032 which provides a fix
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float)) => {}
+
+        // Integer/complex/bool literals → reject
         ResolvedPythonType::Atom(PythonType::Number(_)) => {
             checker.report_diagnostic(DecimalFromNonStringArg, arg.range());
         }
-        // Other known types (bytes, list, dict, etc.) → reject
+
+        // Bytes literals → reject
+        ResolvedPythonType::Atom(PythonType::Bytes) => {
+            checker.report_diagnostic(DecimalFromNonStringArg, arg.range());
+        }
+
+        // Other known atom types (list, dict, set, etc.) → reject
         ResolvedPythonType::Atom(_) => {
             checker.report_diagnostic(DecimalFromNonStringArg, arg.range());
         }
-        // Union types → reject
-        ResolvedPythonType::Union(_) => {
-            checker.report_diagnostic(DecimalFromNonStringArg, arg.range());
-        }
-        // TypeError → reject
-        ResolvedPythonType::TypeError => {
-            checker.report_diagnostic(DecimalFromNonStringArg, arg.range());
-        }
-        // Unknown (variables, function calls) → check annotation if possible
+
+        // Unknown (variables, function calls, attributes) → check binding annotation
         ResolvedPythonType::Unknown => {
-            if !is_string_typed_name(checker, arg) {
+            if is_known_non_string_binding(checker, arg) {
                 checker.report_diagnostic(DecimalFromNonStringArg, arg.range());
             }
         }
+
+        // Union, TypeError → do not report (too uncertain)
+        ResolvedPythonType::Union(_) | ResolvedPythonType::TypeError => {}
     }
 }
 
-/// Check if an expression is a name reference that is annotated as `str`.
-fn is_string_typed_name(checker: &Checker, expr: &Expr) -> bool {
+/// Returns `true` if the expression is a name bound to a known non-string type
+/// (e.g., `int`, `float`). Uses Ruff's semantic type-checking infrastructure
+/// which handles annotated assignments, function parameters, and common aliases.
+fn is_known_non_string_binding(checker: &Checker, expr: &Expr) -> bool {
     let Expr::Name(name) = expr else {
         return false;
     };
@@ -105,16 +133,13 @@ fn is_string_typed_name(checker: &Checker, expr: &Expr) -> bool {
     };
 
     let binding = checker.semantic().binding(binding_id);
+    let semantic = checker.semantic();
 
-    // Check if the binding's source statement has a `str` annotation
-    if let Some(node_id) = binding.source {
-        let stmt = checker.semantic().statement(node_id);
-        if let ast::Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) = stmt {
-            if let Expr::Name(ann_name) = annotation.as_ref() {
-                return ann_name.id == "str";
-            }
-        }
+    // If it's annotated as str, it's fine
+    if typing::is_string(binding, semantic) {
+        return false;
     }
 
-    false
+    // If it's annotated as int or float, it's definitely bad
+    typing::is_int(binding, semantic) || typing::is_float(binding, semantic)
 }

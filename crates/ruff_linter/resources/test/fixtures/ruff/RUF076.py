@@ -20,29 +20,71 @@ d6 = Decimal(f"{x_val}")
 # No arguments (valid default)
 d7 = Decimal()
 
+# Tuple constructor form (valid sign/digits/exponent)
+d8 = Decimal((0, (1, 2, 3), -2))
+
+# Float literals (deferred to RUF032)
+d9 = Decimal(1.5)
+d10 = Decimal(3.14)
+
+# Keyword argument with string literal
+d11 = Decimal(value="99.9")
+
+# Function parameter annotated as str
+def process_str(s: str):
+    return decimal.Decimal(s)
+
+# Untyped variable (Unknown - not reported)
+z = some_function()
+d12 = Decimal(z)
+
+# Attribute access (Unknown - not reported)
+d13 = Decimal(obj.value)
+
+# Function call result (Unknown - not reported)
+d14 = Decimal(str(100))
+
 # ===== INVALID cases (should trigger RUF076) =====
 
 # Integer literals
-d8 = Decimal(1)  # RUF076
-d9 = Decimal(0)  # RUF076
-d10 = Decimal(0xAB)  # RUF076
-d11 = decimal.Decimal(42)  # RUF076
+d20 = Decimal(1)  # RUF076
+d21 = Decimal(0)  # RUF076
+d22 = Decimal(0xAB)  # RUF076
+d23 = decimal.Decimal(42)  # RUF076
 
 # Unary ops on integers
-d12 = Decimal(+1)  # RUF076
-d13 = Decimal(-1)  # RUF076
+d24 = Decimal(+1)  # RUF076
+d25 = Decimal(-1)  # RUF076
+
+# Boolean literals (subclass of int)
+d26 = Decimal(True)  # RUF076
+d27 = Decimal(False)  # RUF076
+
+# Complex literals
+d28 = Decimal(1j)  # RUF076
+
+# Bytes literal
+d29 = Decimal(b"123")  # RUF076
 
 # Variables with int annotation
 x: int = 42
-d14 = Decimal(x)  # RUF076
+d30 = Decimal(x)  # RUF076
 
 # Variables with float annotation
 y: float = 3.14
-d15 = Decimal(y)  # RUF076
+d31 = Decimal(y)  # RUF076
 
-# Untyped variable (assigned int literal - type is Unknown, no str annotation)
-z = 100
-d16 = Decimal(z)  # RUF076
+# Keyword argument with non-string value
+d32 = Decimal(value=1)  # RUF076
+d33 = Decimal(value=0xFF)  # RUF076
+
+# Function parameter annotated as int
+def process_int(n: int):
+    return decimal.Decimal(n)  # RUF076
+
+# Function parameter annotated as float
+def process_float(f: float):
+    return decimal.Decimal(f)  # RUF076
 
 # ===== Edge cases =====
 
@@ -51,7 +93,7 @@ class Decimal:
     def __init__(self, value):
         self.value = value
 
-d17 = Decimal(1)  # No error: shadowed name
+d40 = Decimal(1)  # No error: shadowed name
 
 # Re-test with fully qualified after shadow
-d18 = decimal.Decimal(1)  # RUF076: still resolves to real decimal.Decimal
+d41 = decimal.Decimal(1)  # RUF076: still resolves to real decimal.Decimal
