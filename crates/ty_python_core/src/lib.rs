@@ -9,13 +9,14 @@ use std::sync::Arc;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{FrozenIndexVec, IndexSlice};
-use ruff_python_ast::NodeIndex;
+use ruff_python_ast::{NodeIndex, sub_ast_level};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
+use thin_vec::ThinVec;
 use ty_module_resolver::ModuleName;
 
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -263,15 +264,18 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
 
 #[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
 struct DefinitionsByNode<'db> {
-    single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
-    non_single: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+    root_presence: Box<[u64]>,
+    root_ranks: Box<[u32]>,
+    root_definitions: Box<[Definition<'db>]>,
+    sub_ast: ThinVec<(DefinitionNodeKey, Definition<'db>)>,
+    non_single: ThinVec<(DefinitionNodeKey, Box<[Definition<'db>]>)>,
 }
 
 impl<'db> DefinitionsByNode<'db> {
     fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
-        let mut single = FxHashMap::default();
-        let mut non_single = FxHashMap::default();
-        single.reserve(definitions_by_node.len());
+        let mut root = Vec::new();
+        let mut sub_ast = Vec::new();
+        let mut non_single = Vec::new();
 
         #[expect(
             clippy::iter_over_hash_type,
@@ -279,23 +283,77 @@ impl<'db> DefinitionsByNode<'db> {
         )]
         for (key, definitions) in definitions_by_node {
             if definitions.len() == 1 {
-                single.insert(key, definitions[0]);
+                let definition = definitions[0];
+                if sub_ast_level(key.index().as_u32().unwrap()) == 0 {
+                    root.push((key, definition));
+                } else {
+                    sub_ast.push((key, definition));
+                }
             } else {
-                non_single.insert(key, definitions.into_boxed_slice());
+                non_single.push((key, definitions.into_boxed_slice()));
             }
         }
 
-        single.shrink_to_fit();
-        non_single.shrink_to_fit();
+        root.sort_unstable_by_key(|(key, _)| *key);
+        let mut root_presence =
+            vec![
+                0u64;
+                root.last()
+                    .map_or(0, |(key, _)| key.index().as_u32().unwrap() as usize / 64
+                        + 1)
+            ];
+        for (key, _) in &root {
+            let index = key.index().as_u32().unwrap() as usize;
+            root_presence[index / 64] |= 1 << (index % 64);
+        }
+        let mut rank = 0u32;
+        let root_ranks = root_presence
+            .iter()
+            .map(|presence| {
+                let current_rank = rank;
+                rank += presence.count_ones();
+                current_rank
+            })
+            .collect();
 
-        Self { single, non_single }
+        sub_ast.sort_unstable_by_key(|(key, _)| *key);
+        non_single.sort_unstable_by_key(|(key, _)| *key);
+
+        Self {
+            root_presence: root_presence.into_boxed_slice(),
+            root_ranks,
+            root_definitions: root.into_iter().map(|(_, definition)| definition).collect(),
+            sub_ast: sub_ast.into_iter().collect(),
+            non_single: non_single.into_iter().collect(),
+        }
     }
 
     fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
-        self.single
-            .get(&key)
-            .map(std::slice::from_ref)
-            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
+        let index = key.index().as_u32()? as usize;
+        let definition = if sub_ast_level(index as u32) == 0 {
+            let word_index = index / 64;
+            let bit = 1 << (index % 64);
+            self.root_presence.get(word_index).and_then(|presence| {
+                if presence & bit == 0 {
+                    None
+                } else {
+                    let rank = self.root_ranks[word_index] + (presence & (bit - 1)).count_ones();
+                    Some(&self.root_definitions[rank as usize])
+                }
+            })
+        } else {
+            self.sub_ast
+                .binary_search_by_key(&key, |(candidate, _)| *candidate)
+                .ok()
+                .map(|index| &self.sub_ast[index].1)
+        };
+
+        definition.map(std::slice::from_ref).or_else(|| {
+            self.non_single
+                .binary_search_by_key(&key, |(candidate, _)| *candidate)
+                .ok()
+                .map(|index| self.non_single[index].1.as_ref())
+        })
     }
 }
 
@@ -654,10 +712,10 @@ impl<'db> SemanticIndex<'db> {
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> Option<Definition<'db>> {
-        self.definitions_by_node
-            .single
-            .get(&definition_key.into())
-            .copied()
+        let [definition] = self.definitions_by_node.get(definition_key.into())? else {
+            return None;
+        };
+        Some(*definition)
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
