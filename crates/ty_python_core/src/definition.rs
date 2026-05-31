@@ -199,6 +199,10 @@ impl<'db> Definitions<'db> {
     pub fn push(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
     }
+
+    pub(crate) fn into_vec(self) -> Vec<Definition<'db>> {
+        self.definitions.into_vec()
+    }
 }
 
 impl<'db> Deref for Definitions<'db> {
