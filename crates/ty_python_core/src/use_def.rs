@@ -481,6 +481,8 @@ pub struct UseDefMap<'db> {
         Definition<'db>,
         DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
     >,
+    initial_definitions_at_definition:
+        DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
 
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
@@ -743,7 +745,11 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.definitions_by_definition[&definition].bindings;
+        let bindings_id = self
+            .definitions_by_definition
+            .get(&definition)
+            .unwrap_or(&self.initial_definitions_at_definition)
+            .bindings;
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -754,7 +760,10 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations_id = self.definitions_by_definition[&binding]
+        let declarations_id = self
+            .definitions_by_definition
+            .get(&binding)
+            .unwrap_or(&self.initial_definitions_at_definition)
             .declarations
             .expect("binding definition should have retained declarations");
         self.declarations_iterator(
@@ -1864,9 +1873,17 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_declarations_capacity,
             interned_declarations_capacity,
         );
+        let initial_bindings = Bindings::unbound(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let initial_bindings_id = place_state_interner.intern_bindings(initial_bindings.clone());
+        let initial_declarations =
+            Declarations::undeclared(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let initial_declarations_id =
+            place_state_interner.intern_declarations(initial_declarations.clone());
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
         let definitions_by_definition = Self::intern_definitions_by_definition(
             self.definitions_by_definition,
+            &initial_bindings,
+            &initial_declarations,
             &mut place_state_interner,
         );
         let bindings_by_use =
@@ -1939,6 +1956,10 @@ impl<'db> UseDefMapBuilder<'db> {
             symbol_states,
             member_states,
             definitions_by_definition,
+            initial_definitions_at_definition: DefinitionsAtDefinition {
+                bindings: initial_bindings_id,
+                declarations: Some(initial_declarations_id),
+            },
             enclosing_snapshots: enclosing_snapshots.into(),
             end_of_scope_reachability: self.reachability,
         }
@@ -1965,6 +1986,8 @@ impl<'db> UseDefMapBuilder<'db> {
             Definition<'db>,
             DefinitionsAtDefinition<Bindings, Declarations>,
         >,
+        initial_bindings: &Bindings,
+        initial_declarations: &Declarations,
         place_state_interner: &mut PlaceStateInterner,
     ) -> FxHashMap<
         Definition<'db>,
@@ -1981,6 +2004,14 @@ impl<'db> UseDefMapBuilder<'db> {
             },
         ) in definitions_by_definition
         {
+            if bindings == *initial_bindings
+                && declarations
+                    .as_ref()
+                    .is_none_or(|declarations| declarations == initial_declarations)
+            {
+                continue;
+            }
+
             let bindings = place_state_interner.intern_bindings(bindings);
             let declarations = declarations
                 .map(|declarations| place_state_interner.intern_declarations(declarations));
@@ -1993,6 +2024,7 @@ impl<'db> UseDefMapBuilder<'db> {
             );
         }
 
+        interned_ids_by_definition.shrink_to_fit();
         interned_ids_by_definition
     }
 
