@@ -2522,9 +2522,10 @@ impl<'a> Checker<'a> {
     /// end-of-scope (an `except ... as e:` handler) or removes (a later `del`) would no longer
     /// resolve, turning valid references into F821 false positives.
     ///
-    /// A generator that contains an assignment expression (`:=`) is also visited eagerly: per
-    /// [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target) the target binds in the
-    /// enclosing scope, so the binding must be created before the surrounding code is analyzed.
+    /// A class-scope generator never needs to create an enclosing-scope binding eagerly: per
+    /// [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target) an assignment expression
+    /// that would bind into a class-scope comprehension is a syntax error, and one nested in a
+    /// lambda binds in the lambda rather than the enclosing scope.
     fn visit_generator(&mut self, elt: &'a Expr, generators: &'a [Comprehension]) {
         let Some(generator) = generators.first() else {
             unreachable!("Generator expression must contain at least one generator");
@@ -2540,11 +2541,11 @@ impl<'a> Checker<'a> {
                 .any(|comprehension| comprehension.is_async),
         });
 
-        if !in_class_scope || contains_assignment_expression(elt, generators) {
+        if in_class_scope {
+            self.visit.generators.push(self.semantic.snapshot());
+        } else {
             self.visit_comprehensions(generators);
             self.visit_expr(elt);
-        } else {
-            self.visit.generators.push(self.semantic.snapshot());
         }
     }
 
@@ -3386,23 +3387,6 @@ impl<'a> ParsedAnnotationsCache<'a> {
     fn clear(&self) {
         self.by_offset.borrow_mut().clear();
     }
-}
-
-/// Returns `true` if the body or any iterable or condition of `generators` contains an assignment
-/// expression (`:=`).
-///
-/// Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), an assignment expression
-/// inside a generator binds its target in the enclosing scope rather than the generator scope.
-/// That binding has to be created eagerly, so a generator that contains one cannot be deferred.
-fn contains_assignment_expression(elt: &Expr, generators: &[Comprehension]) -> bool {
-    fn contains_named(expr: &Expr) -> bool {
-        helpers::any_over_expr(expr, Expr::is_named_expr)
-    }
-
-    contains_named(elt)
-        || generators.iter().any(|generator| {
-            contains_named(&generator.iter) || generator.ifs.iter().any(contains_named)
-        })
 }
 
 #[expect(clippy::too_many_arguments)]

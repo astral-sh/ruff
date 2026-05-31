@@ -24,6 +24,14 @@ class Foo:
         return (Foo.BAZ for _ in range(3))
 
 
+class WalrusInLambda:
+    values = (0,)
+
+    # No F821: the generator is deferred, so the class name resolves. The walrus binds in the
+    # lambda scope rather than the class scope, so it does not force eager evaluation.
+    generated = ((WalrusInLambda, lambda: (seen := 1)) for _ in values)
+
+
 def uses_walrus(items):
     # No F821: an assignment expression binds `seen` in this scope (PEP 572), so the
     # generator is evaluated eagerly and `seen` is visible afterward.
