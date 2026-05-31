@@ -2774,7 +2774,7 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown | list[Unknown]
+        reveal_type(self.x3)  # revealed: list[int] | list[Divergent]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -2874,6 +2874,24 @@ class NestedLists2:
         self.x = make_list(self.x)
 
 reveal_type(NestedLists2().x)  # revealed: list[Divergent]
+```
+
+The recursive marker must survive operations that would otherwise drop it. Concatenating with an
+empty list (`+ []`) resolves through `list.__add__`'s overloads ambiguously (the empty list is
+gradual), which previously collapsed the result to `Unknown` and discarded the `Divergent` marker.
+Without the marker, `recursive_type_normalized` could no longer fold the recursion and the attribute
+type proliferated without bound, hanging the type checker. We now preserve the marker through the
+ambiguous overload result so the fixed point converges:
+
+```py
+class NestedListsConcat:
+    def __init__(self):
+        self.x = [0]
+
+    def f(self):
+        self.x = [self.x] + []
+
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent]
 ```
 
 ### Builtin types attributes

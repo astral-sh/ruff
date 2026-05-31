@@ -946,6 +946,11 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Returns `true` if any `Type::Divergent(_)` recursion marker appears anywhere inside `self`.
+    pub(crate) fn contains_any_divergent(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, false, |ty| matches!(ty, Type::Divergent(_)))
+    }
+
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
     /// behave as: `object` for top-materialized, `Never` for bottom-materialized.
     /// Returns `None` if `self` is not `Divergent` or has not been materialized.
