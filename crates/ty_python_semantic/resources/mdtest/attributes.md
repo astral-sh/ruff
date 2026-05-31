@@ -3039,9 +3039,8 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
 ## Divergent inferred implicit instance attribute types
 
 If an implicit attribute is defined recursively and type inference diverges, the divergent part is
-filled in with the dynamic type `Divergent`. Types containing `Divergent` can be seen as "cheap"
-recursive types: they are not true recursive types based on recursive type theory, so no unfolding
-is performed when you use them.
+filled in with the dynamic type `Divergent`. When the recursion flows through a *different* instance
+(here, `other`), the divergent part stays a bare `Divergent` marker that does not unfold:
 
 ```py
 class C:
@@ -3051,6 +3050,10 @@ class C:
 reveal_type(C().x)  # revealed: tuple[Divergent, int]
 reveal_type(C().x[0])  # revealed: Divergent
 ```
+
+A *self-referential* implicit attribute (the recursion flows through `self`) is instead inferred as
+a true recursive type (a μ-binder), so structural operations such as subscript and iteration unfold
+it on demand — see [Self-referential implicit attributes](#self-referential-implicit-attributes).
 
 This also works if the tuple is not constructed directly:
 
@@ -3093,6 +3096,51 @@ class F:
         self.x = make_homogeneous_tuple(other.x)
 
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
+```
+
+## Self-referential implicit attributes
+
+When an implicit attribute refers to *itself* (the recursion flows through `self`), we infer a true
+recursive type: a μ-binder whose recursive position is still displayed as `Divergent`, but which
+unfolds one step every time a structural operation (subscript, iteration, …) descends into it.
+Without this, the type would bottom out at the bare `Divergent` marker after a single step.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = (1,)
+
+    def f(self):
+        self.x = (self.x, 0)
+
+        reveal_type(self.x)  # revealed: tuple[tuple[int] | tuple[Divergent, int], Literal[0]]
+        # Each subscript unfolds the recursive type one more step instead of collapsing to `Divergent`:
+        reveal_type(self.x[0])  # revealed: tuple[int] | tuple[Divergent, int]
+        reveal_type(self.x[0][0])  # revealed: int | tuple[int] | tuple[Divergent, int]
+        # The base case `int` (from `(1,)`) is genuinely not subscriptable:
+        # error: [not-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
+        reveal_type(self.x[0][0][0])  # revealed: Unknown | int | tuple[int] | tuple[Divergent, int]
+```
+
+The same recursive type is observed when the attribute is read from outside the class, so unfolding
+is a property of the type itself, not of where it is used:
+
+```py
+reveal_type(Foo().x)  # revealed: tuple[int] | tuple[Divergent, int]
+reveal_type(Foo().x[0])  # revealed: int | tuple[int] | tuple[Divergent, int]
+```
+
+Infinitely-nested generics behave the same way — subscripting keeps unfolding rather than stopping
+at `Divergent`:
+
+```py
+class S:
+    def f(self):
+        self.x = [self.x]
+
+reveal_type(S().x)  # revealed: list[Divergent]
+reveal_type(S().x[0])  # revealed: list[Divergent]
+reveal_type(S().x[0][0])  # revealed: list[Divergent]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

@@ -946,9 +946,33 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Returns `true` if any `Type::Divergent(_)` recursion marker appears anywhere inside `self`.
+    /// Returns `true` if any recursion marker — a bare `Type::Divergent(_)` or a `Type::Recursive`
+    /// μ-binder (whose body holds the marker but is `Atomic` to `any_over_type`, so it is not
+    /// descended into) — appears anywhere inside `self`. Used by ambiguous-overload resolution to
+    /// keep preserving the recursion marker even after it has been wrapped in a `Type::Recursive`.
     pub(crate) fn contains_any_divergent(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, false, |ty| matches!(ty, Type::Divergent(_)))
+        any_over_type(db, self, false, |ty| {
+            matches!(ty, Type::Divergent(_) | Type::Recursive(_))
+        })
+    }
+
+    /// Returns `true` if a `Type::Divergent(binder_id)` marker appears at a *structural* (nested)
+    /// position — i.e. inside a constructor such as `tuple[…]` / `list[…]` — rather than only as a
+    /// bare top-level union member or as the whole type itself.
+    ///
+    /// A bare top-level `Divergent` (e.g. `int | Divergent`, which `recursive_type_normalized`
+    /// reduces to `int`) is a degenerate, non-structural recursion and should not be wrapped in a
+    /// `Type::Recursive` μ-binder; only structural recursion (e.g. `tuple[Divergent, int]`) benefits
+    /// from the binder, since that is what lets subscript/iteration unfold on demand.
+    pub(crate) fn has_structural_divergent(self, db: &'db dyn Db, binder_id: salsa::Id) -> bool {
+        match self {
+            Type::Divergent(_) => false,
+            Type::Union(union) => union.elements(db).iter().any(|element| {
+                !matches!(element, Type::Divergent(d) if d.id() == binder_id)
+                    && element.contains_divergent_with_id(db, binder_id)
+            }),
+            other => other.contains_divergent_with_id(db, binder_id),
+        }
     }
 
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
@@ -2065,6 +2089,19 @@ impl<'db> Type<'db> {
         nested: bool,
     ) -> Option<Self> {
         if nested && self.same_divergent_marker(div) {
+            return None;
+        }
+        // A `Type::Recursive` whose binder matches the divergent marker being normalized is itself a
+        // recursive position: collapse it like the bare `Divergent` marker so the surrounding
+        // structure stays finite across fixed-point iterations. This fires when an implicit
+        // recursive attribute's wrapped provisional (`Type::Recursive`) is read back into a fresh
+        // body during cycle iteration; folding it to `Divergent` keeps the iteration in
+        // Divergent-space (see `implicit_attribute_cycle_recover`).
+        if nested
+            && let Type::Recursive(rec) = self
+            && let Type::Divergent(d) = div
+            && rec.binder_id(db) == d.id()
+        {
             return None;
         }
         match self {

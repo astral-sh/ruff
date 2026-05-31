@@ -1025,7 +1025,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // default) is too permissive — e.g. it would make `str <: Divergent` succeed
             // under assignability, breaking invariance checks on `list[Recursive]`.
             (Type::Divergent(divergent), other) | (other, Type::Divergent(divergent)) => {
-                if let Some(wrapping) = self.find_wrapping_recursive(db, divergent) {
+                // Only resolve the marker to its wrapping μ-binder for *named* recursive types
+                // (PEP 695 aliases). The strict structural unfold is what keeps `list[A]`
+                // invariance precise for those. Implicit recursive types from inference cycles
+                // (`source_alias = None`) stay gradual — like a bare `Divergent` — so that a
+                // self-referential implicit attribute's own assignments are not flagged (e.g.
+                // `self.x = [self.x[0].flip()]`, where `flip` widens the element type).
+                if let Some(wrapping) = self.find_wrapping_recursive(db, divergent)
+                    && wrapping.source_alias(db).is_some()
+                {
                     let is_left = matches!(source, Type::Divergent(d) if d.id() == divergent.id());
                     let recursive_ty = Type::Recursive(wrapping);
                     if is_left {

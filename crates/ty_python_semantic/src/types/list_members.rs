@@ -170,6 +170,10 @@ impl<'db> AllMembers<'db> {
                     // `Type` guarantees that unions/intersections
                     // are kept in DNF (i.e., they are flattened).
                     ty.is_dynamic()
+                        // An implicit recursive type from an inference cycle (no source alias)
+                        // is a gradual artifact, like the `Divergent` marker it wraps; filter it
+                        // out of the union so the remaining (concrete) members are not masked.
+                        || matches!(ty, Type::Recursive(rec) if rec.source_alias(db).is_none())
                         || match ty {
                             Type::Intersection(intersection) => {
                                 intersection.positive(db).iter().any(Type::is_dynamic)
