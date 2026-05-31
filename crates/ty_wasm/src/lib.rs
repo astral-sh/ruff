@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use js_sys::{Error, JsString};
+use js_sys::{Error, JsString, Uint32Array};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
@@ -628,22 +628,16 @@ impl Workspace {
     }
 
     #[wasm_bindgen(js_name = "semanticTokens")]
-    pub fn semantic_tokens(&self, file_id: &FileHandle) -> Result<Vec<SemanticToken>, Error> {
-        let index = line_index(&self.db, file_id.file);
-        let source = source_text(&self.db, file_id.file);
-
-        let semantic_token = ty_ide::semantic_tokens(&self.db, file_id.file, None);
-
-        let result = semantic_token
-            .iter()
-            .map(|token| SemanticToken {
-                kind: token.token_type.into(),
-                modifiers: token.modifiers.bits(),
-                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
-            })
-            .collect::<Vec<_>>();
-
-        Ok(result)
+    pub fn semantic_tokens(&self, file_id: &FileHandle) -> Result<SemanticTokens, Error> {
+        Ok(SemanticTokens::from_encoded(
+            ty_ide::encoded_semantic_tokens(
+                &self.db,
+                file_id.file,
+                None,
+                self.position_encoding.into(),
+                true,
+            ),
+        ))
     }
 
     #[wasm_bindgen(js_name = "semanticTokensInRange")]
@@ -651,26 +645,20 @@ impl Workspace {
         &self,
         file_id: &FileHandle,
         range: Range,
-    ) -> Result<Vec<SemanticToken>, Error> {
+    ) -> Result<SemanticTokens, Error> {
         let index = line_index(&self.db, file_id.file);
         let source = source_text(&self.db, file_id.file);
+        let range = range.to_text_range(&index, &source, self.position_encoding)?;
 
-        let semantic_token = ty_ide::semantic_tokens(
-            &self.db,
-            file_id.file,
-            Some(range.to_text_range(&index, &source, self.position_encoding)?),
-        );
-
-        let result = semantic_token
-            .iter()
-            .map(|token| SemanticToken {
-                kind: token.token_type.into(),
-                modifiers: token.modifiers.bits(),
-                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
-            })
-            .collect::<Vec<_>>();
-
-        Ok(result)
+        Ok(SemanticTokens::from_encoded(
+            ty_ide::encoded_semantic_tokens(
+                &self.db,
+                file_id.file,
+                Some(range),
+                self.position_encoding.into(),
+                true,
+            ),
+        ))
     }
 
     #[wasm_bindgen(js_name = "codeActions")]
@@ -1342,11 +1330,9 @@ pub struct InlayHintLabelPart {
 }
 
 #[wasm_bindgen]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SemanticToken {
-    pub kind: SemanticTokenKind,
-    pub modifiers: u32,
-    pub range: Range,
+#[derive(Debug, Clone)]
+pub struct SemanticTokens {
+    data: Uint32Array,
 }
 
 #[wasm_bindgen]
@@ -1406,7 +1392,12 @@ impl From<ty_ide::ReferenceKind> for DocumentHighlightKind {
 }
 
 #[wasm_bindgen]
-impl SemanticToken {
+impl SemanticTokens {
+    #[wasm_bindgen(getter)]
+    pub fn data(&self) -> Uint32Array {
+        self.data.clone()
+    }
+
     pub fn kinds() -> Vec<String> {
         ty_ide::SemanticTokenType::all()
             .iter()
@@ -1422,45 +1413,15 @@ impl SemanticToken {
     }
 }
 
-#[wasm_bindgen]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[repr(u32)]
-pub enum SemanticTokenKind {
-    Namespace,
-    Class,
-    Parameter,
-    SelfParameter,
-    ClsParameter,
-    Variable,
-    Property,
-    Function,
-    Method,
-    Keyword,
-    String,
-    Number,
-    Decorator,
-    BuiltinConstant,
-    TypeParameter,
-}
+impl SemanticTokens {
+    fn from_encoded(tokens: Vec<ty_ide::EncodedSemanticToken>) -> Self {
+        let data = tokens
+            .into_iter()
+            .flat_map(ty_ide::EncodedSemanticToken::as_u32_array)
+            .collect::<Vec<u32>>();
 
-impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
-    fn from(value: ty_ide::SemanticTokenType) -> Self {
-        match value {
-            ty_ide::SemanticTokenType::Namespace => Self::Namespace,
-            ty_ide::SemanticTokenType::Class => Self::Class,
-            ty_ide::SemanticTokenType::Parameter => Self::Parameter,
-            ty_ide::SemanticTokenType::SelfParameter => Self::SelfParameter,
-            ty_ide::SemanticTokenType::ClsParameter => Self::ClsParameter,
-            ty_ide::SemanticTokenType::Variable => Self::Variable,
-            ty_ide::SemanticTokenType::Property => Self::Property,
-            ty_ide::SemanticTokenType::Function => Self::Function,
-            ty_ide::SemanticTokenType::Method => Self::Method,
-            ty_ide::SemanticTokenType::Keyword => Self::Keyword,
-            ty_ide::SemanticTokenType::String => Self::String,
-            ty_ide::SemanticTokenType::Number => Self::Number,
-            ty_ide::SemanticTokenType::Decorator => Self::Decorator,
-            ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
-            ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+        Self {
+            data: Uint32Array::from(data.as_slice()),
         }
     }
 }
