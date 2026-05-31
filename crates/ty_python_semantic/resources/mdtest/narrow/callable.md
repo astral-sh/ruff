@@ -132,26 +132,57 @@ def f(x: object):
         reveal_type(x)  # revealed: Top[(...) -> object]
 ```
 
-## Class-pattern diagnostics distinguish `typing.Callable` from `collections.abc.Callable`
+## `Callable` special-form identity
 
-`Callable` is a special form, not a class, so it cannot be used as the class in a class pattern. The
-resulting `invalid-match-pattern` diagnostic should name the symbol by the module it was imported
-from, not the module its definition site happens to live in.
+`typing.Callable` and `collections.abc.Callable` are both modeled as special forms. Import
+resolution should preserve which module the symbol comes from, even when the symbol is re-exported
+through another module. These tests only check symbol resolution; class-pattern behavior is tested
+separately below.
 
-### `from collections.abc import Callable`
+### Direct imports
+
+```py
+import collections.abc
+import typing
+from collections.abc import Callable as CollectionsAbcCallable
+from typing import Callable as TypingCallable
+
+reveal_type(TypingCallable)  # revealed: <special-form 'typing.Callable'>
+reveal_type(typing.Callable)  # revealed: <special-form 'typing.Callable'>
+reveal_type(CollectionsAbcCallable)  # revealed: <special-form 'collections.abc.Callable'>
+reveal_type(collections.abc.Callable)  # revealed: <special-form 'collections.abc.Callable'>
+```
+
+### Imports proxied through another module
+
+`typing_compat.py`:
+
+```py
+from typing import Callable
+```
+
+`collections_abc_compat.py`:
 
 ```py
 from collections.abc import Callable
-
-def _(subj: int | Callable[..., str]) -> None:
-    match subj:
-        # TODO: Should be valid.
-        # error: [invalid-match-pattern] "`<special-form 'collections.abc.Callable'>` cannot be used in a class pattern because it is not a type"
-        case Callable(): ...
-        case _: ...
 ```
 
-### `import collections.abc; collections.abc.Callable()`
+`main.py`:
+
+```py
+from collections_abc_compat import Callable as CollectionsAbcCallable
+from typing_compat import Callable as TypingCallable
+
+reveal_type(TypingCallable)  # revealed: <special-form 'typing.Callable'>
+reveal_type(CollectionsAbcCallable)  # revealed: <special-form 'collections.abc.Callable'>
+```
+
+## Class-pattern behavior for `typing.Callable` and `collections.abc.Callable`
+
+At runtime, `collections.abc.Callable` is supported in `match` statement class patterns, however
+`typing.Callable` is not.
+
+### `collections.abc.Callable`
 
 ```py
 import collections.abc
@@ -164,19 +195,7 @@ def _(subj: int | collections.abc.Callable[..., str]) -> None:
         case _: ...
 ```
 
-### `from typing import Callable`
-
-```py
-from typing import Callable
-
-def _(subj: int | Callable[..., str]) -> None:
-    match subj:
-        # error: [invalid-match-pattern] "`<special-form 'typing.Callable'>` cannot be used in a class pattern because it is not a type"
-        case Callable(): ...
-        case _: ...
-```
-
-### `import typing; typing.Callable()`
+### `typing.Callable`
 
 ```py
 import typing
