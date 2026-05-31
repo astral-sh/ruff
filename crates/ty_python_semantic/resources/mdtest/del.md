@@ -366,7 +366,7 @@ def f(l: list[int]):
 ```
 
 ```snapshot
-error[invalid-argument-type]: Method `__delitem__` of type `bound method list[int].__delitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> None` cannot be called  with key of type `Literal["string"]` on object of type `list[int]`
+error[invalid-argument-type]: Method `__delitem__` of type `bound method list[int].__delitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> None` cannot be called with key of type `Literal["string"]` on object of type `list[int]`
  --> src/mdtest_snippet.py:8:5
   |
 8 |     del l["string"]
@@ -416,6 +416,61 @@ reveal_type(g[0])  # revealed: str
 
 # error: [not-subscriptable] "Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method"
 del g[0]
+```
+
+### Multiple item deletion targets
+
+```py
+class OnlyGetItem:
+    def __getitem__(self, key: int) -> int:
+        return key
+
+items = [1]
+not_deletable = OnlyGetItem()
+also_not_deletable = OnlyGetItem()
+
+# snapshot: not-subscriptable
+del items[0], not_deletable[0]
+
+# snapshot: not-subscriptable
+del not_deletable[0], items[0]
+
+# snapshot: not-subscriptable
+# snapshot: not-subscriptable
+del not_deletable[0], also_not_deletable[0]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+  --> src/mdtest_snippet.py:10:1
+   |
+10 | del items[0], not_deletable[0]
+   | ---           ^^^^^^^^^^^^^^^^
+   |
+
+
+error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+  --> src/mdtest_snippet.py:13:1
+   |
+13 | del not_deletable[0], items[0]
+   | --- ^^^^^^^^^^^^^^^^
+   |
+
+
+error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+  --> src/mdtest_snippet.py:17:1
+   |
+17 | del not_deletable[0], also_not_deletable[0]
+   | --- ^^^^^^^^^^^^^^^^
+   |
+
+
+error[not-subscriptable]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+  --> src/mdtest_snippet.py:17:1
+   |
+17 | del not_deletable[0], also_not_deletable[0]
+   | ---                   ^^^^^^^^^^^^^^^^^^^^^
+   |
 ```
 
 ### TypedDict deletion

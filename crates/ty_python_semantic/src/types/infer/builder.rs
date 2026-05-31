@@ -14,7 +14,7 @@ use ruff_python_ast::{
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::typing::as_pep_585_generic;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
@@ -75,6 +75,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::builder::subscript::DelDiagnosticRanges;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
@@ -4937,11 +4938,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             targets,
         } = delete;
+
         for target in targets {
             self.infer_expression(target, TypeContext::default());
             match target {
                 ast::Expr::Subscript(subscript) => {
-                    self.validate_subscript_deletion(*range, subscript);
+                    let diagnostic_ranges = if targets.len() == 1 {
+                        DelDiagnosticRanges::SingleTarget {
+                            full_statement_range: *range,
+                        }
+                    } else {
+                        DelDiagnosticRanges::MultipleTargets {
+                            del_keyword_range: TextRange::new(
+                                range.start(),
+                                range.start() + "del".text_len(),
+                            ),
+                            target_range: target.range(),
+                        }
+                    };
+                    self.validate_subscript_deletion(diagnostic_ranges, subscript);
                 }
                 _ => {}
             }
