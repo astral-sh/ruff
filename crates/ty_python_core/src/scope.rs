@@ -108,7 +108,7 @@ impl FileScopeId {
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub struct Scope<'db> {
     /// The Salsa ingredient for this scope.
-    scope_id: ScopeId<'db>,
+    id: ScopeId<'db>,
 
     /// The parent scope, if any.
     parent: Option<FileScopeId>,
@@ -128,7 +128,7 @@ impl<'db> Scope<'db> {
         descendants: Range<FileScopeId>,
     ) -> Self {
         Scope {
-            scope_id,
+            id: scope_id,
             parent,
             node,
             descendants,
@@ -136,7 +136,7 @@ impl<'db> Scope<'db> {
     }
 
     pub fn scope_id(&self) -> ScopeId<'db> {
-        self.scope_id
+        self.id
     }
 
     pub fn parent(&self) -> Option<FileScopeId> {
