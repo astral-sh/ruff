@@ -1334,7 +1334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_declaration()
         );
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
-        let prior_bindings = use_def.bindings_at_definition(declaration);
+        let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
         let inferred_ty = place_from_bindings(self.db(), prior_bindings)
             .place
@@ -10756,11 +10756,9 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         let mut bound_ty = inferred_ty;
 
         if self.qualifiers.contains(TypeQualifiers::FINAL) {
-            let mut previous_bindings = use_def.bindings_at_definition(self.binding);
-
             // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
 
-            let previous_definition = previous_bindings.find_map(|r| r.binding.definition());
+            let previous_definition = use_def.first_prior_binding(self.binding);
 
             if !self.is_local || previous_definition.is_some() {
                 let place = place_table.place(self.binding.place(db));

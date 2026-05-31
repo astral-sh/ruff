@@ -1716,6 +1716,62 @@ def f(items, flags):
         x = 25
     if flags[126]:
         x = 26
+    if flags[127]:
+        x = 27
+    if flags[128]:
+        x = 28
+    if flags[129]:
+        x = 29
+    if flags[130]:
+        x = 30
+    if flags[131]:
+        x = 31
+    if flags[132]:
+        x = 32
+    if flags[133]:
+        x = 33
+    if flags[134]:
+        x = 34
+    if flags[135]:
+        x = 35
+    if flags[136]:
+        x = 36
+    if flags[137]:
+        x = 37
+    if flags[138]:
+        x = 38
+    if flags[139]:
+        x = 39
+    if flags[140]:
+        x = 40
+    if flags[141]:
+        x = 41
+    if flags[142]:
+        x = 42
+    if flags[143]:
+        x = 43
+    if flags[144]:
+        x = 44
+    if flags[145]:
+        x = 45
+    if flags[146]:
+        x = 46
+    if flags[147]:
+        x = 47
+    if flags[148]:
+        x = 48
+    if flags[149]:
+        x = 49
+    if flags[150]:
+        x = 50
+    if flags[151]:
+        x = 51
+    if flags[152]:
+        x = 52
+    if flags[153]:
+        x = 53
+    if flags[154]:
+        x = 54
 ```
 
 ### `Divergent` in narrowing conditions doesn't run afoul of "monotonic widening" in cycle recovery

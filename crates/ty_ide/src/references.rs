@@ -20,7 +20,7 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::Ranged;
-use ty_python_core::definition::{Definition, DefinitionState};
+use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeKind;
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
@@ -623,14 +623,7 @@ impl<'a> LocalReferencesFinder<'a> {
     fn binding_is_first_assignment_on_some_path(&self, binding: Definition<'a>) -> bool {
         let db = self.model.db();
         let use_def = ty_python_core::use_def_map(db, binding.scope(db));
-        use_def
-            .bindings_at_definition(binding)
-            .any(|prior_binding| {
-                matches!(
-                    prior_binding.binding,
-                    DefinitionState::Deleted | DefinitionState::Undefined
-                )
-            })
+        use_def.has_prior_undefined_or_deleted_binding(binding)
     }
 }
 
