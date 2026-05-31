@@ -262,6 +262,41 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
+#[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
+struct DefinitionsByNode<'db> {
+    single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    multiple: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+}
+
+impl<'db> DefinitionsByNode<'db> {
+    fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
+        let mut single = FxHashMap::default();
+        let mut multiple = FxHashMap::default();
+        single.reserve(definitions_by_node.len());
+
+        for (key, definitions) in definitions_by_node {
+            let definitions = definitions.into_vec();
+            if let [definition] = definitions.as_slice() {
+                single.insert(key, *definition);
+            } else {
+                multiple.insert(key, definitions.into_boxed_slice());
+            }
+        }
+
+        single.shrink_to_fit();
+        multiple.shrink_to_fit();
+
+        Self { single, multiple }
+    }
+
+    fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
+        self.single
+            .get(&key)
+            .map(std::slice::from_ref)
+            .or_else(|| self.multiple.get(&key).map(AsRef::as_ref))
+    }
+}
+
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update, get_size2::GetSize)]
 pub struct SemanticIndex<'db> {
@@ -275,7 +310,7 @@ pub struct SemanticIndex<'db> {
     scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
+    definitions_by_node: DefinitionsByNode<'db>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -532,17 +567,19 @@ impl<'db> SemanticIndex<'db> {
     /// There will only ever be >1 `Definition` associated with a `definition_key`
     /// if the definition is created by a wildcard (`*`) import.
     #[track_caller]
-    pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &Definitions<'db> {
-        &self.definitions_by_node[&definition_key.into()]
+    pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &[Definition<'db>] {
+        self.definitions_by_node
+            .get(definition_key.into())
+            .expect("definition should be present in the semantic index")
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_node`, if any.
     pub fn try_definitions(
         &self,
         definition_node: ast::AnyNodeRef<'_>,
-    ) -> Option<&Definitions<'db>> {
+    ) -> Option<&[Definition<'db>]> {
         let definition_key = DefinitionNodeKey::from_node_ref(definition_node);
-        self.definitions_by_node.get(&definition_key)
+        self.definitions_by_node.get(definition_key)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
@@ -576,7 +613,7 @@ impl<'db> SemanticIndex<'db> {
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> Option<Definition<'db>> {
         self.definitions_by_node
-            .get(&definition_key.into())?
+            .get(definition_key.into())?
             .iter()
             .copied()
             .exactly_one()
