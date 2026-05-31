@@ -1363,7 +1363,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn push_loop_header_binding(&mut self, place: ScopedPlaceId, loop_token: LoopToken<'db>) {
         let scope = self.current_scope();
-        let binding = LoopHeaderBinding::new(self.scope_ids_by_scope[scope], loop_token, place);
+        let binding =
+            LoopHeaderBinding::new(self.db, self.scope_ids_by_scope[scope], loop_token, place);
         self.current_use_def_map_mut()
             .record_loop_header_binding(place, binding);
 

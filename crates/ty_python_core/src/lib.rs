@@ -172,34 +172,14 @@ pub struct LoopToken<'db> {}
 impl get_size2::GetSize for LoopToken<'_> {}
 
 /// A compact internal binding used to model values that flow around a loop back edge.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Update, get_size2::GetSize)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct LoopHeaderBinding<'db> {
-    scope: ScopeId<'db>,
-    loop_token: LoopToken<'db>,
-    place: ScopedPlaceId,
+    pub scope: ScopeId<'db>,
+    pub loop_token: LoopToken<'db>,
+    pub place: ScopedPlaceId,
 }
 
-impl<'db> LoopHeaderBinding<'db> {
-    pub fn new(scope: ScopeId<'db>, loop_token: LoopToken<'db>, place: ScopedPlaceId) -> Self {
-        Self {
-            scope,
-            loop_token,
-            place,
-        }
-    }
-
-    pub fn scope(self) -> ScopeId<'db> {
-        self.scope
-    }
-
-    pub fn loop_token(self) -> LoopToken<'db> {
-        self.loop_token
-    }
-
-    pub fn place(self) -> ScopedPlaceId {
-        self.place
-    }
-}
+impl get_size2::GetSize for LoopHeaderBinding<'_> {}
 
 /// Look up a `LoopHeader` given a `LoopToken`.
 ///

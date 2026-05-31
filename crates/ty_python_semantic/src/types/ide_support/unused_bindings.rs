@@ -107,8 +107,8 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
                     continue;
                 };
 
-                let loop_header = get_loop_header(db, loop_header_binding.loop_token());
-                for live_binding in loop_header.bindings_for_place(loop_header_binding.place()) {
+                let loop_header = get_loop_header(db, loop_header_binding.loop_token(db));
+                for live_binding in loop_header.bindings_for_place(loop_header_binding.place(db)) {
                     if is_reachable(db, use_def_map, live_binding.reachability_constraint()) {
                         loop_header_used_definition_ids.insert(live_binding.binding());
                     }

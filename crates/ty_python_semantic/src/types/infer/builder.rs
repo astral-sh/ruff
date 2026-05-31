@@ -8384,7 +8384,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             DefinitionState::LoopHeader(loop_header_binding) => {
                                 let binding_ty = loop_header_binding_type(
                                     db,
-                                    loop_header_binding.loop_token(),
+                                    loop_header_binding.loop_token(db),
                                     loop_header_binding,
                                 );
                                 union = union.add(

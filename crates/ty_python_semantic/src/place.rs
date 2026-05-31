@@ -1235,7 +1235,7 @@ pub(crate) fn loop_header_reachability<'db>(
     loop_token: LoopToken<'db>,
     binding: LoopHeaderBinding<'db>,
 ) -> LoopHeaderReachability<'db> {
-    debug_assert_eq!(loop_token, binding.loop_token());
+    debug_assert_eq!(loop_token, binding.loop_token(db));
     loop_header_reachability_impl(db, binding, false)
 }
 
@@ -1259,10 +1259,10 @@ fn loop_header_reachability_impl<'db>(
     // overhead minimal while preserving diagnostics.
     const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
 
-    let scope = binding.scope();
+    let scope = binding.scope(db);
     let use_def = use_def_map(db, scope);
-    let loop_header = get_loop_header(db, binding.loop_token());
-    let place = binding.place();
+    let loop_header = get_loop_header(db, binding.loop_token(db));
+    let place = binding.place(db);
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
@@ -1371,9 +1371,9 @@ pub(crate) fn loop_header_binding_type<'db>(
     // overhead minimal while preserving diagnostics.
     const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
 
-    debug_assert_eq!(loop_token, binding.loop_token());
-    let loop_header = loop_header_reachability(db, binding.loop_token(), binding);
-    let use_def = use_def_map(db, binding.scope());
+    debug_assert_eq!(loop_token, binding.loop_token(db));
+    let loop_header = loop_header_reachability(db, binding.loop_token(db), binding);
+    let use_def = use_def_map(db, binding.scope(db));
     if use_def.reachability_constraints().used_interiors().len()
         > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
     {
@@ -1385,7 +1385,7 @@ pub(crate) fn loop_header_binding_type<'db>(
         let binding_ty = match reachable_binding.binding {
             DefinitionState::Defined(definition) => binding_type(db, definition),
             DefinitionState::LoopHeader(binding) => {
-                loop_header_binding_type(db, binding.loop_token(), binding)
+                loop_header_binding_type(db, binding.loop_token(db), binding)
             }
             DefinitionState::Deleted | DefinitionState::Undefined => {
                 unreachable!("loop headers only include bindings from within the loop")
@@ -1393,7 +1393,7 @@ pub(crate) fn loop_header_binding_type<'db>(
         };
         let narrowed_ty = use_def
             .narrowing_evaluator(reachable_binding.narrowing_constraint)
-            .narrow(db, binding_ty, binding.place());
+            .narrow(db, binding_ty, binding.place(db));
         union.add_in_place(narrowed_ty);
     }
     union.build()
@@ -1466,16 +1466,16 @@ fn place_from_bindings_impl<'db>(
                         return None;
                     }
 
-                    let loop_header = loop_header_reachability(db, binding.loop_token(), binding);
+                    let loop_header = loop_header_reachability(db, binding.loop_token(db), binding);
                     deleted_reachability =
                         deleted_reachability.or(loop_header.deleted_reachability);
                     if loop_header.reachable_bindings.is_empty() {
                         return None;
                     }
 
-                    let binding_ty = loop_header_binding_type(db, binding.loop_token(), binding);
+                    let binding_ty = loop_header_binding_type(db, binding.loop_token(db), binding);
                     return Some((
-                        narrowing_constraint.narrow(db, binding_ty, binding.place()),
+                        narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
                         static_reachability,
                     ));
                 }
