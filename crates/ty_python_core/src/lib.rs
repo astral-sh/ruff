@@ -260,38 +260,33 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
 #[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
 struct DefinitionsByNode<'db> {
     single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
-    non_single: ThinVec<(DefinitionNodeKey, Box<[Definition<'db>]>)>,
+    star_imports: ThinVec<(DefinitionNodeKey, Box<[Definition<'db>]>)>,
 }
 
 impl<'db> DefinitionsByNode<'db> {
-    fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
-        let mut single = FxHashMap::default();
-        let mut non_single = Vec::new();
-        single.reserve(definitions_by_node.len());
-
-        for (key, definitions) in definitions_by_node {
-            if definitions.len() == 1 {
-                single.insert(key, definitions[0]);
-            } else {
-                non_single.push((key, definitions.into_boxed_slice()));
-            }
-        }
-
+    fn from_maps(
+        mut single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+        star_imports: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
+    ) -> Self {
         single.shrink_to_fit();
-        non_single.sort_unstable_by_key(|(key, _)| *key);
+        let mut star_imports: Vec<_> = star_imports
+            .into_iter()
+            .map(|(key, definitions)| (key, definitions.into_boxed_slice()))
+            .collect();
+        star_imports.sort_unstable_by_key(|(key, _)| *key);
 
         Self {
             single,
-            non_single: non_single.into_iter().collect(),
+            star_imports: star_imports.into_iter().collect(),
         }
     }
 
     fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
         self.single.get(&key).map(std::slice::from_ref).or_else(|| {
-            self.non_single
+            self.star_imports
                 .binary_search_by_key(&key, |(candidate, _)| *candidate)
                 .ok()
-                .map(|index| self.non_single[index].1.as_ref())
+                .map(|index| self.star_imports[index].1.as_ref())
         })
     }
 }

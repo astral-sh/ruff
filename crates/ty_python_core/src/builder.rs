@@ -1,4 +1,5 @@
 use std::cell::{OnceCell, RefCell};
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
@@ -180,7 +181,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: ExpressionsScopeMapBuilder,
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
+    definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    star_import_definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
@@ -235,6 +237,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_expression: ExpressionsScopeMapBuilder::new(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
+            star_import_definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
             condition_flow_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
@@ -279,16 +282,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     pub(crate) fn expect_single_definition(
         &self,
-        definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
+        definition_key: impl Into<DefinitionNodeKey>,
     ) -> Definition<'db> {
-        let definitions = &self.definitions_by_node[&definition_key.into()];
-        debug_assert_eq!(
-            definitions.len(),
-            1,
-            "Expected exactly one definition to be associated with AST node {definition_key:?} but found {}",
-            definitions.len()
-        );
-        definitions[0]
+        self.definitions_by_node[&definition_key.into()]
     }
 
     /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
@@ -1138,8 +1134,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
-        self.definitions_by_node.entry(key).or_default()
+    fn add_entry_for_star_import_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
+        self.star_import_definitions_by_node.entry(key).or_default()
     }
 
     /// Add a [`Definition`] associated with the `definition_node` AST node.
@@ -1201,6 +1197,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `definition_node` is guaranteed to be a child of `self.module`
         let kind = definition_node.into_owned(self.module);
         let is_loop_header = kind.is_loop_header();
+        let is_star_import = kind.as_star_import().is_some();
 
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
@@ -1218,10 +1215,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // Loop headers are internal use-def definitions. They are retrieved through the loop
             // token rather than by their AST node.
             0
-        } else {
-            let definitions = self.add_entry_for_definition_key(definition_node.key());
+        } else if is_star_import {
+            let definitions = self.add_entry_for_star_import_key(definition_node.key());
             definitions.push(definition);
             definitions.len()
+        } else {
+            match self.definitions_by_node.entry(definition_node.key()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(definition);
+                    1
+                }
+                Entry::Occupied(_) => 2,
+            }
         };
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
@@ -2228,7 +2233,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         SemanticIndex {
             place_tables: place_tables.into(),
             scopes: self.scopes.into(),
-            definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
+            definitions_by_node: DefinitionsByNode::from_maps(
+                self.definitions_by_node,
+                self.star_import_definitions_by_node,
+            ),
             expressions_by_node: self.expressions_by_node,
             statements_by_node: self.statements_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
@@ -2485,7 +2493,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         //   (e.g. `from foo import *, bar, *`)
                         // - If the `*` import refers to a module that has 0 exported names.
                         // - If the module being imported from cannot be resolved.
-                        self.add_entry_for_definition_key(alias.into());
+                        self.add_entry_for_star_import_key(alias.into());
 
                         if found_star {
                             continue;
