@@ -201,8 +201,8 @@ impl<'db> Definitions<'db> {
         self.definitions.push(definition);
     }
 
-    pub(crate) fn into_vec(self) -> Vec<Definition<'db>> {
-        self.definitions.into_vec()
+    pub(crate) fn into_boxed_slice(self) -> Box<[Definition<'db>]> {
+        self.definitions.into_vec().into_boxed_slice()
     }
 }
 
