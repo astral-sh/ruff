@@ -1937,6 +1937,11 @@ fn add_unimported_completions<'db>(
                 (name, ImportRequest::module(name))
             });
         let import_action = importer.import(request, &members);
+
+        if import_action.import().is_none() && import_action.symbol_text() == name {
+            continue;
+        }
+
         // N.B. We use `add_skip_query` here because `all_symbols`
         // already takes our query into account.
         completions.add_skip_query(
