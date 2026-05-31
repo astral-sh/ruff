@@ -504,9 +504,47 @@ explicitly enable the `D` rule code prefix, since the `D` rules are not enabled 
     convention = "google"
     ```
 
-Enabling a [`convention`](settings.md#lint_pydocstyle_convention) disables any rules that are not
-included in it. For the exact rule sets in the PEP 257, NumPy, and Google conventions, see the
-[`convention`](settings.md#lint_pydocstyle_convention) settings documentation.
+Enabling a [`convention`](settings.md#lint_pydocstyle_convention) will disable any rules that are not
+included in the specified convention. As such, the intended workflow is to enable a convention and
+then selectively enable or disable any additional rules on top of it:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    select = [
+        "D",
+        # Augment the convention by requiring an imperative mood for all docstrings.
+        "D401",
+    ]
+
+    ignore = [
+        # Relax the convention by _not_ requiring documentation for every function parameter.
+        "D417",
+    ]
+
+    [tool.ruff.lint.pydocstyle]
+    convention = "google"
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    select = [
+        "D",
+        # Augment the convention by requiring an imperative mood for all docstrings.
+        "D401",
+    ]
+
+    ignore = [
+        # Relax the convention by _not_ requiring documentation for every function parameter.
+        "D417",
+    ]
+
+    [lint.pydocstyle]
+    convention = "google"
+    ```
 
 By default, no [`convention`](settings.md#lint_pydocstyle_convention) is set, and so the enabled rules
 are determined by the [`select`](settings.md#lint_select) setting alone.

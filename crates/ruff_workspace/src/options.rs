@@ -3357,6 +3357,8 @@ pub struct PydocstyleOptions {
     /// [`D409`](rules/mismatched-section-underline-length.md), and
     /// [`D413`](rules/missing-blank-line-after-last-section.md).
     ///
+    /// For more information see [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings).
+    ///
     /// To enable an additional rule that's excluded from the convention,
     /// select the desired rule via its fully qualified rule code (e.g.,
     /// `D400` instead of `D4` or `D40`):
