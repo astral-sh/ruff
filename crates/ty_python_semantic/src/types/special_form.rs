@@ -386,6 +386,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::Annotated => Self::Annotated,
                 SpecialFormTypeBuilder::Callable => match module {
                     KnownModule::CollectionsAbc => Self::CollectionsAbcCallable,
+                    KnownModule::CollectionsAbcInternal => Self::CollectionsAbcCallable,
                     _ => Self::TypingCallable,
                 },
                 SpecialFormTypeBuilder::CallableTypeOf => Self::CallableTypeOf,
@@ -491,7 +492,10 @@ impl SpecialFormType {
             | Self::CallableTypeOf
             | Self::RegularCallableTypeOf => module.is_ty_extensions(),
 
-            Self::CollectionsAbcCallable => module == KnownModule::CollectionsAbc,
+            Self::CollectionsAbcCallable => matches!(
+                module,
+                KnownModule::CollectionsAbc | KnownModule::CollectionsAbcInternal
+            ),
         }
     }
 

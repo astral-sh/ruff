@@ -146,11 +146,13 @@ import collections.abc
 import typing
 from collections.abc import Callable as CollectionsAbcCallable
 from typing import Callable as TypingCallable
+from _collections_abc import Callable as _CollectionsAbcCallable
 
 reveal_type(TypingCallable)  # revealed: <special-form 'typing.Callable'>
 reveal_type(typing.Callable)  # revealed: <special-form 'typing.Callable'>
 reveal_type(CollectionsAbcCallable)  # revealed: <special-form 'collections.abc.Callable'>
 reveal_type(collections.abc.Callable)  # revealed: <special-form 'collections.abc.Callable'>
+reveal_type(_CollectionsAbcCallable)  # revealed: <special-form 'collections.abc.Callable'>
 ```
 
 ### Imports proxied through another module
