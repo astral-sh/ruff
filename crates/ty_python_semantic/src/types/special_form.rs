@@ -256,7 +256,7 @@ impl SpecialFormType {
 
     /// Parse a `SpecialFormType` from its runtime symbol name in the context of `module`.
     ///
-    /// The module is needed to disambiguate symbols like `Callable`, which is exported by both
+    /// The `module` parameter is needed to disambiguate symbols like `Callable`, which is exported by both
     /// `typing` and `collections.abc` and inhabits a different `SpecialFormType` variant in each.
     fn from_name(name: &str, module: KnownModule) -> Option<Self> {
         /// An enum that maps 1:1 with `SpecialFormType`, but which holds no associated data
