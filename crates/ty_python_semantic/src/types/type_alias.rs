@@ -94,17 +94,26 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// otherwise return the simplified body directly.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let raw = self.raw_value_type(db);
-        let body = self.apply_function_specialization(db, raw);
         if self.is_self_referential(db) {
             use salsa::plumbing::AsId;
             let binder_id = self.as_id();
-            let folded = crate::types::recursive::substitute_self_alias_with_divergent(
+            // Fold self-references to `Divergent(binder_id)` on the *raw* body **before** applying
+            // the alias's own specialization. The fold matches recursive references by definition
+            // (any specialization), so the folded body contains no `Type::TypeAlias(self)` node.
+            //
+            // Doing this before `apply_function_specialization` is load-bearing for termination:
+            // otherwise the specialization walk descends into a nested self-reference whose
+            // argument is a *deeper* specialization (`A[T | A[T]]`, `A[Concatenate[int, P]]`),
+            // recomputes `value_type` for it, and never reaches a fixed point — the type-argument
+            // proliferation that hangs/overflows on generic recursive aliases.
+            let folded_raw = crate::types::recursive::substitute_self_alias_with_divergent(
                 db,
-                body,
+                raw,
                 self.definition(db),
                 binder_id,
             );
-            let simplified = strip_top_level_divergent(db, folded, binder_id);
+            let body = self.apply_function_specialization(db, folded_raw);
+            let simplified = strip_top_level_divergent(db, body, binder_id);
             if simplified.contains_divergent_with_id(db, binder_id) {
                 Type::recursive(
                     db,
@@ -116,7 +125,7 @@ impl<'db> PEP695TypeAliasType<'db> {
                 simplified
             }
         } else {
-            body
+            self.apply_function_specialization(db, raw)
         }
     }
 

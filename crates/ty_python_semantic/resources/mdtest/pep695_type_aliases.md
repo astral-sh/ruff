@@ -590,6 +590,11 @@ def subscript_recovered_alias(x: CrashyOperation):
 def iterate_recovered_alias(x: CrashyOperation):
     for y in x:
         reveal_type(y)  # revealed: Unknown
+
+# Calling the parser-recovered recursive alias must also terminate (regression for a stack
+# overflow on the call path, ty issue #3196).
+def call_recovered_alias(x: CrashyOperation):
+    reveal_type(x())  # revealed: Unknown
 ```
 
 ### With legacy generic
@@ -643,6 +648,41 @@ type C = Callable[[], C | None]
 
 def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
+```
+
+### Generic self-recursive aliases (type-argument proliferation)
+
+A generic recursive alias whose self-reference uses a *deeper* specialization than the alias's own
+parameters (`A[T | A[T]]`, `A[Concatenate[int, P]]`) previously overflowed/hung, because each
+specialization spawned a deeper one without converging (ty issue #3452). The self-reference is now
+folded at the recursive position before the alias's own specialization is applied, so the value type
+is finite. The recursive argument is conservatively simplified to the alias's own parameters at the
+recursion point (e.g. `A[int | A[int]]` is shown as `A[int]`); this is sound and avoids the
+proliferation.
+
+```py
+from typing import Callable, Concatenate
+
+type A1[**P] = Callable[[], A1[Concatenate[int, P]]]
+
+def _(func: A1):
+    reveal_type(func)  # revealed: () -> A1
+
+type A2[T] = Callable[[A2[T]], A2[T | A2[T]]]
+
+def _(x: A2[int]):
+    reveal_type(x)  # revealed: (A2[int], /) -> A2[int]
+```
+
+When the type argument does *not* grow through the recursion, distinct specializations stay distinct
+(the argument surfaces outside the recursive position):
+
+```py
+type F[T] = list[F[T]]
+
+def _(x: F[int], y: F[str]):
+    reveal_type(x)  # revealed: list[F[int]]
+    reveal_type(y)  # revealed: list[F[str]]
 ```
 
 ### Subtyping of materializations of cyclic aliases
