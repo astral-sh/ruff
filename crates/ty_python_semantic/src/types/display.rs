@@ -3135,6 +3135,10 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Callable(callable) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
+                // Ensure that when we go-to-definition on an inlay hint for a `Callable`,
+                // regardless of whether it's imported from `collections.abc` or `typing`,
+                // we go to `typing.pyi` because in typeshed there is no `Callable` in
+                // `collections.abc`.
                 f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
                     .write_str("Callable")?;
                 f.write_str(" special-form '")?;
