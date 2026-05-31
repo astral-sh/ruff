@@ -163,7 +163,7 @@
 //! The data structure we build to answer these questions is the `UseDefMap`. It has a
 //! `bindings_by_use` vector of [`InternedBindingsId`] indexed by [`ScopedUseId`]
 //! (plus an interned bindings table), a
-//! `bindings_by_declaration` and `prior_states_by_binding` maps, and `symbol_states` and
+//! `prior_states_by_definition` map, and `symbol_states` and
 //! `member_states` vectors indexed by [`ScopedSymbolId`]/[`ScopedMemberId`]. The values are (in
 //! principle) a list of live bindings at that use/definition, or at the end of the scope for that
 //! place, with a list of the dominating constraints for each binding.
@@ -348,12 +348,50 @@ impl PriorBindingsSummary {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-struct PriorBindingState<D> {
-    declarations: D,
-    prior_bindings: PriorBindingsSummary,
+enum PriorState<B, D> {
+    Binding {
+        declarations: D,
+        prior_bindings: PriorBindingsSummary,
+    },
+    Declaration {
+        bindings: B,
+    },
 }
 
-type RetainedPriorBindingState = PriorBindingState<InternedDeclarationsId>;
+// The low word stores declarations for binding states and bindings for declaration states. The
+// caller knows which kind of definition it is querying. The high word stores the binding summary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct RetainedPriorState(u64);
+
+impl RetainedPriorState {
+    fn binding(declarations: InternedDeclarationsId, prior_bindings: PriorBindingsSummary) -> Self {
+        Self(u64::from(declarations.as_u32()) | u64::from(prior_bindings.0) << 32)
+    }
+
+    fn declaration(bindings: InternedBindingsId) -> Self {
+        Self(u64::from(bindings.as_u32()))
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "extracting the intentionally packed low word"
+    )]
+    fn low_word(self) -> u32 {
+        self.0 as u32
+    }
+
+    fn declarations(self) -> InternedDeclarationsId {
+        InternedDeclarationsId::from_u32(self.low_word())
+    }
+
+    fn bindings(self) -> InternedBindingsId {
+        InternedBindingsId::from_u32(self.low_word())
+    }
+
+    fn prior_bindings(self) -> PriorBindingsSummary {
+        PriorBindingsSummary((self.0 >> 32) as u32)
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum InternedEnclosingSnapshotId {
@@ -413,8 +451,7 @@ pub struct UseDefMap<'db> {
     ///
     /// If we see a binding to a `Final`-qualified symbol, we also need the bindings to find
     /// previous bindings to that symbol. If there are any, the assignment is invalid.
-    bindings_by_declaration: FxHashMap<Definition<'db>, InternedBindingsId>,
-    prior_states_by_binding: FxHashMap<Definition<'db>, RetainedPriorBindingState>,
+    prior_states_by_definition: FxHashMap<Definition<'db>, RetainedPriorState>,
 
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<PlaceState>>,
@@ -674,7 +711,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         declaration: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings = self.bindings_by_declaration[&declaration];
+        let bindings = self.prior_states_by_definition[&declaration].bindings();
         self.bindings_iterator(
             &self.interned_bindings[bindings],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -685,7 +722,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = self.prior_states_by_binding[&binding].declarations;
+        let declarations = self.prior_states_by_definition[&binding].declarations();
         self.declarations_iterator(
             &self.interned_declarations[declarations],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -693,15 +730,15 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn first_prior_binding(&self, binding: Definition<'db>) -> Option<Definition<'db>> {
-        self.prior_states_by_binding[&binding]
-            .prior_bindings
+        self.prior_states_by_definition[&binding]
+            .prior_bindings()
             .first_definition()
             .and_then(|id| self.all_definitions[id].definition())
     }
 
     pub fn has_prior_undefined_or_deleted_binding(&self, binding: Definition<'db>) -> bool {
-        self.prior_states_by_binding[&binding]
-            .prior_bindings
+        self.prior_states_by_definition[&binding]
+            .prior_bindings()
             .has_undefined_or_deleted()
     }
 
@@ -1036,11 +1073,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// keyed by their text range.
     range_reachability: Vec<(TextRange, RangeInfo)>,
 
-    /// Live bindings for each declaration-only definition.
-    bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
-
-    /// Retained prior state for each binding-only definition.
-    prior_states_by_binding: FxHashMap<Definition<'db>, PriorBindingState<Declarations>>,
+    /// Retained prior state for each binding-only or declaration-only definition.
+    prior_states_by_definition: FxHashMap<Definition<'db>, PriorState<Bindings, Declarations>>,
 
     /// Currently live bindings and declarations for each place.
     symbol_states: IndexVec<ScopedSymbolId, PlaceState>,
@@ -1071,8 +1105,7 @@ impl<'db> UseDefMapBuilder<'db> {
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
-            bindings_by_declaration: FxHashMap::default(),
-            prior_states_by_binding: FxHashMap::default(),
+            prior_states_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
             reachable_member_definitions: IndexVec::new(),
@@ -1164,9 +1197,9 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
         };
-        self.prior_states_by_binding.insert(
+        self.prior_states_by_definition.insert(
             binding,
-            PriorBindingState {
+            PriorState::Binding {
                 declarations: place_state.declarations().clone(),
                 prior_bindings,
             },
@@ -1426,8 +1459,12 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
         };
 
-        self.bindings_by_declaration
-            .insert(declaration, place_state.bindings().clone());
+        self.prior_states_by_definition.insert(
+            declaration,
+            PriorState::Declaration {
+                bindings: place_state.bindings().clone(),
+            },
+        );
         place_state.record_declaration(def_id, self.reachability);
 
         let definitions = match place {
@@ -1776,23 +1813,26 @@ impl<'db> UseDefMapBuilder<'db> {
         self.range_reachability.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
-        let mut interned_bindings = IndexVec::with_capacity(self.bindings_by_declaration.len());
-        let mut interned_ids_by_bindings =
-            FxHashMap::with_capacity_and_hasher(self.bindings_by_declaration.len(), FxBuildHasher);
-        let declarations_capacity = self.prior_states_by_binding.len();
+        let mut interned_bindings = IndexVec::with_capacity(self.prior_states_by_definition.len());
+        let mut interned_ids_by_bindings = FxHashMap::with_capacity_and_hasher(
+            self.prior_states_by_definition.len(),
+            FxBuildHasher,
+        );
+        let declarations_capacity = self
+            .prior_states_by_definition
+            .values()
+            .filter(|prior_state| matches!(prior_state, PriorState::Binding { .. }))
+            .count();
         let mut interned_declarations = IndexVec::with_capacity(declarations_capacity);
         let mut interned_ids_by_declarations =
             FxHashMap::with_capacity_and_hasher(declarations_capacity, FxBuildHasher);
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
-        let bindings_by_declaration = Self::intern_bindings_by_declaration(
-            self.bindings_by_declaration,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-        );
-        let prior_states_by_binding = Self::intern_prior_states_by_binding(
-            self.prior_states_by_binding,
+        let prior_states_by_definition = Self::intern_prior_states_by_definition(
+            self.prior_states_by_definition,
             &mut interned_declarations,
             &mut interned_ids_by_declarations,
+            &mut interned_bindings,
+            &mut interned_ids_by_bindings,
         );
         let bindings_by_use = Self::intern_bindings_by_use(
             self.bindings_by_use,
@@ -1873,8 +1913,7 @@ impl<'db> UseDefMapBuilder<'db> {
             range_reachability: self.range_reachability.into_boxed_slice(),
             symbol_states,
             member_states,
-            bindings_by_declaration,
-            prior_states_by_binding,
+            prior_states_by_definition,
             enclosing_snapshots: enclosing_snapshots.into(),
             end_of_scope_reachability: self.reachability,
         }
@@ -1896,60 +1935,46 @@ impl<'db> UseDefMapBuilder<'db> {
             .collect()
     }
 
-    fn intern_bindings_by_declaration(
-        bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
-        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
-    ) -> FxHashMap<Definition<'db>, InternedBindingsId> {
-        bindings_by_declaration
-            .into_iter()
-            .map(|(definition, bindings)| {
-                let interned_id = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings)
-                {
-                    *interned_id
-                } else {
-                    let interned_id = interned_bindings.push(bindings.clone());
-                    interned_ids_by_bindings.insert(bindings, interned_id);
-                    interned_id
-                };
-                (definition, interned_id)
-            })
-            .collect()
-    }
-
-    fn intern_prior_states_by_binding(
-        prior_states_by_binding: FxHashMap<Definition<'db>, PriorBindingState<Declarations>>,
+    fn intern_prior_states_by_definition(
+        prior_states_by_definition: FxHashMap<Definition<'db>, PriorState<Bindings, Declarations>>,
         interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
         interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
-    ) -> FxHashMap<Definition<'db>, RetainedPriorBindingState> {
-        prior_states_by_binding
+        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+    ) -> FxHashMap<Definition<'db>, RetainedPriorState> {
+        prior_states_by_definition
             .into_iter()
-            .map(
-                |(
-                    definition,
-                    PriorBindingState {
+            .map(|(definition, prior_state)| {
+                let prior_state = match prior_state {
+                    PriorState::Binding {
                         declarations,
                         prior_bindings,
-                    },
-                )| {
-                    let declarations = if let Some(interned_id) =
-                        interned_ids_by_declarations.get(&declarations)
-                    {
-                        *interned_id
-                    } else {
-                        let interned_id = interned_declarations.push(declarations.clone());
-                        interned_ids_by_declarations.insert(declarations, interned_id);
-                        interned_id
-                    };
-                    (
-                        definition,
-                        RetainedPriorBindingState {
-                            declarations,
-                            prior_bindings,
-                        },
-                    )
-                },
-            )
+                    } => {
+                        let declarations = if let Some(interned_id) =
+                            interned_ids_by_declarations.get(&declarations)
+                        {
+                            *interned_id
+                        } else {
+                            let interned_id = interned_declarations.push(declarations.clone());
+                            interned_ids_by_declarations.insert(declarations, interned_id);
+                            interned_id
+                        };
+                        RetainedPriorState::binding(declarations, prior_bindings)
+                    }
+                    PriorState::Declaration { bindings } => {
+                        let bindings =
+                            if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
+                                *interned_id
+                            } else {
+                                let interned_id = interned_bindings.push(bindings.clone());
+                                interned_ids_by_bindings.insert(bindings, interned_id);
+                                interned_id
+                            };
+                        RetainedPriorState::declaration(bindings)
+                    }
+                };
+                (definition, prior_state)
+            })
             .collect()
     }
 
