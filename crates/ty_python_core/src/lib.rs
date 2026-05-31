@@ -259,35 +259,34 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
 #[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
 struct DefinitionsByNode<'db> {
     single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
-    multiple: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+    non_single: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
 }
 
 impl<'db> DefinitionsByNode<'db> {
     fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
         let mut single = FxHashMap::default();
-        let mut multiple = FxHashMap::default();
+        let mut non_single = FxHashMap::default();
         single.reserve(definitions_by_node.len());
 
         for (key, definitions) in definitions_by_node {
-            let definitions = definitions.into_vec();
-            if let [definition] = definitions.as_slice() {
-                single.insert(key, *definition);
+            if definitions.len() == 1 {
+                single.insert(key, definitions[0]);
             } else {
-                multiple.insert(key, definitions.into_boxed_slice());
+                non_single.insert(key, definitions.into_boxed_slice());
             }
         }
 
         single.shrink_to_fit();
-        multiple.shrink_to_fit();
+        non_single.shrink_to_fit();
 
-        Self { single, multiple }
+        Self { single, non_single }
     }
 
     fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
         self.single
             .get(&key)
             .map(std::slice::from_ref)
-            .or_else(|| self.multiple.get(&key).map(AsRef::as_ref))
+            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
     }
 }
 
@@ -560,7 +559,8 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
     ///
     /// There will only ever be >1 `Definition` associated with a `definition_key`
-    /// if the definition is created by a wildcard (`*`) import.
+    /// if the definitions are created by a wildcard (`*`) import or synthesized
+    /// for a loop header.
     #[track_caller]
     pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &[Definition<'db>] {
         self.definitions_by_node
@@ -585,9 +585,9 @@ impl<'db> SemanticIndex<'db> {
     /// the `debug_assertions` feature is enabled, this method will panic.
     ///
     /// It is generally safe to use this method for any AST node that does not
-    /// correspond to a `*` (wildcard) import, since `*` imports are the only
-    /// situations that can result in multiple definitions being associated with a
-    /// single AST node.
+    /// correspond to a `*` (wildcard) import or a loop statement, since those are
+    /// the only situations that can result in multiple definitions being
+    /// associated with a single AST node.
     #[track_caller]
     pub fn expect_single_definition(
         &self,
