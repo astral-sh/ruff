@@ -56,53 +56,44 @@ pub fn definition_for_name<'db>(
     None
 }
 
-/// Returns all definitions for a name. If any definitions are imports, they
-/// are resolved (recursively) to the original definitions or module files.
-pub fn definitions_for_name<'db>(
+/// Returns reachable local definitions for a name without resolving imports or falling back to
+/// builtins.
+pub(super) fn visible_reachable_definitions_for_name<'db>(
     model: &SemanticModel<'db>,
     name_str: &str,
     node: AnyNodeRef<'_>,
-    alias_resolution: ImportAliasResolution,
-) -> Vec<ResolvedDefinition<'db>> {
+) -> FxIndexSet<Definition<'db>> {
     let db = model.db();
     let file = model.file();
     let index = semantic_index(db, file);
 
-    // Get the scope for this name expression
     let Some(file_scope) = model.scope(node) else {
-        return vec![];
+        return FxIndexSet::default();
     };
 
-    let mut all_definitions = FxIndexSet::default();
+    let mut definitions = FxIndexSet::default();
 
-    // Search through the scope hierarchy: start from the current scope and
-    // traverse up through parent scopes to find definitions
     for (scope_id, _scope) in index.visible_ancestor_scopes(file_scope) {
         let place_table = index.place_table(scope_id);
 
         let Some(symbol_id) = place_table.symbol_id(name_str) else {
-            continue; // Name not found in this scope, try parent scope
+            continue;
         };
 
-        // Check if this place is marked as global or nonlocal
         let place_expr = place_table.symbol(symbol_id);
-        let is_global = place_expr.is_global();
-        let is_nonlocal = place_expr.is_nonlocal();
 
         // TODO: The current algorithm doesn't return definitions or bindings
         // for other scopes that are outside of this scope hierarchy that target
         // this name using a nonlocal or global binding. The semantic analyzer
         // doesn't appear to track these in a way that we can easily access
         // them from here without walking all scopes in the module.
-
-        // If marked as global, skip to global scope
-        if is_global {
+        if place_expr.is_global() {
             let global_scope_id = global_scope(db, file);
             let global_place_table = ty_python_core::place_table(db, global_scope_id);
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                all_definitions.extend(reachable_definitions(
+                definitions.extend(reachable_definitions(
                     db,
                     global_use_def_map
                         .reachable_symbol_bindings(global_symbol_id)
@@ -117,16 +108,13 @@ pub fn definitions_for_name<'db>(
             break;
         }
 
-        // If marked as nonlocal, skip current scope and search in ancestor scopes
-        if is_nonlocal {
-            // Continue searching in parent scopes, but skip the current scope
+        if place_expr.is_nonlocal() {
             continue;
         }
 
         let use_def_map = index.use_def_map(scope_id);
 
-        // Get all definitions (both bindings and declarations) for this place
-        all_definitions.extend(reachable_definitions(
+        definitions.extend(reachable_definitions(
             db,
             use_def_map
                 .reachable_symbol_bindings(symbol_id)
@@ -138,11 +126,24 @@ pub fn definitions_for_name<'db>(
                 ),
         ));
 
-        // If we found definitions in this scope, we can stop searching
-        if !all_definitions.is_empty() {
+        if !definitions.is_empty() {
             break;
         }
     }
+
+    definitions
+}
+
+/// Returns all definitions for a name. If any definitions are imports, they
+/// are resolved (recursively) to the original definitions or module files.
+pub fn definitions_for_name<'db>(
+    model: &SemanticModel<'db>,
+    name_str: &str,
+    node: AnyNodeRef<'_>,
+    alias_resolution: ImportAliasResolution,
+) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
+    let all_definitions = visible_reachable_definitions_for_name(model, name_str, node);
 
     // Resolve import definitions to their targets
     let mut resolved_definitions = Vec::new();
