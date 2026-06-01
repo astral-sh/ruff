@@ -1,9 +1,11 @@
 """faulthandler module."""
+
 import sys
 from _typeshed import FileDescriptorLike
 
 def cancel_dump_traceback_later() -> None:
     """Cancel the previous call to dump_traceback_later()."""
+
 def disable() -> None:
     """Disable the fault handler."""
 
@@ -35,8 +37,8 @@ else:
         timeout: float, repeat: bool = False, file: FileDescriptorLike = sys.stderr, exit: bool = False
     ) -> None:
         """Dump the traceback of all threads in timeout seconds,
-or each timeout seconds if repeat is True. If exit is True, call _exit(1) which is not safe.
-"""
+        or each timeout seconds if repeat is True. If exit is True, call _exit(1) which is not safe.
+        """
 
 if sys.version_info >= (3, 15):
     def enable(
@@ -65,9 +67,7 @@ if sys.platform != "win32":
             max_threads: int | None = None,
         ) -> None: ...
     else:
-        def register(
-            signum: int, file: FileDescriptorLike = sys.stderr, all_threads: bool = True, chain: bool = False
-        ) -> None:
+        def register(signum: int, file: FileDescriptorLike = sys.stderr, all_threads: bool = True, chain: bool = False) -> None:
             """Register a handler for the signal 'signum': dump the traceback of the current thread, or of all threads if all_threads is True, into file."""
 
     def unregister(signum: int, /) -> None:

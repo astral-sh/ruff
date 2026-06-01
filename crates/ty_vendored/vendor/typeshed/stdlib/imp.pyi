@@ -5,6 +5,7 @@ In most cases it is preferred you consider using the importlib module's
 functionality over this module.
 
 """
+
 import types
 from _imp import (
     acquire_lock as acquire_lock,
@@ -41,13 +42,16 @@ def new_module(name: str) -> types.ModuleType:
     The module is not entered into sys.modules.
 
     """
+
 def get_magic() -> bytes:
     """**DEPRECATED**
 
     Return the magic number for .pyc files.
     """
+
 def get_tag() -> str:
     """Return the magic tag for .pyc files."""
+
 def cache_from_source(path: StrPath, debug_override: bool | None = None) -> str:
     """**DEPRECATED**
 
@@ -62,6 +66,7 @@ def cache_from_source(path: StrPath, debug_override: bool | None = None) -> str:
     If sys.implementation.cache_tag is None then NotImplementedError is raised.
 
     """
+
 def source_from_cache(path: StrPath) -> str:
     """**DEPRECATED**
 
@@ -73,6 +78,7 @@ def source_from_cache(path: StrPath) -> str:
     sys.implementation.cache_tag is None then NotImplementedError is raised.
 
     """
+
 def get_suffixes() -> list[tuple[str, str, int]]:
     """**DEPRECATED**"""
 
@@ -82,6 +88,7 @@ class NullImporter:
     Null import object.
 
     """
+
     def __init__(self, path: StrPath) -> None: ...
     def find_module(self, fullname: Any) -> None:
         """Always returns None."""
@@ -101,8 +108,10 @@ class _FileLike(Protocol):
 def load_source(name: str, pathname: str, file: _FileLike | None = None) -> types.ModuleType: ...
 def load_compiled(name: str, pathname: str, file: _FileLike | None = None) -> types.ModuleType:
     """**DEPRECATED**"""
+
 def load_package(name: str, path: StrPath) -> types.ModuleType:
     """**DEPRECATED**"""
+
 def load_module(name: str, file: _FileLike | None, filename: str, details: tuple[str, str, int]) -> types.ModuleType:
     """**DEPRECATED**
 
@@ -126,6 +135,7 @@ def find_module(
     submodule name and the package's __path__.
 
     """
+
 def reload(module: types.ModuleType) -> types.ModuleType:
     """**DEPRECATED**
 
@@ -134,14 +144,16 @@ def reload(module: types.ModuleType) -> types.ModuleType:
     The module must have been successfully imported before.
 
     """
+
 def init_builtin(name: str) -> types.ModuleType | None:
     """**DEPRECATED**
 
     Load and return a built-in module by name, or None is such module doesn't
     exist
     """
+
 def load_dynamic(name: str, path: str, file: Any = None) -> types.ModuleType:  # file argument is ignored
     """**DEPRECATED**
 
-        Load an extension module.
-        """
+    Load an extension module.
+    """
