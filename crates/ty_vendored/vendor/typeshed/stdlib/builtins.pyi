@@ -42,7 +42,7 @@ from _typeshed import (
     SupportsRichComparisonT,
     SupportsWrite,
 )
-from collections.abc import Awaitable, Callable, Iterable, Iterator, MutableSet, Reversible, Set as AbstractSet, Sized
+from collections.abc import Awaitable, Callable, Hashable, Iterable, Iterator, MutableSet, Reversible, Set as AbstractSet, Sized
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from os import PathLike
 from types import CellType, CodeType, EllipsisType, GenericAlias, NotImplementedType, TracebackType
@@ -2784,7 +2784,7 @@ class tuple(Sequence[_T_co]):
     def __gt__(self, value: tuple[_T_co, ...], /) -> bool: ...
     def __ge__(self, value: tuple[_T_co, ...], /) -> bool: ...
     def __eq__(self, value: object, /) -> bool: ...
-    def __hash__(self) -> int: ...
+    def __hash__(self: tuple[Hashable, ...]) -> int: ...
 
     @overload
     def __add__(self, value: tuple[_T_co, ...], /) -> tuple[_T_co, ...]:
