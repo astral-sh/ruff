@@ -1,4 +1,5 @@
 use itertools::Either;
+use smallvec::{SmallVec, smallvec_inline};
 
 use std::convert::Infallible;
 
@@ -727,12 +728,13 @@ impl<'db> IntersectionType<'db> {
 
         if let Some(first) = elements_iter.next() {
             if let Some(second) = elements_iter.next() {
-                let builder =
-                    IntersectionBuilder::new(db).positive_elements([first.into(), second.into()]);
-                elements_iter
-                    .fold(builder, |builder, element| {
-                        builder.add_positive(element.into())
-                    })
+                IntersectionBuilder::new(db)
+                    .positive_conjunction(
+                        [first.into(), second.into()]
+                            .into_iter()
+                            .chain(elements_iter.map(Into::into))
+                            .collect::<SmallVec<_>>(),
+                    )
                     .build()
             } else {
                 first.into()
@@ -752,7 +754,7 @@ impl<'db> IntersectionType<'db> {
     )]
     pub(crate) fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
         IntersectionBuilder::new(db)
-            .positive_elements([a, b])
+            .positive_conjunction(smallvec_inline![a, b])
             .build()
     }
 

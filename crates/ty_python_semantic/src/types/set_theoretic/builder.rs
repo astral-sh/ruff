@@ -39,6 +39,7 @@
 use super::RecursivelyDefined;
 use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
@@ -1243,19 +1244,24 @@ impl<'db> IntersectionBuilder<'db> {
     /// Before distributing a union, check whether another single-valued conjunct makes the
     /// conjunction impossible, e.g. `(A | B | C) & None`.
     pub(crate) fn positive_conjunction(self, conjuncts: SmallVec<[Type<'db>; 2]>) -> Self {
-        let Some(union) = conjuncts
+        if conjuncts.iter().any(Type::is_divergent) {
+            return self.positive_elements(conjuncts);
+        }
+
+        if let Some(union) = conjuncts
             .iter()
             .copied()
             .find(|conjunct| conjunct.is_union())
-        else {
-            return self.positive_elements(conjuncts);
-        };
-
-        if conjuncts.iter().copied().any(|conjunct| {
-            conjunct != union
-                && conjunct.is_single_valued(self.db)
-                && union.is_disjoint_from(self.db, conjunct)
-        }) {
+            && conjuncts.iter().copied().any(|conjunct| {
+                conjunct != union
+                    // `is_single_valued` expands aliases without a recursion guard.
+                    && !any_over_type(self.db, conjunct, true, |nested| {
+                        matches!(nested, Type::TypeAlias(_))
+                    })
+                    && conjunct.is_single_valued(self.db)
+                    && union.is_disjoint_from(self.db, conjunct)
+            })
+        {
             return self.add_positive(Type::Never);
         }
 
@@ -1806,10 +1812,9 @@ mod tests {
     use crate::place::{global_symbol, known_module_symbol};
     use crate::types::enums::enum_member_literals;
     use crate::types::type_alias::TypeAliasType;
-    use crate::types::{KnownClass, KnownInstanceType, Truthiness};
+    use crate::types::{IntersectionType, KnownClass, KnownInstanceType, Truthiness};
 
     use ruff_db::system::DbWithWritableSystem as _;
-    use smallvec::smallvec;
     use ty_module_resolver::KnownModule;
 
     #[test]
@@ -1905,17 +1910,62 @@ mod tests {
     }
 
     #[test]
-    fn positive_conjunction_short_circuits_disjoint_singleton_for_union() {
+    fn from_elements_short_circuits_disjoint_singleton_for_union() {
         let db = setup_db();
 
         let union = UnionType::from_elements(&db, [Type::int_literal(0), Type::int_literal(1)])
             .expect_union();
 
-        let intersection = IntersectionBuilder::new(&db)
-            .positive_conjunction(smallvec![Type::Union(union), Type::none(&db)])
-            .build();
+        let intersection = IntersectionType::from_elements(
+            &db,
+            [Type::Union(union), Type::object(), Type::none(&db)],
+        );
 
         assert_eq!(intersection, Type::Never);
+    }
+
+    #[test]
+    fn from_elements_preserves_divergent() {
+        let db = setup_db();
+        let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
+        let union = UnionType::from_elements(&db, [Type::int_literal(0), Type::int_literal(1)])
+            .expect_union();
+
+        let intersection =
+            IntersectionType::from_elements(&db, [divergent, Type::Union(union), Type::none(&db)]);
+
+        assert_eq!(intersection, divergent);
+    }
+
+    #[test]
+    fn from_elements_skips_preflight_for_type_aliases() {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type RecursiveTuple = tuple[RecursiveTuple]")
+            .unwrap();
+
+        let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let alias_ty = global_symbol(&db, module, "RecursiveTuple")
+            .place
+            .expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            alias_ty
+        else {
+            panic!("Expected `RecursiveTuple` to be a type alias");
+        };
+        let union = UnionType::from_elements(&db, [Type::int_literal(0), Type::int_literal(1)])
+            .expect_union();
+
+        for recursive in [
+            Type::TypeAlias(TypeAliasType::PEP695(alias)),
+            alias.value_type(&db),
+        ] {
+            let intersection = IntersectionType::from_elements(
+                &db,
+                [Type::Union(union), recursive, Type::none(&db)],
+            );
+
+            assert_eq!(intersection, Type::Never);
+        }
     }
 
     #[test]
