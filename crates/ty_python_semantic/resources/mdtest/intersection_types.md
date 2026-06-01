@@ -959,6 +959,56 @@ def mixed(
     reveal_type(i4)  # revealed: Any
 ```
 
+## Generics
+
+Subtype-related covariant and contravariant containers can be simplified according to their
+variance. An invariant container with a fully static type argument can also simplify an intersection
+with the same container specialized with a dynamic type:
+
+```py
+from typing import Any, Generic, TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+U = TypeVar("U")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Q: ...
+class P(Q): ...
+class R: ...
+class Invariant(Generic[T]): ...
+class MultiInvariant(Generic[T, U]): ...
+class Covariant(Generic[T_co]): ...
+class Contravariant(Generic[T_contra]): ...
+
+def _(
+    invariant: Intersection[Invariant[P], Invariant[Q]],
+    covariant: Intersection[Covariant[P], Covariant[Q]],
+    contravariant: Intersection[Contravariant[P], Contravariant[Q]],
+    covariant_unrelated: Intersection[Covariant[P], Covariant[R]],
+    contravariant_unrelated: Intersection[Contravariant[P], Contravariant[R]],
+    invariant_any: Intersection[Invariant[P], Invariant[Any]],
+    invariant_any_reversed: Intersection[Invariant[Any], Invariant[P]],
+    multi_invariant_any: Intersection[MultiInvariant[P, Q], MultiInvariant[Any, Q]],
+    multi_invariant_crossed: Intersection[MultiInvariant[P, Any], MultiInvariant[Any, Q]],
+    covariant_any: Intersection[Covariant[P], Covariant[Any]],
+    contravariant_any: Intersection[Contravariant[P], Contravariant[Any]],
+) -> None:
+    reveal_type(invariant)  # revealed: Invariant[P] & Invariant[Q]
+    reveal_type(covariant)  # revealed: Covariant[P]
+    reveal_type(contravariant)  # revealed: Contravariant[Q]
+    reveal_type(covariant_unrelated)  # revealed: Covariant[P] & Covariant[R]
+    reveal_type(contravariant_unrelated)  # revealed: Contravariant[P] & Contravariant[R]
+
+    reveal_type(invariant_any)  # revealed: Invariant[P]
+    reveal_type(invariant_any_reversed)  # revealed: Invariant[P]
+    reveal_type(multi_invariant_any)  # revealed: MultiInvariant[P, Q]
+    reveal_type(multi_invariant_crossed)  # revealed: MultiInvariant[P, Any] & MultiInvariant[Any, Q]
+    reveal_type(covariant_any)  # revealed: Covariant[P] & Covariant[Any]
+    reveal_type(contravariant_any)  # revealed: Contravariant[P] & Contravariant[Any]
+```
+
 ## Calling intersection types
 
 ### Basic intersection calls

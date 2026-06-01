@@ -42,7 +42,7 @@ use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
-    SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
+    SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -126,6 +126,54 @@ fn merge_truthiness_guarded_pair<'db>(
         Some(candidate)
     } else {
         None
+    }
+}
+
+fn simplify_invariant_generic_intersection<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let (left_class, left_specialization) = left.class_specialization(db)?;
+    let (right_class, right_specialization) = right.class_specialization(db)?;
+    if left_class != right_class
+        || left_specialization.generic_context(db) != right_specialization.generic_context(db)
+        || left_specialization.materialization_kind(db).is_some()
+        || right_specialization.materialization_kind(db).is_some()
+        || left_specialization.tuple(db).is_some()
+        || right_specialization.tuple(db).is_some()
+    {
+        return None;
+    }
+
+    let mut left_is_more_precise = false;
+    let mut right_is_more_precise = false;
+    for (typevar, left_type, right_type) in itertools::izip!(
+        left_specialization.generic_context(db).variables(db),
+        left_specialization.types(db),
+        right_specialization.types(db)
+    ) {
+        if left_type == right_type {
+            continue;
+        }
+        if typevar.variance(db) != TypeVarVariance::Invariant {
+            return None;
+        }
+        match (left_type, right_type) {
+            (left_type, Type::Dynamic(_)) if !left_type.has_dynamic(db) => {
+                left_is_more_precise = true;
+            }
+            (Type::Dynamic(_), right_type) if !right_type.has_dynamic(db) => {
+                right_is_more_precise = true;
+            }
+            _ => return None,
+        }
+    }
+
+    match (left_is_more_precise, right_is_more_precise) {
+        (true, false) => Some(left),
+        (false, true) => Some(right),
+        _ => None,
     }
 }
 
@@ -1482,6 +1530,19 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_positive) in self.positive.iter().enumerate() {
+                    if let Some(simplified) = simplify_invariant_generic_intersection(
+                        db,
+                        *existing_positive,
+                        new_positive,
+                    ) {
+                        if simplified == *existing_positive {
+                            return;
+                        }
+                        new_positive = simplified;
+                        to_remove.push(index);
+                        continue;
+                    }
+
                     // S & T = S    if S <: T
                     if existing_positive.is_redundant_with(db, new_positive) {
                         return;
