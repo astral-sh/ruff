@@ -4956,11 +4956,17 @@ impl SequentMap {
         let (new_lower, new_upper) = match (
             constrained_constraint_data.bounds.lower,
             constrained_constraint_data.bounds.upper,
+            bound_constraint_data.bounds.lower,
+            bound_constraint_data.bounds.upper,
         ) {
             // (B ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ BU)
-            (Some(Type::TypeVar(constrained_lower)), Some(Type::TypeVar(constrained_upper)))
-                if constrained_lower.is_same_typevar_as(db, bound_typevar)
-                    && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
+            (
+                Some(Type::TypeVar(constrained_lower)),
+                Some(Type::TypeVar(constrained_upper)),
+                _,
+                _,
+            ) if constrained_lower.is_same_typevar_as(db, bound_typevar)
+                && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
             {
                 (
                     bound_constraint_data.bounds.lower,
@@ -4969,23 +4975,22 @@ impl SequentMap {
             }
 
             // (CL ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ BU)
-            (constrained_lower, Some(Type::TypeVar(constrained_upper)))
+            (constrained_lower, Some(Type::TypeVar(constrained_upper)), _, _)
                 if constrained_upper.is_same_typevar_as(db, bound_typevar) =>
             {
                 (constrained_lower, bound_constraint_data.bounds.upper)
             }
 
             // (B ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ CU)
-            (Some(Type::TypeVar(constrained_lower)), constrained_upper)
+            (Some(Type::TypeVar(constrained_lower)), constrained_upper, _, _)
                 if constrained_lower.is_same_typevar_as(db, bound_typevar) =>
             {
                 (bound_constraint_data.bounds.lower, constrained_upper)
             }
 
             // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
-            (constrained_lower, Some(constrained_upper))
-                if let Some(bound_lower) = bound_constraint_data.bounds.lower
-                    && !constrained_upper.is_never()
+            (constrained_lower, Some(constrained_upper), Some(bound_lower), _)
+                if !constrained_upper.is_never()
                     && !constrained_upper.is_object()
                     && constrained_upper
                         .top_materialization(db)
@@ -4998,9 +5003,8 @@ impl SequentMap {
             }
 
             // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
-            (Some(constrained_lower), constrained_upper)
-                if let Some(bound_upper) = bound_constraint_data.bounds.upper
-                    && !constrained_lower.is_never()
+            (Some(constrained_lower), constrained_upper, _, Some(bound_upper))
+                if !constrained_lower.is_never()
                     && !constrained_lower.is_object()
                     && bound_upper
                         .top_materialization(db)
@@ -5136,32 +5140,32 @@ impl SequentMap {
                 // Note: if `Bivariant` is ever removed from the `TypeVarVariance` enum, we would
                 // need an alternative representation for "typevar not present"
                 // (e.g., `Option<TypeVarVariance>`).
-                let upper_replacement = match constrained_upper.variance_of(db, bound_typevar) {
-                    TypeVarVariance::Bivariant => None,
+                let upper_replacement = match (
+                    constrained_upper.variance_of(db, bound_typevar),
+                    bound_data.bounds.lower,
+                    bound_data.bounds.upper,
+                ) {
+                    (TypeVarVariance::Bivariant, _, _) => None,
                     // Skip bare typevars — those are handled by
                     // `add_mutual_sequents_for_different_typevars`.
                     _ if constrained_upper.is_type_var() => None,
                     // Covariance preserves direction: upper bound on T substitutes into upper
                     // bound. A ≤ B → G[A] ≤ G[B], so (T ≤ u_B) gives G[T] ≤ G[u_B].
-                    TypeVarVariance::Covariant
-                        if let Some(bound_upper) = bound_data.bounds.upper
-                            && !bound_upper.is_object() =>
+                    (TypeVarVariance::Covariant, _, Some(bound_upper))
+                        if !bound_upper.is_object() =>
                     {
                         bound_data.bounds.upper
                     }
                     // Contravariance flips direction: lower bound on T substitutes into upper
                     // bound. A ≤ B → G[B] ≤ G[A], so (l_B ≤ T) gives G[T] ≤ G[l_B].
-                    TypeVarVariance::Contravariant
-                        if let Some(bound_lower) = bound_data.bounds.lower
-                            && !bound_lower.is_never() =>
+                    (TypeVarVariance::Contravariant, Some(bound_lower), _)
+                        if !bound_lower.is_never() =>
                     {
                         bound_data.bounds.lower
                     }
                     // Invariance requires equality: only substitute if l_B = u_B.
-                    TypeVarVariance::Invariant
-                        if bound_data.bounds.lower == bound_data.bounds.upper
-                            && let Some(bound_lower) = bound_data.bounds.lower
-                            && !bound_lower.is_never() =>
+                    (TypeVarVariance::Invariant, Some(bound_lower), Some(bound_upper))
+                        if bound_lower == bound_upper && !bound_lower.is_never() =>
                     {
                         bound_data.bounds.lower
                     }
@@ -5206,30 +5210,30 @@ impl SequentMap {
                 }
 
                 // Check the lower bound of the constrained constraint for nested occurrences.
-                let lower_replacement = match constrained_lower.variance_of(db, bound_typevar) {
-                    TypeVarVariance::Bivariant => None,
+                let lower_replacement = match (
+                    constrained_lower.variance_of(db, bound_typevar),
+                    bound_data.bounds.lower,
+                    bound_data.bounds.upper,
+                ) {
+                    (TypeVarVariance::Bivariant, _, _) => None,
                     _ if constrained_lower.is_type_var() => None,
                     // Covariance preserves direction: lower bound on T substitutes into lower
                     // bound. A ≤ B → G[A] ≤ G[B], so (l_B ≤ T) gives G[l_B] ≤ G[T].
-                    TypeVarVariance::Covariant
-                        if let Some(bound_lower) = bound_data.bounds.lower
-                            && !bound_lower.is_never() =>
+                    (TypeVarVariance::Covariant, Some(bound_lower), _)
+                        if !bound_lower.is_never() =>
                     {
                         bound_data.bounds.lower
                     }
                     // Contravariance flips direction: upper bound on T substitutes into lower
                     // bound. A ≤ B → G[B] ≤ G[A], so (T ≤ u_B) gives G[u_B] ≤ G[T].
-                    TypeVarVariance::Contravariant
-                        if let Some(bound_upper) = bound_data.bounds.upper
-                            && !bound_upper.is_object() =>
+                    (TypeVarVariance::Contravariant, _, Some(bound_upper))
+                        if !bound_upper.is_object() =>
                     {
                         bound_data.bounds.upper
                     }
                     // Invariance requires equality: only substitute if l_B = u_B.
-                    TypeVarVariance::Invariant
-                        if bound_data.bounds.lower == bound_data.bounds.upper
-                            && let Some(bound_lower) = bound_data.bounds.lower
-                            && !bound_lower.is_never() =>
+                    (TypeVarVariance::Invariant, Some(bound_lower), Some(bound_upper))
+                        if bound_lower == bound_upper && !bound_lower.is_never() =>
                     {
                         bound_data.bounds.lower
                     }
