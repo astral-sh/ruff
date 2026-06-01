@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
-use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
+use crate::{Mode, ParseOptions, RECURSIVE_AST_TEST_DEPTH, parse, parse_expression, parse_module};
 
 #[test]
 fn test_modes() {
@@ -344,17 +344,12 @@ fn test_tstring_fstring_middle_fuzzer() {
 mod stack_growth {
     use super::*;
 
-    // Windows test threads have a 1 MiB stack by default. Keep successfully
-    // parsed ASTs shallow enough for their recursive drop glue in debug builds
-    // while still exercising parser stack growth.
-    const AST_STACK_GROWTH_DEPTH: usize = 1_000;
-
     #[test]
     fn nested_parens() {
         let source = format!(
             "{}1{}",
-            "(".repeat(AST_STACK_GROWTH_DEPTH),
-            ")".repeat(AST_STACK_GROWTH_DEPTH)
+            "(".repeat(RECURSIVE_AST_TEST_DEPTH),
+            ")".repeat(RECURSIVE_AST_TEST_DEPTH)
         );
         parse_module(&source).unwrap();
     }
@@ -364,7 +359,7 @@ mod stack_growth {
         // Nested function definitions exercise stack-growth instrumentation on
         // `parse_block` rather than `parse_lhs_expression`. Each level
         // needs one more leading tab to make indentation valid.
-        let depth = AST_STACK_GROWTH_DEPTH;
+        let depth = RECURSIVE_AST_TEST_DEPTH;
         let mut source = String::new();
         for i in 0..depth {
             source.push_str(&"\t".repeat(i));
@@ -379,14 +374,16 @@ mod stack_growth {
     fn nested_lists() {
         let source = format!(
             "{}1{}",
-            "[".repeat(AST_STACK_GROWTH_DEPTH),
-            "]".repeat(AST_STACK_GROWTH_DEPTH)
+            "[".repeat(RECURSIVE_AST_TEST_DEPTH),
+            "]".repeat(RECURSIVE_AST_TEST_DEPTH)
         );
         parse_module(&source).unwrap();
     }
 
     #[test]
     fn unclosed_lists() {
+        // Invalid input does not return a deeply nested AST that must be dropped
+        // on the test thread, so this does not need the lower Windows limit.
         let source = "[".repeat(5_000);
         assert!(parse_module(&source).is_err());
     }
@@ -395,8 +392,8 @@ mod stack_growth {
     fn nested_calls() {
         let source = format!(
             "x = {}1{}",
-            "f(".repeat(AST_STACK_GROWTH_DEPTH),
-            ")".repeat(AST_STACK_GROWTH_DEPTH)
+            "f(".repeat(RECURSIVE_AST_TEST_DEPTH),
+            ")".repeat(RECURSIVE_AST_TEST_DEPTH)
         );
         parse_module(&source).unwrap();
     }
@@ -405,8 +402,8 @@ mod stack_growth {
     fn nested_subscripts() {
         let source = format!(
             "x = {}1{}",
-            "a[".repeat(AST_STACK_GROWTH_DEPTH),
-            "]".repeat(AST_STACK_GROWTH_DEPTH)
+            "a[".repeat(RECURSIVE_AST_TEST_DEPTH),
+            "]".repeat(RECURSIVE_AST_TEST_DEPTH)
         );
         parse_module(&source).unwrap();
     }
@@ -417,8 +414,8 @@ mod stack_growth {
         // stack-growth instrumentation in addition to statement / expression paths.
         let source = format!(
             "match x:\n case {}y{}: pass\n",
-            "(".repeat(AST_STACK_GROWTH_DEPTH),
-            ")".repeat(AST_STACK_GROWTH_DEPTH),
+            "(".repeat(RECURSIVE_AST_TEST_DEPTH),
+            ")".repeat(RECURSIVE_AST_TEST_DEPTH),
         );
         parse_module(&source).unwrap();
     }
@@ -428,7 +425,7 @@ mod stack_growth {
         // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
         // parenthesised sub-expression, exactly like the pattern described in
         // the tracking issue.
-        let depth = AST_STACK_GROWTH_DEPTH;
+        let depth = RECURSIVE_AST_TEST_DEPTH;
         let mut source = String::new();
         for _ in 0..depth {
             source.push_str("1+(");
@@ -448,7 +445,7 @@ mod stack_growth {
         // the binary-expression recursion path directly, unlike the
         // `1+(1+(...))` interplay test which recurses through parenthesised
         // atoms.
-        let depth = AST_STACK_GROWTH_DEPTH;
+        let depth = RECURSIVE_AST_TEST_DEPTH;
         let mut source = String::with_capacity(depth * 3 + 1);
         for _ in 0..depth {
             source.push_str("1**");
@@ -462,7 +459,7 @@ mod stack_growth {
         // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
         // conditional layer (`parse_if_expression` -> `orelse`), which is not
         // covered by stack growth in `parse_lhs_expression`.
-        let depth = AST_STACK_GROWTH_DEPTH;
+        let depth = RECURSIVE_AST_TEST_DEPTH;
         let mut source = String::with_capacity(depth * 12 + 1);
         for _ in 0..depth {
             source.push_str("1 if 1 else ");
@@ -477,7 +474,7 @@ mod stack_growth {
         // conditional layer (`parse_lambda_expr` -> body), bypassing stack
         // growth in `parse_lhs_expression` entirely.
         let mut source = String::from("x = ");
-        for _ in 0..AST_STACK_GROWTH_DEPTH {
+        for _ in 0..RECURSIVE_AST_TEST_DEPTH {
             source.push_str("lambda: ");
         }
         source.push('1');
@@ -496,13 +493,9 @@ fn invalid_async_chain_is_iterative() {
 #[test]
 fn nested_equal_precedence_unary_chains_are_iterative() {
     // Consecutive unary operators sharing precedence do not require stack growth.
-    // Keep the recursively owned output shallow enough to drop on Windows'
-    // default 1 MiB test-thread stack in debug builds.
-    const DEPTH: usize = 1_000;
-
-    let source = format!("{}1\n", "-~+".repeat(DEPTH));
+    let source = format!("{}1\n", "-~+".repeat(RECURSIVE_AST_TEST_DEPTH));
     parse_module(&source).unwrap();
 
-    let source = format!("{}True\n", "not ".repeat(DEPTH));
+    let source = format!("{}True\n", "not ".repeat(RECURSIVE_AST_TEST_DEPTH));
     parse_module(&source).unwrap();
 }
