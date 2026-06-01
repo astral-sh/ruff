@@ -50,8 +50,9 @@ pub fn goto_implementation(
         return None;
     }
 
-    let implementation_targets =
-        Definitions::new(implementations).into_navigation_targets(model.db());
+    let implementation_targets = Definitions::new(implementations)
+        .map_stubs(model.db())
+        .into_navigation_targets(model.db());
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -289,6 +290,53 @@ mod tests {
          ::: child.py:5:9
           |
         5 |     def method(self): ...
+          |         ------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_stub_map_class_method() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+x = MyClass(0)
+x.act<CURSOR>ion()
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+    def action(self):
+        print(self.val)
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    def __init__(self, val: bool): ...
+    def action(self): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:4:3
+          |
+        4 | x.action()
+          |   ^^^^^^ Clicking here
+          |
+        info: Found 1 implementation
+         --> mymodule.py:5:9
+          |
+        5 |     def action(self):
           |         ------
           |
         ");
