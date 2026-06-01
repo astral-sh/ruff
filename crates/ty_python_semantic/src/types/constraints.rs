@@ -2416,7 +2416,7 @@ impl NodeId {
         }
 
         let mut typevars = FxHashSet::default();
-        self.for_each_constraint(builder, &mut |constraint, _| {
+        self.for_each_unique_constraint(builder, &mut |constraint, _| {
             let constraint = builder.constraint_data(constraint);
             typevars.insert(constraint.typevar);
         });
@@ -2697,7 +2697,7 @@ impl NodeId {
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
     /// caller only needs to discover the set of constraints mentioned in a BDD; traversing every
     /// root-to-leaf occurrence can be exponential in the presence of shared subgraphs.
-    fn for_each_constraint(
+    fn for_each_unique_constraint(
         self,
         builder: &ConstraintSetBuilder<'_>,
         f: &mut dyn FnMut(ConstraintId, usize),
@@ -3829,7 +3829,7 @@ impl InteriorNode {
         // the BDD as a DAG and deduplicate repeated constraints before sorting.
         let mut constraints: FxHashMap<ConstraintId, usize> = FxHashMap::default();
         self.node()
-            .for_each_constraint(builder, &mut |constraint, source_order| {
+            .for_each_unique_constraint(builder, &mut |constraint, source_order| {
                 constraints
                     .entry(constraint)
                     .and_modify(|existing: &mut usize| *existing = (*existing).min(source_order))
@@ -3873,7 +3873,7 @@ impl InteriorNode {
         let mut seen_constraints = FxHashSet::default();
         let mut source_orders = FxHashMap::default();
         self.node()
-            .for_each_constraint(builder, &mut |constraint, source_order| {
+            .for_each_unique_constraint(builder, &mut |constraint, source_order| {
                 seen_constraints.insert(constraint);
                 source_orders
                     .entry(constraint)
