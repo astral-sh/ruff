@@ -428,7 +428,7 @@ impl<'db> OverloadLiteral<'db> {
             .expect_function()
             .node(&module)
             .name
-            .scoped_use_id(db, scope);
+            .scoped_use_id(db, self.file(db));
 
         let Place::Defined(DefinedPlace {
             ty: Type::FunctionLiteral(previous_type),
