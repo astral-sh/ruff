@@ -3396,6 +3396,14 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "with_detailed_display" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
+                ))
+                .into()
+            }
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
@@ -6037,6 +6045,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6284,7 +6293,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)

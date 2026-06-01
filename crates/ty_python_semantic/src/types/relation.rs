@@ -258,7 +258,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
