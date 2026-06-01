@@ -695,6 +695,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
     }
 
+    /// Marks outer bindings captured by the popped scope or any descendant scope as used.
+    ///
+    /// For lazy popped scopes, later reassignments can still reach the captured reference, so we
+    /// remember the captured symbol and mark future live bindings in `update_lazy_snapshots`.
     fn mark_captured_bindings_used(
         &mut self,
         popped_scope_id: FileScopeId,
