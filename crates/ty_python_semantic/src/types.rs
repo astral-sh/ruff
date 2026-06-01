@@ -7593,7 +7593,7 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
         } else if matches!(self, InvalidTypeExpression::Concatenate) {
             diagnostic.info("`typing.Concatenate` is only valid:");
-            diagnostic.info(" - as the first argument to `typing.Callable`");
+            diagnostic.info(" - as the first argument to `Callable`");
             diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
     }
@@ -7868,6 +7868,26 @@ impl<'db> ModuleLiteralType<'db> {
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {
             return self.try_module_getattr(db, name);
+        }
+
+        // typeshed re-exports some special forms across modules (e.g. `collections.abc.Callable`
+        // is `from typing import Callable as Callable`). The resolved type still carries the
+        // definition-site variant (`SpecialFormType::TypingCallable`), so we recover the
+        // import-path identity here while it's still observable.
+        if let Place::Defined(defined) = place_and_qualifiers.place
+            && let Type::SpecialForm(special) = defined.ty
+            && let Some(import_module) = self.module(db).known(db)
+        {
+            let rewrapped = special.rewrap_for_import_module(name, import_module);
+            if rewrapped != special {
+                return PlaceAndQualifiers {
+                    place: Place::Defined(DefinedPlace {
+                        ty: Type::SpecialForm(rewrapped),
+                        ..defined
+                    }),
+                    qualifiers: place_and_qualifiers.qualifiers,
+                };
+            }
         }
 
         place_and_qualifiers

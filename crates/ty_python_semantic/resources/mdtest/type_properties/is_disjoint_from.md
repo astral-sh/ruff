@@ -920,6 +920,7 @@ A callable type is disjoint from special form types, except for callable special
 from ty_extensions import is_disjoint_from, static_assert, TypeOf
 from typing_extensions import Any, Callable, TypedDict
 from typing import Literal, Union, Optional, Final, Type, ChainMap, Counter, OrderedDict, DefaultDict, Deque
+from collections.abc import Callable as CollectionsAbcCallable
 
 # Most special forms are disjoint from callable types because they are
 # type constructors/annotations that are subscripted, not called.
@@ -940,6 +941,9 @@ static_assert(is_disjoint_from(TypeOf[Final], Callable[..., Any]))
 
 static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Callable]))
 static_assert(is_disjoint_from(TypeOf[Callable], Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[CollectionsAbcCallable]))
+static_assert(is_disjoint_from(TypeOf[CollectionsAbcCallable], Callable[..., Any]))
 
 # However, some special forms are callable (TypedDict and collection constructors)
 static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[TypedDict]))
