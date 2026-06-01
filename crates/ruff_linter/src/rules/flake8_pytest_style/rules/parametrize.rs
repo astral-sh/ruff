@@ -714,26 +714,29 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
     //
     // In this case, it is left unchanged.
     // ```
-    if let Some(argvalues_edits) = unpack_single_element_items(checker, argvalues) {
-        let argnames_edit =
-            Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
-        let fix = if checker.comment_ranges().intersects(argnames_edit.range())
-            || argvalues_edits
-                .iter()
-                .any(|edit| checker.comment_ranges().intersects(edit.range()))
-        {
-            Fix::unsafe_edits(argnames_edit, argvalues_edits)
-        } else {
-            Fix::safe_edits(argnames_edit, argvalues_edits)
-        };
-        diagnostic.set_fix(fix);
-    }
+    let Some(argvalues_edits) = unpack_single_element_items(checker, argvalues) else {
+        return;
+    };
+
+    let argnames_edit =
+        Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
+    let fix = if checker.comment_ranges().intersects(argnames_edit.range())
+        || argvalues_edits
+            .iter()
+            .any(|edit| checker.comment_ranges().intersects(edit.range()))
+    {
+        Fix::unsafe_edits(argnames_edit, argvalues_edits)
+    } else {
+        Fix::safe_edits(argnames_edit, argvalues_edits)
+    };
+    diagnostic.set_fix(fix);
 }
 
 /// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
 /// For instance, `[(1,) (2,)]` will be transformed into `[1, 2]`.
-/// In the case where a transformation will break code, `None` is returned.
-/// For instance, `[(1,), two]` is not transformed.
+///
+/// If the elements of `expr` are not literal lists or tuples, `None` is returned to avoid changing
+/// behavior.
 fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Option<Vec<Edit>> {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
     else {
