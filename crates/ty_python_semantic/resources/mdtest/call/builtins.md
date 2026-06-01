@@ -190,6 +190,29 @@ isinstance("", t.Any)  # error: [invalid-argument-type]
 isinstance("", (int, t.Any))  # error: [invalid-argument-type]
 ```
 
+## Generic builtins should not overfit upper-bound-only callback constraints
+
+These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
+`object` bounds through the constraint solver. The current solver picks callback parameter upper
+bounds as concrete solutions when the iterable argument is otherwise unknown. That overfits the
+result to `Sized` or `object`; ideally the element type would remain `Unknown`, while the callable
+return type would still be used where possible.
+
+```py
+from ty_extensions import Unknown
+
+def _(xs: Unknown):
+    # TODO: should be `list[Unknown]`
+    reveal_type(sorted(xs, key=len))  # revealed: list[Sized]
+
+    # TODO: should be `map[str]`
+    reveal_type(map("{}".format, xs))  # revealed: map[object]
+
+    # TODO: should not emit an error and should reveal `str`
+    # error: [no-matching-overload]
+    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+```
+
 ## The builtin `NotImplemented` constant is not callable
 
 ```py
