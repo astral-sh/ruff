@@ -21,7 +21,7 @@ help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import Union
-4 | 
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -36,7 +36,7 @@ help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import Union
-4 | 
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -51,7 +51,7 @@ help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import Union
-4 | 
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -65,14 +65,16 @@ UP007 [*] Use `X | Y` for type annotations
 6 |     ...
   |
 help: Convert to `X | Y`
-2 | from typing import Union
-3 | 
-4 | 
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Union
+4 |
+5 |
   - def f(x: Union[str, int, Union[float, bytes]]) -> None:
-5 + def f(x: str | int | Union[float, bytes]) -> None:
-6 |     ...
-7 | 
-8 | 
+6 + def f(x: str | int | Union[float, bytes]) -> None:
+7 |     ...
+8 |
+9 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -84,14 +86,16 @@ UP007 [*] Use `X | Y` for type annotations
 6 |     ...
   |
 help: Convert to `X | Y`
-2 | from typing import Union
-3 | 
-4 | 
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Union
+4 |
+5 |
   - def f(x: Union[str, int, Union[float, bytes]]) -> None:
-5 + def f(x: Union[str, int, float | bytes]) -> None:
-6 |     ...
-7 | 
-8 | 
+6 + def f(x: Union[str, int, float | bytes]) -> None:
+7 |     ...
+8 |
+9 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -103,10 +107,15 @@ UP007 [*] Use `X | Y` for type annotations
 10 |     ...
    |
 help: Convert to `X | Y`
-6  |     ...
-7  | 
-8  | 
+1  + from __future__ import annotations
+2  | import typing
+3  | from typing import Union
+4  |
+--------------------------------------------------------------------------------
+7  |     ...
+8  |
+9  |
    - def f(x: typing.Union[str, int]) -> None:
-9  + def f(x: str | int) -> None:
-10 |     ...
+10 + def f(x: str | int) -> None:
+11 |     ...
 note: This is an unsafe fix and may change runtime behavior
