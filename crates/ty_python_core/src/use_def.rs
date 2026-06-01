@@ -487,6 +487,19 @@ enum InternedEnclosingSnapshotId {
     Bindings(InternedBindingsId),
 }
 
+/// Usage metadata for a definition.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct DefinitionUsage {
+    /// Whether this binding definition has at least one ordinary use.
+    is_used: bool,
+
+    /// Whether this multipart import definition has a dotted attribute use.
+    ///
+    /// `import os.path` binds the root symbol `os`, so ordinary symbol usage cannot distinguish
+    /// `os` from `os.path`.
+    is_multipart_import_used: bool,
+}
+
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct UseDefMap<'db> {
@@ -494,10 +507,10 @@ pub struct UseDefMap<'db> {
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
     all_definitions: FrozenIndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
-    /// A bitset-like map indicating whether each binding definition has at least one use.
+    /// Usage metadata for each definition.
     ///
     /// This uses the same index as `all_definitions`.
-    used_bindings: FrozenIndexVec<ScopedDefinitionId, bool>,
+    definition_usage: FrozenIndexVec<ScopedDefinitionId, DefinitionUsage>,
 
     /// Array of predicates in this scope.
     predicates: Predicates<'db>,
@@ -631,7 +644,11 @@ impl<'db> UseDefMap<'db> {
     ) -> impl Iterator<Item = (ScopedDefinitionId, DefinitionState<'db>, bool)> + '_ {
         self.all_definitions
             .iter_enumerated()
-            .map(|(id, &state)| (id, state, self.used_bindings[id]))
+            .map(|(id, &state)| (id, state, self.definition_usage[id].is_used))
+    }
+
+    pub fn is_multipart_import_definition_used(&self, definition: ScopedDefinitionId) -> bool {
+        self.definition_usage[definition].is_multipart_import_used
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -1135,10 +1152,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`DefinitionState`].
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
-    /// Tracks whether each binding definition has at least one use.
+    /// Usage metadata for each definition.
     ///
     /// Uses the same index as `all_definitions`.
-    used_bindings: IndexVec<ScopedDefinitionId, bool>,
+    definition_usage: IndexVec<ScopedDefinitionId, DefinitionUsage>,
 
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
@@ -1191,7 +1208,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(is_class_scope: bool) -> Self {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
-            used_bindings: IndexVec::from_iter([false]),
+            definition_usage: IndexVec::from_iter([DefinitionUsage::default()]),
             predicates: PredicatesBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
@@ -1210,8 +1227,8 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn push_definition(&mut self, state: DefinitionState<'db>) -> ScopedDefinitionId {
         let def_id = self.all_definitions.push(state);
-        let used_id = self.used_bindings.push(false);
-        debug_assert_eq!(def_id, used_id);
+        let usage_id = self.definition_usage.push(DefinitionUsage::default());
+        debug_assert_eq!(def_id, usage_id);
         def_id
     }
 
@@ -1650,6 +1667,41 @@ impl<'db> UseDefMapBuilder<'db> {
         self.mark_definition_ids_used(binding_definition_ids);
     }
 
+    pub(super) fn symbol_binding_definition_ids(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> Vec<ScopedDefinitionId> {
+        self.symbol_states[symbol]
+            .bindings()
+            .iter()
+            .map(LiveBinding::binding)
+            .collect()
+    }
+
+    pub(super) fn reachable_symbol_binding_definition_ids(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> Vec<ScopedDefinitionId> {
+        self.reachable_symbol_definitions[symbol]
+            .bindings
+            .iter()
+            .map(LiveBinding::binding)
+            .collect()
+    }
+
+    pub(super) fn mark_multipart_import_definition_used(&mut self, definition: ScopedDefinitionId) {
+        if definition.is_unbound() {
+            return;
+        }
+
+        if matches!(
+            self.all_definitions[definition],
+            DefinitionState::Defined(_)
+        ) {
+            self.definition_usage[definition].is_multipart_import_used = true;
+        }
+    }
+
     pub(super) fn record_multi_use(
         &mut self,
         places: impl Iterator<Item = ScopedPlaceId>,
@@ -1800,7 +1852,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.all_definitions[definition_id],
             DefinitionState::Defined(_)
         ) {
-            self.used_bindings[definition_id] = true;
+            self.definition_usage[definition_id].is_used = true;
         }
     }
 
@@ -1910,7 +1962,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
         self.all_definitions.shrink_to_fit();
-        self.used_bindings.shrink_to_fit();
+        self.definition_usage.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.member_states.shrink_to_fit();
         self.reachable_symbol_definitions.shrink_to_fit();
@@ -2002,7 +2054,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         UseDefMap {
             all_definitions: self.all_definitions.into(),
-            used_bindings: self.used_bindings.into(),
+            definition_usage: self.definition_usage.into(),
             predicates: self.predicates.build(),
             reachability_constraints: self.reachability_constraints.build(),
             interned_bindings,
