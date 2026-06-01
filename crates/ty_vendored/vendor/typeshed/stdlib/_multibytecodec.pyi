@@ -14,8 +14,6 @@ class _MultibyteCodec:
 @disjoint_base
 class MultibyteIncrementalDecoder:
     errors: str
-    """how to treat errors"""
-
     def __init__(self, errors: str = "strict") -> None: ...
     def decode(self, input: ReadableBuffer, final: bool = False) -> str: ...
     def getstate(self) -> tuple[bytes, int]: ...
@@ -25,8 +23,6 @@ class MultibyteIncrementalDecoder:
 @disjoint_base
 class MultibyteIncrementalEncoder:
     errors: str
-    """how to treat errors"""
-
     def __init__(self, errors: str = "strict") -> None: ...
     def encode(self, input: str, final: bool = False) -> bytes: ...
     def getstate(self) -> int: ...
@@ -36,8 +32,6 @@ class MultibyteIncrementalEncoder:
 @disjoint_base
 class MultibyteStreamReader:
     errors: str
-    """how to treat errors"""
-
     stream: _ReadableStream
     def __init__(self, stream: _ReadableStream, errors: str = "strict") -> None: ...
     def read(self, sizeobj: int | None = None, /) -> str: ...
@@ -48,8 +42,6 @@ class MultibyteStreamReader:
 @disjoint_base
 class MultibyteStreamWriter:
     errors: str
-    """how to treat errors"""
-
     stream: _WritableStream
     def __init__(self, stream: _WritableStream, errors: str = "strict") -> None: ...
     def reset(self) -> None: ...
