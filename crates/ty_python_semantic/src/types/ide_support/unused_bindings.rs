@@ -558,6 +558,33 @@ mod tests {
     }
 
     #[test]
+    fn closure_use_does_not_mark_shadowed_binding_used() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                x = 1
+                x = 2
+
+                def inner():
+                    return x
+
+                return inner
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let first_x_start = TextSize::try_from(source.find("x = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(first_x_start, first_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn skips_binding_captured_by_comprehension_in_nested_function() -> anyhow::Result<()> {
         let source = dedent(
             "

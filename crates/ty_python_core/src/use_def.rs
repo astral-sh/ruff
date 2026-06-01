@@ -1598,17 +1598,12 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(use_id, new_use);
     }
 
-    pub(super) fn mark_enclosing_snapshot_bindings_used(
-        &mut self,
-        snapshot_id: ScopedEnclosingSnapshotId,
-    ) {
-        let Some(EnclosingSnapshot::Bindings(bindings)) = self.enclosing_snapshots.get(snapshot_id)
-        else {
-            return;
-        };
-
-        let binding_definition_ids: Vec<ScopedDefinitionId> =
-            bindings.iter().map(LiveBinding::binding).collect();
+    pub(super) fn mark_symbol_bindings_used(&mut self, symbol: ScopedSymbolId) {
+        let binding_definition_ids: Vec<ScopedDefinitionId> = self.symbol_states[symbol]
+            .bindings()
+            .iter()
+            .map(LiveBinding::binding)
+            .collect();
         self.mark_definition_ids_used(binding_definition_ids);
     }
 
