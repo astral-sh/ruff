@@ -572,48 +572,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn mark_captures_used_by_scope_tree(
-        &mut self,
-        popped_scope_id: FileScopeId,
-        popped_scope_laziness: ScopeLaziness,
-    ) {
-        let mut used_captures = Vec::new();
-
-        for free_symbol_scope in self.scope_and_descendant_ids(popped_scope_id) {
-            for free_symbol in self.place_tables[free_symbol_scope].symbols() {
-                if !free_symbol.is_used() || free_symbol.is_local() || free_symbol.is_global() {
-                    continue;
-                }
-
-                let name = free_symbol.name();
-                let Some(enclosing_scope_id) =
-                    self.resolve_nested_reference_scope(free_symbol_scope, name.as_str())
-                else {
-                    continue;
-                };
-                let Some(enclosing_symbol_id) =
-                    self.place_tables[enclosing_scope_id].symbol_id(name)
-                else {
-                    continue;
-                };
-
-                used_captures.push((enclosing_scope_id, enclosing_symbol_id));
-            }
-        }
-
-        used_captures.sort_unstable();
-        used_captures.dedup();
-
-        for (enclosing_scope_id, enclosing_symbol_id) in used_captures {
-            self.use_def_maps[enclosing_scope_id].mark_symbol_bindings_used(enclosing_symbol_id);
-
-            if popped_scope_laziness.is_lazy() {
-                self.used_lazy_captures
-                    .insert((enclosing_scope_id, enclosing_symbol_id));
-            }
-        }
-    }
-
     /// Any lazy snapshots of the place that have been reassigned are obsolete, so update them.
     /// ```py
     /// def outer() -> None:
@@ -737,6 +695,48 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
     }
 
+    fn mark_captured_bindings_used(
+        &mut self,
+        popped_scope_id: FileScopeId,
+        popped_scope_laziness: ScopeLaziness,
+    ) {
+        let mut used_captures = Vec::new();
+
+        for free_symbol_scope in self.scope_and_descendant_ids(popped_scope_id) {
+            for free_symbol in self.place_tables[free_symbol_scope].symbols() {
+                if !free_symbol.is_used() || free_symbol.is_local() || free_symbol.is_global() {
+                    continue;
+                }
+
+                let name = free_symbol.name();
+                let Some(enclosing_scope_id) =
+                    self.resolve_nested_reference_scope(free_symbol_scope, name.as_str())
+                else {
+                    continue;
+                };
+                let Some(enclosing_symbol_id) =
+                    self.place_tables[enclosing_scope_id].symbol_id(name)
+                else {
+                    continue;
+                };
+
+                used_captures.push((enclosing_scope_id, enclosing_symbol_id));
+            }
+        }
+
+        used_captures.sort_unstable();
+        used_captures.dedup();
+
+        for (enclosing_scope_id, enclosing_symbol_id) in used_captures {
+            self.use_def_maps[enclosing_scope_id].mark_symbol_bindings_used(enclosing_symbol_id);
+
+            if popped_scope_laziness.is_lazy() {
+                self.used_lazy_captures
+                    .insert((enclosing_scope_id, enclosing_symbol_id));
+            }
+        }
+    }
+
     fn pop_scope(&mut self) -> FileScopeId {
         self.try_node_context_stack_manager.exit_scope();
 
@@ -762,7 +762,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         } else {
             self.record_lazy_snapshots(popped_scope_id);
         }
-        self.mark_captures_used_by_scope_tree(popped_scope_id, popped_scope_laziness);
+        self.mark_captured_bindings_used(popped_scope_id, popped_scope_laziness);
 
         popped_scope_id
     }
