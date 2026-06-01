@@ -6590,6 +6590,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (elt_tcx_constraints, elt_tcx_variance)
         };
 
+        // Avoid projecting and solving a constraint set when contextual inference has already
+        // provided the complete specialization for an empty collection literal.
+        if elts.is_empty()
+            && tcx.annotation.is_some()
+            && let Some(specialization) = generic_context
+                .variables(self.db())
+                .map(|typevar| {
+                    let identity = typevar.identity(self.db());
+                    // Keep this parallel with the slow path below: a covariant context provides
+                    // only an upper bound, which does not determine the specialization for an empty
+                    // literal. A contravariant context provides a lower bound, for which inference
+                    // selects the narrowest valid solution.
+                    if elt_tcx_variance
+                        .get(&identity)
+                        .is_some_and(|variance| variance.is_covariant())
+                    {
+                        return None;
+                    }
+                    elt_tcx_constraints.get(&identity).copied()
+                })
+                .collect::<Option<Vec<_>>>()
+        {
+            let class_type = collection_alias.origin(self.db()).apply_specialization(
+                self.db(),
+                |generic_context| {
+                    generic_context
+                        .specialize_recursive(self.db(), specialization.into_iter().map(Some))
+                },
+            );
+            return Type::from(class_type).to_instance(self.db());
+        }
+
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
