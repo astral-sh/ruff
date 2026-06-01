@@ -205,6 +205,21 @@ def is_assignable_to(ty: TypeForm[object], to: TypeForm[object]) -> ConstraintSe
     .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     """
 
+def is_constraint_set_assignable_to(
+    ty: TypeForm[object],
+    to: TypeForm[object],
+) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is `assignable`_ to `to`.
+
+    This differs from `is_assignable_to` in how it treats typevars.
+    `is_assignable_to` will assume that all typevars are non-inferable, and will
+    require all possible specializations of a typevar to satisfy the relation.
+    This method will instead return a constraint set describing which
+    specializations (possibly not all of them) satisfy the relation.
+
+    .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    """
+
 def is_disjoint_from(
     type_a: TypeForm[object], type_b: TypeForm[object]
 ) -> ConstraintSet:
