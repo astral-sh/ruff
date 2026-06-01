@@ -7,6 +7,24 @@ use ty_python_semantic::{
     SemanticModel, implementation_definitions_for_attribute, implementation_definitions_for_method,
 };
 
+/// Navigate from an attribute access or method declaration to that method and known subclass overrides.
+///
+/// For an attribute access, this resolves the receiver type and returns the method implementation
+/// family for that type:
+///
+/// ```py
+/// animal.speak()
+///        ^^^^^
+/// ```
+///
+/// For a method declaration, this uses the containing class as the root and returns that method
+/// along with known overrides on subclasses:
+///
+/// ```py
+/// class Animal:
+///     def speak(self): ...
+///         ^^^^^
+/// ```
 pub fn goto_implementation(
     db: &dyn Db,
     file: File,

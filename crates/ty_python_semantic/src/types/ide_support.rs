@@ -326,9 +326,18 @@ pub fn definitions_for_attribute<'db>(
 
 /// Returns definitions for the implementation family of an attribute expression `x.y`.
 ///
-/// This finds same-named methods defined on the inferred receiver class and on all known
-/// transitive subclasses. It intentionally only returns methods defined in class bodies,
-/// not call sites or arbitrary assignments with the same name.
+/// ```py
+/// def f(animal: Animal):
+///     animal.speak()
+///            ^^^^^
+/// ```
+///
+/// For a receiver of type `Animal`, this includes `Animal.speak` plus `speak` overrides on known
+/// subclasses such as `Dog` or `Cat`. For a receiver of type `Dog`, the root is `Dog`: inherited
+/// behavior resolves through `Dog`'s MRO, and sibling classes such as `Cat` are not included.
+///
+/// Only `def`-style methods are returned; assignments such as `Dog.speak = ...`,
+/// `self.speak = ...`, or `speak = ...` are not treated as implementations.
 pub fn implementation_definitions_for_attribute<'db>(
     model: &SemanticModel<'db>,
     attribute: &ast::ExprAttribute,
@@ -346,18 +355,29 @@ pub fn implementation_definitions_for_attribute<'db>(
 
     let mut definitions = Vec::new();
     for root in roots {
-        extend_unique_definitions(
-            &mut definitions,
-            implementation_definitions_for_class_family(db, root, method_name),
-        );
+        for definition in implementation_definitions_for_class_family(db, root, method_name) {
+            if !definitions.contains(&definition) {
+                definitions.push(definition);
+            }
+        }
     }
     definitions
 }
 
 /// Returns definitions for the implementation family of a method declaration.
 ///
+/// ```py
+/// class Animal:
+///     def speak(self): ...
+///         ^^^^^
+///
+/// class Dog(Animal):
+///     def speak(self): ...
+/// ```
+///
 /// The containing class is used as the root, and same-named methods defined on known transitive
-/// subclasses are returned along with the method itself.
+/// subclasses are returned along with the method itself. This does not walk to parent classes: on
+/// `Dog.speak`, the root is `Dog`, so `Animal.speak` is not included.
 pub fn implementation_definitions_for_method<'db>(
     model: &SemanticModel<'db>,
     function: &ast::StmtFunctionDef,
@@ -464,6 +484,20 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
 
 /// Returns the method implementation family rooted at `root`.
 ///
+/// ```py
+/// class Animal:
+///     def speak(self): ...
+///
+/// class Dog(Animal):
+///     pass
+///
+/// class LoudDog(Dog):
+///     def speak(self): ...
+/// ```
+///
+/// For root `Dog` and method `speak`, this returns `Animal.speak` because that is the method
+/// `Dog` inherits through MRO, followed by `LoudDog.speak` because it is a known subclass override.
+///
 /// The first entry is the method that would be selected for the root class itself, using MRO
 /// lookup. That matters for concrete subclasses that inherit a method without overriding it. After
 /// that, we add same-named methods defined directly on known transitive subclasses, which are the
@@ -475,10 +509,11 @@ fn implementation_definitions_for_class_family<'db>(
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = mro_method_definitions(db, root, method_name);
     for subtype in transitive_subtypes(db, root) {
-        extend_unique_definitions(
-            &mut definitions,
-            own_method_definitions(db, subtype, method_name),
-        );
+        for definition in own_method_definitions(db, subtype, method_name) {
+            if !definitions.contains(&definition) {
+                definitions.push(definition);
+            }
+        }
     }
     definitions
 }
@@ -504,9 +539,23 @@ fn mro_method_definitions<'db>(
 
 /// Returns function definitions for `method_name` that are declared directly in `class`.
 ///
-/// This does not walk base classes. It is used for subclass override collection, where inherited
-/// methods are already represented by the root MRO lookup and should not be repeated for every
-/// subclass that merely inherits them.
+/// ```py
+/// class Animal:
+///     def speak(self): ...
+///
+/// class Dog(Animal):
+///     pass
+///
+/// class Cat(Animal):
+///     def speak(self): ...
+/// ```
+///
+/// For method `speak`, this returns nothing for `Dog` because it only inherits the method, but it
+/// returns `Cat.speak` for `Cat` because the method is defined directly in `Cat`'s body.
+///
+/// Subclasses that only inherit the method do not add a new implementation target. The inherited
+/// method is already returned by the root MRO lookup; this only finds subclasses that define a new
+/// method body.
 fn own_method_definitions<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -541,23 +590,7 @@ fn own_method_definitions<'db>(
     .collect()
 }
 
-fn extend_unique_definitions<'db>(
-    definitions: &mut Vec<ResolvedDefinition<'db>>,
-    new_definitions: impl IntoIterator<Item = ResolvedDefinition<'db>>,
-) {
-    for definition in new_definitions {
-        if !definitions.contains(&definition) {
-            definitions.push(definition);
-        }
-    }
-}
-
 /// Normalizes a receiver type into the class roots used for implementation lookup.
-///
-/// Attribute receivers can be unions, finite intersections, `TypeVars`, instances, class objects, or
-/// aliases over those forms. This recursively expands the forms that can represent multiple
-/// possible receiver classes and deduplicates roots so downstream implementation collection can be
-/// order-preserving without returning duplicate targets.
 fn collect_implementation_root_classes<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -566,11 +599,13 @@ fn collect_implementation_root_classes<'db>(
 ) {
     match ty.resolve_type_alias(db) {
         Type::Union(union) => {
+            // `pet: Dog | Cat` can dispatch through either `Dog` or `Cat`.
             for element in union.elements(db) {
                 collect_implementation_root_classes(db, *element, seen, roots);
             }
         }
         Type::Intersection(intersection) => {
+            // Finite intersections can stand for alternatives like `Dog` or `Cat`.
             if let Some(alternatives) = intersection.finite_alternatives(db) {
                 for alternative in alternatives {
                     collect_implementation_root_classes(db, alternative, seen, roots);
@@ -578,15 +613,18 @@ fn collect_implementation_root_classes<'db>(
             }
         }
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+            // `T: Animal` can dispatch through the `Animal` bound.
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 collect_implementation_root_classes(db, bound, seen, roots);
             }
+            // `T: (Dog, Cat)` can dispatch through either constraint.
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 collect_implementation_root_classes(db, constraints.as_type(db), seen, roots);
             }
             None => {}
         },
         ty => {
+            // `dog: Dog` maps directly to the `Dog` class root.
             let root = match ty {
                 Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
                     extract_class_literal(db, ty)
@@ -2201,6 +2239,15 @@ pub fn type_hierarchy_subtypes(
         .collect()
 }
 
+/// Finds all known subclasses of `root`, including subclasses of subclasses.
+///
+/// ```py
+/// class Animal: ...
+/// class Dog(Animal): ...
+/// class LoudDog(Dog): ...
+/// ```
+///
+/// For `Animal`, this returns both `Dog` and `LoudDog`.
 fn transitive_subtypes<'db>(db: &'db dyn Db, root: ClassLiteral<'db>) -> Vec<ClassLiteral<'db>> {
     fn collect<'db>(
         db: &'db dyn Db,
@@ -2223,6 +2270,16 @@ fn transitive_subtypes<'db>(db: &'db dyn Db, root: ClassLiteral<'db>) -> Vec<Cla
     subtypes
 }
 
+/// Finds classes that directly inherit from `target_class`.
+///
+/// ```py
+/// class Animal: ...
+/// class Dog(Animal): ...
+/// class LoudDog(Dog): ...
+/// ```
+///
+/// For `Animal`, this returns `Dog`, but not `LoudDog`. Transitive subclasses are collected by
+/// repeatedly calling this helper.
 fn direct_subtypes<'db>(
     db: &'db dyn Db,
     target_class: ClassLiteral<'db>,
