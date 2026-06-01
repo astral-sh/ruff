@@ -692,7 +692,7 @@ impl SearchPaths {
         }
     }
 
-    /// Registers the file roots for all non-dynamically discovered search paths that aren't first-party.
+    /// Registers the file roots for all non-dynamically discovered search paths.
     pub fn try_register_static_roots(&self, db: &dyn Db) {
         let files = db.files();
         for path in self
@@ -704,6 +704,10 @@ impl SearchPaths {
             if let Some(system_path) = path.as_system_path() {
                 if !path.is_first_party() {
                     files.try_add_root(db, system_path, FileRootKind::LibrarySearchPath);
+                } else {
+                    if files.root(db, system_path).is_none() {
+                        files.try_add_root(db, system_path, FileRootKind::LibrarySearchPath);
+                    }
                 }
             }
         }
