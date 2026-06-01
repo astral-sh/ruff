@@ -54,6 +54,11 @@ impl EnvVars {
     /// Accepts the same values as the `--output-format` command-line argument.
     pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
 
+    /// The path to the uv executable to use for workspace discovery.
+    ///
+    /// When set, ty invokes `uv workspace metadata` to discover the workspace root.
+    pub const UV: &'static str = "UV";
+
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
 

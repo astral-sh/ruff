@@ -73,6 +73,12 @@ Equivalent to `TY_MAX_PARALLELISM`.
 
 This is a standard Rayon environment variable.
 
+### `UV`
+
+The path to the uv executable to use for workspace discovery.
+
+When set, ty invokes `uv workspace metadata` to discover the workspace root.
+
 ### `VIRTUAL_ENV`
 
 Used to detect an activated virtual environment.

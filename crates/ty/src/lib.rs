@@ -3,6 +3,7 @@ mod logging;
 mod printer;
 mod python_version;
 mod rule;
+mod uv;
 mod version;
 
 use std::fmt::Write;
@@ -114,7 +115,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             })?
     };
 
-    let project_path = args
+    let explicit_project_path = args
         .project
         .as_ref()
         .map(|project| {
@@ -126,14 +127,27 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
                 ))
             }
         })
-        .transpose()?
+        .transpose()?;
+    let uv_workspace_root = explicit_project_path
+        .is_none()
+        .then(|| uv::discover_workspace_root(&cwd))
+        .flatten();
+    let is_uv_workspace_member = uv_workspace_root
+        .as_ref()
+        .is_some_and(|workspace_root| workspace_root != &cwd);
+    let project_path = explicit_project_path
+        .or(uv_workspace_root)
         .unwrap_or_else(|| cwd.clone());
 
-    let check_paths: Vec<_> = args
+    let mut check_paths: Vec<_> = args
         .paths
         .iter()
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
+    // Use uv to discover workspace settings without checking sibling workspace members by default.
+    if check_paths.is_empty() && is_uv_workspace_member {
+        check_paths.push(cwd.clone());
+    }
 
     let mode = if args.fix {
         MainLoopMode::Fix(FixMode::ApplyFixes)
