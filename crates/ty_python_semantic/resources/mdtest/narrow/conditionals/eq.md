@@ -94,6 +94,15 @@ def _(x: Single | int):
     else:
         reveal_type(x)  # revealed: int
 
+def _(x: list[int] | Literal[Answer.NO]):
+    if x != Answer.NO:
+        reveal_type(x)  # revealed: list[int]
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x == Answer.NO:
+        return
+    reveal_type(x)  # revealed: list[int]
+
 class Color(Enum):
     RED = "red"
     GREEN = "green"
