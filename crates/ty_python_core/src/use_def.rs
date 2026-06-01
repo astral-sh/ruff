@@ -635,21 +635,29 @@ static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
 enum RetainedDefinitionState<'db> {
     Unused(Definition<'db>),
     Used(Definition<'db>),
+    MultipartImportUsed(Definition<'db>),
+    UsedAndMultipartImportUsed(Definition<'db>),
     Undefined,
     Deleted,
 }
 
 impl<'db> RetainedDefinitionState<'db> {
-    fn new(state: DefinitionState<'db>, used: bool) -> Self {
+    fn new(state: DefinitionState<'db>, used: bool, multipart_import_used: bool) -> Self {
         match state {
-            DefinitionState::Defined(definition) if used => Self::Used(definition),
-            DefinitionState::Defined(definition) => Self::Unused(definition),
+            DefinitionState::Defined(definition) => match (used, multipart_import_used) {
+                (false, false) => Self::Unused(definition),
+                (true, false) => Self::Used(definition),
+                (false, true) => Self::MultipartImportUsed(definition),
+                (true, true) => Self::UsedAndMultipartImportUsed(definition),
+            },
             DefinitionState::Undefined => {
                 debug_assert!(!used);
+                debug_assert!(!multipart_import_used);
                 Self::Undefined
             }
             DefinitionState::Deleted => {
                 debug_assert!(!used);
+                debug_assert!(!multipart_import_used);
                 Self::Deleted
             }
         }
@@ -657,7 +665,10 @@ impl<'db> RetainedDefinitionState<'db> {
 
     fn state(self) -> DefinitionState<'db> {
         match self {
-            Self::Unused(definition) | Self::Used(definition) => {
+            Self::Unused(definition)
+            | Self::Used(definition)
+            | Self::MultipartImportUsed(definition)
+            | Self::UsedAndMultipartImportUsed(definition) => {
                 DefinitionState::Defined(definition)
             }
             Self::Undefined => DefinitionState::Undefined,
@@ -666,7 +677,14 @@ impl<'db> RetainedDefinitionState<'db> {
     }
 
     fn is_used(self) -> bool {
-        matches!(self, Self::Used(_))
+        matches!(self, Self::Used(_) | Self::UsedAndMultipartImportUsed(_))
+    }
+
+    fn is_multipart_import_used(self) -> bool {
+        matches!(
+            self,
+            Self::MultipartImportUsed(_) | Self::UsedAndMultipartImportUsed(_)
+        )
     }
 }
 
@@ -682,19 +700,26 @@ impl<'db> RetainedDefinitions<'db> {
     fn new(
         states: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
         used: IndexVec<ScopedDefinitionId, bool>,
+        multipart_import_used: IndexVec<ScopedDefinitionId, bool>,
     ) -> Self {
         let mut states = states.into_iter();
         let mut used = used.into_iter();
+        let mut multipart_import_used = multipart_import_used.into_iter();
 
         let unbound_state = states.next();
         let unbound_used = used.next();
+        let unbound_multipart_import_used = multipart_import_used.next();
         debug_assert_eq!(unbound_state, Some(DefinitionState::Undefined));
         debug_assert_eq!(unbound_used, Some(false));
+        debug_assert_eq!(unbound_multipart_import_used, Some(false));
 
         Self {
             states: states
                 .zip(used)
-                .map(|(state, used)| RetainedDefinitionState::new(state, used))
+                .zip(multipart_import_used)
+                .map(|((state, used), multipart_import_used)| {
+                    RetainedDefinitionState::new(state, used, multipart_import_used)
+                })
                 .collect(),
         }
     }
@@ -884,6 +909,12 @@ impl<'db> UseDefMap<'db> {
         self.all_definitions
             .iter_enumerated()
             .map(|(id, state)| (id, state.state(), state.is_used()))
+    }
+
+    pub fn is_multipart_import_definition_used(&self, definition: ScopedDefinitionId) -> bool {
+        self.all_definitions
+            .get(definition)
+            .is_multipart_import_used()
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -1608,6 +1639,11 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Uses the same index as `all_definitions`.
     used_bindings: IndexVec<ScopedDefinitionId, bool>,
 
+    /// Tracks whether each multipart import definition has a dotted attribute use.
+    ///
+    /// Uses the same index as `all_definitions`.
+    used_multipart_imports: IndexVec<ScopedDefinitionId, bool>,
+
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
 
@@ -1670,6 +1706,7 @@ impl<'db> UseDefMapBuilder<'db> {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
             used_bindings: IndexVec::from_iter([false]),
+            used_multipart_imports: IndexVec::from_iter([false]),
             predicates: PredicatesBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
@@ -1700,7 +1737,9 @@ impl<'db> UseDefMapBuilder<'db> {
     fn push_definition(&mut self, state: DefinitionState<'db>) -> ScopedDefinitionId {
         let def_id = self.all_definitions.push(state);
         let used_id = self.used_bindings.push(false);
+        let multipart_used_id = self.used_multipart_imports.push(false);
         debug_assert_eq!(def_id, used_id);
+        debug_assert_eq!(def_id, multipart_used_id);
         def_id
     }
 
@@ -2243,6 +2282,41 @@ impl<'db> UseDefMapBuilder<'db> {
         self.mark_definition_ids_used(binding_definition_ids);
     }
 
+    pub(super) fn symbol_binding_definition_ids(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> Vec<ScopedDefinitionId> {
+        self.symbol_states[symbol]
+            .bindings()
+            .iter()
+            .map(LiveBinding::binding)
+            .collect()
+    }
+
+    pub(super) fn reachable_symbol_binding_definition_ids(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> Vec<ScopedDefinitionId> {
+        self.reachable_symbol_definitions[symbol]
+            .bindings
+            .iter()
+            .map(LiveBinding::binding)
+            .collect()
+    }
+
+    pub(super) fn mark_multipart_import_definition_used(&mut self, definition: ScopedDefinitionId) {
+        if definition.is_unbound() {
+            return;
+        }
+
+        if matches!(
+            self.all_definitions[definition],
+            DefinitionState::Defined(_)
+        ) {
+            self.used_multipart_imports[definition] = true;
+        }
+    }
+
     pub(super) fn record_multi_use(
         &mut self,
         places: impl Iterator<Item = ScopedPlaceId>,
@@ -2658,7 +2732,11 @@ impl<'db> UseDefMapBuilder<'db> {
                 narrowing_constraints,
             })
         });
-        let all_definitions = RetainedDefinitions::new(self.all_definitions, self.used_bindings);
+        let all_definitions = RetainedDefinitions::new(
+            self.all_definitions,
+            self.used_bindings,
+            self.used_multipart_imports,
+        );
 
         UseDefMap {
             all_definitions,

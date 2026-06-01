@@ -983,6 +983,20 @@ impl<'db> DefinitionKind<'db> {
         )
     }
 
+    pub fn unaliased_multipart_import_name<'a>(
+        &'a self,
+        parsed: &'a ParsedModuleRef,
+    ) -> Option<&'a str> {
+        let DefinitionKind::Import(import) = self else {
+            return None;
+        };
+
+        let alias = import.alias(parsed);
+        let name = alias.name.id.as_str();
+
+        (alias.asname.is_none() && name.contains('.')).then_some(name)
+    }
+
     pub const fn is_unannotated_assignment(&self) -> bool {
         matches!(self, DefinitionKind::Assignment(_))
     }

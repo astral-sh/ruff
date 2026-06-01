@@ -28,7 +28,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
-    DefinitionNodeKey, DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef,
+    DefinitionNodeKey, DefinitionNodeRef, DefinitionState, Definitions, DictKeyAssignmentNodeRef,
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
     LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
@@ -1398,6 +1398,73 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
+    }
+
+    fn record_multipart_import_use(&mut self, expr: &ast::Expr) {
+        let Some(dotted_name) = dotted_attribute_name(expr) else {
+            return;
+        };
+        let Some(imported_root) = dotted_name.split('.').next() else {
+            return;
+        };
+
+        for (scope_id, _) in self.visible_ancestor_scopes(self.current_scope()) {
+            let place_table = &self.place_tables[scope_id];
+            let Some(symbol_id) = place_table.symbol_id(imported_root) else {
+                continue;
+            };
+
+            let symbol = place_table.symbol(symbol_id);
+            if !symbol.is_local() {
+                continue;
+            }
+
+            let live_definition_ids =
+                self.use_def_maps[scope_id].symbol_binding_definition_ids(symbol_id);
+            let all_live_definitions_are_multipart_imports =
+                live_definition_ids.iter().all(|definition_id| {
+                    let DefinitionState::Defined(definition) =
+                        self.use_def_maps[scope_id].definition(*definition_id)
+                    else {
+                        return false;
+                    };
+
+                    definition
+                        .kind(self.db)
+                        .unaliased_multipart_import_name(self.module)
+                        .is_some()
+                });
+            let candidate_definition_ids = if all_live_definitions_are_multipart_imports {
+                self.use_def_maps[scope_id].reachable_symbol_binding_definition_ids(symbol_id)
+            } else {
+                live_definition_ids
+            };
+
+            let matching_definitions = candidate_definition_ids
+                .into_iter()
+                .filter(|definition_id| {
+                    let DefinitionState::Defined(definition) =
+                        self.use_def_maps[scope_id].definition(*definition_id)
+                    else {
+                        return false;
+                    };
+
+                    let kind = definition.kind(self.db);
+                    kind.unaliased_multipart_import_name(self.module)
+                        .is_some_and(|imported_name| {
+                            dotted_name_matches(&dotted_name, imported_name)
+                        })
+                })
+                .collect::<Vec<_>>();
+
+            for definition_id in matching_definitions {
+                self.use_def_maps[scope_id].mark_multipart_import_definition_used(definition_id);
+            }
+
+            // The first visible scope containing the root symbol determines what the dotted use
+            // resolves to. Even if it is not a multipart import, it shadows outer imports.
+            break;
+        }
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -4426,6 +4493,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                     if is_use {
                         self.record_place_use(place_id, expr);
+                        if matches!(expr, ast::Expr::Attribute(_)) {
+                            self.record_multipart_import_use(expr);
+                        }
 
                         // Keep track of any uses of unannotated collection initializers.
                         if let Some(collection_def) =
@@ -5173,6 +5243,25 @@ fn is_if_type_checking(expr: &ast::Expr) -> bool {
         }
         _ => false,
     }
+}
+
+fn dotted_attribute_name(expr: &ast::Expr) -> Option<String> {
+    match expr {
+        ast::Expr::Name(name) => Some(name.id.to_string()),
+        ast::Expr::Attribute(attribute) => {
+            let mut name = dotted_attribute_name(&attribute.value)?;
+            name.push('.');
+            name.push_str(attribute.attr.id.as_str());
+            Some(name)
+        }
+        _ => None,
+    }
+}
+
+fn dotted_name_matches(name: &str, imported_name: &str) -> bool {
+    name == imported_name
+        || (name.starts_with(imported_name)
+            && name.as_bytes().get(imported_name.len()) == Some(&b'.'))
 }
 
 /// Returns if the expression is a `not TYPE_CHECKING` expression.
