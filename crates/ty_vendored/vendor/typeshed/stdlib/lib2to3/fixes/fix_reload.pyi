@@ -1,3 +1,7 @@
+"""Fixer for reload().
+
+reload(s) -> importlib.reload(s)
+"""
 from typing import ClassVar, Literal
 
 from .. import fixer_base
