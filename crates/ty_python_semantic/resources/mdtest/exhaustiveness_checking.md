@@ -406,7 +406,7 @@ def if_else_non_exhaustive(x: A[D] | B[E] | C[F]):
     else:
         this_should_be_an_error  # error: [unresolved-reference]
 
-        # this diagnostic is correct: the inferred type of `x` is `B[E] & ~A[D] & ~C[F]`
+        # this diagnostic is correct: the inferred type of `x` is `B[E] & ~A[Any] & ~C[Any]`
         assert_never(x)  # error: [type-assertion-failure]
 
 def match_exhaustive(x: A[D] | B[E] | C[F]):

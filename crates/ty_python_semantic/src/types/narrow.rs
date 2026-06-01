@@ -12,7 +12,7 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
+    TypeVarVariance, UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
     sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
@@ -284,7 +284,22 @@ impl ClassInfoConstraintFunction {
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
+                let class_type = class.as_static().map_or_else(
+                    || class.top_materialization(db),
+                    |class| {
+                        if !class.generic_context(db).is_some_and(|generic_context| {
+                            generic_context
+                                .variables(db)
+                                .all(|typevar| typevar.variance(db) == TypeVarVariance::Invariant)
+                        }) {
+                            return class.top_materialization(db);
+                        }
+                        class.apply_specialization(db, |generic_context| {
+                            generic_context.repeat_specialization(db, Type::any())
+                        })
+                    },
+                );
+                Type::instance(db, class_type)
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))

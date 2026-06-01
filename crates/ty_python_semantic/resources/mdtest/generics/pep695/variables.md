@@ -907,7 +907,7 @@ def iterable_after_negative_narrow[T: str | list[str]](foo: T) -> None:
 def non_iterable_after_negative_narrow[T: int | list[str]](foo: T) -> None:
     if isinstance(foo, list):
         return
-    reveal_type(foo)  # revealed: T@non_iterable_after_negative_narrow & ~Top[list[Unknown]]
+    reveal_type(foo)  # revealed: T@non_iterable_after_negative_narrow & ~list[Any]
     for x in foo: ...  # error: [not-iterable]
 ```
 

@@ -967,7 +967,7 @@ with the same container specialized with a dynamic type:
 
 ```py
 from typing import Any, Generic, TypeVar
-from ty_extensions import Intersection
+from ty_extensions import Intersection, Not
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -1007,6 +1007,15 @@ def _(
     reveal_type(multi_invariant_crossed)  # revealed: MultiInvariant[P, Any] & MultiInvariant[Any, Q]
     reveal_type(covariant_any)  # revealed: Covariant[P] & Covariant[Any]
     reveal_type(contravariant_any)  # revealed: Contravariant[P] & Contravariant[Any]
+```
+
+```py
+def _(
+    invariant_not_any: Intersection[Invariant[P], Not[Invariant[Any]]],
+    invariant_not_any_reversed: Intersection[Not[Invariant[Any]], Invariant[P]],
+) -> None:
+    reveal_type(invariant_not_any)  # revealed: Never
+    reveal_type(invariant_not_any_reversed)  # revealed: Never
 ```
 
 ## Calling intersection types
