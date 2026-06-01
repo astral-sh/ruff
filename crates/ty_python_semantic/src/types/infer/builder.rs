@@ -5972,14 +5972,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .into_iter()
                 .map(|(identity, accumulator)| (identity, accumulator.into_type(db)))
                 .collect();
-        Type::from(class.apply_specialization(db, |generic_context| {
+        let specialized = Type::from(class.apply_specialization(db, |generic_context| {
             generic_context.specialize_recursive(
                 db,
                 generic_context
                     .variables(db)
                     .map(|typevar| type_context_mappings.get(&typevar.identity(db)).copied()),
             )
-        }))
+        }));
+        if specialized.is_assignable_to(db, Type::Callable(target_callable)) {
+            specialized
+        } else {
+            ty
+        }
     }
 
     #[track_caller]

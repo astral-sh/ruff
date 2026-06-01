@@ -795,7 +795,7 @@ assignments that are in non-covariant position.
 import builtins
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import Any, Callable, Iterable, Literal, MutableSequence, Sequence
+from typing import Any, Callable, Iterable, Literal, MutableSequence, overload, Sequence
 
 x1: Sequence[Any] = [1, 2, 3]
 reveal_type(x1)  # revealed: list[int]
@@ -903,6 +903,19 @@ class M[T]:
 
 m_factory: Callable[[str], M[tuple[str]]] = reveal_type(M)  # revealed: <class 'M'>
 reveal_type(m_factory("x"))  # revealed: M[tuple[str]]
+
+class MultiPath[T]:
+    value: T
+
+    @overload
+    def __init__(self, value: T) -> None: ...
+    @overload
+    def __init__(self, value: list[T]) -> None: ...
+    def __init__(self, value: object) -> None: ...
+
+# fmt: off
+multi_path_factory: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(MultiPath)  # revealed: <class 'MultiPath'>
+# fmt: on
 ```
 
 ## Narrow union declared type for generic calls
