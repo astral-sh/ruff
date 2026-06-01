@@ -1968,6 +1968,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
         }
 
+        // TODO: Replace this fallback with expanding-cycle detection in the constraint-set
+        // solution layer.
         if types
             .iter()
             .any(|(identity, ty)| self.has_expanding_cycle(generic_context, &types, *identity, *ty))
