@@ -509,7 +509,7 @@ fn implementation_definitions_for_class_family<'db>(
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = mro_method_definitions(db, root, method_name);
     for subtype in transitive_subtypes(db, root) {
-        for definition in own_method_definitions(db, subtype, method_name) {
+        for definition in own_method_definitions(db, subtype, method_name).unwrap_or_default() {
             if !definitions.contains(&definition) {
                 definitions.push(definition);
             }
@@ -530,10 +530,7 @@ fn mro_method_definitions<'db>(
     class
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
-        .find_map(|class| {
-            let definitions = own_method_definitions(db, class.class_literal(db), method_name);
-            (!definitions.is_empty()).then_some(definitions)
-        })
+        .find_map(|class| own_method_definitions(db, class.class_literal(db), method_name))
         .unwrap_or_default()
 }
 
@@ -556,24 +553,28 @@ fn mro_method_definitions<'db>(
 /// Subclasses that only inherit the method do not add a new implementation target. The inherited
 /// method is already returned by the root MRO lookup; this only finds subclasses that define a new
 /// method body.
+///
+/// Returns `None` if `class` has no reachable user-visible definitions for `method_name`. Returns
+/// `Some` with an empty vector if the class defines the symbol but none of the reachable
+/// definitions are `def`-style methods.
 fn own_method_definitions<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
     method_name: &str,
-) -> Vec<ResolvedDefinition<'db>> {
+) -> Option<Vec<ResolvedDefinition<'db>>> {
     let Some(class) = class.as_static() else {
-        return Vec::new();
+        return None;
     };
 
     let class_scope = class.body_scope(db);
     let class_place_table = ty_python_core::place_table(db, class_scope);
 
     let Some(place_id) = class_place_table.symbol_id(method_name) else {
-        return Vec::new();
+        return None;
     };
 
     let use_def = use_def_map(db, class_scope);
-    reachable_definitions(
+    let definitions = reachable_definitions(
         db,
         use_def
             .reachable_symbol_declarations(place_id)
@@ -583,11 +584,19 @@ fn own_method_definitions<'db>(
                     .reachable_symbol_bindings(place_id)
                     .filter_map(|binding| binding.binding.definition()),
             ),
+    );
+
+    if definitions.is_empty() {
+        return None;
+    }
+
+    Some(
+        definitions
+            .into_iter()
+            .filter(|definition| matches!(definition.kind(db), DefinitionKind::Function(_)))
+            .map(ResolvedDefinition::Definition)
+            .collect(),
     )
-    .into_iter()
-    .filter(|definition| matches!(definition.kind(db), DefinitionKind::Function(_)))
-    .map(ResolvedDefinition::Definition)
-    .collect()
 }
 
 /// Normalizes a receiver type into the class roots used for implementation lookup.
