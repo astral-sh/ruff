@@ -543,9 +543,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Records snapshots of the place states visible from the current lazy scope.
     fn record_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
-        // A lazy scope can capture an outer binding through a nested eager scope. For example,
+        // A lazy scope can capture an outer binding via a nested scope. For example,
         // in `def inner(): return [a for _ in xs]`, `a` is free in the comprehension scope,
-        // not directly in `inner`, so include free symbols from descendants.
+        // not directly in `inner`, so include descendant free symbols when recording snapshots.
         let mut nested_symbol_names = self.free_symbol_names_in_scope_tree(popped_scope_id);
         nested_symbol_names.extend(
             self.place_tables[popped_scope_id]
