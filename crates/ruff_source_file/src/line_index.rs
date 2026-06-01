@@ -297,15 +297,11 @@ impl LineIndex {
             let next_line_start = starts[row_index + 1].to_usize();
             let bytes = contents.as_bytes();
 
-            let line_ending_len = if bytes[next_line_start - 1] == b'\n'
-                && next_line_start >= 2
-                && bytes[next_line_start - 2] == b'\r'
-            {
+            let line_ending_len = if bytes[..next_line_start].ends_with(b"\r\n") {
                 2
             } else {
                 1
             };
-
             starts[row_index + 1] - TextSize::new(line_ending_len)
         }
     }
