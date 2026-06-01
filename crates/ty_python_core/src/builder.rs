@@ -34,6 +34,7 @@ use crate::definition::{
     ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
+use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
@@ -2230,13 +2231,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
-        self.enclosing_lambda_statements.shrink_to_fit();
-        self.imported_modules.shrink_to_fit();
         self.scope_ids_by_scope.shrink_to_fit();
-        self.enclosing_snapshots.shrink_to_fit();
-
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
+        let uses_by_collection = FrozenMap::from_entries(
+            self.uses_by_collection
+                .into_iter()
+                .map(|(definition, uses)| (definition, uses.into_boxed_slice()))
+                .collect(),
+        );
 
         SemanticIndex {
             place_tables: place_tables.into(),
@@ -2249,15 +2252,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps: use_def_maps.into(),
-            enclosing_lambda_statements: self.enclosing_lambda_statements,
-            collections_by_use: self.collections_by_use,
-            uses_by_collection: self.uses_by_collection,
-            imported_modules: Arc::new(self.imported_modules),
+            enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
+            collections_by_use: FrozenMap::from(self.collections_by_use),
+            uses_by_collection,
+            imported_modules: Arc::new(FrozenSet::from(self.imported_modules)),
             has_future_annotations: self.has_future_annotations,
-            enclosing_snapshots: self.enclosing_snapshots,
+            enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
-            generator_functions: self.generator_functions,
-            narrowing_alias_predicates: self.alias_predicates,
+            generator_functions: FrozenSet::from(self.generator_functions),
+            narrowing_alias_predicates: FrozenMap::from(self.alias_predicates),
         }
     }
 

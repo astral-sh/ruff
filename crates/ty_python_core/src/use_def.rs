@@ -893,7 +893,7 @@ impl<'db> UseDefMap<'db> {
 #[derive(get_size2::GetSize)]
 pub(crate) struct ScopedEnclosingSnapshotId;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
 pub(crate) struct EnclosingSnapshotKey {
     /// The enclosing scope containing the bindings
     pub(crate) enclosing_scope: FileScopeId,
