@@ -3790,21 +3790,16 @@ impl InteriorNode {
     }
 
     fn path_assignments(self, builder: &ConstraintSetBuilder<'_>) -> PathAssignments {
-        // Sort the constraints in this BDD by their earliest `source_order` before adding them to
-        // the sequent map. This ensures that constraints appear in the sequent map in a stable
-        // order. We only need to discover which constraints are mentioned in the BDD, so we treat
-        // the BDD as a DAG and deduplicate repeated constraints before sorting.
-        let mut constraints: FxHashMap<ConstraintId, usize> = FxHashMap::default();
+        // Sort the constraints in this BDD by their `source_order`s before adding them to the
+        // sequent map. This ensures that constraints appear in the sequent map in a stable order.
+        // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
+        // unstable sort is fine.
+        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
         self.node()
             .for_each_unique_constraint(builder, &mut |constraint, source_order| {
-                constraints
-                    .entry(constraint)
-                    .and_modify(|existing: &mut usize| *existing = (*existing).min(source_order))
-                    .or_insert(source_order);
+                constraints.push((constraint, source_order));
             });
-        let mut constraints: SmallVec<[_; 8]> = constraints.into_iter().collect();
-        constraints
-            .sort_unstable_by_key(|(constraint, source_order)| (*source_order, constraint.index()));
+        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
 
         PathAssignments::new(constraints.into_iter().map(|(constraint, _)| constraint))
     }
