@@ -515,6 +515,26 @@ info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
+## `Self`
+
+Type aliases cannot contain `Self`, even when they are defined in a class body:
+
+```py
+from typing_extensions import Annotated, Self, TypeAlias
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Alias: TypeAlias = tuple[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Subscripted: TypeAlias = Self[int]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Stringified: TypeAlias = "tuple[Self]"
+
+    Metadata: TypeAlias = Annotated[int, tuple[Self]]
+```
+
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
 
 ```py

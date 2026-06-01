@@ -28,6 +28,16 @@ def g(x: MyNone):
 g(None)
 ```
 
+## `Self`
+
+```py
+from typing_extensions import Self
+
+class C:
+    # TODO: Reject `Self` once we can distinguish implicit type aliases from ordinary assignments.
+    Alias = tuple[Self]
+```
+
 ## Unions
 
 We also support unions in type aliases:

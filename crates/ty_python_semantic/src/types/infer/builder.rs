@@ -3557,6 +3557,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &AssignmentDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
+        // TODO: Reject `Self` in implicit type aliases once we can distinguish them from ordinary
+        // assignments without speculatively reinterpreting value expressions.
         let target = assignment.target(self.module());
 
         let add = self.add_binding(target.into(), definition);
@@ -4143,8 +4145,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Match the binding context used by eager assignment inference so legacy type variables
         // in the alias value are bound to the alias definition.
         let previous_context = self.typevar_binding_context.replace(definition);
+        let previous_in_type_alias = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_TYPE_ALIAS, true);
 
         self.infer_type_expression(&arguments.args[1]);
+        self.context
+            .inference_flags
+            .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);
+
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
         for keyword in &arguments.keywords {
             self.infer_expression(&keyword.value, TypeContext::default());

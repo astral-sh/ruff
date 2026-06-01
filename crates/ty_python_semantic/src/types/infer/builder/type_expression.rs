@@ -1361,12 +1361,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let ast::ExprSubscript {
             range: _,
             node_index: _,
-            value: _,
+            value,
             slice,
             ctx: _,
         } = subscript;
 
         match value_ty {
+            Type::SpecialForm(SpecialFormType::TypingSelf)
+                if self
+                    .inference_flags()
+                    .contains(InferenceFlags::IN_TYPE_ALIAS) =>
+            {
+                if !self.in_string_annotation() {
+                    self.infer_expression(slice, TypeContext::default());
+                }
+                self.report_invalid_type_expression(
+                    &**value,
+                    "`Self` cannot be used in a type alias",
+                );
+                Type::unknown()
+            }
             Type::Never => {
                 // This case can be entered when we use a type annotation like `Literal[1]`
                 // in unreachable code, since we infer `Never` for `Literal`.  We call
