@@ -5861,6 +5861,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This lets `list` in a `Callable[[], list[str]]` context be treated as `list[str]`.
     fn specialize_generic_class_from_context(&self, ty: Type<'db>, target: Type<'db>) -> Type<'db> {
+        // TODO: The ConstraintSetAssignability type relation should already be
+        // able to determine that `list` (coerced into a callable) is assignable
+        // to `Callable[[], list[str]]` when `_T@list = str`. However, when
+        // comparing callables, if either is generic, we existentially quantify
+        // away its typevars, transforming `∃ _T@list . _T@list = str` into
+        // `always`. If we _didn't_ perform that quantification, we would have
+        // the information we need to choose an appropriate specialization of
+        // `list` given the type context, and we wouldn't have to duplicate all
+        // of the logic below.
         let Type::ClassLiteral(class) = ty else {
             return ty;
         };
