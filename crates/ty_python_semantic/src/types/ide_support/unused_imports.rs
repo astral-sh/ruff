@@ -6,10 +6,10 @@ use ruff_python_ast::ModExpression;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{self as ast, AnyNodeRef, helpers::is_dunder, name::Name};
 use ruff_python_parser::Parsed;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
-use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
+use ty_python_core::scope::ScopeKind;
 use ty_python_core::semantic_index;
 
 use super::visible_reachable_definitions_for_name;
@@ -46,7 +46,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
 
         let use_def_map = index.use_def_map(file_scope_id);
 
-        for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
+        for (definition_id, state, is_used) in use_def_map.all_definitions_with_usage() {
             let DefinitionState::Defined(definition) = state else {
                 continue;
             };
@@ -64,28 +64,14 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             };
 
-            let multipart_import_name = unaliased_multipart_import_name(kind, &parsed);
-            let multipart_import_is_used =
-                multipart_import_name.is_some_and(|name| match scope.node() {
-                    NodeWithScopeKind::Module => {
-                        multipart_import_is_used_in_body(parsed.suite(), name, range)
-                    }
-                    NodeWithScopeKind::Class(class) => multipart_import_is_used_in_class_body(
-                        &class.node(&parsed).body,
-                        name,
-                        range,
-                    ),
-                    NodeWithScopeKind::Function(function) => {
-                        multipart_import_is_used_in_body(&function.node(&parsed).body, name, range)
-                    }
-                    NodeWithScopeKind::Lambda(lambda) => {
-                        let mut visitor = MultipartImportUseVisitor::new(name, range);
-                        visitor.visit_expr(&lambda.node(&parsed).body);
-                        visitor.used
-                    }
-                    _ => false,
-                });
-            if multipart_import_is_used || (multipart_import_name.is_none() && is_used) {
+            let multipart_import_name = kind.unaliased_multipart_import_name(&parsed);
+            let is_used = if multipart_import_name.is_some() {
+                use_def_map.is_multipart_import_definition_used(definition_id)
+            } else {
+                is_used
+            };
+
+            if is_used {
                 continue;
             }
 
@@ -323,298 +309,6 @@ fn import_target(
 
     let target = alias.asname.as_ref().unwrap_or(&alias.name);
     Some((target.range, target.id.clone()))
-}
-
-fn unaliased_multipart_import_name<'a>(
-    kind: &'a DefinitionKind<'_>,
-    parsed: &'a ruff_db::parsed::ParsedModuleRef,
-) -> Option<&'a str> {
-    let DefinitionKind::Import(import) = kind else {
-        return None;
-    };
-
-    let alias = import.alias(parsed);
-    let name = alias.name.id.as_str();
-
-    (alias.asname.is_none() && name.contains('.')).then_some(name)
-}
-
-fn expr_uses_dotted_import(expr: &ast::Expr, imported_name: &str) -> bool {
-    let mut segments = imported_name.split('.');
-    expr_matches_dotted_import_prefix(expr, &mut segments) && segments.next().is_none()
-}
-
-fn expr_matches_dotted_import_prefix(
-    expr: &ast::Expr,
-    segments: &mut std::str::Split<'_, char>,
-) -> bool {
-    match expr {
-        ast::Expr::Name(name) => segments.next().is_some_and(|segment| name.id == segment),
-        ast::Expr::Attribute(attribute) => {
-            if !expr_matches_dotted_import_prefix(&attribute.value, segments) {
-                return false;
-            }
-
-            // Once all imported segments are consumed, any further attribute access
-            // is a use of the import.
-            segments
-                .next()
-                .is_none_or(|segment| attribute.attr.id == segment)
-        }
-        _ => false,
-    }
-}
-
-struct MultipartImportUseVisitor<'a> {
-    imported_name: &'a str,
-    imported_root: &'a str,
-    import_range: TextRange,
-    used: bool,
-    shadowed_scopes: Vec<bool>,
-}
-
-impl<'import> MultipartImportUseVisitor<'import> {
-    fn new(imported_name: &'import str, import_range: TextRange) -> Self {
-        Self {
-            imported_name,
-            imported_root: imported_name.split('.').next().unwrap_or(imported_name),
-            import_range,
-            used: false,
-            shadowed_scopes: vec![false],
-        }
-    }
-
-    fn current_scope_is_shadowed(&self) -> bool {
-        self.shadowed_scopes.last().copied().unwrap_or_default()
-    }
-
-    fn shadow_current_scope(&mut self) {
-        if let Some(shadowed) = self.shadowed_scopes.last_mut() {
-            *shadowed = true;
-        }
-    }
-
-    fn with_scope(&mut self, initially_shadowed: bool, visit: impl FnOnce(&mut Self)) {
-        self.shadowed_scopes.push(initially_shadowed);
-        visit(self);
-        self.shadowed_scopes.pop();
-    }
-
-    fn visit_comprehension_scope<'ast>(
-        &mut self,
-        generators: &'ast [ast::Comprehension],
-        visit_body: impl FnOnce(&mut Self),
-    ) where
-        Self: SourceOrderVisitor<'ast>,
-    {
-        let Some((first, rest)) = generators.split_first() else {
-            self.with_scope(self.current_scope_is_shadowed(), visit_body);
-            return;
-        };
-
-        // The first iterator is evaluated in the surrounding scope. The targets,
-        // filters, later iterators, and body live in the comprehension scope.
-        self.visit_expr(&first.iter);
-        self.with_scope(self.current_scope_is_shadowed(), |visitor| {
-            visitor.visit_expr(&first.target);
-            for if_expr in &first.ifs {
-                visitor.visit_expr(if_expr);
-            }
-
-            for generator in rest {
-                visitor.visit_expr(&generator.iter);
-                visitor.visit_expr(&generator.target);
-                for if_expr in &generator.ifs {
-                    visitor.visit_expr(if_expr);
-                }
-            }
-
-            visit_body(visitor);
-        });
-    }
-}
-
-impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
-        if self.used {
-            return;
-        }
-
-        match stmt {
-            ast::Stmt::FunctionDef(function) => {
-                for decorator in &function.decorator_list {
-                    self.visit_decorator(decorator);
-                }
-                if let Some(type_params) = function.type_params.as_deref() {
-                    self.visit_type_params(type_params);
-                }
-                self.visit_parameters(&function.parameters);
-                if let Some(returns) = function.returns.as_deref() {
-                    self.visit_annotation(returns);
-                }
-
-                let shadows_outer_scope = function.range.end() > self.import_range.end()
-                    && function.name.as_str() == self.imported_root;
-                if shadows_outer_scope {
-                    self.shadow_current_scope();
-                }
-
-                let body_is_shadowed = self.current_scope_is_shadowed()
-                    || parameters_bind_name(&function.parameters, self.imported_root);
-                self.with_scope(body_is_shadowed, |visitor| {
-                    for stmt in &function.body {
-                        visitor.visit_stmt(stmt);
-                    }
-                });
-            }
-            ast::Stmt::ClassDef(class) => {
-                for decorator in &class.decorator_list {
-                    self.visit_decorator(decorator);
-                }
-                if let Some(type_params) = class.type_params.as_deref() {
-                    self.visit_type_params(type_params);
-                }
-                if let Some(arguments) = class.arguments.as_deref() {
-                    self.visit_arguments(arguments);
-                }
-
-                let shadows_outer_scope = class.range.end() > self.import_range.end()
-                    && class.name.as_str() == self.imported_root;
-                if shadows_outer_scope {
-                    self.shadow_current_scope();
-                }
-
-                self.with_scope(self.current_scope_is_shadowed(), |visitor| {
-                    for stmt in &class.body {
-                        visitor.visit_stmt(stmt);
-                    }
-                });
-            }
-            _ => source_order::walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        if self.used {
-            return;
-        }
-
-        if let ast::Expr::Lambda(lambda) = expr {
-            if let Some(parameters) = lambda.parameters.as_deref() {
-                self.visit_parameters(parameters);
-            }
-
-            let body_is_shadowed = self.current_scope_is_shadowed()
-                || lambda
-                    .parameters
-                    .as_deref()
-                    .is_some_and(|parameters| parameters_bind_name(parameters, self.imported_root));
-            self.with_scope(body_is_shadowed, |visitor| {
-                visitor.visit_expr(&lambda.body);
-            });
-            return;
-        }
-
-        if expr.range().end() <= self.import_range.end() {
-            return;
-        }
-
-        match expr {
-            ast::Expr::ListComp(list_comp) => {
-                self.visit_comprehension_scope(&list_comp.generators, |visitor| {
-                    visitor.visit_expr(&list_comp.elt);
-                });
-                return;
-            }
-            ast::Expr::SetComp(set_comp) => {
-                self.visit_comprehension_scope(&set_comp.generators, |visitor| {
-                    visitor.visit_expr(&set_comp.elt);
-                });
-                return;
-            }
-            ast::Expr::DictComp(dict_comp) => {
-                self.visit_comprehension_scope(&dict_comp.generators, |visitor| {
-                    if let Some(key) = dict_comp.key.as_deref() {
-                        visitor.visit_expr(key);
-                    }
-                    visitor.visit_expr(&dict_comp.value);
-                });
-                return;
-            }
-            ast::Expr::Generator(generator) => {
-                self.visit_comprehension_scope(&generator.generators, |visitor| {
-                    visitor.visit_expr(&generator.elt);
-                });
-                return;
-            }
-            _ => {}
-        }
-
-        if let ast::Expr::Name(name) = expr
-            && matches!(name.ctx, ast::ExprContext::Store)
-            && name.id == self.imported_root
-        {
-            self.shadow_current_scope();
-            return;
-        }
-
-        if let ast::Expr::Attribute(attribute) = expr
-            && matches!(attribute.ctx, ast::ExprContext::Load)
-            && !self.current_scope_is_shadowed()
-            && expr_uses_dotted_import(expr, self.imported_name)
-        {
-            self.used = true;
-            return;
-        }
-
-        source_order::walk_expr(self, expr);
-    }
-}
-
-fn multipart_import_is_used_in_body(
-    body: &[ast::Stmt],
-    imported_name: &str,
-    import_range: TextRange,
-) -> bool {
-    let mut visitor = MultipartImportUseVisitor::new(imported_name, import_range);
-
-    for stmt in body {
-        visitor.visit_stmt(stmt);
-
-        if visitor.used {
-            break;
-        }
-    }
-
-    visitor.used
-}
-
-fn multipart_import_is_used_in_class_body(
-    body: &[ast::Stmt],
-    imported_name: &str,
-    import_range: TextRange,
-) -> bool {
-    let mut visitor = MultipartImportUseVisitor::new(imported_name, import_range);
-
-    for stmt in body {
-        if matches!(stmt, ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_)) {
-            continue;
-        }
-
-        visitor.visit_stmt(stmt);
-
-        if visitor.used {
-            break;
-        }
-    }
-
-    visitor.used
-}
-
-fn parameters_bind_name(parameters: &ast::Parameters, name: &str) -> bool {
-    parameters
-        .iter()
-        .any(|parameter| parameter.name().as_str() == name)
 }
 
 #[cfg(test)]
