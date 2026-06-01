@@ -179,6 +179,24 @@ mod tests {
     }
 
     #[test]
+    fn implementation_shadowed_inherited_method_from_concrete_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                def speak(self): ...
+
+            class Dog(Animal):
+                speak = 1
+
+            dog = Dog()
+            dog.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"No goto target found");
+    }
+
+    #[test]
     fn implementation_inherited_method_from_union_receivers_deduplicates() {
         let test = cursor_test(
             r#"
