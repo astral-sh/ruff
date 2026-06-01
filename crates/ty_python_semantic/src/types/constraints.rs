@@ -162,10 +162,9 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
 pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
     ///
-    /// This method short-circuits if we encounter a constraint set that is semantically always
-    /// satisfied. Unlike a structural `ALWAYS_TRUE`, a semantically-always set may still carry
-    /// inference evidence; in that case, the evidence-bearing node is returned rather than being
-    /// replaced by `ALWAYS_TRUE`.
+    /// This method short-circuits; if we encounter any element that
+    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied], then the overall result
+    /// must be as well, and we stop consuming elements from the iterator.
     fn when_any<'db, 'c>(
         self,
         db: &'db dyn Db,
@@ -504,7 +503,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns the union of this constraint set and another. The other constraint set is provided
     /// as a thunk, to implement short-circuiting: the thunk is not forced if the constraint set is
-    /// semantically always satisfied.
+    /// already saturated.
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
@@ -1124,6 +1123,7 @@ impl<'db> Constraint<'db> {
         if lower.is_none() && upper.is_none() {
             return ALWAYS_TRUE;
         }
+
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
         // be a union type. Because the following equivalences hold, we can break these bounds
         // apart and create an equivalent BDD with more nodes but simpler constraints. (Fewer,
@@ -1306,15 +1306,13 @@ impl<'db> Constraint<'db> {
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
-            (Type::TypeVar(lower_bound), _)
-                if typevar.can_be_bound_for(db, builder, lower_bound) =>
-            {
+            (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, builder, lower) => {
                 let lower = Node::new_constraint(
                     builder,
                     ConstraintId::new_with_bounds(
                         db,
                         builder,
-                        lower_bound,
+                        lower,
                         None,
                         Some(Type::TypeVar(typevar)),
                     ),
@@ -1329,9 +1327,7 @@ impl<'db> Constraint<'db> {
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
-            (_, Type::TypeVar(upper_bound))
-                if typevar.can_be_bound_for(db, builder, upper_bound) =>
-            {
+            (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, builder, upper) => {
                 let lower = if lower.is_none() {
                     ALWAYS_TRUE
                 } else {
@@ -1342,7 +1338,7 @@ impl<'db> Constraint<'db> {
                     ConstraintId::new_with_bounds(
                         db,
                         builder,
-                        upper_bound,
+                        upper,
                         Some(Type::TypeVar(typevar)),
                         None,
                     ),
@@ -2157,10 +2153,6 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
-        // Short-circuiting on a semantically-always node is safe here because `tree_fold` returns
-        // that node itself. This preserves any inference evidence attached to the tautology (for
-        // example an explicit `Never` lower bound) while avoiding the combinatorial explosion from
-        // unioning many alternative evidence-bearing tautologies.
         Self::tree_fold(
             db,
             builder,
@@ -2176,9 +2168,6 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
-        // Unlike `distributed_or`, semantic short-circuiting is still safe here: once a conjunct
-        // has no satisfying paths, later conjuncts cannot add useful solution evidence. Returning
-        // that unsatisfiable node also preserves the first contradiction for display/debugging.
         Self::tree_fold(
             db,
             builder,
@@ -3902,13 +3891,15 @@ impl InteriorNode {
                 // the constraint set that replaces the upper/lower bound that matched with the
                 // bound constraint's corresponding bound.
                 let (new_lower, new_upper) = match (
-                    constrained_constraint_data.bounds.materialized_lower(),
-                    constrained_constraint_data.bounds.materialized_upper(),
+                    constrained_constraint_data.bounds.lower,
+                    constrained_constraint_data.bounds.upper,
                 ) {
                     // (B ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ BU)
-                    (Type::TypeVar(constrained_lower), Type::TypeVar(constrained_upper))
-                        if constrained_lower.is_same_typevar_as(db, bound_typevar)
-                            && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
+                    (
+                        Some(Type::TypeVar(constrained_lower)),
+                        Some(Type::TypeVar(constrained_upper)),
+                    ) if constrained_lower.is_same_typevar_as(db, bound_typevar)
+                        && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
                     {
                         (
                             bound_constraint_data.bounds.lower,
@@ -3917,23 +3908,17 @@ impl InteriorNode {
                     }
 
                     // (CL ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ BU)
-                    (_, Type::TypeVar(constrained_upper))
+                    (constrained_lower, Some(Type::TypeVar(constrained_upper)))
                         if constrained_upper.is_same_typevar_as(db, bound_typevar) =>
                     {
-                        (
-                            constrained_constraint_data.bounds.lower,
-                            bound_constraint_data.bounds.upper,
-                        )
+                        (constrained_lower, bound_constraint_data.bounds.upper)
                     }
 
                     // (B ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ CU)
-                    (Type::TypeVar(constrained_lower), _)
+                    (Some(Type::TypeVar(constrained_lower)), constrained_upper)
                         if constrained_lower.is_same_typevar_as(db, bound_typevar) =>
                     {
-                        (
-                            bound_constraint_data.bounds.lower,
-                            constrained_constraint_data.bounds.upper,
-                        )
+                        (bound_constraint_data.bounds.lower, constrained_upper)
                     }
 
                     _ => continue,
@@ -4981,11 +4966,11 @@ impl SequentMap {
         let constrained_constraint_data = builder.constraint_data(constrained_constraint);
         let constrained_typevar = constrained_constraint_data.typevar;
         let (new_lower, new_upper) = match (
-            constrained_constraint_data.bounds.materialized_lower(),
-            constrained_constraint_data.bounds.materialized_upper(),
+            constrained_constraint_data.bounds.lower,
+            constrained_constraint_data.bounds.upper,
         ) {
             // (B ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ BU)
-            (Type::TypeVar(constrained_lower), Type::TypeVar(constrained_upper))
+            (Some(Type::TypeVar(constrained_lower)), Some(Type::TypeVar(constrained_upper)))
                 if constrained_lower.is_same_typevar_as(db, bound_typevar)
                     && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
             {
@@ -4996,64 +4981,47 @@ impl SequentMap {
             }
 
             // (CL ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ BU)
-            (_, Type::TypeVar(constrained_upper))
+            (constrained_lower, Some(Type::TypeVar(constrained_upper)))
                 if constrained_upper.is_same_typevar_as(db, bound_typevar) =>
             {
-                (
-                    constrained_constraint_data.bounds.lower,
-                    bound_constraint_data.bounds.upper,
-                )
+                (constrained_lower, bound_constraint_data.bounds.upper)
             }
 
             // (B ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ CU)
-            (Type::TypeVar(constrained_lower), _)
+            (Some(Type::TypeVar(constrained_lower)), constrained_upper)
                 if constrained_lower.is_same_typevar_as(db, bound_typevar) =>
             {
-                (
-                    bound_constraint_data.bounds.lower,
-                    constrained_constraint_data.bounds.upper,
-                )
+                (bound_constraint_data.bounds.lower, constrained_upper)
             }
 
             // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
-            (_, constrained_upper)
-                if bound_constraint_data.bounds.has_lower()
+            (constrained_lower, Some(constrained_upper))
+                if let Some(bound_lower) = bound_constraint_data.bounds.lower
                     && !constrained_upper.is_never()
                     && !constrained_upper.is_object()
                     && constrained_upper
                         .top_materialization(db)
                         .is_constraint_set_assignable_to(
                             db,
-                            bound_constraint_data
-                                .bounds
-                                .materialized_lower()
-                                .bottom_materialization(db),
+                            bound_lower.bottom_materialization(db),
                         ) =>
             {
-                (
-                    constrained_constraint_data.bounds.lower,
-                    Some(Type::TypeVar(bound_typevar)),
-                )
+                (constrained_lower, Some(Type::TypeVar(bound_typevar)))
             }
 
             // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
-            (constrained_lower, _)
-                if bound_constraint_data.bounds.has_upper()
+            (Some(constrained_lower), constrained_upper)
+                if let Some(bound_upper) = bound_constraint_data.bounds.upper
                     && !constrained_lower.is_never()
                     && !constrained_lower.is_object()
-                    && bound_constraint_data
-                        .bounds
-                        .materialized_upper()
+                    && bound_upper
                         .top_materialization(db)
                         .is_constraint_set_assignable_to(
                             db,
                             constrained_lower.bottom_materialization(db),
                         ) =>
             {
-                (
-                    Some(Type::TypeVar(bound_typevar)),
-                    constrained_constraint_data.bounds.upper,
-                )
+                (Some(Type::TypeVar(bound_typevar)), constrained_upper)
             }
 
             _ => return,
@@ -5104,8 +5072,8 @@ impl SequentMap {
             constrained_upper = None;
         }
 
-        if !(constrained_lower.unwrap_or(Type::Never).is_never()
-            && constrained_upper.unwrap_or(Type::object()).is_object())
+        if !(constrained_lower.is_none_or(|ty| ty.is_never())
+            && constrained_upper.is_none_or(|ty| ty.is_object()))
         {
             post_constraints.push(ConstraintId::new_with_bounds(
                 db,
@@ -5147,8 +5115,6 @@ impl SequentMap {
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = builder.constraint_data(bound_constraint);
                 let bound_typevar = bound_data.typevar;
-                let bound_lower = bound_data.bounds.materialized_lower();
-                let bound_upper = bound_data.bounds.materialized_upper();
                 let constrained_data = builder.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
                 let constrained_lower = constrained_data.bounds.materialized_lower();
@@ -5186,23 +5152,26 @@ impl SequentMap {
                     // Covariance preserves direction: upper bound on T substitutes into upper
                     // bound. A ≤ B → G[A] ≤ G[B], so (T ≤ u_B) gives G[T] ≤ G[u_B].
                     TypeVarVariance::Covariant
-                        if bound_data.bounds.has_upper() && !bound_upper.is_object() =>
+                        if let Some(bound_upper) = bound_data.bounds.upper
+                            && !bound_upper.is_object() =>
                     {
-                        Some(bound_upper)
+                        bound_data.bounds.upper
                     }
                     // Contravariance flips direction: lower bound on T substitutes into upper
                     // bound. A ≤ B → G[B] ≤ G[A], so (l_B ≤ T) gives G[T] ≤ G[l_B].
                     TypeVarVariance::Contravariant
-                        if bound_data.bounds.has_lower() && !bound_lower.is_never() =>
+                        if let Some(bound_lower) = bound_data.bounds.lower
+                            && !bound_lower.is_never() =>
                     {
-                        Some(bound_lower)
+                        bound_data.bounds.lower
                     }
                     // Invariance requires equality: only substitute if l_B = u_B.
                     TypeVarVariance::Invariant
                         if bound_data.bounds.lower == bound_data.bounds.upper
+                            && let Some(bound_lower) = bound_data.bounds.lower
                             && !bound_lower.is_never() =>
                     {
-                        Some(bound_lower)
+                        bound_data.bounds.lower
                     }
                     _ => None,
                 };
@@ -5251,23 +5220,26 @@ impl SequentMap {
                     // Covariance preserves direction: lower bound on T substitutes into lower
                     // bound. A ≤ B → G[A] ≤ G[B], so (l_B ≤ T) gives G[l_B] ≤ G[T].
                     TypeVarVariance::Covariant
-                        if bound_data.bounds.has_lower() && !bound_lower.is_never() =>
+                        if let Some(bound_lower) = bound_data.bounds.lower
+                            && !bound_lower.is_never() =>
                     {
-                        Some(bound_lower)
+                        bound_data.bounds.lower
                     }
                     // Contravariance flips direction: upper bound on T substitutes into lower
                     // bound. A ≤ B → G[B] ≤ G[A], so (T ≤ u_B) gives G[u_B] ≤ G[T].
                     TypeVarVariance::Contravariant
-                        if bound_data.bounds.has_upper() && !bound_upper.is_object() =>
+                        if let Some(bound_upper) = bound_data.bounds.upper
+                            && !bound_upper.is_object() =>
                     {
-                        Some(bound_upper)
+                        bound_data.bounds.upper
                     }
                     // Invariance requires equality: only substitute if l_B = u_B.
                     TypeVarVariance::Invariant
                         if bound_data.bounds.lower == bound_data.bounds.upper
+                            && let Some(bound_lower) = bound_data.bounds.lower
                             && !bound_lower.is_never() =>
                     {
-                        Some(bound_lower)
+                        bound_data.bounds.lower
                     }
                     _ => None,
                 };
@@ -5481,8 +5453,8 @@ impl SequentMap {
         let mut try_one_direction =
             |left_constraint: ConstraintId, right_constraint: ConstraintId| {
                 let left_constraint_data = builder.constraint_data(left_constraint);
-                let left_lower = left_constraint_data.bounds.materialized_lower();
-                let left_upper = left_constraint_data.bounds.materialized_upper();
+                let left_lower = left_constraint_data.bounds.lower;
+                let left_upper = left_constraint_data.bounds.upper;
                 let right_constraint_data = builder.constraint_data(right_constraint);
                 let right_lower = right_constraint_data.bounds.lower;
                 let right_upper = right_constraint_data.bounds.upper;
@@ -5550,15 +5522,16 @@ impl SequentMap {
                         post_constraints
                     };
                 let post_constraints = match (left_lower, left_upper) {
-                    (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
-                        if bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
-                    {
+                    (
+                        Some(Type::TypeVar(bound_typevar)),
+                        Some(Type::TypeVar(other_bound_typevar)),
+                    ) if bound_typevar.is_same_typevar_as(db, other_bound_typevar) => {
                         new_constraints(bound_typevar, right_lower, right_upper)
                     }
-                    (Type::TypeVar(bound_typevar), _) => {
+                    (Some(Type::TypeVar(bound_typevar)), _) => {
                         new_constraints(bound_typevar, None, right_upper)
                     }
-                    (_, Type::TypeVar(bound_typevar)) => {
+                    (_, Some(Type::TypeVar(bound_typevar))) => {
                         new_constraints(bound_typevar, right_lower, None)
                     }
                     _ => return,
