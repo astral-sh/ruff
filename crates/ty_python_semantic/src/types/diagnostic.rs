@@ -5562,14 +5562,15 @@ pub(crate) enum TypedDictDeleteErrorKind {
 
 pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     context: &InferContext<'db, '_>,
-    key_node: AnyNodeRef,
+    target_node: AnyNodeRef,
+    del_keyword_range: TextRange,
     typed_dict_ty: TypedDictType<'db>,
     field_name: &str,
     field: Option<&crate::types::typed_dict::TypedDictField<'db>>,
     error_kind: TypedDictDeleteErrorKind,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INVALID_DELETION, key_node) else {
+    let Some(builder) = context.report_lint(&INVALID_DELETION, target_node) else {
         return;
     };
 
@@ -5583,6 +5584,7 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
             "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
     };
+    diagnostic.annotate(context.secondary(del_keyword_range));
 
     // Add sub-diagnostic pointing to where the field is defined (if available)
     if let Some(field) = field

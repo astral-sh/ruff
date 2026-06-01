@@ -366,12 +366,77 @@ def f(l: list[int]):
 ```
 
 ```snapshot
-error[invalid-deletion]: Method `__delitem__` of type `bound method list[int].__delitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> None` cannot be called with key of type `Literal["string"]` on object of type `list[int]`
+error[invalid-deletion]: Invalid `del` statement
  --> src/mdtest_snippet.py:8:5
   |
 8 |     del l["string"]
-  |     ^^^^^^^^^^^^^^^
+  |     --- ^^^^^^^^^^^ Invalid index of type `Literal["string"]`
   |
+info: `__delitem__` is implicitly called due to this subscript deletion
+```
+
+### Invalid `__delitem__` methods
+
+```py
+class NonCallableDelItem:
+    __delitem__: None = None
+
+# snapshot: invalid-deletion
+del NonCallableDelItem()[0]
+
+def f(flag: bool):
+    class PossiblyMissingDelItem:
+        if flag:
+            def __delitem__(self, key: int) -> None:
+                pass
+
+    possibly_missing = PossiblyMissingDelItem()
+    # snapshot: invalid-deletion
+    del possibly_missing[0]
+
+    class PossiblyNonCallableDelItem:
+        if flag:
+            def __delitem__(self, key: int) -> None:
+                pass
+
+        else:
+            __delitem__: None = None
+
+    possibly_non_callable = PossiblyNonCallableDelItem()
+    # snapshot: invalid-deletion
+    del possibly_non_callable[0]
+```
+
+```snapshot
+error[invalid-deletion]: Invalid `del` statement
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | del NonCallableDelItem()[0]
+  | --- --------------------^^^
+  |     |                    |
+  |     |                    Method `__delitem__` has type `None`
+  |     |                    An object of type `None` cannot be called
+  |     Has type `NonCallableDelItem`
+  |
+
+
+error[invalid-deletion]: Invalid `del` statement
+  --> src/mdtest_snippet.py:15:5
+   |
+15 |     del possibly_missing[0]
+   |     --- ^^^^^^^^^^^^^^^^^^^ Method `__delitem__` may be missing
+   |
+info: `__delitem__` is implicitly called due to this subscript deletion
+
+
+error[invalid-deletion]: Invalid `del` statement
+  --> src/mdtest_snippet.py:27:5
+   |
+27 |     del possibly_non_callable[0]
+   |     --- ^^^^^^^^^^^^^^^^^^^^^^^^ Method `__delitem__` has type `(bound method PossiblyNonCallableDelItem.__delitem__(key: int) -> None) | None`
+   |
+info: An object of type `(bound method PossiblyNonCallableDelItem.__delitem__(key: int) -> None) | None` may not be callable
+info: `__delitem__` is implicitly called due to this subscript deletion
 ```
 
 ### `__delitem__` without `__getitem__`
@@ -414,7 +479,7 @@ class OnlyGetItem:
 g = OnlyGetItem()
 reveal_type(g[0])  # revealed: str
 
-# error: [invalid-deletion] "Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method"
+# error: [invalid-deletion] "Cannot delete a subscript on an object of type `OnlyGetItem` with no `__delitem__` method"
 del g[0]
 ```
 
@@ -441,36 +506,40 @@ del not_deletable[0], also_not_deletable[0]
 ```
 
 ```snapshot
-error[invalid-deletion]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+error[invalid-deletion]: Invalid `del` statement
   --> src/mdtest_snippet.py:10:1
    |
 10 | del items[0], not_deletable[0]
-   | ---           ^^^^^^^^^^^^^^^^
+   | ---           ^^^^^^^^^^^^^^^^ No `__delitem__` method
    |
+info: `__delitem__` is implicitly called due to this subscript deletion
 
 
-error[invalid-deletion]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+error[invalid-deletion]: Invalid `del` statement
   --> src/mdtest_snippet.py:13:1
    |
 13 | del not_deletable[0], items[0]
-   | --- ^^^^^^^^^^^^^^^^
+   | --- ^^^^^^^^^^^^^^^^ No `__delitem__` method
    |
+info: `__delitem__` is implicitly called due to this subscript deletion
 
 
-error[invalid-deletion]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+error[invalid-deletion]: Invalid `del` statement
   --> src/mdtest_snippet.py:17:1
    |
 17 | del not_deletable[0], also_not_deletable[0]
-   | --- ^^^^^^^^^^^^^^^^
+   | --- ^^^^^^^^^^^^^^^^ No `__delitem__` method
    |
+info: `__delitem__` is implicitly called due to this subscript deletion
 
 
-error[invalid-deletion]: Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method
+error[invalid-deletion]: Invalid `del` statement
   --> src/mdtest_snippet.py:17:1
    |
 17 | del not_deletable[0], also_not_deletable[0]
-   | ---                   ^^^^^^^^^^^^^^^^^^^^^
+   | ---                   ^^^^^^^^^^^^^^^^^^^^^ No `__delitem__` method
    |
+info: `__delitem__` is implicitly called due to this subscript deletion
 ```
 
 ### TypedDict deletion
@@ -508,10 +577,10 @@ del m["name"]
 
 ```snapshot
 error[invalid-deletion]: Cannot delete required key "name" from TypedDict `Movie`
-  --> src/mdtest_snippet.py:19:7
+  --> src/mdtest_snippet.py:19:1
    |
 19 | del m["name"]
-   |       ^^^^^^
+   | --- ^^^^^^^^^
    |
 info: Field defined here
  --> src/mdtest_snippet.py:3:7
@@ -548,10 +617,10 @@ del mixed["name"]
 
 ```snapshot
 error[invalid-deletion]: Cannot delete required key "name" from TypedDict `MixedMovie`
-  --> src/mdtest_snippet.py:23:11
+  --> src/mdtest_snippet.py:23:1
    |
 23 | del mixed["name"]
-   |           ^^^^^^
+   | --- ^^^^^^^^^^^^^
    |
 info: Field defined here
   --> src/mdtest_snippet.py:11:7
@@ -576,9 +645,9 @@ del mixed["non_existent"]
 
 ```snapshot
 error[invalid-deletion]: Cannot delete unknown key "non_existent" from TypedDict `MixedMovie`
-  --> src/mdtest_snippet.py:25:11
+  --> src/mdtest_snippet.py:25:1
    |
 25 | del mixed["non_existent"]
-   |           ^^^^^^^^^^^^^^
+   | --- ^^^^^^^^^^^^^^^^^^^^^
    |
 ```

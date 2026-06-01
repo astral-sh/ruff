@@ -75,7 +75,6 @@ use crate::types::generics::{
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
-use crate::types::infer::builder::subscript::DelDiagnosticInfo;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
@@ -4938,26 +4937,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             targets,
         } = delete;
+        let del_keyword_range = TextRange::new(range.start(), range.start() + "del".text_len());
 
         for target in targets {
             self.infer_expression(target, TypeContext::default());
             match target {
                 ast::Expr::Subscript(target) => {
-                    let diagnostic_ranges = if targets.len() == 1 {
-                        DelDiagnosticInfo::SingleTarget {
-                            full_statement_range: *range,
-                            target,
-                        }
-                    } else {
-                        DelDiagnosticInfo::MultipleTargets {
-                            del_keyword_range: TextRange::new(
-                                range.start(),
-                                range.start() + "del".text_len(),
-                            ),
-                            target,
-                        }
-                    };
-                    self.validate_subscript_deletion(diagnostic_ranges, target);
+                    self.validate_subscript_deletion(del_keyword_range, target);
                 }
                 _ => {}
             }

@@ -5630,12 +5630,13 @@ def _(extra: Extra, key: str) -> None:
 ```
 
 ```snapshot
-error[invalid-deletion]: Method `__delitem__` of type `(key: Never, /) -> None` cannot be called with key of type `str` on object of type `Extra`
+error[invalid-deletion]: Invalid `del` statement
   --> src/mdtest_snippet.py:14:5
    |
 14 |     del extra[key]
-   |     ^^^^^^^^^^^^^^
+   |     --- ^^^^^^^^^^ Invalid key of type `str`
    |
+info: `__delitem__` is implicitly called due to this subscript deletion
 ```
 
 ### Assignability between TypedDicts accounts for the type of extra items
