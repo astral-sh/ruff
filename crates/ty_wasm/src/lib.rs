@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use js_sys::{Error, JsString, Uint32Array};
+use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
@@ -1332,7 +1332,8 @@ pub struct InlayHintLabelPart {
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct SemanticTokens {
-    data: Uint32Array,
+    #[wasm_bindgen(readonly, getter_with_clone)]
+    pub data: Vec<u32>,
 }
 
 #[wasm_bindgen]
@@ -1393,11 +1394,6 @@ impl From<ty_ide::ReferenceKind> for DocumentHighlightKind {
 
 #[wasm_bindgen]
 impl SemanticTokens {
-    #[wasm_bindgen(getter)]
-    pub fn data(&self) -> Uint32Array {
-        self.data.clone()
-    }
-
     pub fn kinds() -> Vec<String> {
         ty_ide::SemanticTokenType::all()
             .iter()
@@ -1420,9 +1416,7 @@ impl SemanticTokens {
             .flat_map(ty_ide::EncodedSemanticToken::as_u32_array)
             .collect::<Vec<u32>>();
 
-        Self {
-            data: Uint32Array::from(data.as_slice()),
-        }
+        Self { data }
     }
 }
 
