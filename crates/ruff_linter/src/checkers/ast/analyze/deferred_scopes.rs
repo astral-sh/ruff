@@ -19,6 +19,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
         Rule::InvalidFirstArgumentNameForClassMethod,
+        Rule::GlobalOrNonlocalInBranch,
         Rule::InvalidFirstArgumentNameForMethod,
         Rule::MutableClassDefault,
         Rule::MutableDataclassDefault,
@@ -243,6 +244,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if scope.kind.is_function() {
+            if checker.is_rule_enabled(Rule::GlobalOrNonlocalInBranch) {
+                ruff::rules::global_or_nonlocal_in_branch(checker, scope_id, scope);
+            }
+
             if checker.is_rule_enabled(Rule::NoSelfUse) {
                 pylint::rules::no_self_use(checker, scope_id, scope);
             }
