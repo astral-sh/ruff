@@ -390,3 +390,28 @@ def _(x: A | B | C):
     else:
         reveal_type(x)  # revealed: B | C
 ```
+
+This also works for `NamedTuple` classes:
+
+```py
+from typing import Literal, NamedTuple
+
+class A(NamedTuple):
+    tag: Literal["a"]
+    field_a: int
+
+class B(NamedTuple):
+    tag: Literal["b"]
+    field_b: str
+
+def _(x: A | B):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: B
+
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: B
+```
