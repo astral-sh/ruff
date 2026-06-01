@@ -200,6 +200,10 @@ impl<'db> Definitions<'db> {
     pub fn push(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
     }
+
+    pub(crate) fn into_boxed_slice(self) -> Box<[Definition<'db>]> {
+        self.definitions.into_vec().into_boxed_slice()
+    }
 }
 
 impl<'db> Deref for Definitions<'db> {

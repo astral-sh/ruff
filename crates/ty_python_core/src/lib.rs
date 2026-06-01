@@ -6,7 +6,6 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
-use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{FrozenIndexVec, IndexSlice};
@@ -262,6 +261,40 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
+#[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
+struct DefinitionsByNode<'db> {
+    single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    non_single: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+}
+
+impl<'db> DefinitionsByNode<'db> {
+    fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
+        let mut single = FxHashMap::default();
+        let mut non_single = FxHashMap::default();
+        single.reserve(definitions_by_node.len());
+
+        for (key, definitions) in definitions_by_node {
+            if definitions.len() == 1 {
+                single.insert(key, definitions[0]);
+            } else {
+                non_single.insert(key, definitions.into_boxed_slice());
+            }
+        }
+
+        single.shrink_to_fit();
+        non_single.shrink_to_fit();
+
+        Self { single, non_single }
+    }
+
+    fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
+        self.single
+            .get(&key)
+            .map(std::slice::from_ref)
+            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
+    }
+}
+
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update, get_size2::GetSize)]
 pub struct SemanticIndex<'db> {
@@ -275,7 +308,7 @@ pub struct SemanticIndex<'db> {
     scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
+    definitions_by_node: DefinitionsByNode<'db>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -530,19 +563,22 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
     ///
     /// There will only ever be >1 `Definition` associated with a `definition_key`
-    /// if the definition is created by a wildcard (`*`) import.
+    /// if the definitions are created by a wildcard (`*`) import or synthesized
+    /// for a loop header.
     #[track_caller]
-    pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &Definitions<'db> {
-        &self.definitions_by_node[&definition_key.into()]
+    pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &[Definition<'db>] {
+        self.definitions_by_node
+            .get(definition_key.into())
+            .expect("definition should be present in the semantic index")
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_node`, if any.
     pub fn try_definitions(
         &self,
         definition_node: ast::AnyNodeRef<'_>,
-    ) -> Option<&Definitions<'db>> {
+    ) -> Option<&[Definition<'db>]> {
         let definition_key = DefinitionNodeKey::from_node_ref(definition_node);
-        self.definitions_by_node.get(&definition_key)
+        self.definitions_by_node.get(definition_key)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
@@ -553,9 +589,9 @@ impl<'db> SemanticIndex<'db> {
     /// the `debug_assertions` feature is enabled, this method will panic.
     ///
     /// It is generally safe to use this method for any AST node that does not
-    /// correspond to a `*` (wildcard) import, since `*` imports are the only
-    /// situations that can result in multiple definitions being associated with a
-    /// single AST node.
+    /// correspond to a `*` (wildcard) import or a loop statement, since those are
+    /// the only situations that can result in multiple definitions being
+    /// associated with a single AST node.
     #[track_caller]
     pub fn expect_single_definition(
         &self,
@@ -576,11 +612,9 @@ impl<'db> SemanticIndex<'db> {
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> Option<Definition<'db>> {
         self.definitions_by_node
-            .get(&definition_key.into())?
-            .iter()
+            .single
+            .get(&definition_key.into())
             .copied()
-            .exactly_one()
-            .ok()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
