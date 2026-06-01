@@ -98,6 +98,26 @@ impl PreviousDefinitions {
 }
 
 impl Declarations {
+    pub(super) fn undeclared_reachability_constraint(
+        &self,
+    ) -> Option<ScopedReachabilityConstraintId> {
+        let [
+            LiveDeclaration {
+                declaration: ScopedDefinitionId::UNBOUND,
+                reachability_constraint,
+            },
+        ] = self.live_declarations.as_slice()
+        else {
+            return None;
+        };
+        Some(*reachability_constraint)
+    }
+
+    pub(super) fn is_always_undeclared(&self) -> bool {
+        self.undeclared_reachability_constraint()
+            == Some(ScopedReachabilityConstraintId::ALWAYS_TRUE)
+    }
+
     pub(super) fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_declaration = LiveDeclaration {
             declaration: ScopedDefinitionId::UNBOUND,
@@ -203,6 +223,18 @@ pub(super) struct Bindings {
 }
 
 impl Bindings {
+    pub(super) fn is_always_unbound(&self) -> bool {
+        self.unbound_narrowing_constraint.is_none()
+            && matches!(
+                self.live_bindings.as_slice(),
+                [LiveBinding {
+                    binding: ScopedDefinitionId::UNBOUND,
+                    narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+                    reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+                }]
+            )
+    }
+
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
@@ -446,9 +478,8 @@ impl PlaceState {
         &self.declarations
     }
 
-    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
-        self.declarations.finish(reachability_constraints);
-        self.bindings.finish(reachability_constraints);
+    pub(super) fn into_parts(self) -> (Bindings, Declarations) {
+        (self.bindings, self.declarations)
     }
 }
 

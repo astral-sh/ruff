@@ -5,7 +5,7 @@ use crate::{
     Db,
     types::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
-        PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
+        PropertyInstanceType, Signature, StringLiteralType, Type, TypeFormType, UnionType,
         callable::{CallableFunctionProvenance, CallableTypeKind},
         constraints::ConstraintSet,
         function::FunctionType,
@@ -69,22 +69,47 @@ impl<'db> BoundMethodType<'db> {
     )]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
-        let self_instance = self.typing_self_type(db);
 
         CallableType::new(
             db,
-            CallableSignature::from_overloads(
-                function
-                    .signature(db)
-                    .overloads
-                    .iter()
-                    .map(|signature| signature.bind_self(db, Some(self_instance))),
-            ),
+            self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
                 function.has_explicit_return_annotation(db),
             ),
         )
+    }
+
+    #[salsa::tracked(cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        let function_signature = self.function(db).signature(db);
+        let typing_self_type = self.typing_self_type(db);
+
+        let [signature] = function_signature.overloads.as_slice() else {
+            if !function_signature
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return CallableSignature::from_overloads(
+                    function_signature
+                        .overloads
+                        .iter()
+                        .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+                );
+            }
+
+            let self_instance = self.self_instance(db);
+            return CallableSignature::from_overloads(
+                function_signature
+                    .overloads
+                    .iter()
+                    .filter(|signature| signature.can_bind_self_to(db, self_instance))
+                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+            );
+        };
+
+        CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -256,6 +281,8 @@ impl<'db> KnownBoundMethodType<'db> {
     ///
     /// If the bound method type is overloaded, it may have multiple signatures.
     pub(super) fn signatures(self, db: &'db dyn Db) -> impl Iterator<Item = Signature<'db>> {
+        let object_type_form = || TypeFormType::from_type_expression(db, Type::object());
+
         match self {
             // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
             // This is required because we need to return more precise types than what the signature in
@@ -377,14 +404,11 @@ impl<'db> KnownBoundMethodType<'db> {
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("lower_bound")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                             Parameter::positional_only(Some(Name::new_static("typevar")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                             Parameter::positional_only(Some(Name::new_static("upper_bound")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                         ],
                     ),
                     KnownClass::ConstraintSet.to_instance(db),
@@ -405,11 +429,9 @@ impl<'db> KnownBoundMethodType<'db> {
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("ty")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                             Parameter::positional_only(Some(Name::new_static("of")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
+                                .with_annotated_type(object_type_form()),
                         ],
                     ),
                     KnownClass::ConstraintSet.to_instance(db),
@@ -432,10 +454,12 @@ impl<'db> KnownBoundMethodType<'db> {
                     Parameters::new(
                         db,
                         [Parameter::keyword_only(Name::new_static("inferable"))
-                            .type_form()
                             .with_annotated_type(UnionType::from_two_elements(
                                 db,
-                                Type::homogeneous_tuple(db, Type::any()),
+                                TypeFormType::from_type_expression(
+                                    db,
+                                    Type::homogeneous_tuple(db, Type::object()),
+                                ),
                                 Type::none(db),
                             ))
                             .with_default_type(Type::none(db))],

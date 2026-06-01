@@ -1,6 +1,6 @@
 use itertools::Either;
 use ruff_db::files::File;
-use ruff_index::IndexVec;
+use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
@@ -11,7 +11,7 @@ use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachabilit
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, declaration_type,
+    UnionBuilder, UnionType, binding_type, declaration_type, is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -1096,7 +1096,7 @@ enum DeclarationsBoundnessEvaluator<'map, 'db> {
     BasedOnUnboundVisibility {
         unbound_visibility: Option<DeclarationWithConstraint<'db>>,
         reachability_constraints: &'map ReachabilityConstraints,
-        predicates: &'map IndexVec<ScopedPredicateId, Predicate<'db>>,
+        predicates: &'map IndexSlice<ScopedPredicateId, Predicate<'db>>,
         requires_explicit_reexport: RequiresExplicitReExport,
     },
 }
@@ -1401,6 +1401,14 @@ fn place_from_bindings_impl<'db>(
              reachability_constraint,
          }| {
             let binding = match binding {
+                DefinitionState::Defined(binding)
+                    if is_discarded_dict_key_assignment(db, binding) =>
+                {
+                    // This synthesized `d[key] = value` binding was derived from an assignment such
+                    // as `d = {key: value}`. If the RHS is not known to be stored unchanged, discard
+                    // the binding so that lookup of `d[key]` can fall back to `d`.
+                    return None;
+                }
                 DefinitionState::Defined(binding) => binding,
                 DefinitionState::Undefined => {
                     return None;

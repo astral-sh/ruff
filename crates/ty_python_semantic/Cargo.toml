@@ -25,7 +25,7 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_site_packages = { workspace = true }
-ty_python_core = { workspace = true, features = ["serde"] }
+ty_python_core = { workspace = true }
 
 bitflags = { workspace = true }
 compact_str = { workspace = true }
@@ -48,7 +48,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing", "os"] }
+ruff_db = { workspace = true, features = ["testing"] }
 ruff_python_parser = { workspace = true }
 test-case = { workspace = true }
 ty_test = { workspace = true }

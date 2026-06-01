@@ -1002,15 +1002,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
                 let self_ty = bound_method.self_instance(self.db);
-                let typing_self_ty = bound_method.typing_self_type(self.db);
+                let bound_signatures = bound_method.bound_signatures(self.db);
 
-                match function.signature(self.db).overloads.as_slice() {
+                match bound_signatures.overloads.as_slice() {
                     [signature] => {
-                        let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
-                        let hide_unused_self =
-                            bound_signature.should_hide_self_from_display(self.db);
+                        let hide_unused_self = signature.should_hide_self_from_display(self.db);
                         let type_parameters = DisplayOptionalGenericContext {
-                            generic_context: bound_signature.generic_context.as_ref(),
+                            generic_context: signature.generic_context.as_ref(),
                             db: self.db,
                             settings: self.settings.clone(),
                             hide_unused_self,
@@ -1023,7 +1021,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         f.write_char('.')?;
                         f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;
-                        bound_signature
+                        signature
                             .display_with(self.db, self.settings.disallow_signature_name())
                             .fmt_detailed(f)
                     }
@@ -1038,11 +1036,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         let separator = if self.settings.multiline { "\n" } else { ", " };
                         let mut join = f.join(separator);
                         for signature in signatures {
-                            join.entry(
-                                &signature
-                                    .bind_self(self.db, Some(typing_self_ty))
-                                    .display_with(self.db, self.settings.clone()),
-                            );
+                            join.entry(&signature.display_with(self.db, self.settings.clone()));
                         }
                         join.finish()?;
                         if !self.settings.multiline {

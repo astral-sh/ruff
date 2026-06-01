@@ -49,6 +49,6 @@ info: Method defined here
      |         ^^^^^       --------------------------------- Parameter declared here
      |
 info: Union variant `bound method bytes.split(sep: Buffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]` is incompatible with this call site
-info: Attempted to call union type `(bound method bytes.split(sep: Buffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]) | (Overload[(sep: LiteralString | None = None, maxsplit: SupportsIndex = -1) -> list[LiteralString], (sep: str | None = None, maxsplit: SupportsIndex = -1) -> list[str]])`
+info: Attempted to call union type `(bound method bytes.split(sep: Buffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]) | (bound method str.split(sep: str | None = None, maxsplit: SupportsIndex = -1) -> list[str])`
 
 ```
