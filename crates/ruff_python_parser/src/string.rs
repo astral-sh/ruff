@@ -532,6 +532,10 @@ mod tests {
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
+    // Windows test threads have a 1 MiB stack by default. Keep successfully
+    // parsed ASTs shallow enough for their recursive drop glue in debug builds
+    // while still exercising parser stack growth.
+    const FORMAT_SPEC_STACK_GROWTH_DEPTH: usize = 1_000;
 
     fn parse_suite(source: &str) -> Result<Suite, ParseError> {
         parse_module(source).map(Parsed::into_suite)
@@ -588,7 +592,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     #[test]
     fn fstring_nested_spec_stack_growth() {
-        parse_suite(&nested_format_spec('f', 5_000)).unwrap();
+        parse_suite(&nested_format_spec('f', FORMAT_SPEC_STACK_GROWTH_DEPTH)).unwrap();
     }
 
     #[test]
@@ -706,7 +710,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     #[test]
     fn tstring_nested_spec_stack_growth() {
-        parse_suite(&nested_format_spec('t', 5_000)).unwrap();
+        parse_suite(&nested_format_spec('t', FORMAT_SPEC_STACK_GROWTH_DEPTH)).unwrap();
     }
 
     #[test]
