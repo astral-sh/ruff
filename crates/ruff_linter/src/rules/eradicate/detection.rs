@@ -22,7 +22,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             # Case-sensitive
             pyright
         |   pyrefly
-        |   ruff\s*:\s*(disable|enable|ignore)
+        |   ruff\s*:\s*(disable|enable|ignore|file-ignore)
         |   mypy:
         |   type:\s*ignore
         |   ty:\s*ignore
@@ -157,6 +157,7 @@ mod tests {
         assert!(!comment_contains_code("#ruff:enable[E501, F84]", &[]));
         assert!(!comment_contains_code("# ruff: ignore[ARG001]", &[]));
         assert!(!comment_contains_code("#ruff:ignore[ARG001]", &[]));
+        assert!(!comment_contains_code("#ruff:file-ignore[ARG001]", &[]));
         assert!(!comment_contains_code(
             "# pylint: disable=redefined-outer-name",
             &[]

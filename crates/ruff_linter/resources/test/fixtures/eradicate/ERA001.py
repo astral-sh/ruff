@@ -97,6 +97,7 @@ print(1)
 
 # ty: ignore
 # ruff: ignore[ARG001]
+# ruff: file-ignore[ARG001]
 
 # mypy: ignore-errors
 # pyright: ignore-errors
