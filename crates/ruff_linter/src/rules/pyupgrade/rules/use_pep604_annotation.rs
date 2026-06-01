@@ -59,6 +59,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## Options
 /// - `target-version`
 /// - `lint.pyupgrade.keep-runtime-typing`
+/// - `lint.future-annotations`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [preview]: https://docs.astral.sh/ruff/preview/
@@ -115,11 +116,17 @@ impl Violation for NonPEP604AnnotationUnion {
 /// operator. The fix is also marked as unsafe when it would remove comments
 /// present within the type annotation being rewritten.
 ///
+/// In [preview], this rule can also add its own `__future__` import on Python
+/// 3.9 and earlier, if the [`lint.future-annotations`] setting is enabled. This
+/// also makes the fix unsafe.
+///
 /// ## Options
 /// - `target-version`
 /// - `lint.pyupgrade.keep-runtime-typing`
+/// - `lint.future-annotations`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP604AnnotationOptional;
@@ -260,17 +267,8 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(
-                                    checker.generator().expr(&pep_604_union(elts)),
-                                    expr.range(),
-                                    checker.locator(),
-                                ),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        let replacement = checker.generator().expr(&pep_604_union(elts));
+                        diagnostic.set_fix(create_fix(replacement));
                     }
                     _ => {
                         // Single argument.
