@@ -2983,18 +2983,19 @@ struct InteriorNodeData {
     max_source_order: usize,
 }
 
-/// Accumulated lower and upper bounds for a single typevar on a single BDD path.
+/// Accumulates lower and upper bounds for a single typevar on a single BDD path.
 ///
 /// Lower bounds are collected into a union (they are alternatives for the minimum type the
 /// typevar can specialize to). Upper bounds are collected into an intersection (the typevar
-/// must satisfy all of them simultaneously).
+/// must satisfy all of them simultaneously). Once the path has been fully traversed, the
+/// accumulated sets are collapsed into a [`ConstraintBounds`].
 #[derive(Default)]
-struct Bounds<'db> {
+struct ConstraintBoundsBuilder<'db> {
     lower: FxIndexSet<Type<'db>>,
     upper: FxIndexSet<Type<'db>>,
 }
 
-impl<'db> Bounds<'db> {
+impl<'db> ConstraintBoundsBuilder<'db> {
     fn add_lower(&mut self, _db: &'db dyn Db, ty: Type<'db>) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
@@ -3024,18 +3025,16 @@ impl<'db> Bounds<'db> {
             .retain(|existing| !ty.is_redundant_with(db, *existing));
         self.upper.insert(ty);
     }
+
+    fn finish(self, db: &'db dyn Db) -> ConstraintBounds<'db> {
+        ConstraintBounds::new(
+            (!self.lower.is_empty()).then(|| UnionType::from_elements(db, self.lower)),
+            (!self.upper.is_empty()).then(|| IntersectionType::from_elements(db, self.upper)),
+        )
+    }
 }
 
-/// Materialized lower and upper bounds for a single typevar on a single BDD path.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct TypeVarBounds<'db> {
-    bound_typevar: BoundTypeVarInstance<'db>,
-    /// The union of all explicit lower bounds on this path.
-    lower: Option<Type<'db>>,
-    /// The intersection of all explicit upper bounds on this path (NOT including the typevar's
-    /// declared upper bound).
-    upper: Option<Type<'db>>,
-}
+type PathBound<'db> = (BoundTypeVarInstance<'db>, ConstraintBounds<'db>);
 
 impl<'db> Type<'db> {
     /// Calculates the [`PathBounds`] that represent the valid solutions for when `self` is
@@ -3073,7 +3072,7 @@ impl<'db> Type<'db> {
 pub(crate) enum PathBounds<'db> {
     Unsatisfiable,
     Unconstrained,
-    Constrained(Box<[Box<[TypeVarBounds<'db>]>]>),
+    Constrained(Box<[Box<[PathBound<'db>]>]>),
 }
 
 impl<'db> PathBounds<'db> {
@@ -3106,7 +3105,8 @@ impl<'db> PathBounds<'db> {
         });
 
         let mut result = Vec::with_capacity(sorted_paths.len());
-        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, Bounds<'db>> = FxHashMap::default();
+        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxHashMap::default();
 
         for path in sorted_paths {
             mappings.clear();
@@ -3136,13 +3136,7 @@ impl<'db> PathBounds<'db> {
 
             let path_bounds = mappings
                 .drain()
-                .map(|(bound_typevar, bounds)| TypeVarBounds {
-                    bound_typevar,
-                    lower: (!bounds.lower.is_empty())
-                        .then(|| UnionType::from_elements(db, bounds.lower)),
-                    upper: (!bounds.upper.is_empty())
-                        .then(|| IntersectionType::from_elements(db, bounds.upper)),
-                })
+                .map(|(bound_typevar, bounds)| (bound_typevar, bounds.finish(db)))
                 .collect();
             result.push(path_bounds);
         }
@@ -3183,9 +3177,7 @@ impl<'db> PathBounds<'db> {
         let mut solutions = Vec::with_capacity(paths.len());
         'paths: for path in paths {
             let mut solution = Vec::with_capacity(path.len());
-            for bounds in path {
-                let bound_typevar = bounds.bound_typevar;
-                let bounds = ConstraintBounds::new(bounds.lower, bounds.upper);
+            for (bound_typevar, bounds) in path.iter().copied() {
                 let variance = bounds.variance();
 
                 match choose(bound_typevar, variance, bounds) {
