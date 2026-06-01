@@ -9,7 +9,7 @@ use std::sync::Arc;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_index::{FrozenIndexVec, IndexSlice, IndexVec};
+use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
@@ -305,7 +305,7 @@ pub struct SemanticIndex<'db> {
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
-    ast_ids: IndexVec<FileScopeId, AstIds>,
+    ast_ids: AstIds,
 
     /// The set of modules that are imported anywhere within this file.
     imported_modules: Arc<FrozenSet<ModuleName>>,
@@ -371,8 +371,8 @@ impl<'db> SemanticIndex<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
-        &self.ast_ids[scope_id]
+    pub(crate) fn ast_ids(&self) -> &AstIds {
+        &self.ast_ids
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
@@ -1456,8 +1456,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .elt
             .as_name_expr()
             .unwrap();
-        let element_use_id =
-            element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
+        let element_use_id = element.scoped_use_id(&db, file);
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
@@ -1727,7 +1726,7 @@ class C[T]:
         let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
             panic!("expected a Name");
         };
-        let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
+        let x_use_id = x_use_expr_name.scoped_use_id(&db, file);
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
