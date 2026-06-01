@@ -244,7 +244,7 @@ def _set_running_loop(loop: AbstractEventLoop | None, /) -> None:
     This function is thread-specific.
     """
 
-def _get_running_loop() -> AbstractEventLoop:
+def _get_running_loop() -> AbstractEventLoop | None:
     """Return the running event loop or None.
 
     This is a low-level function intended to be used by event loops.

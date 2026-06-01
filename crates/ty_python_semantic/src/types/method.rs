@@ -69,22 +69,47 @@ impl<'db> BoundMethodType<'db> {
     )]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
-        let self_instance = self.typing_self_type(db);
 
         CallableType::new(
             db,
-            CallableSignature::from_overloads(
-                function
-                    .signature(db)
-                    .overloads
-                    .iter()
-                    .map(|signature| signature.bind_self(db, Some(self_instance))),
-            ),
+            self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
                 function.has_explicit_return_annotation(db),
             ),
         )
+    }
+
+    #[salsa::tracked(cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        let function_signature = self.function(db).signature(db);
+        let typing_self_type = self.typing_self_type(db);
+
+        let [signature] = function_signature.overloads.as_slice() else {
+            if !function_signature
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return CallableSignature::from_overloads(
+                    function_signature
+                        .overloads
+                        .iter()
+                        .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+                );
+            }
+
+            let self_instance = self.self_instance(db);
+            return CallableSignature::from_overloads(
+                function_signature
+                    .overloads
+                    .iter()
+                    .filter(|signature| signature.can_bind_self_to(db, self_instance))
+                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+            );
+        };
+
+        CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
     }
 
     pub(super) fn recursive_type_normalized_impl(

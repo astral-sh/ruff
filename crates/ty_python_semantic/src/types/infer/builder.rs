@@ -24,8 +24,8 @@ use ty_python_core::statement::StatementInner;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
-    infer_deferred_types, infer_definition_types, infer_expression_types,
+    FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
@@ -99,7 +99,7 @@ use crate::types::{
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -329,6 +329,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
+    /// If the inference region refers to a definition, whether synthesized dictionary-key
+    /// assignments derived from its right-hand side should be discarded.
+    discards_dict_key_assignments: bool,
+
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
@@ -374,7 +378,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
+            discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
+        }
+    }
+
+    fn discard_dict_key_assignments_for(&mut self, definition: Definition<'db>) {
+        if matches!(self.region, InferenceRegion::Definition(d) if d == definition) {
+            self.discards_dict_key_assignments = true;
         }
     }
 
@@ -428,10 +439,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
-            self.qualifiers.extend(extra.qualifiers.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
+            self.qualifiers.extend(extra.qualifiers.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
 
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
@@ -470,10 +482,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
-            self.qualifiers.extend(extra.qualifiers.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
+            self.qualifiers.extend(extra.qualifiers.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
         }
     }
 
@@ -493,9 +506,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
 
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
@@ -519,9 +533,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
 
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
@@ -1428,6 +1443,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         (declared_ty, inferred_ty)
                     }
                 } else {
+                    self.discard_dict_key_assignments_for(definition);
                     report_invalid_assignment(
                         &self.context,
                         node,
@@ -8407,13 +8423,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
                         match binding.binding {
-                            DefinitionState::Defined(definition) => {
+                            DefinitionState::Defined(definition)
+                                if !is_discarded_dict_key_assignment(db, definition) =>
+                            {
                                 let binding_ty = binding_type(db, definition);
                                 union = union.add(
                                     binding.narrowing_constraint.narrow(db, binding_ty, place),
                                 );
                             }
-                            DefinitionState::Undefined | DefinitionState::Deleted => {
+                            DefinitionState::Defined(_)
+                            | DefinitionState::Undefined
+                            | DefinitionState::Deleted => {
                                 union =
                                     union.add(binding.narrowing_constraint.narrow(db, ty, place));
                             }
@@ -9831,10 +9851,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             qualifiers: _,
-            mut type_expression_flags,
+            type_expression_flags,
             mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -9844,6 +9864,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
@@ -9883,14 +9904,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
 
-                type_expression_flags.shrink_to_fit();
-                expected_types.shrink_to_fit();
-                string_annotations.shrink_to_fit();
                 collection_use_constraints.shrink_to_fit();
                 Box::new(ExpressionInferenceExtra {
-                    string_annotations,
-                    expected_types,
-                    type_expression_flags,
+                    string_annotations: FrozenSet::from(string_annotations),
+                    expected_types: FrozenMap::from(expected_types),
+                    type_expression_flags: FrozenMap::from(type_expression_flags),
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
                     cycle_recovery,
@@ -9912,11 +9930,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             expressions,
-            mut qualifiers,
-            mut type_expression_flags,
+            qualifiers,
+            type_expression_flags,
             mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -9927,6 +9945,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
@@ -9952,25 +9971,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !collection_use_constraints.is_empty())
         .then(|| {
             collection_use_constraints.shrink_to_fit();
-            qualifiers.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            type_expression_flags.shrink_to_fit();
-            string_annotations.shrink_to_fit();
             return_types_and_ranges.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
-                string_annotations,
-                expected_types,
+                string_annotations: FrozenSet::from(string_annotations),
+                expected_types: FrozenMap::from(expected_types),
                 called_functions: called_functions
                     .into_iter()
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
                 return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
-                type_expression_flags,
+                type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
                 cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
-                qualifiers,
+                qualifiers: FrozenMap::from(qualifiers),
             })
         });
 
@@ -10037,6 +10052,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: _,
             dataclass_field_specifiers: _,
             undecorated_type: _,
+            discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
             index: _,
@@ -10065,17 +10081,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             expressions,
-            mut qualifiers,
-            mut type_expression_flags,
+            qualifiers,
+            type_expression_flags,
             mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
             deferred,
             cycle_recovery,
             undecorated_type,
+            discards_dict_key_assignments,
             called_functions,
 
             // builder only state
@@ -10100,29 +10117,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !called_functions.is_empty()
             || !qualifiers.is_empty()
             || !type_expression_flags.is_empty()
-            || !collection_use_constraints.is_empty())
-        .then(|| {
-            collection_use_constraints.shrink_to_fit();
-            qualifiers.shrink_to_fit();
-            type_expression_flags.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            string_annotations.shrink_to_fit();
-            Box::new(DefinitionInferenceExtra {
-                string_annotations,
-                expected_types,
-                collection_use_constraints,
-                called_functions: called_functions
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
-                type_expression_flags,
-                cycle_recovery,
-                deferred: deferred.into_boxed_slice(),
-                diagnostics,
-                undecorated_type,
-                qualifiers,
-            })
-        });
+            || !collection_use_constraints.is_empty()
+            || discards_dict_key_assignments)
+            .then(|| {
+                collection_use_constraints.shrink_to_fit();
+                Box::new(DefinitionInferenceExtra {
+                    string_annotations: FrozenSet::from(string_annotations),
+                    expected_types: FrozenMap::from(expected_types),
+                    collection_use_constraints,
+                    called_functions: called_functions
+                        .into_iter()
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                    type_expression_flags: FrozenMap::from(type_expression_flags),
+                    cycle_recovery,
+                    deferred: deferred.into_boxed_slice(),
+                    diagnostics,
+                    undecorated_type,
+                    discards_dict_key_assignments,
+                    qualifiers: FrozenMap::from(qualifiers),
+                })
+            });
 
         if bindings.len() > 20 {
             tracing::debug!(
@@ -10155,9 +10170,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut string_annotations,
-            mut expected_types,
-            mut type_expression_flags,
+            string_annotations,
+            expected_types,
+            type_expression_flags,
             mut collection_use_constraints,
             expressions,
             scope,
@@ -10171,6 +10186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // Builder only state
             expression_cache: _,
@@ -10193,14 +10209,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !type_expression_flags.is_empty()
             || !collection_use_constraints.is_empty())
         .then(|| {
-            type_expression_flags.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            string_annotations.shrink_to_fit();
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
-                string_annotations,
-                expected_types,
-                type_expression_flags,
+                string_annotations: FrozenSet::from(string_annotations),
+                expected_types: FrozenMap::from(expected_types),
+                type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
                 cycle_recovery,
                 diagnostics,
@@ -10246,6 +10259,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             called_functions: _,
             undecorated_type: _,
+            discards_dict_key_assignments: _,
             qualifiers: _,
             type_expression_flags: _,
         } = *self;
@@ -10289,6 +10303,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
@@ -10792,6 +10807,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         }
 
         if !bound_ty.is_assignable_to(db, declared_ty) {
+            builder.discard_dict_key_assignments_for(self.binding);
             report_invalid_assignment(
                 &builder.context,
                 self.node,
@@ -10815,6 +10831,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))
             {
+                builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = self.node {
@@ -10823,6 +10840,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 .unwrap_or_else(|| builder.infer_expression(value, TypeContext::default()));
 
             if !value_ty.is_typed_dict() && !Self::is_safe_mutable_class(db, value_ty) {
+                builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
         }
