@@ -2908,32 +2908,11 @@ fn implicit_attribute_cycle_recover<'db>(
     _name: String,
     _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
-    // Strip the `Type::Recursive` wrap that the previous iteration's recovery applied (see below),
-    // so the union inside `cycle_normalized` runs over the Divergent-form body. Otherwise a
-    // top-level `Recursive` union member never collapses and the union grows every iteration,
-    // breaking convergence.
-    let previous_inner = previous_member.inner.map_type(|ty| match ty {
-        Type::Recursive(rec) if cycle.head_ids().any(|id| id == rec.binder_id(db)) => *rec.body(db),
-        _ => ty,
-    });
-
+    // Present a recursively-defined implicit attribute as a true `Type::Recursive` μ-binder so
+    // structural operations (subscript, iteration, …) unfold it on demand instead of bottoming out
+    // at the bare `Divergent` marker.
     let inner = member
         .inner
-        .cycle_normalized(db, previous_inner, cycle)
-        // Present a self-referential implicit attribute as a true `Type::Recursive` μ-binder so
-        // structural operations (subscript, iteration, …) unfold on demand instead of bottoming out
-        // at the bare `Divergent` marker. The body keeps its `Divergent(id)` markers at the
-        // recursive positions; `recursive_type_normalized` folds a same-binder `Recursive` back to
-        // `Divergent`, so the fixed-point iteration still converges (it stays in Divergent-space
-        // because the wrap above is stripped before the next union).
-        .map_type(|ty| {
-            cycle.head_ids().fold(ty, |ty, id| {
-                if ty.has_structural_divergent(db, id) {
-                    Type::recursive(db, id, None, ty)
-                } else {
-                    ty
-                }
-            })
-        });
+        .cycle_normalized_recursive(db, previous_member.inner, cycle);
     Member { inner }
 }

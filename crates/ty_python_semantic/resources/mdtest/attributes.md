@@ -2774,7 +2774,7 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent]
+        reveal_type(self.x3)  # revealed: list[Divergent] | list[int]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -3038,9 +3038,11 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
 
 ## Divergent inferred implicit instance attribute types
 
-If an implicit attribute is defined recursively and type inference diverges, the divergent part is
-filled in with the dynamic type `Divergent`. When the recursion flows through a *different* instance
-(here, `other`), the divergent part stays a bare `Divergent` marker that does not unfold:
+If an implicit attribute is defined recursively and type inference diverges, the recursive position
+is filled in with the dynamic type `Divergent`, and the attribute is inferred as a true recursive
+type (a μ-binder). Structural operations such as subscript and iteration unfold it on demand instead
+of bottoming out at the bare `Divergent` marker. This holds whether the recursion flows through
+`self` or through a *different* instance (here, `other`):
 
 ```py
 class C:
@@ -3048,12 +3050,13 @@ class C:
         self.x = (other.x, 1)
 
 reveal_type(C().x)  # revealed: tuple[Divergent, int]
-reveal_type(C().x[0])  # revealed: Divergent
+# Subscripting unfolds the recursive type one step instead of collapsing to `Divergent`:
+reveal_type(C().x[0])  # revealed: tuple[Divergent, int]
+reveal_type(C().x[0][0])  # revealed: tuple[Divergent, int]
 ```
 
-A *self-referential* implicit attribute (the recursion flows through `self`) is instead inferred as
-a true recursive type (a μ-binder), so structural operations such as subscript and iteration unfold
-it on demand — see [Self-referential implicit attributes](#self-referential-implicit-attributes).
+See also [Self-referential implicit attributes](#self-referential-implicit-attributes) for the
+`self`-recursive form and multi-level unfolding.
 
 This also works if the tuple is not constructed directly:
 

@@ -864,6 +864,27 @@ impl<'db> PlaceAndQualifiers<'db> {
         };
         PlaceAndQualifiers { place, qualifiers }
     }
+
+    /// Like [`cycle_normalized`][Self::cycle_normalized], but presents a recursively-defined place
+    /// type as a true `Type::Recursive` μ-binder so structural operations (subscript, iteration, …)
+    /// unfold it on demand instead of bottoming out at the bare `Divergent` marker.
+    ///
+    /// Used by *value*-level place cycles: implicit instance attributes and attribute access
+    /// through an instance. The wrap is stripped from both operands before the union and the body
+    /// is folded back to `Divergent`-space by `recursive_type_normalized`, so convergence is
+    /// unchanged. Must **not** be used for type-alias value resolution.
+    pub(crate) fn cycle_normalized_recursive(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        let current = self.map_type(|ty| ty.unwrap_head_recursive(db, cycle));
+        let previous = previous.map_type(|ty| ty.unwrap_head_recursive(db, cycle));
+        current
+            .cycle_normalized(db, previous, cycle)
+            .map_type(|ty| ty.wrap_structural_recursive(db, cycle))
+    }
 }
 
 impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {

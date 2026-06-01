@@ -975,6 +975,61 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns `true` if this type describes a runtime *value* (e.g. an instance, tuple, callable),
+    /// as opposed to a *type used as a value* — a class object, `type[…]`, generic alias, special
+    /// form, or named/known-instance type. Used to decide whether a recursive cycle result should
+    /// be presented as a value-level `Type::Recursive`: a recursively-defined *value* binding
+    /// (loop-carried local) should be wrapped, but an *implicit type alias* (`A = list["A"]`, whose
+    /// value is the class object `list[…]`) must not be — wrapping it would corrupt how it is later
+    /// interpreted as a type.
+    pub(crate) fn is_recursion_value_like(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::GenericAlias(_)
+            | Type::ClassLiteral(_)
+            | Type::SubclassOf(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::TypeAlias(_) => false,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| element.is_recursion_value_like(db)),
+            _ => true,
+        }
+    }
+
+    /// Strip a top-level implicit `Type::Recursive` (`source_alias = None`) μ-binder whose binder is
+    /// one of `cycle`'s heads, returning its `Divergent`-form body. Used by cycle recovery to keep
+    /// the fixed-point iteration in "Divergent-space": a previous iteration may have wrapped the
+    /// provisional, but the union/normalization must run over the unwrapped body.
+    pub(crate) fn unwrap_head_recursive(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+        match self {
+            Type::Recursive(rec)
+                if rec.source_alias(db).is_none()
+                    && cycle.head_ids().any(|id| id == rec.binder_id(db)) =>
+            {
+                *rec.body(db)
+            }
+            _ => self,
+        }
+    }
+
+    /// Wrap `self` in an implicit `Type::Recursive` μ-binder for each cycle head whose `Divergent`
+    /// marker survives at a *structural* position (see [`has_structural_divergent`]). This is what
+    /// turns a recursively-defined cycle result (implicit attribute, attribute access through an
+    /// instance, loop-carried local, …) into a true recursive type that unfolds on demand.
+    ///
+    /// [`has_structural_divergent`]: Type::has_structural_divergent
+    pub(crate) fn wrap_structural_recursive(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+        cycle.head_ids().fold(self, |ty, id| {
+            if ty.has_structural_divergent(db, id) {
+                Type::recursive(db, id, None, ty)
+            } else {
+                ty
+            }
+        })
+    }
+
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
     /// behave as: `object` for top-materialized, `Never` for bottom-materialized.
     /// Returns `None` if `self` is not `Divergent` or has not been materialized.
@@ -1111,7 +1166,7 @@ impl<'db> Type<'db> {
         })
     }
 
-    fn is_typealias_special_form(&self) -> bool {
+    pub(crate) fn is_typealias_special_form(&self) -> bool {
         matches!(self, Type::SpecialForm(SpecialFormType::TypeAlias))
     }
 
@@ -2091,18 +2146,19 @@ impl<'db> Type<'db> {
         if nested && self.same_divergent_marker(div) {
             return None;
         }
-        // A `Type::Recursive` whose binder matches the divergent marker being normalized is itself a
-        // recursive position: collapse it like the bare `Divergent` marker so the surrounding
-        // structure stays finite across fixed-point iterations. This fires when an implicit
-        // recursive attribute's wrapped provisional (`Type::Recursive`) is read back into a fresh
-        // body during cycle iteration; folding it to `Divergent` keeps the iteration in
-        // Divergent-space (see `implicit_attribute_cycle_recover`).
-        if nested
-            && let Type::Recursive(rec) = self
-            && let Type::Divergent(d) = div
-            && rec.binder_id(db) == d.id()
+        // An implicit recursive type (`source_alias = None`) is folded back to its own `Divergent`
+        // marker during normalization. This keeps the fixed-point iteration in "Divergent-space":
+        // a wrapped provisional (`Type::Recursive`) read back into a fresh body collapses to a flat
+        // marker rather than nesting. Crucially, this also flattens recursive types minted by
+        // *other* cycles in the same strongly-connected component (cross-instance member lookups,
+        // mutually-recursive attributes, loop-carried locals), so re-wrapping cannot nest μ-binders
+        // and blow up. The binder's own id is preserved (unlike `None`, which would relabel the
+        // marker as the head currently being normalized). Named recursive aliases
+        // (`source_alias = Some`) are left intact.
+        if let Type::Recursive(rec) = self
+            && rec.source_alias(db).is_none()
         {
-            return None;
+            return Some(Type::divergent(rec.binder_id(db)));
         }
         match self {
             Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
@@ -2638,7 +2694,9 @@ impl<'db> Type<'db> {
     #[salsa::tracked(
         cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
-            member.cycle_normalized(db, *previous, cycle)
+            // Present a recursively-defined member (e.g. a cross-instance attribute
+            // `self.x = (other.x, …)`) as a true `Type::Recursive` so it unfolds on demand.
+            member.cycle_normalized_recursive(db, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -3263,7 +3321,9 @@ impl<'db> Type<'db> {
     #[salsa::tracked(
         cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
-            member.cycle_normalized(db, *previous, cycle)
+            // Present a recursively-defined member (e.g. a cross-instance attribute
+            // `self.x = (other.x, …)`) as a true `Type::Recursive` so it unfolds on demand.
+            member.cycle_normalized_recursive(db, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
