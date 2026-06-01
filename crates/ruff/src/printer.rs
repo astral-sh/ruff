@@ -336,47 +336,36 @@ impl Printer {
 
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in &statistics {
+                    let fixable = if any_fixable {
+                        if statistic.all_fixable {
+                            &all_fixable
+                        } else if statistic.any_fixable() {
+                            &partially_fixable
+                        } else {
+                            unfixable
+                        }
+                    } else {
+                        ""
+                    };
                     if is_rule_name_output_enabled(preview) {
                         writeln!(
                             writer,
-                            "{:>count_width$}  {}{}",
-                            statistic.count.to_string().bold(),
-                            if any_fixable {
-                                if statistic.all_fixable {
-                                    &all_fixable
-                                } else if statistic.any_fixable() {
-                                    &partially_fixable
-                                } else {
-                                    unfixable
-                                }
-                            } else {
-                                ""
-                            },
-                            statistic.name,
+                            "{count:>count_width$}\t{fixable}{name}",
+                            count = statistic.count.to_string().bold(),
+                            name = statistic.name,
                         )?;
                     } else {
                         writeln!(
                             writer,
-                            "{:>count_width$}\t{:<code_width$}\t{}{}",
-                            statistic.count.to_string().bold(),
-                            statistic
+                            "{count:>count_width$}\t{code:<code_width$}\t{fixable}{name}",
+                            count = statistic.count.to_string().bold(),
+                            code = statistic
                                 .code
                                 .map(SecondaryCode::as_str)
                                 .unwrap_or_default()
                                 .red()
                                 .bold(),
-                            if any_fixable {
-                                if statistic.all_fixable {
-                                    &all_fixable
-                                } else if statistic.any_fixable() {
-                                    &partially_fixable
-                                } else {
-                                    unfixable
-                                }
-                            } else {
-                                ""
-                            },
-                            statistic.name,
+                            name = statistic.name,
                         )?;
                     }
                 }

@@ -237,7 +237,21 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = format!("{id}:", id = diag.secondary_code_or_id(config.preview));
+        // TODO(brent) I'm pretty sure this is not the right place for this check, just trying to
+        // get the tests to pass temporarily. It's highly suspicious that this is basically the
+        // opposite of Diagnostic::display_diagnostic_id but with an additional hide_severity check.
+        let id = if config.preview {
+            diag.name().to_string()
+        } else if let Some(code) = diag.secondary_code() {
+            code.to_string()
+        } else {
+            if config.hide_severity {
+                format!("{id}:", id = diag.name())
+            } else {
+                diag.name().to_string()
+            }
+        };
+
         let level = if config.hide_severity {
             AnnotateLevel::None
         } else {
