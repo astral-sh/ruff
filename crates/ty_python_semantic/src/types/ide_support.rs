@@ -562,17 +562,10 @@ fn own_method_definitions<'db>(
     class: ClassLiteral<'db>,
     method_name: &str,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
-    let Some(class) = class.as_static() else {
-        return None;
-    };
-
+    let class = class.as_static()?;
     let class_scope = class.body_scope(db);
     let class_place_table = ty_python_core::place_table(db, class_scope);
-
-    let Some(place_id) = class_place_table.symbol_id(method_name) else {
-        return None;
-    };
-
+    let place_id = class_place_table.symbol_id(method_name)?;
     let use_def = use_def_map(db, class_scope);
     let definitions = reachable_definitions(
         db,
