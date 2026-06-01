@@ -91,7 +91,6 @@ operator
 optuna
 paasta
 packaging
-pandas
 pandas-stubs
 pandera
 paroxython
