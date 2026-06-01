@@ -558,6 +558,42 @@ mod tests {
     }
 
     #[test]
+    fn skips_binding_captured_by_comprehension_in_nested_function() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer() -> None:
+                a = 1
+
+                def inner() -> list[int]:
+                    return [a + x for x in [1, 2, 3]]
+
+                return inner
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_parameter_captured_by_nested_comprehension() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def foo(i: int):
+                def bar():
+                    return [[k for k in range(i)] for _ in range(2)]
+
+                return bar
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
     fn closure_uses_nearest_shadowed_binding() -> anyhow::Result<()> {
         let source = dedent(
             "
