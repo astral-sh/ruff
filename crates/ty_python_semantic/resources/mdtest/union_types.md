@@ -359,6 +359,9 @@ class Contravariant[T]:
 class Invariant[T]:
     mutable_attribute: T
 
+class P: ...
+class Q: ...
+
 def _(
     a: Bivariant[Any] | Bivariant[Any | str],
     b: Bivariant[Any | str] | Bivariant[Any],
@@ -377,4 +380,25 @@ def _(
     reveal_type(f)  # revealed: Contravariant[Any]
     reveal_type(g)  # revealed: Invariant[Any] | Invariant[Any | str]
     reveal_type(h)  # revealed: Invariant[Any | str] | Invariant[Any]
+```
+
+Covariant and contravariant containers with different specializations can be merged by combining
+their type arguments. Invariant containers cannot be merged:
+
+```py
+def _(
+    covariant: Covariant[P] | Covariant[Q],
+    contravariant: Contravariant[P] | Contravariant[Q],
+    invariant: Invariant[P] | Invariant[Q],
+    covariant_any: Covariant[P] | Covariant[Any],
+    contravariant_any: Contravariant[P] | Contravariant[Any],
+    invariant_any: Invariant[P] | Invariant[Any],
+) -> None:
+    reveal_type(covariant)  # revealed: Covariant[P | Q]
+    reveal_type(contravariant)  # revealed: Contravariant[P & Q]
+    reveal_type(invariant)  # revealed: Invariant[P] | Invariant[Q]
+
+    reveal_type(covariant_any)  # revealed: Covariant[P | Any]
+    reveal_type(contravariant_any)  # revealed: Contravariant[P & Any]
+    reveal_type(invariant_any)  # revealed: Invariant[P] | Invariant[Any]
 ```

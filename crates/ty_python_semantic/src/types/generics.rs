@@ -1063,6 +1063,28 @@ pub struct Specialization<'db> {
     tuple_inner: Option<TupleType<'db>>,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum GenericSetOperation {
+    Union,
+    Intersection,
+}
+
+impl GenericSetOperation {
+    fn combine<'db>(self, db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> Type<'db> {
+        match self {
+            Self::Union => UnionType::from_two_elements(db, left, right),
+            Self::Intersection => IntersectionType::from_two_elements(db, left, right),
+        }
+    }
+
+    const fn flip(self) -> Self {
+        match self {
+            Self::Union => Self::Intersection,
+            Self::Intersection => Self::Union,
+        }
+    }
+}
+
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Specialization<'_> {}
 
@@ -1252,6 +1274,41 @@ impl<'db> Specialization<'db> {
         // TODO: Combine the tuple specs too
         // TODO(jelle): specialization type?
         Specialization::new(db, self.generic_context(db), types, None, None)
+    }
+
+    /// Merge two specializations of the same generic class by distributing a set operation over
+    /// their type parameters according to variance.
+    pub(crate) fn merge_set_operation(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        operation: GenericSetOperation,
+    ) -> Option<Self> {
+        let generic_context = self.generic_context(db);
+        if other.generic_context(db) != generic_context
+            || self.materialization_kind(db).is_some()
+            || other.materialization_kind(db).is_some()
+            || self.tuple_inner(db).is_some()
+            || other.tuple_inner(db).is_some()
+        {
+            return None;
+        }
+
+        let types: Option<Box<[_]>> = itertools::izip!(
+            generic_context.variables(db),
+            self.types(db),
+            other.types(db)
+        )
+        .map(
+            |(typevar, left, right)| match specialization_variance(db, typevar) {
+                TypeVarVariance::Covariant => Some(operation.combine(db, *left, *right)),
+                TypeVarVariance::Contravariant => Some(operation.flip().combine(db, *left, *right)),
+                TypeVarVariance::Invariant | TypeVarVariance::Bivariant => None,
+            },
+        )
+        .collect();
+
+        Some(Self::new(db, generic_context, types?, None, None))
     }
 
     pub(super) fn recursive_type_normalized_impl(

@@ -959,6 +959,42 @@ def mixed(
     reveal_type(i4)  # revealed: Any
 ```
 
+## Generics
+
+Covariant and contravariant containers with different specializations can be merged by combining
+their type arguments. Invariant containers cannot be merged:
+
+```py
+from typing import Any, Generic, TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class P: ...
+class Q: ...
+class Invariant(Generic[T]): ...
+class Covariant(Generic[T_co]): ...
+class Contravariant(Generic[T_contra]): ...
+
+def _(
+    invariant: Intersection[Invariant[P], Invariant[Q]],
+    covariant: Intersection[Covariant[P], Covariant[Q]],
+    contravariant: Intersection[Contravariant[P], Contravariant[Q]],
+    invariant_any: Intersection[Invariant[P], Invariant[Any]],
+    covariant_any: Intersection[Covariant[P], Covariant[Any]],
+    contravariant_any: Intersection[Contravariant[P], Contravariant[Any]],
+) -> None:
+    reveal_type(invariant)  # revealed: Invariant[P] & Invariant[Q]
+    reveal_type(covariant)  # revealed: Covariant[P & Q]
+    reveal_type(contravariant)  # revealed: Contravariant[P | Q]
+
+    reveal_type(invariant_any)  # revealed: Invariant[P] & Invariant[Any]
+    reveal_type(covariant_any)  # revealed: Covariant[P & Any]
+    reveal_type(contravariant_any)  # revealed: Contravariant[P | Any]
+```
+
 ## Calling intersection types
 
 ### Basic intersection calls

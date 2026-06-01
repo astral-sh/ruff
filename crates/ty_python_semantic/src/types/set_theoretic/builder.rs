@@ -38,11 +38,12 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::{EnumComplement, enum_metadata};
+use crate::types::generics::GenericSetOperation;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
-    SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, ClassLiteral, ClassType, EnumLiteralType, GenericAlias, IntersectionType,
+    KnownClass, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
+    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -127,6 +128,32 @@ fn merge_truthiness_guarded_pair<'db>(
     } else {
         None
     }
+}
+
+fn merge_generic_instances<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+    operation: GenericSetOperation,
+) -> Option<Type<'db>> {
+    let (Type::NominalInstance(left), Type::NominalInstance(right)) = (left, right) else {
+        return None;
+    };
+    let (ClassType::Generic(left), ClassType::Generic(right)) = (left.class(db), right.class(db))
+    else {
+        return None;
+    };
+    if left.origin(db) != right.origin(db) {
+        return None;
+    }
+
+    let specialization =
+        left.specialization(db)
+            .merge_set_operation(db, right.specialization(db), operation)?;
+    Some(Type::instance(
+        db,
+        ClassType::Generic(GenericAlias::new(db, left.origin(db), specialization)),
+    ))
 }
 
 /// Combine union elements that cover more of the same enum class.
@@ -930,6 +957,14 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
+            if let Some(merged_type) =
+                merge_generic_instances(self.db, element_type, ty, GenericSetOperation::Union)
+            {
+                to_remove.push(i);
+                ty = merged_type;
+                continue;
+            }
+
             if element_type
                 .as_literal_value_kind()
                 .zip(bool_pair(ty))
@@ -1482,6 +1517,17 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_positive) in self.positive.iter().enumerate() {
+                    if let Some(merged) = merge_generic_instances(
+                        db,
+                        *existing_positive,
+                        new_positive,
+                        GenericSetOperation::Intersection,
+                    ) {
+                        new_positive = merged;
+                        to_remove.push(index);
+                        continue;
+                    }
+
                     // S & T = S    if S <: T
                     if existing_positive.is_redundant_with(db, new_positive) {
                         return;
