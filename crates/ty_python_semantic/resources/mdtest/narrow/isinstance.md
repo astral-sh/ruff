@@ -645,9 +645,7 @@ def _(x: object):
         x.push(str)
 ```
 
-Invariant generics are trickiest. The top materialization, conceptually the type that includes all
-instances of the generic class regardless of the type parameter, cannot be represented directly in
-the type system, so we represent it with the internal `Top[]` special form.
+Invariant type parameters use an explicit `Any` specialization:
 
 ```py
 class Invariant[T]:
@@ -657,14 +655,12 @@ class Invariant[T]:
 
 def _(x: object):
     if isinstance(x, Invariant):
-        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
-        reveal_type(x.get())  # revealed: object
-        # error: [invalid-argument-type] "Argument to bound method `Invariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
+        reveal_type(x)  # revealed: Invariant[Any]
+        reveal_type(x.get())  # revealed: Any
         x.push(42)
 ```
 
-When reading attributes from a top-materialized generic, only type parameters should be
-materialized. Unrelated gradual attribute types should be preserved.
+When reading attributes from an invariant generic, unrelated gradual attribute types are preserved:
 
 ```py
 from typing import Any
@@ -675,8 +671,8 @@ class InvariantWithAny[T: int]:
 
 def _(x: object):
     if isinstance(x, InvariantWithAny):
-        reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
-        reveal_type(x.a)  # revealed: object
+        reveal_type(x)  # revealed: InvariantWithAny[Any]
+        reveal_type(x.a)  # revealed: Any
         reveal_type(x.b)  # revealed: Any
 ```
 
@@ -696,7 +692,7 @@ def _(x: object):
         x.push(42, "hello")
 ```
 
-When more complex types are involved, the `Top[]` type may get simplified away.
+When more complex types are involved, positive invariant intersections can simplify:
 
 ```py
 def _(x: list[int] | set[str]):
@@ -706,17 +702,18 @@ def _(x: list[int] | set[str]):
         reveal_type(x)  # revealed: set[str]
 ```
 
-Though if the types involved are not disjoint bases, we necessarily keep a more complex type.
+If the types involved are not disjoint bases, the `Any` specialization is preserved where it cannot
+simplify:
 
 ```py
 def _(x: Invariant[int] | Covariant[str]):
     if isinstance(x, Invariant):
-        reveal_type(x)  # revealed: Invariant[int] | (Covariant[str] & Top[Invariant[Unknown]])
+        reveal_type(x)  # revealed: Invariant[int] | (Covariant[str] & Invariant[Any])
     else:
-        reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
+        reveal_type(x)  # revealed: Covariant[str] & ~Invariant[Any]
 ```
 
-The behavior of `issubclass()` is similar.
+`issubclass()` continues to use top materialization:
 
 ```py
 def _(x: type[object], y: type[object], z: type[object]):
@@ -730,9 +727,8 @@ def _(x: type[object], y: type[object], z: type[object]):
 
 ## Narrowing generic defaults in Python 3.13
 
-When a type parameter has a bare `Any` default, narrowing still materializes the substituted
-typevar. The default isn't used during `isinstance` narrowing (the type parameter gets `Unknown`
-instead), so the default value is irrelevant here:
+When an invariant type parameter has a bare `Any` default, narrowing explicitly specializes the
+parameter to `Any`:
 
 ```toml
 [environment]
@@ -747,10 +743,11 @@ class WithAnyDefault[T = Any]:
 
 def _(x: object):
     if isinstance(x, WithAnyDefault):
-        reveal_type(x.y)  # revealed: tuple[Any, object]
+        reveal_type(x.y)  # revealed: tuple[Any, Any]
 ```
 
-Type alias defaults substituted into type parameters still need to be materialized when narrowing:
+The explicit `Any` specialization is also used when the default is a type alias. Unrelated
+occurrences of the alias are preserved:
 
 ```py
 from typing import Any
@@ -762,7 +759,7 @@ class WithAliasDefault[T = A]:
 
 def _(x: object):
     if isinstance(x, WithAliasDefault):
-        reveal_type(x.y)  # revealed: tuple[A, object]
+        reveal_type(x.y)  # revealed: tuple[A, Any]
 ```
 
 ## Narrowing generic `classmethod`

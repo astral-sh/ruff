@@ -177,6 +177,14 @@ fn simplify_invariant_generic_intersection<'db>(
     }
 }
 
+fn is_precise_invariant_generic_specialization_of<'db>(
+    db: &'db dyn Db,
+    precise: Type<'db>,
+    gradual: Type<'db>,
+) -> bool {
+    simplify_invariant_generic_intersection(db, precise, gradual) == Some(precise)
+}
+
 /// Combine union elements that cover more of the same enum class.
 ///
 /// Enum complements are intersections like `Color & ~Literal[Color.RED]`. When a union contains
@@ -1565,7 +1573,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // S & ~T = Never    if S <: T
-                    if new_positive.is_subtype_of(db, *existing_negative) {
+                    if new_positive.is_subtype_of(db, *existing_negative)
+                        || is_precise_invariant_generic_specialization_of(
+                            db,
+                            new_positive,
+                            *existing_negative,
+                        )
+                    {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;
@@ -1711,7 +1725,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     }
 
                     // S & ~T = Never    if S <: T
-                    if existing_positive.is_subtype_of(db, new_negative) {
+                    if existing_positive.is_subtype_of(db, new_negative)
+                        || is_precise_invariant_generic_specialization_of(
+                            db,
+                            *existing_positive,
+                            new_negative,
+                        )
+                    {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;
