@@ -852,3 +852,27 @@ def same_typevar[T]():
     expected = ~ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 ```
+
+## Displaying constraints
+
+The `with_detailed_display` method can be used to print out the boolean formula that a constraint
+set represents. However, this method is only intended for debugging purposes, and we reserve the
+right to change the rendering at any time! We therefore do _not_ have a battery of mdtests printing
+out all of the different kinds of constraints described above. Here we just test that the method
+exists, and provides more detail than otherwise.
+
+```py
+from ty_extensions import ConstraintSet
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+def _[T]() -> None:
+    # revealed: ConstraintSet[bool]
+    reveal_type(ConstraintSet.range(Sub, T, Super))
+    # We are not asserting anything specific about what's displayed here, just that it's different
+    # from above. If our constraint set rendering changes, update this accordingly.
+    # revealed: ConstraintSet[(Sub ≤ T@_ ≤ Super)]
+    reveal_type(ConstraintSet.range(Sub, T, Super).with_detailed_display())
+```

@@ -163,6 +163,16 @@ class ConstraintSet:
     def __and__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __or__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __invert__(self) -> ConstraintSet: ...
+    def with_detailed_display(self) -> ConstraintSet:
+        """
+        Returns a copy of this constraint set that will display the full
+        constraint formula when rendered as a string.
+
+        Typically we only display "bool" for a non-trivial constraint set, to
+        help ensure that we do not write test cases that depend on how
+        constraint sets are rendered. But it can be useful to see the full
+        detail for debugging purposes.
+        """
 
 class GenericContext:
     """
