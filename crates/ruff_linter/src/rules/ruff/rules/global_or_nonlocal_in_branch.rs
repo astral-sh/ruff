@@ -26,6 +26,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// counter = 0
 ///
+///
 /// def update(flag):
 ///     if flag:
 ///         global counter
@@ -38,6 +39,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ```python
 /// counter = 0
+///
 ///
 /// def update(flag):
 ///     global counter
