@@ -3329,8 +3329,9 @@ pub struct PydocstyleOptions {
     /// [`D411`](rules/no-blank-line-before-section.md),
     /// [`D413`](rules/missing-blank-line-after-last-section.md),
     /// [`D415`](rules/missing-terminal-punctuation.md),
-    /// [`D416`](rules/missing-section-name-colon.md), and
-    /// [`D417`](rules/undocumented-param.md).
+    /// [`D416`](rules/missing-section-name-colon.md),
+    /// [`D417`](rules/undocumented-param.md), and
+    /// [`D420`](rules/incorrect-section-order.md).
     ///
     /// The NumPy convention includes all `D` errors apart from:
     /// [`D107`](rules/undocumented-public-init.md),
@@ -3357,7 +3358,7 @@ pub struct PydocstyleOptions {
     /// [`D409`](rules/mismatched-section-underline-length.md), and
     /// [`D413`](rules/missing-blank-line-after-last-section.md).
     ///
-    /// For more information see [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings).
+    /// For more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.
     ///
     /// To enable an additional rule that's excluded from the convention,
     /// select the desired rule via its fully qualified rule code (e.g.,
