@@ -1,15 +1,20 @@
 use get_size2::GetSize;
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{parsed_module, parsed_string_annotation};
+use ruff_db::source::{SourceText, source_text};
+use ruff_python_ast::ModExpression;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
-use ruff_python_ast::{self as ast, helpers::is_dunder, name::Name};
+use ruff_python_ast::{self as ast, AnyNodeRef, helpers::is_dunder, name::Name};
+use ruff_python_parser::Parsed;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::definition::{DefinitionKind, DefinitionState};
+use rustc_hash::FxHashSet;
+use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_core::semantic_index;
 
-use crate::Db;
+use super::visible_reachable_definitions_for_name;
 use crate::dunder_all::dunder_all_names;
+use crate::{Db, SemanticModel};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
 pub struct UnusedImport {
@@ -26,6 +31,7 @@ pub struct UnusedImport {
 pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
     let parsed = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
+    let mut string_annotation_definitions = None;
     let mut explicit_exports = None;
     let mut unused = Vec::new();
 
@@ -83,6 +89,14 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             }
 
+            if multipart_import_name.is_none()
+                && string_annotation_definitions
+                    .get_or_insert_with(|| string_annotation_used_definitions(db, file))
+                    .contains(&definition)
+            {
+                continue;
+            }
+
             if is_intentionally_unused_name(&display_name) {
                 continue;
             }
@@ -108,6 +122,179 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
     unused.sort_unstable_by_key(|import| (import.range.start(), import.range.end()));
     unused.dedup_by_key(|import| import.range);
     unused
+}
+
+fn string_annotation_used_definitions(db: &dyn Db, file: File) -> FxHashSet<Definition<'_>> {
+    let parsed = parsed_module(db, file).load(db);
+    let source = source_text(db, file);
+    let model = SemanticModel::new(db, file);
+    let mut definitions = FxHashSet::default();
+    let mut visitor = StringAnnotationDefinitionVisitor {
+        model: &model,
+        source: &source,
+        definitions: &mut definitions,
+        in_annotation: false,
+        scope_node: None,
+    };
+
+    for stmt in parsed.suite() {
+        visitor.visit_stmt(stmt);
+    }
+
+    definitions
+}
+
+fn parse_string_annotation(
+    source: &SourceText,
+    string: &ast::ExprStringLiteral,
+) -> Option<Parsed<ModExpression>> {
+    let string_literal = string.as_single_part_string()?;
+
+    if string_literal.flags.prefix().is_raw()
+        || &source[string_literal.content_range()] != string_literal.as_str()
+    {
+        return None;
+    }
+
+    parsed_string_annotation(source.as_str(), string_literal).ok()
+}
+
+struct StringAnnotationDefinitionVisitor<'model, 'db> {
+    model: &'model SemanticModel<'db>,
+    source: &'model SourceText,
+    definitions: &'model mut FxHashSet<Definition<'db>>,
+    in_annotation: bool,
+    scope_node: Option<AnyNodeRef<'model>>,
+}
+
+impl<'model> StringAnnotationDefinitionVisitor<'model, '_> {
+    fn enter_annotation(&mut self, expr: &'model ast::Expr, visit: impl FnOnce(&mut Self)) {
+        let previous = std::mem::replace(&mut self.in_annotation, true);
+        let previous_scope_node = self.scope_node.replace(expr.into());
+        visit(self);
+        self.scope_node = previous_scope_node;
+        self.in_annotation = previous;
+    }
+
+    fn visit_string_annotation(&mut self, string: &'model ast::ExprStringLiteral) {
+        let Some(parsed) = parse_string_annotation(self.source, string) else {
+            return;
+        };
+
+        let Some(scope_node) = self.scope_node else {
+            return;
+        };
+        let mut visitor = ParsedStringAnnotationDefinitionVisitor {
+            model: self.model,
+            source: self.source,
+            definitions: self.definitions,
+            scope_node,
+            parse_nested_string_annotations: true,
+        };
+        visitor.visit_expr(parsed.expr());
+    }
+}
+
+impl<'model> SourceOrderVisitor<'model> for StringAnnotationDefinitionVisitor<'model, '_> {
+    fn visit_annotation(&mut self, expr: &'model ast::Expr) {
+        self.enter_annotation(expr, |visitor| {
+            source_order::walk_annotation(visitor, expr);
+        });
+    }
+
+    fn visit_expr(&mut self, expr: &'model ast::Expr) {
+        match expr {
+            ast::Expr::StringLiteral(string) if self.in_annotation => {
+                self.visit_string_annotation(string);
+            }
+            _ => source_order::walk_expr(self, expr),
+        }
+    }
+}
+
+struct ParsedStringAnnotationDefinitionVisitor<'model, 'db> {
+    model: &'model SemanticModel<'db>,
+    source: &'model SourceText,
+    definitions: &'model mut FxHashSet<Definition<'db>>,
+    scope_node: AnyNodeRef<'model>,
+    parse_nested_string_annotations: bool,
+}
+
+impl ParsedStringAnnotationDefinitionVisitor<'_, '_> {
+    fn collect_name(&mut self, name: &ast::ExprName) {
+        self.definitions
+            .extend(visible_reachable_definitions_for_name(
+                self.model,
+                name.id.as_str(),
+                self.scope_node,
+            ));
+    }
+
+    fn visit_string_annotation(&mut self, string: &ast::ExprStringLiteral) {
+        if !self.parse_nested_string_annotations {
+            return;
+        }
+
+        let Some(parsed) = parse_string_annotation(self.source, string) else {
+            return;
+        };
+
+        self.visit_expr(parsed.expr());
+    }
+
+    fn visit_subscript(&mut self, subscript: &ast::ExprSubscript) {
+        self.visit_expr(&subscript.value);
+        let subscript_name = annotation_subscript_name(&subscript.value);
+
+        if subscript_name == Some("Literal") {
+            // String arguments to `Literal` are values, not forward annotations.
+            self.with_parse_nested_string_annotations(false, |visitor| {
+                visitor.visit_expr(&subscript.slice);
+            });
+            return;
+        }
+
+        if subscript_name == Some("Annotated") {
+            if let ast::Expr::Tuple(tuple) = subscript.slice.as_ref()
+                && let Some((first, rest)) = tuple.elts.split_first()
+            {
+                self.visit_expr(first);
+                self.with_parse_nested_string_annotations(false, |visitor| {
+                    for elt in rest {
+                        visitor.visit_expr(elt);
+                    }
+                });
+                return;
+            }
+        }
+
+        self.visit_expr(&subscript.slice);
+    }
+
+    fn with_parse_nested_string_annotations(&mut self, parse: bool, visit: impl FnOnce(&mut Self)) {
+        let previous = std::mem::replace(&mut self.parse_nested_string_annotations, parse);
+        visit(self);
+        self.parse_nested_string_annotations = previous;
+    }
+}
+
+impl<'ast> SourceOrderVisitor<'ast> for ParsedStringAnnotationDefinitionVisitor<'_, '_> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        match expr {
+            ast::Expr::Name(name) => self.collect_name(name),
+            ast::Expr::StringLiteral(string) => self.visit_string_annotation(string),
+            ast::Expr::Subscript(subscript) => self.visit_subscript(subscript),
+            _ => source_order::walk_expr(self, expr),
+        }
+    }
+}
+
+fn annotation_subscript_name(expr: &ast::Expr) -> Option<&str> {
+    match expr {
+        ast::Expr::Name(name) => Some(name.id.as_str()),
+        ast::Expr::Attribute(attribute) => Some(attribute.attr.id.as_str()),
+        _ => None,
+    }
 }
 
 /// Returns `true` for concrete import aliases that can produce unused-import hints.
@@ -183,24 +370,148 @@ struct MultipartImportUseVisitor<'a> {
     imported_root: &'a str,
     import_range: TextRange,
     used: bool,
-    shadowed: bool,
+    shadowed_scopes: Vec<bool>,
 }
 
-impl<'a> MultipartImportUseVisitor<'a> {
-    fn new(imported_name: &'a str, import_range: TextRange) -> Self {
+impl<'import> MultipartImportUseVisitor<'import> {
+    fn new(imported_name: &'import str, import_range: TextRange) -> Self {
         Self {
             imported_name,
             imported_root: imported_name.split('.').next().unwrap_or(imported_name),
             import_range,
             used: false,
-            shadowed: false,
+            shadowed_scopes: vec![false],
         }
+    }
+
+    fn current_scope_is_shadowed(&self) -> bool {
+        self.shadowed_scopes.last().copied().unwrap_or_default()
+    }
+
+    fn shadow_current_scope(&mut self) {
+        if let Some(shadowed) = self.shadowed_scopes.last_mut() {
+            *shadowed = true;
+        }
+    }
+
+    fn with_scope(&mut self, initially_shadowed: bool, visit: impl FnOnce(&mut Self)) {
+        self.shadowed_scopes.push(initially_shadowed);
+        visit(self);
+        self.shadowed_scopes.pop();
+    }
+
+    fn visit_comprehension_scope<'ast>(
+        &mut self,
+        generators: &'ast [ast::Comprehension],
+        visit_body: impl FnOnce(&mut Self),
+    ) where
+        Self: SourceOrderVisitor<'ast>,
+    {
+        let Some((first, rest)) = generators.split_first() else {
+            self.with_scope(self.current_scope_is_shadowed(), visit_body);
+            return;
+        };
+
+        // The first iterator is evaluated in the surrounding scope. The targets,
+        // filters, later iterators, and body live in the comprehension scope.
+        self.visit_expr(&first.iter);
+        self.with_scope(self.current_scope_is_shadowed(), |visitor| {
+            visitor.visit_expr(&first.target);
+            for if_expr in &first.ifs {
+                visitor.visit_expr(if_expr);
+            }
+
+            for generator in rest {
+                visitor.visit_expr(&generator.iter);
+                visitor.visit_expr(&generator.target);
+                for if_expr in &generator.ifs {
+                    visitor.visit_expr(if_expr);
+                }
+            }
+
+            visit_body(visitor);
+        });
     }
 }
 
 impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        if self.used {
+            return;
+        }
+
+        match stmt {
+            ast::Stmt::FunctionDef(function) => {
+                for decorator in &function.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = function.type_params.as_deref() {
+                    self.visit_type_params(type_params);
+                }
+                self.visit_parameters(&function.parameters);
+                if let Some(returns) = function.returns.as_deref() {
+                    self.visit_annotation(returns);
+                }
+
+                let shadows_outer_scope = function.range.end() > self.import_range.end()
+                    && function.name.as_str() == self.imported_root;
+                if shadows_outer_scope {
+                    self.shadow_current_scope();
+                }
+
+                let body_is_shadowed = self.current_scope_is_shadowed()
+                    || parameters_bind_name(&function.parameters, self.imported_root);
+                self.with_scope(body_is_shadowed, |visitor| {
+                    for stmt in &function.body {
+                        visitor.visit_stmt(stmt);
+                    }
+                });
+            }
+            ast::Stmt::ClassDef(class) => {
+                for decorator in &class.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = class.type_params.as_deref() {
+                    self.visit_type_params(type_params);
+                }
+                if let Some(arguments) = class.arguments.as_deref() {
+                    self.visit_arguments(arguments);
+                }
+
+                let shadows_outer_scope = class.range.end() > self.import_range.end()
+                    && class.name.as_str() == self.imported_root;
+                if shadows_outer_scope {
+                    self.shadow_current_scope();
+                }
+
+                self.with_scope(self.current_scope_is_shadowed(), |visitor| {
+                    for stmt in &class.body {
+                        visitor.visit_stmt(stmt);
+                    }
+                });
+            }
+            _ => source_order::walk_stmt(self, stmt),
+        }
+    }
+
     fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        if self.used || self.shadowed {
+        if self.used {
+            return;
+        }
+
+        if let ast::Expr::Lambda(lambda) = expr {
+            if let Some(parameters) = lambda.parameters.as_deref() {
+                self.visit_parameters(parameters);
+            }
+
+            let body_is_shadowed = self.current_scope_is_shadowed()
+                || lambda
+                    .parameters
+                    .as_deref()
+                    .is_some_and(|parameters| parameters_bind_name(parameters, self.imported_root));
+            self.with_scope(body_is_shadowed, |visitor| {
+                visitor.visit_expr(&lambda.body);
+            });
             return;
         }
 
@@ -208,16 +519,46 @@ impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
             return;
         }
 
+        match expr {
+            ast::Expr::ListComp(list_comp) => {
+                self.visit_comprehension_scope(&list_comp.generators, |visitor| {
+                    visitor.visit_expr(&list_comp.elt);
+                });
+                return;
+            }
+            ast::Expr::SetComp(set_comp) => {
+                self.visit_comprehension_scope(&set_comp.generators, |visitor| {
+                    visitor.visit_expr(&set_comp.elt);
+                });
+                return;
+            }
+            ast::Expr::DictComp(dict_comp) => {
+                self.visit_comprehension_scope(&dict_comp.generators, |visitor| {
+                    visitor.visit_expr(&dict_comp.key);
+                    visitor.visit_expr(&dict_comp.value);
+                });
+                return;
+            }
+            ast::Expr::Generator(generator) => {
+                self.visit_comprehension_scope(&generator.generators, |visitor| {
+                    visitor.visit_expr(&generator.elt);
+                });
+                return;
+            }
+            _ => {}
+        }
+
         if let ast::Expr::Name(name) = expr
             && matches!(name.ctx, ast::ExprContext::Store)
             && name.id == self.imported_root
         {
-            self.shadowed = true;
+            self.shadow_current_scope();
             return;
         }
 
         if let ast::Expr::Attribute(attribute) = expr
             && matches!(attribute.ctx, ast::ExprContext::Load)
+            && !self.current_scope_is_shadowed()
             && expr_uses_dotted_import(expr, self.imported_name)
         {
             self.used = true;
@@ -238,7 +579,7 @@ fn multipart_import_is_used_in_body(
     for stmt in body {
         visitor.visit_stmt(stmt);
 
-        if visitor.used || visitor.shadowed {
+        if visitor.used {
             break;
         }
     }
@@ -260,12 +601,18 @@ fn multipart_import_is_used_in_class_body(
 
         visitor.visit_stmt(stmt);
 
-        if visitor.used || visitor.shadowed {
+        if visitor.used {
             break;
         }
     }
 
     visitor.used
+}
+
+fn parameters_bind_name(parameters: &ast::Parameters, name: &str) -> bool {
+    parameters
+        .iter()
+        .any(|parameter| parameter.name().as_str() == name)
 }
 
 #[cfg(test)]
@@ -580,6 +927,97 @@ mod tests {
         )?;
 
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_module_scope_multipart_import_used_after_function_local_shadowing()
+    -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            import os.path
+
+            def f():
+                os = None
+
+            print(os.path)
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_multipart_import_shadowed_by_function_parameter() -> anyhow::Result<()> {
+        let entries = UnusedImportTest::new().entries(
+            r#"
+            import os.path
+
+            def f(os):
+                print(os.path)
+            "#,
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("os.path".to_string(), "os.path".to_string())]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reports_multipart_import_shadowed_by_lambda_parameter() -> anyhow::Result<()> {
+        let entries = UnusedImportTest::new().entries(
+            r#"
+            import os.path
+
+            f = lambda os: os.path
+            "#,
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("os.path".to_string(), "os.path".to_string())]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn skips_multipart_import_used_after_comprehension_target_shadowing() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            import os.path
+
+            _ = [os for os in range(3)]
+            _ = {os for os in range(3)}
+            _ = {os: None for os in range(3)}
+            _ = (os for os in range(3))
+            print(os.path)
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_multipart_import_used_only_from_comprehension_shadowing() -> anyhow::Result<()> {
+        let entries = UnusedImportTest::new().entries(
+            r#"
+            import os.path
+
+            _ = [os.path for os in values]
+            _ = {os.path for os in values}
+            _ = {os.path: None for os in values}
+            _ = (os.path for os in values)
+            "#,
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("os.path".to_string(), "os.path".to_string())]
+        );
         Ok(())
     }
 
@@ -992,6 +1430,21 @@ mod tests {
     }
 
     #[test]
+    fn skips_imports_used_in_function_scope_stringified_annotations() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+
+            def f():
+                value: "Path"
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
     fn reports_imports_used_only_as_literal_string_values() -> anyhow::Result<()> {
         let names = UnusedImportTest::new().names(
             r#"
@@ -1003,6 +1456,36 @@ mod tests {
         )?;
 
         assert_eq!(names, vec!["Path"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_imports_used_only_as_annotated_string_metadata() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+            from typing import Annotated
+
+            value: "Annotated[int, 'Path']"
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["Path"]);
+        Ok(())
+    }
+
+    #[test]
+    fn skips_import_used_as_annotated_string_first_argument() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+            from typing import Annotated
+
+            value: "Annotated['Path', 'metadata']"
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
         Ok(())
     }
 
