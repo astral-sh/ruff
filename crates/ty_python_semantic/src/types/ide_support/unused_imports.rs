@@ -534,7 +534,9 @@ impl<'a> SourceOrderVisitor<'a> for MultipartImportUseVisitor<'_> {
             }
             ast::Expr::DictComp(dict_comp) => {
                 self.visit_comprehension_scope(&dict_comp.generators, |visitor| {
-                    visitor.visit_expr(&dict_comp.key);
+                    if let Some(key) = dict_comp.key.as_deref() {
+                        visitor.visit_expr(key);
+                    }
                     visitor.visit_expr(&dict_comp.value);
                 });
                 return;
