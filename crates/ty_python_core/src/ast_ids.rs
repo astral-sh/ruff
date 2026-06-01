@@ -34,11 +34,11 @@ pub(crate) struct AstIds {
 
 impl AstIds {
     pub(super) fn from_builders(builders: IndexVec<FileScopeId, AstIdsBuilder>) -> Self {
-        let capacity = builders.iter().map(|builder| builder.uses_map.len()).sum();
+        let capacity = builders.iter().map(|builder| builder.uses.len()).sum();
         let mut uses_map = FxHashMap::with_capacity_and_hasher(capacity, FxBuildHasher);
 
         for builder in builders {
-            for (key, use_id) in builder.uses_map {
+            for (key, use_id) in builder.uses {
                 let previous = uses_map.insert(key, use_id);
                 debug_assert!(previous.is_none());
             }
@@ -112,19 +112,23 @@ impl HasScopedUseId for ast::ExprRef<'_> {
 
 #[derive(Debug, Default)]
 pub(super) struct AstIdsBuilder {
-    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    uses: Vec<(ExpressionNodeKey, ScopedUseId)>,
 }
 
 impl AstIdsBuilder {
     /// Adds `expr` to the use ids map and returns its id.
     pub(super) fn record_use(&mut self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
-        let use_id = self.uses_map.len().into();
-        self.uses_map.insert(expr.into(), use_id);
+        let use_id = self.uses.len().into();
+        self.uses.push((expr.into(), use_id));
         use_id
     }
 
-    pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
-        self.uses_map.get(&key.into()).copied()
+    pub(super) fn try_find_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
+        let key = key.into();
+        self.uses
+            .iter()
+            .rev()
+            .find_map(|(use_key, use_id)| (*use_key == key).then_some(*use_id))
     }
 }
 

@@ -790,7 +790,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
         let use_def = self.current_use_def_map();
-        let use_id = self.current_ast_ids().try_use_id(collection_use)?;
+        let use_id = self.current_ast_ids().try_find_use_id(collection_use)?;
 
         use_def
             .bindings_at_use(use_id)
