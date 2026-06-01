@@ -3082,6 +3082,24 @@ class NestedLists2:
 reveal_type(NestedLists2().x)  # revealed: list[Divergent]
 ```
 
+During fixpoint iteration, overloads may fail to resolve correctly and be treated as `Unknown`. Even
+in this case, `Divergent` is propagated, guaranteeing the convergence of type inference. Here is the
+regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+
+```py
+class NestedListsConcat:
+    def __init__(self):
+        self.x = [0]
+        self.y = [0]
+
+    def f(self, y: list):
+        self.x = [self.x] + []
+        self.y = [self.y].__add__(y)
+
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
