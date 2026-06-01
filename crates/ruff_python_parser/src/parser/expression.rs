@@ -28,7 +28,10 @@ use crate::{
     UnsupportedSyntaxErrorKind,
 };
 
-use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
+use super::{
+    InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind,
+    STACK_GROWTH_NESTING_THRESHOLD,
+};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -343,6 +346,39 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
+        if self.tokens.nesting() < STACK_GROWTH_NESTING_THRESHOLD
+            && !Self::token_starts_unnested_recursive_lhs(token)
+        {
+            return self.parse_lhs_expression_inner(left_precedence, context, token);
+        }
+
+        self.with_grown_stack(|parser| {
+            parser.parse_lhs_expression_inner(left_precedence, context, token)
+        })
+    }
+
+    /// Returns whether parsing an expression that starts with `token` can recurse without
+    /// first increasing delimiter nesting.
+    #[inline]
+    fn token_starts_unnested_recursive_lhs(token: TokenKind) -> bool {
+        token.as_unary_operator().is_some()
+            || matches!(
+                token,
+                TokenKind::Star
+                    | TokenKind::Await
+                    | TokenKind::Lambda
+                    | TokenKind::Yield
+                    | TokenKind::FStringStart
+                    | TokenKind::TStringStart
+            )
+    }
+
+    fn parse_lhs_expression_inner(
+        &mut self,
+        left_precedence: OperatorPrecedence,
+        context: ExpressionContext,
+        token: TokenKind,
+    ) -> ParsedExpr {
         let start = self.node_start();
 
         if let Some(unary_op) = token.as_unary_operator() {
@@ -661,11 +697,10 @@ impl<'src> Parser<'src> {
                 self.parse_strings()
             }
             TokenKind::Lpar => {
-                // Nested content re-enters expression parsing after the opening delimiter.
-                return self.with_grown_stack(Self::parse_parenthesized_expression);
+                return self.parse_parenthesized_expression();
             }
-            TokenKind::Lsqb => self.with_grown_stack(Self::parse_list_like_expression),
-            TokenKind::Lbrace => self.with_grown_stack(Self::parse_set_or_dict_like_expression),
+            TokenKind::Lsqb => self.parse_list_like_expression(),
+            TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
 
             kind => {
                 if kind.is_keyword() {
@@ -702,12 +737,8 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
-                TokenKind::Lpar => Expr::Call(
-                    self.with_grown_stack(|parser| parser.parse_call_expression(lhs, start)),
-                ),
-                TokenKind::Lsqb => Expr::Subscript(
-                    self.with_grown_stack(|parser| parser.parse_subscript_expression(lhs, start)),
-                ),
+                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
+                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => {
                     Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
                 }
@@ -1136,9 +1167,7 @@ impl<'src> Parser<'src> {
             self.bump(TokenKind::from(nested_op));
         }
 
-        let operand = self.with_grown_stack(|parser| {
-            parser.parse_binary_expression_or_higher(precedence, context)
-        });
+        let operand = self.parse_binary_expression_or_higher(precedence, context);
         let operand =
             nested_operators
                 .into_iter()
@@ -1622,13 +1651,11 @@ impl<'src> Parser<'src> {
         let mut flags = self.tokens.current_flags().as_any_string_flags();
 
         self.bump(kind.start_token());
-        let elements = self.with_grown_stack(|parser| {
-            parser.parse_interpolated_string_elements(
-                flags,
-                InterpolatedStringElementsKind::Regular(kind),
-                kind,
-            )
-        });
+        let elements = self.parse_interpolated_string_elements(
+            flags,
+            InterpolatedStringElementsKind::Regular(kind),
+            kind,
+        );
 
         if !self.expect(kind.end_token()) {
             flags = flags.with_unclosed(true);
@@ -2745,21 +2772,19 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
-        let parsed_expr = self.with_grown_stack(|parser| {
-            match context.starred_expression_precedence() {
-                StarredExpressionPrecedence::Conditional => parser
-                    .parse_conditional_expression_or_higher_impl(
-                        // test_err starred_starred_expression
-                        // print(*
-                        // *[])
-                        // print(* *[])
-                        context.disallow_starred_expressions(),
-                    ),
-                StarredExpressionPrecedence::BitwiseOr => {
-                    parser.parse_expression_with_bitwise_or_precedence()
-                }
+        let parsed_expr = match context.starred_expression_precedence() {
+            StarredExpressionPrecedence::Conditional => self
+                .parse_conditional_expression_or_higher_impl(
+                    // test_err starred_starred_expression
+                    // print(*
+                    // *[])
+                    // print(* *[])
+                    context.disallow_starred_expressions(),
+                ),
+            StarredExpressionPrecedence::BitwiseOr => {
+                self.parse_expression_with_bitwise_or_precedence()
             }
-        });
+        };
 
         ast::ExprStarred {
             value: Box::new(parsed_expr.expr),
@@ -2780,12 +2805,10 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Await);
 
-        let parsed_expr = self.with_grown_stack(|parser| {
-            parser.parse_binary_expression_or_higher(
-                OperatorPrecedence::Await,
-                ExpressionContext::default(),
-            )
-        });
+        let parsed_expr = self.parse_binary_expression_or_higher(
+            OperatorPrecedence::Await,
+            ExpressionContext::default(),
+        );
 
         ast::ExprAwait {
             value: Box::new(parsed_expr.expr),
@@ -2810,9 +2833,7 @@ impl<'src> Parser<'src> {
         }
 
         let value = self.at_expr().then(|| {
-            let parsed_expr = self.with_grown_stack(|parser| {
-                parser.parse_expression_list(ExpressionContext::starred_bitwise_or())
-            });
+            let parsed_expr = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
 
             // test_ok iter_unpack_yield_py37
             // # parse_options: {"target-version": "3.7"}
@@ -2868,7 +2889,7 @@ impl<'src> Parser<'src> {
         // would have stopped at the comma. Then, the outer expression would
         // have been a tuple expression with two elements: `yield from x` and `y`.
         let expr = self
-            .with_grown_stack(|parser| parser.parse_expression_list(ExpressionContext::default()))
+            .parse_expression_list(ExpressionContext::default())
             .expr;
 
         match &expr {
