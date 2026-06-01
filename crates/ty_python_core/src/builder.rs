@@ -34,7 +34,7 @@ use crate::definition::{
     ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
-use crate::frozen::{FrozenMap, FrozenSalsaMap, FrozenSet};
+use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
@@ -2234,7 +2234,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_ids_by_scope.shrink_to_fit();
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
-        let uses_by_collection = FrozenSalsaMap::from_entries(
+        let uses_by_collection = FrozenMap::from_entries(
             self.uses_by_collection
                 .into_iter()
                 .map(|(definition, uses)| (definition, uses.into_boxed_slice()))

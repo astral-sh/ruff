@@ -19,7 +19,7 @@ use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
 
-use crate::frozen::{FrozenMap, FrozenSalsaMap, FrozenSet};
+use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
 pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
@@ -293,7 +293,7 @@ pub struct SemanticIndex<'db> {
     collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
 
     // Map from a collection literal definition to statements containing a constraining use.
-    uses_by_collection: FrozenSalsaMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
+    uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,

@@ -1,6 +1,3 @@
-use rustc_hash::FxHashMap;
-use salsa::plumbing::AsId;
-
 /// Compact immutable key-value entries stored in key order.
 ///
 /// Analysis builds these tables with hash maps, but after construction they only need keyed
@@ -100,43 +97,6 @@ impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter_mut()
-    }
-}
-
-/// Compact immutable key-value entries for Salsa ingredients.
-///
-/// Unlike [`FrozenMap`], this orders keys by their Salsa ingredient IDs rather than requiring
-/// `K: Ord`.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct FrozenSalsaMap<K, V>(Box<[(K, V)]>);
-
-impl<K: AsId, V> FrozenSalsaMap<K, V> {
-    pub(crate) fn from_entries(mut entries: Vec<(K, V)>) -> Self {
-        entries.sort_unstable_by_key(|(key, _)| key.as_id());
-        Self(entries.into_boxed_slice())
-    }
-
-    pub(crate) fn get(&self, key: &K) -> Option<&V> {
-        let key_id = key.as_id();
-        self.0
-            .binary_search_by(|(candidate, _)| candidate.as_id().cmp(&key_id))
-            .ok()
-            .map(|index| &self.0[index].1)
-    }
-}
-
-impl<K: AsId, V> From<FxHashMap<K, V>> for FrozenSalsaMap<K, V> {
-    fn from(map: FxHashMap<K, V>) -> Self {
-        Self::from_entries(map.into_iter().collect())
-    }
-}
-
-impl<K: AsId, V> std::ops::Index<&K> for FrozenSalsaMap<K, V> {
-    type Output = V;
-
-    #[track_caller]
-    fn index(&self, index: &K) -> &Self::Output {
-        self.get(index).expect("key not found")
     }
 }
 
