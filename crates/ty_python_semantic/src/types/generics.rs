@@ -103,7 +103,8 @@ pub(crate) fn bind_typevar<'db>(
         }
     }
     // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
-    // Class-scoped type variables are not visible from inner class scopes.
+    // Legacy class-scoped type variables are not visible from inner class scopes, but
+    // PEP 695 class type parameter scopes do cover inner scopes.
     let mut crossed_class_scope = false;
     for (_, ancestor_scope) in index.ancestor_scopes(containing_scope) {
         let is_class_scope = ancestor_scope.kind().is_class();
@@ -120,9 +121,14 @@ pub(crate) fn bind_typevar<'db>(
             }
             node => GenericContext::of_node(db, node, index),
         };
-        // If we've already crossed a class boundary, skip class-scoped generic contexts.
-        // This prevents inner classes from accessing type parameters of outer classes.
-        if (!is_class_scope || !crossed_class_scope)
+        let class_typevars_visible = !is_class_scope
+            || !crossed_class_scope
+            || ancestor_scope.node().as_class().is_some_and(|class| {
+                let definition = index.expect_single_definition(class);
+                original_class_type(db, definition)
+                    .is_some_and(|class| class.has_pep_695_type_params(db))
+            });
+        if class_typevars_visible
             && let Some(generic_context) = generic_context
             && let Some(bound) = generic_context.binds_typevar(db, typevar)
         {

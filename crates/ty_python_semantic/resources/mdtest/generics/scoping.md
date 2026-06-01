@@ -392,21 +392,42 @@ def foo():
         ): ...
 ```
 
-## Class scopes do not cover inner scopes
+## Legacy class scopes do not cover inner scopes
 
-Just like regular symbols, the typevars of a generic class are only available in that class's scope,
-and are not available in nested scopes.
+Legacy typevars of a generic class are only available in that class's scope, and are not available
+in nested scopes.
 
 ```py
-class C[T]:
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class C(Generic[T]):
     ok1: list[T] = []
 
     class Bad:
         # error: [unbound-type-variable]
         bad: list[T] = []
 
-    class Inner[S]: ...
+    class Inner(Generic[S]): ...
     ok2: Inner[T]
+```
+
+## PEP 695 class scopes cover inner scopes
+
+Unlike legacy typevars, PEP 695 class type parameters are valid in inner scopes contained within the
+class body.
+
+```py
+from typing import Optional
+
+class C[T]:
+    class Inner:
+        data: Optional[T] = None
+
+        def method(self, value: T) -> T:
+            return value
 ```
 
 ## Type parameter defaults cannot reference outer-scope type parameters
