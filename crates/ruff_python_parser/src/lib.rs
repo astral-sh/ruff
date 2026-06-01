@@ -88,6 +88,13 @@ mod token_set;
 mod token_source;
 pub mod typing;
 
+// Windows test threads have a 1 MiB stack by default. Keep successfully parsed
+// recursive ASTs shallow enough for their unprotected drop glue in debug builds.
+#[cfg(all(test, target_os = "windows"))]
+const RECURSIVE_AST_TEST_DEPTH: usize = 1_000;
+#[cfg(all(test, not(target_os = "windows")))]
+const RECURSIVE_AST_TEST_DEPTH: usize = 5_000;
+
 /// Parse a full Python module usually consisting of multiple lines.
 ///
 /// This is a convenience function that can be used to parse a full Python program without having to

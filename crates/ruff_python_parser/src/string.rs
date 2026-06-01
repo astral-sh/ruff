@@ -527,16 +527,14 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
-    use crate::{InterpolatedStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
+    use crate::{
+        InterpolatedStringErrorType, ParseError, ParseErrorType, Parsed, RECURSIVE_AST_TEST_DEPTH,
+        parse_module,
+    };
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
-    // Windows test threads have a 1 MiB stack by default. Keep successfully
-    // parsed ASTs shallow enough for their recursive drop glue in debug builds
-    // while still exercising parser stack growth.
-    const FORMAT_SPEC_STACK_GROWTH_DEPTH: usize = 1_000;
-
     fn parse_suite(source: &str) -> Result<Suite, ParseError> {
         parse_module(source).map(Parsed::into_suite)
     }
@@ -592,7 +590,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     #[test]
     fn fstring_nested_spec_stack_growth() {
-        parse_suite(&nested_format_spec('f', FORMAT_SPEC_STACK_GROWTH_DEPTH)).unwrap();
+        parse_suite(&nested_format_spec('f', RECURSIVE_AST_TEST_DEPTH)).unwrap();
     }
 
     #[test]
@@ -710,7 +708,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     #[test]
     fn tstring_nested_spec_stack_growth() {
-        parse_suite(&nested_format_spec('t', FORMAT_SPEC_STACK_GROWTH_DEPTH)).unwrap();
+        parse_suite(&nested_format_spec('t', RECURSIVE_AST_TEST_DEPTH)).unwrap();
     }
 
     #[test]
