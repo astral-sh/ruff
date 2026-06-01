@@ -33,9 +33,6 @@ mod tests;
 // `ensure_sufficient_stack` helper.
 const STACK_RED_ZONE: usize = 100 * 1024;
 const STACK_SIZE: usize = 1024 * 1024;
-// Avoid stack checks on ordinary shallow expressions inside delimiters such as calls and
-// subscripts. Nested content re-enters `parse_lhs_expression` after the opening delimiter.
-const STACK_GROWTH_NESTING_THRESHOLD: u32 = 64;
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
