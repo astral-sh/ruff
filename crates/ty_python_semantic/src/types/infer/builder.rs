@@ -6773,7 +6773,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .origin(self.db())
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
-                    let lower = bounds?.lower()?;
+                    let lower = bounds?.lower?;
 
                     let lower = if tcx.annotation.is_none() {
                         // Constraints learned from later collection uses should follow the same

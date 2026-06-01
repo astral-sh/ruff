@@ -2085,8 +2085,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.db,
             self.constraints,
             bound_typevar,
-            bounds.lower(),
-            bounds.upper(),
+            bounds.lower,
+            bounds.upper,
         );
         self.pending
             .intersect(self.db, self.constraints, constraint);

@@ -4805,7 +4805,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return None;
             }
 
-            let lower = bounds.lower()?;
+            let lower = bounds.lower?;
             if lower.is_never() {
                 return None;
             }
@@ -4826,7 +4826,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let choose_solution =
             |typevar: BoundTypeVarInstance<'db>, bounds: Option<ConstraintBounds<'db>>| {
                 let bounds = bounds?;
-                if let Some(lower) = bounds.lower()
+                if let Some(lower) = bounds.lower
                     && let Some(&preferred_ty) =
                         preferred_type_mappings.get(&typevar.identity(self.db))
                     && lower.is_assignable_to(self.db, preferred_ty)

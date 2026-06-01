@@ -1028,8 +1028,8 @@ pub(crate) struct Constraint<'db> {
 /// satisfiability.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct ConstraintBounds<'db> {
-    lower: Option<Type<'db>>,
-    upper: Option<Type<'db>>,
+    pub(crate) lower: Option<Type<'db>>,
+    pub(crate) upper: Option<Type<'db>>,
 }
 
 impl<'db> ConstraintBounds<'db> {
@@ -1039,14 +1039,6 @@ impl<'db> ConstraintBounds<'db> {
 
     pub(crate) fn exact(ty: Type<'db>) -> Self {
         Self::new(Some(ty), Some(ty))
-    }
-
-    pub(crate) fn lower(self) -> Option<Type<'db>> {
-        self.lower
-    }
-
-    pub(crate) fn upper(self) -> Option<Type<'db>> {
-        self.upper
     }
 
     fn has_lower(self) -> bool {
@@ -3228,11 +3220,11 @@ impl<'db> PathBounds<'db> {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
-                if let Some(lower) = bounds.lower() {
+                if let Some(lower) = bounds.lower {
                     return Ok(Some(lower));
                 }
 
-                if let Some(upper) = bounds.upper() {
+                if let Some(upper) = bounds.upper {
                     return Ok(Some(IntersectionType::from_elements(db, [upper, bound])));
                 }
 
