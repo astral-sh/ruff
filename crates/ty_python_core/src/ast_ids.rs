@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_db::files::File;
@@ -112,7 +114,7 @@ impl HasScopedUseId for ast::ExprRef<'_> {
 
 #[derive(Debug, Default)]
 pub(super) struct AstIdsBuilder {
-    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    uses_map: BTreeMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIdsBuilder {
