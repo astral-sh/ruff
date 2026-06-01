@@ -9,7 +9,8 @@ lint.select = ["UP032"]
 A `str.format` argument is evaluated once, but an f-string re-evaluates it on every interpolation. So
 when an argument is used more than once and can have a side effect, the call is left unconverted to
 avoid running that side effect twice. This used to cover only call expressions; it now covers any
-side-effecting expression, such as a subscript or a walrus binding.
+side-effecting expression, such as a subscript or a walrus binding. Even a builtin call like `list()`
+counts, since the f-string would construct a new object on each interpolation.
 
 ```py
 def foo(): ...
@@ -20,6 +21,7 @@ d = {}
 "{x} {x}".format(x=foo())
 "{x} {x}".format(x=d["k"])
 "{x} {x}".format(x=(y := 1))
+"{x.append} {x.append}".format(x=list())
 ```
 
 ## A single use is still converted
