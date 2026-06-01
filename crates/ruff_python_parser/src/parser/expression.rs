@@ -343,15 +343,6 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        self.parse_lhs_expression_inner(left_precedence, context, token)
-    }
-
-    fn parse_lhs_expression_inner(
-        &mut self,
-        left_precedence: OperatorPrecedence,
-        context: ExpressionContext,
-        token: TokenKind,
-    ) -> ParsedExpr {
         let start = self.node_start();
 
         if let Some(unary_op) = token.as_unary_operator() {
