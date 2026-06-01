@@ -4806,10 +4806,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             let lower = bounds.lower?;
-            if lower.is_never() {
-                return None;
-            }
-
             let promoted = lower.promote(self.db);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
