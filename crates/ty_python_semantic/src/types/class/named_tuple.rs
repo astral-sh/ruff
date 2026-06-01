@@ -52,6 +52,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 Parameter::positional_or_keyword(field.name)
                     .with_annotated_type(field.ty)
                     .with_optional_default_type(field.default)
+                    .with_definition(field.definition)
             }));
 
             let signature = Signature::new_generic(
@@ -89,6 +90,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 Parameter::keyword_only(field.name)
                     .with_annotated_type(field.ty)
                     .with_default_type(field.ty)
+                    .with_definition(field.definition)
             }));
 
             let signature = Signature::new(Parameters::new(db, parameters), self_ty);
@@ -115,6 +117,8 @@ pub struct NamedTupleField<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
     pub(crate) default: Option<Type<'db>>,
+    /// The field's first declaration for a class based named tuple.
+    pub(crate) definition: Option<Definition<'db>>,
 }
 
 /// A namedtuple created via the functional form `namedtuple(name, fields)` or
@@ -231,7 +235,9 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=dynamic_namedtuple_mro_cycle_initial
+        cycle_initial=|db, _, self_| Mro::from_error(
+            db, ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
+        ),
     )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
@@ -406,7 +412,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
-        #[salsa::tracked(cycle_initial=deferred_spec_initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(
+            cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
             let module = parsed_module(db, definition.file(db)).load(db);
             let node = definition
@@ -419,14 +428,6 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)) => spec,
                 _ => NamedTupleSpec::unknown(db),
             }
-        }
-
-        fn deferred_spec_initial<'db>(
-            db: &'db dyn Db,
-            _id: salsa::Id,
-            _definition: Definition<'db>,
-        ) -> NamedTupleSpec<'db> {
-            NamedTupleSpec::unknown(db)
         }
 
         match self.anchor(db) {
@@ -448,17 +449,6 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_fields(db)
     }
-}
-
-fn dynamic_namedtuple_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    self_: DynamicNamedTupleLiteral<'db>,
-) -> Mro<'db> {
-    Mro::from_error(
-        db,
-        ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
-    )
 }
 
 /// Anchor for identifying a dynamic `namedtuple`/`NamedTuple` class literal.
@@ -558,6 +548,7 @@ impl<'db> NamedTupleSpec<'db> {
                             .unwrap_or(div)
                     },
                     default: None,
+                    definition: f.definition,
                 })
             })
             .collect::<Option<Box<_>>>()?;

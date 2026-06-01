@@ -738,6 +738,9 @@ impl<'db> BoundSuperType<'db> {
                 }
                 return Ok(builder.build());
             }
+            Type::EnumComplement(complement) => {
+                return delegate_to(complement.to_intersection(db));
+            }
             Type::TypeAlias(alias) => {
                 return delegate_to(alias.value_type(db));
             }
@@ -836,7 +839,8 @@ impl<'db> BoundSuperType<'db> {
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Callable(_)
-            | Type::DataclassTransformer(_) => {
+            | Type::DataclassTransformer(_)
+            | Type::TypeForm(_) => {
                 return Err(BoundSuperError::AbstractOwnerType {
                     owner_type,
                     pivot_class: pivot_class_type,

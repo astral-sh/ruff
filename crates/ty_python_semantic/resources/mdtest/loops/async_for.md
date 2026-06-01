@@ -35,6 +35,32 @@ async def foo():
         reveal_type(y)  # revealed: str
 ```
 
+## Async for loop over narrowed TypeVar
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Self
+
+class AsyncStrings:
+    def __aiter__(self) -> Self:
+        return self
+
+    async def __anext__(self) -> str:
+        return "x"
+
+async def foo[T: int | AsyncStrings](value: T) -> None:
+    if isinstance(value, int):
+        return
+
+    reveal_type(value)  # revealed: T@foo & ~int
+    async for item in value:
+        reveal_type(item)  # revealed: str
+```
+
 ## Error cases
 
 ### No `__aiter__` method

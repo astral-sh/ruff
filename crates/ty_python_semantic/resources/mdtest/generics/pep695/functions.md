@@ -137,6 +137,31 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+Protocol inference should also preserve unions of structurally matching arguments:
+
+```py
+from typing import Protocol
+
+class A:
+    def foo(self) -> "A":
+        raise NotImplementedError
+
+class B:
+    def foo(self) -> "B":
+        raise NotImplementedError
+
+class SupportsFoo[T](Protocol):
+    def foo(self) -> T: ...
+
+def takes_in_supports_foo[T](obj: SupportsFoo[T]) -> T:
+    raise NotImplementedError
+
+def _(a: A, b: B, x: A | B):
+    reveal_type(takes_in_supports_foo(a))  # revealed: A
+    reveal_type(takes_in_supports_foo(b))  # revealed: B
+    reveal_type(takes_in_supports_foo(x))  # revealed: A | B
+```
+
 ## Inferring tuple parameter types
 
 ```py
@@ -601,8 +626,7 @@ be able to unify the two assignments to `A`.
 ```py
 from functions import invoke, Covariant, head_covariant, lift_covariant
 
-# TODO: revealed: `int`
-# revealed: Unknown
+# revealed: int
 reveal_type(invoke(head_covariant, Covariant[int]()))
 # revealed: Covariant[Literal[1]]
 reveal_type(invoke(lift_covariant, 1))
@@ -714,6 +738,25 @@ def decorated[T](t: T) -> None:
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]
     reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Attribute access on `Callable`-bounded TypeVars
+
+```py
+from typing import Callable
+
+def my_decorator[T: Callable](f: T) -> None:
+    # error: [unresolved-attribute]
+    f.whatever
+    # error: [unresolved-attribute]
+    f.whatever = 1
+
+class Box[T: Callable]:
+    cls: type[T]
+
+def specialized(box: Box[Callable]) -> None:
+    # error: [unresolved-attribute]
+    box.cls.whatever
 ```
 
 ## Solving TypeVars with upper bounds in unions

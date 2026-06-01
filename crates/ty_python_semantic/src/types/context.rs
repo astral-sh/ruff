@@ -43,7 +43,6 @@ pub(crate) struct InferContext<'db, 'ast> {
     file: File,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
-    no_type_check: InNoTypeCheck,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
     bomb: DebugDropBomb,
@@ -57,7 +56,6 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             module,
             file: scope.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
-            no_type_check: InNoTypeCheck::default(),
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
@@ -167,38 +165,36 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         DiagnosticGuardBuilder::new(self, id, severity)
     }
 
-    pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) -> InNoTypeCheck {
-        std::mem::replace(&mut self.no_type_check, no_type_check)
-    }
-
     fn is_in_no_type_check(&self) -> bool {
-        match self.no_type_check {
-            InNoTypeCheck::Possibly => {
-                // Accessing the semantic index here is fine because
-                // the index belongs to the same file as for which we emit the diagnostic.
-                let index = semantic_index(self.db, self.file);
-
-                let scope_id = self.scope.file_scope_id(self.db);
-
-                // Inspect all ancestor function scopes by walking bottom up and check
-                // if any is decorated with `@no_type_check`. We use the undecorated type
-                // rather than the binding type because other decorators (e.g. unknown ones)
-                // may transform the function type into a non-`FunctionLiteral`.
-                // `undecorated_type()` can be `None` during cycle recovery.
-                index
-                    .ancestor_scopes(scope_id)
-                    .filter_map(|(_, scope)| scope.node().as_function())
-                    .filter_map(|node| {
-                        infer_definition_types(self.db, index.expect_single_definition(node))
-                            .undecorated_type()
-                            .and_then(Type::as_function_literal)
-                    })
-                    .any(|function_ty| {
-                        function_ty.has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
-                    })
-            }
-            InNoTypeCheck::Yes => true,
+        if self
+            .inference_flags
+            .contains(InferenceFlags::IN_NO_TYPE_CHECK)
+        {
+            return true;
         }
+
+        // Accessing the semantic index here is fine because
+        // the index belongs to the same file as for which we emit the diagnostic.
+        let index = semantic_index(self.db, self.file);
+
+        let scope_id = self.scope.file_scope_id(self.db);
+
+        // Inspect all ancestor function scopes by walking bottom up and check
+        // if any is decorated with `@no_type_check`. We use the undecorated type
+        // rather than the binding type because other decorators (e.g. unknown ones)
+        // may transform the function type into a non-`FunctionLiteral`.
+        // `undecorated_type()` can be `None` during cycle recovery.
+        index
+            .ancestor_scopes(scope_id)
+            .filter_map(|(_, scope)| scope.node().as_function())
+            .filter_map(|node| {
+                infer_definition_types(self.db, index.expect_single_definition(node))
+                    .undecorated_type()
+                    .and_then(Type::as_function_literal)
+            })
+            .any(|function_ty| {
+                function_ty.has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
+            })
     }
 
     /// Check whether a diagnostic emitted at `range` is in reachable code.
@@ -237,17 +233,6 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("defused", &self.bomb)
             .finish()
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
-pub(crate) enum InNoTypeCheck {
-    /// The inference might be in a `no_type_check` block but only if any
-    /// ancestor function is decorated with `@no_type_check`.
-    #[default]
-    Possibly,
-
-    /// The inference is known to be in an `@no_type_check` decorated function.
-    Yes,
 }
 
 /// An abstraction for mutating a diagnostic through the lense of a lint.

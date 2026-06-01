@@ -5,8 +5,8 @@ from asyncio.events import AbstractEventLoop
 from collections.abc import Awaitable, Callable, Coroutine, Generator
 from contextvars import Context
 from types import FrameType, GenericAlias
-from typing import Any, Literal, TextIO, TypeVar
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import Any, Literal, TextIO, TypeAlias, TypeVar
+from typing_extensions import Self, disjoint_base
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
@@ -32,10 +32,12 @@ class Future(Awaitable[_T]):
     @property
     def _exception(self) -> BaseException | None: ...
     _blocking: bool
+
     @property
     def _log_traceback(self) -> bool: ...
     @_log_traceback.setter
     def _log_traceback(self, val: Literal[False]) -> None: ...
+
     _asyncio_future_blocking: bool  # is a part of duck-typing contract for `Future`
     def __init__(self, *, loop: AbstractEventLoop | None = None) -> None: ...
     def __del__(self) -> None:
@@ -242,7 +244,7 @@ def _set_running_loop(loop: AbstractEventLoop | None, /) -> None:
     This function is thread-specific.
     """
 
-def _get_running_loop() -> AbstractEventLoop:
+def _get_running_loop() -> AbstractEventLoop | None:
     """Return the running event loop or None.
 
     This is a low-level function intended to be used by event loops.

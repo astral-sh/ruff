@@ -26,6 +26,7 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Ord, PartialOrd)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     pub file: File,
@@ -263,9 +264,8 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     AugmentedAssignment(&'ast ast::StmtAugAssign),
     DictKeyAssignment(DictKeyAssignmentNodeRef<'ast, 'db>),
     Comprehension(ComprehensionDefinitionNodeRef<'ast, 'db>),
-    VariadicPositionalParameter(&'ast ast::Parameter),
-    VariadicKeywordParameter(&'ast ast::Parameter),
-    Parameter(&'ast ast::ParameterWithDefault),
+    Parameter(ParameterDefinitionNodeRef<'ast>),
+    LambdaParameter(LambdaParameterDefinitionNodeRef<'ast>),
     WithItem(WithItemDefinitionNodeRef<'ast, 'db>),
     MatchPattern(MatchPatternDefinitionNodeRef<'ast>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'ast>),
@@ -383,9 +383,15 @@ impl<'ast, 'db> From<ComprehensionDefinitionNodeRef<'ast, 'db>> for DefinitionNo
     }
 }
 
-impl<'ast> From<&'ast ast::ParameterWithDefault> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::ParameterWithDefault) -> Self {
+impl<'ast> From<ParameterDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: ParameterDefinitionNodeRef<'ast>) -> Self {
         Self::Parameter(node)
+    }
+}
+
+impl<'ast> From<LambdaParameterDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: LambdaParameterDefinitionNodeRef<'ast>) -> Self {
+        Self::LambdaParameter(node)
     }
 }
 
@@ -492,6 +498,48 @@ pub(crate) struct ComprehensionDefinitionNodeRef<'ast, 'db> {
     pub(crate) target: &'ast ast::Expr,
     pub(crate) first: bool,
     pub(crate) is_async: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum ParameterDefinitionNodeRef<'ast> {
+    VariadicPositionalParameter(&'ast ast::Parameter),
+    VariadicKeywordParameter(&'ast ast::Parameter),
+    Parameter(&'ast ast::ParameterWithDefault),
+}
+
+impl ParameterDefinitionNodeRef<'_> {
+    pub(super) fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
+        match self {
+            Self::VariadicPositionalParameter(parameter) => {
+                ParameterDefinitionNodeKind::VariadicPositionalParameter(AstNodeRef::new(
+                    parsed, parameter,
+                ))
+            }
+            Self::VariadicKeywordParameter(parameter) => {
+                ParameterDefinitionNodeKind::VariadicKeywordParameter(AstNodeRef::new(
+                    parsed, parameter,
+                ))
+            }
+            Self::Parameter(parameter) => {
+                ParameterDefinitionNodeKind::Parameter(AstNodeRef::new(parsed, parameter))
+            }
+        }
+    }
+
+    pub(super) fn key(self) -> DefinitionNodeKey {
+        match self {
+            Self::VariadicPositionalParameter(node) => node.into(),
+            Self::VariadicKeywordParameter(node) => node.into(),
+            Self::Parameter(node) => node.into(),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct LambdaParameterDefinitionNodeRef<'ast> {
+    pub(crate) index: usize,
+    pub(crate) parameter: ParameterDefinitionNodeRef<'ast>,
+    pub(crate) lambda: &'ast ast::ExprLambda,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -615,15 +663,18 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 first,
                 is_async,
             }),
-            DefinitionNodeRef::VariadicPositionalParameter(parameter) => {
-                DefinitionKind::VariadicPositionalParameter(AstNodeRef::new(parsed, parameter))
-            }
-            DefinitionNodeRef::VariadicKeywordParameter(parameter) => {
-                DefinitionKind::VariadicKeywordParameter(AstNodeRef::new(parsed, parameter))
-            }
             DefinitionNodeRef::Parameter(parameter) => {
-                DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
+                DefinitionKind::Parameter(parameter.into_owned(parsed))
             }
+            DefinitionNodeRef::LambdaParameter(LambdaParameterDefinitionNodeRef {
+                index,
+                parameter,
+                lambda,
+            }) => DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                index,
+                parameter: parameter.into_owned(parsed),
+                lambda: AstNodeRef::new(parsed, lambda),
+            }),
             DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
                 unpack,
                 context_expr,
@@ -723,9 +774,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => {
                 DefinitionNodeKey(NodeKey::from_node(target))
             }
-            Self::VariadicPositionalParameter(node) => node.into(),
-            Self::VariadicKeywordParameter(node) => node.into(),
-            Self::Parameter(node) => node.into(),
+            Self::LambdaParameter(LambdaParameterDefinitionNodeRef { parameter, .. }) => {
+                parameter.key()
+            }
+            Self::Parameter(parameter) => parameter.key(),
             Self::WithItem(WithItemDefinitionNodeRef {
                 context_expr: _,
                 unpack: _,
@@ -805,9 +857,8 @@ pub enum DefinitionKind<'db> {
     DictKeyAssignment(DictKeyAssignmentKind<'db>),
     For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind<'db>),
-    VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
-    VariadicKeywordParameter(AstNodeRef<ast::Parameter>),
-    Parameter(AstNodeRef<ast::ParameterWithDefault>),
+    Parameter(ParameterDefinitionNodeKind),
+    LambdaParameter(LambdaParameterDefinitionNodeKind),
     WithItem(WithItemDefinitionKind<'db>),
     MatchPattern(MatchPatternDefinitionKind),
     ExceptHandler(ExceptHandlerDefinitionKind),
@@ -817,7 +868,7 @@ pub enum DefinitionKind<'db> {
     LoopHeader(LoopHeaderDefinitionKind<'db>),
 }
 
-impl DefinitionKind<'_> {
+impl<'db> DefinitionKind<'db> {
     pub fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
@@ -855,17 +906,19 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
+    pub fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
+        match self {
+            DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
+            _ => None,
+        }
+    }
+
     pub const fn is_function_def(&self) -> bool {
         matches!(self, DefinitionKind::Function(_))
     }
 
     pub const fn is_parameter_def(&self) -> bool {
-        matches!(
-            self,
-            DefinitionKind::VariadicPositionalParameter(_)
-                | DefinitionKind::VariadicKeywordParameter(_)
-                | DefinitionKind::Parameter(_)
-        )
+        matches!(self, DefinitionKind::Parameter(_))
     }
 
     pub const fn is_loop_header(&self) -> bool {
@@ -902,13 +955,11 @@ impl DefinitionKind<'_> {
             }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
-            DefinitionKind::VariadicPositionalParameter(parameter) => {
-                parameter.node(module).name.range()
-            }
-            DefinitionKind::VariadicKeywordParameter(parameter) => {
-                parameter.node(module).name.range()
-            }
-            DefinitionKind::Parameter(parameter) => parameter.node(module).parameter.name.range(),
+            DefinitionKind::Parameter(parameter) => parameter.target_range(module),
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                parameter,
+                ..
+            }) => parameter.target_range(module),
             DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
             DefinitionKind::MatchPattern(match_pattern) => {
                 match_pattern.identifier.node(module).range()
@@ -959,11 +1010,11 @@ impl DefinitionKind<'_> {
             }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
-            DefinitionKind::VariadicPositionalParameter(parameter) => {
-                parameter.node(module).range()
-            }
-            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
-            DefinitionKind::Parameter(parameter) => parameter.node(module).parameter.range(),
+            DefinitionKind::Parameter(parameter) => parameter.full_range(module),
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                parameter,
+                ..
+            }) => parameter.full_range(module),
             DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
             DefinitionKind::MatchPattern(match_pattern) => {
                 match_pattern.identifier.node(module).range()
@@ -988,28 +1039,11 @@ impl DefinitionKind<'_> {
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
-            // a parameter always binds a value, but is only a declaration if annotated
-            DefinitionKind::VariadicPositionalParameter(parameter)
-            | DefinitionKind::VariadicKeywordParameter(parameter) => {
-                if parameter.node(module).annotation.is_some() {
-                    DefinitionCategory::DeclarationAndBinding
-                } else {
-                    DefinitionCategory::Binding
-                }
-            }
-            // presence of a default is irrelevant, same logic as for a no-default parameter
-            DefinitionKind::Parameter(parameter_with_default) => {
-                if parameter_with_default
-                    .node(module)
-                    .parameter
-                    .annotation
-                    .is_some()
-                {
-                    DefinitionCategory::DeclarationAndBinding
-                } else {
-                    DefinitionCategory::Binding
-                }
-            }
+            DefinitionKind::Parameter(parameter) => parameter.category(module),
+            DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+                parameter,
+                ..
+            }) => parameter.category(module),
             // Annotated assignment is always a declaration. It is also a binding if there is a RHS
             // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
@@ -1144,6 +1178,65 @@ impl<'db> ComprehensionDefinitionKind<'db> {
     pub fn is_async(&self) -> bool {
         self.is_async
     }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub enum ParameterDefinitionNodeKind {
+    VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
+    VariadicKeywordParameter(AstNodeRef<ast::Parameter>),
+    Parameter(AstNodeRef<ast::ParameterWithDefault>),
+}
+
+impl ParameterDefinitionNodeKind {
+    pub(crate) fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+        match self {
+            Self::VariadicPositionalParameter(parameter) => parameter.node(module).name.range(),
+            Self::VariadicKeywordParameter(parameter) => parameter.node(module).name.range(),
+            Self::Parameter(parameter) => parameter.node(module).parameter.name.range(),
+        }
+    }
+
+    pub(crate) fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
+        match self {
+            Self::VariadicPositionalParameter(parameter) => parameter.node(module).range(),
+            Self::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
+            Self::Parameter(parameter) => parameter.node(module).parameter.range(),
+        }
+    }
+
+    pub(crate) fn category(&self, module: &ParsedModuleRef) -> DefinitionCategory {
+        match self {
+            // a parameter always binds a value, but is only a declaration if annotated
+            Self::VariadicPositionalParameter(parameter)
+            | Self::VariadicKeywordParameter(parameter) => {
+                if parameter.node(module).annotation.is_some() {
+                    DefinitionCategory::DeclarationAndBinding
+                } else {
+                    DefinitionCategory::Binding
+                }
+            }
+            // presence of a default is irrelevant, same logic as for a no-default parameter
+            Self::Parameter(parameter_with_default) => {
+                if parameter_with_default
+                    .node(module)
+                    .parameter
+                    .annotation
+                    .is_some()
+                {
+                    DefinitionCategory::DeclarationAndBinding
+                } else {
+                    DefinitionCategory::Binding
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct LambdaParameterDefinitionNodeKind {
+    pub index: usize,
+    pub lambda: AstNodeRef<ast::ExprLambda>,
+    pub parameter: ParameterDefinitionNodeKind,
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
@@ -1405,6 +1498,18 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
 pub struct DefinitionNodeKey(NodeKey);
+
+impl DefinitionNodeKey {
+    pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+
+    pub fn from_assignment(node: &ast::StmtAssign) -> impl Iterator<Item = DefinitionNodeKey> {
+        node.targets
+            .iter()
+            .map(|target| Self(NodeKey::from_node(target)))
+    }
+}
 
 impl From<&ast::Alias> for DefinitionNodeKey {
     fn from(node: &ast::Alias) -> Self {

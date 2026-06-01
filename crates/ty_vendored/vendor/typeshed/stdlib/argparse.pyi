@@ -65,8 +65,8 @@ import sys
 from _typeshed import SupportsWrite, sentinel
 from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
-from typing import IO, Any, ClassVar, Final, Generic, NoReturn, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import IO, Any, ClassVar, Final, Generic, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "ArgumentParser",
@@ -172,39 +172,28 @@ class _ActionsContainer:
         add_argument(dest, ..., name=value, ...)
         add_argument(option_string, option_string, ..., name=value, ...)
         """
-    if sys.version_info >= (3, 14):
-        @overload
-        def add_argument_group(
-            self,
-            title: str | None = None,
-            description: str | None = None,
-            *,
-            # argument_default's type must be valid for the arguments in the group
-            argument_default: Any = ...,
-            conflict_handler: str = ...,
-        ) -> _ArgumentGroup: ...
-        @overload
-        @deprecated("The `prefix_chars` parameter deprecated since Python 3.14.")
-        def add_argument_group(
-            self,
-            title: str | None = None,
-            description: str | None = None,
-            *,
-            prefix_chars: str,
-            argument_default: Any = ...,
-            conflict_handler: str = ...,
-        ) -> _ArgumentGroup: ...
-    else:
-        def add_argument_group(
-            self,
-            title: str | None = None,
-            description: str | None = None,
-            *,
-            prefix_chars: str = ...,
-            # argument_default's type must be valid for the arguments in the group
-            argument_default: Any = ...,
-            conflict_handler: str = ...,
-        ) -> _ArgumentGroup: ...
+
+    @overload
+    def add_argument_group(
+        self,
+        title: str | None = None,
+        description: str | None = None,
+        *,
+        # argument_default's type must be valid for the arguments in the group
+        argument_default: Any = ...,
+        conflict_handler: str = ...,
+    ) -> _ArgumentGroup: ...
+    @overload
+    @deprecated("The `prefix_chars` parameter deprecated since Python 3.14.")
+    def add_argument_group(
+        self,
+        title: str | None = None,
+        description: str | None = None,
+        *,
+        prefix_chars: str,
+        argument_default: Any = ...,
+        conflict_handler: str = ...,
+    ) -> _ArgumentGroup: ...
 
     def add_mutually_exclusive_group(self, *, required: bool = False) -> _MutuallyExclusiveGroup: ...
     def _add_action(self, action: _ActionT) -> _ActionT: ...
@@ -266,7 +255,28 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     _subparsers: _ArgumentGroup | None
 
     # Note: the constructor arguments are also used in _SubParsersAction.add_parser.
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            prog: str | None = None,
+            usage: str | None = None,
+            description: str | None = None,
+            epilog: str | None = None,
+            parents: Iterable[ArgumentParser] = [],
+            formatter_class: _FormatterClass = ...,
+            prefix_chars: str = "-",
+            fromfile_prefix_chars: str | None = None,
+            argument_default: Any = None,
+            conflict_handler: str = "error",
+            add_help: bool = True,
+            allow_abbrev: bool = True,
+            exit_on_error: bool = True,
+            *,
+            suggest_on_error: bool = True,
+            color: bool = True,
+        ) -> None: ...
+
+    elif sys.version_info >= (3, 14):
         def __init__(
             self,
             prog: str | None = None,
@@ -310,6 +320,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def parse_args(self, args: Iterable[str] | None, namespace: _N) -> _N: ...
     @overload
     def parse_args(self, *, namespace: _N) -> _N: ...
+
     @overload
     def add_subparsers(
         self: _ArgumentParserT,
@@ -339,16 +350,24 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         help: str | None = None,
         metavar: str | None = None,
     ) -> _SubParsersAction[_ArgumentParserT]: ...
+
     def print_usage(self, file: SupportsWrite[str] | None = None) -> None: ...
     def print_help(self, file: SupportsWrite[str] | None = None) -> None: ...
-    def format_usage(self) -> str: ...
-    def format_help(self) -> str: ...
+    if sys.version_info >= (3, 15):
+        def format_usage(self, formatter: HelpFormatter | None = None) -> str: ...
+        def format_help(self, formatter: HelpFormatter | None = None) -> str: ...
+
+    else:
+        def format_usage(self) -> str: ...
+        def format_help(self) -> str: ...
+
     @overload
     def parse_known_args(self, args: Iterable[str] | None = None, namespace: None = None) -> tuple[Namespace, list[str]]: ...
     @overload
     def parse_known_args(self, args: Iterable[str] | None, namespace: _N) -> tuple[_N, list[str]]: ...
     @overload
     def parse_known_args(self, *, namespace: _N) -> tuple[_N, list[str]]: ...
+
     def convert_arg_line_to_args(self, arg_line: str) -> list[str]: ...
     def exit(self, status: int = 0, message: str | None = None) -> NoReturn: ...
     def error(self, message: str) -> NoReturn:
@@ -367,6 +386,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def parse_intermixed_args(self, args: Iterable[str] | None, namespace: _N) -> _N: ...
     @overload
     def parse_intermixed_args(self, *, namespace: _N) -> _N: ...
+
     @overload
     def parse_known_intermixed_args(
         self, args: Iterable[str] | None = None, namespace: None = None
@@ -375,6 +395,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def parse_known_intermixed_args(self, args: Iterable[str] | None, namespace: _N) -> tuple[_N, list[str]]: ...
     @overload
     def parse_known_intermixed_args(self, *, namespace: _N) -> tuple[_N, list[str]]: ...
+
     # undocumented
     def _get_optional_actions(self) -> list[Action]: ...
     def _get_positional_actions(self) -> list[Action]: ...
@@ -398,7 +419,11 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def _get_values(self, action: Action, arg_strings: list[str]) -> Any: ...
     def _get_value(self, action: Action, arg_string: str) -> Any: ...
     def _check_value(self, action: Action, value: Any) -> None: ...
-    def _get_formatter(self) -> HelpFormatter: ...
+    if sys.version_info >= (3, 15):
+        def _get_formatter(self, file: SupportsWrite[str] | None = None) -> HelpFormatter: ...
+    else:
+        def _get_formatter(self) -> HelpFormatter: ...
+
     def _print_message(self, message: str, file: SupportsWrite[str] | None = None) -> None: ...
 
 class HelpFormatter:
@@ -429,7 +454,12 @@ class HelpFormatter:
         def __init__(self, formatter: HelpFormatter, parent: Self | None, heading: str | None = None) -> None: ...
         def format_help(self) -> str: ...
 
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self, prog: str, indent_increment: int = 2, max_help_position: int = 24, width: int | None = None
+        ) -> None: ...
+
+    elif sys.version_info >= (3, 14):
         def __init__(
             self, prog: str, indent_increment: int = 2, max_help_position: int = 24, width: int | None = None, color: bool = True
         ) -> None: ...
@@ -699,101 +729,59 @@ class Namespace(_AttributeHolder):
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
-if sys.version_info >= (3, 14):
-    @deprecated("Deprecated since Python 3.14. Open files after parsing arguments instead.")
-    class FileType:
-        """Deprecated factory for creating file object types
+@deprecated("Deprecated since Python 3.14. Open files after parsing arguments instead.")
+class FileType:
+    """Deprecated factory for creating file object types
 
-        Instances of FileType are typically passed as type= arguments to the
-        ArgumentParser add_argument() method.
+    Instances of FileType are typically passed as type= arguments to the
+    ArgumentParser add_argument() method.
 
-        Keyword Arguments:
-            - mode -- A string indicating how the file is to be opened. Accepts the
-                same values as the builtin open() function.
-            - bufsize -- The file's desired buffer size. Accepts the same values as
-                the builtin open() function.
-            - encoding -- The file's encoding. Accepts the same values as the
-                builtin open() function.
-            - errors -- A string indicating how encoding and decoding errors are to
-                be handled. Accepts the same value as the builtin open() function.
-        """
+    Keyword Arguments:
+        - mode -- A string indicating how the file is to be opened. Accepts the
+            same values as the builtin open() function.
+        - bufsize -- The file's desired buffer size. Accepts the same values as
+            the builtin open() function.
+        - encoding -- The file's encoding. Accepts the same values as the
+            builtin open() function.
+        - errors -- A string indicating how encoding and decoding errors are to
+            be handled. Accepts the same value as the builtin open() function.
+    """
 
-        # undocumented
-        _mode: str
-        _bufsize: int
-        _encoding: str | None
-        _errors: str | None
-        def __init__(
-            self, mode: str = "r", bufsize: int = -1, encoding: str | None = None, errors: str | None = None
-        ) -> None: ...
-        def __call__(self, string: str) -> IO[Any]: ...
-
-else:
-    class FileType:
-        """Factory for creating file object types
-
-        Instances of FileType are typically passed as type= arguments to the
-        ArgumentParser add_argument() method.
-
-        Keyword Arguments:
-            - mode -- A string indicating how the file is to be opened. Accepts the
-                same values as the builtin open() function.
-            - bufsize -- The file's desired buffer size. Accepts the same values as
-                the builtin open() function.
-            - encoding -- The file's encoding. Accepts the same values as the
-                builtin open() function.
-            - errors -- A string indicating how encoding and decoding errors are to
-                be handled. Accepts the same value as the builtin open() function.
-        """
-
-        # undocumented
-        _mode: str
-        _bufsize: int
-        _encoding: str | None
-        _errors: str | None
-        def __init__(
-            self, mode: str = "r", bufsize: int = -1, encoding: str | None = None, errors: str | None = None
-        ) -> None: ...
-        def __call__(self, string: str) -> IO[Any]: ...
+    # undocumented
+    _mode: str
+    _bufsize: int
+    _encoding: str | None
+    _errors: str | None
+    def __init__(self, mode: str = "r", bufsize: int = -1, encoding: str | None = None, errors: str | None = None) -> None: ...
+    def __call__(self, string: str) -> IO[Any]: ...
 
 # undocumented
 class _ArgumentGroup(_ActionsContainer):
     title: str | None
     _group_actions: list[Action]
-    if sys.version_info >= (3, 14):
-        @overload
-        def __init__(
-            self,
-            container: _ActionsContainer,
-            title: str | None = None,
-            description: str | None = None,
-            *,
-            argument_default: Any = ...,
-            conflict_handler: str = ...,
-        ) -> None: ...
-        @overload
-        @deprecated("Undocumented `prefix_chars` parameter is deprecated since Python 3.14.")
-        def __init__(
-            self,
-            container: _ActionsContainer,
-            title: str | None = None,
-            description: str | None = None,
-            *,
-            prefix_chars: str,
-            argument_default: Any = ...,
-            conflict_handler: str = ...,
-        ) -> None: ...
-    else:
-        def __init__(
-            self,
-            container: _ActionsContainer,
-            title: str | None = None,
-            description: str | None = None,
-            *,
-            prefix_chars: str = ...,
-            argument_default: Any = ...,
-            conflict_handler: str = ...,
-        ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        container: _ActionsContainer,
+        title: str | None = None,
+        description: str | None = None,
+        *,
+        argument_default: Any = ...,
+        conflict_handler: str = ...,
+    ) -> None: ...
+    @overload
+    @deprecated("Undocumented `prefix_chars` parameter is deprecated since Python 3.14.")
+    def __init__(
+        self,
+        container: _ActionsContainer,
+        title: str | None = None,
+        description: str | None = None,
+        *,
+        prefix_chars: str,
+        argument_default: Any = ...,
+        conflict_handler: str = ...,
+    ) -> None: ...
 
 # undocumented
 class _MutuallyExclusiveGroup(_ArgumentGroup):

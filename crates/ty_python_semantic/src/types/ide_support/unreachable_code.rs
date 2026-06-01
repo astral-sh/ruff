@@ -1,12 +1,13 @@
 use crate::Db;
 use crate::reachability::is_reachable;
+use get_size2::GetSize;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_text_size::TextRange;
 use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::semantic_index;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, GetSize)]
 pub struct UnreachableRange {
     pub range: TextRange,
     pub kind: UnreachableKind,
@@ -32,7 +33,7 @@ pub struct UnreachableRange {
 /// if sys.version_info <= (3, 10):
 ///     print("unreachable when checking with Python 3.11+")
 /// ```
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, GetSize)]
 pub enum UnreachableKind {
     Unconditional,
     CurrentAnalysis,
@@ -43,8 +44,8 @@ pub enum UnreachableKind {
 /// Collects all unreachable ranges recorded in each scope's use-def map.
 /// `ALWAYS_FALSE` constraints are classified as unconditional; all others are
 /// unreachable only under the current analysis.
-#[salsa::tracked(returns(ref))]
-pub fn unreachable_ranges(db: &dyn Db, file: File) -> Vec<UnreachableRange> {
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub fn unreachable_ranges(db: &dyn Db, file: File) -> Box<[UnreachableRange]> {
     let index = semantic_index(db, file);
     let mut unreachable = Vec::new();
 
@@ -69,7 +70,7 @@ pub fn unreachable_ranges(db: &dyn Db, file: File) -> Vec<UnreachableRange> {
     merge_overlapping_ranges(unreachable)
 }
 
-fn merge_overlapping_ranges(mut ranges: Vec<UnreachableRange>) -> Vec<UnreachableRange> {
+fn merge_overlapping_ranges(mut ranges: Vec<UnreachableRange>) -> Box<[UnreachableRange]> {
     ranges.sort_unstable_by_key(|range| (range.range.start(), range.range.end(), range.kind));
 
     ranges

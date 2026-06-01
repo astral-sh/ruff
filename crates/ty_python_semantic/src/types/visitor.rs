@@ -3,10 +3,10 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     types::{
-        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
-        IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-        PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
-        TypeGuardType, TypeIsType, TypedDictType, UnionType,
+        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
+        GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
+        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
+        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
@@ -20,7 +20,7 @@ use crate::{
         type_alias::walk_type_alias_type,
         typed_dict::walk_typed_dict_type,
         typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
-        walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
+        walk_property_instance_type, walk_typeform_type, walk_typeguard_type, walk_typeis_type,
     },
 };
 use std::cell::{Cell, RefCell};
@@ -44,6 +44,12 @@ pub(crate) trait TypeVisitor<'db> {
         walk_intersection_type(db, intersection, self);
     }
 
+    fn visit_enum_complement_type(&self, db: &'db dyn Db, complement: EnumComplementType<'db>) {
+        for rest in complement.rest(db) {
+            self.visit_type(db, *rest);
+        }
+    }
+
     fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
         walk_callable_type(db, callable, self);
     }
@@ -58,6 +64,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_typeguard_type(&self, db: &'db dyn Db, type_is: TypeGuardType<'db>) {
         walk_typeguard_type(db, type_is, self);
+    }
+
+    fn visit_typeform_type(&self, db: &'db dyn Db, typeform: TypeFormType<'db>) {
+        walk_typeform_type(db, typeform, self);
     }
 
     fn visit_subclass_of_type(&self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
@@ -126,6 +136,7 @@ pub(crate) trait TypeVisitor<'db> {
 pub(super) enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
+    EnumComplement(EnumComplementType<'db>),
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
@@ -138,6 +149,7 @@ pub(super) enum NonAtomicType<'db> {
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
     TypeGuard(TypeGuardType<'db>),
+    TypeForm(TypeFormType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
@@ -173,6 +185,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::Intersection(intersection) => {
                 TypeKind::NonAtomic(NonAtomicType::Intersection(intersection))
             }
+            Type::EnumComplement(complement) => {
+                TypeKind::NonAtomic(NonAtomicType::EnumComplement(complement))
+            }
             Type::Union(union) => TypeKind::NonAtomic(NonAtomicType::Union(union)),
             Type::BoundMethod(method) => TypeKind::NonAtomic(NonAtomicType::BoundMethod(method)),
             Type::BoundSuper(bound_super) => {
@@ -205,6 +220,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::TypeGuard(type_guard) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeGuard(type_guard))
             }
+            Type::TypeForm(typeform) => TypeKind::NonAtomic(NonAtomicType::TypeForm(typeform)),
             Type::TypedDict(typed_dict) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
@@ -226,6 +242,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::Intersection(intersection) => {
             visitor.visit_intersection_type(db, intersection);
         }
+        NonAtomicType::EnumComplement(complement) => {
+            visitor.visit_enum_complement_type(db, complement);
+        }
         NonAtomicType::Union(union) => visitor.visit_union_type(db, union),
         NonAtomicType::BoundMethod(method) => visitor.visit_bound_method_type(db, method),
         NonAtomicType::BoundSuper(bound_super) => visitor.visit_bound_super_type(db, bound_super),
@@ -244,6 +263,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
         NonAtomicType::TypeGuard(type_guard) => visitor.visit_typeguard_type(db, type_guard),
+        NonAtomicType::TypeForm(typeform) => visitor.visit_typeform_type(db, typeform),
         NonAtomicType::TypeVar(bound_typevar) => {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }

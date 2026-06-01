@@ -167,6 +167,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
    |
+info: unexpected extra parameter `y`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -360,6 +361,251 @@ superclass.
 ```pyi
 class Sub23(Super4):
     def method(self, x, *args, y, **kwargs): ...
+```
+
+## `ClassVar` and instance variables
+
+A pure class variable cannot override an inherited instance variable, and an instance variable
+cannot override an inherited pure class variable.
+
+### Direct overrides
+
+An annotation without `ClassVar` declares an instance variable, even if the declaration also has a
+class-level default value. An explicit `ClassVar` declaration is a pure class variable. Overriding
+one with the other changes the places where the attribute is valid, so it violates Liskov
+substitution:
+
+```py
+from typing import ClassVar
+
+class Base:
+    instance_attr: int
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
+
+class Subclass(Base):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr`"
+    instance_attr: ClassVar[int]
+
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
+    instance_attr_with_default: ClassVar[int] = 1
+
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
+    class_attr: int
+
+class ValidSubclass(Base):
+    instance_attr: int
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
+```
+
+### Regular class-body assignments
+
+An unannotated class-body assignment is an instance variable with a class-level default. This means
+it can replace another inherited instance-variable default. If it overrides an inherited `ClassVar`,
+it inherits that declaration and remains a class variable. However, an explicit `ClassVar` cannot
+override an inherited unannotated class-body assignment, because code using the base class can still
+write that attribute through an instance:
+
+```py
+from typing import ClassVar
+
+class Base:
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
+
+class RegularClassAttributeOverride(Base):
+    class_attr = 1
+
+class AugmentedClassAttributeOverride(Base):
+    class_attr = 1
+    class_attr += 1
+
+class IntermediateClassAttributeOverride(Base):
+    class_attr = 1
+
+class ExplicitClassVarOverrideAfterInheritedClassVar(IntermediateClassAttributeOverride):
+    class_attr: ClassVar[int] = 1
+
+class RegularClassAttributeBase:
+    attr = 1
+
+class ExplicitClassVarOverride(RegularClassAttributeBase):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
+    attr: ClassVar[int] = 1
+
+class ClassDefaultBase:
+    class_default: int = 1
+    declared_instance: bool
+
+class ClassDefaultSubclass(ClassDefaultBase):
+    class_default = 2
+    declared_instance = True
+```
+
+### Method definitions
+
+Method definitions create descriptors in the class body. They are not instance variable
+declarations, so the class-variable vs. instance-variable override check does not apply to them:
+
+```py
+from collections.abc import Callable
+from typing import Any, ClassVar
+
+class ClassVarBase:
+    plain: ClassVar[Callable[..., Any]]
+    static: ClassVar[Callable[..., Any]]
+    class_: ClassVar[Callable[..., Any]]
+    non_callable: ClassVar[int]
+
+class MethodSubclass(ClassVarBase):
+    def plain(self, x: int) -> int:
+        return x
+
+    @staticmethod
+    def static(x: int) -> int:
+        return x
+
+    @classmethod
+    def class_(cls, x: int) -> int:
+        return x
+
+    def non_callable(self) -> int:
+        return 1
+
+class PropertyBase:
+    attr: ClassVar[int]
+
+class PropertySubclass(PropertyBase):
+    @property
+    def attr(  # error: [invalid-attribute-override] "instance variable cannot override class variable `PropertyBase.attr`"
+        self,
+    ) -> int:
+        return 1
+```
+
+### Repeated inherited conflicts
+
+If a parent class already made an invalid change from class variable to instance variable, a child
+that keeps the parent's kind should not receive a duplicate diagnostic. The same applies in the
+other direction:
+
+```py
+from typing import ClassVar
+
+class GrandparentClassVar:
+    attr: ClassVar[int]
+
+class ParentInstance(GrandparentClassVar):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
+    attr: int
+
+class ChildInstance(ParentInstance):
+    attr: int
+
+class GrandparentInstance:
+    attr: int
+
+class ParentClassVar(GrandparentInstance):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
+    attr: ClassVar[int]
+
+class ChildClassVar(ParentClassVar):
+    attr: ClassVar[int]
+```
+
+### Descriptors
+
+A descriptor can define different behavior when accessed on an instance. Because descriptor lookup
+is neither a pure class variable nor a normal instance variable, overriding it with an instance
+attribute is accepted:
+
+```py
+from typing import ClassVar
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object]) -> int:
+        return 1
+
+class DescriptorBase:
+    descriptor_attr = Descriptor()
+
+class DescriptorOverride(DescriptorBase):
+    descriptor_attr: int
+
+class DescriptorAnnotationBase:
+    descriptor_attr: Descriptor
+
+class DescriptorAnnotationOverride(DescriptorAnnotationBase):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `DescriptorAnnotationBase.descriptor_attr`"
+    descriptor_attr: ClassVar[Descriptor]
+```
+
+### Multiple inheritance
+
+The subclass must satisfy every base class. It is not enough for the first base in the MRO to agree
+with the subclass: an unrelated base that declares the same member as a pure class variable still
+makes an instance-variable override invalid.
+
+```py
+from typing import ClassVar
+
+class ClassVarBase:
+    attr: ClassVar[int]
+
+class InstanceBase:
+    attr: int
+
+class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
+    attr: int
+```
+
+### Dataclasses
+
+Dataclass fields are instance variables, even though they are usually declared in the class body.
+`ClassVar` fields remain pure class variables and are excluded from dataclass instance fields:
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
+
+@dataclass
+class DC6:
+    x: int
+    y: ClassVar[int] = 1
+
+@dataclass
+class DC7(DC6):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `DC6.x`"
+    x: ClassVar[int]
+
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `DC6.y`"
+    y: int
+```
+
+### Protocol implementations
+
+Regular class-body assignments can implement protocol instance attributes. The `ClassVar` case below
+uses the same rule as normal classes: an unannotated class-body assignment over an inherited
+`ClassVar` provides a value while preserving the inherited declaration.
+
+```py
+from typing import ClassVar, Protocol
+
+class ProtocolBase(Protocol):
+    class_attr: ClassVar[int]
+    instance_attr: int
+    instance_attr_with_default: int = 1
+
+class ProtocolImpl(ProtocolBase):
+    class_attr = 1
+    instance_attr = 1
+    instance_attr_with_default = 1
+
+class ProtocolWithClassVarImpl(ProtocolBase):
+    class_attr = 0
+    instance_attr = 0
 ```
 
 ## The entire class hierarchy is checked
@@ -873,9 +1119,9 @@ error[invalid-method-override]: Invalid override of method `__eq__`
   3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
     |
-   ::: stdlib/builtins.pyi:142:9
+   ::: stdlib/builtins.pyi:136:9
     |
-142 |     def __eq__(self, value: object, /) -> bool: ...
+136 |     def __eq__(self, value: object, /) -> bool: ...
     |         -------------------------------------- `object.__eq__` defined here
     |
 info: parameter `value` has an incompatible type: `object` is not assignable to `Bad`
@@ -919,37 +1165,24 @@ from typing import NamedTuple
 class Foo:
     x: int
 
-class Bar(Foo):
-    def __lt__(self, other: Bar) -> bool: ...  # snapshot: invalid-method-override
+class Bar(Foo):  # error: [subclass-of-dataclass-with-order]
+    def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
 
-# TODO: specifying `order=True` on the subclass means that a `__lt__` method is
-# generated that is incompatible with the generated `__lt__` method on the superclass.
-# We could consider detecting this and emitting a diagnostic, though maybe it shouldn't
-# be `invalid-method-override` since we'd emit it on the class definition rather than
-# on any method definition. Note also that no other type checker complains about this
-# as of 2025-11-21.
+# Specifying `order=True` on the subclass means that comparison methods are generated for the
+# subclass, but cross-class comparisons with the parent still raise `TypeError` at runtime.
+# TODO: We should also emit `invalid-method-override` diagnostics for each generated
+# comparison method since they have incompatible signatures.
 @dataclass(order=True)
-class Bar2(Foo):
+class Bar2(Foo):  # error: [subclass-of-dataclass-with-order]
     y: str
 
-# TODO: Although this class does not override any methods of `Foo`, the design of the
-# `order=True` stdlib dataclasses feature itself arguably violates the Liskov Substitution
+# Although this class does not override any methods of `Foo`, the design of the
+# `order=True` stdlib dataclasses feature itself violates the Liskov Substitution
 # Principle! Instances of `Bar3` cannot be substituted wherever an instance of `Foo` is
 # expected, because the generated `__lt__` method on `Foo` raises an error unless the r.h.s.
 # and `l.h.s.` have exactly the same `__class__` (it does not permit instances of `Foo` to
 # be compared with instances of subclasses of `Foo`).
-#
-# Many users would probably like their type checkers to alert them to cases where instances
-# of subclasses cannot be substituted for instances of superclasses, as this violates many
-# assumptions a type checker will make and makes it likely that a type checker will fail to
-# catch type errors elsewhere in the user's code. We could therefore consider treating all
-# `order=True` dataclasses as implicitly `@final` in order to enforce soundness. However,
-# this probably shouldn't be reported with the same error code as Liskov violations, since
-# the error does not stem from any method signatures written by the user. The example is
-# only included here for completeness.
-#
-# Note that no other type checker catches this error as of 2025-11-21.
-class Bar3(Foo): ...
+class Bar3(Foo): ...  # error: [subclass-of-dataclass-with-order]
 
 class Eggs:
     def __lt__(self, other: Eggs) -> bool: ...
@@ -969,34 +1202,18 @@ class Spam(Baz):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `__lt__`
- --> src/mdtest_snippet.pyi:9:9
-  |
-9 |     def __lt__(self, other: Bar) -> bool: ...  # snapshot: invalid-method-override
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Foo.__lt__`
-  |
-info: parameter `other` has an incompatible type: `Foo` is not assignable to `Bar`
-info: This violates the Liskov Substitution Principle
-info: `Foo.__lt__` is a generated method created because `Foo` is a dataclass
- --> src/mdtest_snippet.pyi:5:7
-  |
-5 | class Foo:
-  |       ^^^ Definition of `Foo`
-  |
-
-
 error[invalid-method-override]: Invalid override of method `_asdict`
-  --> src/mdtest_snippet.pyi:54:9
+  --> src/mdtest_snippet.pyi:41:9
    |
-54 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
+41 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Baz._asdict`
    |
 info: incompatible return types: `tuple[int, ...]` is not assignable to `dict[str, Any]`
 info: This violates the Liskov Substitution Principle
 info: `Baz._asdict` is a generated method created because `Baz` inherits from `typing.NamedTuple`
-  --> src/mdtest_snippet.pyi:50:7
+  --> src/mdtest_snippet.pyi:37:7
    |
-50 | class Baz(NamedTuple):
+37 | class Baz(NamedTuple):
    |       ^^^^^^^^^^^^^^^ Definition of `Baz`
    |
 ```

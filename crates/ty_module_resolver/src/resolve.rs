@@ -32,6 +32,7 @@ specifies ty's implementation of Python's import resolution algorithm.
 */
 
 use std::borrow::Cow;
+use std::fmt;
 use std::iter::FusedIterator;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -233,8 +234,9 @@ fn resolve_module_query<'db>(
 /// aggressively cached. Including the `importing_file` as part of that query would
 /// trash the caching of import resolution between files.
 ///
-/// TODO: should (some) of this also be cached? If an entire directory of python files
-/// is misunderstood we'll end up in here a lot.
+/// Cache desperate resolution because repeated unresolved imports in a project can otherwise
+/// re-walk the same importing-file-relative search paths many times.
+#[salsa::tracked]
 fn desperately_resolve_module<'db>(
     db: &'db dyn Db,
     importing_file: File,
@@ -368,7 +370,7 @@ pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathI
 ///
 /// We exclude `__init__.py(i)` dirs to avoid truncating packages.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<SearchPath>> {
+fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Box<[SearchPath]>> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
@@ -423,7 +425,7 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
     if search_paths.is_empty() {
         None
     } else {
-        Some(search_paths)
+        Some(search_paths.into_boxed_slice())
     }
 }
 
@@ -732,6 +734,18 @@ impl SearchPaths {
         }
     }
 
+    pub fn display<'a>(
+        &'a self,
+        db: &'a dyn Db,
+        mode: ModuleResolveMode,
+    ) -> DisplaySearchPaths<'a> {
+        DisplaySearchPaths {
+            search_paths: self,
+            db,
+            mode,
+        }
+    }
+
     pub fn custom_stdlib(&self) -> Option<&SystemPath> {
         self.stdlib_path
             .as_ref()
@@ -740,6 +754,28 @@ impl SearchPaths {
 
     pub fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
+    }
+}
+
+pub struct DisplaySearchPaths<'a> {
+    search_paths: &'a SearchPaths,
+    db: &'a dyn Db,
+    mode: ModuleResolveMode,
+}
+
+impl fmt::Display for DisplaySearchPaths<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut paths = self.search_paths.iter(self.db, self.mode).peekable();
+
+        if paths.peek().is_none() {
+            return f.write_str("[]");
+        }
+
+        writeln!(f, "[")?;
+        for path in paths {
+            writeln!(f, "  {path},")?;
+        }
+        f.write_str("]")
     }
 }
 

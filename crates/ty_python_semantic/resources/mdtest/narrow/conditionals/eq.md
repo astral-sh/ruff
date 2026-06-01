@@ -3,9 +3,9 @@
 ## `x != None`
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if x != None:
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -15,9 +15,9 @@ def _(flag: bool):
 ## `None != x` (reversed operands)
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if None != x:
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -27,9 +27,9 @@ def _(flag: bool):
 This also works for `==` with reversed operands:
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if None == x:
         reveal_type(x)  # revealed: None
     else:
@@ -58,6 +58,9 @@ def _(x: bool):
 
 ```py
 from enum import Enum
+from typing import Literal
+
+from ty_extensions import Intersection, Not
 
 class Answer(Enum):
     NO = 0
@@ -90,6 +93,33 @@ def _(x: Single | int):
         reveal_type(x)  # revealed: Single | int
     else:
         reveal_type(x)  # revealed: int
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x != Answer.NO:
+        reveal_type(x)  # revealed: list[int]
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x == Answer.NO:
+        return
+    reveal_type(x)  # revealed: list[int]
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+def after_excluding_red(x: Color | int):
+    if x is Color.RED:
+        return
+
+    if x == Color.GREEN:
+        reveal_type(x)  # revealed: Literal[Color.GREEN] | int
+    else:
+        reveal_type(x)  # revealed: Literal[Color.BLUE] | int
+
+def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]]):
+    if x == y:
+        reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
@@ -134,9 +164,9 @@ def _(answer: AmbiguousEnum):
 ## `x != y` where `y` is of literal type
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else 2
+from typing import Literal
 
+def _(x: Literal[1, 2]):
     if x != 1:
         reveal_type(x)  # revealed: Literal[2]
 ```
@@ -158,10 +188,9 @@ def _(flag: bool):
 ## `x != y` where `y` has multiple single-valued options
 
 ```py
-def _(flag1: bool, flag2: bool):
-    x = 1 if flag1 else 2
-    y = 2 if flag2 else 3
+from typing import Literal
 
+def _(x: Literal[1, 2], y: Literal[2, 3]):
     if x != y:
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
@@ -192,9 +221,7 @@ def _(x: Literal[1, 2], y: Y):
 Only single-valued types should narrow the type:
 
 ```py
-def _(flag: bool, a: int, y: int):
-    x = a if flag else None
-
+def _(x: int | None, y: int):
     if x != y:
         reveal_type(x)  # revealed: int | None
 ```
@@ -202,10 +229,9 @@ def _(flag: bool, a: int, y: int):
 ## Mix of single-valued and non-single-valued types
 
 ```py
-def _(flag1: bool, flag2: bool, a: int):
-    x = 1 if flag1 else 2
-    y = 2 if flag2 else a
+from typing import Literal
 
+def _(x: Literal[1, 2], y: int):
     if x != y:
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
@@ -319,4 +345,82 @@ def _(x: Literal["a", "b"] | tuple[int, int]):
     else:
         # tuple type remains in the else branch
         reveal_type(x)  # revealed: Literal["b"] | tuple[int, int]
+```
+
+## Narrowing tagged unions of nominal classes by attribute
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+    field_a: int
+
+class B:
+    tag: Literal["b"]
+    field_b: str
+
+def _(x: A | B):
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+        reveal_type(x.field_a)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: B
+        reveal_type(x.field_b)  # revealed: str
+
+    if "b" == x.tag:
+        reveal_type(x)  # revealed: B
+    else:
+        reveal_type(x)  # revealed: A
+
+    if x.tag != "a":
+        reveal_type(x)  # revealed: B
+    else:
+        reveal_type(x)  # revealed: A
+```
+
+Non-literal tag arms are preserved during positive narrowing:
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: str
+
+class C:
+    tag: Literal["c"]
+
+def _(x: A | B | C):
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A | B
+    else:
+        reveal_type(x)  # revealed: B | C
+```
+
+This also works for `NamedTuple` classes:
+
+```py
+from typing import Literal, NamedTuple
+
+class A(NamedTuple):
+    tag: Literal["a"]
+    field_a: int
+
+class B(NamedTuple):
+    tag: Literal["b"]
+    field_b: str
+
+def _(x: A | B):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: B
+
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: B
 ```

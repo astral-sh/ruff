@@ -19,7 +19,7 @@ use super::{
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -33,7 +33,9 @@ use crate::types::member::Member;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::signatures::{
+    CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
+};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
@@ -96,7 +98,7 @@ impl<'db> CodeGeneratorKind<'db> {
         class: StaticClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Option<Self> {
-        #[salsa::tracked(cycle_initial=code_generator_of_static_class_initial,
+        #[salsa::tracked(cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_static_class<'db>(
@@ -144,15 +146,6 @@ impl<'db> CodeGeneratorKind<'db> {
             } else {
                 None
             }
-        }
-
-        fn code_generator_of_static_class_initial<'db>(
-            _db: &'db dyn Db,
-            _id: salsa::Id,
-            _class: StaticClassLiteral<'db>,
-            _specialization: Option<Specialization<'db>>,
-        ) -> Option<CodeGeneratorKind<'db>> {
-            None
         }
 
         code_generator_of_static_class(db, class, specialization)
@@ -299,38 +292,33 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
         let specialization = self.specialization(db);
 
-        // if the class is the thing defining the variable, then it can
-        // reference it without it being applied to the specialization
-        std::iter::once(origin.variance_of(db, typevar))
-            .chain(
-                specialization
-                    .generic_context(db)
-                    .variables(db)
-                    .zip(specialization.types(db))
-                    .map(|(generic_typevar, ty)| {
-                        if let Some(explicit_variance) =
-                            generic_typevar.typevar(db).explicit_variance(db)
-                        {
-                            ty.with_polarity(explicit_variance).variance_of(db, typevar)
-                        } else {
-                            // `with_polarity` composes the passed variance with the
-                            // inferred one. The inference is done lazily, as we can
-                            // sometimes determine the result just from the passed
-                            // variance. This operation is commutative, so we could
-                            // infer either first.  We choose to make the `StaticClassLiteral`
-                            // variance lazy, as it is known to be expensive, requiring
-                            // that we traverse all members.
-                            //
-                            // If salsa let us look at the cache, we could check first
-                            // to see if the class literal query was already run.
+        // Note that we only care about the variance of the specialized generic alias with respect
+        // to the given type variable, not the unspecialized class literal origin.
+        specialization
+            .generic_context(db)
+            .variables(db)
+            .zip(specialization.types(db))
+            .map(|(generic_typevar, ty)| {
+                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
+                    ty.with_polarity(explicit_variance).variance_of(db, typevar)
+                } else {
+                    // `with_polarity` composes the passed variance with the
+                    // inferred one. The inference is done lazily, as we can
+                    // sometimes determine the result just from the passed
+                    // variance. This operation is commutative, so we could
+                    // infer either first.  We choose to make the `StaticClassLiteral`
+                    // variance lazy, as it is known to be expensive, requiring
+                    // that we traverse all members.
+                    //
+                    // If salsa let us look at the cache, we could check first
+                    // to see if the class literal query was already run.
 
-                            let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
-                            origin
-                                .with_polarity(typevar_variance_in_substituted_type)
-                                .variance_of(db, generic_typevar)
-                        }
-                    }),
-            )
+                    let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
+                    origin
+                        .with_polarity(typevar_variance_in_substituted_type)
+                        .variance_of(db, generic_typevar)
+                }
+            })
             .collect()
     }
 }
@@ -1177,6 +1165,8 @@ impl<'db> ClassType<'db> {
             }
         }
 
+        abstract_methods.shrink_to_fit();
+
         abstract_methods
     }
 
@@ -1194,12 +1184,14 @@ impl<'db> ClassType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
             &constraints,
             InferableTypeVars::None,
             &relation_visitor,
             &disjointness_visitor,
+            &signature_relation_visitor,
             &materialization_visitor,
         );
         checker
@@ -1221,7 +1213,10 @@ impl<'db> ClassType<'db> {
     /// Return the [`DisjointBase`] that appears first in the MRO of this class.
     ///
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -1594,6 +1589,7 @@ impl<'db> ClassType<'db> {
                             db,
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
+                            CallableFunctionProvenance::None,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -1763,7 +1759,10 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
-    #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|db, _, _| CallableTypes::one(CallableType::bottom(db)),
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
@@ -1832,6 +1831,7 @@ impl<'db> ClassType<'db> {
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
                 CallableTypeKind::Regular,
+                CallableFunctionProvenance::None,
             );
 
             if returns_non_subclass {
@@ -1902,6 +1902,7 @@ impl<'db> ClassType<'db> {
                     db,
                     synthesized_dunder_init_signature,
                     CallableTypeKind::Regular,
+                    CallableFunctionProvenance::None,
                 ))
             } else {
                 None
@@ -1972,14 +1973,6 @@ impl<'db> ClassType<'db> {
     pub(super) fn definition_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).header_span(db)
     }
-}
-
-fn into_callable_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: ClassType<'db>,
-) -> CallableTypes<'db> {
-    CallableTypes::one(CallableType::bottom(db))
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -2111,25 +2104,30 @@ pub(super) struct AbstractMethod<'db> {
     pub(super) kind: AbstractMethodKind,
 }
 
-/// A filter that describes which methods are considered when looking for implicit attribute assignments
-/// in [`StaticClassLiteral::implicit_attribute`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum MethodDecorator {
+/// The decorator category for a method-like function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum MethodDecorator {
+    /// An instance method with an implicit instance receiver, conventionally named `self`.
+    #[default]
     None,
+    /// A classmethod with an implicit class receiver, conventionally named `cls`.
     ClassMethod,
+    /// A staticmethod with no implicit receiver.
     StaticMethod,
 }
 
 impl MethodDecorator {
-    pub(crate) fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Result<Self, ()> {
+    /// Returns the decorator category for a function type.
+    pub fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Option<Self> {
         match (fn_type.is_classmethod(db), fn_type.is_staticmethod(db)) {
-            (true, true) => Err(()), // A method can't be static and class method at the same time.
-            (true, false) => Ok(Self::ClassMethod),
-            (false, true) => Ok(Self::StaticMethod),
-            (false, false) => Ok(Self::None),
+            (true, true) => None, // A method can't be static and class method at the same time.
+            (true, false) => Some(Self::ClassMethod),
+            (false, true) => Some(Self::StaticMethod),
+            (false, false) => Some(Self::None),
         }
     }
 
+    /// Returns a concise description of this decorator category.
     pub(crate) const fn description(self) -> &'static str {
         match self {
             MethodDecorator::None => "an instance method",
@@ -2572,15 +2570,17 @@ impl<'db> DisjointBase<'db> {
 
     /// Two disjoint bases can only coexist in a class's MRO if one is a subclass of the other
     fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
+        // CPython's layout check operates on runtime classes. Type arguments are irrelevant here:
+        // a generic disjoint base and any specialization of that base share the same layout.
         self == other
             || self
                 .class
                 .default_specialization(db)
-                .is_subclass_of(db, other.class.default_specialization(db))
+                .is_subtype_of_class_literal(db, other.class)
             || other
                 .class
                 .default_specialization(db)
-                .is_subclass_of(db, self.class.default_specialization(db))
+                .is_subtype_of_class_literal(db, self.class)
     }
 }
 

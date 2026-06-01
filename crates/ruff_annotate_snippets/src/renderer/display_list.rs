@@ -1266,12 +1266,6 @@ fn format_snippet<'m>(
     body
 }
 
-#[inline]
-// TODO: option_zip
-fn zip_opt<A, B>(a: Option<A>, b: Option<B>) -> Option<(A, B)> {
-    a.and_then(|a| b.map(|b| (a, b)))
-}
-
 fn format_header<'a>(
     origin: Option<&'a str>,
     main_range: Option<usize>,
@@ -1285,7 +1279,7 @@ fn format_header<'a>(
         DisplayHeaderType::Continuation
     };
 
-    if let Some((main_range, path)) = zip_opt(main_range, origin) {
+    if let Some((main_range, path)) = main_range.zip(origin) {
         let mut col = 1;
         let mut line_offset = 1;
 

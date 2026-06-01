@@ -43,7 +43,7 @@ from types import TracebackType
 from typing import IO, Any, BinaryIO, Final, Generic, Literal, Protocol, TextIO, TypeVar, overload, type_check_only
 from typing_extensions import Self, disjoint_base
 
-_T = TypeVar("_T")
+_S = TypeVar("_S", bound=str)
 
 if sys.version_info >= (3, 14):
     DEFAULT_BUFFER_SIZE: Final = 131072
@@ -562,8 +562,34 @@ class BufferedReader(BufferedIOBase, _BufferedIOBase, BinaryIO, Generic[_Buffere
     def seek(self, target: int, whence: int = 0, /) -> int: ...
     def truncate(self, pos: int | None = None, /) -> int: ...
 
+@type_check_only
+class _BufferedWriterStream(Protocol):
+    def write(self, b: WriteableBuffer, /) -> int | None: ...
+    def seek(self, pos: int, whence: int, /) -> int: ...
+    def tell(self) -> int: ...
+    def truncate(self, size: int, /) -> int: ...
+    def flush(self) -> object: ...
+    def close(self) -> object: ...
+    @property
+    def closed(self) -> bool: ...
+    def writable(self) -> bool: ...
+    def seekable(self) -> bool: ...
+
+    # The following methods just pass through to the underlying stream. Since
+    # not all streams support them, they are marked as optional here, and will
+    # raise an AttributeError if called on a stream that does not support them.
+
+    # @property
+    # def name(self) -> Any: ...  # Type is inconsistent between the various I/O types.
+    # @property
+    # def mode(self) -> str: ...
+    # def fileno(self) -> int: ...
+    # def isatty(self) -> bool: ...
+
+_BufferedWriterStreamT = TypeVar("_BufferedWriterStreamT", bound=_BufferedWriterStream, default=_BufferedWriterStream)
+
 @disjoint_base
-class BufferedWriter(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incompatible definitions of writelines in the base classes
+class BufferedWriter(BufferedIOBase, _BufferedIOBase, BinaryIO, Generic[_BufferedWriterStreamT]):  # type: ignore[misc]  # incompatible definitions of writelines in the base classes
     """A buffer for a writeable sequential RawIO object.
 
     The constructor creates a BufferedWriter for the given writeable raw
@@ -571,11 +597,11 @@ class BufferedWriter(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore
     DEFAULT_BUFFER_SIZE.
     """
 
-    raw: RawIOBase
+    raw: _BufferedWriterStreamT
     if sys.version_info >= (3, 14):
-        def __init__(self, raw: RawIOBase, buffer_size: int = 131072) -> None: ...
+        def __init__(self, raw: _BufferedWriterStreamT, buffer_size: int = 131072) -> None: ...
     else:
-        def __init__(self, raw: RawIOBase, buffer_size: int = 8192) -> None: ...
+        def __init__(self, raw: _BufferedWriterStreamT, buffer_size: int = 8192) -> None: ...
 
     def write(self, buffer: ReadableBuffer, /) -> int: ...
     def seek(self, target: int, whence: int = 0, /) -> int: ...
@@ -603,7 +629,7 @@ class BufferedRandom(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore
     def truncate(self, pos: int | None = None, /) -> int: ...
 
 @disjoint_base
-class BufferedRWPair(BufferedIOBase, _BufferedIOBase, Generic[_BufferedReaderStreamT]):
+class BufferedRWPair(BufferedIOBase, _BufferedIOBase, Generic[_BufferedReaderStreamT, _BufferedWriterStreamT]):
     """A buffered reader and writer object together.
 
     A buffered reader object and buffered writer object put together to
@@ -616,9 +642,13 @@ class BufferedRWPair(BufferedIOBase, _BufferedIOBase, Generic[_BufferedReaderStr
     """
 
     if sys.version_info >= (3, 14):
-        def __init__(self, reader: _BufferedReaderStreamT, writer: RawIOBase, buffer_size: int = 131072, /) -> None: ...
+        def __init__(
+            self, reader: _BufferedReaderStreamT, writer: _BufferedWriterStreamT, buffer_size: int = 131072, /
+        ) -> None: ...
     else:
-        def __init__(self, reader: _BufferedReaderStreamT, writer: RawIOBase, buffer_size: int = 8192, /) -> None: ...
+        def __init__(
+            self, reader: _BufferedReaderStreamT, writer: _BufferedWriterStreamT, buffer_size: int = 8192, /
+        ) -> None: ...
 
     def peek(self, size: int = 0, /) -> bytes: ...
 
@@ -869,21 +899,19 @@ class IncrementalNewlineDecoder:
     def reset(self) -> None: ...
     def setstate(self, state: tuple[bytes, int], /) -> None: ...
 
-if sys.version_info >= (3, 10):
-    @overload
-    def text_encoding(encoding: None, stacklevel: int = 2, /) -> Literal["locale", "utf-8"]:
-        """A helper function to choose the text encoding.
+@overload
+def text_encoding(encoding: None, stacklevel: int = 2, /) -> Literal["locale", "utf-8"]:
+    """A helper function to choose the text encoding.
 
-        When encoding is not None, this function returns it.
-        Otherwise, this function returns the default text encoding
-        (i.e. "locale" or "utf-8" depends on UTF-8 mode).
+    When encoding is not None, this function returns it.
+    Otherwise, this function returns the default text encoding
+    (i.e. "locale" or "utf-8" depends on UTF-8 mode).
 
-        This function emits an EncodingWarning if encoding is None and
-        sys.flags.warn_default_encoding is true.
+    This function emits an EncodingWarning if encoding is None and
+    sys.flags.warn_default_encoding is true.
 
-        This can be used in APIs with an encoding=None parameter.
-        However, please consider using encoding="utf-8" for new APIs.
-        """
-
-    @overload
-    def text_encoding(encoding: _T, stacklevel: int = 2, /) -> _T: ...
+    This can be used in APIs with an encoding=None parameter.
+    However, please consider using encoding="utf-8" for new APIs.
+    """
+@overload
+def text_encoding(encoding: _S, stacklevel: int = 2, /) -> _S: ...

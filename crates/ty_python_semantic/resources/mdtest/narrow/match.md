@@ -8,10 +8,10 @@ python-version = "3.10"
 ## Single `match` pattern
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
-    reveal_type(x)  # revealed: None | Literal[1]
+def _(x: Literal[1] | None):
+    reveal_type(x)  # revealed: Literal[1] | None
 
     y = 0
 
@@ -151,6 +151,32 @@ def test_match_refutable(x: dict | int) -> None:
             reveal_type(x)  # revealed: dict[Unknown, Unknown] | int
 ```
 
+## Sequence patterns
+
+```py
+from collections.abc import Sequence
+
+def test_match_star(x: Sequence[int] | int) -> None:
+    match x:
+        case [*rest]:
+            reveal_type(x)  # revealed: (Sequence[int] & ~str & ~bytes & ~bytearray) | (int & Sequence[object])
+        case _:
+            # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but
+            # sequence patterns explicitly do not match them. `bytes` and
+            # `bytearray` are possible inhabitants of `Sequence[int]`.
+            # TODO: After https://github.com/astral-sh/ty/issues/3314 is
+            # fixed, the `Sequence[int] & str` intersection should simplify to
+            # `Never`.
+            reveal_type(x)  # revealed: (int & ~Sequence[object]) | (Sequence[int] & str) | bytes | bytearray
+
+def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
+    match x:
+        case [*rest]:
+            reveal_type(x)  # revealed: list[int]
+        case _:
+            reveal_type(x)  # revealed: str | bytes | bytearray
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
@@ -287,7 +313,7 @@ def _(x: Literal["foo", b"bar"] | int):
             pass
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
             pass
-        case _ if reveal_type(x):  # revealed: int | Literal["foo", b"bar"]
+        case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
             pass
 ```
 
@@ -345,18 +371,43 @@ class Answer(Enum):
     YES = 1
     MAYBE = 2
 
-    def is_yes(self) -> bool:
-        reveal_type(self)  # revealed: Self@is_yes
+    def is_yes_through_class_member(self) -> bool:
+        reveal_type(self)  # revealed: Self@is_yes_through_class_member
 
         match self:
             case Answer.YES:
-                reveal_type(self)  # revealed: Self@is_yes
+                reveal_type(self)  # revealed: Self@is_yes_through_class_member
                 return True
             case Answer.NO | Answer.MAYBE:
-                reveal_type(self)  # revealed: Self@is_yes & ~Literal[Answer.YES]
+                reveal_type(self)  # revealed: Self@is_yes_through_class_member & ~Literal[Answer.YES]
                 return False
             case _:
                 assert_never(self)  # no error
+
+    def is_yes_through_self_member(self) -> bool:
+        match self:
+            case self.YES:
+                reveal_type(self)  # revealed: Self@is_yes_through_self_member
+                return True
+            case self.NO | self.MAYBE:
+                reveal_type(self)  # revealed: Self@is_yes_through_self_member & ~Literal[Answer.YES]
+                return False
+            case _:
+                assert_never(self)  # no error
+
+    @classmethod
+    def is_yes_through_cls_member(cls, answer: "Answer") -> bool:
+        reveal_type(cls.YES)  # revealed: Literal[Answer.YES]
+
+        match answer:
+            case cls.YES:
+                reveal_type(answer)  # revealed: Literal[Answer.YES]
+                return True
+            case cls.NO | cls.MAYBE:
+                reveal_type(answer)  # revealed: Literal[Answer.NO, Answer.MAYBE]
+                return False
+            case _:
+                assert_never(answer)  # no error
 
     def assert_yes(self) -> Self:
         reveal_type(self)  # revealed: Self@assert_yes
@@ -369,7 +420,7 @@ class Answer(Enum):
                 reveal_type(self)  # revealed: Self@assert_yes & ~Literal[Answer.YES]
                 raise ValueError("Answer is not YES")
 
-Answer.YES.is_yes()
+Answer.YES.is_yes_through_class_member()
 
 try:
     reveal_type(Answer.MAYBE.assert_yes())  # revealed: Literal[Answer.MAYBE]
@@ -500,4 +551,51 @@ def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
             # Since the previous case could match any string, this case can
             # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
             reveal_type(u)  # revealed: tuple[Literal["bar"], str]
+```
+
+## Narrowing tagged unions of nominal classes by attribute
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+    field_a: int
+
+class B:
+    tag: Literal["b"]
+    field_b: str
+
+def _(x: A | B):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: A
+            reveal_type(x.field_a)  # revealed: int
+        case "b":
+            reveal_type(x)  # revealed: B
+            reveal_type(x.field_b)  # revealed: str
+        case _:
+            reveal_type(x)  # revealed: Never
+```
+
+Non-literal tag arms are preserved during positive narrowing:
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: str
+
+class C:
+    tag: Literal["c"]
+
+def _(x: A | B | C):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: A | B
+        case _:
+            reveal_type(x)  # revealed: B | C
 ```

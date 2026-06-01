@@ -209,6 +209,29 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+## Loop-carried augmented unions
+
+PEP 604 unions created by augmented assignment should converge when the previous loop iteration
+already contains the same type alias:
+
+```py
+def f(condition: bool):
+    type Left = int
+    alias = Left
+    reveal_type(alias)  # revealed: TypeAliasType
+
+    while condition:
+        type Right = str
+        alias |= Right
+        reveal_type(alias)  # revealed: <types.UnionType special-form 'int | str'>
+
+    reveal_type(alias)  # revealed: TypeAliasType | <types.UnionType special-form 'int | str'>
+
+    # it would be okay to emit an `invalid-type-form` error here
+    def inner(x: alias):
+        reveal_type(x)  # revealed: int | str
+```
+
 ## Multiple layers of union aliases
 
 ```py
@@ -224,6 +247,51 @@ type Y = W | X
 from ty_extensions import is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(Y, A | B | C | D))
+```
+
+## Unions of enum literal aliases
+
+A union of aliases covering every member of an enum is equivalent to the enum itself, including when
+the aliases occur inside a larger type.
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Choice(Enum):
+    A = "A"
+    B = "B"
+
+type A = Literal[Choice.A]
+type B = Literal[Choice.B]
+type Either = A | B
+type Selector = A | B | tuple[A, B]
+
+def accept_either(value: Either) -> None: ...
+def accept_optional_either(value: Either | None) -> None: ...
+def accept_selector(value: Selector) -> None: ...
+
+class Config:
+    either: Either
+    selector: Selector
+
+def _(choice: Choice, config: Config) -> None:
+    direct: Either = choice
+    accept_either(choice)
+    accept_optional_either(config.either)
+    values: list[Selector] = []
+    accept_selector(config.selector)
+
+class ExtendedChoice(Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+
+type ExtendedA = Literal[ExtendedChoice.A]
+type ExtendedB = Literal[ExtendedChoice.B]
+
+def _(choice: ExtendedChoice) -> None:
+    partial: ExtendedA | ExtendedB = choice  # error: [invalid-assignment]
 ```
 
 ## In binary ops
@@ -376,6 +444,11 @@ def f(x: OptNestedInt) -> None:
     reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
     if x is not None:
         reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
+
+type RecursiveList = list[RecursiveList]
+
+def g(x: RecursiveList):
+    reveal_type(x[0])  # revealed: list[RecursiveList]
 ```
 
 ### Invalid self-referential
@@ -431,8 +504,7 @@ type Foo[T] = list[T] | Bar[T]
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
-    # TODO: should be `int | list[int]`
-    reveal_type(x)  # revealed: int | list[int] | Any
+    reveal_type(x)  # revealed: int | list[int]
 ```
 
 ### With legacy generic
@@ -579,7 +651,7 @@ type A = list[Union["A", str]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str] | str
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With new-style union
@@ -590,7 +662,7 @@ type A = list[A | str]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str] | str
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With Optional
@@ -603,7 +675,7 @@ type A = list[Optional[Union["A", str]]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str | None] | str | None
+        reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
 
 ### Tuple comparison

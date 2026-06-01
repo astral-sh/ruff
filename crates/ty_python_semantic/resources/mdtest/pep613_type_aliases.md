@@ -361,7 +361,7 @@ NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```
 
-## Conditionally imported on Python < 3.10
+## Conditionally imported
 
 ```toml
 [environment]
@@ -370,7 +370,8 @@ python-version = "3.9"
 
 ```py
 try:
-    # error: [unresolved-import]
+    # this fails at runtime, but we don't emit an error for it
+    # because typeshed has removed its <3.10 branches for the stdlib
     from typing import TypeAlias
 except ImportError:
     from typing_extensions import TypeAlias
@@ -500,11 +501,18 @@ bad7: TypeAlias = ReadOnly[int]  # error: [invalid-type-form]
 bad9: TypeAlias = InitVar[int]  # error: [invalid-type-form]
 bad10: TypeAlias = InitVar  # error: [invalid-type-form]
 
-# TODO: this should cause us to emit an error (`Unpack` is not valid at the
-# top level in this context), but for different reasons to the above cases:
-# `Unpack` is not a type qualifier, and so the error message in our diagnostic
-# shouldn't say that it is.
-differently_bad: TypeAlias = Unpack[tuple[int, ...]]
+differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: `Unpack` is not allowed in type alias values
+  --> src/mdtest_snippet.py:14:30
+   |
+14 | differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

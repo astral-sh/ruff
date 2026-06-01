@@ -9,8 +9,8 @@ import sys
 from _typeshed import BytesPath, ExcInfo, FileDescriptorOrPath, MaybeNone, StrOrBytesPath, StrPath, SupportsRead, SupportsWrite
 from collections.abc import Callable, Iterable, Sequence
 from tarfile import _TarfileFilter
-from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, deprecated
+from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import deprecated
 
 __all__ = [
     "copyfileobj",
@@ -117,9 +117,9 @@ def copy(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrP
     raised.
 
     """
-
 @overload
 def copy(src: BytesPath, dst: _BytesPathT, *, follow_symlinks: bool = True) -> _BytesPathT | bytes: ...
+
 @overload
 def copy2(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrPathT | str:
     """Copy data and metadata. Return the file's destination.
@@ -132,9 +132,9 @@ def copy2(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _Str
     If follow_symlinks is false, symlinks won't be followed. This
     resembles GNU's "cp -P src dst".
     """
-
 @overload
 def copy2(src: BytesPath, dst: _BytesPathT, *, follow_symlinks: bool = True) -> _BytesPathT | bytes: ...
+
 def ignore_patterns(*patterns: StrPath) -> Callable[[Any, list[str]], set[str]]:
     """Function that can be used as copytree() ignore parameter.
 
@@ -335,7 +335,6 @@ if sys.version_info >= (3, 13):
         symbolic link, chown will modify the link itself and not the file being
         referenced by the link.
         """
-
     @overload
     def chown(
         path: FileDescriptorOrPath,
@@ -353,7 +352,6 @@ if sys.version_info >= (3, 13):
     def chown(
         path: FileDescriptorOrPath, user: str | int, group: str | int, *, dir_fd: int | None = None, follow_symlinks: bool = True
     ) -> None: ...
-
 else:
     @overload
     def chown(path: FileDescriptorOrPath, user: str | int, group: None = None) -> None:
@@ -362,7 +360,6 @@ else:
         user and group can be the uid/gid or the user/group names, and in that case,
         they are converted to their respective uid/gid.
         """
-
     @overload
     def chown(path: FileDescriptorOrPath, user: None = None, *, group: str | int) -> None: ...
     @overload
@@ -395,9 +392,9 @@ def which(cmd: StrPath, mode: int = 1, path: StrPath | None = None) -> str | Non
     path.
 
     """
-
 @overload
 def which(cmd: bytes, mode: int = 1, path: StrPath | None = None) -> bytes | None: ...
+
 def make_archive(
     base_name: str,
     format: str,
@@ -444,11 +441,11 @@ def register_archive_format(
     description can be provided to describe the format, and will be returned
     by the get_archive_formats() function.
     """
-
 @overload
 def register_archive_format(
     name: str, function: Callable[[str, str], object], extra_args: None = None, description: str = ""
 ) -> None: ...
+
 def unregister_archive_format(name: str) -> None: ...
 def unpack_archive(
     filename: StrPath, extract_dir: StrPath | None = None, format: str | None = None, *, filter: _TarfileFilter | None = None
@@ -494,11 +491,11 @@ def register_unpack_format(
     description can be provided to describe the format, and will be returned
     by the get_unpack_formats() function.
     """
-
 @overload
 def register_unpack_format(
     name: str, extensions: list[str], function: Callable[[str, str], object], extra_args: None = None, description: str = ""
 ) -> None: ...
+
 def unregister_unpack_format(name: str) -> None:
     """Removes the pack format from the registry."""
 

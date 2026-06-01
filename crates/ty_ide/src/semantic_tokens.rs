@@ -14,9 +14,6 @@
 //!
 //! TODO: Need to handle semantic tokens within quoted annotations.
 //!
-//! TODO: Need to properly handle Annotated expressions. All type arguments other
-//! than the first should be treated as value expressions, not as type expressions.
-//!
 //! TODO: Properties (or perhaps more generally, descriptor objects?) should be
 //! classified as property tokens rather than just variables.
 //!
@@ -43,14 +40,14 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_semantic::{
     HasType, SemanticModel,
     types::ide_support::{
         CallArgumentForm, call_argument_forms, definition_for_name,
         static_member_type_for_attribute,
     },
-    types::{SpecialFormType, Type, TypeVarKind},
+    types::{KnownInstanceType, MethodDecorator, SpecialFormType, Type, TypeVarKind},
 };
 
 /// Semantic token types supported by the language server.
@@ -313,8 +310,10 @@ impl<'db> SemanticTokenVisitor<'db> {
                 }
             }
             DefinitionKind::Class(_) => Some((SemanticTokenType::Class, modifiers)),
-            DefinitionKind::TypeVar(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
-            DefinitionKind::Parameter(parameter) => {
+            DefinitionKind::TypeVar(_) | DefinitionKind::ParamSpec(_) => {
+                Some((SemanticTokenType::TypeParameter, modifiers))
+            }
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
                 let parsed = parsed_module(db, definition.file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
@@ -342,12 +341,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                 Some((SemanticTokenType::Parameter, modifiers))
             }
-            DefinitionKind::VariadicPositionalParameter(_) => {
-                Some((SemanticTokenType::Parameter, modifiers))
-            }
-            DefinitionKind::VariadicKeywordParameter(_) => {
-                Some((SemanticTokenType::Parameter, modifiers))
-            }
+            DefinitionKind::Parameter(_) => Some((SemanticTokenType::Parameter, modifiers)),
             DefinitionKind::TypeAlias(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
             DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
@@ -373,6 +367,11 @@ impl<'db> SemanticTokenVisitor<'db> {
                 if let Some(value) = value
                     && let Some(value_ty) = value.inferred_type(&model)
                 {
+                    if matches!(value_ty, Type::KnownInstance(KnownInstanceType::TypeVar(_))) {
+                        modifiers.remove(SemanticTokenModifier::READONLY);
+                        return Some((SemanticTokenType::TypeParameter, modifiers));
+                    }
+
                     if value_ty.is_class_literal()
                         || value_ty.is_subclass_of()
                         || value_ty.is_generic_alias()
@@ -404,6 +403,9 @@ impl<'db> SemanticTokenVisitor<'db> {
         Some(match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
             Type::TypeVar(_) => (SemanticTokenType::TypeParameter, modifiers),
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => {
+                (SemanticTokenType::TypeParameter, modifiers)
+            }
             Type::FunctionLiteral(_) => {
                 // Check if this is a method based on current scope
                 if self.in_class_scope {
@@ -550,40 +552,36 @@ impl<'db> SemanticTokenVisitor<'db> {
         func: &ast::StmtFunctionDef,
     ) -> SemanticTokenType {
         if is_first && self.in_class_scope {
-            // Check if this is a classmethod (has @classmethod decorator)
-            // TODO - replace with a more robust way to check whether this is a classmethod
-            let is_classmethod =
-                func.decorator_list
-                    .iter()
-                    .any(|decorator| match &decorator.expression {
-                        ast::Expr::Name(name) => name.id.as_str() == "classmethod",
-                        ast::Expr::Attribute(attr) => attr.attr.id.as_str() == "classmethod",
-                        _ => false,
-                    });
+            let method_decorator = func
+                .inferred_type(self.model)
+                .and_then(Type::as_function_literal)
+                .and_then(|function_ty| {
+                    MethodDecorator::try_from_fn_type(self.model.db(), function_ty)
+                })
+                .unwrap_or_default();
 
-            // Check if this is a staticmethod (has @staticmethod decorator)
-            // TODO - replace with a more robust way to check whether this is a staticmethod
-            let is_staticmethod =
-                func.decorator_list
-                    .iter()
-                    .any(|decorator| match &decorator.expression {
-                        ast::Expr::Name(name) => name.id.as_str() == "staticmethod",
-                        ast::Expr::Attribute(attr) => attr.attr.id.as_str() == "staticmethod",
-                        _ => false,
-                    });
-
-            if is_staticmethod {
-                // Static methods don't have self/cls parameters
-                SemanticTokenType::Parameter
-            } else if is_classmethod {
-                // First parameter of a classmethod is cls parameter
-                SemanticTokenType::ClsParameter
-            } else {
-                // First parameter of an instance method is self parameter
-                SemanticTokenType::SelfParameter
+            match method_decorator {
+                MethodDecorator::StaticMethod => SemanticTokenType::Parameter,
+                MethodDecorator::ClassMethod => SemanticTokenType::ClsParameter,
+                MethodDecorator::None => SemanticTokenType::SelfParameter,
             }
         } else {
             SemanticTokenType::Parameter
+        }
+    }
+
+    fn classify_function_definition(&self, func: &ast::StmtFunctionDef) -> SemanticTokenType {
+        if !self.in_class_scope {
+            return SemanticTokenType::Function;
+        }
+
+        if matches!(
+            func.inferred_type(self.model),
+            Some(Type::PropertyInstance(_))
+        ) {
+            SemanticTokenType::Property
+        } else {
+            SemanticTokenType::Method
         }
     }
 
@@ -649,6 +647,35 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
         }
     }
+
+    fn visit_expr_with_type_form(&mut self, expr: &Expr, in_type_form: bool) {
+        let prev_in_type_form = self.in_type_form;
+        self.in_type_form = in_type_form;
+        self.visit_expr(expr);
+        self.in_type_form = prev_in_type_form;
+    }
+
+    fn visit_value_expression(&mut self, expr: &Expr) {
+        self.visit_expr_with_type_form(expr, false);
+    }
+
+    fn visit_annotated_arguments(&mut self, slice: &Expr) {
+        let ast::Expr::Tuple(tuple) = slice else {
+            self.visit_annotation(slice);
+            return;
+        };
+
+        let Some((annotation, metadata)) = tuple.elts.split_first() else {
+            self.visit_annotation(slice);
+            return;
+        };
+
+        self.visit_annotation(annotation);
+
+        for metadata_element in metadata {
+            self.visit_value_expression(metadata_element);
+        }
+    }
 }
 
 impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
@@ -676,11 +703,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Function name
                 self.add_token(
                     func.name.range(),
-                    if self.in_class_scope {
-                        SemanticTokenType::Method
-                    } else {
-                        SemanticTokenType::Function
-                    },
+                    self.classify_function_definition(func),
                     if func.is_async {
                         SemanticTokenModifier::DEFINITION | SemanticTokenModifier::ASYNC
                     } else {
@@ -906,10 +929,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
     /// Visit an annotation or other expression that should be interpreted as a type form.
     fn visit_annotation(&mut self, expr: &'_ Expr) {
-        let prev_in_type_form = self.in_type_form;
-        self.in_type_form = true;
-        self.visit_expr(expr);
-        self.in_type_form = prev_in_type_form;
+        self.visit_expr_with_type_form(expr, true);
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
@@ -979,12 +999,21 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
                 {
-                    let mut sub_visitor = SemanticTokenVisitor::new(&sub_model, None);
+                    let mut sub_visitor = SemanticTokenVisitor::new(&sub_model, self.range_filter);
                     sub_visitor.visit_expr(sub_ast.expr());
                     self.tokens.extend(sub_visitor.tokens);
                 } else {
                     walk_expr(self, expr);
                 }
+            }
+            ast::Expr::Subscript(subscript)
+                if matches!(
+                    subscript.value.inferred_type(self.model),
+                    Some(Type::SpecialForm(SpecialFormType::Annotated))
+                ) =>
+            {
+                self.visit_expr(subscript.value.as_ref());
+                self.visit_annotated_arguments(subscript.slice.as_ref());
             }
             ast::Expr::Call(call) => {
                 self.visit_expr(call.func.as_ref());
@@ -1251,6 +1280,36 @@ mod tests {
     }
 
     #[test]
+    fn semantic_tokens_annotated_metadata() {
+        let test = SemanticTokenTest::new(
+            "
+from typing import Annotated
+
+class Metadata:
+    field = 1
+
+def f(x: Annotated[int, Metadata.field]): ...
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Annotated" @ 20..29: Variable
+        "Metadata" @ 37..45: Class [definition]
+        "field" @ 51..56: Variable [definition]
+        "1" @ 59..60: Number
+        "f" @ 66..67: Function [definition]
+        "x" @ 68..69: Parameter [definition]
+        "Annotated" @ 71..80: Variable
+        "int" @ 81..84: Class
+        "Metadata" @ 86..94: Class
+        "field" @ 95..100: Variable
+        "#);
+    }
+
+    #[test]
     fn semantic_tokens_match_class_pattern_keyword_before_positional() {
         // Regression test for https://github.com/astral-sh/ty/issues/2417
         // This used to cause a panic because keyword patterns and positional
@@ -1322,6 +1381,68 @@ y = 'hello'
         "42" @ 5..7: Number
         "y" @ 8..9: Variable [definition]
         "'hello'" @ 12..19: String
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_legacy_typevar() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import Generic, TypeVar
+
+KT = TypeVar("KT")
+
+class Box(Generic[KT]):
+    value: KT
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Generic" @ 20..27: Variable
+        "TypeVar" @ 29..36: Class
+        "KT" @ 38..40: TypeParameter [definition]
+        "TypeVar" @ 43..50: Class
+        "\"KT\"" @ 51..55: String
+        "Box" @ 64..67: Class [definition]
+        "Generic" @ 68..75: Variable
+        "KT" @ 76..78: TypeParameter
+        "value" @ 86..91: Variable [definition]
+        "KT" @ 93..95: TypeParameter
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_legacy_paramspec() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def decorator(func: Callable[P, int]) -> Callable[P, str]: ...
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Callable" @ 20..28: Variable
+        "ParamSpec" @ 30..39: Class
+        "P" @ 41..42: TypeParameter [definition]
+        "ParamSpec" @ 45..54: Class
+        "\"P\"" @ 55..58: String
+        "decorator" @ 65..74: Function [definition]
+        "func" @ 75..79: Parameter [definition]
+        "Callable" @ 81..89: Variable
+        "P" @ 90..91: TypeParameter
+        "int" @ 93..96: Class
+        "Callable" @ 102..110: Variable
+        "P" @ 111..112: TypeParameter
+        "str" @ 114..117: Class
         "#);
     }
 
@@ -1416,6 +1537,56 @@ class MyClass:
         "method" @ 42..48: Method [definition]
         "x" @ 49..50: Parameter [definition]
         "y" @ 52..53: Parameter [definition]
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_aliased_staticmethod_parameter() {
+        let test = SemanticTokenTest::new(
+            "
+sm = staticmethod
+
+class MyClass:
+    @sm
+    def method(x, y): pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "sm" @ 1..3: Class [definition]
+        "staticmethod" @ 6..18: Class
+        "MyClass" @ 26..33: Class [definition]
+        "sm" @ 40..42: Decorator
+        "method" @ 51..57: Method [definition]
+        "x" @ 58..59: Parameter [definition]
+        "y" @ 61..62: Parameter [definition]
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_aliased_classmethod_parameter() {
+        let test = SemanticTokenTest::new(
+            "
+cm = classmethod
+
+class MyClass:
+    @cm
+    def method(cls, x): pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "cm" @ 1..3: Class [definition]
+        "classmethod" @ 6..17: Class
+        "MyClass" @ 25..32: Class [definition]
+        "cm" @ 39..41: Decorator
+        "method" @ 50..56: Method [definition]
+        "cls" @ 57..60: ClsParameter [definition]
+        "x" @ 62..63: Parameter [definition]
         "#);
     }
 
@@ -1924,7 +2095,7 @@ t = MyClass.prop          # prop should be property on the class itself
         "self" @ 108..112: SelfParameter [definition]
         "\"hello\"" @ 130..137: String
         "property" @ 144..152: Decorator
-        "prop" @ 161..165: Method [definition]
+        "prop" @ 161..165: Property [definition]
         "self" @ 166..170: SelfParameter [definition]
         "self" @ 188..192: SelfParameter
         "CONSTANT" @ 193..201: Variable [readonly]
@@ -1974,7 +2145,7 @@ x = Foo.prop
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "Foo" @ 7..10: Class [definition]
         "property" @ 17..25: Decorator
-        "prop" @ 34..38: Method [definition]
+        "prop" @ 34..38: Property [definition]
         "self" @ 39..43: SelfParameter [definition]
         "int" @ 48..51: Class
         "4" @ 68..69: Number
@@ -2019,19 +2190,19 @@ b = cfg.read_write
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "Config" @ 7..13: Class [definition]
         "property" @ 20..28: Decorator
-        "read_only" @ 37..46: Method [definition]
+        "read_only" @ 37..46: Property [definition]
         "self" @ 47..51: SelfParameter [definition]
         "str" @ 56..59: Class
         "'value'" @ 76..83: String
         "property" @ 90..98: Decorator
-        "read_write" @ 107..117: Method [definition]
+        "read_write" @ 107..117: Property [definition]
         "self" @ 118..122: SelfParameter [definition]
         "int" @ 127..130: Class
         "self" @ 147..151: SelfParameter
         "_x" @ 152..154: Variable
         "read_write" @ 161..171: Method
         "setter" @ 172..178: Method
-        "read_write" @ 187..197: Method [definition]
+        "read_write" @ 187..197: Property [definition]
         "self" @ 198..202: SelfParameter [definition]
         "value" @ 204..209: Parameter [definition]
         "int" @ 211..214: Class
@@ -2072,7 +2243,7 @@ def f(obj: WithProperty | WithAttribute):
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "WithProperty" @ 7..19: Class [definition]
         "property" @ 26..34: Decorator
-        "value" @ 43..48: Method [definition]
+        "value" @ 43..48: Property [definition]
         "self" @ 49..53: SelfParameter [definition]
         "int" @ 58..61: Class
         "1" @ 78..79: Number
@@ -2120,20 +2291,20 @@ x = obj.value
         "random" @ 20..26: Method
         "ReadOnly" @ 34..42: Class [definition]
         "property" @ 49..57: Decorator
-        "value" @ 66..71: Method [definition]
+        "value" @ 66..71: Property [definition]
         "self" @ 72..76: SelfParameter [definition]
         "int" @ 81..84: Class
         "1" @ 101..102: Number
         "ReadWrite" @ 110..119: Class [definition]
         "property" @ 126..134: Decorator
-        "value" @ 143..148: Method [definition]
+        "value" @ 143..148: Property [definition]
         "self" @ 149..153: SelfParameter [definition]
         "int" @ 158..161: Class
         "self" @ 178..182: SelfParameter
         "_value" @ 183..189: Variable
         "value" @ 196..201: Method
         "setter" @ 202..208: Method
-        "value" @ 217..222: Method [definition]
+        "value" @ 217..222: Property [definition]
         "self" @ 223..227: SelfParameter [definition]
         "new_value" @ 229..238: Parameter [definition]
         "int" @ 240..243: Class
@@ -2230,7 +2401,7 @@ x = foobar_cls.prop                              # prop should be property
         "self" @ 73..77: SelfParameter [definition]
         "\"hello\"" @ 95..102: String
         "property" @ 109..117: Decorator
-        "prop" @ 126..130: Method [definition]
+        "prop" @ 126..130: Property [definition]
         "self" @ 131..135: SelfParameter [definition]
         "str" @ 140..143: Class
         "\"hello\"" @ 160..167: String
@@ -2245,7 +2416,7 @@ x = foobar_cls.prop                              # prop should be property
         "int" @ 235..238: Class
         "42" @ 255..257: Number
         "property" @ 264..272: Decorator
-        "prop" @ 281..285: Method [definition]
+        "prop" @ 281..285: Property [definition]
         "self" @ 286..290: SelfParameter [definition]
         "int" @ 295..298: Class
         "self" @ 315..319: SelfParameter
@@ -2325,7 +2496,7 @@ q = Baz.prop        # prop should be property on the class as well
         "int" @ 155..158: Class
         "42" @ 179..181: Number
         "property" @ 192..200: Decorator
-        "prop" @ 213..217: Method [definition]
+        "prop" @ 213..217: Property [definition]
         "self" @ 218..222: SelfParameter [definition]
         "int" @ 227..230: Class
         "42" @ 251..253: Number
@@ -2336,7 +2507,7 @@ q = Baz.prop        # prop should be property on the class as well
         "str" @ 320..323: Class
         "\"hello\"" @ 344..351: String
         "property" @ 362..370: Decorator
-        "prop" @ 383..387: Method [definition]
+        "prop" @ 383..387: Property [definition]
         "self" @ 388..392: SelfParameter [definition]
         "str" @ 397..400: Class
         "\"hello\"" @ 421..428: String
@@ -2407,7 +2578,7 @@ q = Baz.prop
         "int" @ 107..110: Class
         "42" @ 131..133: Number
         "property" @ 144..152: Decorator
-        "prop" @ 165..169: Method [definition]
+        "prop" @ 165..169: Property [definition]
         "self" @ 170..174: SelfParameter [definition]
         "int" @ 179..182: Class
         "42" @ 203..205: Number
@@ -2415,7 +2586,7 @@ q = Baz.prop
         "self" @ 237..241: SelfParameter [definition]
         "\"hello\"" @ 263..270: String
         "property" @ 281..289: Decorator
-        "method" @ 302..308: Method [definition]
+        "method" @ 302..308: Property [definition]
         "self" @ 309..313: SelfParameter [definition]
         "str" @ 318..321: Class
         "\"hello\"" @ 342..349: String
@@ -3504,16 +3675,16 @@ class BoundedContainer[T: int, U = str]:
         "func_paramspec" @ 266..280: Function [definition]
         "P" @ 283..284: TypeParameter [definition]
         "func" @ 286..290: Parameter [definition]
-        "P" @ 301..302: Variable
+        "P" @ 301..302: TypeParameter
         "int" @ 304..307: Class
-        "P" @ 322..323: Variable
+        "P" @ 322..323: TypeParameter
         "str" @ 325..328: Class
         "wrapper" @ 339..346: Function [definition]
         "args" @ 348..352: Parameter [definition]
-        "P" @ 354..355: Variable
+        "P" @ 354..355: TypeParameter
         "args" @ 356..360: Property [readonly]
         "kwargs" @ 364..370: Parameter [definition]
-        "P" @ 372..373: Variable
+        "P" @ 372..373: TypeParameter
         "kwargs" @ 374..380: Property [readonly]
         "str" @ 385..388: Class
         "str" @ 405..408: Class

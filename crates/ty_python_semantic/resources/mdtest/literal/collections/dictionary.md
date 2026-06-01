@@ -65,7 +65,7 @@ reveal_type(x)  # revealed: dict[int, (_: int) -> int]
 ## Mixed dict
 
 ```py
-# revealed: dict[str, int | tuple[int, int] | tuple[int, int, int]]
+# revealed: dict[str, int | tuple[int, ...]]
 reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 ```
 
@@ -208,6 +208,7 @@ x3["inner"] = {"inner": {"a": 1}}
 f1(**x3["inner"])
 
 def _(x: dict[str, object]):
+    # error: [invalid-type-form]
     x["inner"]: dict[str, float | str] = {"a": 1, "b": "a"}
 
     f2(**x["inner"])  # ok
@@ -221,6 +222,68 @@ def _(x: dict[str, object]):
     x["inner"] = {"inner": {"a": 1}}
     # error: [invalid-argument-type]
     f1(**x["inner"])
+
+def _(x: dict[str, dict[str, float | str]]):
+    # A rejected dictionary assignment does not establish known key types.
+    # error: [invalid-assignment]
+    x["kwargs"] = {"nested": {"a": 1}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+    # error: [invalid-argument-type]
+    f1(**x["kwargs"])
+
+def _(x: dict[str, dict[str, float | str]]):
+    x["kwargs"] = {"nested": 1}
+    reveal_type(x["kwargs"]["nested"])  # revealed: Literal[1]
+
+    # A rejected replacement also invalidates a prior known-key type.
+    # error: [invalid-assignment]
+    x["kwargs"] = {"nested": {"a": 1}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+
+def accepts_value(**kwargs: object): ...
+def _(x: dict[str, dict[str, float | str]]):
+    # error: [invalid-assignment]
+    x = {"kwargs": {"nested": {"a": object()}}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+    # error: [invalid-argument-type]
+    accepts_value(**x["kwargs"]["nested"])
+
+def _(x: list[dict[str, float | str]]):
+    # error: [invalid-assignment]
+    x = [{"nested": {"a": object()}}]
+    # error: [invalid-argument-type]
+    accepts_value(**x[0]["nested"])
+
+def _(x: dict[str, object], y: int):
+    # An invalid nested binding does not reject the dictionary assignment itself.
+    # error: [invalid-assignment]
+    x = {"a": (y := "bad")}
+    reveal_type(x["a"])  # revealed: int
+
+class Normalizing:
+    def __getitem__(self, key: str) -> dict[str, object]:
+        return {}
+    def __setitem__(self, key: str, value: dict[str, object]) -> None:
+        pass
+
+def _(normalizing: Normalizing):
+    # An arbitrary setter may transform the assigned value, so its children are not narrowed.
+    normalizing["mapping"] = {"a": 1}
+    reveal_type(normalizing["mapping"]["a"])  # revealed: object
+
+class NormalizingDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> dict[str, object]:
+        return {}
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class WithNormalizingDescriptor:
+    mapping: NormalizingDescriptor = NormalizingDescriptor()
+
+def _(normalizing: WithNormalizingDescriptor):
+    # A data descriptor may likewise transform the assigned value.
+    normalizing.mapping = {"a": 1}
+    reveal_type(normalizing.mapping["a"])  # revealed: object
 
 class Y:
     inner: dict[str, object]

@@ -833,7 +833,7 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
         .write_str(T::FORM_NAME)?;
     f.write_char('[')?;
     guard
-        .return_type(db)
+        .type_argument(db)
         .display_with(db, settings.singleline())
         .fmt_detailed(f)?;
     if let Some(name) = guard.place_name(db) {
@@ -1002,15 +1002,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
                 let self_ty = bound_method.self_instance(self.db);
-                let typing_self_ty = bound_method.typing_self_type(self.db);
+                let bound_signatures = bound_method.bound_signatures(self.db);
 
-                match function.signature(self.db).overloads.as_slice() {
+                match bound_signatures.overloads.as_slice() {
                     [signature] => {
-                        let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
-                        let hide_unused_self =
-                            bound_signature.should_hide_self_from_display(self.db);
+                        let hide_unused_self = signature.should_hide_self_from_display(self.db);
                         let type_parameters = DisplayOptionalGenericContext {
-                            generic_context: bound_signature.generic_context.as_ref(),
+                            generic_context: signature.generic_context.as_ref(),
                             db: self.db,
                             settings: self.settings.clone(),
                             hide_unused_self,
@@ -1023,7 +1021,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         f.write_char('.')?;
                         f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;
-                        bound_signature
+                        signature
                             .display_with(self.db, self.settings.disallow_signature_name())
                             .fmt_detailed(f)
                     }
@@ -1038,11 +1036,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         let separator = if self.settings.multiline { "\n" } else { ", " };
                         let mut join = f.join(separator);
                         for signature in signatures {
-                            join.entry(
-                                &signature
-                                    .bind_self(self.db, Some(typing_self_ty))
-                                    .display_with(self.db, self.settings.clone()),
-                            );
+                            join.entry(&signature.display_with(self.db, self.settings.clone()));
                         }
                         join.finish()?;
                         if !self.settings.multiline {
@@ -1191,6 +1185,23 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
+            Type::EnumComplement(complement) => {
+                if let Some(literals) =
+                    complement.remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
+                {
+                    DisplayLiteralGroup {
+                        literals,
+                        db: self.db,
+                        settings: self.settings.clone(),
+                    }
+                    .fmt_detailed(f)
+                } else {
+                    complement
+                        .to_intersection(self.db)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(n) => write!(f.with_type(self.ty), "{n}"),
                 LiteralValueTypeKind::Bool(boolean) => {
@@ -1204,14 +1215,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         string.display_with(self.db, self.settings.clone()),
                     )
                 }
-                // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
-                // which would mean users would be able to jump to the definition of `LiteralString` from the
-                // inlay hint, but that seems less useful than the definition of `str` for a variable that is
-                // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
-                // at runtime)
-                LiteralValueTypeKind::LiteralString => {
-                    f.with_type(self.ty).write_str("LiteralString")
-                }
+                // We used to return `str` as the type here because that feels generally more useful.
+                // However, the inoncistency between the type shown in the inlay hint and its hover, and the
+                // inconsistency to what's shown when hovering the backed inlay hint of a `LiteralString`
+                // convinvced us that we should change the type to `LiteralString`.
+                LiteralValueTypeKind::LiteralString => f
+                    .with_type(Type::SpecialForm(SpecialFormType::LiteralString))
+                    .write_str("LiteralString"),
                 LiteralValueTypeKind::Bytes(bytes) => {
                     let escape =
                         AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
@@ -1227,7 +1237,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .enum_class(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
-                    write!(f, ".{}", enum_literal.name(self.db))
+                    f.write_char('.')?;
+                    write!(
+                        f.with_type(Type::enum_literal(enum_literal)),
+                        "{}",
+                        enum_literal.name(self.db)
+                    )
                 }
             },
             Type::TypeVar(bound_typevar) => {
@@ -1259,6 +1274,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::TypeIs(type_is) => fmt_type_guard_like(self.db, type_is, &self.settings, f),
             Type::TypeGuard(type_guard) => {
                 fmt_type_guard_like(self.db, type_guard, &self.settings, f)
+            }
+            Type::TypeForm(typeform) => {
+                f.with_type(Type::SpecialForm(SpecialFormType::TypeForm))
+                    .write_str("TypeForm")?;
+                f.write_char('[')?;
+                typeform
+                    .type_argument(self.db)
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
+                f.write_char(']')
             }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
                 ClassType::NonGeneric(class) => class
@@ -2448,17 +2473,44 @@ const UNION_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        fn is_condensable(ty: Type<'_>) -> bool {
-            matches!(
-                ty.as_literal_value_kind(),
-                Some(
-                    LiteralValueTypeKind::Int(_)
-                        | LiteralValueTypeKind::String(_)
-                        | LiteralValueTypeKind::Bytes(_)
-                        | LiteralValueTypeKind::Bool(_)
-                        | LiteralValueTypeKind::Enum(_)
-                )
-            )
+        /// Return the literal types that can be folded into a displayed `Literal[...]` group.
+        ///
+        /// Plain literal types are returned as-is. Small enum complements are expanded to their
+        /// remaining enum literals so a type like `Color & ~Literal[Color.RED]` can be displayed
+        /// with the same condensation rules as explicit enum-literal unions. Large complements
+        /// stay compact to keep diagnostics readable.
+        ///
+        /// ```python
+        /// from enum import Enum
+        ///
+        /// class Color(Enum):
+        ///     RED = 1
+        ///     BLUE = 2
+        ///
+        /// # Color excluding RED displays through the literal-group path for BLUE.
+        /// ```
+        fn condensable_literals<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+            match ty {
+                Type::LiteralValue(literal)
+                    if matches!(
+                        literal.kind(),
+                        LiteralValueTypeKind::Int(_)
+                            | LiteralValueTypeKind::String(_)
+                            | LiteralValueTypeKind::Bytes(_)
+                            | LiteralValueTypeKind::Bool(_)
+                            | LiteralValueTypeKind::Enum(_)
+                    ) =>
+                {
+                    Some(vec![ty])
+                }
+                Type::EnumComplement(complement) => {
+                    complement.remaining_literal_types_for_display(db, LITERAL_POLICY.max)
+                }
+                Type::Intersection(intersection) => {
+                    intersection.finite_alternatives_for_display(db, LITERAL_POLICY.max)
+                }
+                _ => None,
+            }
         }
 
         fn singleline_union_element_label<'db>(
@@ -2484,26 +2536,32 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
 
         let elements = self.ty.elements(self.db);
         let mut condensed_types = vec![];
+        let mut condensed_element_count = 0usize;
         let mut subclass_of_types = vec![];
         let element_labels: Vec<_> = elements
             .iter()
             .copied()
             .map(|element| {
-                (!is_condensable(element) && !element.is_subclass_of())
+                (condensable_literals(self.db, element).is_none() && !element.is_subclass_of())
                     .then(|| singleline_union_element_label(self.db, element, &self.settings))
             })
             .collect();
         let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
 
         for element in elements.iter().copied() {
-            if is_condensable(element) {
-                condensed_types.push(element);
+            if let Some(literals) = condensable_literals(self.db, element) {
+                condensed_element_count += 1;
+                for literal in literals {
+                    if !condensed_types.contains(&literal) {
+                        condensed_types.push(literal);
+                    }
+                }
             } else if let Type::SubclassOf(subclass_of) = element {
                 subclass_of_types.push(subclass_of);
             }
         }
 
-        let total_entries = elements.len() - condensed_types.len() - subclass_of_types.len()
+        let total_entries = elements.len() - condensed_element_count - subclass_of_types.len()
             + usize::from(!condensed_types.is_empty())
             + usize::from(!subclass_of_types.is_empty());
 
@@ -2524,7 +2582,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 break;
             }
 
-            if is_condensable(*element) {
+            if condensable_literals(self.db, *element).is_some() {
                 if let Some(condensed_types) = condensed_types.take() {
                     displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
@@ -3104,7 +3162,17 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(ty).write_str(declaration.name(self.db))?;
                 f.write_str("'>")
             }
+            KnownInstanceType::Sentinel(sentinel) => {
+                f.with_type(ty).write_str(sentinel.name(self.db).as_str())
+            }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
+            KnownInstanceType::FunctoolsPartial(partial) => {
+                f.write_str("partial[")?;
+                Type::Callable(partial.partial(self.db))
+                    .display_with(self.db, DisplaySettings::default().singleline())
+                    .fmt_detailed(f)?;
+                f.write_str("]")
+            }
         }
     }
 }

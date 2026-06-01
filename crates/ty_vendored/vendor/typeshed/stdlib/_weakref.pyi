@@ -21,6 +21,5 @@ def proxy(object: _C, callback: Callable[[_C], Any] | None = None, /) -> Callabl
     'callback', if given, is called with a reference to the
     proxy when 'object' is about to be finalized.
     """
-
 @overload
 def proxy(object: _T, callback: Callable[[_T], Any] | None = None, /) -> Any: ...

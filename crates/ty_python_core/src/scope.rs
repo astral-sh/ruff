@@ -37,6 +37,7 @@ impl<'db> ScopeId<'db> {
                 | NodeWithScopeKind::ListComprehension(_)
                 | NodeWithScopeKind::SetComprehension(_)
                 | NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::GeneratorExpression(_)
         )
     }
 
@@ -81,7 +82,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-#[derive(salsa::Update, get_size2::GetSize)]
+#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
 pub struct FileScopeId;
 
 impl FileScopeId {
@@ -176,7 +177,7 @@ impl ScopeVisibility {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, get_size2::GetSize)]
 pub(crate) enum ScopeLaziness {
     /// The scope is evaluated lazily (e.g. function, type alias scope).
     Lazy,

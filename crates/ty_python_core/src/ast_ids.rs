@@ -43,7 +43,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
 
 /// Uniquely identifies a use of a name in a [`crate::FileScopeId`].
 #[newtype_index]
-#[derive(get_size2::GetSize)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
@@ -102,15 +102,15 @@ impl AstIdsBuilder {
     /// Adds `expr` to the use ids map and returns its id.
     pub(super) fn record_use(&mut self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         let use_id = self.uses_map.len().into();
-
         self.uses_map.insert(expr.into(), use_id);
-
         use_id
     }
 
-    pub(super) fn finish(mut self) -> AstIds {
-        self.uses_map.shrink_to_fit();
+    pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
+        self.uses_map.get(&key.into()).copied()
+    }
 
+    pub(super) fn finish(self) -> AstIds {
         AstIds {
             uses_map: self.uses_map,
         }
@@ -123,7 +123,9 @@ pub(crate) mod node_key {
 
     use crate::{ast_node_ref::AstNodeRef, node_key::NodeKey};
 
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+    #[derive(
+        Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+    )]
     pub struct ExpressionNodeKey(NodeKey);
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
@@ -146,6 +148,12 @@ pub(crate) mod node_key {
 
     impl From<&ast::ExprCall> for ExpressionNodeKey {
         fn from(value: &ast::ExprCall) -> Self {
+            Self(NodeKey::from_node(value))
+        }
+    }
+
+    impl From<&ast::ExprLambda> for ExpressionNodeKey {
+        fn from(value: &ast::ExprLambda) -> Self {
             Self(NodeKey::from_node(value))
         }
     }

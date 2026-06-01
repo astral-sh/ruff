@@ -849,3 +849,17 @@ def capybara(top: Top[Invariant[Any]], bottom: Bottom[Invariant[Any]]) -> None:
     reveal_type(top.attr)  # revealed: object
     reveal_type(bottom.attr)  # revealed: Never
 ```
+
+Alias specializations also preserve the materialization polarity in contravariant positions.
+
+```py
+from ty_extensions import Top, Bottom
+from typing import Any, Callable
+
+type Alias[T] = T
+type AliasedCallable[T] = Callable[[Alias[T]], T]
+
+def _(top: Top[AliasedCallable[Any]], bottom: Bottom[AliasedCallable[Any]]) -> None:
+    reveal_type(top)  # revealed: (Never, /) -> object
+    reveal_type(bottom)  # revealed: (object, /) -> Never
+```

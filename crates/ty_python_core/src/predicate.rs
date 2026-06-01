@@ -8,7 +8,7 @@
 //!   static reachability of a binding, and the reachability of a statement or expression.
 
 use ruff_db::files::File;
-use ruff_index::{Idx, IndexVec};
+use ruff_index::{FrozenIndexVec, Idx, IndexVec};
 use ruff_python_ast::{Singleton, name::Name};
 
 use crate::db::Db;
@@ -51,7 +51,7 @@ impl Idx for ScopedPredicateId {
 }
 
 // A collection of predicates for a given scope.
-pub type Predicates<'db> = IndexVec<ScopedPredicateId, Predicate<'db>>;
+pub type Predicates<'db> = FrozenIndexVec<ScopedPredicateId, Predicate<'db>>;
 
 #[derive(Debug, Default)]
 pub(crate) struct PredicatesBuilder<'db> {
@@ -68,7 +68,7 @@ impl<'db> PredicatesBuilder<'db> {
 
     pub(crate) fn build(mut self) -> Predicates<'db> {
         self.predicates.shrink_to_fit();
-        self.predicates
+        self.predicates.into()
     }
 }
 
@@ -153,6 +153,7 @@ pub enum PatternPredicateKind<'db> {
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
     Mapping(ClassPatternKind),
+    Sequence(ClassPatternKind),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Unsupported,
 }

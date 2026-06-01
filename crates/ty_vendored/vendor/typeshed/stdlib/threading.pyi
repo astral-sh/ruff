@@ -4,11 +4,11 @@ import _thread
 import sys
 from _thread import _ExceptHookArgs, get_native_id as get_native_id
 from _typeshed import ProfileFunction, TraceFunction
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextvars import Context
 from types import TracebackType
 from typing import Any, Final, TypeVar, final
-from typing_extensions import deprecated
+from typing_extensions import Self, deprecated
 
 _T = TypeVar("_T")
 
@@ -31,6 +31,8 @@ __all__ = [
     "Timer",
     "ThreadError",
     "ExceptHookArgs",
+    "getprofile",
+    "gettrace",
     "setprofile",
     "settrace",
     "local",
@@ -39,11 +41,11 @@ __all__ = [
     "get_native_id",
 ]
 
-if sys.version_info >= (3, 10):
-    __all__ += ["getprofile", "gettrace"]
-
 if sys.version_info >= (3, 12):
     __all__ += ["setprofile_all_threads", "settrace_all_threads"]
+
+if sys.version_info >= (3, 15):
+    __all__ += ["concurrent_tee", "serialize_iterator", "synchronized_iterator"]
 
 _profile_hook: ProfileFunction | None
 
@@ -136,12 +138,24 @@ if sys.version_info >= (3, 12):
         method is called.
         """
 
-if sys.version_info >= (3, 10):
-    def gettrace() -> TraceFunction | None:
-        """Get the trace function as set by threading.settrace()."""
+def gettrace() -> TraceFunction | None:
+    """Get the trace function as set by threading.settrace()."""
 
-    def getprofile() -> ProfileFunction | None:
-        """Get the profiler function as set by threading.setprofile()."""
+def getprofile() -> ProfileFunction | None:
+    """Get the profiler function as set by threading.setprofile()."""
+
+if sys.version_info >= (3, 15):
+    @final
+    class serialize_iterator(Iterator[_T]):
+        def __init__(self, iterable: Iterable[_T]) -> None: ...
+        def __iter__(self) -> Self: ...
+        def __next__(self) -> _T: ...
+        def send(self, value: Any, /) -> _T: ...
+        def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ...) -> _T: ...
+        def close(self) -> None: ...
+
+    def synchronized_iterator(func: Callable[..., Iterable[_T]]) -> Callable[..., Iterator[_T]]: ...
+    def concurrent_tee(iterable: Iterable[_T], n: int = 2) -> tuple[Iterator[_T], ...]: ...
 
 def stack_size(size: int = 0, /) -> int:
     """Return the thread stack size used when creating new threads.  The
@@ -670,8 +684,7 @@ class Event:
         """
 
 excepthook: Callable[[_ExceptHookArgs], object]
-if sys.version_info >= (3, 10):
-    __excepthook__: Callable[[_ExceptHookArgs], object]
+__excepthook__: Callable[[_ExceptHookArgs], object]
 ExceptHookArgs = _ExceptHookArgs
 
 class Timer(Thread):

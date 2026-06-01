@@ -25,7 +25,9 @@ expression: initialization_result
     "hoverProvider": true,
     "completionProvider": {
       "triggerCharacters": [
-        "."
+        ".",
+        "\"",
+        "'"
       ]
     },
     "signatureHelpProvider": {
@@ -65,6 +67,7 @@ expression: initialization_result
         "changeNotifications": true
       }
     },
+    "callHierarchyProvider": true,
     "semanticTokensProvider": {
       "legend": {
         "tokenTypes": [

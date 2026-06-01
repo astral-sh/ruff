@@ -500,26 +500,11 @@ pub fn definitions_for_keyword_argument<'db>(
 
         // For each signature, find the parameter with the matching name
         for signature in signatures {
-            if let Some((_param_index, _param)) =
+            if let Some((_param_index, param)) =
                 signature.parameters().keyword_by_name(keyword_name_str)
+                && let Some(definition) = param.definition()
             {
-                if let Some(function_definition) = signature.definition() {
-                    let function_file = function_definition.file(db);
-                    let module = parsed_module(db, function_file).load(db);
-                    let def_kind = function_definition.kind(db);
-
-                    if let DefinitionKind::Function(function_ast_ref) = def_kind {
-                        let function_node = function_ast_ref.node(&module);
-
-                        if let Some(parameter_range) =
-                            find_parameter_range(&function_node.parameters, keyword_name_str)
-                        {
-                            resolved_definitions.push(ResolvedDefinition::FileWithRange(
-                                FileRange::new(function_file, parameter_range),
-                            ));
-                        }
-                    }
-                }
+                resolved_definitions.push(ResolvedDefinition::Definition(definition));
             }
         }
     }
@@ -647,20 +632,6 @@ impl<'db> CallSignatureDetails<'db> {
             argument_to_parameter_mapping,
             argument_to_displayed_parameter_mapping,
         }
-    }
-
-    fn get_definition_parameter_range(&self, db: &dyn Db, name: &str) -> Option<FileRange> {
-        let definition = self.signature.definition()?;
-        let file = definition.file(db);
-        let module_ref = parsed_module(db, file).load(db);
-
-        let parameters = match definition.kind(db) {
-            DefinitionKind::Function(node) => &node.node(&module_ref).parameters,
-            // TODO: lambda functions
-            _ => return None,
-        };
-
-        Some(FileRange::new(file, parameters.find(name)?.name().range))
     }
 }
 
@@ -1258,7 +1229,11 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         };
 
-        let parameter_label_offset = resolved.get_definition_parameter_range(db, param.name()?);
+        let parameter_label_offset = param.definition().map(|definition| {
+            let param_file = definition.file(db);
+            let module = parsed_module(db, param_file).load(db);
+            definition.focus_range(db, &module)
+        });
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
@@ -1270,18 +1245,6 @@ pub fn inlay_hint_call_argument_details<'db>(
     }
 
     Some(InlayHintCallArgumentDetails { argument_names })
-}
-
-/// Find the text range of a specific parameter in function parameters by name.
-/// Only searches for parameters that can be addressed by name in keyword arguments.
-fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> Option<TextRange> {
-    // Check regular positional and keyword-only parameters
-    parameters
-        .args
-        .iter()
-        .chain(&parameters.kwonlyargs)
-        .find(|param| param.parameter.name.as_str() == parameter_name)
-        .map(|param| param.parameter.name.range())
 }
 
 mod resolve_definition {
@@ -1305,6 +1268,7 @@ mod resolve_definition {
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
     use ruff_python_stdlib::sys::is_builtin_module;
+    use ruff_text_size::TextRange;
     use rustc_hash::FxHashSet;
     use tracing::trace;
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
@@ -1312,7 +1276,7 @@ mod resolve_definition {
     use crate::Db;
     use crate::module_docstring;
     use crate::types::binding_type;
-    use ty_python_core::definition::{Definition, DefinitionKind};
+    use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
@@ -1332,6 +1296,31 @@ mod resolve_definition {
     }
 
     impl<'db> ResolvedDefinition<'db> {
+        pub fn focus_range(&self, db: &dyn Db) -> FileRange {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    let parsed = parsed_module(db, definition.file(db)).load(db);
+                    definition.focus_range(db, &parsed)
+                }
+                // For modules, navigate to the start of the file
+                ResolvedDefinition::Module(module) => FileRange::new(*module, TextRange::default()),
+                ResolvedDefinition::FileWithRange(file_range) => *file_range,
+            }
+        }
+
+        pub fn category(&self, db: &dyn Db) -> DefinitionCategory {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    let file = definition.file(db);
+                    let parsed = parsed_module(db, file).load(db);
+                    definition.kind(db).category(file.is_stub(db), &parsed)
+                }
+                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => {
+                    DefinitionCategory::DeclarationAndBinding
+                }
+            }
+        }
+
         pub fn definition(&self) -> Option<Definition<'db>> {
             match self {
                 ResolvedDefinition::Definition(definition) => Some(*definition),
@@ -1580,23 +1569,29 @@ mod resolve_definition {
         let definitions_in_module = find_symbol_in_scope(db, global_scope, symbol_name);
 
         // Recursively resolve any import definitions found in the target module
-        if definitions_in_module.is_empty() {
-            // This might be importing a submodule, try that
-            return Vec::from_iter(resolve_from_import_submodule_definitions(
-                db,
-                file,
-                symbol_name,
-                module_name,
-            ));
-        }
-
         let mut resolved_definitions = Vec::new();
         for def in definitions_in_module {
             let resolved =
                 resolve_definition_recursive(db, def, visited, Some(symbol_name), alias_resolution);
             resolved_definitions.extend(resolved);
         }
-        resolved_definitions
+
+        if resolved_definitions.is_empty() {
+            // In `pkg/__init__.py`, `from . import child` resolves `.` to
+            // `pkg/__init__.py`. Looking up `child` there can find an import definition
+            // that recursively resolves back here (possibly through `from . import *`),
+            // so recursive resolution bottoms out before reaching the `pkg.child`
+            // submodule target. Fall back to the same submodule candidate we use when
+            // `child` has no binding in `pkg/__init__.py`.
+            Vec::from_iter(resolve_from_import_submodule_definitions(
+                db,
+                file,
+                symbol_name,
+                module_name,
+            ))
+        } else {
+            resolved_definitions
+        }
     }
 
     // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
@@ -1787,7 +1782,14 @@ mod resolve_definition {
                     definitions.extend(
                         find_symbol_in_scope(db, scope, component)
                             .into_iter()
-                            .map(ResolvedDefinition::Definition),
+                            .flat_map(|definition| {
+                                resolve_definition(
+                                    db,
+                                    definition,
+                                    Some(component),
+                                    ImportAliasResolution::ResolveAliases,
+                                )
+                            }),
                     );
                 } else {
                     // We're in the middle of the path, look for scopes that match the current component
@@ -1873,9 +1875,8 @@ mod resolve_definition {
             | DefinitionKind::DictKeyAssignment(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
-            | DefinitionKind::VariadicPositionalParameter(_)
-            | DefinitionKind::VariadicKeywordParameter(_)
             | DefinitionKind::Parameter(_)
+            | DefinitionKind::LambdaParameter { .. }
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ExceptHandler(_)
