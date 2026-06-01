@@ -339,8 +339,13 @@ impl<'db> Definitions<'db> {
         goto_target: &GotoTarget<'_>,
     ) -> Option<Definitions<'db>> {
         let definitions = self.goto_declaration(model, goto_target)?;
-        let resolved = StubMapper::new(model.db()).map_definitions(definitions.0);
-        Some(Self::new(resolved))
+        Some(definitions.map_stubs(model.db()))
+    }
+
+    /// Map definitions from stub files to corresponding source implementations.
+    pub(crate) fn map_stubs(self, db: &'db dyn ty_python_semantic::Db) -> Definitions<'db> {
+        let resolved = StubMapper::new(db).map_definitions(self.0);
+        Self::new(resolved)
     }
 
     /// Convert these semantic definitions to editor-facing navigation targets.
