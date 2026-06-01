@@ -4886,13 +4886,6 @@ impl SequentMap {
         let right_constraint_data = builder.constraint_data(right_constraint);
         let right_typevar = right_constraint_data.typevar;
 
-        if left_constraint.implies(db, builder, right_constraint) {
-            self.add_single_implication(db, builder, left_constraint, right_constraint);
-        }
-        if right_constraint.implies(db, builder, left_constraint) {
-            self.add_single_implication(db, builder, right_constraint, left_constraint);
-        }
-
         if !left_typevar.is_same_typevar_as(db, right_typevar) {
             self.add_mutual_sequents_for_different_typevars(
                 db,
@@ -5023,8 +5016,12 @@ impl SequentMap {
         };
 
         let mut post_constraints: SmallVec<[ConstraintId; 3]> = SmallVec::new();
-        let mut constrained_lower = new_lower;
-        let mut constrained_upper = new_upper;
+        // These are derived logical constraints, not direct inference evidence. Avoid preserving
+        // explicit bounds that are equivalent to missing lower/upper bounds, so a derived
+        // `T ≤ U ≤ object` can satisfy a later query for `T ≤ U` without requiring a separate
+        // materialized-default implication.
+        let mut constrained_lower = new_lower.filter(|lower| !lower.is_never());
+        let mut constrained_upper = new_upper.filter(|upper| !upper.is_object());
 
         // The transitive rule above gives us an intended post-condition
         // `new_lower ≤ [constrained] ≤ new_upper`.
@@ -5473,8 +5470,12 @@ impl SequentMap {
                         // orientation, split it into equivalent canonical constraints instead of
                         // dropping it.
                         let mut post_constraints: SmallVec<[ConstraintId; 3]> = SmallVec::new();
-                        let mut constrained_lower = right_lower;
-                        let mut constrained_upper = right_upper;
+                        // These are derived logical constraints, not direct inference evidence.
+                        // Avoid preserving explicit bounds that are equivalent to missing
+                        // lower/upper bounds; direct constraints still retain their explicit
+                        // bound presence.
+                        let mut constrained_lower = right_lower.filter(|lower| !lower.is_never());
+                        let mut constrained_upper = right_upper.filter(|upper| !upper.is_object());
 
                         if let Some(Type::TypeVar(lower_bound_typevar)) = right_lower
                             && !lower_bound_typevar.can_be_bound_for(db, builder, bound_typevar)
