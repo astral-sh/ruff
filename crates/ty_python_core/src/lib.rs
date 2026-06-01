@@ -6,7 +6,6 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
-use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{FrozenIndexVec, IndexSlice};
@@ -613,11 +612,9 @@ impl<'db> SemanticIndex<'db> {
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> Option<Definition<'db>> {
         self.definitions_by_node
-            .get(definition_key.into())?
-            .iter()
+            .single
+            .get(&definition_key.into())
             .copied()
-            .exactly_one()
-            .ok()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
