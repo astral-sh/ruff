@@ -69,6 +69,17 @@ def call_with_args(y: object, a: int, b: str) -> object:
     return None
 ```
 
+If a top-callable is part of an intersection, it should still contribute its return type even when
+the other intersection elements are not callable:
+
+```py
+def resolve(value: str):
+    if callable(value):
+        reveal_type(value)  # revealed: str & Top[(...) -> object]
+        # error: [call-top-callable]
+        reveal_type(value())  # revealed: object
+```
+
 ## Narrowing with named expressions (walrus operator)
 
 When `callable()` is used with a named expression, the target of the named expression should be
