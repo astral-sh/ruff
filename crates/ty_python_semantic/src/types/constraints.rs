@@ -240,6 +240,7 @@ where
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct OwnedConstraintSet<'db> {
     node: NodeId,
+    deferred_quantification: InferableTypeVars<'db>,
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: IndexVec<NodeId, InteriorNodeData>,
@@ -249,6 +250,7 @@ impl Default for OwnedConstraintSet<'_> {
     fn default() -> Self {
         Self {
             node: ALWAYS_FALSE,
+            deferred_quantification: InferableTypeVars::None,
             constraints: IndexVec::default(),
             typevars: IndexVec::default(),
             nodes: IndexVec::default(),
@@ -302,7 +304,11 @@ impl<'db> OwnedConstraintSet<'db> {
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
         };
-        let set = ConstraintSet::from_node(&builder, self.node);
+        let set = ConstraintSet::from_node_with_deferred_quantification(
+            &builder,
+            self.node,
+            self.deferred_quantification,
+        );
         f(&builder, set)
     }
 }
@@ -322,6 +328,10 @@ pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
 
+    /// Type variables that should be existentially quantified before solution extraction or final
+    /// semantic observation.
+    deferred_quantification: InferableTypeVars<'db>,
+
     /// A reference to the builder that holds the storage for this constraint set's BDD
     builder: &'c ConstraintSetBuilder<'db>,
 
@@ -331,8 +341,17 @@ pub struct ConstraintSet<'db, 'c> {
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+        Self::from_node_with_deferred_quantification(builder, node, InferableTypeVars::None)
+    }
+
+    fn from_node_with_deferred_quantification(
+        builder: &'c ConstraintSetBuilder<'db>,
+        node: NodeId,
+        deferred_quantification: InferableTypeVars<'db>,
+    ) -> Self {
         Self {
             node,
+            deferred_quantification,
             builder,
             _invariant: PhantomData,
         }
@@ -573,6 +592,35 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
+    #[expect(dead_code)]
+    pub(crate) fn with_deferred_quantification(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        deferred_quantification: InferableTypeVars<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        Self::from_node_with_deferred_quantification(
+            builder,
+            self.node,
+            self.deferred_quantification
+                .merge(db, deferred_quantification),
+        )
+    }
+
+    #[expect(dead_code)]
+    fn apply_deferred_quantification(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> NodeId {
+        if matches!(self.deferred_quantification, InferableTypeVars::None) {
+            return self.node;
+        }
+        self.node
+            .exists(db, builder, self.deferred_quantification.iter(db))
+    }
+
     pub(crate) fn remove_noninferable(
         self,
         db: &'db dyn Db,
@@ -643,6 +691,7 @@ impl Debug for ConstraintSet<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ConstraintSet")
             .field("node", &self.node)
+            .field("deferred_quantification", &self.deferred_quantification)
             .finish()
     }
 }
@@ -729,6 +778,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
+        let deferred_quantification = constraint.deferred_quantification;
         let mut storage = self.storage.into_inner();
 
         storage.nodes.shrink_to_fit();
@@ -737,6 +787,7 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         OwnedConstraintSet {
             node,
+            deferred_quantification,
             constraints: storage.constraints,
             typevars: storage.typevars,
             nodes: storage.nodes,
@@ -814,7 +865,11 @@ impl<'db> ConstraintSetBuilder<'db> {
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
         let node = rebuild_node(self, other, &constraints, &mut cache, other.node);
-        ConstraintSet::from_node(self, node)
+        ConstraintSet::from_node_with_deferred_quantification(
+            self,
+            node,
+            other.deferred_quantification,
+        )
     }
 
     /// Interns a single typevar, giving it a stable order in this builder
@@ -6367,6 +6422,7 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
+    use crate::FxOrderSet;
     use crate::db::tests::setup_db;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
     use ruff_python_ast::name::Name;
@@ -6649,6 +6705,32 @@ mod tests {
         // iff(T, ¬T) == false
         let negated = tdd.negate(&db, &builder);
         assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn deferred_quantification_owned_round_trip() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let deferred_quantification =
+            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+
+        let builder = ConstraintSetBuilder::new();
+        let owned = builder.into_owned(|builder| {
+            let t_int = create_constraint(&db, builder, t, KnownClass::Int);
+            ConstraintSet::from_node_with_deferred_quantification(
+                builder,
+                t_int.node,
+                deferred_quantification,
+            )
+        });
+
+        owned.query(|_builder, set| {
+            assert_eq!(set.deferred_quantification, deferred_quantification);
+        });
+
+        let builder = ConstraintSetBuilder::new();
+        let set = builder.load(&db, &owned);
+        assert_eq!(set.deferred_quantification, deferred_quantification);
     }
 
     /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to

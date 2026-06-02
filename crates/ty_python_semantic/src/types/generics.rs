@@ -246,6 +246,9 @@ pub(crate) fn typing_self<'db>(
 /// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
 /// fresh generic-callable occurrence be inferable without making the surrounding source-level
 /// typevar inferable.
+///
+/// TODO: This now also represents deferred existentially quantified type variables on constraint
+/// sets. Consider renaming it to a more general name, such as `InternedTypeVarSet`.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum InferableTypeVars<'db> {
     None,

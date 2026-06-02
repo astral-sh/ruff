@@ -16,8 +16,10 @@
 ## Current status
 
 - `[x]` Initial planning revision created: `[π] Plan deferred quantification for callable constraints`.
-- `[x]` Relevant code paths were surveyed; no implementation has been started.
-- `[~]` This plan is an initial draft and needs review/iteration before implementation.
+- `[x]` Relevant code paths were surveyed and the plan was reviewed for implementation.
+- `[x]` Phase 1 implementation revision created: `[π] Add deferred constraint-set quantification metadata`.
+- `[x]` Phase 1 is implemented: `ConstraintSet` and `OwnedConstraintSet` now carry `deferred_quantification`, default constructors use `InferableTypeVars::None`, helper methods exist for recording/applying/merging deferred quantification, owned/query/load round trips preserve the metadata, and a focused Rust unit test covers owned/query/load metadata preservation.
+- `[ ]` Next step: Phase 2 should propagate deferred metadata through constraint-set operations and switch public semantic observations to apply deferred quantification while keeping construction short-circuiting raw.
 
 ## Background and goal
 
@@ -35,10 +37,10 @@ That immediate reduction hides the freshened callable type variables from later 
         - currently calls `when.reduce_inferable(db, self.constraints, source_inferable.iter(db).chain(target_inferable.iter(db)))` before returning.
     - `CallableSignature::when_constraint_set_assignable_to` and signature overload handling return these constraint sets to callers.
 - `crates/ty_python_semantic/src/types/constraints.rs`
-    - `ConstraintSet` currently contains only a `NodeId` plus its builder reference.
-    - `OwnedConstraintSet` stores the owned arenas for cached/interened constraint sets.
-    - `ConstraintSet::reduce_inferable` performs existential abstraction via `NodeId::exists` / `InteriorNode::exists_one`.
-    - `ConstraintSet::solutions`, `solutions_with`, `remove_noninferable`, and `Type::assignable_solutions_with_inferable` are the main solution-generation/projection paths.
+    - `ConstraintSet` contains a raw `NodeId`, its builder reference, and `deferred_quantification: InferableTypeVars<'db>` metadata. The metadata is represented and preserved, but most operations still need Phase 2/4 updates to apply or propagate it.
+    - `OwnedConstraintSet` stores the owned arenas for cached/interened constraint sets plus the deferred-quantification metadata.
+    - `ConstraintSet::reduce_inferable` still performs immediate existential abstraction via `NodeId::exists` / `InteriorNode::exists_one`.
+    - `ConstraintSet::solutions`, `solutions_with`, `remove_noninferable`, and `Type::assignable_solutions_with_inferable` are still the main solution-generation/projection paths and have not yet been refactored for deferred quantification.
     - `PathBounds::compute` currently takes a raw `NodeId`, so any deferred metadata must be applied before calling it.
 - `crates/ty_python_semantic/src/types/generics.rs`
     - `SpecializationBuilder::solve_pending_with` removes non-inferable constraints and then solves pending constraints.
@@ -85,18 +87,18 @@ Each phase should generally become its own jj revision if it can be made clean i
 
 ### Phase 1: Represent deferred quantification
 
-- `[ ]` Add deferred-quantification metadata to constraint sets.
+- `[x]` Add deferred-quantification metadata to constraint sets.
     - Add an `InferableTypeVars<'db>` field (for example `deferred_quantification`) to `ConstraintSet<'db, 'c>` and `OwnedConstraintSet<'db>`.
     - Keep field/helper names in terms of deferred quantification, even though the storage type is `InferableTypeVars<'db>`.
     - This keeps `ConstraintSet` `Copy` and reuses existing ordered identity storage/merge/iteration for `BoundTypeVarIdentity<'db>`.
     - Add a TODO near the `InferableTypeVars` definition explaining that it now also represents deferred existential variables, so we might eventually rename it (for example to `InternedTypeVarSet`). Do not perform that rename in this PR.
-- `[ ]` Add constructors/helpers such as:
+- `[x]` Add constructors/helpers such as:
     - keep `ConstraintSet::from_node`, `from_bool`, and `constrain_typevar` defaulting to `InferableTypeVars::None` for deferred metadata,
     - an internal constructor/helper for building a `ConstraintSet` from a raw `NodeId` plus explicit deferred metadata,
     - `ConstraintSet::with_deferred_quantification(...)` (accepts an `InferableTypeVars<'db>`, records those typevars without changing the node, and merges with any existing deferred metadata),
     - an internal helper named `apply_deferred_quantification` that applies stored deferred quantification via raw `Node`/`NodeId` existential abstraction and returns the effective raw `NodeId`; it must return quickly without BDD work when metadata is `InferableTypeVars::None`,
     - a helper to merge metadata when combining two sets.
-- `[ ]` Update `OwnedConstraintSet::default`, `OwnedConstraintSet::query`, `ConstraintSetBuilder::into_owned`, and `ConstraintSetBuilder::load` to preserve the metadata by copying the `InferableTypeVars<'db>` value directly. No builder-local remapping is needed.
+- `[x]` Update `OwnedConstraintSet::default`, `OwnedConstraintSet::query`, `ConstraintSetBuilder::into_owned`, and `ConstraintSetBuilder::load` to preserve the metadata by copying the `InferableTypeVars<'db>` value directly. No builder-local remapping is needed.
 
 ### Phase 2: Propagate metadata through operations
 
@@ -105,13 +107,13 @@ Each phase should generally become its own jj revision if it can be made clean i
     - `or` / `union`: `(P, D) ∨ (Q, E)` becomes `(P ∨ Q, D ∪ E)`; `union` mutates/returns `self` with merged deferred metadata and should verify both operands' builders.
     - `IteratorConstraintsExtension::when_all` / `when_any` must keep using `NodeId::distributed_and` / `distributed_or` for performance and accumulate/merge metadata from every generated constraint set alongside the distributed node construction.
     - Construction short-circuiting in `ConstraintSet::and` / `or` should call raw `Node` `is_never_satisfied` / `is_always_satisfied` directly. Do not use public `ConstraintSet` semantic satisfiability methods for construction short-circuiting. If the RHS thunk is skipped, do not force it to collect deferred metadata; add a comment that skipped quantifiers are vacuous and preserving thunk laziness is intentional for performance.
-- `[x]` Operations that do not commute with existential quantification force deferred quantification before proceeding:
+- `[ ]` Operations that do not commute with existential quantification force deferred quantification before proceeding:
     - `negate`: apply deferred quantification before negating, so `¬(∃T. P)` is preserved instead of accidentally becoming `∃T. ¬P`.
     - `implies`: apply deferred quantification to the left side before negation; preserve RHS thunk laziness, and if the RHS is evaluated, apply deferred quantification to it before combining.
     - `iff`: apply deferred quantification to both operands before building the operation.
     - `implies_subtype_of`: apply deferred quantification to `self` before delegating to raw implication logic; the newly created subtype constraint is raw and carries no deferred metadata.
     - Add TODO comments explaining that a future, more invasive design could track quantifier structure/polarity through these operations; that is explicitly out of scope for this PR.
-- `[x]` Raw vs effective satisfiability API policy:
+- `[ ]` Raw vs effective satisfiability API policy:
     - `Node` and related BDD types remain the raw representation; their existing `is_always_satisfied` / `is_never_satisfied` checks are raw checks because they cannot see deferred quantification metadata.
     - `ConstraintSet::and` / `or` should use raw `Node` checks for construction short-circuiting, so effective truth after existential quantification does not erase useful raw constraints.
     - Public `ConstraintSet::is_always_satisfied`, `ConstraintSet::is_never_satisfied`, and `satisfied_by_all_typevars` should apply deferred quantification first and therefore report semantic/effective satisfiability.
