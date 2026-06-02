@@ -534,7 +534,7 @@ impl ParameterDefinitionNodeRef<'_> {
         match self {
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
-            Self::Parameter(node) => node.into(),
+            Self::Parameter(node) => (&node.parameter).into(),
         }
     }
 }
@@ -1505,7 +1505,10 @@ pub struct DefinitionNodeKey(NodeKey);
 
 impl DefinitionNodeKey {
     pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
-        Self(NodeKey::from_node(node))
+        match node {
+            ast::AnyNodeRef::ParameterWithDefault(parameter) => parameter.into(),
+            _ => Self(NodeKey::from_node(node)),
+        }
     }
 
     pub fn from_assignment(node: &ast::StmtAssign) -> impl Iterator<Item = DefinitionNodeKey> {
@@ -1601,7 +1604,7 @@ impl From<&ast::Parameter> for DefinitionNodeKey {
 
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
     fn from(node: &ast::ParameterWithDefault) -> Self {
-        Self(NodeKey::from_node(node))
+        Self(NodeKey::from_node(&node.parameter))
     }
 }
 
@@ -1609,7 +1612,7 @@ impl From<ast::AnyParameterRef<'_>> for DefinitionNodeKey {
     fn from(value: ast::AnyParameterRef) -> Self {
         Self(match value {
             ast::AnyParameterRef::Variadic(node) => NodeKey::from_node(node),
-            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(node),
+            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(&node.parameter),
         })
     }
 }
