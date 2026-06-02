@@ -5312,6 +5312,26 @@ impl SequentMap {
         ante: ConstraintId,
         post: ConstraintId,
     ) {
+        if ante.implies(db, builder, post) {
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                ante = %ante.display(db, builder),
+                post = %post.display(db, builder),
+                "antecedent implies postcondition",
+            );
+            self.add_single_implication(db, builder, ante, post);
+        }
+    }
+
+    /// Adds a direct implication from an unvisited constraint only when the antecedent is fully
+    /// static.
+    fn add_direct_implication_from_unvisited<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) {
         let ante_data = builder.constraint_data(ante);
         let post_data = builder.constraint_data(post);
         if !ante_data.typevar.is_same_typevar_as(db, post_data.typevar)
@@ -5323,14 +5343,13 @@ impl SequentMap {
             return;
         }
 
-        if ante.implies(db, builder, post) {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                ante = %ante.display(db, builder),
-                post = %post.display(db, builder),
-                "antecedent implies postcondition",
-            );
-            self.add_single_implication(db, builder, ante, post);
+        // `ConstraintId::implies` uses constraint-set assignability, which is existential for
+        // gradual types. It is not a logical implication across every materialization, so it
+        // cannot be used to collapse an unvisited gradual branch.
+        let is_fully_static =
+            |ty: Type<'db>| ty.top_materialization(db) == ty.bottom_materialization(db);
+        if is_fully_static(ante_data.lower) && is_fully_static(ante_data.upper) {
+            self.add_direct_implication(db, builder, ante, post);
         }
     }
 
@@ -5600,8 +5619,9 @@ impl PathAssignments {
     /// [`for_constraint_pair`][SequentMap::for_constraint_pair] for constraints that have already
     /// been encountered, so that if we walk another constraint set containing them, we reuse the
     /// work to calculate their sequents. `discovered` also contains constraints from unvisited
-    /// branch alternatives. For those, only a direct implication from the current constraint can
-    /// affect the current path, so we add it without calculating or caching the full pair map.
+    /// branch alternatives. If the current constraint is fully static, only a direct implication
+    /// from it can affect the current path, so we add it without calculating or caching the full
+    /// pair map.
     fn discover_constraint<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -5637,11 +5657,12 @@ impl PathAssignments {
                 let pair_map = SequentMap::for_constraint_pair(db, builder, left, right);
                 self.map.merge(&pair_map);
             } else {
-                // A constraint from an unvisited branch alternative can still be implied by the
-                // current constraint. Keep that implication, but defer all sequents that require
-                // both constraints until we actually encounter the alternative.
+                // An unvisited branch alternative can still be implied by a fully static current
+                // constraint. Keep that implication, but defer implications from gradual
+                // constraints and all sequents that require both constraints until we actually
+                // encounter the alternative.
                 self.map
-                    .add_direct_implication(db, builder, constraint, *existing);
+                    .add_direct_implication_from_unvisited(db, builder, constraint, *existing);
             }
         }
     }
@@ -6451,6 +6472,32 @@ mod tests {
             .unwrap();
 
         assert!(narrower_path.assignment_holds(t_int.when_true()));
+    }
+
+    #[test]
+    fn path_assignments_does_not_discover_gradual_implications_from_unprocessed_constraints() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_any = ConstraintId::new(&db, &builder, t, Type::any(), Type::object());
+        let t_int = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+            Type::object(),
+        );
+        let mut path = PathAssignments::new([t_any, t_int]);
+
+        // `Any` is assignable to `int`, but not every materialization of `Any` is a subtype of
+        // `int`, so this implication cannot collapse an unvisited branch.
+        assert!(t_any.implies(&db, &builder, t_int));
+
+        path.add_assignment(&db, &builder, t_any.when_true(), 0, false)
+            .unwrap();
+
+        assert!(!path.assignment_holds(t_int.when_true()));
+        assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 0);
     }
 
     #[test]
