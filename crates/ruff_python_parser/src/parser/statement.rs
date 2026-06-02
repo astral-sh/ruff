@@ -614,11 +614,10 @@ impl<'src> Parser<'src> {
         // import ,
         // import x, y,
 
-        let mut names = self.parse_comma_separated_list_into_vec_with_capacity(
-            RecoveryContextKind::ImportNames,
-            |p| p.parse_alias(ImportStyle::Import),
-            1,
-        );
+        let mut names = self
+            .parse_comma_separated_list_into_vec(RecoveryContextKind::ImportNames, |p| {
+                p.parse_alias(ImportStyle::Import)
+            });
 
         if names.is_empty() {
             // test_err import_stmt_empty
@@ -692,7 +691,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Import);
 
         let names_start = self.node_start();
-        let mut names = Vec::new();
+        let mut names = vec![];
         let mut seen_star_import = false;
 
         let parenthesized = Parenthesized::from(self.eat(TokenKind::Lpar));
@@ -1446,9 +1445,6 @@ impl<'src> Parser<'src> {
         });
 
         if self.at(TokenKind::Else) {
-            if elif_else_clauses.is_empty() {
-                elif_else_clauses.reserve_exact(1);
-            }
             elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
         }
 
@@ -2282,17 +2278,15 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_comma_separated_list_into_vec_with_capacity(
+                self.parse_comma_separated_list_into_vec(
                     RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression),
                     |p| p.parse_with_item(WithItemParsingState::Regular).item,
-                    1,
                 )
             }
         } else {
-            self.parse_comma_separated_list_into_vec_with_capacity(
+            self.parse_comma_separated_list_into_vec(
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized),
                 |p| p.parse_with_item(WithItemParsingState::Regular).item,
-                1,
             )
         }
     }
@@ -2330,7 +2324,7 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut parsed_with_items = Vec::with_capacity(1);
+        let mut parsed_with_items = vec![];
         let mut has_optional_vars = false;
 
         // test_err with_items_parenthesized_missing_comma
@@ -4006,9 +4000,6 @@ impl<'src> Parser<'src> {
         while recovery_kind.is_list_element(self) {
             progress.assert_progressing(self);
 
-            if clauses.is_empty() {
-                clauses.reserve_exact(1);
-            }
             clauses.push(parse_clause(self));
         }
 
