@@ -196,6 +196,41 @@ def _(target: FooSub | str):
             y = 4
 
     reveal_type(y)  # revealed: Literal[1, 3, 4]
+
+# Also handle special case for `collections.abc.Callable`
+
+from collections import abc
+
+def _(subj: abc.Callable[..., str]) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[2]
+
+def _(subj: None) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1]
+
+def _(subj: int | abc.Callable[..., str]) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[2, 3]
 ```
 
 ### With arguments

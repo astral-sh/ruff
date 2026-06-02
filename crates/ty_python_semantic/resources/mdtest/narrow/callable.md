@@ -198,14 +198,14 @@ At runtime, `collections.abc.Callable` is supported in `match` statement class p
 ### `collections.abc.Callable`
 
 ```py
-import collections.abc
+from collections import abc
 
-def _(subj: int | collections.abc.Callable[..., str]) -> None:
+def _(subj: None | abc.Callable[..., str]) -> None:
     match subj:
-        # TODO: Should be valid.
-        # error: [invalid-match-pattern] "`<special-form 'collections.abc.Callable'>` cannot be used in a class pattern because it is not a type"
-        case collections.abc.Callable(): ...
-        case _: ...
+        case abc.Callable():
+            reveal_type(subj)  # revealed: (...) -> str
+        case _:
+            reveal_type(subj)  # revealed: None
 ```
 
 ### `typing.Callable`
@@ -213,7 +213,7 @@ def _(subj: int | collections.abc.Callable[..., str]) -> None:
 ```py
 import typing
 
-def _(subj: int | typing.Callable[..., str]) -> None:
+def _(subj: None | typing.Callable[..., str]) -> None:
     match subj:
         # error: [invalid-match-pattern] "`<special-form 'typing.Callable'>` cannot be used in a class pattern because it is not a type"
         case typing.Callable(): ...
