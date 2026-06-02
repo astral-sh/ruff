@@ -284,6 +284,36 @@ pub(crate) fn infer_complete_scope_types<'db>(
     infer_scope_types_impl(db, InferScope::new(db, scope, TypeContext::default()))
 }
 
+/// Infer all types for a [`ScopeId`] while collecting expected-type metadata for string-literal
+/// completions at `target_range`.
+///
+/// This is intentionally separate from [`infer_complete_scope_types`] so normal type-checking and
+/// CLI runs don't retain IDE-only expected-type maps.
+pub(crate) fn infer_complete_scope_types_with_expected_types<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    target_range: TextRange,
+) -> ScopeInference<'db> {
+    // Scopes that may require type context are inferred during the inference of
+    // their outer scope.
+    if scope.accepts_type_context(db) {
+        let file = scope.file(db);
+        let index = semantic_index(db, file);
+
+        if let Some(parent_scope) = index.parent_scope_id(scope.file_scope_id(db)) {
+            // Note that nested lambdas or comprehensions may require recursing until we reach
+            // an outer scope that is independent of any type context.
+            return infer_complete_scope_types_with_expected_types(
+                db,
+                parent_scope.to_scope_id(db, file),
+                target_range,
+            );
+        }
+    }
+
+    infer_scope_types_with_expected_types(db, scope, TypeContext::default(), target_range)
+}
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -298,6 +328,32 @@ pub(crate) fn infer_scope_types<'db>(
     tcx: TypeContext<'db>,
 ) -> &'db ScopeInference<'db> {
     infer_scope_types_impl(db, InferScope::new(db, scope, tcx))
+}
+
+pub(crate) fn infer_scope_types_with_expected_types<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    tcx: TypeContext<'db>,
+    target_range: TextRange,
+) -> ScopeInference<'db> {
+    let file = scope.file(db);
+    let _span = tracing::trace_span!(
+        "infer_scope_types_with_expected_types",
+        scope=?scope.as_id(),
+        ?target_range,
+        ?file
+    )
+    .entered();
+
+    let module = parsed_module(db, file).load(db);
+
+    // Using the index here is fine because the code below depends on the AST anyway.
+    // The isolation of the query is by the return inferred types.
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope, tcx), index, &module)
+        .with_expected_type_collection(target_range)
+        .finish_scope()
 }
 
 #[salsa::tracked(

@@ -7,6 +7,8 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -53,6 +55,47 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
     let diagnostics = check_types(db, file);
 
     assert_diagnostic_messages(&diagnostics, expected);
+}
+
+#[test]
+fn expected_types_are_collected_only_for_completion() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        r#"
+        from typing_extensions import Literal
+
+        value: Literal["apple", "banana"] = "app"
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
+    let module = parsed_module(&db, file).load(&db);
+    let ast::Stmt::AnnAssign(assignment) = &module.syntax().body[1] else {
+        panic!("expected annotated assignment");
+    };
+    let ast::Expr::StringLiteral(string_expr) = assignment
+        .value
+        .as_deref()
+        .expect("annotated assignment to have a value")
+    else {
+        panic!("expected string literal value");
+    };
+    let expr = ast::ExprRef::from(string_expr);
+    let scope = global_scope(&db, file);
+
+    assert!(
+        infer_complete_scope_types(&db, scope)
+            .try_expected_type(expr)
+            .is_none()
+    );
+    assert!(
+        infer_complete_scope_types_with_expected_types(&db, scope, string_expr.range())
+            .try_expected_type(expr)
+            .is_some()
+    );
+
+    Ok(())
 }
 
 #[test]
