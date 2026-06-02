@@ -177,12 +177,37 @@ fn simplify_invariant_generic_intersection<'db>(
     }
 }
 
-fn is_precise_invariant_generic_specialization_of<'db>(
+fn is_invariant_generic_specialization_covered_by<'db>(
     db: &'db dyn Db,
-    precise: Type<'db>,
-    gradual: Type<'db>,
+    specialization: Type<'db>,
+    covering: Type<'db>,
 ) -> bool {
-    simplify_invariant_generic_intersection(db, precise, gradual) == Some(precise)
+    let Some((specialization_class, specialization)) = specialization.class_specialization(db)
+    else {
+        return false;
+    };
+    let Some((covering_class, covering)) = covering.class_specialization(db) else {
+        return false;
+    };
+    if specialization_class != covering_class
+        || specialization.generic_context(db) != covering.generic_context(db)
+        || specialization.materialization_kind(db).is_some()
+        || covering.materialization_kind(db).is_some()
+        || specialization.tuple(db).is_some()
+        || covering.tuple(db).is_some()
+    {
+        return false;
+    }
+
+    itertools::izip!(
+        specialization.generic_context(db).variables(db),
+        specialization.types(db),
+        covering.types(db)
+    )
+    .all(|(typevar, specialization, covering)| {
+        typevar.variance(db) == TypeVarVariance::Invariant
+            && (specialization == covering || matches!(covering, Type::Dynamic(_)))
+    })
 }
 
 /// Combine union elements that cover more of the same enum class.
@@ -1574,7 +1599,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // S & ~T = Never    if S <: T
                     if new_positive.is_subtype_of(db, *existing_negative)
-                        || is_precise_invariant_generic_specialization_of(
+                        || is_invariant_generic_specialization_covered_by(
                             db,
                             new_positive,
                             *existing_negative,
@@ -1726,7 +1751,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                     // S & ~T = Never    if S <: T
                     if existing_positive.is_subtype_of(db, new_negative)
-                        || is_precise_invariant_generic_specialization_of(
+                        || is_invariant_generic_specialization_covered_by(
                             db,
                             *existing_positive,
                             new_negative,
