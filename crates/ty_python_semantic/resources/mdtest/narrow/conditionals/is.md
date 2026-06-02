@@ -143,9 +143,13 @@ Every `TypedDict` inhabitant is a runtime dictionary, so the identity branch rem
 
 ```py
 from typing import TypedDict
+from typing_extensions import Never
 from ty_extensions import TypedDictTop
 
 class Movie(TypedDict):
+    title: str
+
+class PartialMovie(TypedDict, total=False):
     title: str
 
 def _(x: Movie, y: dict[str, object]) -> None:
@@ -153,6 +157,14 @@ def _(x: Movie, y: dict[str, object]) -> None:
         x.missing  # error: [unresolved-attribute]
 
 def _(x: TypedDictTop, y: dict[str | int, object]) -> None:
+    if x is y:
+        x.missing  # error: [unresolved-attribute]
+
+def _(x: TypedDictTop, y: dict[Never, Never]) -> None:
+    if x is y:
+        x.missing  # error: [unresolved-attribute]
+
+def _(x: PartialMovie, y: dict[Never, Never]) -> None:
     if x is y:
         x.missing  # error: [unresolved-attribute]
 ```
