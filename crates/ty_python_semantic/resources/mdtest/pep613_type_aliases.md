@@ -553,6 +553,10 @@ class C:
     def takes(self, value: Inner) -> None:
         reveal_type(value)  # revealed: Unknown
 
+    def invalid_attribute(self) -> Self:
+        self.attribute: TypeAlias = Self
+        return self.attribute  # error: [invalid-return-type]
+
 C().takes(1)
 ```
 

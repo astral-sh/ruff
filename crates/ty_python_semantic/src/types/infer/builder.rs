@@ -5838,7 +5838,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
             ast::Expr::Name(name) => {
                 let ty = self.infer_name_expression(name);
-                if tcx.is_typealias()
+                if self
+                    .inference_flags()
+                    .contains(InferenceFlags::IN_TYPE_ALIAS)
                     && matches!(ty, Type::SpecialForm(SpecialFormType::TypingSelf))
                 {
                     self.infer_name_or_attribute_type_expression(ty, expression)
@@ -5850,7 +5852,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Attribute(attribute) => {
                 let ty = self.infer_attribute_expression(attribute);
-                if tcx.is_typealias()
+                if self
+                    .inference_flags()
+                    .contains(InferenceFlags::IN_TYPE_ALIAS)
                     && matches!(ty, Type::SpecialForm(SpecialFormType::TypingSelf))
                 {
                     self.infer_name_or_attribute_type_expression(ty, expression)
