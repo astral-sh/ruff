@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, HasNodeIndex};
 use rustc_hash::FxHashMap;
 
 use super::{ArgExpr, TypeInferenceBuilder};
+use crate::Program;
 use crate::types::typed_dict::{
     extract_unpacked_typed_dict_keys_from_value_type, infer_unpacked_keyword_types,
     validate_typed_dict_constructor,
@@ -31,6 +32,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         arguments: &ast::Arguments,
     ) -> Option<Type<'db>> {
+        // A custom typeshed can redefine `dict.__new__` or `dict.__init__`, so normal constructor
+        // binding must remain authoritative for its calls.
+        if Program::get(self.db())
+            .custom_stdlib_search_path(self.db())
+            .is_some()
+        {
+            return None;
+        }
+
         let [argument] = &*arguments.args else {
             return None;
         };
