@@ -246,6 +246,27 @@ reveal_type(generic_context(outside_callable(int_identity)))
 outside_callable(int_identity)("string")
 ```
 
+## Returned callable with constraints from a protocol
+
+Constraints from an unvisited protocol branch can still be implied by a constraint on the current
+path. The implied constraint must be included when specializing the returned callable.
+
+```py
+from typing import Any, Callable, Container, TypeVar
+
+T = TypeVar("T")
+
+Validator = Callable[[list[T], T], None]
+
+def in_(options: Container[T]) -> Validator[T]:
+    raise NotImplementedError
+
+a: list[Any] = []
+validator = in_("abc")
+# error: [invalid-argument-type] "Argument is incorrect: Expected `Any & str`, found `None`"
+validator(a, None)
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set

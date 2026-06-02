@@ -5304,6 +5304,36 @@ impl SequentMap {
         try_one_direction(right_constraint, left_constraint);
     }
 
+    /// Adds a single implication that can be inferred directly from two concrete constraints.
+    fn add_direct_implication<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) {
+        let ante_data = builder.constraint_data(ante);
+        let post_data = builder.constraint_data(post);
+        if !ante_data.typevar.is_same_typevar_as(db, post_data.typevar)
+            || ante_data.lower.is_type_var()
+            || ante_data.upper.is_type_var()
+            || post_data.lower.is_type_var()
+            || post_data.upper.is_type_var()
+        {
+            return;
+        }
+
+        if ante.implies(db, builder, post) {
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                ante = %ante.display(db, builder),
+                post = %post.display(db, builder),
+                "antecedent implies postcondition",
+            );
+            self.add_single_implication(db, builder, ante, post);
+        }
+    }
+
     fn add_concrete_sequents<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -5316,24 +5346,8 @@ impl SequentMap {
         // identify constraints that are identical besides e.g. ordering of union/intersection
         // elements. (For instance, when processing `T ≤ τ₁ & τ₂` and `T ≤ τ₂ & τ₁`, these clauses
         // would add sequents for `(T ≤ τ₁ & τ₂) → (T ≤ τ₂ & τ₁)` and vice versa.)
-        if left_constraint.implies(db, builder, right_constraint) {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                left = %left_constraint.display(db, builder),
-                right = %right_constraint.display(db, builder),
-                "left implies right",
-            );
-            self.add_single_implication(db, builder, left_constraint, right_constraint);
-        }
-        if right_constraint.implies(db, builder, left_constraint) {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                left = %left_constraint.display(db, builder),
-                right = %right_constraint.display(db, builder),
-                "right implies left",
-            );
-            self.add_single_implication(db, builder, right_constraint, left_constraint);
-        }
+        self.add_direct_implication(db, builder, left_constraint, right_constraint);
+        self.add_direct_implication(db, builder, right_constraint, left_constraint);
 
         match left_constraint.intersect(db, builder, right_constraint) {
             IntersectionResult::Simplified(intersection_constraint_data) => {
@@ -5579,11 +5593,15 @@ impl PathAssignments {
             || self.assignment_holds(constraint.when_unconstrained())
     }
 
-    /// Update our sequent map to ensure that it holds all of the sequents that involve the given
-    /// constraint. We do not calculate the new sequents directly. Instead, we call
-    /// [`SequentMap::for_constraint`] and [`for_constraint_pair`][SequentMap::for_constraint_pair]
-    /// to calculate _and cache_ the constraints, so that if we walk another constraint set
-    /// containing this constraint, we reuse the work to calculate its sequents.
+    /// Update our sequent map with the sequents that can affect a path after encountering the given
+    /// constraint.
+    ///
+    /// We call [`SequentMap::for_constraint`] and
+    /// [`for_constraint_pair`][SequentMap::for_constraint_pair] for constraints that have already
+    /// been encountered, so that if we walk another constraint set containing them, we reuse the
+    /// work to calculate their sequents. `discovered` also contains constraints from unvisited
+    /// branch alternatives. For those, only a direct implication from the current constraint can
+    /// affect the current path, so we add it without calculating or caching the full pair map.
     fn discover_constraint<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -5601,16 +5619,21 @@ impl PathAssignments {
         self.map.merge(&single_map);
         drop(single_map);
 
-        // Only calculate pair sequents for constraints that we have actually encountered while
-        // traversing the BDD. `discovered` also contains constraints from branch alternatives,
-        // which do not affect the result unless we eventually add an assignment for them.
         for (existing, processed) in &self.discovered {
-            if !*processed || *existing == constraint {
+            if *existing == constraint {
                 continue;
             }
 
-            let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
-            self.map.merge(&pair_map);
+            if *processed {
+                let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
+                self.map.merge(&pair_map);
+            } else {
+                // A constraint from an unvisited branch alternative can still be implied by the
+                // current constraint. Keep that implication, but defer all sequents that require
+                // both constraints until we actually encounter the alternative.
+                self.map
+                    .add_direct_implication(db, builder, constraint, *existing);
+            }
         }
     }
 
@@ -6376,6 +6399,49 @@ mod tests {
                 └─₀ never
             "#},
         );
+    }
+
+    #[test]
+    fn path_assignments_discovers_implications_from_unprocessed_constraints() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = ConstraintSet::constrain_typevar(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Int.to_instance(&db),
+        )
+        .node
+        .root_constraint(&builder)
+        .unwrap();
+        let t_bool = ConstraintSet::constrain_typevar(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Bool.to_instance(&db),
+        )
+        .node
+        .root_constraint(&builder)
+        .unwrap();
+        let mut broader_path = PathAssignments::new([t_int, t_bool]);
+
+        broader_path
+            .add_assignment(&db, &builder, t_int.when_true(), 0, false)
+            .unwrap();
+
+        assert!(!broader_path.assignment_holds(t_bool.when_true()));
+        assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 0);
+
+        let mut narrower_path = PathAssignments::new([t_int, t_bool]);
+
+        narrower_path
+            .add_assignment(&db, &builder, t_bool.when_true(), 0, false)
+            .unwrap();
+
+        assert!(narrower_path.assignment_holds(t_int.when_true()));
     }
 
     #[test]
