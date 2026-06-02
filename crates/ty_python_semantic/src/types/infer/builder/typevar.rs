@@ -662,7 +662,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             name: _,
             default,
         } = node;
-        self.infer_optional_expression(default.as_deref(), TypeContext::default());
+        if let Some(default) = default.as_deref() {
+            let previous_in_valid_unpack_context = self
+                .context
+                .inference_flags
+                .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
+            self.infer_type_expression(default);
+            self.context.inference_flags.set(
+                InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+                previous_in_valid_unpack_context,
+            );
+        }
         let pep_695_todo = todo_type!("PEP-695 TypeVarTuple definition types");
         self.add_declaration_with_binding(
             node.into(),

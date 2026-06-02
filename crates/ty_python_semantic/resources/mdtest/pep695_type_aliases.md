@@ -111,13 +111,18 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Annotated, Self, cast
+from typing import Annotated, Self, Unpack, cast
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     type Default[T = Self] = T
 
     type DefaultMetadata[T = Annotated[int, cast(Self, object())]] = T
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type VariadicDefault[*Ts = *Self] = tuple[*Ts]
+
+    type ValidVariadicDefault[*Ts = Unpack[tuple[int, str]]] = tuple[*Ts]
 ```
 
 ## Aliased type aliases
