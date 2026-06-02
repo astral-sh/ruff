@@ -1041,6 +1041,15 @@ def narrow_iterable_keys(choices: Iterable[Any] | None) -> None:
         sink(choices.keys())
 ```
 
+`fromkeys()` creates a new dictionary rather than mutating the narrowed value, so it should also
+remain available:
+
+```py
+def narrow_dict_fromkeys(value: object) -> None:
+    if isinstance(value, dict):
+        reveal_type(value.fromkeys(["a"], 1))  # revealed: dict[str, int]
+```
+
 `reversed()` is a read-only dict operation, so it should dispatch through the `TypedDictTop` arm
 without raising a spurious overload-resolution error:
 

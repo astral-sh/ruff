@@ -4397,7 +4397,7 @@ static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnl
 ```py
 from collections.abc import MutableMapping
 from typing import TypedDict, Mapping
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import TypedDictTop, static_assert, is_disjoint_from
 
 class TD(TypedDict):
     x: int
@@ -4407,6 +4407,7 @@ class RegularNonTD: ...
 static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
 static_assert(not is_disjoint_from(TD, MutableMapping[str, object]))
+static_assert(not is_disjoint_from(TypedDictTop, dict[str | int, object]))
 static_assert(is_disjoint_from(TD, Mapping[int, object]))
 static_assert(is_disjoint_from(TD, RegularNonTD))
 static_assert(not is_disjoint_from(TD, dict[str, int]))

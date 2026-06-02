@@ -3077,19 +3077,47 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::TypedDictTop, Type::TypedDict(_)) => self.never(),
 
             // Other than the special cases enumerated above, a TypedDict type is always disjoint
-            // from any type that is not a supertype of `dict[str, Any]`. TypedDict is not
-            // statically assignable to mutable dictionary types, but every inhabitant is a
-            // runtime `dict`, so disjointness must preserve that possible overlap.
+            // from any type that cannot overlap with `dict[str, Any]`. TypedDict is not statically
+            // assignable to mutable dictionary types, but every inhabitant is a runtime `dict`,
+            // so disjointness must preserve that possible overlap.
             (Type::TypedDictTop | Type::TypedDict(_), other)
             | (other, Type::TypedDictTop | Type::TypedDict(_)) => {
-                let dict_str_any = KnownClass::Dict
-                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
-
-                self.as_relation_checker(TypeRelation::Assignability)
-                    .check_type_pair(db, dict_str_any, other)
-                    .negate(db, self.constraints)
+                self.check_typed_dict_runtime_dict_disjointness(db, other)
             }
         }
+    }
+
+    fn check_typed_dict_runtime_dict_disjointness(
+        &self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let other_mapping = KnownClass::Mapping
+            .try_to_class_literal(db)
+            .and_then(|mapping| {
+                other.nominal_class(db)?.iter_mro(db).find_map(|base| {
+                    let ClassType::Generic(alias) = base.into_class()? else {
+                        return None;
+                    };
+                    (alias.origin(db) == mapping).then(|| alias.specialization(db))
+                })
+            });
+
+        // A TypedDict only has string keys at runtime. Comparing that guarantee against the
+        // projected Mapping key preserves overlap with wider key types without relying on the
+        // invariant assignability of dict.
+        if let Some(other_mapping) = other_mapping
+            && let Some(other_key) = other_mapping.types(db).first()
+        {
+            return self.check_type_pair(db, KnownClass::Str.to_instance(db), *other_key);
+        }
+
+        let dict_str_any = KnownClass::Dict
+            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+
+        self.as_relation_checker(TypeRelation::Assignability)
+            .check_type_pair(db, dict_str_any, other)
+            .negate(db, self.constraints)
     }
 
     fn check_property_instance_pair(
