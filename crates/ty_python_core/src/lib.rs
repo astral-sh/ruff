@@ -451,6 +451,46 @@ impl<'db> SemanticIndex<'db> {
         self.place_table(scope).symbol(symbol).is_nonlocal()
     }
 
+    /// Returns `true` if the given symbol in the given scope resolves to the global scope, either
+    /// because:
+    ///
+    /// 1. The given scope *is* the global scope.
+    /// 2. The symbol is explicitly declared `global` in the given scope.
+    /// 3. The symbol is a free variable in the given scope, and no enclosing function scope
+    ///    defines it.
+    ///
+    /// The third case requires walking ancestor scopes until we encounter either a binding or a
+    /// `nonlocal` declaration (those aren't allowed to resolve to the global scope, so we don't
+    /// need to chase them).
+    pub fn symbol_resolves_to_global_scope(
+        &self,
+        symbol: ScopedSymbolId,
+        scope: FileScopeId,
+    ) -> bool {
+        let symbol = self.place_table(scope).symbol(symbol);
+        let name = symbol.name();
+        // Note that `visible_ancestor_scopes` includes the starting scope itself.
+        for (visible_scope_id, _) in self.visible_ancestor_scopes(scope) {
+            if visible_scope_id.is_global() {
+                // We return `true` here even if the global variable isn't actually defined. That
+                // case will be probably a diagnostic elsewhere.
+                return true;
+            }
+            let place_table = self.place_table(visible_scope_id);
+            let Some(visible_symbol_id) = place_table.symbol_id(name) else {
+                continue;
+            };
+            let visible_symbol = place_table.symbol(visible_symbol_id);
+            if visible_symbol.is_global() {
+                return true;
+            }
+            if visible_symbol.is_local() || visible_symbol.is_nonlocal() {
+                return false;
+            }
+        }
+        unreachable!("should return true at the global scope above");
+    }
+
     /// Returns the id of the parent scope.
     pub fn parent_scope_id(&self, scope_id: FileScopeId) -> Option<FileScopeId> {
         let scope = self.scope(scope_id);

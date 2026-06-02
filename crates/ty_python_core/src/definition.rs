@@ -3,9 +3,11 @@ use std::ops::Deref;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use smallvec::SmallVec;
 
 use crate::Db;
 use crate::LoopToken;
@@ -870,6 +872,8 @@ pub enum DefinitionKind<'db> {
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
     LoopHeader(LoopHeaderDefinitionKind<'db>),
+    // Boxing here helps avoid growing the memory footprint of this enum.
+    NestedBindings(Box<NestedBindingsDefinitionKind>),
 }
 
 impl<'db> DefinitionKind<'db> {
@@ -930,9 +934,12 @@ impl<'db> DefinitionKind<'db> {
     }
 
     /// Returns `true` if this definition is user-visible (i.e., not an internal
-    /// control-flow construct like a loop header definition).
+    /// synthetic definition like a loop header or nested bindings definition).
     pub const fn is_user_visible(&self) -> bool {
-        !self.is_loop_header()
+        !matches!(
+            self,
+            DefinitionKind::LoopHeader(_) | DefinitionKind::NestedBindings(_)
+        )
     }
 
     /// Returns the [`TextRange`] of the definition target.
@@ -979,6 +986,12 @@ impl<'db> DefinitionKind<'db> {
                 type_var_tuple.node(module).name.range()
             }
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                // TODO: We only return the `TextRange` of one of the `nonlocal` or `global`
+                // declarations that affect this variable, even if there's more than one. We could
+                // find a way to return all of them, or split up the synthetic definition somehow.
+                nested_bindings.nested_declarations[0].range
+            }
         }
     }
 
@@ -1028,6 +1041,12 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                // TODO: We only return the `TextRange` of one of the `nonlocal` or `global`
+                // declarations that affect this variable, even if there's more than one. We could
+                // find a way to return all of them, or split up the synthetic definition somehow.
+                nested_bindings.nested_declarations[0].range
+            }
         }
     }
 
@@ -1068,7 +1087,8 @@ impl<'db> DefinitionKind<'db> {
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
+            | DefinitionKind::LoopHeader(_)
+            | DefinitionKind::NestedBindings(_) => DefinitionCategory::Binding,
         }
     }
 
@@ -1498,6 +1518,15 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
             LoopStmtKind::For(stmt) => stmt.node(module).range(),
         }
     }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct NestedBindingsDefinitionKind {
+    pub name: Name,
+    // Note that in general this can include both `global` and `nonlocal` declarations from
+    // different nested scopes, because we don't necessarily know at synthesis time which of those
+    // kind will be visible in the current scope.
+    pub nested_declarations: SmallVec<[crate::builder::NestedDeclaration; 1]>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
