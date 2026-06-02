@@ -251,15 +251,17 @@ python-version = "3.12"
 ```py
 from typing import TypedDict
 
-class EmptyTypedDict(TypedDict):
-    pass
+class Namespace(TypedDict):
+    z: int
 
-type NamespaceAlias = EmptyTypedDict
+type NamespaceAlias = Namespace
 
 def f(attributes: NamespaceAlias):
     Y = type("Y", (), attributes)
 
     reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.z)  # revealed: int
+    reveal_type(Y().z)  # revealed: int
 ```
 
 ## Closed TypedDicts (PEP-728)

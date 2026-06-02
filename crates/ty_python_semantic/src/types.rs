@@ -2814,7 +2814,7 @@ impl<'db> Type<'db> {
                 name.as_str(),
                 policy,
             ),
-            Type::TypedDict(typed_dict) if typed_dict.is_open_empty(db) => {
+            Type::TypedDict(typed_dict) if typed_dict.is_unknown_schema(db) => {
                 KnownClass::TypedDictReadOnlyFallback
                     .to_class_literal(db)
                     .find_name_in_mro_with_policy(db, name.as_str(), policy)
@@ -3197,7 +3197,7 @@ impl<'db> Type<'db> {
                 Place::Undefined.into()
             }
 
-            Type::TypedDict(typed_dict) if typed_dict.is_open_empty(db) => {
+            Type::TypedDict(typed_dict) if typed_dict.is_unknown_schema(db) => {
                 KnownClass::TypedDictReadOnlyFallback
                     .to_instance(db)
                     .instance_member(db, name)
@@ -6361,6 +6361,7 @@ impl<'db> Type<'db> {
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown),
+            Type::TypeAlias(alias) => alias.value_type(db).dunder_class(db),
             _ => self.to_meta_type(db),
         }
     }

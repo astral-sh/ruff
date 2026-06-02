@@ -351,7 +351,7 @@ impl<'db> AllMembers<'db> {
             },
 
             Type::TypedDict(typed_dict) => {
-                if typed_dict.is_open_empty(db) {
+                if typed_dict.is_unknown_schema(db) {
                     if let Type::ClassLiteral(ClassLiteral::Static(class)) =
                         KnownClass::TypedDictReadOnlyFallback.to_class_literal(db)
                     {

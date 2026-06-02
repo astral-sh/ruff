@@ -1555,9 +1555,9 @@ static_assert(not is_assignable_to(Robot, Person))
 static_assert(not is_assignable_to(Person, Robot))
 ```
 
-An open empty `TypedDict` is the structural top type of all `TypedDict`s. Since a value with this
-type can be an inhabitant of any more specific schema, it only exposes schema-independent read
-operations:
+An open empty `TypedDict` is the structural top type of all `TypedDict`s. A declared empty
+`TypedDict` still has a known empty set of allowed keys, so it retains ordinary `TypedDict` key
+diagnostics and mutation methods:
 
 ```py
 from collections.abc import Mapping
@@ -1583,14 +1583,16 @@ def project(value: Mapping[K, V]) -> tuple[K, V]:
     raise NotImplementedError
 
 def use_empty_typed_dict(dst: EmptyTypedDict, src: Year, other: dict[int, bytes]) -> None:
-    reveal_type(dst["unknown"])  # revealed: object
+    # A declared empty TypedDict still has a known empty set of allowed keys.
+    # error: [invalid-key]
+    reveal_type(dst["unknown"])  # revealed: Unknown
     reveal_type(project(dst))  # revealed: tuple[str, object]
     reveal_type(iter(dst))  # revealed: Iterator[str]
     reveal_type(dst | src)  # revealed: EmptyTypedDict
     reveal_type(dst | other)  # revealed: dict[str | int, object]
     reveal_type(other | dst)  # revealed: dict[int | str, object]
-    dst.update(src)  # error: [unresolved-attribute]
-    dst |= src  # error: [unsupported-operator]
+    dst.update(src)
+    dst |= src
 ```
 
 In order for one `TypedDict` `B` to be assignable to another `TypedDict` `A`, all required keys in
@@ -4318,8 +4320,9 @@ Bad = TypedDict("Bad", {key: int})
 b = Bad(x=1)
 reveal_type(b)  # revealed: Bad
 
-# An open empty TypedDict permits arbitrary read-only fields.
-reveal_type(b["x"])  # revealed: object
+# Field access reports unknown keys
+# error: [invalid-key]
+reveal_type(b["x"])  # revealed: Unknown
 ```
 
 ## Equivalence between functional and class-based `TypedDict`
