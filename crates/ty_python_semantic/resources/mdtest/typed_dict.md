@@ -2356,6 +2356,52 @@ def takes_dict(value: dict[str, object]) -> None: ...
 def _(movie: Movie) -> None:
     reveal_type(dict(movie))  # revealed: dict[str, object]
     takes_dict(dict(movie))
+
+def make_movie(value: object) -> Movie:
+    raise NotImplementedError
+
+def preserve_argument_diagnostics() -> None:
+    dict(make_movie(missing))  # error: [unresolved-reference]
+
+def mixed(movie_or_int: Movie | int) -> None:
+    # A union with a non-TypedDict member should still use normal overload resolution.
+    dict(movie_or_int)  # error: [no-matching-overload]
+```
+
+The same result is inferred efficiently for a union of `TypedDict`s:
+
+```py
+from typing import Literal, TypedDict
+
+A = TypedDict("A", {"type": Literal["a"]})
+B = TypedDict("B", {"type": Literal["b"]})
+C = TypedDict("C", {"type": Literal["c"]})
+D = TypedDict("D", {"type": Literal["d"]})
+E = TypedDict("E", {"type": Literal["e"]})
+F = TypedDict("F", {"type": Literal["f"]})
+G = TypedDict("G", {"type": Literal["g"]})
+H = TypedDict("H", {"type": Literal["h"]})
+I = TypedDict("I", {"type": Literal["i"]})
+J = TypedDict("J", {"type": Literal["j"]})
+K = TypedDict("K", {"type": Literal["k"]})
+L = TypedDict("L", {"type": Literal["l"]})
+M = TypedDict("M", {"type": Literal["m"]})
+N = TypedDict("N", {"type": Literal["n"]})
+O = TypedDict("O", {"type": Literal["o"]})
+P = TypedDict("P", {"type": Literal["p"]})
+Q = TypedDict("Q", {"type": Literal["q"]})
+R = TypedDict("R", {"type": Literal["r"]})
+S = TypedDict("S", {"type": Literal["s"]})
+T = TypedDict("T", {"type": Literal["t"]})
+U = TypedDict("U", {"type": Literal["u"]})
+V = TypedDict("V", {"type": Literal["v"]})
+W = TypedDict("W", {"type": Literal["w"]})
+X = TypedDict("X", {"type": Literal["x"]})
+
+Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X
+
+def _(item: Item) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a

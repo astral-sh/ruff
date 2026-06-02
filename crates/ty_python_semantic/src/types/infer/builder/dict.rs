@@ -10,7 +10,49 @@ use crate::types::typed_dict::{
 use crate::types::{KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) fn infer_keyword_only_dict_call(
+    pub(super) fn infer_dict_call(
+        &mut self,
+        func: &ast::Expr,
+        arguments: &ast::Arguments,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        if let Some(ty) = self.infer_single_positional_typed_dict_call(arguments) {
+            return Some(ty);
+        }
+        self.infer_keyword_only_dict_call(func, arguments, call_expression_tcx)
+    }
+
+    /// Fast-path `dict(typed_dict)` and `dict(typed_dict_union)`.
+    ///
+    /// `TypedDict` inhabitants are runtime dictionaries, and ty models a copied `TypedDict` as
+    /// `dict[str, object]`. Avoiding generic protocol inference here is important because matching
+    /// a large union of `TypedDict`s against `SupportsKeysAndGetItem` is very expensive.
+    fn infer_single_positional_typed_dict_call(
+        &mut self,
+        arguments: &ast::Arguments,
+    ) -> Option<Type<'db>> {
+        let [argument] = &*arguments.args else {
+            return None;
+        };
+        if argument.is_starred_expr() || !arguments.keywords.is_empty() {
+            return None;
+        }
+
+        let mut speculative_builder = self.speculate();
+        let argument_ty = speculative_builder.infer_expression(argument, TypeContext::default());
+        if !is_typed_dict_or_union_of_typed_dicts(speculative_builder.db(), argument_ty) {
+            return None;
+        }
+        self.extend(speculative_builder);
+
+        let db = self.db();
+        Some(
+            KnownClass::Dict
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::object()]),
+        )
+    }
+
+    fn infer_keyword_only_dict_call(
         &mut self,
         func: &ast::Expr,
         arguments: &ast::Arguments,
@@ -114,5 +156,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             &mut infer_elt_ty,
             call_expression_tcx,
         )
+    }
+}
+
+fn is_typed_dict_or_union_of_typed_dicts<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::TypedDict(_) => true,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| element.resolve_type_alias(db).is_typed_dict()),
+        _ => false,
     }
 }
