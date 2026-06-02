@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbrace.py
 ---
 ## AST
 
@@ -35,6 +36,7 @@ Module(
                                                             ctx: Invalid,
                                                         },
                                                     ),
+                                                    expression_source: "",
                                                     debug_text: None,
                                                     conversion: None,
                                                     format_spec: None,
@@ -80,6 +82,7 @@ Module(
                                                             ctx: Load,
                                                         },
                                                     ),
+                                                    expression_source: "foo",
                                                     debug_text: None,
                                                     conversion: Repr,
                                                     format_spec: None,
@@ -125,6 +128,7 @@ Module(
                                                             ctx: Load,
                                                         },
                                                     ),
+                                                    expression_source: "foo",
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "",
@@ -176,6 +180,7 @@ Module(
                                                             ctx: Invalid,
                                                         },
                                                     ),
+                                                    expression_source: "",
                                                     debug_text: None,
                                                     conversion: None,
                                                     format_spec: None,
@@ -221,6 +226,7 @@ Module(
                                                             ctx: Invalid,
                                                         },
                                                     ),
+                                                    expression_source: "",
                                                     debug_text: None,
                                                     conversion: None,
                                                     format_spec: None,

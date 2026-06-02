@@ -57,6 +57,7 @@ Module(
                                                                 },
                                                             },
                                                         ),
+                                                        expression_source: "'string'",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -193,6 +194,7 @@ Module(
                                                                 },
                                                             },
                                                         ),
+                                                        expression_source: "'string'",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -301,6 +303,7 @@ Module(
                                                                 },
                                                             },
                                                         ),
+                                                        expression_source: "'string'",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(

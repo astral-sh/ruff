@@ -4330,6 +4330,7 @@ Module(
                                                                                 ctx: Load,
                                                                             },
                                                                         ),
+                                                                        expression_source: "y",
                                                                         debug_text: None,
                                                                         conversion: None,
                                                                         format_spec: None,

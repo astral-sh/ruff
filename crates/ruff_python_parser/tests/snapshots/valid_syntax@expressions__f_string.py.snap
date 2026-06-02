@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/f_string.py
 ---
 ## AST
 
@@ -194,6 +195,7 @@ Module(
                                                                 },
                                                             },
                                                         ),
+                                                        expression_source: "\" f\"",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -241,6 +243,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: None,
                                                         conversion: Str,
                                                         format_spec: None,
@@ -299,6 +302,7 @@ Module(
                                                                 parenthesized: false,
                                                             },
                                                         ),
+                                                        expression_source: "3,",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -367,6 +371,7 @@ Module(
                                                                 ],
                                                             },
                                                         ),
+                                                        expression_source: "3!=4",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -421,6 +426,7 @@ Module(
                                                                 ),
                                                             },
                                                         ),
+                                                        expression_source: "3",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -453,6 +459,7 @@ Module(
                                                                                     },
                                                                                 },
                                                                             ),
+                                                                            expression_source: "\"}\"",
                                                                             debug_text: None,
                                                                             conversion: None,
                                                                             format_spec: None,
@@ -513,6 +520,7 @@ Module(
                                                                 ),
                                                             },
                                                         ),
+                                                        expression_source: "3",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -545,6 +553,7 @@ Module(
                                                                                     },
                                                                                 },
                                                                             ),
+                                                                            expression_source: "\"{\"",
                                                                             debug_text: None,
                                                                             conversion: None,
                                                                             format_spec: None,
@@ -604,6 +613,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "  ",
@@ -657,6 +667,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "  ",
@@ -724,6 +735,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "  ",
@@ -797,6 +809,7 @@ Module(
                                                                 parenthesized: false,
                                                             },
                                                         ),
+                                                        expression_source: "1, 2",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "  ",
@@ -866,6 +879,7 @@ Module(
                                                                                                     ),
                                                                                                 },
                                                                                             ),
+                                                                                            expression_source: "3.1415",
                                                                                             debug_text: Some(
                                                                                                 DebugText {
                                                                                                     leading: "",
@@ -904,6 +918,7 @@ Module(
                                                                 },
                                                             },
                                                         ),
+                                                        expression_source: "f\"{3.1415=:.1f}\"",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -1008,6 +1023,7 @@ Module(
                                                                                         ),
                                                                                     },
                                                                                 ),
+                                                                                expression_source: "x + y",
                                                                                 debug_text: None,
                                                                                 conversion: None,
                                                                                 format_spec: None,
@@ -1209,6 +1225,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -1233,6 +1250,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "bar",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -1331,6 +1349,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -1392,6 +1411,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: " (  ",
@@ -1452,6 +1472,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -1476,6 +1497,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "bar",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -1500,6 +1522,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "three",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -1561,6 +1584,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foo",
                                                         debug_text: None,
                                                         conversion: Ascii,
                                                         format_spec: None,
@@ -1585,6 +1609,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "bar",
                                                         debug_text: None,
                                                         conversion: Str,
                                                         format_spec: None,
@@ -1609,6 +1634,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "baz",
                                                         debug_text: None,
                                                         conversion: Repr,
                                                         format_spec: None,
@@ -1633,6 +1659,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "foobar",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -1687,6 +1714,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "x",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -1748,6 +1776,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "x",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -1800,6 +1829,7 @@ Module(
                                                                                     },
                                                                                 },
                                                                             ),
+                                                                            expression_source: "{1}.pop()",
                                                                             debug_text: None,
                                                                             conversion: None,
                                                                             format_spec: None,
@@ -1893,6 +1923,7 @@ Module(
                                                                 ),
                                                             },
                                                         ),
+                                                        expression_source: "lambda x:{x}",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -1940,6 +1971,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "x",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "",
@@ -1993,6 +2025,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "x",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "    ",
@@ -2046,6 +2079,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "x",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "",
@@ -2099,6 +2133,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "x",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -2160,6 +2195,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "x",
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "",
@@ -2227,6 +2263,7 @@ Module(
                                                                 ctx: Load,
                                                             },
                                                         ),
+                                                        expression_source: "x",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -2302,6 +2339,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "x",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
@@ -2351,6 +2389,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "x",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
@@ -2382,6 +2421,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "y",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
@@ -2431,6 +2471,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "x",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
@@ -2524,6 +2565,7 @@ Module(
                                                                 parenthesized: false,
                                                             },
                                                         ),
+                                                        expression_source: "command, *args",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: None,
@@ -2585,6 +2627,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "x",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
@@ -2779,6 +2822,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "bar",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
@@ -2867,6 +2911,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "bar",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
@@ -2955,6 +3000,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "bar",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
@@ -3050,6 +3096,7 @@ Module(
                                                                     ctx: Load,
                                                                 },
                                                             ),
+                                                            expression_source: "baz",
                                                             debug_text: None,
                                                             conversion: None,
                                                             format_spec: None,
