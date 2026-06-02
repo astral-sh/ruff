@@ -74,6 +74,23 @@ elif result.eofs == "C":
     errors = 1
 
 
+# Inter-branch comments produce an unsafe fix
+if a:
+    pass
+
+# This comment separates the branches
+elif b:
+    pass
+
+if a:
+    pass
+
+# Multi-line comment
+# between branches
+elif b:
+    pass
+
+
 # OK
 def complicated_calc(*arg, **kwargs):
     return 42
@@ -159,20 +176,3 @@ elif True:
     print(1)
 else:
     print(2)
-
-
-# Comments between branches prevent merging
-if a:
-    pass
-
-# This comment separates the branches
-elif b:
-    pass
-
-if a:
-    pass
-
-# Multi-line comment
-# between branches
-elif b:
-    pass

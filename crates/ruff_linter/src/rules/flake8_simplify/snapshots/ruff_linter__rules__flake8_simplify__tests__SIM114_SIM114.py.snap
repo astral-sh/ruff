@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-assertion_line: 59
 ---
 SIM114 [*] Combine `if` branches using logical `or` operator
  --> SIM114.py:2:1
@@ -317,157 +316,216 @@ help: Combine `if` branches
 74 |
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:118:5
+  --> SIM114.py:78:1
+   |
+77 |   # Inter-branch comments produce an unsafe fix
+78 | / if a:
+79 | |     pass
+80 | |
+81 | | # This comment separates the branches
+82 | | elif b:
+83 | |     pass
+   | |________^
+84 |
+85 |   if a:
+   |
+help: Combine `if` branches
+75 |
+76 |
+77 | # Inter-branch comments produce an unsafe fix
+   - if a:
+   -     pass
+   -
+   - # This comment separates the branches
+   - elif b:
+78 + if a or b:
+79 |     pass
+80 |
+81 | if a:
+note: This is an unsafe fix and may change runtime behavior
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+  --> SIM114.py:85:1
+   |
+83 |       pass
+84 |
+85 | / if a:
+86 | |     pass
+87 | |
+88 | | # Multi-line comment
+89 | | # between branches
+90 | | elif b:
+91 | |     pass
+   | |________^
+   |
+help: Combine `if` branches
+82 | elif b:
+83 |     pass
+84 |
+   - if a:
+   -     pass
+   -
+   - # Multi-line comment
+   - # between branches
+   - elif b:
+85 + if a or b:
+86 |     pass
+87 |
+88 |
+note: This is an unsafe fix and may change runtime behavior
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+   --> SIM114.py:135:5
     |
-116 |       a = True
-117 |       b = False
-118 | /     if a > b:  # end-of-line
-119 | |         return 3
-120 | |     elif a == b:
-121 | |         return 3
+133 |       a = True
+134 |       b = False
+135 | /     if a > b:  # end-of-line
+136 | |         return 3
+137 | |     elif a == b:
+138 | |         return 3
     | |________________^
-122 |       elif a < b:  # end-of-line
-123 |           return 4
+139 |       elif a < b:  # end-of-line
+140 |           return 4
     |
 help: Combine `if` branches
-115 | def func():
-116 |     a = True
-117 |     b = False
+132 | def func():
+133 |     a = True
+134 |     b = False
     -     if a > b:  # end-of-line
     -         return 3
     -     elif a == b:
-118 +     if a > b or a == b:  # end-of-line
-119 |         return 3
-120 |     elif a < b:  # end-of-line
-121 |         return 4
+135 +     if a > b or a == b:  # end-of-line
+136 |         return 3
+137 |     elif a < b:  # end-of-line
+138 |         return 4
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:122:5
+   --> SIM114.py:139:5
     |
-120 |       elif a == b:
-121 |           return 3
-122 | /     elif a < b:  # end-of-line
-123 | |         return 4
-124 | |     elif b is None:
-125 | |         return 4
+137 |       elif a == b:
+138 |           return 3
+139 | /     elif a < b:  # end-of-line
+140 | |         return 4
+141 | |     elif b is None:
+142 | |         return 4
     | |________________^
     |
 help: Combine `if` branches
-119 |         return 3
-120 |     elif a == b:
-121 |         return 3
+136 |         return 3
+137 |     elif a == b:
+138 |         return 3
     -     elif a < b:  # end-of-line
     -         return 4
     -     elif b is None:
-122 +     elif a < b or b is None:  # end-of-line
-123 |         return 4
-124 |
-125 |
+139 +     elif a < b or b is None:  # end-of-line
+140 |         return 4
+141 |
+142 |
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:132:5
+   --> SIM114.py:149:5
     |
-130 |       a = True
-131 |       b = False
-132 | /     if a > b:  # end-of-line
-133 | |         return 3
-134 | |     elif a := 1:
-135 | |         return 3
+147 |       a = True
+148 |       b = False
+149 | /     if a > b:  # end-of-line
+150 | |         return 3
+151 | |     elif a := 1:
+152 | |         return 3
     | |________________^
     |
 help: Combine `if` branches
-129 |     """Ensure that the named expression is parenthesized when merged."""
-130 |     a = True
-131 |     b = False
+146 |     """Ensure that the named expression is parenthesized when merged."""
+147 |     a = True
+148 |     b = False
     -     if a > b:  # end-of-line
     -         return 3
     -     elif a := 1:
-132 +     if a > b or (a := 1):  # end-of-line
-133 |         return 3
-134 |
-135 |
+149 +     if a > b or (a := 1):  # end-of-line
+150 |         return 3
+151 |
+152 |
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:140:1
+   --> SIM114.py:157:1
     |
-138 |   # Known gap: inline comments on the elif header are silently deleted.
-139 |   # See https://github.com/astral-sh/ruff/issues/25470
-140 | / if a:  # we preserve comments, too!
-141 | |     b
-142 | | elif c:  # but not on the second branch
-143 | |     b
+155 |   # Known gap: inline comments on the elif header are silently deleted.
+156 |   # See https://github.com/astral-sh/ruff/issues/25470
+157 | / if a:  # we preserve comments, too!
+158 | |     b
+159 | | elif c:  # but not on the second branch
+160 | |     b
     | |_____^
     |
 help: Combine `if` branches
-137 |
-138 | # Known gap: inline comments on the elif header are silently deleted.
-139 | # See https://github.com/astral-sh/ruff/issues/25470
+154 |
+155 | # Known gap: inline comments on the elif header are silently deleted.
+156 | # See https://github.com/astral-sh/ruff/issues/25470
     - if a:  # we preserve comments, too!
     -     b
     - elif c:  # but not on the second branch
-140 + if a or c:  # we preserve comments, too!
-141 |     b
-142 |
-143 |
+157 + if a or c:  # we preserve comments, too!
+158 |     b
+159 |
+160 |
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:146:1
+   --> SIM114.py:163:1
     |
-146 | / if a: b  # here's a comment
-147 | | elif c: b
+163 | / if a: b  # here's a comment
+164 | | elif c: b
     | |_________^
     |
 help: Combine `if` branches
-143 |     b
-144 |
-145 |
+160 |     b
+161 |
+162 |
     - if a: b  # here's a comment
     - elif c: b
-146 + if a or c: b  # here's a comment
-147 |
-148 |
-149 | if(x > 200): pass
+163 + if a or c: b  # here's a comment
+164 |
+165 |
+166 | if(x > 200): pass
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:150:1
+   --> SIM114.py:167:1
     |
-150 | / if(x > 200): pass
-151 | | elif(100 < x and x < 200 and 300 < y and y < 800):
-152 | |     pass
+167 | / if(x > 200): pass
+168 | | elif(100 < x and x < 200 and 300 < y and y < 800):
+169 | |     pass
     | |________^
     |
 help: Combine `if` branches
-147 | elif c: b
-148 |
-149 |
+164 | elif c: b
+165 |
+166 |
     - if(x > 200): pass
     - elif(100 < x and x < 200 and 300 < y and y < 800):
     - 	pass
-150 + if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
-151 |
-152 |
-153 | # See: https://github.com/astral-sh/ruff/issues/12732
+167 + if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
+168 |
+169 |
+170 | # See: https://github.com/astral-sh/ruff/issues/12732
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:156:1
+   --> SIM114.py:173:1
     |
-155 |   # See: https://github.com/astral-sh/ruff/issues/12732
-156 | / if False if True else False:
-157 | |     print(1)
-158 | | elif True:
-159 | |     print(1)
+172 |   # See: https://github.com/astral-sh/ruff/issues/12732
+173 | / if False if True else False:
+174 | |     print(1)
+175 | | elif True:
+176 | |     print(1)
     | |____________^
-160 |   else:
-161 |       print(2)
+177 |   else:
+178 |       print(2)
     |
 help: Combine `if` branches
-153 |
-154 |
-155 | # See: https://github.com/astral-sh/ruff/issues/12732
+170 |
+171 |
+172 | # See: https://github.com/astral-sh/ruff/issues/12732
     - if False if True else False:
     -     print(1)
     - elif True:
-156 + if (False if True else False) or True:
-157 |     print(1)
-158 | else:
-159 |     print(2)
+173 + if (False if True else False) or True:
+174 |     print(1)
+175 | else:
+176 |     print(2)

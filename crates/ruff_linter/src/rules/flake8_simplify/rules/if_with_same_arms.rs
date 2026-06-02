@@ -88,18 +88,18 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
-        // Don't merge if there are comments between the branches that would be lost
+        // The fix silently deletes inter-branch comments (those between the end
+        // of the current branch's last line and the `elif` keyword). Mark the
+        // fix as unsafe when inter-branch comments exist — the diagnostic still
+        // fires to keep `# noqa: SIM114` used and avoid RUF100 regressions.
         let inter_branch = TextRange::new(
             checker.locator().full_line_end(current_branch.end()),
             following_branch.range().start(),
         );
-        if !checker
+        let safe = checker
             .comment_ranges()
             .comments_in_range(inter_branch)
-            .is_empty()
-        {
-            continue;
-        }
+            .is_empty();
 
         let mut diagnostic = checker.report_diagnostic(
             IfWithSameArms,
@@ -113,18 +113,23 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
                 following_branch,
                 checker.locator(),
                 checker.tokens(),
+                safe,
             )
         });
     }
 }
 
 /// Generate a [`Fix`] to merge two [`IfElifBranch`] branches.
+///
+/// If `safe` is `false`, the fix is marked as [`Fix::unsafe_edits`] because
+/// inter-branch comments would be silently deleted.
 fn merge_branches(
     stmt_if: &ast::StmtIf,
     current_branch: &IfElifBranch,
     following_branch: &IfElifBranch,
     locator: &Locator,
     tokens: &ruff_python_ast::token::Tokens,
+    safe: bool,
 ) -> Result<Fix> {
     // Identify the colon (`:`) at the end of the current branch's test.
     let Some(current_branch_colon) =
@@ -177,10 +182,12 @@ fn merge_branches(
             None
         };
 
-    Ok(Fix::safe_edits(
-        deletion_edit,
-        parenthesize_edit.into_iter().chain(Some(insertion_edit)),
-    ))
+    let rest = parenthesize_edit.into_iter().chain(Some(insertion_edit));
+    if safe {
+        Ok(Fix::safe_edits(deletion_edit, rest))
+    } else {
+        Ok(Fix::unsafe_edits(deletion_edit, rest))
+    }
 }
 
 /// Return the [`TextRange`] of an [`IfElifBranch`]'s body (from the end of the test to the end of
