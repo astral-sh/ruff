@@ -517,10 +517,12 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 
 ## `Self`
 
-Type aliases cannot contain `Self`, even when they are defined in a class body:
+Type aliases cannot contain `Self` as part of the aliased type, even when they are defined in a
+class body. `Self` is allowed in nested positions that are evaluated as runtime expressions:
 
 ```py
 from typing_extensions import Annotated, Self, TypeAlias
+from ty_extensions import TypeOf
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
@@ -533,6 +535,12 @@ class C:
     Stringified: TypeAlias = "tuple[Self]"
 
     Metadata: TypeAlias = Annotated[int, tuple[Self]]
+
+    ValueExpression: TypeAlias = TypeOf[Self]
+    value_expression: ValueExpression = Self
+
+    def use_value_expression(self, value: ValueExpression) -> None:
+        reveal_type(value)  # revealed: @Todo(Inference of subscript on special form)
 ```
 
 ## Disabled `invalid-type-form` `Self` fallback

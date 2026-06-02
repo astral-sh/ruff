@@ -5840,7 +5840,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ty = self.infer_name_expression(name);
                 if self
                     .inference_flags()
-                    .contains(InferenceFlags::IN_TYPE_ALIAS)
+                    .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
+                    && tcx.is_typealias()
                     && matches!(ty, Type::SpecialForm(SpecialFormType::TypingSelf))
                 {
                     self.infer_name_or_attribute_type_expression(ty, expression)
@@ -5854,7 +5855,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ty = self.infer_attribute_expression(attribute);
                 if self
                     .inference_flags()
-                    .contains(InferenceFlags::IN_TYPE_ALIAS)
+                    .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
+                    && tcx.is_typealias()
                     && matches!(ty, Type::SpecialForm(SpecialFormType::TypingSelf))
                 {
                     self.infer_name_or_attribute_type_expression(ty, expression)

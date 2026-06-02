@@ -84,10 +84,12 @@ def f() -> None:
 
 ## `Self`
 
-Type aliases cannot contain `Self`, even when they are defined in a class body:
+Type aliases cannot contain `Self` as part of the aliased type, even when they are defined in a
+class body. `Self` is allowed in nested positions that are evaluated as runtime expressions:
 
 ```py
 from typing import Annotated, Self, cast
+from ty_extensions import TypeOf
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
@@ -101,6 +103,10 @@ class C:
 
     type Metadata = Annotated[int, tuple[Self]]
     type BoundMetadata[T: Annotated[int, cast(Self, object())]] = T
+
+    type ValueExpression = TypeOf[Self]
+    value_expression: ValueExpression = Self
+    invalid_value_expression: ValueExpression = int  # error: [invalid-assignment]
 ```
 
 ## `Self` in type parameter defaults
@@ -408,12 +414,17 @@ def f(x: IntAndT[str]) -> None:
 
 ```py
 from typing_extensions import Annotated, Self, TypeAliasType
+from ty_extensions import TypeOf
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     Alias = TypeAliasType("Alias", tuple[Self])
 
     Metadata = TypeAliasType("Metadata", Annotated[int, tuple[Self]])
+
+    ValueExpression = TypeAliasType("ValueExpression", TypeOf[Self])
+    value_expression: ValueExpression = Self
+    invalid_value_expression: ValueExpression = int  # error: [invalid-assignment]
 ```
 
 ### Generic value binds type variables to alias definition
