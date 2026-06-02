@@ -1175,6 +1175,19 @@ class Unrelated: ...
 Bad: type[Unrelated] = type("Bad", (Base,), {})
 ```
 
+## Dynamic class reassignment in a loop
+
+A dynamic class can capture the previous value of a loop-carried variable in its namespace. Type
+inference should reach a fixed point instead of repeatedly nesting the dynamic class's member type.
+
+```py
+def make_chain(depth: int) -> type[object]:
+    current: type[object] = type("Leaf", (object,), {})
+    for index in range(depth):
+        current = type(f"Level{index}", (object,), {"child": current})
+    return current
+```
+
 ## Special base classes
 
 Some special base classes work with dynamic class creation, but special semantics may not be fully

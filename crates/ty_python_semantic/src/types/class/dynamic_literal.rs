@@ -497,6 +497,35 @@ impl<'db> DynamicClassLiteral<'db> {
     }
 }
 
+impl<'db> DynamicClassLiteral<'db> {
+    /// Normalize member types because they are part of this dynamic class's interned identity.
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let members = self
+            .members(db)
+            .iter()
+            .map(|(name, ty)| {
+                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                Some((name.clone(), ty))
+            })
+            .collect::<Option<Box<_>>>()?;
+
+        Some(Self::new(
+            db,
+            self.name(db).clone(),
+            self.anchor(db).clone(),
+            members,
+            self.has_dynamic_namespace(db),
+            self.dataclass_params(db),
+        ))
+    }
+}
+
 /// Error for metaclass conflicts in dynamic classes.
 ///
 /// This mirrors `MetaclassErrorKind::Conflict` for regular classes.

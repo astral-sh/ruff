@@ -2073,6 +2073,9 @@ impl<'db> Type<'db> {
             Type::GenericAlias(generic) => generic
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::GenericAlias),
+            Type::ClassLiteral(class) => class
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::ClassLiteral),
             Type::SubclassOf(subclass_of) => subclass_of
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::SubclassOf),
@@ -2107,7 +2110,6 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
             | Type::LiteralValue(_) => Some(self),
         }

@@ -349,6 +349,23 @@ impl<'db> ClassLiteral<'db> {
             .expect("`object` should always be a non-generic class in typeshed")
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Dynamic(dynamic) => Some(Self::Dynamic(
+                dynamic.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::Static(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicTypedDict(_)
+            | Self::DynamicEnum(_) => Some(self),
+        }
+    }
+
     /// Returns the name of the class.
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         match self {
@@ -854,7 +871,9 @@ impl<'db> ClassType<'db> {
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::NonGeneric(_) => Some(self),
+            Self::NonGeneric(class) => Some(Self::NonGeneric(
+                class.recursive_type_normalized_impl(db, div, nested)?,
+            )),
             Self::Generic(generic) => Some(Self::Generic(
                 generic.recursive_type_normalized_impl(db, div, nested)?,
             )),
