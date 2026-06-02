@@ -203,6 +203,7 @@ use crate::{
         infer_narrowing_constraint,
     },
 };
+use ruff_index::IndexSlice;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -215,7 +216,7 @@ use ty_python_core::{
     place_table,
     predicate::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        Predicates, ScopedPredicateId,
+        ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
@@ -557,7 +558,7 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
     fn narrow_by_constraint(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
@@ -567,7 +568,7 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness;
 }
@@ -597,7 +598,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     fn narrow_by_constraint(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
@@ -618,7 +619,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         mut id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
         type Id = ScopedReachabilityConstraintId;
@@ -628,21 +629,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
                 Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
                 Id::AMBIGUOUS => return Truthiness::Ambiguous,
                 Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => {
-                    // `id` gives us the index of this node in the IndexVec that we used when
-                    // constructing this BDD. When finalizing the builder, we threw away any
-                    // interior nodes that weren't marked as used. The `used_indices` bit vector
-                    // lets us verify that this node was marked as used, and the rank of that bit
-                    // in the bit vector tells us where this node lives in the "condensed"
-                    // `used_interiors` vector.
-                    let raw_index = id.as_u32() as usize;
-                    debug_assert!(
-                        self.used_indices().get_bit(raw_index).unwrap_or(false),
-                        "all used reachability constraints should have been marked as used",
-                    );
-                    let index = self.used_indices().rank(raw_index) as usize;
-                    self.used_interiors()[index]
-                }
+                _ => self.get_interior_node(id),
             };
             let predicate = &predicates[node.atom()];
             match analyze_single(db, predicate) {
@@ -826,7 +813,7 @@ impl ProjectedNarrowingGraph<'_> {
 struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
     constraints: &'a ReachabilityConstraints,
-    predicates: &'a Predicates<'db>,
+    predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
     project_cache: FxHashMap<ScopedReachabilityConstraintId, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
@@ -837,7 +824,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         constraints: &'a ReachabilityConstraints,
-        predicates: &'a Predicates<'db>,
+        predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
     ) -> Self {
         Self {

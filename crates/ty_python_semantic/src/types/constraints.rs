@@ -581,7 +581,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.solutions_with(db, builder, choose)
     }
 
-    #[expect(dead_code)] // Keep this around for debugging purposes
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node
             .simplify_for_display(db, self.builder)
@@ -691,7 +690,12 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
-        let storage = self.storage.into_inner();
+        let mut storage = self.storage.into_inner();
+
+        storage.nodes.shrink_to_fit();
+        storage.typevars.shrink_to_fit();
+        storage.constraints.shrink_to_fit();
+
         OwnedConstraintSet {
             node,
             constraints: storage.constraints,
@@ -2855,7 +2859,7 @@ impl<'db> Type<'db> {
 pub(crate) enum PathBounds<'db> {
     Unsatisfiable,
     Unconstrained,
-    Constrained(Vec<Vec<TypeVarBounds<'db>>>),
+    Constrained(Box<[Box<[TypeVarBounds<'db>]>]>),
 }
 
 impl<'db> PathBounds<'db> {
@@ -2923,7 +2927,7 @@ impl<'db> PathBounds<'db> {
             result.push(path_bounds);
         }
 
-        PathBounds::Constrained(result)
+        PathBounds::Constrained(result.into_boxed_slice())
     }
 
     pub(crate) fn solve(

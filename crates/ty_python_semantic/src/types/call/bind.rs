@@ -146,6 +146,20 @@ fn freshen_generic_contexts_in_type<'db>(
         })
 }
 
+fn type_form_argument<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    match ty {
+        Type::TypeForm(type_form) => type_form.type_argument(db),
+        Type::SpecialForm(special_form) => special_form.type_form_argument(db).unwrap_or(ty),
+        Type::KnownInstance(instance) if instance.is_type_form_value() => {
+            instance.type_form_argument(db).unwrap_or(ty)
+        }
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+            ty.to_instance(db).unwrap_or(ty)
+        }
+        _ => ty,
+    }
+}
+
 /// Priority levels for call errors in intersection types.
 /// Higher values indicate more specific errors that should take precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -370,7 +384,17 @@ impl<'db> BindingsElement<'db> {
     }
 
     fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        IntersectionType::from_elements(db, self.items.iter().map(|item| item.return_type(db)))
+        if self.is_callable() {
+            IntersectionType::from_elements(
+                db,
+                self.items
+                    .iter()
+                    .filter(|item| item.is_callable())
+                    .map(|item| item.return_type(db)),
+            )
+        } else {
+            Type::unknown()
+        }
     }
 
     /// Check types for all bindings in this element.
@@ -1905,9 +1929,11 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
-                                    ty_a.when_equivalent_to(db, *ty_b, constraints)
+                                    ty_a.when_equivalent_to(db, ty_b, constraints)
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -1918,11 +1944,13 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
                                     ty_a.when_subtype_of(
                                         db,
-                                        *ty_b,
+                                        ty_b,
                                         constraints,
                                         InferableTypeVars::None,
                                     )
@@ -1936,11 +1964,13 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
                                     ty_a.when_assignable_to(
                                         db,
-                                        *ty_b,
+                                        ty_b,
                                         constraints,
                                         InferableTypeVars::None,
                                     )
@@ -1952,13 +1982,30 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::IsConstraintSetAssignableTo) => {
+                            if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
+                                let constraints = ConstraintSetBuilder::new();
+                                let result = constraints.into_owned(|constraints| {
+                                    ty_a.when_constraint_set_assignable_to(db, ty_b, constraints)
+                                });
+                                let tracked = InternedConstraintSet::new(db, result);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
+                                ));
+                            }
+                        }
+
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
                                     ty_a.when_disjoint_from(
                                         db,
-                                        *ty_b,
+                                        ty_b,
                                         constraints,
                                         InferableTypeVars::None,
                                     )
@@ -1972,14 +2019,17 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSingleton) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(Type::bool_literal(ty.is_singleton(db)));
+                                overload.set_return_type(Type::bool_literal(
+                                    type_form_argument(db, *ty).is_singleton(db),
+                                ));
                             }
                         }
 
                         Some(KnownFunction::IsSingleValued) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload
-                                    .set_return_type(Type::bool_literal(ty.is_single_valued(db)));
+                                overload.set_return_type(Type::bool_literal(
+                                    type_form_argument(db, *ty).is_single_valued(db),
+                                ));
                             }
                         }
 
@@ -2520,20 +2570,19 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
-                        let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] =
-                            overload.parameter_types()
+                        let [Some(lower), Some(typevar), Some(upper)] = overload.parameter_types()
                         else {
+                            return;
+                        };
+                        let lower = type_form_argument(db, *lower);
+                        let typevar = type_form_argument(db, *typevar);
+                        let upper = type_form_argument(db, *upper);
+                        let Type::TypeVar(typevar) = typevar else {
                             return;
                         };
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
-                            ConstraintSet::constrain_typevar(
-                                db,
-                                constraints,
-                                *typevar,
-                                *lower,
-                                *upper,
-                            )
+                            ConstraintSet::constrain_typevar(db, constraints, typevar, lower, upper)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -2573,18 +2622,20 @@ impl<'db> Bindings<'db> {
                         let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
                             continue;
                         };
+                        let ty_a = type_form_argument(db, *ty_a);
+                        let ty_b = type_form_argument(db, *ty_b);
 
                         let nonce_generator = TypeVarNonceGenerator::default();
                         let ty_a = freshen_generic_contexts_in_type(
                             db,
-                            *ty_a,
-                            generic_contexts_mentioned_in_type(db, *ty_a),
+                            ty_a,
+                            generic_contexts_mentioned_in_type(db, ty_a),
                             &nonce_generator,
                         );
                         let ty_b = freshen_generic_contexts_in_type(
                             db,
-                            *ty_b,
-                            generic_contexts_mentioned_in_type(db, *ty_b),
+                            ty_b,
+                            generic_contexts_mentioned_in_type(db, ty_b),
                             &nonce_generator,
                         );
 
@@ -2649,8 +2700,12 @@ impl<'db> Bindings<'db> {
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
                             [None] => InferableTypeVars::None,
-                            [Some(Type::NominalInstance(instance))] => {
-                                match extract_inferable(instance) {
+                            [Some(ty)] => {
+                                let Type::NominalInstance(instance) = type_form_argument(db, *ty)
+                                else {
+                                    continue;
+                                };
+                                match extract_inferable(&instance) {
                                     Some(inferable) => inferable,
                                     None => continue,
                                 }
@@ -2662,6 +2717,15 @@ impl<'db> Bindings<'db> {
                         let set = constraints.load(db, tracked.constraints(db));
                         let result = set.satisfied_by_all_typevars(db, &constraints, inferable);
                         overload.set_return_type(Type::bool_literal(result));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
+                    ) => {
+                        let tracked = tracked.with_detailed_display(db);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
                     }
 
                     Type::ClassLiteral(class) => match class.known(db) {
@@ -2865,9 +2929,24 @@ impl<'db> CallableBinding<'db> {
         signature_type: Type<'db>,
         overloads: impl IntoIterator<Item = Signature<'db>>,
     ) -> Self {
+        Self::from_indexed_overloads(signature_type, overloads.into_iter().enumerate())
+    }
+
+    /// Constructs a callable binding from overloads while preserving each overload's position in
+    /// the defining function's overload list.
+    ///
+    /// The preserved indexes are used for diagnostics so filtered or reordered bindings can still
+    /// point back to the correct overload declaration.
+    pub(crate) fn from_indexed_overloads(
+        signature_type: Type<'db>,
+        overloads: impl IntoIterator<Item = (usize, Signature<'db>)>,
+    ) -> Self {
         let overloads = overloads
             .into_iter()
-            .map(|signature| Binding::single(signature_type, signature))
+            .map(|(source_overload_index, signature)| {
+                Binding::single(signature_type, signature)
+                    .with_source_overload_index(source_overload_index)
+            })
             .collect();
         Self {
             callable_type: signature_type,
@@ -3083,6 +3162,28 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
         self.bound_type = Some(bound_type);
         self
+    }
+
+    /// Returns the source overload indexes that should be shown in diagnostics.
+    ///
+    /// Bound method overloads preserve their source indexes after receiver filtering. Method
+    /// wrapper overloads are synthesized from `__get__`, so their indexes do not correspond to
+    /// the overload declarations of the underlying function.
+    fn diagnostic_overload_indexes(
+        &self,
+        db: &'db dyn Db,
+        kind: FunctionKind,
+        function: FunctionType<'db>,
+    ) -> SmallVec<[usize; 1]> {
+        if matches!(kind, FunctionKind::MethodWrapper) {
+            let (overloads, _) = function.overloads_and_implementation(db);
+            return (0..overloads.len()).collect();
+        }
+
+        self.overloads
+            .iter()
+            .map(Binding::source_overload_index)
+            .collect()
     }
 
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
@@ -3890,9 +3991,14 @@ impl<'db> CallableBinding<'db> {
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
-                            index: matching_overload_index,
+                            index: self.overloads[matching_overload_index].source_overload_index(),
                             kind,
                             function,
+                            candidate_indexes: self.diagnostic_overload_indexes(
+                                context.db(),
+                                kind,
+                                function,
+                            ),
                         });
                     self.overloads[matching_overload_index].report_diagnostics(
                         context,
@@ -3915,9 +4021,14 @@ impl<'db> CallableBinding<'db> {
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
-                            index: matching_overload_index,
+                            index: self.overloads[matching_overload_index].source_overload_index(),
                             kind,
                             function,
+                            candidate_indexes: self.diagnostic_overload_indexes(
+                                context.db(),
+                                kind,
+                                function,
+                            ),
                         });
                     self.overloads[matching_overload_index].report_diagnostics(
                         context,
@@ -3962,8 +4073,14 @@ impl<'db> CallableBinding<'db> {
                 if let Some((kind, function)) = function_type_and_kind {
                     let (overloads, implementation) =
                         function.overloads_and_implementation(context.db());
+                    let diagnostic_overload_indexes =
+                        self.diagnostic_overload_indexes(context.db(), kind, function);
+                    let possible_overloads = diagnostic_overload_indexes
+                        .iter()
+                        .filter_map(|&index| overloads.get(index).copied())
+                        .collect_vec();
 
-                    if let Some(overload) = overloads.first() {
+                    if let Some(overload) = possible_overloads.first() {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "First overload defined here",
@@ -3988,16 +4105,16 @@ impl<'db> CallableBinding<'db> {
                         function.name(context.db())
                     ));
 
-                    for overload in overloads.iter().take(MAXIMUM_OVERLOADS) {
+                    for overload in possible_overloads.iter().take(MAXIMUM_OVERLOADS) {
                         diag.info(format_args!(
                             "  {}",
                             overload.signature(context.db()).display(context.db())
                         ));
                     }
-                    if overloads.len() > MAXIMUM_OVERLOADS {
+                    if possible_overloads.len() > MAXIMUM_OVERLOADS {
                         diag.info(format_args!(
                             "... omitted {remaining} overloads",
-                            remaining = overloads.len() - MAXIMUM_OVERLOADS
+                            remaining = possible_overloads.len() - MAXIMUM_OVERLOADS
                         ));
                     }
 
@@ -5686,6 +5803,13 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
 pub(crate) struct Binding<'db> {
     pub(crate) signature: Signature<'db>,
 
+    /// The overload's position in the underlying function definition list.
+    ///
+    /// For example, if a function defines overloads at indexes `0`, `1`, and `2`, and we later
+    /// filter a bound method down to only the last two overloads, those bindings still store `1`
+    /// and `2` here so diagnostics can point at the source declarations.
+    source_overload_index: usize,
+
     /// The type that is (hopefully) callable.
     pub(crate) callable_type: Type<'db>,
 
@@ -5727,6 +5851,7 @@ impl<'db> Binding<'db> {
         let return_ty = signature.return_ty;
         Binding {
             signature,
+            source_overload_index: 0,
             callable_type: signature_type,
             signature_type,
             return_ty,
@@ -6098,6 +6223,17 @@ impl<'db> Binding<'db> {
             original_parameter_type,
             parameter_type,
         ))
+    }
+
+    /// Records the overload's source definition index for later diagnostics.
+    fn with_source_overload_index(mut self, source_overload_index: usize) -> Self {
+        self.source_overload_index = source_overload_index;
+        self
+    }
+
+    /// Returns the overload's source position in the defining function's overload list.
+    fn source_overload_index(&self) -> usize {
+        self.source_overload_index
     }
 
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
@@ -7091,11 +7227,9 @@ impl<'db> BindingError<'db> {
                             matching_overload.kind,
                             matching_overload.function.name(context.db())
                         ));
-                        let (overloads, _) = matching_overload
-                            .function
-                            .overloads_and_implementation(context.db());
-                        for (overload_index, overload) in
-                            overloads.iter().enumerate().take(MAXIMUM_OVERLOADS)
+                        for (overload_index, overload) in matching_overload
+                            .candidate_overloads(context.db())
+                            .take(MAXIMUM_OVERLOADS)
                         {
                             if overload_index == matching_overload.index {
                                 continue;
@@ -7105,10 +7239,10 @@ impl<'db> BindingError<'db> {
                                 overload.signature(context.db()).display(context.db())
                             ));
                         }
-                        if overloads.len() > MAXIMUM_OVERLOADS {
+                        if matching_overload.candidate_count() > MAXIMUM_OVERLOADS {
                             diag.info(format_args!(
                                 "... omitted {remaining} overloads",
-                                remaining = overloads.len() - MAXIMUM_OVERLOADS
+                                remaining = matching_overload.candidate_count() - MAXIMUM_OVERLOADS
                             ));
                         }
                     }
@@ -7640,6 +7774,8 @@ impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
 struct MatchingOverloadLiteral<'db> {
     /// The position of the matching overload in the list of overloads.
     index: usize,
+    /// The source overload positions that remained after any callable-specific filtering.
+    candidate_indexes: SmallVec<[usize; 1]>,
     /// The kind of function this overload is for.
     kind: FunctionKind,
     /// The function literal that this overload belongs to.
@@ -7660,6 +7796,26 @@ impl<'db> MatchingOverloadLiteral<'db> {
         // above, we get an empty list of overloads because the implementation of that method
         // relies on it existing in the file.
         overloads.get(self.index).copied()
+    }
+
+    /// Iterates the overload literals that remain diagnostic candidates, paired with their
+    /// source overload-definition index.
+    fn candidate_overloads(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = (usize, OverloadLiteral<'db>)> + '_ {
+        let (overloads, _) = self.function.overloads_and_implementation(db);
+        self.candidate_indexes.iter().filter_map(|&index| {
+            overloads
+                .get(index)
+                .copied()
+                .map(|overload| (index, overload))
+        })
+    }
+
+    /// Returns the number of overloads considered diagnostic candidates.
+    fn candidate_count(&self) -> usize {
+        self.candidate_indexes.len()
     }
 }
 

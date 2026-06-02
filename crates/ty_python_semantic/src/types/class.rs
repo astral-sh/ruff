@@ -1165,6 +1165,8 @@ impl<'db> ClassType<'db> {
             }
         }
 
+        abstract_methods.shrink_to_fit();
+
         abstract_methods
     }
 

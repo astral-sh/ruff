@@ -428,7 +428,7 @@ impl<'db> OverloadLiteral<'db> {
             .expect_function()
             .node(&module)
             .name
-            .scoped_use_id(db, scope);
+            .scoped_use_id(db, self.file(db));
 
         let Place::Defined(DefinedPlace {
             ty: Type::FunctionLiteral(previous_type),
@@ -1927,6 +1927,8 @@ pub enum KnownFunction {
     IsSubtypeOf,
     /// `ty_extensions.is_assignable_to`
     IsAssignableTo,
+    /// `ty_extensions.is_constraint_set_assignable_to`
+    IsConstraintSetAssignableTo,
     /// `ty_extensions.is_disjoint_from`
     IsDisjointFrom,
     /// `ty_extensions.is_singleton`
@@ -2035,6 +2037,7 @@ impl KnownFunction {
             Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
+            | Self::IsConstraintSetAssignableTo
             | Self::IsDisjointFrom
             | Self::IsEquivalentTo
             | Self::IsSingleValued
@@ -2590,6 +2593,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsDisjointFrom
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
+                | KnownFunction::IsConstraintSetAssignableTo
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface

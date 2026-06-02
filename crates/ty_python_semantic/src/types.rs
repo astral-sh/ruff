@@ -29,6 +29,7 @@ pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_RE
 pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
     infer_expression_type, infer_expression_types, infer_scope_types,
+    is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -543,6 +544,17 @@ macro_rules! todo_type {
 pub use crate::types::definition::TypeDefinition;
 pub(crate) use todo_type;
 
+/// The role a function definition plays in a property's descriptor protocol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PropertyAccessorRole {
+    /// `@property def x(self)` — runs on read.
+    Getter,
+    /// `@x.setter def x(self, value)` — runs on write.
+    Setter,
+    /// `@x.deleter def x(self)` — runs on `del`.
+    Deleter,
+}
+
 /// Represents an instance of `builtins.property`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
@@ -571,6 +583,37 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for PropertyInstanceType<'_> {}
 
 impl<'db> PropertyInstanceType<'db> {
+    /// Returns the [`PropertyAccessorRole`] that `def` plays in this property, or `None` when
+    /// `def` is not one of this property's accessors.
+    ///
+    /// Each accessor slot is a function-literal `Type`; an accessor may be overloaded, so a
+    /// definition is matched against every overload signature and the implementation, not just
+    /// the implementation's definition.
+    pub fn accessor_role(
+        self,
+        db: &'db dyn Db,
+        def: Definition<'db>,
+    ) -> Option<PropertyAccessorRole> {
+        let slot_matches = |accessor: Option<Type<'db>>| -> bool {
+            accessor
+                .and_then(Type::as_function_literal)
+                .into_iter()
+                .flat_map(|function| function.iter_overloads_and_implementation(db))
+                .filter_map(|overload| overload.signature(db).definition())
+                .any(|accessor_def| accessor_def == def)
+        };
+
+        if slot_matches(self.getter(db)) {
+            Some(PropertyAccessorRole::Getter)
+        } else if slot_matches(self.setter(db)) {
+            Some(PropertyAccessorRole::Setter)
+        } else if slot_matches(self.deleter(db)) {
+            Some(PropertyAccessorRole::Deleter)
+        } else {
+            None
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -2546,6 +2589,10 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
+        if let Some(fallback) = self.materialized_divergent_fallback() {
+            return fallback.class_member_with_policy(db, name, policy);
+        }
+
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
@@ -3350,6 +3397,14 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "with_detailed_display" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
+                ))
+                .into()
+            }
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
@@ -3912,46 +3967,6 @@ impl<'db> Type<'db> {
             .into(),
 
             Type::FunctionLiteral(function_type) => match function_type.known(db) {
-                Some(
-                    KnownFunction::IsEquivalentTo
-                    | KnownFunction::IsAssignableTo
-                    | KnownFunction::IsSubtypeOf
-                    | KnownFunction::IsDisjointFrom,
-                ) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_only(Some(Name::new_static("a")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_only(Some(Name::new_static("b")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                            ],
-                        ),
-                        KnownClass::ConstraintSet.to_instance(db),
-                    ),
-                )
-                .into(),
-
-                Some(KnownFunction::IsSingleton | KnownFunction::IsSingleValued) => {
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new(
-                                db,
-                                [Parameter::positional_only(Some(Name::new_static("a")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any())],
-                            ),
-                            KnownClass::Bool.to_instance(db),
-                        ),
-                    )
-                    .into()
-                }
-
                 Some(KnownFunction::AssertType) => {
                     let val_ty = BoundTypeVarInstance::synthetic(
                         db,
@@ -6033,6 +6048,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6280,7 +6296,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6886,7 +6903,7 @@ fn self_typevar_owner_class_literal<'db>(
 fn class_mro_literals<'db>(
     db: &'db dyn Db,
     class_literal: ClassLiteral<'db>,
-) -> Vec<ClassLiteral<'db>> {
+) -> Box<[ClassLiteral<'db>]> {
     class_literal
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
@@ -7554,9 +7571,7 @@ impl<'db> InvalidTypeExpression<'db> {
             self
         {
             let module = module.module(db);
-            let Some(module_name_final_part) = module.name(db).components().next_back() else {
-                return;
-            };
+            let module_name_final_part = module.name(db).last_component();
             let Some(module_member_with_same_name) = ty
                 .member(db, module_name_final_part)
                 .place
@@ -7606,7 +7621,7 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
         } else if matches!(self, InvalidTypeExpression::Concatenate) {
             diagnostic.info("`typing.Concatenate` is only valid:");
-            diagnostic.info(" - as the first argument to `typing.Callable`");
+            diagnostic.info(" - as the first argument to `Callable`");
             diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
     }
@@ -7881,6 +7896,26 @@ impl<'db> ModuleLiteralType<'db> {
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {
             return self.try_module_getattr(db, name);
+        }
+
+        // typeshed re-exports some special forms across modules (e.g. `collections.abc.Callable`
+        // is `from typing import Callable as Callable`). The resolved type still carries the
+        // definition-site variant (`SpecialFormType::TypingCallable`), so we recover the
+        // import-path identity here while it's still observable.
+        if let Place::Defined(defined) = place_and_qualifiers.place
+            && let Type::SpecialForm(special) = defined.ty
+            && let Some(import_module) = self.module(db).known(db)
+        {
+            let rewrapped = special.rewrap_for_import_module(name, import_module);
+            if rewrapped != special {
+                return PlaceAndQualifiers {
+                    place: Place::Defined(DefinedPlace {
+                        ty: Type::SpecialForm(rewrapped),
+                        ..defined
+                    }),
+                    qualifiers: place_and_qualifiers.qualifiers,
+                };
+            }
         }
 
         place_and_qualifiers

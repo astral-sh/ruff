@@ -445,7 +445,7 @@ reveal_type(Sum)  # revealed: <class 'tuple[T@Sum, U@Sum]'>
 reveal_type(ListOrTuple)  # revealed: <types.UnionType special-form 'list[T@ListOrTuple] | tuple[T@ListOrTuple, ...]'>
 # revealed: <types.UnionType special-form 'list[T@ListOrTupleLegacy] | tuple[T@ListOrTupleLegacy, ...]'>
 reveal_type(ListOrTupleLegacy)
-reveal_type(MyCallable)  # revealed: <typing.Callable special-form '(**P@MyCallable) -> T@MyCallable'>
+reveal_type(MyCallable)  # revealed: <Callable special-form '(**P@MyCallable) -> T@MyCallable'>
 reveal_type(AnnotatedType)  # revealed: <special-form 'typing.Annotated[T@AnnotatedType, <metadata>]'>
 reveal_type(TransparentAlias)  # revealed: TypeVar
 reveal_type(MyOptional)  # revealed: <types.UnionType special-form 'T@MyOptional | None'>
@@ -510,7 +510,7 @@ reveal_type(ListOfPairs)  # revealed: <class 'list[tuple[str, str]]'>
 reveal_type(ListOrTupleOfInts)  # revealed: <types.UnionType special-form 'list[int] | tuple[int, ...]'>
 reveal_type(AnnotatedInt)  # revealed: <special-form 'typing.Annotated[int, <metadata>]'>
 reveal_type(SubclassOfInt)  # revealed: <special-form 'type[int]'>
-reveal_type(CallableIntToStr)  # revealed: <typing.Callable special-form '(int, /) -> str'>
+reveal_type(CallableIntToStr)  # revealed: <Callable special-form '(int, /) -> str'>
 
 def _(
     ints_or_none: IntsOrNone,
@@ -1606,9 +1606,9 @@ CallableNoArgs = Callable[[], None]
 BasicCallable = Callable[[int, str], bytes]
 GradualCallable = Callable[..., str]
 
-reveal_type(CallableNoArgs)  # revealed: <typing.Callable special-form '() -> None'>
-reveal_type(BasicCallable)  # revealed: <typing.Callable special-form '(int, str, /) -> bytes'>
-reveal_type(GradualCallable)  # revealed: <typing.Callable special-form '(...) -> str'>
+reveal_type(CallableNoArgs)  # revealed: <Callable special-form '() -> None'>
+reveal_type(BasicCallable)  # revealed: <Callable special-form '(int, str, /) -> bytes'>
+reveal_type(GradualCallable)  # revealed: <Callable special-form '(...) -> str'>
 
 def _(
     callable_no_args: CallableNoArgs,
@@ -1634,14 +1634,14 @@ def _(takes_callable: TakesCallable, returns_callable: ReturnsCallable):
 Invalid uses result in diagnostics:
 
 ```py
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 InvalidCallable1 = Callable[[int]]
 
 # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
 InvalidCallable2 = Callable[int, str]
 
-reveal_type(InvalidCallable1)  # revealed: <typing.Callable special-form '(...) -> Unknown'>
-reveal_type(InvalidCallable2)  # revealed: <typing.Callable special-form '(...) -> Unknown'>
+reveal_type(InvalidCallable1)  # revealed: <Callable special-form '(...) -> Unknown'>
+reveal_type(InvalidCallable2)  # revealed: <Callable special-form '(...) -> Unknown'>
 
 def _(invalid_callable1: InvalidCallable1, invalid_callable2: InvalidCallable2):
     reveal_type(invalid_callable1)  # revealed: (...) -> Unknown

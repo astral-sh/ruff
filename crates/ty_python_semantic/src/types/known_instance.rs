@@ -24,14 +24,26 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// mdtests. In theory, that means there's no need for this to be interned; being tracked would be
 /// sufficient. However, we currently think that tracked structs are unsound w.r.t. salsa cycles,
 /// so out of an abundance of caution, we are interning the struct.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedConstraintSet<'db> {
     #[returns(ref)]
     pub(super) constraints: OwnedConstraintSet<'db>,
+
+    pub(super) detailed_display: bool,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for InternedConstraintSet<'_> {}
+
+impl<'db> InternedConstraintSet<'db> {
+    pub(super) fn new(db: &'db dyn Db, constraints: OwnedConstraintSet<'db>) -> Self {
+        Self::new_internal(db, constraints, false)
+    }
+
+    pub(super) fn with_detailed_display(self, db: &'db dyn Db) -> Self {
+        Self::new_internal(db, self.constraints(db), true)
+    }
+}
 
 /// A salsa-interned payload for `functools.partial(...)` instances.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]

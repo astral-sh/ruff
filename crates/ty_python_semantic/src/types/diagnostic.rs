@@ -162,6 +162,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ATTRIBUTE_OVERRIDE);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
+    registry.register_lint(&MISSING_OVERRIDE_DECORATOR);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
@@ -2598,6 +2599,46 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for methods that override a method or attribute in a superclass but are not decorated with `@override`.
+    ///
+    /// This rule is disabled by default. Enable it to opt in to strict `@override` enforcement for a project.
+    ///
+    /// ## Exemptions
+    /// Overriding `__init__`, `__new__`, `__init_subclass__`, or `__post_init__` does not require
+    /// `@override`, even if the method is explicitly declared by a superclass.
+    ///
+    /// ## Why is this bad?
+    /// Without an `@override` annotation, refactors can silently change whether a method is an override.
+    /// Requiring `@override` on every override lets ty report when an intended override stops overriding
+    /// anything, and when a method unexpectedly starts overriding a superclass member.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import override
+    ///
+    /// class Parent:
+    ///     def method(self) -> int:
+    ///         return 1
+    ///
+    /// class Child(Parent):
+    ///     def method(self) -> int:  # Error raised here when the rule is enabled
+    ///         return 2
+    ///
+    /// class ExplicitChild(Parent):
+    ///     @override
+    ///     def method(self) -> int:  # fine
+    ///         return 2
+    /// ```
+    pub(crate) static MISSING_OVERRIDE_DECORATOR = {
+        summary: "detects methods that override a superclass member without an `@override` annotation",
+        status: LintStatus::preview("0.0.41"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for `assert_type()` and `assert_never()` calls where the actual type
     /// is not the same as the asserted type.
     ///
@@ -4692,7 +4733,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
+        "Special form `Callable` expected exactly two arguments (parameter types and return type)",
     ));
 }
 
@@ -6645,10 +6686,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         "The stdlib module `{module_name}` only has a `{name}` \
             submodule on Python {version_range}",
         module_name = parent_module.name(db),
-        name = full_submodule_name
-            .components()
-            .next_back()
-            .expect("A `ModuleName` always has at least one component"),
+        name = full_submodule_name.last_component(),
         version_range = version_range.diagnostic_display(),
     ));
 

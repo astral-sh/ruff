@@ -258,7 +258,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -799,6 +800,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let result = f();
         self.context_tree.set_enabled(was_enabled);
         result
+    }
+
+    fn should_provide_callable_upcast_context(&self, source: Type<'db>) -> bool {
+        if !self.is_context_collection_enabled() {
+            return false;
+        }
+
+        // These displays already expose the signature being compared; wrapping them would
+        // duplicate the lower-level callable mismatch context.
+        !matches!(
+            source,
+            Type::Callable(_)
+                | Type::FunctionLiteral(_)
+                | Type::BoundMethod(_)
+                | Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+        )
     }
 
     fn with_recursion_guard(
@@ -1690,11 +1707,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(source, target, || {
-                    source
+                    let Some(callables) = source
                         .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
-                        .when_some_and(db, self.constraints, |callables| {
-                            self.check_callables_vs_callable(db, &callables, target_callable)
-                        })
+                    else {
+                        return self.never();
+                    };
+
+                    let result = self.check_callables_vs_callable(db, &callables, target_callable);
+
+                    if self.should_provide_callable_upcast_context(source)
+                        && result.is_never_satisfied(db)
+                    {
+                        self.provide_context(|| ErrorContext::InferredCallableType {
+                            source,
+                            callable: callables.into_type(db),
+                        });
+                    }
+
+                    result
                 })
             }
 

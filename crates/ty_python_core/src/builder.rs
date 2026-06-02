@@ -34,6 +34,7 @@ use crate::definition::{
     ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
+use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
@@ -58,8 +59,9 @@ use crate::use_def::{
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
-    EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopToken, NarrowingAliasPredicate,
-    PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter, get_loop_header,
+    DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopToken,
+    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
+    get_loop_header,
 };
 
 use super::place::PlaceExprRef;
@@ -1213,7 +1215,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             is_reexported,
         );
 
-        let num_definitions = {
+        let num_definitions = if is_loop_header {
+            // Loop headers are internal use-def definitions. They are retrieved through the loop
+            // token rather than by their AST node.
+            0
+        } else {
             let definitions = self.add_entry_for_definition_key(definition_node.key());
             definitions.push(definition);
             definitions.len()
@@ -2036,7 +2042,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
-        let definition = self.add_definition(
+        self.add_definition(
             symbol.into(),
             ParameterDefinitionNodeRef::Parameter(parameter),
         );
@@ -2044,15 +2050,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_place_table_mut()
             .symbol_mut(symbol)
             .mark_parameter();
-
-        // Insert a mapping from the inner Parameter node to the same definition. This
-        // ensures that calling `HasType::inferred_type` on the inner parameter returns
-        // a valid type (and doesn't panic)
-        let existing_definition = self.definitions_by_node.insert(
-            (&parameter.parameter).into(),
-            Definitions::single(definition),
-        );
-        debug_assert_eq!(existing_definition, None);
     }
 
     fn declare_lambda_parameters(
@@ -2112,7 +2109,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
-        let definition = self.add_definition(
+        self.add_definition(
             symbol.into(),
             LambdaParameterDefinitionNodeRef {
                 index,
@@ -2124,15 +2121,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_place_table_mut()
             .symbol_mut(symbol)
             .mark_parameter();
-
-        // Insert a mapping from the inner Parameter node to the same definition. This
-        // ensures that calling `HasType::inferred_type` on the inner parameter returns
-        // a valid type (and doesn't panic)
-        let existing_definition = self.definitions_by_node.insert(
-            (&parameter.parameter).into(),
-            Definitions::single(definition),
-        );
-        debug_assert_eq!(existing_definition, None);
     }
 
     /// Add an unpackable assignment for the given [`Unpackable`].
@@ -2220,47 +2208,41 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .map(|builder| Arc::new(builder.finish()))
             .collect();
 
-        let mut ast_ids: IndexVec<_, _> = self
-            .ast_ids
-            .into_iter()
-            .map(super::ast_ids::AstIdsBuilder::finish)
-            .collect();
+        let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);
 
         self.scopes.shrink_to_fit();
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
-        ast_ids.shrink_to_fit();
-        self.definitions_by_node.shrink_to_fit();
-        self.statements_by_node.shrink_to_fit();
-        self.enclosing_lambda_statements.shrink_to_fit();
-        self.collections_by_use.shrink_to_fit();
-        self.uses_by_collection.shrink_to_fit();
-
         self.scope_ids_by_scope.shrink_to_fit();
-        self.scopes_by_node.shrink_to_fit();
-        self.generator_functions.shrink_to_fit();
-        self.enclosing_snapshots.shrink_to_fit();
+        let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
+        semantic_syntax_errors.shrink_to_fit();
+        let uses_by_collection = FrozenMap::from_entries(
+            self.uses_by_collection
+                .into_iter()
+                .map(|(definition, uses)| (definition, uses.into_boxed_slice()))
+                .collect(),
+        );
 
         SemanticIndex {
-            place_tables,
-            scopes: self.scopes,
-            definitions_by_node: self.definitions_by_node,
+            place_tables: place_tables.into(),
+            scopes: self.scopes.into(),
+            definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
             statements_by_node: self.statements_by_node,
-            scope_ids_by_scope: self.scope_ids_by_scope,
+            scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
-            use_def_maps,
-            enclosing_lambda_statements: self.enclosing_lambda_statements,
-            collections_by_use: self.collections_by_use,
-            uses_by_collection: self.uses_by_collection,
-            imported_modules: Arc::new(self.imported_modules),
+            use_def_maps: use_def_maps.into(),
+            enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
+            collections_by_use: FrozenMap::from(self.collections_by_use),
+            uses_by_collection,
+            imported_modules: Arc::new(FrozenSet::from(self.imported_modules)),
             has_future_annotations: self.has_future_annotations,
-            enclosing_snapshots: self.enclosing_snapshots,
-            semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
-            generator_functions: self.generator_functions,
-            narrowing_alias_predicates: self.alias_predicates,
+            enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
+            semantic_syntax_errors,
+            generator_functions: FrozenSet::from(self.generator_functions),
+            narrowing_alias_predicates: FrozenMap::from(self.alias_predicates),
         }
     }
 
@@ -3620,10 +3602,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // context the lambda is being inferred with, and so any statement
         // containing a lambda must be inferable as a standalone statement
         // to avoid large scope-level cycles.
-        for lambda in current_statement.lambda_expressions {
-            self.enclosing_lambda_statements
-                .insert(lambda.into(), standalone_statement);
-        }
+        self.enclosing_lambda_statements.extend(
+            current_statement
+                .lambda_expressions
+                .into_iter()
+                .map(|lambda| (lambda.into(), standalone_statement)),
+        );
 
         // The inferred element type of collection literal depends on uses of
         // the collection in its containing scope, and so each use must be part
@@ -4141,6 +4125,21 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 .all(|comprehension| !comprehension.is_async)
             {
                 return true;
+            }
+        }
+        false
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            match self.scopes[scope_info.file_scope_id].kind() {
+                ScopeKind::Comprehension => {}
+                ScopeKind::Class => return true,
+                ScopeKind::Module
+                | ScopeKind::TypeParams
+                | ScopeKind::Function
+                | ScopeKind::Lambda
+                | ScopeKind::TypeAlias => return false,
             }
         }
         false

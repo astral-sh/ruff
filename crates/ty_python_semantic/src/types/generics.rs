@@ -25,7 +25,9 @@ use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
@@ -237,11 +239,13 @@ pub(crate) enum InferableTypeVars<'db> {
 impl<'db> InferableTypeVars<'db> {
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
-        typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
+        mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
     ) -> Self {
         if typevars.is_empty() {
             return InferableTypeVars::None;
         }
+
+        typevars.shrink_to_fit();
         Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
     }
 }
@@ -1977,7 +1981,92 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
         }
 
-        types
+        // TODO: Replace this fallback with expanding-cycle detection in the constraint-set
+        // solution layer.
+        if types
+            .iter()
+            .any(|(identity, ty)| self.has_expanding_cycle(generic_context, &types, *identity, *ty))
+        {
+            // Recursive specialization cannot reach a fixed point when a cycle grows through an
+            // embedded generic type, such as `SupportsAdd[T, S]`.
+            self.solve_hash_map_with(generic_context, choose)
+        } else {
+            types
+        }
+    }
+
+    fn has_expanding_cycle(
+        &self,
+        generic_context: GenericContext<'db>,
+        types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+        identity: BoundTypeVarIdentity<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        match ty {
+            // A bare `T = U` edge only replaces one typevar with another; it does not wrap the
+            // replacement in additional structure and therefore cannot grow during repeated
+            // specialization.
+            Type::TypeVar(_) => false,
+            // Unions and intersections are flattened and deduplicated as they are constructed.
+            // A cyclic reference directly inside one can add elements but cannot create
+            // unbounded nesting. Keep looking inside its elements for a genuinely embedded edge.
+            Type::Union(union) => union.elements(self.db).iter().any(|element| {
+                self.has_expanding_cycle(generic_context, types, identity, *element)
+            }),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(self.db)
+                .chain(intersection.iter_negative(self.db))
+                .any(|element| self.has_expanding_cycle(generic_context, types, identity, element)),
+            _ => any_over_type(self.db, ty, false, |nested| {
+                nested.as_typevar().is_some_and(|dependency| {
+                    let dependency = dependency.identity(self.db);
+                    dependency != identity
+                        && generic_context.contains(self.db, dependency)
+                        && self.reaches_pending_typevar(
+                            generic_context,
+                            types,
+                            dependency,
+                            identity,
+                            &RefCell::default(),
+                        )
+                })
+            }),
+        }
+    }
+
+    fn reaches_pending_typevar(
+        &self,
+        generic_context: GenericContext<'db>,
+        types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+        identity: BoundTypeVarIdentity<'db>,
+        target: BoundTypeVarIdentity<'db>,
+        visited: &RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+    ) -> bool {
+        if identity == target {
+            return true;
+        }
+        if !visited.borrow_mut().insert(identity) {
+            return false;
+        }
+
+        types.get(&identity).is_some_and(|ty| {
+            any_over_type(self.db, *ty, false, |nested| {
+                nested.as_typevar().is_some_and(|dependency| {
+                    let dependency = dependency.identity(self.db);
+                    // Recursive specialization skips a typevar's own slot. Only references
+                    // through other mappings can recursively expand.
+                    dependency != identity
+                        && generic_context.contains(self.db, dependency)
+                        && self.reaches_pending_typevar(
+                            generic_context,
+                            types,
+                            dependency,
+                            target,
+                            visited,
+                        )
+                })
+            })
+        })
     }
 
     fn can_remove_inferable_typevar_artifacts(&self, generic_context: GenericContext<'db>) -> bool {

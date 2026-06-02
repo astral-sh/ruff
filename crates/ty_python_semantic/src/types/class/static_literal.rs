@@ -1746,7 +1746,8 @@ impl<'db> StaticClassLiteral<'db> {
             "Collecting `fields` for NamedTuples should short-circuit in `fields()`"
         );
 
-        self.iter_mro(db, specialization)
+        let mut map: FxIndexMap<_, _> = self
+            .iter_mro(db, specialization)
             .rev()
             .filter_map(|superclass| {
                 let class = superclass.into_class()?;
@@ -1792,7 +1793,10 @@ impl<'db> StaticClassLiteral<'db> {
             // they cannot shadow an inherited field with the same name.
             .filter(|(_, field)| !field.is_kw_only_sentinel(db))
             // We collect into a FxOrderMap here to deduplicate attributes
-            .collect()
+            .collect();
+
+        map.shrink_to_fit();
+        map
     }
 
     pub(crate) fn validate_members(self, context: &InferContext<'db, '_>) {
@@ -2034,6 +2038,8 @@ impl<'db> StaticClassLiteral<'db> {
                 attributes.insert(symbol.name().clone(), field);
             }
         }
+
+        attributes.shrink_to_fit();
 
         attributes
     }
