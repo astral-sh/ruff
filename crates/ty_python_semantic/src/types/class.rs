@@ -349,6 +349,29 @@ impl<'db> ClassLiteral<'db> {
             .expect("`object` should always be a non-generic class in typeshed")
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Dynamic(dynamic) => Some(Self::Dynamic(
+                dynamic.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::DynamicNamedTuple(named_tuple) => Some(Self::DynamicNamedTuple(
+                named_tuple.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::DynamicTypedDict(typed_dict) => Some(Self::DynamicTypedDict(
+                typed_dict.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::DynamicEnum(enum_literal) => Some(Self::DynamicEnum(
+                enum_literal.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::Static(_) => Some(self),
+        }
+    }
+
     /// Returns the name of the class.
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         match self {
@@ -854,7 +877,9 @@ impl<'db> ClassType<'db> {
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::NonGeneric(_) => Some(self),
+            Self::NonGeneric(class) => Some(Self::NonGeneric(
+                class.recursive_type_normalized_impl(db, div, nested)?,
+            )),
             Self::Generic(generic) => Some(Self::Generic(
                 generic.recursive_type_normalized_impl(db, div, nested)?,
             )),
@@ -1564,12 +1589,12 @@ impl<'db> ClassType<'db> {
                         // Fallback overloads: for `tuple[int, str]`, we will generate the following overloads:
                         //
                         //    __getitem__(self, index: int, /) -> int | str
-                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[int | str, ...]
+                        //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | str, ...]
                         //
                         // and for `tuple[str, *tuple[float, ...], bytes]`, we will generate the following overloads:
                         //
                         //    __getitem__(self, index: int, /) -> str | float | bytes
-                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[str | float | bytes, ...]
+                        //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[str | float | bytes, ...]
                         //
                         overload_signatures.push(synthesize_getitem_overload_signature(
                             db,
@@ -1577,9 +1602,16 @@ impl<'db> ClassType<'db> {
                             all_elements_unioned,
                         ));
 
+                        let slice_bound = UnionType::from_elements(
+                            db,
+                            [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                        );
                         overload_signatures.push(synthesize_getitem_overload_signature(
                             db,
-                            KnownClass::Slice.to_instance(db),
+                            KnownClass::Slice.to_specialized_instance(
+                                db,
+                                &[slice_bound, slice_bound, slice_bound],
+                            ),
                             Type::homogeneous_tuple(db, all_elements_unioned),
                         ));
 
