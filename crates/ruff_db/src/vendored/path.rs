@@ -2,6 +2,7 @@ use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::path;
+use std::sync::Arc;
 
 use camino::{Utf8Components, Utf8Path, Utf8PathBuf};
 
@@ -115,6 +116,22 @@ impl VendoredPathBuf {
 
     pub fn push(&mut self, component: impl AsRef<VendoredPath>) {
         self.0.push(component.as_ref())
+    }
+}
+
+impl From<&VendoredPath> for Arc<VendoredPath> {
+    fn from(path: &VendoredPath) -> Self {
+        let path: Arc<Utf8Path> = Arc::from(&path.0);
+        let path = Arc::into_raw(path) as *const VendoredPath;
+        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
+        // *const Utf8Path to a *const VendoredPath is valid.
+        unsafe { Arc::from_raw(path) }
+    }
+}
+
+impl From<VendoredPathBuf> for Arc<VendoredPath> {
+    fn from(path: VendoredPathBuf) -> Self {
+        Arc::from(path.as_path())
     }
 }
 

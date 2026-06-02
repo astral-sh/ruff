@@ -663,7 +663,7 @@ fn fmt_file_location<'db>(
 ) -> fmt::Result {
     let path = file.path(db);
     let path = match path {
-        FilePath::System(path) => Cow::Owned(FilePath::System(
+        FilePath::System(path) => Cow::Owned(FilePath::from(
             path.strip_prefix(db.system().current_directory())
                 .unwrap_or(path)
                 .to_path_buf(),

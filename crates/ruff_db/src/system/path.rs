@@ -3,6 +3,7 @@ use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::path::{Path, PathBuf, StripPrefixError};
+use std::sync::Arc;
 
 /// A slice of a path on [`System`](super::System) (akin to [`str`]).
 ///
@@ -578,6 +579,22 @@ impl SystemPathBuf {
     }
 }
 
+impl From<&SystemPath> for Arc<SystemPath> {
+    fn from(path: &SystemPath) -> Self {
+        let path: Arc<Utf8Path> = Arc::from(&path.0);
+        let path = Arc::into_raw(path) as *const SystemPath;
+        // SAFETY: SystemPath is marked as #[repr(transparent)] so the conversion from a
+        // *const Utf8Path to a *const SystemPath is valid.
+        unsafe { Arc::from_raw(path) }
+    }
+}
+
+impl From<SystemPathBuf> for Arc<SystemPath> {
+    fn from(path: SystemPathBuf) -> Self {
+        Arc::from(path.as_path())
+    }
+}
+
 impl Borrow<SystemPath> for SystemPathBuf {
     fn borrow(&self) -> &SystemPath {
         self.as_path()
@@ -777,6 +794,22 @@ impl SystemVirtualPathBuf {
     #[inline]
     pub const fn as_path(&self) -> &SystemVirtualPath {
         SystemVirtualPath::new(self.0.as_str())
+    }
+}
+
+impl From<&SystemVirtualPath> for Arc<SystemVirtualPath> {
+    fn from(path: &SystemVirtualPath) -> Self {
+        let path: Arc<str> = Arc::from(path.as_str());
+        let path = Arc::into_raw(path) as *const SystemVirtualPath;
+        // SAFETY: SystemVirtualPath is marked as #[repr(transparent)] so the conversion from a
+        // *const str to a *const SystemVirtualPath is valid.
+        unsafe { Arc::from_raw(path) }
+    }
+}
+
+impl From<SystemVirtualPathBuf> for Arc<SystemVirtualPath> {
+    fn from(path: SystemVirtualPathBuf) -> Self {
+        Arc::from(path.as_path())
     }
 }
 
