@@ -1303,9 +1303,24 @@ impl ConstraintId {
         }
 
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower = UnionType::from_two_elements(db, self_constraint.lower, other_constraint.lower);
-        let upper =
-            IntersectionType::from_two_elements(db, self_constraint.upper, other_constraint.upper);
+        let lower = if self_constraint.lower == other_constraint.lower
+            || other_constraint.lower.is_never()
+        {
+            self_constraint.lower
+        } else if self_constraint.lower.is_never() {
+            other_constraint.lower
+        } else {
+            UnionType::from_two_elements(db, self_constraint.lower, other_constraint.lower)
+        };
+        let upper = if self_constraint.upper == other_constraint.upper
+            || other_constraint.upper.is_object()
+        {
+            self_constraint.upper
+        } else if self_constraint.upper.is_object() {
+            other_constraint.upper
+        } else {
+            IntersectionType::from_two_elements(db, self_constraint.upper, other_constraint.upper)
+        };
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
         // empty, since there is no type that is both greater than `lower`, and less than `upper`.

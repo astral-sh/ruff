@@ -490,6 +490,10 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
+        if matches!(self.kind(db), CallableTypeKind::Regular) {
+            return self;
+        }
+
         CallableType::new(
             db,
             self.signatures(db),
@@ -533,21 +537,11 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signatures(db).bind_self(db, self_type),
-            self.kind(db),
-            self.provenance(db),
-        )
+        self.with_signatures(db, self.signatures(db).bind_self(db, self_type))
     }
 
     pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signatures(db).apply_self(db, self_type),
-            self.kind(db),
-            self.provenance(db),
-        )
+        self.with_signatures(db, self.signatures(db).apply_self(db, self_type))
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
@@ -569,13 +563,13 @@ impl<'db> CallableType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(CallableType::new(
-            db,
-            self.signatures(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-            self.kind(db),
-            self.provenance(db),
-        ))
+        Some(
+            self.with_signatures(
+                db,
+                self.signatures(db)
+                    .recursive_type_normalized_impl(db, div, nested)?,
+            ),
+        )
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -589,13 +583,19 @@ impl<'db> CallableType<'db> {
             return replacements.get(&self).copied().unwrap_or(self);
         }
 
-        CallableType::new(
+        self.with_signatures(
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.kind(db),
-            self.provenance(db),
         )
+    }
+
+    fn with_signatures(self, db: &'db dyn Db, signatures: CallableSignature<'db>) -> Self {
+        if signatures == *self.signatures(db) {
+            self
+        } else {
+            CallableType::new(db, signatures, self.kind(db), self.provenance(db))
+        }
     }
 
     pub(super) fn find_legacy_typevars_impl(

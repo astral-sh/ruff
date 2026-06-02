@@ -720,7 +720,7 @@ impl SearchPaths {
             static_paths: self.static_paths.iter(),
             stdlib_path,
             dynamic_paths: None,
-            mode: ModuleResolveModeIngredient::new(db, mode),
+            mode,
         }
     }
 
@@ -926,7 +926,7 @@ pub struct SearchPathIterator<'db> {
     static_paths: std::slice::Iter<'db, SearchPath>,
     stdlib_path: Option<&'db SearchPath>,
     dynamic_paths: Option<std::slice::Iter<'db, SearchPath>>,
-    mode: ModuleResolveModeIngredient<'db>,
+    mode: ModuleResolveMode,
 }
 
 impl<'db> Iterator for SearchPathIterator<'db> {
@@ -946,7 +946,10 @@ impl<'db> Iterator for SearchPathIterator<'db> {
             .or_else(|| stdlib_path.take())
             .or_else(|| {
                 dynamic_paths
-                    .get_or_insert_with(|| dynamic_resolution_paths(*db, *mode).iter())
+                    .get_or_insert_with(|| {
+                        dynamic_resolution_paths(*db, ModuleResolveModeIngredient::new(*db, *mode))
+                            .iter()
+                    })
                     .next()
             })
     }
