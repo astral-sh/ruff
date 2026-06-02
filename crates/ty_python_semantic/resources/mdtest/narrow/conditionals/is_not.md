@@ -59,6 +59,7 @@ Enum literals:
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Answer(Enum):
     NO = 0
@@ -80,6 +81,10 @@ def _(x: Single | int):
         reveal_type(x)  # revealed: int
     else:
         reveal_type(x)  # revealed: Single
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x is not Answer.NO:
+        reveal_type(x)  # revealed: list[int]
 ```
 
 ## `is not` for non-singleton types

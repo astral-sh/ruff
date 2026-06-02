@@ -581,7 +581,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.solutions_with(db, builder, choose)
     }
 
-    #[expect(dead_code)] // Keep this around for debugging purposes
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node
             .simplify_for_display(db, self.builder)

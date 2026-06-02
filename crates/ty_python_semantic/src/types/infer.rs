@@ -49,6 +49,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
+pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet};
 
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
@@ -88,134 +89,6 @@ impl get_size2::GetSize for TypeExpressionFlags {}
 struct TypeAndRange<'db> {
     ty: Type<'db>,
     range: TextRange,
-}
-
-/// Compact structurally immutable key-value entries stored in ascending key order.
-///
-/// This is intended for collections that are constructed once and retained for keyed lookup and
-/// iteration. Lookup is O(log n), iteration is O(n), and collection from an arbitrary iterator or
-/// [`HashMap`](std::collections::HashMap) is O(n log n). Converting a
-/// [`BTreeMap`](std::collections::BTreeMap) is O(n) because its entries are already sorted.
-///
-/// Use a mutable map instead if entries need to be inserted or removed after construction.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(super) struct FrozenMap<K, V>(Box<[(K, V)]>);
-
-impl<K, V> FrozenMap<K, V> {
-    pub(super) fn iter(&self) -> std::slice::Iter<'_, (K, V)> {
-        self.0.iter()
-    }
-
-    #[expect(dead_code)]
-    pub(super) fn keys(&self) -> impl DoubleEndedIterator<Item = &K> + ExactSizeIterator {
-        self.0.iter().map(|(key, _)| key)
-    }
-
-    #[expect(dead_code)]
-    pub(super) fn values(&self) -> impl DoubleEndedIterator<Item = &V> + ExactSizeIterator {
-        self.0.iter().map(|(_, value)| value)
-    }
-}
-
-impl<K: Ord, V> FromIterator<(K, V)> for FrozenMap<K, V> {
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut entries = iter.into_iter().collect::<Vec<_>>();
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-        entries.dedup_by(|(left, _), (right, _)| left == right);
-        Self(entries.into_boxed_slice())
-    }
-}
-
-impl<K, V> From<std::collections::BTreeMap<K, V>> for FrozenMap<K, V> {
-    fn from(map: std::collections::BTreeMap<K, V>) -> Self {
-        Self(map.into_iter().collect())
-    }
-}
-
-impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> {
-    fn from(map: std::collections::HashMap<K, V, S>) -> Self {
-        let mut entries = map.into_iter().collect::<Vec<_>>();
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-        Self(entries.into_boxed_slice())
-    }
-}
-
-impl<K: Ord, V> FrozenMap<K, V> {
-    pub(super) fn get(&self, key: &K) -> Option<&V> {
-        self.0
-            .binary_search_by(|(candidate, _)| candidate.cmp(key))
-            .ok()
-            .map(|index| &self.0[index].1)
-    }
-}
-
-impl<K, V> Default for FrozenMap<K, V> {
-    fn default() -> Self {
-        Self(Box::default())
-    }
-}
-
-/// Compact structurally immutable keys stored in ascending order.
-///
-/// This is intended for collections that are constructed once and retained for membership tests
-/// and iteration. Lookup is O(log n), iteration is O(n), and collection from a
-/// [`HashSet`](std::collections::HashSet) is O(n log n).
-///
-/// Use a mutable set instead if entries need to be inserted or removed after construction.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-struct FrozenSet<K>(Box<[K]>);
-
-impl<K: Ord, S> From<std::collections::HashSet<K, S>> for FrozenSet<K> {
-    fn from(set: std::collections::HashSet<K, S>) -> Self {
-        let mut entries = set.into_iter().collect::<Vec<_>>();
-        entries.sort_unstable();
-        Self(entries.into_boxed_slice())
-    }
-}
-
-impl<K: Ord> FrozenSet<K> {
-    fn contains(&self, key: &K) -> bool {
-        self.0.binary_search(key).is_ok()
-    }
-}
-
-impl<K> FrozenSet<K> {
-    fn iter(&self) -> std::slice::Iter<'_, K> {
-        self.0.iter()
-    }
-}
-
-impl<K> Default for FrozenSet<K> {
-    fn default() -> Self {
-        Self(Box::default())
-    }
-}
-
-impl<K, V> IntoIterator for FrozenMap<K, V> {
-    type Item = (K, V);
-    type IntoIter = std::vec::IntoIter<(K, V)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_vec().into_iter()
-    }
-}
-
-impl<'a, K, V> IntoIterator for &'a FrozenMap<K, V> {
-    type Item = &'a (K, V);
-    type IntoIter = std::slice::Iter<'a, (K, V)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
-    type Item = &'a mut (K, V);
-    type IntoIter = std::slice::IterMut<'a, (K, V)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter_mut()
-    }
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).

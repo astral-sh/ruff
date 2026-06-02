@@ -5789,8 +5789,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_dict_comprehension_expression(dictcomp, tcx)
             }
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
-            ast::Expr::Name(name) => self.infer_name_expression(name),
-            ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
+            ast::Expr::Name(name) => {
+                let ty = self.infer_name_expression(name);
+                tcx.annotation.map_or(ty, |target| {
+                    self.specialize_generic_class_from_context(ty, target)
+                })
+            }
+            ast::Expr::Attribute(attribute) => {
+                let ty = self.infer_attribute_expression(attribute);
+                tcx.annotation.map_or(ty, |target| {
+                    self.specialize_generic_class_from_context(ty, target)
+                })
+            }
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
@@ -5843,6 +5853,147 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         ty
+    }
+
+    /// Specialize a bare generic class value based on type context.
+    ///
+    /// Currently supports only Callable type contexts.
+    ///
+    /// This lets `list` in a `Callable[[], list[str]]` context be treated as `list[str]`.
+    fn specialize_generic_class_from_context(&self, ty: Type<'db>, target: Type<'db>) -> Type<'db> {
+        // TODO: The ConstraintSetAssignability type relation should already be
+        // able to determine that `list` (coerced into a callable) is assignable
+        // to `Callable[[], list[str]]` when `_T@list = str`. However, when
+        // comparing callables, if either is generic, we existentially quantify
+        // away its typevars, transforming `∃ _T@list . _T@list = str` into
+        // `always`. If we _didn't_ perform that quantification, we would have
+        // the information we need to choose an appropriate specialization of
+        // `list` given the type context, and we wouldn't have to duplicate all
+        // of the logic below.
+        let Type::ClassLiteral(class) = ty else {
+            return ty;
+        };
+        let db = self.db();
+        let exactly_one_callable = |union: UnionType<'db>| {
+            union
+                .elements(db)
+                .iter()
+                .filter_map(|element| element.resolve_type_alias(db).as_callable())
+                .exactly_one()
+                .ok()
+        };
+        let Some(target_callable) = (match target {
+            Type::Callable(callable) => Some(callable),
+            Type::Union(union) => exactly_one_callable(union),
+            Type::TypeAlias(_) => match target.resolve_type_alias(db) {
+                Type::Callable(callable) => Some(callable),
+                Type::Union(union) => exactly_one_callable(union),
+                _ => None,
+            },
+            _ => None,
+        }) else {
+            return ty;
+        };
+        // Callables made entirely of dynamic types provide no constraints for specializing the
+        // class. The same is true for a parameterless context whose return type is an
+        // unspecialized variable from an enclosing generic call.
+        if target_callable.signatures(db).iter().all(|signature| {
+            let parameters = signature.parameters().as_slice();
+            (signature.return_ty.is_dynamic()
+                && parameters
+                    .iter()
+                    .all(|parameter| parameter.annotated_type().is_dynamic()))
+                || (parameters.is_empty()
+                    && matches!(
+                        signature.return_ty,
+                        Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                    ))
+        }) {
+            return ty;
+        }
+        let Some(class_generic_context) = class.generic_context(db) else {
+            return ty;
+        };
+        let Some(source_callable) = ty.try_upcast_to_callable(db) else {
+            return ty;
+        };
+        // The callable relation existentially solves variables bound by each signature. Keep
+        // method-local constructor variables scoped there, but expose class variables to this
+        // outer contextual-specialization solve.
+        let source_callable = source_callable.map(|callable| {
+            let signatures = CallableSignature::from_overloads(
+                callable.signatures(db).overloads.iter().map(|signature| {
+                    let signature_generic_context = signature.generic_context.and_then(|context| {
+                        let mut variables = context
+                            .variables(db)
+                            .filter(|typevar| {
+                                !class_generic_context.contains(db, typevar.identity(db))
+                            })
+                            .peekable();
+                        variables
+                            .peek()
+                            .is_some()
+                            .then(|| GenericContext::from_typevar_instances(db, variables))
+                    });
+                    Signature::new_generic(
+                        signature_generic_context,
+                        signature.parameters().clone(),
+                        signature.return_ty,
+                    )
+                    .with_definition(signature.definition())
+                }),
+            );
+            CallableType::new(db, signatures, callable.kind(db), callable.provenance(db))
+        });
+        let inferable = class_generic_context.inferable_typevars(db);
+        let constraints = ConstraintSetBuilder::new();
+        let path_bounds = source_callable
+            .into_type(db)
+            .assignable_solutions_with_inferable(db, Type::Callable(target_callable), inferable);
+        let Solutions::Constrained(solutions) = path_bounds.solve(db, &constraints) else {
+            return ty;
+        };
+
+        let mut type_context_mappings: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
+            FxHashMap::default();
+        for solution in solutions {
+            for binding in solution {
+                let inferred_ty = binding
+                    .solution
+                    .filter_union(db, |ty| !ty.has_unspecialized_type_var(db));
+                if inferred_ty.has_unspecialized_type_var(db) {
+                    continue;
+                }
+
+                type_context_mappings
+                    .entry(binding.bound_typevar.identity(db))
+                    .and_modify(|existing| existing.add(db, inferred_ty))
+                    .or_insert_with(|| UnionAccumulator::new(inferred_ty));
+            }
+        }
+
+        if type_context_mappings.is_empty() {
+            return ty;
+        }
+
+        let type_context_mappings: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+            type_context_mappings
+                .into_iter()
+                .map(|(identity, accumulator)| (identity, accumulator.into_type(db)))
+                .collect();
+        let specialized = Type::from(class.apply_specialization(db, |generic_context| {
+            generic_context.specialize_recursive(
+                db,
+                generic_context
+                    .variables(db)
+                    .map(|typevar| type_context_mappings.get(&typevar.identity(db)).copied()),
+            )
+        }));
+        if specialized.is_assignable_to(db, Type::Callable(target_callable)) {
+            specialized
+        } else {
+            ty
+        }
     }
 
     #[track_caller]
@@ -6589,6 +6740,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (elt_tcx_constraints, elt_tcx_variance)
         };
+
+        // Avoid projecting and solving a constraint set when contextual inference has already
+        // provided the complete specialization for an empty collection literal.
+        if elts.is_empty()
+            && tcx.annotation.is_some()
+            && let Some(specialization) = generic_context
+                .variables(self.db())
+                .map(|typevar| {
+                    let identity = typevar.identity(self.db());
+                    // Keep this parallel with the slow path below: a covariant context provides
+                    // only an upper bound, which does not determine the specialization for an empty
+                    // literal. A contravariant context provides a lower bound, for which inference
+                    // selects the narrowest valid solution.
+                    if elt_tcx_variance
+                        .get(&identity)
+                        .is_some_and(|variance| variance.is_covariant())
+                    {
+                        return None;
+                    }
+                    elt_tcx_constraints.get(&identity).copied()
+                })
+                .collect::<Option<Vec<_>>>()
+        {
+            let class_type = collection_alias.origin(self.db()).apply_specialization(
+                self.db(),
+                |generic_context| {
+                    generic_context
+                        .specialize_recursive(self.db(), specialization.into_iter().map(Some))
+                },
+            );
+            return Type::from(class_type).to_instance(self.db());
+        }
 
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
@@ -7542,7 +7725,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Collect the types of each distinct key.
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
 
-        for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.scope())) {
+        for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.file())) {
             let place = place_from_bindings(db, bindings.clone());
             let Some(key) = place.first_definition.and_then(definition_key) else {
                 continue;
@@ -8613,7 +8796,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return (place, None);
             }
 
-            let use_id = expr_ref.scoped_use_id(db, scope);
+            let use_id = expr_ref.scoped_use_id(db, self.file());
             let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
 
             (place, Some(use_id))

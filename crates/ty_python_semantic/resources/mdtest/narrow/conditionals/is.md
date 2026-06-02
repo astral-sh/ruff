@@ -60,6 +60,7 @@ def _(x: None | Literal[1, True]):
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Answer(Enum):
     NO = 0
@@ -79,6 +80,11 @@ def _(x: Single | int):
         reveal_type(x)  # revealed: Single
     else:
         reveal_type(x)  # revealed: int
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x is Answer.NO:
+        return
+    reveal_type(x)  # revealed: list[int]
 ```
 
 ## `is` for `EllipsisType`
