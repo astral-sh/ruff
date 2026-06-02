@@ -15,20 +15,8 @@ use crate::checkers::ast::Checker;
 /// regardless of where it appears. Nesting it inside a block is misleading: it
 /// looks as though the declaration is scoped to (or conditional on) that block,
 /// when in fact it affects every assignment to the name throughout the function.
-///
-/// The effect applies even when the block never executes. For example, a `global`
-/// inside a `for` loop still takes effect when the loop iterates zero times:
-///
-/// ```pycon
-/// >>> x = 1
-/// >>> def f():
-/// ...     for _ in range(0):
-/// ...         global x
-/// ...     x = 2
-/// >>> f()
-/// >>> x
-/// 2
-/// ```
+/// The effect applies even when the block never executes, such as a `for` loop
+/// that iterates zero times.
 ///
 /// Placing the declaration at the top of the function makes its function-wide
 /// scope obvious.
@@ -80,8 +68,7 @@ impl Violation for NestedGlobalOrNonlocal {
 pub(crate) fn nested_global_or_nonlocal(checker: &Checker, scope: &Scope) {
     let semantic = checker.semantic();
 
-    // `all_bindings` includes shadowed bindings, so the `global`/`nonlocal`
-    // declaration is still found when a later assignment shadows it.
+    // A later assignment can shadow the declaration, so include shadowed bindings.
     for (name, binding_id) in scope.all_bindings() {
         let binding = &semantic.bindings[binding_id];
         let keyword = match binding.kind {
@@ -93,10 +80,8 @@ pub(crate) fn nested_global_or_nonlocal(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        // A `global`/`nonlocal` at the top of the function body has the function
-        // definition as its parent statement. Any other parent means the
-        // declaration is nested inside a block (`if`, `for`, `while`, `with`,
-        // `try`, or `match`), where its function-wide effect is easy to miss.
+        // At the top of the function body the parent statement is the function
+        // itself; any other parent means the declaration is nested in a block.
         if semantic
             .parent_statement(source)
             .is_some_and(|parent| !parent.is_function_def_stmt())
