@@ -21,7 +21,11 @@
 - `[x]` Phase 1 is implemented: `ConstraintSet` and `OwnedConstraintSet` now carry `deferred_quantification`, default constructors use `InferableTypeVars::None`, helper methods exist for recording/applying deferred quantification, owned/query/load round trips preserve the metadata, and a focused Rust unit test covers owned/query/load metadata preservation.
 - `[x]` Phase 2 implementation revision created: `[π] Propagate deferred constraint-set quantification`.
 - `[x]` Phase 2 is implemented: positive combinators and iterator combinators merge deferred metadata, public semantic observations apply deferred quantification, construction short-circuiting uses raw BDD checks, and negation-like operations force deferred quantification before operating.
-- `[ ]` Next step: Phase 3 should replace the callable/signature immediate `reduce_inferable` call with `with_deferred_quantification`.
+- `[x]` Phase 3/4 implementation revision created: `[π] Defer callable quantification through solving`.
+- `[x]` Phase 3 is implemented: callable/signature checking now records signature-local typevars with `with_deferred_quantification` instead of immediately reducing them.
+- `[x]` Phase 4 is implemented: solution generation goes through `ConstraintSet::path_bounds` with an explicit `SolutionProjection`, applies deferred quantification before projection/solving, and former manual projection callers use the centralized API.
+- `[~]` Existing mdtests are updated and full `ty_python_semantic` tests pass. The higher-order `partial(partial, drop)` TODOs are not fully fixed; deferred quantification now exposes an existing returned-callable generic-context inference gap, so those TODOs were updated to the current leak/error behavior and should be fixed separately.
+- `[ ]` Next step: Phase 5 should finish docs/display auditing for deferred quantification.
 
 ## Background and goal
 
@@ -36,18 +40,16 @@ That immediate reduction hides the freshened callable type variables from later 
         - freshens source/target signatures when needed;
         - computes `source_inferable` and `target_inferable` from the (possibly freshened) signatures;
         - checks the signature pair with those variables merged into the relation's `inferable` set;
-        - currently calls `when.reduce_inferable(db, self.constraints, source_inferable.iter(db).chain(target_inferable.iter(db)))` before returning.
+        - records `source_inferable ∪ target_inferable` as deferred quantification on the returned constraint set.
     - `CallableSignature::when_constraint_set_assignable_to` and signature overload handling return these constraint sets to callers.
 - `crates/ty_python_semantic/src/types/constraints.rs`
     - `ConstraintSet` contains a raw `NodeId`, its builder reference, and `deferred_quantification: InferableTypeVars<'db>` metadata.
     - `OwnedConstraintSet` stores the owned arenas for cached/interened constraint sets plus the deferred-quantification metadata.
     - Positive combinators merge deferred metadata while preserving raw construction semantics; public semantic observations apply deferred quantification first.
-    - `ConstraintSet::reduce_inferable` still performs immediate existential abstraction via `NodeId::exists` / `InteriorNode::exists_one`.
-    - `ConstraintSet::solutions`, `solutions_with`, `remove_noninferable`, and `Type::assignable_solutions_with_inferable` are still the main solution-generation/projection paths and have not yet been refactored for deferred quantification.
-    - `PathBounds::compute` currently takes a raw `NodeId`, so any deferred metadata must be applied before calling it.
+    - `ConstraintSet::path_bounds`, `solutions`, and `solutions_with` centralize deferred quantification and optional inferable-only projection before solution extraction.
+    - `PathBounds::compute` remains the raw lower-level implementation and should only be reached through `ConstraintSet::path_bounds` for `ConstraintSet` values.
 - `crates/ty_python_semantic/src/types/generics.rs`
-    - `SpecializationBuilder::solve_pending_with` removes non-inferable constraints and then solves pending constraints.
-    - `SpecializationBuilder::add_type_mappings_from_constraint_set` removes non-inferable constraints and extracts solutions from a constraint set returned by callable-signature inference.
+    - `SpecializationBuilder::solve_pending_with` and `SpecializationBuilder::add_type_mappings_from_constraint_set` now request `SolutionProjection::InferableOnly(self.inferable)` from the centralized constraint-set solution APIs.
 - `crates/ty_python_semantic/src/types/relation.rs`
     - `Type::when_constraint_set_assignable_to_owned` caches an `OwnedConstraintSet` and must preserve any deferred-quantification metadata.
 
@@ -123,30 +125,30 @@ Each phase should generally become its own jj revision if it can be made clean i
 
 ### Phase 3: Defer the callable/signature reduction
 
-- `[ ]` In `TypeRelationChecker::check_signature_pair`, replace the final immediate `reduce_inferable` call with `with_deferred_quantification`, recording the same identities as deferred quantification:
+- `[x]` In `TypeRelationChecker::check_signature_pair`, replace the final immediate `reduce_inferable` call with `with_deferred_quantification`, recording the same identities as deferred quantification:
     - compute `signature_inferable = source_inferable.merge(db, target_inferable)`;
     - use `self.inferable.merge(db, signature_inferable)` for relation checking;
     - pass `signature_inferable` to `with_deferred_quantification` after the inner check. The current code shadows the `inferable` variable, so rename variables to keep the signature-local set available.
-- `[ ]` Keep the relation checker itself using the merged inferable set while checking the signature pair. Only the final projection is deferred.
-- `[ ]` Update comments explaining that signature-local generic variables are still existentially quantified, but that quantification is recorded on the returned `ConstraintSet` instead of applied immediately. Explain that this keeps freshened callable variables visible to later positive constraint construction, while semantic observation / solution extraction still applies the quantification.
+- `[x]` Keep the relation checker itself using the merged inferable set while checking the signature pair. Only the final projection is deferred.
+- `[x]` Update comments explaining that signature-local generic variables are still existentially quantified, but that quantification is recorded on the returned `ConstraintSet` instead of applied immediately. Explain that this keeps freshened callable variables visible to later positive constraint construction, while semantic observation / solution extraction still applies the quantification.
 
 ### Phase 4: Apply deferred quantification at solution generation
 
-- `[ ]` Refactor solution-generation APIs so callers no longer manually pre-project constraint sets. The API must distinguish two modes:
+- `[x]` Refactor solution-generation APIs so callers no longer manually pre-project constraint sets. The API must distinguish two modes:
     - solve all currently present typevars without `remove_noninferable` projection;
     - project to a caller-provided inferable set before solving.
-- `[ ]` Add `ConstraintSet::path_bounds(db, builder, projection)` to centralize deferred quantification and solution projection before calling `PathBounds::compute`. Make `PathBounds::compute` module-private so callers cannot bypass that ordering accidentally. Implement `ConstraintSet::solutions` and `solutions_with` through `path_bounds(...).solve(...)` and `path_bounds(...).solve_with(...)`.
-- `[ ]` Add a small explicit enum for that mode: `SolutionProjection::AllTypeVars` vs `SolutionProjection::InferableOnly(InferableTypeVars<'db>)`. Derive at least `Clone`, `Copy`, and `Debug`; add Salsa/hash/size traits only if compiler errors require them. Do not use `Option<InferableTypeVars<'db>>`; `None` would be too easy to confuse with `InferableTypeVars::None`.
-- `[ ]` Each `ConstraintSet` solution/path-bounds API must enforce this order internally:
+- `[x]` Add `ConstraintSet::path_bounds(db, builder, projection)` to centralize deferred quantification and solution projection before calling `PathBounds::compute`. Make `PathBounds::compute` module-private so callers cannot bypass that ordering accidentally. Implement `ConstraintSet::solutions` and `solutions_with` through `path_bounds(...).solve(...)` and `path_bounds(...).solve_with(...)`.
+- `[x]` Add a small explicit enum for that mode: `SolutionProjection::AllTypeVars` vs `SolutionProjection::InferableOnly(InferableTypeVars<'db>)`. Derive at least `Clone`, `Copy`, and `Debug`; add Salsa/hash/size traits only if compiler errors require them. Do not use `Option<InferableTypeVars<'db>>`; `None` would be too easy to confuse with `InferableTypeVars::None`.
+- `[x]` Each `ConstraintSet` solution/path-bounds API must enforce this order internally:
     1. call `apply_deferred_quantification`, which only existentially abstracts the metadata stored on the `ConstraintSet`; this happens for every `SolutionProjection`, including `AllTypeVars`;
     1. if requested, remove non-inferable constraints for the caller's inferable set according to `SolutionProjection`;
     1. solve / compute `PathBounds`.
-- `[ ]` Update current manual projection callers:
+- `[x]` Update current manual projection callers:
     - `SpecializationBuilder::solve_pending_with`
     - `SpecializationBuilder::add_type_mappings_from_constraint_set`
     - `Type::assignable_solutions_with_inferable`
-- `[ ]` Make `ConstraintSet::remove_noninferable` private or remove that wrapper entirely after updating callers. The centralized `solutions` / `solutions_with` / `path_bounds` methods should be the only public/module-facing way to perform solution projection.
-- `[ ]` Audit nested solution helpers such as `PathBounds::default_solve`, which call `when_constraint_set_assignable_to_owned(...).query(... is_never_satisfied ...)`, to ensure deferred metadata is applied for semantic checks during solution extraction.
+- `[x]` Make `ConstraintSet::remove_noninferable` private or remove that wrapper entirely after updating callers. The centralized `solutions` / `solutions_with` / `path_bounds` methods should be the only public/module-facing way to perform solution projection.
+- `[x]` Audit nested solution helpers such as `PathBounds::default_solve`, which call `when_constraint_set_assignable_to_owned(...).query(... is_never_satisfied ...)`, to ensure deferred metadata is applied for semantic checks during solution extraction.
 
 ### Phase 5: Audit terminal observations and debugging APIs
 
@@ -160,7 +162,7 @@ Each phase should generally become its own jj revision if it can be made clean i
 
 ### Phase 6: Tests
 
-- `[ ]` Add focused Rust unit tests in `constraints.rs` for deferred-quantification metadata:
+- `[~]` Add focused Rust unit tests in `constraints.rs` for deferred-quantification metadata:
     - semantic satisfiability matches eager existential quantification for final observations;
     - positive conjunction preserves raw constraints and applies existential reduction at solving, e.g. `(T = int)` with deferred `{T}` conjoined with `U = T` can solve `U = int` after quantifying `T`;
     - owned round-trip preserves metadata through `into_owned` / `query` / `load`; because this is a Rust unit test, directly collect the metadata field into an `FxHashSet` and assert equivalence before and after, in addition to any semantic check;
@@ -168,9 +170,10 @@ Each phase should generally become its own jj revision if it can be made clean i
     - `SolutionProjection::AllTypeVars` vs `SolutionProjection::InferableOnly(...)` behave differently as intended.
     - Do not add tests that assert or otherwise exercise exact constraint-set display text.
 - `[ ]` Do not add new mdtests unless implementation uncovers a missing user-visible regression case. Existing mdtests already cover the relevant callable/generic/ParamSpec behavior.
-- `[ ]` Update existing mdtests and TODO comments if behavior improves. In particular, this work is expected to resolve the “Multiple occurrences of a higher-order generic callable” TODOs in:
+- `[x]` Update existing mdtests and TODO comments if behavior improves. In particular, this work was expected to resolve the “Multiple occurrences of a higher-order generic callable” TODOs in:
     - `crates/ty_python_semantic/resources/mdtest/generics/legacy/callables.md`
     - `crates/ty_python_semantic/resources/mdtest/generics/pep695/callables.md`
+    - Status: deferred quantification now gets past the original `Unknown` result, but the tests are still TODOs because an existing returned-callable generic-context inference gap leaks `Y@drop` and produces argument errors. The TODO comments now document that separate follow-up.
 - `[ ]` Existing mdtests to run/review include:
     - `generics/legacy/callables.md`
     - `generics/pep695/callables.md`
@@ -178,11 +181,11 @@ Each phase should generally become its own jj revision if it can be made clean i
     - generic callable comparisons that should still fail;
     - overloaded callable cases if snapshots change;
     - ParamSpec cases, because callable/signature logic has special ParamSpec paths.
-- `[ ]` Run targeted tests first:
+- `[x]` Run targeted tests first:
     - `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic`
     - or narrower mdtest commands while iterating.
-- `[ ]` Review all updated snapshots / pending snapshots.
-- `[ ]` Run `uvx prek run --files <changed files>` before declaring implementation complete.
+- `[x]` Review all updated snapshots / pending snapshots. No `.pending-snap` files were produced.
+- `[x]` Run `jpk` (the jj-aware wrapper for `prek`) before declaring implementation complete.
 
 ## Open questions for plan review
 

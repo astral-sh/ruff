@@ -286,6 +286,7 @@ impl<'db> OwnedConstraintSet<'db> {
     pub(crate) fn always() -> Self {
         Self {
             node: ALWAYS_TRUE,
+            deferred_quantification: InferableTypeVars::None,
             constraints: IndexVec::default(),
             typevars: IndexVec::default(),
             nodes: IndexVec::default(),
@@ -361,6 +362,13 @@ pub struct ConstraintSet<'db, 'c> {
 
     /// Ensures that the `'c` lifetime is invariant
     _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum SolutionProjection<'db> {
+    #[cfg_attr(not(test), expect(dead_code))]
+    AllTypeVars,
+    InferableOnly(InferableTypeVars<'db>),
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
@@ -639,22 +647,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
-    /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
-    /// the typevars that were inferable when this constraint set was created, and which should be
-    /// abstracted away. Those typevars will be removed from the constraint set, and the constraint
-    /// set will return true whenever there was _any_ specialization of those typevars that
-    /// returned true before.
-    pub(crate) fn reduce_inferable(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
-    ) -> Self {
-        self.verify_builder(builder);
-        Self::from_node(builder, self.node.exists(db, builder, to_remove))
-    }
-
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn with_deferred_quantification(
         self,
         db: &'db dyn Db,
@@ -682,17 +674,21 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .exists(db, builder, self.deferred_quantification.iter(db))
     }
 
-    pub(crate) fn remove_noninferable(
+    pub(crate) fn path_bounds(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
-    ) -> Self {
+        projection: SolutionProjection<'db>,
+    ) -> PathBounds<'db> {
         self.verify_builder(builder);
-        Self::from_node(
-            builder,
-            self.node.remove_noninferable(db, builder, inferable),
-        )
+        let node = self.apply_deferred_quantification(db, builder);
+        let node = match projection {
+            SolutionProjection::AllTypeVars => node,
+            SolutionProjection::InferableOnly(inferable) => {
+                node.remove_noninferable(db, builder, inferable)
+            }
+        };
+        PathBounds::compute(db, builder, node)
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
@@ -708,24 +704,23 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        projection: SolutionProjection<'db>,
     ) -> Solutions<'db> {
-        self.solutions_with(db, builder, |bound_typevar, _variance, bounds| {
-            PathBounds::default_solve(db, builder, bound_typevar, bounds)
-        })
+        self.path_bounds(db, builder, projection).solve(db, builder)
     }
 
     pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        projection: SolutionProjection<'db>,
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
             ConstraintBounds<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
-        self.verify_builder(builder);
-        self.node.solutions_with(db, builder, choose)
+        self.path_bounds(db, builder, projection).solve_with(choose)
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
@@ -2128,20 +2123,6 @@ impl NodeId {
         }
     }
 
-    fn solutions_with<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            TypeVarVariance,
-            ConstraintBounds<'db>,
-        ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Solutions<'db> {
-        let path_bounds = PathBounds::compute(db, builder, self);
-        path_bounds.solve_with(choose)
-    }
-
     /// Returns the negation of this BDD.
     fn negate(self, builder: &ConstraintSetBuilder<'_>) -> Self {
         match self.node() {
@@ -3161,8 +3142,7 @@ impl<'db> Type<'db> {
         ) -> PathBounds<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
             when.query(|builder, when| {
-                let when = when.remove_noninferable(db, builder, inferable);
-                PathBounds::compute(db, builder, when.node)
+                when.path_bounds(db, builder, SolutionProjection::InferableOnly(inferable))
             })
         }
 
@@ -6825,6 +6805,52 @@ mod tests {
             .with_deferred_quantification(&db, &builder, deferred_quantification);
 
         assert!(t_int.negate(&db, &builder).is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn solution_projection_controls_noninferable_removal() {
+        fn solution_identities<'db, 'c>(
+            db: &'db dyn Db,
+            builder: &'c ConstraintSetBuilder<'db>,
+            set: ConstraintSet<'db, 'c>,
+            projection: SolutionProjection<'db>,
+        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+            let solutions = set.solutions(db, builder, projection);
+            let Solutions::Constrained(mut solutions) = solutions else {
+                panic!("expected constrained solutions");
+            };
+            assert_eq!(solutions.len(), 1);
+            solutions
+                .pop()
+                .expect("expected a solution path")
+                .into_iter()
+                .map(|binding| binding.bound_typevar.identity(db))
+                .collect()
+        }
+
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let t_inferable =
+            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let builder = ConstraintSetBuilder::new();
+        let set = create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
+            create_constraint(&db, &builder, u, KnownClass::Str)
+        });
+
+        assert_eq!(
+            solution_identities(&db, &builder, set, SolutionProjection::AllTypeVars),
+            FxHashSet::from_iter([t.identity(&db), u.identity(&db)]),
+        );
+        assert_eq!(
+            solution_identities(
+                &db,
+                &builder,
+                set,
+                SolutionProjection::InferableOnly(t_inferable),
+            ),
+            FxHashSet::from_iter([t.identity(&db)]),
+        );
     }
 
     #[test]

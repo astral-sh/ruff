@@ -667,9 +667,7 @@ reveal_type(invoke(lift_contravariant, 1))
 ```py
 from functions import invoke, Invariant, head_invariant, lift_invariant
 
-# TODO: revealed: `int`
-# revealed: Unknown
-reveal_type(invoke(head_invariant, Invariant[int]()))
+reveal_type(invoke(head_invariant, Invariant[int]()))  # revealed: int
 # TODO: revealed: `Invariant[int]`
 # revealed: Unknown
 reveal_type(invoke(lift_invariant, 1))
