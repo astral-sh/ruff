@@ -196,7 +196,13 @@ def g(attributes: Namespace):
 `TypedDictTop` is also a valid dynamic namespace, but it has no known keys to extract:
 
 ```py
-from ty_extensions import TypedDictTop
+from typing import Protocol, TypeAlias
+from ty_extensions import Intersection, TypedDictTop
+
+class HasClear(Protocol):
+    def clear(self) -> None: ...
+
+NamespaceAlias: TypeAlias = TypedDictTop
 
 def g(attributes: TypedDictTop):
     Y = type("Y", (), attributes)
@@ -204,6 +210,39 @@ def g(attributes: TypedDictTop):
     reveal_type(Y)  # revealed: <class 'Y'>
     reveal_type(Y.unknown)  # revealed: Unknown
     reveal_type(Y().unknown)  # revealed: Unknown
+
+def h(attributes: NamespaceAlias):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+
+def i(attributes: TypedDictTop | dict[str, object]):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+
+def j(attributes: Intersection[TypedDictTop, HasClear]):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+```
+
+## PEP 695 alias namespaces
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import TypedDictTop
+
+type NamespaceAlias = TypedDictTop
+
+def f(attributes: NamespaceAlias):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
 ```
 
 ## Closed TypedDicts (PEP-728)

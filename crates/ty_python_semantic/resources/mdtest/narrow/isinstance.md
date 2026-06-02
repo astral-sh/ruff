@@ -819,6 +819,10 @@ def takes_typed_dict_top(value: TypedDictTop):
 
 def takes_typed_dict_top_alias(value: Alias):
     reveal_type(value)  # revealed: TypedDictTop
+
+def merge_typed_dict_top_alias(value: Alias, other: dict[int, bytes]) -> None:
+    _ = value | other
+    _ = other | value
 ```
 
 `TypedDictTop` should retain its known string-key projection when passed to generic APIs:
@@ -908,6 +912,11 @@ def preserve_typed_dict_top_protocol(value: object) -> None:
     if isinstance(value, dict) and isinstance(value, HasClear):
         reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | (TypedDictTop & HasClear)
         value.clear()
+
+def merge_typed_dict_top_protocol(value: object, other: dict[int, bytes]) -> None:
+    if isinstance(value, dict) and isinstance(value, HasClear):
+        _ = value | other
+        _ = other | value
 ```
 
 `TypedDict` inhabitants have exact runtime type `dict`, so they remain disjoint from proper
