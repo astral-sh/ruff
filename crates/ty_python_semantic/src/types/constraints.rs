@@ -5619,13 +5619,22 @@ impl PathAssignments {
         self.map.merge(&single_map);
         drop(single_map);
 
+        let mut constraint_is_before_existing = false;
         for (existing, processed) in &self.discovered {
             if *existing == constraint {
+                constraint_is_before_existing = true;
                 continue;
             }
 
             if *processed {
-                let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
+                // Pair sequent maps are not commutative. Preserve the source order recorded in
+                // `discovered`, even if BDD traversal encounters the constraints in another order.
+                let (left, right) = if constraint_is_before_existing {
+                    (constraint, *existing)
+                } else {
+                    (*existing, constraint)
+                };
+                let pair_map = SequentMap::for_constraint_pair(db, builder, left, right);
                 self.map.merge(&pair_map);
             } else {
                 // A constraint from an unvisited branch alternative can still be implied by the
@@ -6472,5 +6481,42 @@ mod tests {
         path.add_assignment(&db, &builder, u_str.when_true(), 1, false)
             .unwrap();
         assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 1);
+    }
+
+    #[test]
+    fn path_assignments_discovers_pairs_in_source_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .node
+            .root_constraint(&builder)
+            .unwrap();
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str)
+            .node
+            .root_constraint(&builder)
+            .unwrap();
+        let mut path = PathAssignments::new([t_int, u_str]);
+
+        path.add_assignment(&db, &builder, u_str.when_true(), 1, false)
+            .unwrap();
+        path.add_assignment(&db, &builder, t_int.when_true(), 0, false)
+            .unwrap();
+
+        assert!(
+            builder
+                .storage
+                .borrow()
+                .pair_sequent_cache
+                .contains_key(&(t_int, u_str))
+        );
+        assert!(
+            !builder
+                .storage
+                .borrow()
+                .pair_sequent_cache
+                .contains_key(&(u_str, t_int))
+        );
     }
 }
