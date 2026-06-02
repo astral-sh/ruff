@@ -12,7 +12,10 @@ pub(super) use self::named_tuple::{
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
-pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use self::typed_dict::synthesize_typed_dict_merge;
+pub(super) use self::typed_dict::{
+    DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_member,
+};
 use super::dedicated::pydantic;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MaterializationKind, MemberLookupPolicy,
@@ -1631,6 +1634,17 @@ impl<'db> ClassType<'db> {
                 let class_literal = generic.origin(db);
                 let specialization = generic.specialization(db);
 
+                if matches!(name, "__or__" | "__ror__")
+                    && Self::is_top_dict_specialization(db, class_literal, specialization)
+                {
+                    return Member::definitely_declared(synthesize_typed_dict_merge(
+                        db,
+                        Type::instance(db, self),
+                        name,
+                    ))
+                    .inner;
+                }
+
                 if let Some(readonly_projection) =
                     Self::dict_top_readonly_projection(db, class_literal, specialization, name)
                 {
@@ -2036,18 +2050,25 @@ impl<'db> ClassType<'db> {
         specialization: Specialization<'db>,
         name: &str,
     ) -> Option<ClassType<'db>> {
-        if specialization.materialization_kind(db) != Some(MaterializationKind::Top)
-            || !specialization.types(db).iter().all(Type::is_unknown)
-            || class_literal.known(db) != Some(KnownClass::Dict)
-        {
+        if !Self::is_top_dict_specialization(db, class_literal, specialization) {
             return None;
         }
 
         let projection = match name {
-            "items" | "keys" | "values" => KnownClass::Dict,
+            "copy" | "items" | "keys" | "values" => KnownClass::Dict,
             _ => KnownClass::Mapping,
         };
         projection.to_specialized_class_type(db, specialization.types(db))
+    }
+
+    fn is_top_dict_specialization(
+        db: &'db dyn Db,
+        class_literal: StaticClassLiteral<'db>,
+        specialization: Specialization<'db>,
+    ) -> bool {
+        specialization.materialization_kind(db) == Some(MaterializationKind::Top)
+            && specialization.types(db).iter().all(Type::is_unknown)
+            && class_literal.known(db) == Some(KnownClass::Dict)
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on

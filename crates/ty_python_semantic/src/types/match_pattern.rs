@@ -12,6 +12,7 @@ use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{
     ComparisonSoundnessPolicy, evaluate_type_equality, is_same_enum_domain,
 };
+use crate::types::narrow::runtime_instance_constraint_for_class_literal;
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
@@ -1058,7 +1059,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    Type::instance(db, class.top_materialization(db))
+                    runtime_instance_constraint_for_class_literal(db, class)
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
                     callable_pattern_type(db)

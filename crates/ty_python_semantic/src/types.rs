@@ -102,6 +102,7 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::{Db, FxOrderSet, Program};
+use class::synthesized_typed_dict_member;
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -2814,20 +2815,8 @@ impl<'db> Type<'db> {
                 name.as_str(),
                 policy,
             ),
-            Type::TypedDict(typed_dict) if typed_dict.is_unknown_schema(db) => {
-                KnownClass::TypedDictReadOnlyFallback
-                    .to_class_literal(db)
-                    .find_name_in_mro_with_policy(db, name.as_str(), policy)
-                    .expect("`find_name_in_mro` should return `Some` for a class literal")
-                    .map_type(|ty| {
-                        ty.apply_type_mapping(
-                            db,
-                            &TypeMapping::ReplaceSelf {
-                                new_upper_bound: self,
-                            },
-                            TypeContext::default(),
-                        )
-                    })
+            Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
+                synthesized_typed_dict_member(db, synthesized, policy, name.as_str())
             }
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
@@ -3197,11 +3186,6 @@ impl<'db> Type<'db> {
                 Place::Undefined.into()
             }
 
-            Type::TypedDict(typed_dict) if typed_dict.is_unknown_schema(db) => {
-                KnownClass::TypedDictReadOnlyFallback
-                    .to_instance(db)
-                    .instance_member(db, name)
-            }
             Type::TypedDict(_) => Place::Undefined.into(),
 
             Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, name),

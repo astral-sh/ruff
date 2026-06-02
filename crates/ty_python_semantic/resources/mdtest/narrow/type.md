@@ -79,9 +79,6 @@ type MovieAlias = Movie
 
 def aliased(x: MovieAlias):
     reveal_type(x.__class__)  # revealed: <class 'dict[str, object]'>
-
-    if type(x) is dict:
-        x["title"] = 1  # error: [invalid-assignment]
 ```
 
 ## `type(x) is C` in chained comparisons

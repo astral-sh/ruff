@@ -1562,6 +1562,7 @@ diagnostics and mutation methods:
 ```py
 from collections.abc import Mapping
 from typing import TypeVar
+from ty_extensions import Intersection
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -1593,6 +1594,9 @@ def use_empty_typed_dict(dst: EmptyTypedDict, src: Year, other: dict[int, bytes]
     reveal_type(other | dst)  # revealed: dict[int | str, object]
     dst.update(src)
     dst |= src
+
+def preserve_mapping_intersection(value: Intersection[Movie, Mapping[str, str]]) -> None:
+    reveal_type(project(value))  # revealed: tuple[str, str]
 ```
 
 In order for one `TypedDict` `B` to be assignable to another `TypedDict` `A`, all required keys in
@@ -5035,7 +5039,8 @@ static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnl
 
 ```py
 from collections.abc import MutableMapping
-from typing import TypedDict, Mapping
+from typing import Mapping, TypedDict
+from typing_extensions import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
@@ -5054,7 +5059,17 @@ static_assert(not is_disjoint_from(EmptyTypedDict, dict[str | int, object]))
 static_assert(is_disjoint_from(TD, Mapping[int, object]))
 static_assert(is_disjoint_from(TD, RegularNonTD))
 static_assert(not is_disjoint_from(TD, dict[str, int]))
-static_assert(not is_disjoint_from(TD, dict[str, str]))
+static_assert(is_disjoint_from(TD, dict[str, str]))
+
+class TwoRequiredFields(TypedDict):
+    first: int
+    second: str
+
+class OptionalTD(TypedDict, total=False):
+    x: int
+
+static_assert(is_disjoint_from(TwoRequiredFields, dict[str, int]))
+static_assert(not is_disjoint_from(OptionalTD, dict[Never, Never]))
 ```
 
 ## Narrowing tagged unions of `TypedDict`s
@@ -5154,7 +5169,7 @@ An open empty `TypedDict` does not provide a known tag schema. In particular, th
 arm introduced by `isinstance(value, dict)` must not enable tagged-union narrowing:
 
 ```py
-def preserve_unknown_schema(value: object) -> None:
+def preserve_structural_top(value: object) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
         if value["tag"] == "foo":
@@ -5254,6 +5269,39 @@ def _(x: Intersection[StrTagTD, Any]):
         reveal_type(x)  # revealed: StrTagTD & Any
     else:
         reveal_type(x)  # revealed: StrTagTD & Any
+```
+
+Type variables can also contain `TypedDict` types through their bounds or constraints. We must
+inspect those schemas before narrowing; a non-literal tag can compare equal at runtime even when its
+type is disjoint from the comparison literal:
+
+```py
+from typing import TypeVar
+from typing_extensions import ReadOnly
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class GenericArm(TypedDict, extra_items=ReadOnly[AlwaysEqual]): ...
+
+class OtherGenericArm(TypedDict):
+    tag: AlwaysEqual
+
+BoundArm = TypeVar("BoundArm", bound=GenericArm)
+ConstrainedArm = TypeVar("ConstrainedArm", GenericArm, OtherGenericArm)
+
+def bounded(value: Foo | BoundArm) -> None:
+    if value["tag"] == "foo":
+        reveal_type(value)  # revealed: Foo | BoundArm@bounded
+    else:
+        reveal_type(value)  # revealed: BoundArm@bounded & ~<TypedDict with items 'tag'>
+
+def constrained(value: Foo | ConstrainedArm) -> None:
+    if value["tag"] == "foo":
+        reveal_type(value)  # revealed: Foo | ConstrainedArm@constrained
+    else:
+        reveal_type(value)  # revealed: ConstrainedArm@constrained & ~<TypedDict with items 'tag'>
 ```
 
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:

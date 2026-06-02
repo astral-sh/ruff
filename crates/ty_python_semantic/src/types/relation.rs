@@ -15,7 +15,6 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
-use crate::types::typed_dict::TypedDictField;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -217,6 +216,10 @@ pub(crate) enum TypeVarEvaluation {
     ///
     /// This is currently opt-in, but will eventually replace eager type-variable evaluation.
     Lazy,
+}
+
+fn typed_dict_runtime_dict(db: &dyn Db) -> Type<'_> {
+    KnownClass::Dict.to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
 }
 
 impl TypeRelation {
@@ -1887,6 +1890,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, KnownClass::Type.to_instance(db), target)
             }
 
+            // TypedDicts hide mutating methods from normal access, but synthesized non-method
+            // protocols such as `hasattr()` constraints describe runtime attribute presence.
+            // Check those against the actual `dict` surface.
+            (Type::TypedDict(_), Type::ProtocolInstance(target_proto))
+                if target_proto.to_nominal_instance().is_none()
+                    && target_proto
+                        .interface(db)
+                        .members(db)
+                        .all(|member| !member.is_method()) =>
+            {
+                self.with_recursion_guard(source, target, || {
+                    self.check_type_satisfies_protocol(
+                        db,
+                        typed_dict_runtime_dict(db),
+                        target_proto,
+                    )
+                })
+            }
+
             (_, Type::ProtocolInstance(target_proto)) => {
                 self.with_recursion_guard(source, target, || {
                     self.check_type_satisfies_protocol(db, source, target_proto)
@@ -2515,6 +2537,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             })
     }
 
+    fn any_protocol_members_absent(
+        &self,
+        db: &'db dyn Db,
+        protocol: ProtocolInstanceType<'db>,
+        other: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        protocol
+            .interface(db)
+            .members(db)
+            .when_any(db, self.constraints, |member| {
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    other.member(db, member.name()).place.is_undefined(),
+                )
+            })
+    }
+
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, true)
     }
@@ -2895,14 +2934,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            // TypedDict inhabitants have exact runtime type `dict`. Protocol member types cannot
+            // prove disjointness here because runtime protocol checks only inspect attribute
+            // presence.
             (Type::ProtocolInstance(protocol), Type::TypedDict(_))
             | (Type::TypedDict(_), Type::ProtocolInstance(protocol)) => {
                 self.with_recursion_guard(left, right, || {
-                    self.any_protocol_members_absent_or_disjoint(
-                        db,
-                        protocol,
-                        Self::typed_dict_runtime_dict(db),
-                    )
+                    self.any_protocol_members_absent(db, protocol, typed_dict_runtime_dict(db))
                 })
             }
 
@@ -3294,29 +3332,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             });
 
         if let Some(other_mapping) = other_mapping {
-            // A TypedDict with a required field must contain at least one string key, so it cannot
-            // overlap a Mapping whose key type is disjoint from str. Optional-only schemas may be
-            // empty, however: `{}` can inhabit both an optional-only TypedDict and
-            // `dict[Never, Never]`, so key types alone cannot prove disjointness.
-            if typed_dict
+            let required_fields = typed_dict
                 .items(db)
                 .values()
-                .any(TypedDictField::is_required)
-                && let Some(other_key) = other_mapping.types(db).first()
-            {
-                return self.check_type_pair(db, KnownClass::Str.to_instance(db), *other_key);
+                .filter(|field| field.is_required());
+
+            // An optional-only TypedDict can be empty, so it overlaps every dictionary type via
+            // `{}` regardless of the dictionary's key and value types.
+            if required_fields.clone().next().is_none() {
+                return self.never();
+            }
+
+            if let [other_key, other_value, ..] = other_mapping.types(db) {
+                // Every TypedDict key is a string. In addition, every required field is present at
+                // runtime, so a single required value type that is disjoint from the dictionary's
+                // value type is enough to prove that no object can inhabit both types.
+                return self
+                    .check_type_pair(db, KnownClass::Str.to_instance(db), *other_key)
+                    .or(db, self.constraints, || {
+                        required_fields.when_any(db, self.constraints, |field| {
+                            self.check_type_pair(db, field.declared_ty, *other_value)
+                        })
+                    });
             }
             return self.never();
         }
 
         self.as_relation_checker(TypeRelation::Assignability)
-            .check_type_pair(db, Self::typed_dict_runtime_dict(db), other)
+            .check_type_pair(db, typed_dict_runtime_dict(db), other)
             .negate(db, self.constraints)
-    }
-
-    fn typed_dict_runtime_dict(db: &'db dyn Db) -> Type<'db> {
-        KnownClass::Dict
-            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
     }
 
     fn check_property_instance_pair(

@@ -44,10 +44,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             visitor: &DictMergeProjectionVisitor<'db>,
         ) -> Option<Type<'db>> {
             match ty {
-                Type::TypedDict(_) => Some(KnownClass::Dict.to_specialized_instance(
-                    db,
-                    &[KnownClass::Str.to_instance(db), Type::object()],
-                )),
+                typed_dict @ Type::TypedDict(_) => typed_dict.dunder_class(db).to_instance(db),
                 Type::Union(union) => union
                     .elements(db)
                     .iter()
@@ -72,8 +69,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         // The projection can be used on either side of `|`. Stop if it would
                         // replace a subclass implementation with the builtin `dict` merge
                         // behavior.
-                        if !base.own_instance_member(db, "__or__").is_undefined()
-                            || !base.own_instance_member(db, "__ror__").is_undefined()
+                        if !base.own_class_member(db, None, "__or__").is_undefined()
+                            || !base.own_class_member(db, None, "__ror__").is_undefined()
                         {
                             return None;
                         }
@@ -103,6 +100,65 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         Type::try_call_bin_op_return_type(db, left_dict, op, right_dict)
+    }
+
+    fn contains_open_empty_typed_dict(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match ty {
+            Type::TypedDict(typed_dict) => typed_dict == TypedDictType::open_empty(db),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| Self::contains_open_empty_typed_dict(db, *element)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|element| Self::contains_open_empty_typed_dict(db, *element)),
+            _ => false,
+        }
+    }
+
+    /// Try binary dispatch with the left operand's runtime `dict` type while preserving the
+    /// original right operand. This allows a proper `dict` subclass to take reflected-method
+    /// priority over the builtin implementation.
+    fn try_dict_merge_reflected_override(
+        db: &'db dyn Db,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if op != ast::Operator::BitOr || !matches!(left_ty, Type::TypedDict(_)) {
+            return None;
+        }
+
+        let left_dict = Self::dict_merge_projection(db, left_ty)?;
+        if left_dict == left_ty
+            || Self::dict_merge_projection(db, right_ty).is_some()
+            || !right_ty.is_subtype_of(db, left_dict)
+        {
+            return None;
+        }
+
+        let reflected_dunder = op.reflected_dunder();
+        let right_reflected = right_ty.to_meta_type(db).member(db, reflected_dunder).place;
+        if right_reflected.is_undefined()
+            || right_reflected
+                == left_dict
+                    .to_meta_type(db)
+                    .member(db, reflected_dunder)
+                    .place
+        {
+            return None;
+        }
+
+        right_ty
+            .try_call_dunder(
+                db,
+                reflected_dunder,
+                CallArguments::positional([left_ty]),
+                TypeContext::default(),
+            )
+            .ok()
+            .map(|bindings| bindings.return_type(db))
     }
 
     pub(super) fn infer_binary_expression(
@@ -365,15 +421,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         right_ty: Type<'db>,
         op: ast::Operator,
     ) -> Option<Type<'db>> {
-        self.infer_binary_expression_type_impl(
-            node,
-            emitted_division_by_zero_diagnostic,
-            left_ty,
-            right_ty,
-            op,
-            &BinaryExpressionVisitor::new(Some(Type::Never)),
-        )
-        .or_else(|| Self::try_dict_merge_fallback(self.db(), left_ty, op, right_ty))
+        let narrowed_dict_merge = (Self::contains_open_empty_typed_dict(self.db(), left_ty)
+            || Self::contains_open_empty_typed_dict(self.db(), right_ty))
+        .then(|| Self::try_dict_merge_fallback(self.db(), left_ty, op, right_ty))
+        .flatten();
+
+        Self::try_dict_merge_reflected_override(self.db(), left_ty, op, right_ty)
+            .or(narrowed_dict_merge)
+            .or_else(|| {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    left_ty,
+                    right_ty,
+                    op,
+                    &BinaryExpressionVisitor::new(Some(Type::Never)),
+                )
+            })
+            .or_else(|| Self::try_dict_merge_fallback(self.db(), left_ty, op, right_ty))
     }
 
     fn infer_binary_expression_type_impl(
