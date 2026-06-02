@@ -18,8 +18,10 @@
 - `[x]` Initial planning revision created: `[π] Plan deferred quantification for callable constraints`.
 - `[x]` Relevant code paths were surveyed and the plan was reviewed for implementation.
 - `[x]` Phase 1 implementation revision created: `[π] Add deferred constraint-set quantification metadata`.
-- `[x]` Phase 1 is implemented: `ConstraintSet` and `OwnedConstraintSet` now carry `deferred_quantification`, default constructors use `InferableTypeVars::None`, helper methods exist for recording/applying/merging deferred quantification, owned/query/load round trips preserve the metadata, and a focused Rust unit test covers owned/query/load metadata preservation.
-- `[ ]` Next step: Phase 2 should propagate deferred metadata through constraint-set operations and switch public semantic observations to apply deferred quantification while keeping construction short-circuiting raw.
+- `[x]` Phase 1 is implemented: `ConstraintSet` and `OwnedConstraintSet` now carry `deferred_quantification`, default constructors use `InferableTypeVars::None`, helper methods exist for recording/applying deferred quantification, owned/query/load round trips preserve the metadata, and a focused Rust unit test covers owned/query/load metadata preservation.
+- `[x]` Phase 2 implementation revision created: `[π] Propagate deferred constraint-set quantification`.
+- `[x]` Phase 2 is implemented: positive combinators and iterator combinators merge deferred metadata, public semantic observations apply deferred quantification, construction short-circuiting uses raw BDD checks, and negation-like operations force deferred quantification before operating.
+- `[ ]` Next step: Phase 3 should replace the callable/signature immediate `reduce_inferable` call with `with_deferred_quantification`.
 
 ## Background and goal
 
@@ -37,8 +39,9 @@ That immediate reduction hides the freshened callable type variables from later 
         - currently calls `when.reduce_inferable(db, self.constraints, source_inferable.iter(db).chain(target_inferable.iter(db)))` before returning.
     - `CallableSignature::when_constraint_set_assignable_to` and signature overload handling return these constraint sets to callers.
 - `crates/ty_python_semantic/src/types/constraints.rs`
-    - `ConstraintSet` contains a raw `NodeId`, its builder reference, and `deferred_quantification: InferableTypeVars<'db>` metadata. The metadata is represented and preserved, but most operations still need Phase 2/4 updates to apply or propagate it.
+    - `ConstraintSet` contains a raw `NodeId`, its builder reference, and `deferred_quantification: InferableTypeVars<'db>` metadata.
     - `OwnedConstraintSet` stores the owned arenas for cached/interened constraint sets plus the deferred-quantification metadata.
+    - Positive combinators merge deferred metadata while preserving raw construction semantics; public semantic observations apply deferred quantification first.
     - `ConstraintSet::reduce_inferable` still performs immediate existential abstraction via `NodeId::exists` / `InteriorNode::exists_one`.
     - `ConstraintSet::solutions`, `solutions_with`, `remove_noninferable`, and `Type::assignable_solutions_with_inferable` are still the main solution-generation/projection paths and have not yet been refactored for deferred quantification.
     - `PathBounds::compute` currently takes a raw `NodeId`, so any deferred metadata must be applied before calling it.
@@ -102,18 +105,18 @@ Each phase should generally become its own jj revision if it can be made clean i
 
 ### Phase 2: Propagate metadata through operations
 
-- `[ ]` Ensure raw-preserving positive combinators merge deferred metadata globally:
+- `[x]` Ensure raw-preserving positive combinators merge deferred metadata globally:
     - `and` / `intersect`: `(P, D) ∧ (Q, E)` becomes `(P ∧ Q, D ∪ E)`; `intersect` mutates/returns `self` with merged deferred metadata and should verify both operands' builders.
     - `or` / `union`: `(P, D) ∨ (Q, E)` becomes `(P ∨ Q, D ∪ E)`; `union` mutates/returns `self` with merged deferred metadata and should verify both operands' builders.
     - `IteratorConstraintsExtension::when_all` / `when_any` must keep using `NodeId::distributed_and` / `distributed_or` for performance and accumulate/merge metadata from every generated constraint set alongside the distributed node construction.
     - Construction short-circuiting in `ConstraintSet::and` / `or` should call raw `Node` `is_never_satisfied` / `is_always_satisfied` directly. Do not use public `ConstraintSet` semantic satisfiability methods for construction short-circuiting. If the RHS thunk is skipped, do not force it to collect deferred metadata; add a comment that skipped quantifiers are vacuous and preserving thunk laziness is intentional for performance.
-- `[ ]` Operations that do not commute with existential quantification force deferred quantification before proceeding:
+- `[x]` Operations that do not commute with existential quantification force deferred quantification before proceeding:
     - `negate`: apply deferred quantification before negating, so `¬(∃T. P)` is preserved instead of accidentally becoming `∃T. ¬P`.
     - `implies`: apply deferred quantification to the left side before negation; preserve RHS thunk laziness, and if the RHS is evaluated, apply deferred quantification to it before combining.
     - `iff`: apply deferred quantification to both operands before building the operation.
     - `implies_subtype_of`: apply deferred quantification to `self` before delegating to raw implication logic; the newly created subtype constraint is raw and carries no deferred metadata.
     - Add TODO comments explaining that a future, more invasive design could track quantifier structure/polarity through these operations; that is explicitly out of scope for this PR.
-- `[ ]` Raw vs effective satisfiability API policy:
+- `[x]` Raw vs effective satisfiability API policy:
     - `Node` and related BDD types remain the raw representation; their existing `is_always_satisfied` / `is_never_satisfied` checks are raw checks because they cannot see deferred quantification metadata.
     - `ConstraintSet::and` / `or` should use raw `Node` checks for construction short-circuiting, so effective truth after existential quantification does not erase useful raw constraints.
     - Public `ConstraintSet::is_always_satisfied`, `ConstraintSet::is_never_satisfied`, and `satisfied_by_all_typevars` should apply deferred quantification first and therefore report semantic/effective satisfiability.

@@ -195,16 +195,28 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: This merges deferred quantification linearly while `distributed_or` combines BDD
+        // nodes logarithmically via `tree_fold`. If this ever shows up in profiles, consider
+        // threading deferred quantification through `tree_fold` so both are combined in the same
+        // logarithmic shape. That extra complexity is not worth it without a demonstrated perf
+        // regression.
+        let mut deferred_quantification = InferableTypeVars::None;
         let node = NodeId::distributed_or(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
+                deferred_quantification =
+                    deferred_quantification.merge(db, constraint.deferred_quantification);
                 constraint.node
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        ConstraintSet::from_node_with_deferred_quantification(
+            builder,
+            node,
+            deferred_quantification,
+        )
     }
 
     fn when_all<'db, 'c>(
@@ -213,16 +225,28 @@ where
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: This merges deferred quantification linearly while `distributed_and` combines BDD
+        // nodes logarithmically via `tree_fold`. If this ever shows up in profiles, consider
+        // threading deferred quantification through `tree_fold` so both are combined in the same
+        // logarithmic shape. That extra complexity is not worth it without a demonstrated perf
+        // regression.
+        let mut deferred_quantification = InferableTypeVars::None;
         let node = NodeId::distributed_and(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
+                deferred_quantification =
+                    deferred_quantification.merge(db, constraint.deferred_quantification);
                 constraint.node
             }),
         );
-        ConstraintSet::from_node(builder, node)
+        ConstraintSet::from_node_with_deferred_quantification(
+            builder,
+            node,
+            deferred_quantification,
+        )
     }
 }
 
@@ -426,12 +450,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
-        self.node.is_never_satisfied(db, self.builder)
+        self.apply_deferred_quantification(db, self.builder)
+            .is_never_satisfied(db, self.builder)
     }
 
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
-        self.node.is_always_satisfied(db, self.builder)
+        self.apply_deferred_quantification(db, self.builder)
+            .is_always_satisfied(db, self.builder)
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -445,7 +471,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.implies_subtype_of(db, builder, lhs, rhs))
+        // TODO: Preserve quantifier structure through negation-like operations instead of forcing
+        // deferred quantification before checking the implication.
+        Self::from_node(
+            builder,
+            self.apply_deferred_quantification(db, builder)
+                .implies_subtype_of(db, builder, lhs, rhs),
+        )
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -469,7 +501,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         inferable: InferableTypeVars<'db>,
     ) -> bool {
         self.verify_builder(builder);
-        self.node.satisfied_by_all_typevars(db, builder, inferable)
+        self.apply_deferred_quantification(db, builder)
+            .satisfied_by_all_typevars(db, builder, inferable)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -478,12 +511,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// nodes.
     pub(crate) fn union(
         &mut self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        other.verify_builder(builder);
         self.node = self.node.or_with_offset(builder, other.node);
+        self.deferred_quantification = self
+            .deferred_quantification
+            .merge(db, other.deferred_quantification);
         *self
     }
 
@@ -493,19 +530,29 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// nodes.
     pub(crate) fn intersect(
         &mut self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        other.verify_builder(builder);
         self.node = self.node.and_with_offset(builder, other.node);
+        self.deferred_quantification = self
+            .deferred_quantification
+            .merge(db, other.deferred_quantification);
         *self
     }
 
     /// Returns the negation of this constraint set.
-    pub(crate) fn negate(self, _db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
+    pub(crate) fn negate(self, db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.negate(builder))
+        // TODO: Preserve quantifier structure through negation instead of forcing deferred
+        // quantification before negating.
+        Self::from_node(
+            builder,
+            self.apply_deferred_quantification(db, builder)
+                .negate(builder),
+        )
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -521,7 +568,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_never_satisfied(db) {
+        // Use raw satisfiability for construction short-circuiting. If the RHS thunk is skipped,
+        // any skipped deferred quantifiers are vacuous relative to raw `false ∧ _`, and preserving
+        // laziness is important for performance.
+        if !self.node.is_never_satisfied(db, builder) {
             let other = other();
             other.verify_builder(builder);
             self.intersect(db, builder, other);
@@ -542,7 +592,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_always_satisfied(db) {
+        // Use raw satisfiability for construction short-circuiting. If the RHS thunk is skipped,
+        // any skipped deferred quantifiers are vacuous relative to raw `true ∨ _`, and preserving
+        // laziness is important for performance.
+        if !self.node.is_always_satisfied(db, builder) {
             let other = other();
             other.verify_builder(builder);
             self.union(db, builder, other);
@@ -560,6 +613,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
         other: impl FnOnce() -> Self,
     ) -> Self {
+        // TODO: Preserve quantifier structure through implication instead of forcing deferred
+        // quantification before the negation-like operation.
         self.negate(db, builder).or(db, builder, other)
     }
 
@@ -569,12 +624,19 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// nodes.
     pub(crate) fn iff(
         self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
+        other.verify_builder(builder);
+        // TODO: Preserve quantifier structure through equivalence instead of forcing deferred
+        // quantification before the negation-like operation.
+        Self::from_node(
+            builder,
+            self.apply_deferred_quantification(db, builder)
+                .iff_with_offset(builder, other.apply_deferred_quantification(db, builder)),
+        )
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -592,7 +654,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
-    #[expect(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn with_deferred_quantification(
         self,
         db: &'db dyn Db,
@@ -608,7 +670,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
-    #[expect(dead_code)]
     fn apply_deferred_quantification(
         self,
         db: &'db dyn Db,
@@ -6705,6 +6766,65 @@ mod tests {
         // iff(T, ¬T) == false
         let negated = tdd.negate(&db, &builder);
         assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn deferred_quantification_applies_to_semantic_observations() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let deferred_quantification =
+            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, deferred_quantification);
+
+        assert!(!t_int.node.is_always_satisfied(&db, &builder));
+        assert!(t_int.is_always_satisfied(&db));
+        assert!(t_int.satisfied_by_all_typevars(&db, &builder, InferableTypeVars::None));
+    }
+
+    #[test]
+    fn deferred_quantification_merges_through_positive_combinators() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let t_deferred =
+            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let u_deferred =
+            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([u.identity(&db)]));
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, t_deferred);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str)
+            .with_deferred_quantification(&db, &builder, u_deferred);
+
+        let intersection = t_int.and(&db, &builder, || u_str);
+        let union = t_int.or(&db, &builder, || u_str);
+        let when_all = [t_int, u_str]
+            .into_iter()
+            .when_all(&db, &builder, |constraint| constraint);
+        let when_any = [t_int, u_str]
+            .into_iter()
+            .when_any(&db, &builder, |constraint| constraint);
+
+        let expected = FxOrderSet::from_iter([t.identity(&db), u.identity(&db)]);
+        for set in [intersection, union, when_all, when_any] {
+            let actual: FxOrderSet<_> = set.deferred_quantification.iter(&db).collect();
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn deferred_quantification_negates_effective_formula() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let deferred_quantification =
+            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, deferred_quantification);
+
+        assert!(t_int.negate(&db, &builder).is_never_satisfied(&db));
     }
 
     #[test]
