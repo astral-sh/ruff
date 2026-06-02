@@ -38,8 +38,7 @@ def g(**kwargs: int):
 
 ## Constructor diagnostics with custom `list` and `set`
 
-Collection-initializer inference should only replace the result type of a supported `list()` or
-`set()` call. We should still validate the call against custom typeshed constructor signatures.
+Collection-initializer inference should still validate custom constructor signatures.
 
 ```toml
 [environment]
@@ -62,11 +61,7 @@ class list[T]:
     @overload
     def __init__(self, required: str) -> None: ...
 
-class set[T]:
-    @overload
-    def __init__(self, required: int) -> None: ...
-    @overload
-    def __init__(self, required: str) -> None: ...
+class set[T](list[T]): ...
 ```
 
 `/typeshed/stdlib/types.pyi`:
@@ -82,10 +77,45 @@ def overload(func, /): ...
 ```
 
 ```py
-import builtins
-
 list()  # error: [no-matching-overload]
 set()  # error: [no-matching-overload]
-builtins.list()  # error: [no-matching-overload]
-builtins.set()  # error: [no-matching-overload]
+```
+
+## Constructor return types with custom `list` and `set`
+
+Collection-initializer inference should not replace constructor return semantics supplied by a
+custom typeshed.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class int: ...
+class str: ...
+class tuple: ...
+class type: ...
+
+class SetMeta(type):
+    def __call__(self) -> str: ...
+
+class list[T]:
+    def __new__(cls) -> int: ...
+
+class set[T](metaclass=SetMeta): ...
+```
+
+`/typeshed/stdlib/types.pyi`:
+
+```pyi
+class FunctionType: ...
+```
+
+```py
+list_result: int = list()
+set_result: str = set()
 ```
