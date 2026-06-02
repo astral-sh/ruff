@@ -49,6 +49,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
+use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet};
 
 use crate::types::diagnostic::TypeCheckDiagnostics;
@@ -57,7 +58,6 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -593,26 +593,24 @@ impl<'db> TypeContext<'db> {
     }
 
     /// If the type annotation is a union, returns the target elements that it can be narrowed to.
-    pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
+    pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<Cow<'db, [Type<'db>]>> {
         let union = self.annotation.and_then(|ty| ty.as_union_like(db))?;
 
-        let union = if union
-            .elements(db)
-            .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_)))
-        {
-            // Rebuild the union to expand alias elements and simplify any redundancies exposed.
-            UnionType::from_elements(db, union.elements(db).iter().copied())
-                .as_union_like(db)
-                .unwrap_or(union)
+        let targets = if union.has_aliases(db) {
+            let expanded = union.expand_aliases(db);
+            if let Some(union) = expanded.as_union_like(db) {
+                Cow::Borrowed(union.elements(db))
+            } else {
+                Cow::Owned(vec![expanded])
+            }
         } else {
-            union
+            Cow::Borrowed(union.elements(db))
         };
 
         // TODO: We could theoretically attempt to narrow to every element of
         // the power set of this union. However, this leads to an exponential
         // explosion of inference attempts, and is rarely needed in practice.
-        Some(union.elements(db))
+        Some(targets)
     }
 }
 

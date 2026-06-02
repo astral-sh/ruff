@@ -93,6 +93,19 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
+    /// Returns `true` if any direct element of this union is a type alias.
+    pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
+        self.elements(db)
+            .iter()
+            .any(|element| matches!(element, Type::TypeAlias(_)))
+    }
+
+    /// Expands direct type alias elements of this union.
+    pub(crate) fn expand_aliases(self, db: &'db dyn Db) -> Type<'db> {
+        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
+        Self::from_elements(db, self.elements(db).iter().copied())
+    }
+
     pub(crate) fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,

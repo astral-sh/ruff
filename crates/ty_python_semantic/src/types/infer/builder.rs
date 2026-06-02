@@ -6623,6 +6623,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If the type context is a union, attempt to narrow to a specific element.
         for narrowed_ty in tcx
             .narrow_targets(db)
+            .as_deref()
             .into_iter()
             .flatten()
             .filter(|ty| ty.class_specialization(db).is_some())
