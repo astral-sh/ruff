@@ -678,8 +678,7 @@ def f2(y: int) -> int: ...
 def f2(y: str | int) -> str | int:
     return y
 
-# TODO: Should this reveal `Overloaded[(int, /, y: str) -> str, (int, /, y: int) -> int]` ?
-reveal_type(f2)  # revealed: Overload[(int, /, y: str) -> str | int, (int, /, y: int) -> str | int]
+reveal_type(f2)  # revealed: Overload[(int, /, y: str) -> str, (int, /, y: int) -> int]
 ```
 
 But, it's possible to add the additional parameter just to the overload signatures and not the
@@ -694,8 +693,7 @@ def f3(x: int, /, y: int) -> int: ...
 def f3(y: str | int) -> str | int:
     return y
 
-# TODO: Should reveal `Overloaded[(int, /, y: str) -> str, (int, /, y: int) -> int]`
-reveal_type(f3)  # revealed: Overload[(int, x: int, /, y: str) -> str | int, (int, x: int, /, y: int) -> str | int]
+reveal_type(f3)  # revealed: Overload[(int, x: int, /, y: str) -> str, (int, x: int, /, y: int) -> int]
 ```
 
 ## `Concatenate` with protocol classes

@@ -1040,22 +1040,13 @@ class ClassWithOverloadedInit[T]:
     def __init__(self: "ClassWithOverloadedInit[str]", x: str) -> None: ...
     def __init__(self, x: int | str) -> None: ...
 
-# TODO: The old solver cannot handle this overloaded constructor. The ideal solution is that we
-# would solve **P once, and map it to the entire overloaded signature of the constructor. This
-# mapping would have to include the return types, since there are different return types for each
-# overload. We would then also have to determine that R must be equal to the return type of **P's
-# solution.
-
 # revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(into_regular_callable(ClassWithOverloadedInit))
-# TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
-# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], [T](x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
+# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(accepts_callable(ClassWithOverloadedInit))
-# TODO: revealed: ClassWithOverloadedInit[int]
-# revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
+# revealed: ClassWithOverloadedInit[int]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
-# TODO: revealed: ClassWithOverloadedInit[str]
-# revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
+# revealed: ClassWithOverloadedInit[str]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
 
 class GenericClass[T]:

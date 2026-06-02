@@ -314,8 +314,11 @@ impl<'db> CallableSignature<'db> {
                 Type::Callable(callable)
                     if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
                 {
-                    Some(CallableSignature::from_overloads(
-                        callable.signatures(db).iter().map(|signature| Signature {
+                    let signatures = callable.signatures(db);
+                    let preserve_overloads = signatures.overloads.len() >= 2
+                        && matches!(self_signature.return_ty, Type::TypeVar(_));
+                    Some(CallableSignature::from_overloads(signatures.iter().map(
+                        |signature| Signature {
                             generic_context: GenericContext::merge_optional(
                                 db,
                                 signature.generic_context,
@@ -342,14 +345,18 @@ impl<'db> CallableSignature<'db> {
                                         .chain(signature.parameters().iter().cloned()),
                                 )
                             },
-                            return_ty: self_signature.return_ty.apply_type_mapping_impl(
-                                db,
-                                type_mapping,
-                                tcx,
-                                visitor,
-                            ),
-                        }),
-                    ))
+                            return_ty: if preserve_overloads {
+                                signature.return_ty
+                            } else {
+                                self_signature.return_ty.apply_type_mapping_impl(
+                                    db,
+                                    type_mapping,
+                                    tcx,
+                                    visitor,
+                                )
+                            },
+                        },
+                    )))
                 }
                 _ => None,
             }
@@ -1604,7 +1611,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     Signature::new_generic(
                                         signature.generic_context,
                                         signature.parameters().clone(),
-                                        Type::unknown(),
+                                        signature.return_ty,
                                     )
                                 }),
                         ),

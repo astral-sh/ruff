@@ -520,6 +520,38 @@ reveal_type(func(1))  # revealed: Literal[1]
 reveal_type(func(""))  # revealed: Literal[""]
 ```
 
+## Identity Decorator
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+For an overloaded function, identity decorators preserve the overloads
+
+```py
+from typing import Callable, overload
+
+def identity[**P, T](f: Callable[P, T]) -> Callable[P, T]:
+    return f
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+@overload
+def f[T](x: list[T]) -> T: ...
+def f(x): ...
+
+g = identity(f)
+
+reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str, [T](x: list[T]) -> T]
+reveal_type(g)  # revealed: Overload[(x: int) -> int, (x: str) -> str, [T](x: list[T]) -> T]
+reveal_type(g(1))  # revealed: int
+reveal_type(g("a"))  # revealed: str
+reveal_type(g(["a"]))  # revealed: str
+```
+
 ## Invalid
 
 ### At least two overloads
