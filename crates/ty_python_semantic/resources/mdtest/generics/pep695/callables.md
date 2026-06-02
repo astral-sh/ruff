@@ -321,6 +321,68 @@ def singleton[S](flag: bool = False) -> Callable[[Callable[[int], S]], Callable[
     return wrapper
 ```
 
+## Generic callable returned from a higher-order call
+
+When a generic callable flows through a higher-order call into the returned callable, the returned
+callable should remain generic instead of leaking the callee's type variables.
+
+```py
+from typing import Callable
+
+def higher[A, B](f: Callable[[A], B]) -> Callable[[A], B]:
+    raise NotImplementedError
+
+def identity[T](x: T) -> T:
+    return x
+
+# TODO: revealed: Literal[1]
+# TODO: no error
+# error: [invalid-argument-type]
+reveal_type(higher(identity)(1))  # revealed: A@higher
+# TODO: revealed: Literal["x"]
+# TODO: no error
+# error: [invalid-argument-type]
+reveal_type(higher(identity)("x"))  # revealed: A@higher
+```
+
+## Returned callable typevars remain correlated with the surrounding return type
+
+If a typevar appears both inside and outside of a returned callable, the callable occurrence should
+not be split into an independent returned-callable typevar. The two positions are correlated by the
+source return type.
+
+```py
+from typing import Callable
+
+def identity[T](x: T) -> T:
+    return x
+
+def pair[X, Y](f: Callable[[X], Y]) -> tuple[Y, Callable[[X], Y]]:
+    raise NotImplementedError
+
+# revealed: tuple[X@pair, (X@pair, /) -> X@pair]
+reveal_type(pair(identity))
+```
+
+## Generic callable arguments do not hide real argument errors
+
+A generic callable argument should not hide errors from a specialization chosen by other arguments.
+
+```py
+from typing import Callable
+
+def identity[A](x: A) -> A:
+    return x
+
+def same[T](c: Callable[[T], T], x: list[T], y: list[T]) -> T:
+    raise NotImplementedError
+
+# TODO: no errors
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(same(identity, [1], ["x"]))  # revealed: int | str
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its
