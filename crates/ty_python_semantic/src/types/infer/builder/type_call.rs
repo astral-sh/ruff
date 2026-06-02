@@ -197,7 +197,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     })
                     .collect();
                 (members, !all_keys_are_string_literals)
-            } else if let Type::TypedDict(typed_dict) = namespace_type {
+            } else if let Some(typed_dict) = namespace_type.resolve_type_alias(db).as_typed_dict() {
                 // `namespace` is a TypedDict instance. Extract known keys as members.
                 // TypedDicts are "open" (can have additional string keys), so this
                 // is still a dynamic namespace for unknown attributes.

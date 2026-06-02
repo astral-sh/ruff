@@ -2592,7 +2592,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 // alias to such a type. An open empty `TypedDict` cannot contribute known fields.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
-        Type::TypedDict(typed_dict) => !typed_dict.is_open_empty(db),
+        Type::TypedDict(typed_dict) => !typed_dict.is_unknown_schema(db),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
@@ -2763,7 +2763,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     };
 
     match ty {
-        Type::TypedDict(td) if td.is_open_empty(db) => false,
+        Type::TypedDict(td) if td.is_unknown_schema(db) => false,
         Type::TypedDict(td) => matching_field_is_literal(&td),
         Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
             !is_or_contains_typeddict(db, *union_member_ty)
