@@ -601,6 +601,7 @@ impl<'db> TypeContext<'db> {
             .iter()
             .any(|element| matches!(element, Type::TypeAlias(_)))
         {
+            // Rebuild the union to expand alias elements and simplify any redundancies exposed.
             UnionType::from_elements(db, union.elements(db).iter().copied())
                 .as_union_like(db)
                 .unwrap_or(union)
