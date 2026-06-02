@@ -496,6 +496,14 @@ reveal_type(x16)  # revealed: list[int | None]
 
 x17: EitherList = ["1", "2", "3"]
 reveal_type(x17)  # revealed: list[int | str]
+
+type SelfOp[T] = Mapping[Literal["$eq", "$ne"], T]
+type ListOp[T] = Mapping[Literal["$in", "$nin"], Sequence[T]]
+type Ops[T] = SelfOp[T] | ListOp[T]
+type NestedOp[T] = T | Ops[T]
+
+x18: NestedOp[str] = {"$in": ["a", "b"]}
+reveal_type(x18)  # revealed: dict[Literal["$in", "$nin"], list[str]]
 ```
 
 ## Annotations influence generic call argument inference

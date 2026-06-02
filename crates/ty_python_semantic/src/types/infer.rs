@@ -57,6 +57,7 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -593,12 +594,24 @@ impl<'db> TypeContext<'db> {
 
     /// If the type annotation is a union, returns the target elements that it can be narrowed to.
     pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
-        self.annotation
-            .and_then(|ty| ty.as_union_like(db))
-            // TODO: We could theoretically attempt to narrow to every element of
-            // the power set of this union. However, this leads to an exponential
-            // explosion of inference attempts, and is rarely needed in practice.
-            .map(|union| union.elements(db))
+        let union = self.annotation.and_then(|ty| ty.as_union_like(db))?;
+
+        let union = if union
+            .elements(db)
+            .iter()
+            .any(|element| matches!(element, Type::TypeAlias(_)))
+        {
+            UnionType::from_elements(db, union.elements(db).iter().copied())
+                .as_union_like(db)
+                .unwrap_or(union)
+        } else {
+            union
+        };
+
+        // TODO: We could theoretically attempt to narrow to every element of
+        // the power set of this union. However, this leads to an exponential
+        // explosion of inference attempts, and is rarely needed in practice.
+        Some(union.elements(db))
     }
 }
 
