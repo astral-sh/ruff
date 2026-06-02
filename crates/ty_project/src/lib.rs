@@ -225,7 +225,7 @@ impl Project {
     pub fn set_dependency_metadata(
         self,
         db: &mut dyn Db,
-        dependency_metadata: Option<Arc<DependencyMetadata>>,
+        dependency_metadata: Option<&Arc<DependencyMetadata>>,
     ) {
         let settings = self
             .settings(db)

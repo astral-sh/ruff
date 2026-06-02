@@ -76,7 +76,7 @@ pub(crate) struct CheckCommand {
     #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
 
-    /// Path to a `uv workspace metadata` JSON snapshot used for dependency lints.
+    /// Path to a `uv workspace metadata` JSON snapshot used instead of automatic uv discovery.
     #[arg(long, value_name = "PATH", hide = true)]
     pub(crate) dependency_metadata: Option<SystemPathBuf>,
 

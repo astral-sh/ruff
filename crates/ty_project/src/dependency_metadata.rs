@@ -14,7 +14,12 @@ struct UvWorkspaceMetadata {
     #[serde(default)]
     resolution: Map<String, Value>,
     #[serde(default)]
-    module_owners: BTreeMap<String, Vec<String>>,
+    module_owners: BTreeMap<String, Vec<UvModuleOwner>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UvModuleOwner {
+    package_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,9 +70,10 @@ pub fn parse_uv_workspace_metadata(source: &str) -> Result<DependencyMetadata> {
     for (module, owner_references) in snapshot.module_owners {
         let owners = owner_references
             .iter()
-            .map(|reference| {
-                resolve_package_reference(reference, &snapshot.resolution)
-                    .with_context(|| format!("Missing resolution package node `{reference}`"))
+            .map(|owner| {
+                resolve_package_reference(&owner.package_id, &snapshot.resolution).with_context(
+                    || format!("Missing resolution package node `{}`", owner.package_id),
+                )
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -182,8 +188,10 @@ fn dependency_group_dependencies(
 
 fn dependency_name(dependency: &Value, resolution: &Map<String, Value>) -> Result<String> {
     match dependency {
-        Value::String(reference) => Ok(resolve_package_reference(reference, resolution)
-            .unwrap_or_else(|| reference.to_string())),
+        Value::String(reference) => {
+            Ok(resolve_package_reference(reference, resolution)
+                .unwrap_or_else(|| reference.clone()))
+        }
         Value::Object(object) => dependency_name_from_object(object, resolution),
         _ => {
             bail!("Expected dependency entry to be a string or object, got `{dependency}`")
@@ -326,8 +334,8 @@ mod tests {
     "attrs==24.0.0": {"name": "attrs"}
   },
   "module_owners": {
-    "requests": ["requests==2.32.0@registry+https://pypi.org/simple"],
-    "rich": ["rich==13.0.0"]
+    "requests": [{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}],
+    "rich": [{"package_id": "rich==13.0.0"}]
   }
 }
 "#,
@@ -401,11 +409,15 @@ mod tests {
   },
   "module_owners": {
     "gpu": [
-      "gpu-a==0.1.0@path+/workspace/gpu_a-0.1.0-py3-none-any.whl",
-      "gpu-b==0.1.0@path+/workspace/gpu_b-0.1.0-py3-none-any.whl"
+      {"package_id": "gpu-a==0.1.0@path+/workspace/gpu_a-0.1.0-py3-none-any.whl"},
+      {"package_id": "gpu-b==0.1.0@path+/workspace/gpu_b-0.1.0-py3-none-any.whl"}
     ],
-    "gpu.a": ["gpu-a==0.1.0@path+/workspace/gpu_a-0.1.0-py3-none-any.whl"],
-    "gpu.b": ["gpu-b==0.1.0@path+/workspace/gpu_b-0.1.0-py3-none-any.whl"]
+    "gpu.a": [
+      {"package_id": "gpu-a==0.1.0@path+/workspace/gpu_a-0.1.0-py3-none-any.whl"}
+    ],
+    "gpu.b": [
+      {"package_id": "gpu-b==0.1.0@path+/workspace/gpu_b-0.1.0-py3-none-any.whl"}
+    ]
   }
 }
 "#,

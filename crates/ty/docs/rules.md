@@ -4336,3 +4336,4 @@ A slice with a step size of zero will raise a `ValueError` at runtime.
 l = list(range(10))
 l[1:10:0]  # ValueError: slice step cannot be zero
 ```
+
