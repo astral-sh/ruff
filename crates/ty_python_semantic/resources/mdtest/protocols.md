@@ -3258,6 +3258,15 @@ output = dict((
 reveal_type(output)  # revealed: dict[str, int]
 ```
 
+Nested ordinary `dict()` copies should also reuse argument inference when rejecting the protocol
+overloads:
+
+```py
+def copy_nested(value: dict[str, int]) -> None:
+    result = dict(dict(dict(dict(dict(dict(dict(dict(dict(dict(dict(dict(dict(dict(dict(dict(value))))))))))))))))
+    reveal_type(result)  # revealed: dict[str, int]
+```
+
 ### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.

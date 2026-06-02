@@ -7990,6 +7990,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         callable_type: Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        // The `dict()` fast path may speculatively infer its positional argument before falling
+        // back to normal constructor binding. Share an expression cache across both paths so the
+        // fallback can reuse that default inference while still performing contextual inference.
+        let teardown_expression_cache = callable_type
+            .as_class_literal()
+            .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
+            && self.setup_expression_cache();
+
+        let ty = self.infer_call_expression_impl_inner(
+            call_expression,
+            callable_type,
+            call_expression_tcx,
+        );
+
+        if teardown_expression_cache {
+            self.teardown_expression_cache();
+        }
+
+        ty
+    }
+
+    fn infer_call_expression_impl_inner(
+        &mut self,
+        call_expression: &ast::ExprCall,
+        callable_type: Type<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         fn report_missing_implicit_constructor_call<'db>(
             context: &InferContext<'db, '_>,
             db: &'db dyn Db,
