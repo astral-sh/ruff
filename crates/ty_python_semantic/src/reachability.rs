@@ -204,8 +204,8 @@ use crate::{
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        mapping_pattern_type, narrow::runtime_instance_constraint_for_class_literal,
+        pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -685,9 +685,7 @@ fn apply_accumulated_narrowing<'db>(
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
     match accumulated {
-        Some(constraint) => NarrowingConstraint::intersection(base_ty)
-            .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db),
+        Some(constraint) => constraint.narrow_base_type(db, base_ty),
         None => base_ty,
     }
 }
@@ -1182,7 +1180,9 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Class(kind) => {
             let class_ty =
                 match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
+                    Type::ClassLiteral(class) => {
+                        runtime_instance_constraint_for_class_literal(db, class)
+                    }
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                         callable_pattern_type(db)
                     }

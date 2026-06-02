@@ -438,7 +438,7 @@ impl ClassInfoConstraintFunction {
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
+                runtime_instance_constraint_for_class_literal(db, class)
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
@@ -614,6 +614,62 @@ impl ClassInfoConstraintFunction {
     }
 }
 
+/// Return the constraint imposed by an `isinstance()`-style runtime check against `class`.
+///
+/// `TypedDict` instances are runtime dictionaries, even though they are not statically assignable
+/// to mutable dictionary types. `Mapping` does not need an explicit open empty `TypedDict` arm
+/// because `TypedDict` is already statically assignable to it.
+pub(crate) fn runtime_instance_constraint_for_class_literal<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Type<'db> {
+    let constraint = Type::instance(db, class.top_materialization(db));
+    if class.is_known(db, KnownClass::Dict) || class.is_known(db, KnownClass::MutableMapping) {
+        UnionBuilder::new(db)
+            .add(constraint)
+            .add(Type::open_empty_typed_dict(db))
+            .build()
+    } else {
+        constraint
+    }
+}
+
+fn exact_class_narrowing_constraint<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    is_positive: bool,
+) -> Option<Type<'db>> {
+    let instance = Type::instance(db, class.top_materialization(db));
+    if is_positive {
+        Some(if class.is_known(db, KnownClass::Dict) {
+            runtime_instance_constraint_for_class_literal(db, class)
+        } else {
+            instance
+        })
+    } else if class.is_final(db) {
+        Some(instance.negate(db))
+    } else if class.is_known(db, KnownClass::Dict) {
+        // `dict` subclasses can fail an exact-class check, but `TypedDict` instances cannot:
+        // every `TypedDict` inhabitant has an exact runtime type of `dict`.
+        Some(Type::open_empty_typed_dict(db).negate(db))
+    } else {
+        None
+    }
+}
+
+fn negate_classinfo_constraint<'db>(db: &'db dyn Db, constraint: Type<'db>) -> Type<'db> {
+    match constraint {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .fold(IntersectionBuilder::new(db), |builder, element| {
+                builder.add_negative(*element)
+            })
+            .build(),
+        _ => constraint.negate(db),
+    }
+}
+
 #[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct Conjunctions<'db> {
     conjuncts: SmallVec<[Type<'db>; 2]>,
@@ -639,12 +695,8 @@ impl<'db> Conjunctions<'db> {
         self
     }
 
-    fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        if self.conjuncts.len() == 1 {
-            return self.conjuncts[0];
-        }
-
-        let mut intersection = IntersectionBuilder::new(db);
+    fn evaluate_constraint_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        let mut intersection = IntersectionBuilder::new(db).add_positive(base_ty);
         for conjunct in self.conjuncts {
             intersection = intersection.add_positive(conjunct);
         }
@@ -767,17 +819,14 @@ impl<'db> NarrowingConstraint<'db> {
             .extend(other.replacement_disjuncts);
     }
 
-    /// Evaluate the type this effectively constrains to
-    ///
-    /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
+    /// Apply the constraint to a base type.
+    pub(crate) fn narrow_base_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
         let mut union = UnionBuilder::new(db);
-        for conjunctions in self
-            .replacement_disjuncts
-            .into_iter()
-            .chain(self.intersection_disjuncts)
-        {
-            union = union.add(conjunctions.evaluate_constraint_type(db));
+        for conjunctions in self.replacement_disjuncts {
+            union = union.add(conjunctions.evaluate_constraint_type(db, Type::object()));
+        }
+        for conjunctions in self.intersection_disjuncts {
+            union = union.add(conjunctions.evaluate_constraint_type(db, base_ty));
         }
         union.build()
     }
@@ -3491,18 +3540,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 if let Some(is_positive) = is_positive
                     && let Some(target) = PlaceExpr::try_from_expr(target_expr)
                     && let Some(other_class) = find_underlying_class(self.db, other)
-                    // `else`-branch narrowing for `if type(x) is Y` can only be done
-                    // if `Y` is a final class
-                    && (is_positive || other_class.is_final(self.db))
+                    && let Some(constraint) =
+                        exact_class_narrowing_constraint(self.db, other_class, is_positive)
                 {
                     let place = self.expect_place(&target);
-                    constraints.insert(
-                        place,
-                        NarrowingConstraint::intersection(
-                            Type::instance(self.db, other_class.top_materialization(self.db))
-                                .negate_if(self.db, !is_positive),
-                        ),
-                    );
+                    constraints.insert(place, NarrowingConstraint::intersection(constraint));
                 }
             }
 
@@ -3631,16 +3673,20 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 let function = function.into_classinfo_constraint_function()?;
 
-                let class_info_ty = inference.expression_type(second_arg);
-
                 function
-                    .generate_constraint(self.db, class_info_ty, is_positive)
-                    .map(|constraint| {
+                    .generate_constraint(
+                        self.db,
+                        inference.expression_type(second_arg),
+                        is_positive,
+                    )
+                    .map(|classinfo| {
                         NarrowingConstraints::from_iter([(
                             place,
-                            NarrowingConstraint::intersection(
-                                constraint.negate_if(self.db, !is_positive),
-                            ),
+                            NarrowingConstraint::intersection(if is_positive {
+                                classinfo
+                            } else {
+                                negate_classinfo_constraint(self.db, classinfo)
+                            }),
                         )])
                     })
             }
@@ -4217,11 +4263,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 }
 
-// Return true if the given type is a `TypedDict` or a union or intersection that includes at least
-// one `TypedDict` (even if other types are also present), or a type alias to such a type.
+// Return true if the given type is a `TypedDict` with a known schema, or a union or intersection
+// that includes at least one such `TypedDict` (even if other types are also present), or a type
+// alias to such a type. An open empty `TypedDict` cannot contribute known fields.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
-        Type::TypedDict(_) => true,
+        Type::TypedDict(typed_dict) => !typed_dict.is_open_empty(db),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
@@ -4369,10 +4416,11 @@ fn nominal_attribute_type<'db>(
     }
 }
 
-// Return true if the given type is a `TypedDict` whose `field_name` field has a supported tag literal
-// type, or a union in which all elements that are `TypedDict`s have a supported tag literal type
-// for that field, or an intersection in which all positive elements that are `TypedDict`s have a
-// supported tag literal type for that field, or a type alias to such a type.
+// Return true if the given type is a `TypedDict` whose `field_name` field has a supported tag
+// literal type, or a union in which all elements that are `TypedDict`s with known schemas have a
+// supported tag literal type for that field, or an intersection in which all positive elements
+// that are `TypedDict`s with known schemas have a supported tag literal type for that field, or a
+// type alias to such a type.
 fn all_matching_typeddict_fields_have_literal_types<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -4387,6 +4435,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     };
 
     match ty {
+        Type::TypedDict(td) if td.is_open_empty(db) => false,
         Type::TypedDict(td) => matching_field_is_literal(&td),
         Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
             !is_or_contains_typeddict(db, *union_member_ty)

@@ -1852,6 +1852,10 @@ impl<'db> Type<'db> {
         Self::TypedDict(TypedDictType::new(defining_class.into()))
     }
 
+    pub(crate) fn open_empty_typed_dict(db: &'db dyn Db) -> Self {
+        Self::TypedDict(TypedDictType::open_empty(db))
+    }
+
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         // Avoid invoking the `IntersectionBuilder` for negations that are trivial.
@@ -2810,6 +2814,21 @@ impl<'db> Type<'db> {
                 name.as_str(),
                 policy,
             ),
+            Type::TypedDict(typed_dict) if typed_dict.is_open_empty(db) => {
+                KnownClass::TypedDictReadOnlyFallback
+                    .to_class_literal(db)
+                    .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                    .expect("`find_name_in_mro` should return `Some` for a class literal")
+                    .map_type(|ty| {
+                        ty.apply_type_mapping(
+                            db,
+                            &TypeMapping::ReplaceSelf {
+                                new_upper_bound: self,
+                            },
+                            TypeContext::default(),
+                        )
+                    })
+            }
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
                 .to_meta_type(db)
@@ -3178,6 +3197,11 @@ impl<'db> Type<'db> {
                 Place::Undefined.into()
             }
 
+            Type::TypedDict(typed_dict) if typed_dict.is_open_empty(db) => {
+                KnownClass::TypedDictReadOnlyFallback
+                    .to_instance(db)
+                    .instance_member(db, name)
+            }
             Type::TypedDict(_) => Place::Undefined.into(),
 
             Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, name),

@@ -176,6 +176,40 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
         reveal_type(Generic[int])  # revealed: <class 'Generic[int]'>
 ```
 
+## `is` between a `TypedDict` and `dict`
+
+Every `TypedDict` inhabitant is a runtime dictionary, so the identity branch remains reachable:
+
+```py
+from typing import TypedDict
+from typing_extensions import Never
+
+class EmptyTypedDict(TypedDict):
+    pass
+
+class Movie(TypedDict):
+    title: str
+
+class PartialMovie(TypedDict, total=False):
+    title: str
+
+def _(x: Movie, y: dict[str, object]) -> None:
+    if x is y:
+        x.missing  # error: [unresolved-attribute]
+
+def _(x: EmptyTypedDict, y: dict[str | int, object]) -> None:
+    if x is y:
+        x.missing  # error: [unresolved-attribute]
+
+def _(x: EmptyTypedDict, y: dict[Never, Never]) -> None:
+    if x is y:
+        x.missing  # error: [unresolved-attribute]
+
+def _(x: PartialMovie, y: dict[Never, Never]) -> None:
+    if x is y:
+        x.missing  # error: [unresolved-attribute]
+```
+
 ## `is` where the other operand is a call expression
 
 ```py

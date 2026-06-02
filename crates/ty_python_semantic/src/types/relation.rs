@@ -15,11 +15,12 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::typed_dict::TypedDictField;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    SubclassOfType, TypeVarBoundOrConstraints, TypedDictType, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -2894,6 +2895,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            (Type::ProtocolInstance(protocol), Type::TypedDict(_))
+            | (Type::TypedDict(_), Type::ProtocolInstance(protocol)) => {
+                self.with_recursion_guard(left, right, || {
+                    self.any_protocol_members_absent_or_disjoint(
+                        db,
+                        protocol,
+                        Self::typed_dict_runtime_dict(db),
+                    )
+                })
+            }
+
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
                 self.with_recursion_guard(left, right, || {
@@ -3246,19 +3258,65 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
-            // types will always be disjoint from `T`. This doesn't cover all cases -- in fact
-            // `dict` *itself* is almost always disjoint from `TypedDict` -- but it's a good
-            // approximation, and some false negatives are acceptable.
-            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-                let dict_str_any = KnownClass::Dict
-                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
-
-                self.as_relation_checker(TypeRelation::Assignability)
-                    .check_type_pair(db, dict_str_any, other)
-                    .negate(db, self.constraints)
+            // Other than the special cases enumerated above, a TypedDict type is always disjoint
+            // from any type that cannot overlap with `dict[str, Any]`. TypedDict is not statically
+            // assignable to mutable dictionary types, but every inhabitant is a runtime `dict`,
+            // so disjointness must preserve that possible overlap.
+            (Type::TypedDict(typed_dict), other) | (other, Type::TypedDict(typed_dict)) => {
+                self.check_typed_dict_runtime_dict_disjointness(db, typed_dict, other)
             }
         }
+    }
+
+    fn check_typed_dict_runtime_dict_disjointness(
+        &self,
+        db: &'db dyn Db,
+        typed_dict: TypedDictType<'db>,
+        other: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let other_mapping = other
+            .nominal_class(db)
+            .and_then(|class| {
+                let dict = KnownClass::Dict.try_to_class_literal(db)?;
+                dict.iter_mro(db, None)
+                    .filter_map(ClassBase::into_class)
+                    .any(|base| base.class_literal(db) == class.class_literal(db))
+                    .then_some(class)
+            })
+            .and_then(|class| {
+                let mapping = KnownClass::Mapping.try_to_class_literal(db)?;
+                class.iter_mro(db).find_map(|base| {
+                    let ClassType::Generic(alias) = base.into_class()? else {
+                        return None;
+                    };
+                    (alias.origin(db) == mapping).then(|| alias.specialization(db))
+                })
+            });
+
+        if let Some(other_mapping) = other_mapping {
+            // A TypedDict with a required field must contain at least one string key, so it cannot
+            // overlap a Mapping whose key type is disjoint from str. Optional-only schemas may be
+            // empty, however: `{}` can inhabit both an optional-only TypedDict and
+            // `dict[Never, Never]`, so key types alone cannot prove disjointness.
+            if typed_dict
+                .items(db)
+                .values()
+                .any(TypedDictField::is_required)
+                && let Some(other_key) = other_mapping.types(db).first()
+            {
+                return self.check_type_pair(db, KnownClass::Str.to_instance(db), *other_key);
+            }
+            return self.never();
+        }
+
+        self.as_relation_checker(TypeRelation::Assignability)
+            .check_type_pair(db, Self::typed_dict_runtime_dict(db), other)
+            .negate(db, self.constraints)
+    }
+
+    fn typed_dict_runtime_dict(db: &'db dyn Db) -> Type<'db> {
+        KnownClass::Dict
+            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
     }
 
     fn check_property_instance_pair(

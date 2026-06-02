@@ -120,6 +120,7 @@ pub enum KnownClass {
     AsyncIterator,
     Sequence,
     Mapping,
+    MutableMapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
     ExtensionTypedDictFallback,
@@ -138,6 +139,7 @@ pub enum KnownClass {
     // _typeshed._type_checker_internals
     NamedTupleFallback,
     NamedTupleLike,
+    TypedDictReadOnlyFallback,
     TypedDictFallback,
     // string.templatelib
     Template,
@@ -265,6 +267,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -285,6 +288,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
             | Self::ExtensionTypedDictFallback
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
@@ -377,6 +381,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -392,6 +397,7 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
+            | KnownClass::TypedDictReadOnlyFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback
             | KnownClass::BuiltinFunctionType
@@ -487,6 +493,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -502,6 +509,7 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
+            | KnownClass::TypedDictReadOnlyFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback
             | KnownClass::BuiltinFunctionType
@@ -598,6 +606,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -607,6 +616,7 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
+            | KnownClass::TypedDictReadOnlyFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback
             | KnownClass::NamedTupleLike
@@ -732,6 +742,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
@@ -740,6 +751,7 @@ impl KnownClass {
             | Self::Path
             | Self::FunctoolsPartial
             | Self::Mapping
+            | Self::MutableMapping
             | Self::Sequence
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
@@ -837,6 +849,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -858,6 +871,7 @@ impl KnownClass {
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict => false,
             KnownClass::NamedTupleFallback
+            | KnownClass::TypedDictReadOnlyFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback => true,
         }
@@ -953,6 +967,7 @@ impl KnownClass {
             Self::AsyncIterator => "AsyncIterator",
             Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
+            Self::MutableMapping => "MutableMapping",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -970,6 +985,7 @@ impl KnownClass {
             Self::ConstraintSet => "ConstraintSet",
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
+            Self::TypedDictReadOnlyFallback => "TypedDictReadOnlyFallback",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::ExtensionTypedDictFallback => "_TypedDict",
             Self::Template => "Template",
@@ -1319,6 +1335,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::ProtocolMeta
             | Self::ParamSpec
             | Self::Hashable
@@ -1357,7 +1374,9 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
-            Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
+            Self::NamedTupleFallback
+            | Self::TypedDictReadOnlyFallback
+            | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike => KnownModule::TyExtensions,
             Self::ConstraintSet
             | Self::GenericContext
@@ -1468,11 +1487,13 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
@@ -1584,11 +1605,13 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
@@ -1663,6 +1686,7 @@ impl KnownClass {
             "AsyncIterator" => &[Self::AsyncIterator, Self::TyExtensionsAsyncIterator],
             "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
+            "MutableMapping" => &[Self::MutableMapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
@@ -1704,6 +1728,7 @@ impl KnownClass {
             "ConstraintSet" => &[Self::ConstraintSet],
             "GenericContext" => &[Self::GenericContext],
             "Specialization" => &[Self::Specialization],
+            "TypedDictReadOnlyFallback" => &[Self::TypedDictReadOnlyFallback],
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
@@ -1790,6 +1815,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::ExtensionTypedDictFallback
             | Self::TypeVar
@@ -1830,6 +1856,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),

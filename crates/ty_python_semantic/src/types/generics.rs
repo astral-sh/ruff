@@ -2946,6 +2946,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            (formal @ Type::NominalInstance(_), Type::TypedDict(_)) => {
+                let str_object_map = KnownClass::Mapping.to_specialized_instance(
+                    self.db,
+                    &[KnownClass::Str.to_instance(self.db), Type::object()],
+                );
+                return self.infer_map_impl(formal, str_object_map, polarity, seen);
+            }
+
             (Type::Intersection(formal_intersection), _) => {
                 // The actual type must be assignable to every (positive) element of the
                 // formal intersection, so we must infer type mappings for each of them. (The

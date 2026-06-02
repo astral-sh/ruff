@@ -500,7 +500,7 @@ In order to preserve the gradual guarantee, we intersect with the type of the se
 type of the second argument is a dynamic type:
 
 ```py
-from typing import Any
+from typing import Any, TypedDict
 from something_unresolvable import SomethingUnknown  # error: [unresolved-import]
 
 class Foo: ...
@@ -511,6 +511,13 @@ def f(a: Foo, b: Any):
 
     if isinstance(a, b):
         reveal_type(a)  # revealed: Foo & Any
+
+class Bar(TypedDict):
+    status: str
+
+def g(a: Bar | int):
+    if isinstance(a, SomethingUnknown):
+        reveal_type(a)  # revealed: (Bar & Unknown) | (int & Unknown)
 ```
 
 ## Narrowing if an object with an intersection/union/TypeVar type is used as the second argument
@@ -732,6 +739,167 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
+For mutable dictionary runtime checks, we include an open empty `TypedDict` alongside the ordinary
+top-materialized dictionary constraint. Every `TypedDict` is a subtype of this empty schema. For
+`Mapping`, the extra arm simplifies away because `TypedDict` is already statically compatible:
+
+```py
+from collections.abc import Mapping, MutableMapping
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def _(x: object, y: Movie):
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+
+    if isinstance(x, Mapping):
+        reveal_type(x)  # revealed: Top[Mapping[Unknown, object]]
+
+    if isinstance(x, MutableMapping):
+        reveal_type(x)  # revealed: Top[MutableMapping[Unknown, Unknown]] | <TypedDict with no items>
+
+    if isinstance(y, dict):
+        reveal_type(y)  # revealed: Movie
+
+    if isinstance(y, Mapping):
+        reveal_type(y)  # revealed: Movie
+
+    if isinstance(y, MutableMapping):
+        reveal_type(y)  # revealed: Movie
+```
+
+When the original type already contains a concrete `TypedDict` arm, runtime narrowing keeps that
+arm:
+
+```py
+def _(z: int | Movie):
+    if isinstance(z, dict):
+        reveal_type(z)  # revealed: Movie
+    else:
+        reveal_type(z)  # revealed: int
+```
+
+When a gradual arm remains after narrowing, the open empty `TypedDict` fallback remains visible too:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def _(value: Movie | T):
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Movie | (T@_ & Top[dict[Unknown, Unknown]]) | (T@_ & <TypedDict with no items>)
+```
+
+The empty `TypedDict` arm has a read-only mapping surface. It preserves common dictionary operations
+without exposing schema-unsafe mutation:
+
+```py
+from typing import Any, Iterable
+
+def takes_dict(value: dict[str, object]) -> None: ...
+def use_narrowed_dict(value: object, default: object) -> None:
+    if isinstance(value, dict) and isinstance(default, dict):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+        for key in value.keys() & default.keys():
+            reveal_type(key)  # revealed: Unknown | str
+            reveal_type(value[key])  # revealed: object
+            reveal_type(default[key])  # revealed: object
+            reveal_type(default.get(key))  # revealed: object
+
+        reveal_type(value.fromkeys(["a"], 1))  # revealed: dict[str, int]
+        reveal_type(reversed(value))  # revealed: Iterator[object]
+        value.clear()  # error: [unresolved-attribute]
+        value.popitem()  # error: [unresolved-attribute]
+        takes_dict(value)  # error: [invalid-argument-type]
+
+def narrow_iterable_keys(choices: Iterable[Any] | None) -> None:
+    if isinstance(choices, dict):
+        reveal_type(choices.keys())  # revealed: dict_keys[Unknown, Unknown] | dict_keys[str, object]
+```
+
+Non-mutating dictionary merges remain valid after runtime narrowing:
+
+```py
+def merge_narrowed_dicts(left: object, right: object) -> None:
+    if isinstance(left, dict) and isinstance(right, dict):
+        reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
+
+class CustomDict(dict[int, bytes]): ...
+
+def merge_custom_dict_with_narrowed_dict(custom: CustomDict, value: object) -> None:
+    if isinstance(value, dict):
+        reveal_type(custom | value)  # revealed: dict[int | Unknown, bytes | Unknown]
+        reveal_type(value | custom)  # revealed: dict[Unknown | int, Unknown | bytes]
+```
+
+It should also keep `dict` methods callable for concrete `dict` unions keyed by `IntEnum` values:
+
+```py
+from enum import IntEnum
+from typing import Protocol
+
+class DiagnosticField(IntEnum):
+    MESSAGE = 77
+
+class PGresult(Protocol):
+    def error_field(self, fieldcode: int) -> bytes | None: ...
+
+ErrorInfo = PGresult | dict[int, bytes | None] | None
+
+def _(info: ErrorInfo):
+    if isinstance(info, dict):
+        reveal_type(info)  # revealed: (PGresult & Top[dict[Unknown, Unknown]]) | dict[int, bytes | None]
+        reveal_type(info.get(DiagnosticField.MESSAGE))  # revealed: Unknown | None | bytes
+    elif info:
+        reveal_type(info)  # revealed: PGresult & ~Top[dict[Unknown, Unknown]] & ~AlwaysFalsy
+        reveal_type(info.error_field(DiagnosticField.MESSAGE))  # revealed: bytes | None
+```
+
+Runtime protocol checks still use the actual `dict` surface, even though mutating methods are hidden
+from direct access on the empty `TypedDict` arm:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class HasClear(Protocol):
+    def clear(self) -> None: ...
+
+def narrow_typed_dict_protocol(movie: Movie) -> None:
+    if isinstance(movie, HasClear):
+        movie.missing  # error: [unresolved-attribute]
+
+def preserve_empty_typed_dict_protocol(value: object) -> None:
+    if isinstance(value, dict) and isinstance(value, HasClear):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | (<TypedDict with no items> & HasClear)
+        value.clear()
+
+def merge_empty_typed_dict_protocol(value: object, other: dict[int, bytes]) -> None:
+    if isinstance(value, dict) and isinstance(value, HasClear):
+        _ = value | other
+        _ = other | value
+```
+
+`TypedDict` inhabitants have exact runtime type `dict`, so they remain disjoint from proper
+subclasses of `dict`:
+
+```py
+from collections import defaultdict
+
+class CustomDictSubclass(dict[str, object]): ...
+
+def narrow_typed_dict_defaultdict(movie: Movie) -> None:
+    if isinstance(movie, defaultdict):
+        reveal_type(movie)  # revealed: Never
+
+def narrow_typed_dict_custom_dict(movie: Movie) -> None:
+    if isinstance(movie, CustomDictSubclass):
+        reveal_type(movie)  # revealed: Never
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py
@@ -812,12 +980,13 @@ def f(fn: Callable[P, R] | classmethod[Any, P, R]) -> Callable[P, R]:
 
 ## Narrowing with TypedDict unions
 
-Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
-during type ordering of normalized intersection types. Regression test for
+`TypedDict` unions should narrow cleanly through `isinstance(x, dict)` without leaving behind
+`Top[dict[...]]` intersections. This also covers the previous panic regression from
 <https://github.com/astral-sh/ty/issues/2451>.
 
 ```py
-from typing import Any, TypedDict, cast
+from collections.abc import MutableMapping
+from typing import TypedDict
 
 class A(TypedDict):
     x: str
@@ -827,11 +996,86 @@ class B(TypedDict):
 
 T = int | A | B
 
-def test(a: Any, items: list[T]) -> None:
-    combined = a or items
-    v = combined[0]
+def narrow_typeddict_union(v: T) -> None:
     if isinstance(v, dict):
-        cast(T, v)  # no panic
+        reveal_type(v)  # revealed: A | B
+    else:
+        reveal_type(v)  # revealed: int
+
+def narrow_single_typeddict(x: list | A) -> None:
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: list[Unknown]
+
+def narrow_mutable_mapping_or_typeddict(x: dict[str, str] | A) -> None:
+    if isinstance(x, MutableMapping):
+        reveal_type(x)  # revealed: dict[str, str] | A
+    else:
+        reveal_type(x)  # revealed: Never
+
+def narrow_dict_or_typeddict(x: dict[str, str] | A) -> None:
+    if isinstance(x, dict):
+        reveal_type(x)  # revealed: dict[str, str] | A
+    else:
+        reveal_type(x)  # revealed: Never
+
+class Package:
+    ecosystem: str
+
+class Vulnerability:
+    package: Package
+    patched_versions: str | None
+
+def narrow_typeddict_or_class(value: A | Vulnerability) -> None:
+    if isinstance(value, dict):
+        pass
+    else:
+        reveal_type(value)  # revealed: Vulnerability & ~Top[dict[Unknown, Unknown]]
+        reveal_type(value.package.ecosystem)  # revealed: str
+
+def narrow_non_dict_object(value: object) -> None:
+    if isinstance(value, dict):
+        pass
+    else:
+        reveal_type(value)  # revealed: ~Top[dict[Unknown, Unknown]] & ~<TypedDict with no items>
+```
+
+Read-only `dict` APIs should remain callable on the narrowed value, but mutation APIs must still be
+rejected when a `TypedDict` arm remains possible:
+
+```py
+from typing import Any, Iterable, Mapping
+
+def sink(x: object) -> None: ...
+def narrow_mapping_items(value: Mapping[str, Any] | Iterable[tuple[str, Any]]) -> None:
+    if isinstance(value, dict):
+        sink(value.items())
+        value.clear()  # error: [unresolved-attribute]
+
+def narrow_dict_items(value: dict[str, Any] | Iterable[tuple[str, Any]]) -> None:
+    if isinstance(value, dict):
+        value.clear()  # error: [unresolved-attribute]
+```
+
+`reversed()` is a read-only dict operation, so it should dispatch through the empty `TypedDict` arm
+without raising a spurious overload-resolution error:
+
+```py
+from typing import TypedDict
+
+class ReversibleMovie(TypedDict):
+    name: str
+    year: int
+
+def narrow_reversed_typeddict_union(x: ReversibleMovie | int) -> None:
+    if isinstance(x, dict):
+        reveal_type(reversed(x))  # revealed: Iterator[str]
+
+def narrow_reversed_object(x: object) -> None:
+    if isinstance(x, dict):
+        reveal_type(reversed(x))  # revealed: Iterator[object]
+        reveal_type(reversed(x.keys()))  # revealed: Iterator[Unknown | str]
 ```
 
 ## Narrowing with named expressions (walrus operator)

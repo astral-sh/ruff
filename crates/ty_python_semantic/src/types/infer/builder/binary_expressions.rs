@@ -12,9 +12,9 @@ use crate::types::diagnostic::{
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
-    DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionTypeInstance,
+    ClassBase, DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints,
+    TypedDictType, UnionBuilder, UnionTypeInstance,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -25,7 +25,86 @@ enum BinaryExpressionOperandTypes<'db> {
 type BinaryExpressionVisitor<'db> =
     CycleDetector<ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
+struct DictMergeProjection;
+type DictMergeProjectionVisitor<'db> =
+    CycleDetector<DictMergeProjection, Type<'db>, Option<Type<'db>>>;
+
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Return an ordinary `dict` approximation for a type known to contain only runtime
+    /// dictionaries.
+    ///
+    /// This is only used as a fallback for the non-mutating `|` operator. Projecting a
+    /// `TypedDict` to `dict` generally would expose mutation APIs that are not schema-safe.
+    /// A union is widened because its arms can have incompatible key and value types. An
+    /// intersection can use any positive arm that guarantees every inhabitant is a runtime dict.
+    fn dict_merge_projection(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        fn imp<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &DictMergeProjectionVisitor<'db>,
+        ) -> Option<Type<'db>> {
+            match ty {
+                Type::TypedDict(_) => Some(KnownClass::Dict.to_specialized_instance(
+                    db,
+                    &[KnownClass::Str.to_instance(db), Type::object()],
+                )),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .all(|element| imp(db, *element, visitor).is_some())
+                    .then(|| {
+                        KnownClass::Dict
+                            .to_specialized_instance(db, &[Type::unknown(), Type::unknown()])
+                    }),
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .find_map(|element| imp(db, *element, visitor)),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))
+                }
+                _ => {
+                    let class = ty.nominal_class(db)?;
+                    for base in class.iter_mro(db).filter_map(ClassBase::into_class) {
+                        if base.is_known(db, KnownClass::Dict) {
+                            return Some(Type::instance(db, base));
+                        }
+                        // The projection can be used on either side of `|`. Stop if it would
+                        // replace a subclass implementation with the builtin `dict` merge
+                        // behavior.
+                        if !base.own_instance_member(db, "__or__").is_undefined()
+                            || !base.own_instance_member(db, "__ror__").is_undefined()
+                        {
+                            return None;
+                        }
+                    }
+                    None
+                }
+            }
+        }
+
+        imp(db, ty, &DictMergeProjectionVisitor::default())
+    }
+
+    fn try_dict_merge_fallback(
+        db: &'db dyn Db,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if op != ast::Operator::BitOr {
+            return None;
+        }
+
+        let left_dict = Self::dict_merge_projection(db, left_ty)?;
+        let right_dict = Self::dict_merge_projection(db, right_ty)?;
+        if left_dict == left_ty && right_dict == right_ty {
+            return None;
+        }
+
+        Type::try_call_bin_op_return_type(db, left_dict, op, right_dict)
+    }
+
     pub(super) fn infer_binary_expression(
         &mut self,
         binary: &ast::ExprBinOp,
@@ -294,6 +373,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             op,
             &BinaryExpressionVisitor::new(Some(Type::Never)),
         )
+        .or_else(|| Self::try_dict_merge_fallback(self.db(), left_ty, op, right_ty))
     }
 
     fn infer_binary_expression_type_impl(
