@@ -9347,8 +9347,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Attribute lookup on a bounded type variable delegates to its upper bound, so
                     // use that bound here too when determining whether the lookup was on a union.
                     let union_like_type = if let Type::TypeVar(typevar) = value_type
-                        && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
-                            typevar.typevar(db).bound_or_constraints(db)
+                        && let Some(bound) = typevar.typevar(db).upper_bound(db)
                     {
                         bound
                     } else {
