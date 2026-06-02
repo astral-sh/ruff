@@ -105,6 +105,42 @@ pub enum DynamicClassAnchor<'db> {
     },
 }
 
+impl<'db> DynamicClassAnchor<'db> {
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Definition(definition) => Some(Self::Definition(*definition)),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                explicit_bases,
+            } => {
+                let explicit_bases = explicit_bases
+                    .iter()
+                    .map(|base| {
+                        let base = base.recursive_type_normalized_impl(db, div, true);
+                        if nested {
+                            base
+                        } else {
+                            Some(base.unwrap_or(div))
+                        }
+                    })
+                    .collect::<Option<Box<_>>>()?;
+
+                Some(Self::ScopeOffset {
+                    scope: *scope,
+                    offset: *offset,
+                    explicit_bases,
+                })
+            }
+        }
+    }
+}
+
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
 
 /// Returns the `bases` argument for a dynamic class constructor call.
@@ -498,13 +534,16 @@ impl<'db> DynamicClassLiteral<'db> {
 }
 
 impl<'db> DynamicClassLiteral<'db> {
-    /// Normalize member types because they are part of this dynamic class's interned identity.
+    /// Normalize types that are part of this dynamic class's interned identity.
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let anchor = self
+            .anchor(db)
+            .recursive_type_normalized_impl(db, div, nested)?;
         let members = self
             .members(db)
             .iter()
@@ -514,14 +553,18 @@ impl<'db> DynamicClassLiteral<'db> {
                 Some((name.clone(), ty))
             })
             .collect::<Option<Box<_>>>()?;
+        let dataclass_params = match self.dataclass_params(db) {
+            Some(params) => Some(params.recursive_type_normalized_impl(db, div, nested)?),
+            None => None,
+        };
 
         Some(Self::new(
             db,
             self.name(db).clone(),
-            self.anchor(db).clone(),
+            anchor,
             members,
             self.has_dynamic_namespace(db),
-            self.dataclass_params(db),
+            dataclass_params,
         ))
     }
 }
