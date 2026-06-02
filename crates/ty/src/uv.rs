@@ -5,8 +5,17 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use serde::Deserialize;
 use ty_static::EnvVars;
 
-pub(crate) fn discover_workspace_root(cwd: &SystemPath) -> Option<SystemPathBuf> {
-    let uv = std::env::var_os(EnvVars::UV)?;
+pub(crate) struct UvWorkspace {
+    pub(crate) root: SystemPathBuf,
+    pub(crate) member: Option<SystemPathBuf>,
+}
+
+pub(crate) fn discover_workspace(cwd: &SystemPath) -> Option<UvWorkspace> {
+    if !matches!(std::env::var(EnvVars::TY_UV).as_deref(), Ok("1" | "true")) {
+        return None;
+    }
+
+    let uv = std::env::var_os(EnvVars::UV).unwrap_or_else(|| "uv".into());
 
     let output = match Command::new(uv)
         .arg("workspace")
@@ -64,16 +73,53 @@ pub(crate) fn discover_workspace_root(cwd: &SystemPath) -> Option<SystemPathBuf>
         return None;
     }
 
-    Some(root)
+    let member = metadata
+        .members
+        .into_iter()
+        .map(|member| member.path)
+        .filter(|member| cwd.as_std_path().starts_with(member))
+        .max_by_key(|member| member.components().count());
+    let member = match member {
+        Some(member) => {
+            let member = match SystemPathBuf::from_path_buf(member) {
+                Ok(member) => member,
+                Err(member) => {
+                    tracing::debug!(
+                        "Ignoring non-Unicode workspace member returned by `uv workspace metadata`: `{}`",
+                        member.display()
+                    );
+                    return None;
+                }
+            };
+
+            if !member.as_std_path().is_dir() {
+                tracing::debug!(
+                    "Ignoring missing workspace member returned by `uv workspace metadata`: `{member}`"
+                );
+                return None;
+            }
+
+            Some(member)
+        }
+        None => None,
+    };
+
+    Some(UvWorkspace { root, member })
 }
 
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
     schema: WorkspaceMetadataSchema,
     workspace_root: PathBuf,
+    members: Vec<WorkspaceMember>,
 }
 
 #[derive(Deserialize)]
 struct WorkspaceMetadataSchema {
     version: String,
+}
+
+#[derive(Deserialize)]
+struct WorkspaceMember {
+    path: PathBuf,
 }

@@ -10,19 +10,32 @@ use crate::CliTest;
 fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
     let case = workspace_case()?;
     case.write_file("shared.py", "value: int = 1")?;
-    case.write_file("packages/member/member.py", "import shared")?;
+    case.write_file(
+        "packages/member/member.py",
+        "import shared\nvalue: int = 'wrong'",
+    )?;
+    case.write_file("packages/member/src/nested.py", "")?;
 
     let mut command = command_with_uv(&case);
-    command.current_dir(case.root().join("packages/member"));
+    command.current_dir(case.root().join("packages/member/src"));
 
-    assert_cmd_snapshot!(command, @"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to `int`
+     --> <temp_dir>/packages/member/member.py:2:8
+      |
+    2 | value: int = 'wrong'
+      |        ---   ^^^^^^^ Incompatible value of type `Literal["wrong"]`
+      |        |
+      |        Declared type
+      |
+
+    Found 1 diagnostic
 
     ----- stderr -----
-    ");
+    "#);
 
     Ok(())
 }
@@ -72,6 +85,44 @@ fn explicit_project_disables_uv_workspace_discovery() -> anyhow::Result<()> {
 #[test]
 fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     let case = workspace_case()?;
+    case.write_file("shared.py", "value: int = 1")?;
+    case.write_file("packages/member/member.py", "import shared")?;
+
+    let mut command = case.command();
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env("UV", "uv")
+        .env_remove("TY_UV");
+
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `shared`
+     --> member.py:1:8
+      |
+    1 | import shared
+      |        ^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/packages/member (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn finds_uv_on_path_without_uv_environment_variable() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value: int = 1")?;
+    case.write_file("packages/member/member.py", "import shared")?;
+
     let mut command = command_with_uv(&case);
     command
         .current_dir(case.root().join("packages/member"))
@@ -124,6 +175,7 @@ requires-python = ">=3.8"
 fn command_with_uv(case: &CliTest) -> Command {
     let mut command = case.command();
     command
+        .env("TY_UV", "1")
         .env("UV", "uv")
         .env("UV_CACHE_DIR", case.root().join("cache"))
         .env("PATH", std::env::var_os("PATH").unwrap_or_default());

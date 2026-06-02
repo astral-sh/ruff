@@ -46,6 +46,13 @@ When set, ty will use this format for output instead of the default.
 
 Accepts the same values as the `--output-format` command-line argument.
 
+### `TY_UV`
+
+Enable uv integration.
+
+When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
+root.
+
 ## Externally-defined variables
 
 ty also reads the following externally defined environment variables:
@@ -77,7 +84,7 @@ This is a standard Rayon environment variable.
 
 The path to the uv executable to use for workspace discovery.
 
-When set, ty invokes `uv workspace metadata` to discover the workspace root.
+ty uses this path when uv integration is enabled by `TY_UV`.
 
 ### `VIRTUAL_ENV`
 

@@ -128,15 +128,15 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             }
         })
         .transpose()?;
-    let uv_workspace_root = explicit_project_path
+    let uv_workspace = explicit_project_path
         .is_none()
-        .then(|| uv::discover_workspace_root(&cwd))
+        .then(|| uv::discover_workspace(&cwd))
         .flatten();
-    let is_uv_workspace_member = uv_workspace_root
+    let uv_workspace_member = uv_workspace
         .as_ref()
-        .is_some_and(|workspace_root| workspace_root != &cwd);
+        .and_then(|workspace| workspace.member.clone());
     let project_path = explicit_project_path
-        .or(uv_workspace_root)
+        .or_else(|| uv_workspace.map(|workspace| workspace.root))
         .unwrap_or_else(|| cwd.clone());
 
     let mut check_paths: Vec<_> = args
@@ -145,8 +145,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
     // Use uv to discover workspace settings without checking sibling workspace members by default.
-    if check_paths.is_empty() && is_uv_workspace_member {
-        check_paths.push(cwd.clone());
+    if check_paths.is_empty()
+        && let Some(workspace_member) = uv_workspace_member
+        && workspace_member != project_path
+    {
+        check_paths.push(workspace_member);
     }
 
     let mode = if args.fix {
