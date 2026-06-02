@@ -3688,8 +3688,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4612ff789805e65c87e9b38cb749a293212a615af065bed8a2001086801498c3"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=345bb673e7a0e4c990366a92fcf51946f2e5f2b6#345bb673e7a0e4c990366a92fcf51946f2e5f2b6"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3715,14 +3714,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58e354cbac6939b9b09cd9c11fb419a53e64b4a0f755d929f56a09f4cc752e41"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=345bb673e7a0e4c990366a92fcf51946f2e5f2b6#345bb673e7a0e4c990366a92fcf51946f2e5f2b6"
 
 [[package]]
 name = "salsa-macros"
 version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3067861075c2b80608f84ad49fb88f2c7610b94cdf8b4201e79ddee87f8980c8"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=345bb673e7a0e4c990366a92fcf51946f2e5f2b6#345bb673e7a0e4c990366a92fcf51946f2e5f2b6"
 dependencies = [
  "proc-macro2",
  "quote",
