@@ -1208,6 +1208,35 @@ def make_chain(depth: int) -> type[object]:
     return current
 ```
 
+## Functional dynamic class reassignment in a loop
+
+Functional class literals can capture the previous value of a loop-carried variable when they are
+used in a dynamic class namespace. Their inferred field or member types should not prevent type
+inference from reaching a fixed point.
+
+```py
+from enum import Enum
+from typing import NamedTuple, TypedDict
+
+def make_named_tuple_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": NamedTuple("N", [("value", current)])})
+    return current
+
+def make_typed_dict_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": TypedDict("T", {"value": current})})
+    return current
+
+def make_enum_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": Enum("E", {"VALUE": current})})
+    return current
+```
+
 ## Special base classes
 
 Some special base classes work with dynamic class creation, but special semantics may not be fully

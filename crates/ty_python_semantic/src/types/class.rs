@@ -359,10 +359,16 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(
                 dynamic.recursive_type_normalized_impl(db, div, nested)?,
             )),
-            Self::Static(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => Some(self),
+            Self::DynamicNamedTuple(named_tuple) => Some(Self::DynamicNamedTuple(
+                named_tuple.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::DynamicTypedDict(typed_dict) => Some(Self::DynamicTypedDict(
+                typed_dict.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::DynamicEnum(enum_literal) => Some(Self::DynamicEnum(
+                enum_literal.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::Static(_) => Some(self),
         }
     }
 
