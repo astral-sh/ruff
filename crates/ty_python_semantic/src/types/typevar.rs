@@ -1080,7 +1080,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 generic_context,
                 delta,
             } => {
-                if generic_context.contains(db, self) && !self.is_paramspec(db) {
+                if generic_context.contains(db, self.identity(db)) && !self.is_paramspec(db) {
                     Type::TypeVar(self.freshen_with_mapping(
                         db,
                         self.freshness(db).add(*delta),
@@ -1370,6 +1370,27 @@ pub struct BoundTypeVarIdentity<'db> {
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
     /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
     pub(super) freshness: TypeVarNonce,
+}
+
+impl<'db> BoundTypeVarIdentity<'db> {
+    fn kind(self, db: &'db dyn Db) -> TypeVarKind {
+        self.identity.kind(db)
+    }
+
+    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_paramspec()
+    }
+
+    pub(crate) fn without_paramspec_attr(mut self, db: &'db dyn Db) -> Self {
+        debug_assert!(
+            self.is_paramspec(db),
+            "Expected a ParamSpec, got {:?}",
+            self.kind(db)
+        );
+
+        self.paramspec_attr = None;
+        self
+    }
 }
 
 #[salsa::tracked(

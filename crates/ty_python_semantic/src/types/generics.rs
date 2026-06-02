@@ -499,15 +499,14 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn contains(
         self,
         db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
+        bound_typevar: BoundTypeVarIdentity<'db>,
     ) -> bool {
         let bound_typevar = if bound_typevar.is_paramspec(db) {
             bound_typevar.without_paramspec_attr(db)
         } else {
             bound_typevar
         };
-        self.variables_inner(db)
-            .contains_key(&bound_typevar.identity(db))
+        self.variables_inner(db).contains_key(&bound_typevar)
     }
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
     /// variables.
@@ -2003,7 +2002,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> bool {
         ty.as_typevar().is_some_and(|typevar| {
             typevar.is_inferable(self.db, self.inferable)
-                && generic_context.contains(self.db, typevar)
+                && generic_context.contains(self.db, typevar.identity(self.db))
         })
     }
 

@@ -7674,8 +7674,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // projected constraint sets, avoid leaking those method-local typevars into the inferred
         // collection literal type.
         if any_over_type(self.db(), constraint, false, |ty| {
-            ty.as_typevar()
-                .is_some_and(|typevar| !receiver_generic_context.contains(self.db(), typevar))
+            ty.as_typevar().is_some_and(|typevar| {
+                !receiver_generic_context.contains(self.db(), typevar.identity(self.db()))
+            })
         }) {
             return None;
         }
