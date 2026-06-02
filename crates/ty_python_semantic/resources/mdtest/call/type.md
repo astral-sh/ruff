@@ -193,6 +193,19 @@ def g(attributes: Namespace):
     reveal_type(y.unknown)  # revealed: Unknown
 ```
 
+`TypedDictTop` is also a valid dynamic namespace, but it has no known keys to extract:
+
+```py
+from ty_extensions import TypedDictTop
+
+def g(attributes: TypedDictTop):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.unknown)  # revealed: Unknown
+    reveal_type(Y().unknown)  # revealed: Unknown
+```
+
 ## Closed TypedDicts (PEP-728)
 
 TODO: We don't support the PEP-728 `closed=True` keyword argument to `TypedDict` yet. When we do, a

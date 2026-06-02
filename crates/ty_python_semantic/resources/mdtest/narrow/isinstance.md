@@ -797,6 +797,13 @@ Non-mutating dictionary merges should remain valid after both operands are narro
 def merge_narrowed_dicts(left: object, right: object) -> None:
     if isinstance(left, dict) and isinstance(right, dict):
         reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
+
+class CustomDict(dict[int, bytes]): ...
+
+def merge_custom_dict_with_narrowed_dict(custom: CustomDict, value: object) -> None:
+    if isinstance(value, dict):
+        reveal_type(custom | value)  # revealed: dict[int | Unknown, bytes | Unknown]
+        reveal_type(value | custom)  # revealed: dict[Unknown | int, Unknown | bytes]
 ```
 
 The `TypedDictTop` arm also has a stable surface name, so users can refer to it directly in
@@ -1108,6 +1115,7 @@ def narrow_reversed_typeddict_union(x: Movie | int) -> None:
 def narrow_reversed_object(x: object) -> None:
     if isinstance(x, dict):
         reveal_type(reversed(x))  # revealed: Iterator[object]
+        reveal_type(reversed(x.keys()))  # revealed: Iterator[Unknown | str]
 ```
 
 ## Narrowing with named expressions (walrus operator)

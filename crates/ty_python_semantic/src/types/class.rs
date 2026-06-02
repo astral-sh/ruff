@@ -1352,7 +1352,7 @@ impl<'db> ClassType<'db> {
                 let specialization = generic.specialization(db);
 
                 if let Some(readonly_projection) =
-                    Self::dict_top_readonly_projection(db, class_literal, specialization)
+                    Self::dict_top_readonly_projection(db, class_literal, specialization, name)
                 {
                     let projected_member = readonly_projection.class_member(db, name, policy);
                     if !projected_member.is_undefined() {
@@ -1710,7 +1710,7 @@ impl<'db> ClassType<'db> {
                 }
 
                 if let Some(readonly_projection) =
-                    Self::dict_top_readonly_projection(db, class_literal, specialization)
+                    Self::dict_top_readonly_projection(db, class_literal, specialization, name)
                 {
                     let projected_member = readonly_projection.instance_member(db, name);
                     if !projected_member.is_undefined() {
@@ -1748,12 +1748,14 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Top-materialized `dict`s can project read-only members through `Mapping` so lookups
-    /// preserve observer signatures without also loosening mutation APIs.
+    /// Top-materialized `dict`s can project read-only members through `Mapping`. Use `dict` itself
+    /// for its view methods so lookups preserve concrete observer types without also loosening
+    /// mutation APIs.
     fn dict_top_readonly_projection(
         db: &'db dyn Db,
         class_literal: StaticClassLiteral<'db>,
         specialization: Specialization<'db>,
+        name: &str,
     ) -> Option<ClassType<'db>> {
         if specialization.materialization_kind(db) != Some(MaterializationKind::Top)
             || !specialization.types(db).iter().all(Type::is_unknown)
@@ -1762,7 +1764,11 @@ impl<'db> ClassType<'db> {
             return None;
         }
 
-        KnownClass::Mapping.to_specialized_class_type(db, specialization.types(db))
+        let projection = match name {
+            "items" | "keys" | "values" => KnownClass::Dict,
+            _ => KnownClass::Mapping,
+        };
+        projection.to_specialized_class_type(db, specialization.types(db))
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on

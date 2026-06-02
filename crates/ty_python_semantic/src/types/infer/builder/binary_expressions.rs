@@ -11,9 +11,9 @@ use crate::types::diagnostic::{
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
-    DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionTypeInstance,
+    ClassBase, DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints,
+    TypedDictType, UnionBuilder, UnionTypeInstance,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -47,11 +47,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     KnownClass::Dict
                         .to_specialized_instance(db, &[Type::unknown(), Type::unknown()])
                 }),
-            _ => ty
-                .known_specialization(db, KnownClass::Dict)
-                .map(|specialization| {
-                    KnownClass::Dict.to_specialized_instance(db, specialization.types(db))
-                }),
+            _ => {
+                let class = ty.nominal_class(db)?;
+                for base in class.iter_mro(db).filter_map(ClassBase::into_class) {
+                    if base.is_known(db, KnownClass::Dict) {
+                        return Some(Type::instance(db, base));
+                    }
+                    // The projection can be used on either side of `|`. Stop if it would replace
+                    // a subclass implementation with the builtin `dict` merge behavior.
+                    if !base.own_instance_member(db, "__or__").is_undefined()
+                        || !base.own_instance_member(db, "__ror__").is_undefined()
+                    {
+                        return None;
+                    }
+                }
+                None
+            }
         }
     }
 

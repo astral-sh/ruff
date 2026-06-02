@@ -173,7 +173,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 (Box::new([]), true)
             };
 
-        if !matches!(namespace_type, Type::TypedDict(_))
+        if !namespace_type.is_typed_dict_like()
             && !namespace_type.is_assignable_to(
                 db,
                 KnownClass::Dict
