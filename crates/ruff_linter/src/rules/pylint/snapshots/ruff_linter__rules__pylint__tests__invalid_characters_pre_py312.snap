@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 308
+---
+PLE2510 Invalid unescaped character backspace, use "\b" instead
+ --> invalid_characters_pre_py312.py:2:9
+  |
+1 | # https://github.com/astral-sh/ruff/issues/18816
+2 | b = f"{'␈'}"
+  |         ^
+3 | b = f"{value:␈}"
+  |
+help: Replace with escape sequence
+
+PLE2510 Invalid unescaped character backspace, use "\b" instead
+ --> invalid_characters_pre_py312.py:3:14
+  |
+1 | # https://github.com/astral-sh/ruff/issues/18816
+2 | b = f"{'␈'}"
+3 | b = f"{value:␈}"
+  |              ^
+  |
+help: Replace with escape sequence

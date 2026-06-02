@@ -3,8 +3,8 @@
 use std::path::Path;
 
 use ruff_notebook::CellOffsets;
-use ruff_python_ast::PySourceType;
-use ruff_python_ast::token::Tokens;
+use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 
@@ -28,6 +28,7 @@ pub(crate) fn check_tokens(
     stylist: &Stylist,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
+    target_version: PythonVersion,
     context: &mut LintContext,
 ) {
     let comment_ranges = indexer.comment_ranges();
@@ -77,8 +78,38 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
+        let mut interpolated_string_depths: Vec<u32> = Vec::new();
+
         for token in tokens {
-            pylint::rules::invalid_string_characters(context, token, locator);
+            let inside_interpolation = interpolated_string_depths.iter().any(|depth| *depth > 0);
+
+            pylint::rules::invalid_string_characters(
+                context,
+                token,
+                locator,
+                target_version,
+                inside_interpolation,
+            );
+
+            match token.kind() {
+                TokenKind::FStringStart | TokenKind::TStringStart => {
+                    interpolated_string_depths.push(0);
+                }
+                TokenKind::FStringEnd | TokenKind::TStringEnd => {
+                    interpolated_string_depths.pop();
+                }
+                TokenKind::Lbrace => {
+                    if let Some(depth) = interpolated_string_depths.last_mut() {
+                        *depth += 1;
+                    }
+                }
+                TokenKind::Rbrace => {
+                    if let Some(depth) = interpolated_string_depths.last_mut() {
+                        *depth = depth.saturating_sub(1);
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
