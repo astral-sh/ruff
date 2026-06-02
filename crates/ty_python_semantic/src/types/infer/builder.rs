@@ -1743,13 +1743,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
-        let definition_range = definition.kind(self.db()).full_range(self.module());
-        if self.should_bypass_standalone_cache(definition_range) {
-            self.infer_region_definition(definition);
-        } else {
-            let result = infer_definition_types(self.db(), definition);
-            self.extend_definition(result);
+
+        if self.expected_type_collection.is_enabled() {
+            let definition_range = definition.kind(self.db()).full_range(self.module());
+            if self.should_bypass_standalone_cache(definition_range) {
+                self.infer_region_definition(definition);
+                return;
+            }
         }
+
+        let result = infer_definition_types(self.db(), definition);
+        self.extend_definition(result);
     }
 
     fn infer_type_alias_definition(
@@ -5700,10 +5704,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         scope: ScopeId<'db>,
         tcx: TypeContext<'db>,
     ) -> ScopeInferenceForMode<'db> {
+        let ExpectedTypeCollection::Enabled { target_range } = self.expected_type_collection else {
+            return ScopeInferenceForMode::Cached(infer_scope_types(self.db(), scope, tcx));
+        };
+
         let scope_range = scope.node(self.db()).range(self.module());
-        if let Some(target_range) = self
-            .expected_type_collection
-            .overlapping_target_range(scope_range)
+        if scope_range
+            .intersect(target_range)
+            .is_some_and(|overlap| !overlap.is_empty())
         {
             ScopeInferenceForMode::Transient(infer_scope_types_with_expected_types(
                 self.db(),
@@ -7421,19 +7429,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
-            let definition_range = definition.kind(self.db()).full_range(self.module());
-            if self.should_bypass_standalone_cache(definition_range) {
-                let result = self
-                    .builder_for_region(InferenceRegion::Definition(definition))
-                    .finish_definition();
-                let ty = result.binding_type(definition);
-                self.extend_definition(&result);
-                ty
-            } else {
-                let result = infer_definition_types(self.db(), definition);
-                self.extend_definition(result);
-                result.binding_type(definition)
+            if self.expected_type_collection.is_enabled() {
+                let definition_range = definition.kind(self.db()).full_range(self.module());
+                if self.should_bypass_standalone_cache(definition_range) {
+                    let result = self
+                        .builder_for_region(InferenceRegion::Definition(definition))
+                        .finish_definition();
+                    let ty = result.binding_type(definition);
+                    self.extend_definition(&result);
+                    return ty;
+                }
             }
+
+            let result = infer_definition_types(self.db(), definition);
+            self.extend_definition(result);
+            result.binding_type(definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
             self.infer_expression(&named.target, TypeContext::default());
