@@ -273,6 +273,8 @@ pub(crate) fn infer_complete_scope_types<'db>(
 }
 
 fn scope_for_complete_inference<'db>(db: &'db dyn Db, mut scope: ScopeId<'db>) -> ScopeId<'db> {
+    // Scopes that may require type context are inferred during the inference of
+    // their outer scope.
     while scope.accepts_type_context(db) {
         let file = scope.file(db);
         let index = semantic_index(db, file);
@@ -281,8 +283,8 @@ fn scope_for_complete_inference<'db>(db: &'db dyn Db, mut scope: ScopeId<'db>) -
             break;
         };
 
-        // Note that nested lambdas or comprehensions may require walking until we reach an outer
-        // scope that is independent of any type context.
+        // Note that nested lambdas or comprehensions may require walking outward until we reach
+        // an outer scope that is independent of any type context.
         scope = parent_scope.to_scope_id(db, file);
     }
 
@@ -369,11 +371,12 @@ fn infer_scope_types_inner<'db>(
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, file);
 
-    let mut builder =
-        TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope, tcx), index, &module);
-    if let Some(target_range) = expected_type_target_range {
-        builder = builder.with_expected_type_collection(target_range);
-    }
+    let builder = TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope, tcx), index, &module);
+    let builder = if let Some(target_range) = expected_type_target_range {
+        builder.with_expected_type_collection(target_range)
+    } else {
+        builder
+    };
     builder.finish_scope()
 }
 

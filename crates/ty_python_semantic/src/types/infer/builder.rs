@@ -7070,8 +7070,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = self.infer_scope_types_for_mode(scope, yield_tcx);
-        let inference = inference.as_ref();
+        let inference_for_mode = self.infer_scope_types_for_mode(scope, yield_tcx);
+        let inference = inference_for_mode.as_ref();
         self.extend_scope(inference);
         let yield_type = self.comprehension_element_type(elt, inference);
 
@@ -7144,8 +7144,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = self.infer_scope_types_for_mode(scope, tcx);
-        let inference = inference.as_ref();
+        let inference_for_mode = self.infer_scope_types_for_mode(scope, tcx);
+        let inference = inference_for_mode.as_ref();
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -7179,8 +7179,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = self.infer_scope_types_for_mode(scope, tcx);
-        let inference = inference.as_ref();
+        let inference_for_mode = self.infer_scope_types_for_mode(scope, tcx);
+        let inference = inference_for_mode.as_ref();
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -7215,8 +7215,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = self.infer_scope_types_for_mode(scope, tcx);
-        let inference = inference.as_ref();
+        let inference_for_mode = self.infer_scope_types_for_mode(scope, tcx);
+        let inference = inference_for_mode.as_ref();
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -7646,8 +7646,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeContext::new(None)
         };
 
-        let inference = self.infer_scope_types_for_mode(scope, return_tcx);
-        let inference = inference.as_ref();
+        let inference_for_mode = self.infer_scope_types_for_mode(scope, return_tcx);
+        let inference = inference_for_mode.as_ref();
         self.extend_scope(inference);
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
