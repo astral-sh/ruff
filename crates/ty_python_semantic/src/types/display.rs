@@ -45,13 +45,24 @@ use ty_python_core::semantic_index;
 /// This wrapper allows tracking both classes and type aliases together for
 /// disambiguation, since a class and type alias with the same name in different
 /// modules need to be distinguished in error messages.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
 enum NamedItem<'db> {
     Class(ClassLiteral<'db>),
     TypeAlias(TypeAliasType<'db>),
 }
 
 impl<'db> NamedItem<'db> {
+    fn is_same_item(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (NamedItem::Class(left), NamedItem::Class(right)) => left == right,
+            (NamedItem::TypeAlias(left), NamedItem::TypeAlias(right)) => {
+                // Specializations of the same alias share a display name.
+                left.definition(db) == right.definition(db)
+            }
+            _ => false,
+        }
+    }
+
     fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             NamedItem::Class(class) => class.name(db),
@@ -465,7 +476,7 @@ impl<'db> AmbiguousNameCollector<'db> {
                 let value = entry.get_mut();
                 match value {
                     AmbiguityState::Unambiguous(existing) => {
-                        if *existing != item {
+                        if !existing.is_same_item(db, item) {
                             let qualified_name_components = item.qualified_name_components(db);
                             if existing.qualified_name_components(db) == qualified_name_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
@@ -481,7 +492,7 @@ impl<'db> AmbiguousNameCollector<'db> {
                         item: existing,
                         qualified_name_components,
                     } => {
-                        if *existing != item {
+                        if !existing.is_same_item(db, item) {
                             let new_components = item.qualified_name_components(db);
                             if *qualified_name_components == new_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
@@ -519,7 +530,7 @@ impl<'db> AmbiguousNameCollector<'db> {
 
 /// Whether or not an item can be unambiguously identified by its *unqualified* name
 /// given the other types that are present in the same context.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 enum AmbiguityState<'db> {
     /// The item can be displayed unambiguously using its unqualified name.
     Unambiguous(NamedItem<'db>),
