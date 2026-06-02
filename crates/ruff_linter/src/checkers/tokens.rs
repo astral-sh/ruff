@@ -104,7 +104,14 @@ pub(crate) fn check_tokens(
                 _ => {}
             }
 
-            let inside_interpolation = interpolated_string_depths.iter().any(|depth| *depth > 0);
+            let inside_interpolation = match token.kind() {
+                // Middle tokens are literal text or format specs for the current f/t-string, where
+                // backslash escapes are valid. They can still be inside an outer interpolation.
+                TokenKind::FStringMiddle | TokenKind::TStringMiddle => interpolated_string_depths
+                    .split_last()
+                    .is_some_and(|(_, outer_depths)| outer_depths.iter().any(|depth| *depth > 0)),
+                _ => interpolated_string_depths.iter().any(|depth| *depth > 0),
+            };
 
             pylint::rules::invalid_string_characters(
                 context,
