@@ -12,10 +12,13 @@ use crate::types::{KnownClass, Type, TypeContext};
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_keyword_only_dict_call(
         &mut self,
-        func: &ast::Expr,
-        arguments: &ast::Arguments,
+        call_expression: &ast::ExprCall,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
+        let ast::ExprCall {
+            func, arguments, ..
+        } = call_expression;
+
         if !arguments.args.is_empty() {
             return None;
         }
@@ -62,7 +65,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     &self.context,
                     typed_dict,
                     arguments,
-                    func.into(),
+                    func.as_ref().into(),
                     |expr, _| self.expression_type(expr),
                 );
 
@@ -107,9 +110,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
+        // Only the common bare empty `dict()` spelling participates in full-scope collection
+        // inference. Aliases and qualified calls retain the existing call-inference behavior.
+        let collection_expr = (arguments.is_empty()
+            && matches!(func.as_ref(), ast::Expr::Name(name) if name.id == "dict"))
+        .then_some(call_expression.into());
+
         self.infer_collection_literal(
             KnownClass::Dict,
-            None,
+            collection_expr,
             &items,
             &mut infer_elt_ty,
             call_expression_tcx,

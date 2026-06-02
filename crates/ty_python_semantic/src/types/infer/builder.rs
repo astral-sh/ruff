@@ -244,12 +244,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Only populated for expressions that have non-empty flags.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
-    /// The constraints on any collection literals that are accessed in this region.
+    /// The constraints on any collection initializers that are accessed in this region.
     //
     // TODO: Store projected constraint sets directly here instead of specialized receiver types.
-    // Bound-method calls on unconstrained collection literals can introduce method-local typevars
+    // Bound-method calls on unconstrained collection initializers can introduce method-local typevars
     // (for example, `list.sort` constrains `T@list` using `SupportsRichComparisonT@sort`). A
-    // principled representation would store an owned constraint set over the collection literal's
+    // principled representation would store an owned constraint set over the collection initializer's
     // generic context and existentially quantify away the method-local typevars, so combining
     // `xs.append("x")` with `xs.sort()` yields `str ≤ T ≤ SupportsRichComparison` instead of
     // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
@@ -6656,7 +6656,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    // Infer the type of a collection literal expression.
+    // Infer the type of a collection initializer expression.
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
@@ -6670,7 +6670,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
 
-            // Attempt to infer the collection literal using the narrowed type context.
+            // Attempt to infer the collection initializer using the narrowed type context.
             let inferred_ty = speculative_builder.infer_collection_literal_impl(
                 collection_class,
                 collection_expr,
@@ -6710,7 +6710,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    // Infer the type of a collection literal expression.
+    // Infer the type of a collection initializer expression.
     fn infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
@@ -6793,7 +6793,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // If the type context is not compatible with the collection type (e.g., a
                     // `list` literal where a `tuple` is expected), the assignability check
                     // produces an unsatisfiable result. In that case, we simply proceed without
-                    // type context constraints rather than aborting the entire collection literal
+                    // type context constraints rather than aborting the entire collection initializer
                     // inference.
                     Solutions::Unsatisfiable | Solutions::Unconstrained => {}
                     Solutions::Constrained(solutions) => {
@@ -6847,7 +6847,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Avoid projecting and solving a constraint set when contextual inference has already
-        // provided the complete specialization for an empty collection literal.
+        // provided the complete specialization for an empty collection initializer.
         if elts.is_empty()
             && tcx.annotation.is_some()
             && let Some(specialization) = generic_context
@@ -6929,7 +6929,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
             && let Some(collection_def) = self.index.try_definition(collection_def)
         {
-            // For unconstrained collection literals, collect any constraints created by later uses
+            // For unconstrained collection initializers, collect any constraints created by later uses
             // of this definition in the scope.
             for (statement, use_expression) in
                 self.index.constraining_collection_uses(collection_def)
@@ -7960,7 +7960,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Method-local typevars describe requirements imposed by the method, not concrete element
         // types learned for the collection. Until collection-use constraints are represented as
         // projected constraint sets, avoid leaking those method-local typevars into the inferred
-        // collection literal type.
+        // collection initializer type.
         if any_over_type(self.db(), constraint, false, |ty| {
             ty.as_typevar().is_some_and(|typevar| {
                 !receiver_generic_context.contains(self.db(), typevar.identity(self.db()))
@@ -7981,6 +7981,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
 
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
+    }
+
+    fn infer_empty_list_or_set_constructor_call(
+        &mut self,
+        collection_class: KnownClass,
+        call_expression: &ast::ExprCall,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        debug_assert!(matches!(
+            collection_class,
+            KnownClass::List | KnownClass::Set
+        ));
+
+        let elements: [[Option<&ast::Expr>; 1]; 0] = [];
+        let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
+
+        self.infer_collection_literal(
+            collection_class,
+            Some(call_expression.into()),
+            &elements,
+            &mut infer_element_ty,
+            tcx,
+        )
+        .unwrap_or_else(|| collection_class.to_specialized_instance(self.db(), &[Type::unknown()]))
     }
 
     fn infer_call_expression_impl(
@@ -8026,11 +8050,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             arguments,
         } = call_expression;
 
+        // The semantic index only records the common bare constructor spellings. Confirm that a
+        // list or set constructor still resolves to the corresponding builtin before applying
+        // collection-initializer result inference. We still run normal call binding below so that
+        // custom typeshed constructor signatures are validated. Empty dict calls use the dict fast
+        // path below.
+        let collection_initializer_ty = if arguments.is_empty()
+            && let ast::Expr::Name(name) = func.as_ref()
+            && let Some(collection_class) = (match name.id.as_str() {
+                "list" => Some(KnownClass::List),
+                "set" => Some(KnownClass::Set),
+                _ => None,
+            })
+            && callable_type
+                .as_class_literal()
+                .is_some_and(|class| class.is_known(self.db(), collection_class))
+        {
+            Some(self.infer_empty_list_or_set_constructor_call(
+                collection_class,
+                call_expression,
+                call_expression_tcx,
+            ))
+        } else {
+            None
+        };
+
         if callable_type
             .as_class_literal()
             .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
             && let Some(ty) =
-                self.infer_keyword_only_dict_call(func, arguments, call_expression_tcx)
+                self.infer_keyword_only_dict_call(call_expression, call_expression_tcx)
         {
             return ty;
         }
@@ -8327,7 +8376,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Ok(()) => bindings,
             Err(_) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
-                return bindings.return_type(self.db());
+                return collection_initializer_ty
+                    .unwrap_or_else(|| bindings.return_type(self.db()));
             }
         };
 
@@ -8379,12 +8429,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Record the constraints for the receiver of a bound method call, if the receiver is an
-        // unconstrained collection literal.
+        // unconstrained collection initializer.
         if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
 
             if let Some(collection_def) = self.index.unconstrained_collection_binding(value)
                 && let Some((collection_literal, _)) = value_type.class_specialization(self.db())
+                && matches!(
+                    collection_literal.known(self.db()),
+                    Some(KnownClass::List | KnownClass::Set | KnownClass::Dict)
+                )
             {
                 let identity_instance = Type::instance(
                     self.db(),
@@ -8440,7 +8494,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let scope = self.scope();
-        let return_ty = bindings.return_type(db);
+        let return_ty = collection_initializer_ty.unwrap_or_else(|| bindings.return_type(db));
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {

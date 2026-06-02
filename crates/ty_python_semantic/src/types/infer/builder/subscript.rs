@@ -1228,10 +1228,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Record the constraints for the object of the subscript assignment, if the object is an
-        // unconstrained collection literal.
+        // unconstrained collection initializer.
         if is_valid_assignment
             && let Some(collection_def) = self.index.unconstrained_collection_binding(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(db)
+            && matches!(
+                class_literal.known(db),
+                Some(KnownClass::List | KnownClass::Set | KnownClass::Dict)
+            )
         {
             let identity_instance = Type::instance(db, class_literal.identity_specialization(db));
             let collection_generic_context = class_literal.generic_context(db);

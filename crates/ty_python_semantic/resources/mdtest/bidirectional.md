@@ -792,6 +792,63 @@ reveal_type(x1_sorted)  # revealed: list[str]
 ```
 
 ```py
+x1_list = list()
+x1_list.append(1)
+x1_list.append("2")
+reveal_type(x1_list)  # revealed: list[int | str]
+
+x1_set = set()
+x1_set.add(1)
+x1_set.add("2")
+reveal_type(x1_set)  # revealed: set[int | str]
+
+x1_dict = dict()
+x1_dict["a"] = 1
+x1_dict["b"] = "2"
+reveal_type(x1_dict)  # revealed: dict[str, int | str]
+
+def make_list() -> list[str]:
+    result = list()
+    result.append(1)
+    reveal_type(result)  # revealed: list[int | str]
+    return result  # error: [invalid-return-type]
+
+def make_set() -> set[str]:
+    result = set()
+    result.add(1)
+    reveal_type(result)  # revealed: set[int | str]
+    return result  # error: [invalid-return-type]
+
+def make_dict() -> dict[str, str]:
+    result = dict()
+    result["x"] = 1
+    reveal_type(result)  # revealed: dict[str, int | str]
+    return result  # error: [invalid-return-type]
+
+def shadowed_constructors() -> None:
+    class list:
+        def append(self, value: str) -> None: ...
+
+    class set:
+        def add(self, value: str) -> None: ...
+
+    class dict:
+        def update(self, **kwargs: int) -> None: ...
+
+    list_result = list()
+    list_result.append("x")
+    reveal_type(list_result)  # revealed: list
+
+    set_result = set()
+    set_result.add("x")
+    reveal_type(set_result)  # revealed: set
+
+    dict_result = dict()
+    dict_result.update(x=1)
+    reveal_type(dict_result)  # revealed: dict
+```
+
+```py
 class X:
     def __init__(self):
         self.x = []

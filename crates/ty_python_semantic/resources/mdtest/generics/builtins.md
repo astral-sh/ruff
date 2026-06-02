@@ -35,3 +35,53 @@ def f(**kwargs):
 def g(**kwargs: int):
     reveal_type(kwargs)  # revealed: dict[Unknown, Unknown, Unknown]
 ```
+
+## Constructor diagnostics with custom `list` and `set`
+
+Collection-initializer inference should only replace the result type of a bare `list()` or `set()`
+call. We should still validate the call against custom typeshed constructor signatures.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+from typing_extensions import overload
+
+class object: ...
+class int: ...
+class str: ...
+class tuple: ...
+
+class list[T]:
+    @overload
+    def __init__(self, required: int) -> None: ...
+    @overload
+    def __init__(self, required: str) -> None: ...
+
+class set[T]:
+    @overload
+    def __init__(self, required: int) -> None: ...
+    @overload
+    def __init__(self, required: str) -> None: ...
+```
+
+`/typeshed/stdlib/types.pyi`:
+
+```pyi
+class FunctionType: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def overload(func, /): ...
+```
+
+```py
+list()  # error: [no-matching-overload]
+set()  # error: [no-matching-overload]
+```
