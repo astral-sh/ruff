@@ -1388,15 +1388,11 @@ def outer():
         8 |         return x  # Should find the nonlocal x declaration in outer scope
           |                ^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> main.py:3:5
           |
         3 |     x = "outer_value"
           |     -
-        4 |
-        5 |     def inner():
-        6 |         nonlocal x
-          |         ----------
           |
         "#);
     }
@@ -1425,15 +1421,11 @@ def outer():
         6 |         nonlocal xy
           |                  ^^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> main.py:3:5
           |
         3 |     xy = "outer_value"
           |     --
-        4 |
-        5 |     def inner():
-        6 |         nonlocal xy
-          |         -----------
           |
         "#);
     }
@@ -1459,15 +1451,11 @@ def function():
         7 |     return global_var  # Should find the global variable declaration
           |            ^^^^^^^^^^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> main.py:2:1
           |
         2 | global_var = "global_value"
           | ----------
-        3 |
-        4 | def function():
-        5 |     global global_var
-          |     -----------------
           |
         "#);
     }
@@ -1493,15 +1481,11 @@ def function():
         5 |     global global_var
           |            ^^^^^^^^^^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> main.py:2:1
           |
         2 | global_var = "global_value"
           | ----------
-        3 |
-        4 | def function():
-        5 |     global global_var
-          |     -----------------
           |
         "#);
     }

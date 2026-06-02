@@ -934,9 +934,12 @@ impl<'db> DefinitionKind<'db> {
     }
 
     /// Returns `true` if this definition is user-visible (i.e., not an internal
-    /// control-flow construct like a loop header definition).
+    /// synthetic definition like a loop header or nested bindings definition).
     pub const fn is_user_visible(&self) -> bool {
-        !self.is_loop_header()
+        !matches!(
+            self,
+            DefinitionKind::LoopHeader(_) | DefinitionKind::NestedBindings(_)
+        )
     }
 
     /// Returns the [`TextRange`] of the definition target.
