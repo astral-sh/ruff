@@ -87,7 +87,7 @@ def f() -> None:
 Type aliases cannot contain `Self`, even when they are defined in a class body:
 
 ```py
-from typing import Annotated, Self
+from typing import Annotated, Self, cast
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
@@ -100,6 +100,7 @@ class C:
     type Bound[T: Self] = T
 
     type Metadata = Annotated[int, tuple[Self]]
+    type BoundMetadata[T: Annotated[int, cast(Self, object())]] = T
 ```
 
 ## `Self` in type parameter defaults
@@ -110,11 +111,13 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Self
+from typing import Annotated, Self, cast
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     type Default[T = Self] = T
+
+    type DefaultMetadata[T = Annotated[int, cast(Self, object())]] = T
 ```
 
 ## Aliased type aliases

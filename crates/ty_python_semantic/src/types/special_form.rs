@@ -744,11 +744,14 @@ impl SpecialFormType {
             )),
 
             Self::TypingSelf => {
+                let in_type_alias_type_parameters = matches!(
+                    scope_id.node(db),
+                    NodeWithScopeKind::TypeAliasTypeParameters(_)
+                ) && !inference_flags
+                    .contains(InferenceFlags::IN_ANNOTATED_METADATA);
+
                 if inference_flags.contains(InferenceFlags::IN_TYPE_ALIAS)
-                    || matches!(
-                        scope_id.node(db),
-                        NodeWithScopeKind::TypeAliasTypeParameters(_)
-                    )
+                    || in_type_alias_type_parameters
                 {
                     return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
                 }

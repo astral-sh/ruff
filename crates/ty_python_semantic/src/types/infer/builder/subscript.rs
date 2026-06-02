@@ -1955,9 +1955,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .context
             .inference_flags
             .replace(InferenceFlags::IN_TYPE_ALIAS, false);
+        let previous_in_annotated_metadata = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_ANNOTATED_METADATA, true);
         for metadata_element in &arguments[1..] {
             self.infer_expression(metadata_element, TypeContext::default());
         }
+        self.context.inference_flags.set(
+            InferenceFlags::IN_ANNOTATED_METADATA,
+            previous_in_annotated_metadata,
+        );
         self.context
             .inference_flags
             .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);
