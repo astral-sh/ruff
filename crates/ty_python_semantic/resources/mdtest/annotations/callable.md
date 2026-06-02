@@ -494,9 +494,7 @@ def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
 
-        # TODO: should be `property`
-        # (or complain that we don't know that `type(c)` has the attribute at all!)
-        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+        reveal_type(type(c).__qualname__)  # revealed: str
 
         # `hasattr` only guarantees that an attribute is readable.
         #

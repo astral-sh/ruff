@@ -4,6 +4,7 @@ use ty_python_core::predicate::{PatternPredicateKind, SequencePatternPredicateKi
 
 use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::narrow::runtime_instance_constraint_for_class_literal;
 use crate::types::signatures::CallableSignature;
 use crate::types::{
     CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature,
@@ -184,7 +185,9 @@ pub(crate) fn definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
                 match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
-                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
+                    Type::ClassLiteral(class) => {
+                        runtime_instance_constraint_for_class_literal(db, class)
+                    }
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                         callable_pattern_type(db)
                     }

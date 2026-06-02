@@ -214,7 +214,6 @@ pub enum TypedDictType<'db> {
 pub enum SynthesizedTypedDictKind {
     Schema,
     Patch,
-    UnknownSchema,
 }
 
 impl<'db> TypedDictType<'db> {
@@ -222,24 +221,15 @@ impl<'db> TypedDictType<'db> {
         Self::Class(defining_class)
     }
 
-    /// Return the structural top type of all open `TypedDict`s.
+    /// Return the structural top type of all `TypedDict`s.
     ///
-    /// Every `TypedDict` is a subtype of an open empty `TypedDict`, because it imposes no
-    /// requirements on known fields and its implicit extra items are read-only `object`s.
+    /// Every `TypedDict` is a subtype of an empty schema with read-only `object` extra items.
     pub(crate) fn open_empty(db: &'db dyn Db) -> Self {
-        Self::Synthesized(SynthesizedTypedDictType::unknown_schema(db))
-    }
-
-    /// Return whether this `TypedDict` represents an unknown schema.
-    ///
-    /// Unknown schemas are represented structurally as open empty `TypedDict`s, but carry a
-    /// distinct synthesized kind because their read and member behavior differs from declared or
-    /// derived empty schemas.
-    pub(crate) fn is_unknown_schema(self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Class(_) => false,
-            Self::Synthesized(synthesized) => synthesized.is_unknown_schema(db),
-        }
+        Self::from_schema_items_with_openness(
+            db,
+            TypedDictSchema::default(),
+            TypedDictOpenness::extra(db, Type::object(), true),
+        )
     }
 
     pub(crate) fn defining_class(self) -> Option<ClassType<'db>> {
@@ -2917,21 +2907,8 @@ impl<'db> SynthesizedTypedDictType<'db> {
         Self::new(db, items, SynthesizedTypedDictKind::Patch, openness)
     }
 
-    fn unknown_schema(db: &'db dyn Db) -> Self {
-        Self::new(
-            db,
-            TypedDictSchema::default(),
-            SynthesizedTypedDictKind::UnknownSchema,
-            TypedDictOpenness::ImplicitlyOpen,
-        )
-    }
-
     fn is_patch(self, db: &'db dyn Db) -> bool {
         self.kind(db) == SynthesizedTypedDictKind::Patch
-    }
-
-    fn is_unknown_schema(self, db: &'db dyn Db) -> bool {
-        self.kind(db) == SynthesizedTypedDictKind::UnknownSchema
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -2960,7 +2937,6 @@ impl<'db> SynthesizedTypedDictType<'db> {
         match self.kind(db) {
             SynthesizedTypedDictKind::Schema => Self::schema(db, items, openness),
             SynthesizedTypedDictKind::Patch => Self::patch(db, items, openness),
-            SynthesizedTypedDictKind::UnknownSchema => Self::unknown_schema(db),
         }
     }
 }

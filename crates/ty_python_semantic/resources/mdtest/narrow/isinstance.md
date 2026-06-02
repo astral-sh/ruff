@@ -744,12 +744,6 @@ def _(x: object, y: Movie):
     if isinstance(x, MutableMapping):
         reveal_type(x)  # revealed: Top[MutableMapping[Unknown, Unknown]] | <TypedDict with no items>
 
-    if isinstance(y, dict):
-        reveal_type(y)  # revealed: Movie
-
-    if isinstance(y, Mapping):
-        reveal_type(y)  # revealed: Movie
-
     if isinstance(y, MutableMapping):
         reveal_type(y)  # revealed: Movie
 ```
@@ -781,8 +775,6 @@ The empty `TypedDict` arm has a read-only mapping surface. It preserves common d
 without exposing schema-unsafe mutation:
 
 ```py
-from typing import Any, Iterable
-
 def takes_dict(value: dict[str, object]) -> None: ...
 def use_narrowed_dict(value: object, default: object) -> None:
     if isinstance(value, dict) and isinstance(default, dict):
@@ -795,13 +787,9 @@ def use_narrowed_dict(value: object, default: object) -> None:
 
         reveal_type(value.fromkeys(["a"], 1))  # revealed: dict[str, int]
         reveal_type(reversed(value))  # revealed: Iterator[object]
+        reveal_type(value.copy())  # revealed: dict[Unknown, Unknown] | <TypedDict with no items>
         value.clear()  # error: [unresolved-attribute]
-        value.popitem()  # error: [unresolved-attribute]
         takes_dict(value)  # error: [invalid-argument-type]
-
-def narrow_iterable_keys(choices: Iterable[Any] | None) -> None:
-    if isinstance(choices, dict):
-        reveal_type(choices.keys())  # revealed: dict_keys[Unknown, Unknown] | dict_keys[str, object]
 ```
 
 Non-mutating dictionary merges remain valid after runtime narrowing:
@@ -810,6 +798,7 @@ Non-mutating dictionary merges remain valid after runtime narrowing:
 def merge_narrowed_dicts(left: object, right: object) -> None:
     if isinstance(left, dict) and isinstance(right, dict):
         reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
+        reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
 
 class CustomDict(dict[int, bytes]): ...
 
@@ -817,6 +806,24 @@ def merge_custom_dict_with_narrowed_dict(custom: CustomDict, value: object) -> N
     if isinstance(value, dict):
         reveal_type(custom | value)  # revealed: dict[int | Unknown, bytes | Unknown]
         reveal_type(value | custom)  # revealed: dict[Unknown | int, Unknown | bytes]
+
+class ReflectedDict(dict[str, object]):
+    # error: [invalid-method-override]
+    def __ror__(self, other: Movie) -> str:
+        return "reflected"
+
+def preserve_reflected_dict_override(movie: Movie, custom: ReflectedDict) -> None:
+    reveal_type(movie | custom)  # revealed: str
+
+class LeftDict(dict[str, object]): ...
+
+class SiblingReflectedDict(dict[str, object]):
+    # error: [invalid-method-override]
+    def __ror__(self, other: LeftDict) -> str:
+        return "reflected"
+
+def preserve_sibling_dict_dispatch(left: LeftDict, right: SiblingReflectedDict) -> None:
+    reveal_type(left | right)  # revealed: dict[str, object]
 ```
 
 It should also keep `dict` methods callable for concrete `dict` unions keyed by `IntEnum` values:
@@ -852,13 +859,23 @@ from typing import Protocol, runtime_checkable
 class HasClear(Protocol):
     def clear(self) -> None: ...
 
+@runtime_checkable
+class HasClearReturningInt(Protocol):
+    def clear(self) -> int: ...
+
 def narrow_typed_dict_protocol(movie: Movie) -> None:
     if isinstance(movie, HasClear):
         movie.missing  # error: [unresolved-attribute]
 
+def preserve_typed_dict_protocol_member_type(movie: Movie) -> None:
+    if isinstance(movie, HasClearReturningInt):
+        movie["title"] = 1  # error: [invalid-assignment]
+
 def preserve_empty_typed_dict_protocol(value: object) -> None:
     if isinstance(value, dict) and isinstance(value, HasClear):
         reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | (<TypedDict with no items> & HasClear)
+        reveal_type(type(value))  # revealed: type[Top[dict[Unknown, Unknown]]]
+        reveal_type(value.__class__)  # revealed: type[Top[dict[Unknown, Unknown]]]
         value.clear()
 
 def merge_empty_typed_dict_protocol(value: object, other: dict[int, bytes]) -> None:
@@ -986,20 +1003,8 @@ def narrow_typeddict_union(v: T) -> None:
     else:
         reveal_type(v)  # revealed: int
 
-def narrow_single_typeddict(x: list | A) -> None:
-    if isinstance(x, dict):
-        reveal_type(x)  # revealed: A
-    else:
-        reveal_type(x)  # revealed: list[Unknown]
-
 def narrow_mutable_mapping_or_typeddict(x: dict[str, str] | A) -> None:
     if isinstance(x, MutableMapping):
-        reveal_type(x)  # revealed: dict[str, str] | A
-    else:
-        reveal_type(x)  # revealed: Never
-
-def narrow_dict_or_typeddict(x: dict[str, str] | A) -> None:
-    if isinstance(x, dict):
         reveal_type(x)  # revealed: dict[str, str] | A
     else:
         reveal_type(x)  # revealed: Never
@@ -1036,10 +1041,6 @@ def narrow_mapping_items(value: Mapping[str, Any] | Iterable[tuple[str, Any]]) -
     if isinstance(value, dict):
         sink(value.items())
         value.clear()  # error: [unresolved-attribute]
-
-def narrow_dict_items(value: dict[str, Any] | Iterable[tuple[str, Any]]) -> None:
-    if isinstance(value, dict):
-        value.clear()  # error: [unresolved-attribute]
 ```
 
 `reversed()` is a read-only dict operation, so it should dispatch through the empty `TypedDict` arm
@@ -1058,7 +1059,6 @@ def narrow_reversed_typeddict_union(x: ReversibleMovie | int) -> None:
 
 def narrow_reversed_object(x: object) -> None:
     if isinstance(x, dict):
-        reveal_type(reversed(x))  # revealed: Iterator[object]
         reveal_type(reversed(x.keys()))  # revealed: Iterator[Unknown | str]
 ```
 

@@ -18,8 +18,8 @@ use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
-    TypedDictField, TypedDictOpenness, TypedDictSchema, deferred_functional_typed_dict_openness,
-    deferred_functional_typed_dict_schema,
+    SynthesizedTypedDictType, TypedDictField, TypedDictOpenness, TypedDictSchema,
+    deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
@@ -697,13 +697,11 @@ fn synthesize_typed_dict_view_method<'db>(
 }
 
 /// Synthesize a merge operator (`__or__`, `__ror__`, or `__ior__`) for a `TypedDict`.
-fn synthesize_typed_dict_merge<'db>(
+pub(super) fn synthesize_typed_dict_merge<'db>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     name: &str,
 ) -> Type<'db> {
-    let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]>;
-
     let first_overload_value_ty = if name == "__ior__"
         && let Type::TypedDict(typed_dict) = instance_ty
     {
@@ -718,10 +716,11 @@ fn synthesize_typed_dict_merge<'db>(
             .with_annotated_type(first_overload_value_ty),
     ];
 
-    overloads = smallvec::smallvec![Signature::new(
-        Parameters::new(db, first_overload_parameters,),
-        instance_ty,
-    )];
+    let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]> =
+        smallvec::smallvec![Signature::new(
+            Parameters::new(db, first_overload_parameters,),
+            instance_ty,
+        )];
 
     if name != "__ior__" {
         let partial_ty = if let Type::TypedDict(td) = instance_ty {
@@ -762,6 +761,24 @@ fn synthesize_typed_dict_merge<'db>(
             Parameters::new(db, overload_three_parameters),
             dict_return_ty,
         ));
+
+        let top_dict_ty = KnownClass::Dict
+            .to_instance_unknown(db)
+            .top_materialization(db);
+        let open_empty_typed_dict_ty = Type::TypedDict(TypedDictType::open_empty(db));
+        if instance_ty == top_dict_ty || instance_ty == open_empty_typed_dict_ty {
+            let runtime_dict_top =
+                UnionType::from_elements(db, [top_dict_ty, open_empty_typed_dict_ty]);
+            let parameters = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("value")))
+                    .with_annotated_type(runtime_dict_top),
+            ];
+            let return_ty =
+                KnownClass::Dict.to_specialized_instance(db, &[Type::unknown(), Type::unknown()]);
+            overloads.push(Signature::new(Parameters::new(db, parameters), return_ty));
+        }
     }
 
     Type::Callable(CallableType::new(
@@ -997,6 +1014,25 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 }
 
+fn typed_dict_fallback_member<'db>(
+    db: &'db dyn Db,
+    new_upper_bound: Type<'db>,
+    lookup_policy: MemberLookupPolicy,
+    name: &str,
+) -> PlaceAndQualifiers<'db> {
+    KnownClass::TypedDictFallback
+        .to_class_literal(db)
+        .find_name_in_mro_with_policy(db, name, lookup_policy)
+        .expect("Will return Some() when called on class literal")
+        .map_type(|ty| {
+            ty.apply_type_mapping(
+                db,
+                &TypeMapping::ReplaceSelf { new_upper_bound },
+                TypeContext::default(),
+            )
+        })
+}
+
 pub(super) fn typed_dict_class_member<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
@@ -1004,15 +1040,12 @@ pub(super) fn typed_dict_class_member<'db>(
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let fallback_member = KnownClass::TypedDictFallback
-        .to_class_literal(db)
-        .find_name_in_mro_with_policy(db, name, lookup_policy)
-        .expect("Will return Some() when called on class literal")
-        .map_type(|ty| {
-            let new_upper_bound = determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
-            let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
-            ty.apply_type_mapping(db, &mapping, TypeContext::default())
-        });
+    let fallback_member = typed_dict_fallback_member(
+        db,
+        determine_upper_bound(db, self_class, ClassBase::is_typed_dict),
+        lookup_policy,
+        name,
+    );
     if !fallback_member.is_undefined() {
         return fallback_member;
     }
@@ -1043,4 +1076,25 @@ pub(super) fn typed_dict_class_member<'db>(
     }
 
     fallback_member
+}
+
+/// Look up a member on a synthesized `TypedDict` schema.
+///
+/// Synthesized schemas have no class literal to provide an MRO, so synthesize schema-sensitive
+/// methods directly and then use the standard `TypedDict` fallback for shared methods.
+pub(crate) fn synthesized_typed_dict_member<'db>(
+    db: &'db dyn Db,
+    synthesized: SynthesizedTypedDictType<'db>,
+    lookup_policy: MemberLookupPolicy,
+    name: &str,
+) -> PlaceAndQualifiers<'db> {
+    let typed_dict = TypedDictType::Synthesized(synthesized);
+
+    if let Some(member) = synthesize_typed_dict_method(db, typed_dict, name, || {
+        TypedDictFields::Dynamic(synthesized.items(db))
+    }) {
+        return Member::definitely_declared(member).inner;
+    }
+
+    typed_dict_fallback_member(db, Type::TypedDict(typed_dict), lookup_policy, name)
 }

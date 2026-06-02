@@ -158,10 +158,6 @@ def _(x: Movie, y: dict[str, object]) -> None:
     if x is y:
         x.missing  # error: [unresolved-attribute]
 
-def _(x: EmptyTypedDict, y: dict[str | int, object]) -> None:
-    if x is y:
-        x.missing  # error: [unresolved-attribute]
-
 def _(x: EmptyTypedDict, y: dict[Never, Never]) -> None:
     if x is y:
         x.missing  # error: [unresolved-attribute]

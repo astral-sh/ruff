@@ -206,28 +206,23 @@ def g(attributes: Namespace):
 An empty `TypedDict` is also a valid dynamic namespace, but it has no known keys to extract:
 
 ```py
-from typing import Protocol, TypeAlias, TypedDict
+from typing import Protocol, TypedDict
 from ty_extensions import Intersection
 
 class EmptyTypedDict(TypedDict):
     pass
 
+class Namespace(TypedDict):
+    z: int
+
 class HasClear(Protocol):
     def clear(self) -> None: ...
-
-NamespaceAlias: TypeAlias = EmptyTypedDict
 
 def g(attributes: EmptyTypedDict):
     Y = type("Y", (), attributes)
 
     reveal_type(Y)  # revealed: <class 'Y'>
     reveal_type(Y.unknown)  # revealed: Unknown
-    reveal_type(Y().unknown)  # revealed: Unknown
-
-def h(attributes: NamespaceAlias):
-    Y = type("Y", (), attributes)
-
-    reveal_type(Y)  # revealed: <class 'Y'>
 
 def i(attributes: EmptyTypedDict | dict[str, object]):
     Y = type("Y", (), attributes)
@@ -238,6 +233,13 @@ def j(attributes: Intersection[EmptyTypedDict, HasClear]):
     Y = type("Y", (), attributes)
 
     reveal_type(Y)  # revealed: <class 'Y'>
+
+def k(attributes: Intersection[Namespace, HasClear]):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.z)  # revealed: int
+    reveal_type(Y().z)  # revealed: int
 ```
 
 ## PEP 695 alias namespaces

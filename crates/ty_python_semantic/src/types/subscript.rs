@@ -579,9 +579,7 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `person["name"]`, return `str`
-            (Type::TypedDict(typed_dict), _)
-                if !typed_dict.is_unknown_schema(db) && expr_context != ast::ExprContext::Store =>
-            {
+            (Type::TypedDict(typed_dict), _) if expr_context != ast::ExprContext::Store => {
                 Some(typed_dict_subscript(db, typed_dict, slice_ty))
             }
 

@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
+
 use crate::Db;
 use crate::types::class::{
     ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
 };
-use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
     report_instance_layout_conflict,
@@ -13,46 +14,50 @@ use crate::types::infer::builder::{
         DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
     },
 };
-use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
+use crate::types::{
+    IntersectionType, KnownClass, SubclassOfType, Type, TypeContext, UnionType,
+    definition_expression_type,
+};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 use ty_python_core::definition::Definition;
 
-struct DynamicClassNamespace;
-type DynamicClassNamespaceVisitor<'db> = CycleDetector<DynamicClassNamespace, Type<'db>, bool>;
-
-/// Return whether every inhabitant of `ty` can be used as the namespace in a three-argument
-/// `type()` call.
-fn is_assignable_to_dynamic_class_namespace<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    fn imp<'db>(
+/// Extract the `TypedDict` fields constrained by a dynamic class namespace type.
+fn typed_dict_namespace_members<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<BTreeMap<Name, Type<'db>>> {
+    fn collect<'db>(
         db: &'db dyn Db,
         ty: Type<'db>,
-        visitor: &DynamicClassNamespaceVisitor<'db>,
+        members: &mut BTreeMap<Name, Type<'db>>,
     ) -> bool {
-        match ty {
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .all(|element| imp(db, *element, visitor)),
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .any(|element| imp(db, *element, visitor)),
-            Type::TypeAlias(alias) => visitor.visit(ty, || imp(db, alias.value_type(db), visitor)),
-            _ => {
-                matches!(ty, Type::TypedDict(_))
-                    || ty.is_assignable_to(
-                        db,
-                        KnownClass::Dict.to_specialized_instance(
-                            db,
-                            &[KnownClass::Str.to_instance(db), Type::any()],
-                        ),
-                    )
+        match ty.resolve_type_alias(db) {
+            Type::TypedDict(typed_dict) => {
+                for (name, field) in typed_dict.items(db) {
+                    let ty = field.declared_ty;
+                    members
+                        .entry(name.clone())
+                        .and_modify(|existing| {
+                            *existing = IntersectionType::from_two_elements(db, *existing, ty);
+                        })
+                        .or_insert(ty);
+                }
+                true
             }
+            Type::Intersection(intersection) => {
+                let mut found = false;
+                for positive in intersection.positive(db) {
+                    found |= collect(db, *positive, members);
+                }
+                found
+            }
+            _ => false,
         }
     }
 
-    imp(db, ty, &DynamicClassNamespaceVisitor::default())
+    let mut members = BTreeMap::new();
+    collect(db, ty, &mut members).then_some(members)
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -197,22 +202,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     })
                     .collect();
                 (members, !all_keys_are_string_literals)
-            } else if let Some(typed_dict) = namespace_type.resolve_type_alias(db).as_typed_dict() {
-                // `namespace` is a TypedDict instance. Extract known keys as members.
+            } else if let Some(typed_dict_members) =
+                typed_dict_namespace_members(db, namespace_type)
+            {
+                // `namespace` contains a TypedDict instance. Extract known keys as members.
                 // TypedDicts are "open" (can have additional string keys), so this
                 // is still a dynamic namespace for unknown attributes.
-                let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
-                    .items(db)
-                    .iter()
-                    .map(|(name, field)| (name.clone(), field.declared_ty))
-                    .collect();
+                let members: Box<[(ast::name::Name, Type<'db>)]> =
+                    typed_dict_members.into_iter().collect();
                 (members, true)
             } else {
                 // `namespace` is not a dict literal, so it's dynamic.
                 (Box::new([]), true)
             };
 
-        if !is_assignable_to_dynamic_class_namespace(db, namespace_type)
+        let namespace_target = UnionType::from_two_elements(
+            db,
+            KnownClass::Dict
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
+            Type::open_empty_typed_dict(db),
+        );
+
+        if !namespace_type.is_assignable_to(db, namespace_target)
             && let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
