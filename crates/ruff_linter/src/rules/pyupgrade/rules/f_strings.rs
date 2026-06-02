@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
@@ -327,10 +327,11 @@ impl FStringConversion {
                     // string, we can't convert the format string to an f-string. For example,
                     // converting `"{x} {x}".format(x=foo())` would result in `f"{foo()} {foo()}"`,
                     // which would call `foo()` twice.
-                    if !seen.insert(specifier) {
-                        if any_over_expr(arg, &Expr::is_call_expr) {
-                            return Ok(Self::SideEffects);
-                        }
+                    //
+                    // This is also true for builtins, so we don't treat them as special when
+                    // checking for effects here.
+                    if !seen.insert(specifier) && contains_effect(arg, |_| false) {
+                        return Ok(Self::SideEffects);
                     }
 
                     converted.push_str(&formatted_expr(

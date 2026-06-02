@@ -1082,7 +1082,7 @@ def _(
     # `NotCallable` would fail with call-non-callable
     # We only show the call-top-callable error (it's more specific)
     # error: [call-top-callable]
-    x()
+    reveal_type(x())  # revealed: object
 ```
 
 ### Keyword arguments

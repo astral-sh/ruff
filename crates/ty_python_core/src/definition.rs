@@ -26,6 +26,7 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Ord, PartialOrd)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     pub file: File,
@@ -198,6 +199,10 @@ impl<'db> Definitions<'db> {
 
     pub fn push(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
+    }
+
+    pub(crate) fn into_boxed_slice(self) -> Box<[Definition<'db>]> {
+        self.definitions.into_vec().into_boxed_slice()
     }
 }
 
@@ -529,7 +534,7 @@ impl ParameterDefinitionNodeRef<'_> {
         match self {
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
-            Self::Parameter(node) => node.into(),
+            Self::Parameter(node) => (&node.parameter).into(),
         }
     }
 }
@@ -1500,7 +1505,10 @@ pub struct DefinitionNodeKey(NodeKey);
 
 impl DefinitionNodeKey {
     pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
-        Self(NodeKey::from_node(node))
+        match node {
+            ast::AnyNodeRef::ParameterWithDefault(parameter) => parameter.into(),
+            _ => Self(NodeKey::from_node(node)),
+        }
     }
 
     pub fn from_assignment(node: &ast::StmtAssign) -> impl Iterator<Item = DefinitionNodeKey> {
@@ -1596,7 +1604,7 @@ impl From<&ast::Parameter> for DefinitionNodeKey {
 
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
     fn from(node: &ast::ParameterWithDefault) -> Self {
-        Self(NodeKey::from_node(node))
+        Self(NodeKey::from_node(&node.parameter))
     }
 }
 
@@ -1604,7 +1612,7 @@ impl From<ast::AnyParameterRef<'_>> for DefinitionNodeKey {
     fn from(value: ast::AnyParameterRef) -> Self {
         Self(match value {
             ast::AnyParameterRef::Variadic(node) => NodeKey::from_node(node),
-            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(node),
+            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(&node.parameter),
         })
     }
 }

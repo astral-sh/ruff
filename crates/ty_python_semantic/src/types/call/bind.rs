@@ -283,7 +283,17 @@ impl<'db> BindingsElement<'db> {
     }
 
     fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        IntersectionType::from_elements(db, self.items.iter().map(|item| item.return_type(db)))
+        if self.is_callable() {
+            IntersectionType::from_elements(
+                db,
+                self.items
+                    .iter()
+                    .filter(|item| item.is_callable())
+                    .map(|item| item.return_type(db)),
+            )
+        } else {
+            Type::unknown()
+        }
     }
 
     /// Check types for all bindings in this element.
@@ -1835,6 +1845,21 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::IsConstraintSetAssignableTo) => {
+                            if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let ty_a = type_form_argument(db, *ty_a);
+                                let ty_b = type_form_argument(db, *ty_b);
+                                let constraints = ConstraintSetBuilder::new();
+                                let result = constraints.into_owned(|constraints| {
+                                    ty_a.when_constraint_set_assignable_to(db, ty_b, constraints)
+                                });
+                                let tracked = InternedConstraintSet::new(db, result);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
+                                ));
+                            }
+                        }
+
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let ty_a = type_form_argument(db, *ty_a);
@@ -2541,6 +2566,15 @@ impl<'db> Bindings<'db> {
                         let set = constraints.load(db, tracked.constraints(db));
                         let result = set.satisfied_by_all_typevars(db, &constraints, inferable);
                         overload.set_return_type(Type::bool_literal(result));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
+                    ) => {
+                        let tracked = tracked.with_detailed_display(db);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
                     }
 
                     Type::ClassLiteral(class) => match class.known(db) {

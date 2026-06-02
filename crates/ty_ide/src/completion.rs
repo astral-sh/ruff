@@ -982,7 +982,7 @@ impl<'m> ContextCursor<'m> {
             // invalid we extract the token under the self and check if it makes
             // up that "empty space" inside the Parameters Node. If it does, we know
             // that we are still binding variables, just that the current state is
-            // syntatically invalid. Hence we suppress autocomplete suggestons
+            // syntactically invalid. Hence we suppress autocomplete suggestons
             // also in those cases.
             ast::AnyNodeRef::Parameters(params) => {
                 if !params.range.contains_range(self.range) {
@@ -1823,7 +1823,7 @@ fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'
 
     // Note that we specifically omit the `type` keyword here, since
     // it will be included via `builtins`. This does make its sorting
-    // priority slighty different than other keywords, but it's not
+    // priority slightly different than other keywords, but it's not
     // clear (to me, AG) if that's an issue or not. Since the builtin
     // completion has an actual type associated with it, we use that
     // instead of a keyword completion.
@@ -9927,7 +9927,7 @@ bar(y_true=y<CURSOR>
 
     // Ideally, we should favour completions that are definitely raisable
     // here. However, doing so would require `exception_ty` to fall back to
-    // token matching when AST-matching fails, making the function signficantly
+    // token matching when AST-matching fails, making the function significantly
     // more complex. At the time of writing, this trade-off was not
     // considered worthwhile.
     //
@@ -10259,7 +10259,7 @@ raise <CURSOR>
                 // N.B. We very much want to use the default settings
                 // here, so that our test environment matches the
                 // production environment. If a default changes, the
-                // tests should be fixed to accomodate that change
+                // tests should be fixed to accommodate that change
                 // as well. ---AG
                 settings: CompletionSettings::default(),
                 capabilities: CompletionCapabilities::default(),

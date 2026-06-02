@@ -163,6 +163,16 @@ class ConstraintSet:
     def __and__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __or__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __invert__(self) -> ConstraintSet: ...
+    def with_detailed_display(self) -> ConstraintSet:
+        """
+        Returns a copy of this constraint set that will display the full
+        constraint formula when rendered as a string.
+
+        Typically we only display "bool" for a non-trivial constraint set, to
+        help ensure that we do not write test cases that depend on how
+        constraint sets are rendered. But it can be useful to see the full
+        detail for debugging purposes.
+        """
 
 class GenericContext:
     """
@@ -191,6 +201,21 @@ def is_subtype_of(ty: TypeForm[object], of: TypeForm[object]) -> ConstraintSet:
 
 def is_assignable_to(ty: TypeForm[object], to: TypeForm[object]) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is `assignable`_ to `to`.
+
+    .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    """
+
+def is_constraint_set_assignable_to(
+    ty: TypeForm[object],
+    to: TypeForm[object],
+) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is `assignable`_ to `to`.
+
+    This differs from `is_assignable_to` in how it treats typevars.
+    `is_assignable_to` will assume that all typevars are non-inferable, and will
+    require all possible specializations of a typevar to satisfy the relation.
+    This method will instead return a constraint set describing which
+    specializations (possibly not all of them) satisfy the relation.
 
     .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     """

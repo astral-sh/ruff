@@ -1121,6 +1121,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
                     }
+                    KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
+                        return f.write_str("bound method `ConstraintSet.with_detailed_display`");
+                    }
                 };
 
                 let class_ty = cls.to_class_literal(self.db);
@@ -3087,7 +3090,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(ty).write_str("ConstraintSet")?;
                 let constraints = ConstraintSetBuilder::new();
                 let set = constraints.load(self.db, interned_set.constraints(self.db));
-                if set.is_always_satisfied(self.db) {
+                if interned_set.detailed_display(self.db) {
+                    write!(f, "[{}]", set.display(self.db))
+                } else if set.is_always_satisfied(self.db) {
                     f.write_str("[Literal[True]]")
                 } else if set.is_never_satisfied(self.db) {
                     f.write_str("[Literal[False]]")
@@ -3135,8 +3140,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Callable(callable) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(Type::SpecialForm(SpecialFormType::Callable))
-                    .write_str("typing.Callable")?;
+                // Ensure that when we go-to-definition on an inlay hint for a `Callable`,
+                // regardless of whether it's imported from `collections.abc` or `typing`,
+                // we go to `typing.pyi` because in typeshed there is no `Callable` in
+                // `collections.abc`.
+                f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
+                    .write_str("Callable")?;
                 f.write_str(" special-form '")?;
                 callable.display(self.db).fmt_detailed(f)?;
                 f.write_str("'>")
