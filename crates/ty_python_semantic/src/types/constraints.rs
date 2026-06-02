@@ -5601,7 +5601,14 @@ impl PathAssignments {
         self.map.merge(&single_map);
         drop(single_map);
 
-        for existing in self.discovered.keys().dropping_back(1) {
+        // Only calculate pair sequents for constraints that we have actually encountered while
+        // traversing the BDD. `discovered` also contains constraints from branch alternatives,
+        // which do not affect the result unless we eventually add an assignment for them.
+        for (existing, processed) in &self.discovered {
+            if !*processed || *existing == constraint {
+                continue;
+            }
+
             let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
             self.map.merge(&pair_map);
         }
@@ -6369,5 +6376,35 @@ mod tests {
                 └─₀ never
             "#},
         );
+    }
+
+    #[test]
+    fn path_assignments_only_discovers_pairs_of_processed_constraints() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let v = create_typevar(&db, "V");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .node
+            .root_constraint(&builder)
+            .unwrap();
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str)
+            .node
+            .root_constraint(&builder)
+            .unwrap();
+        let v_bool = create_constraint(&db, &builder, v, KnownClass::Bool)
+            .node
+            .root_constraint(&builder)
+            .unwrap();
+        let mut path = PathAssignments::new([t_int, u_str, v_bool]);
+
+        path.add_assignment(&db, &builder, t_int.when_true(), 0, false)
+            .unwrap();
+        assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 0);
+
+        path.add_assignment(&db, &builder, u_str.when_true(), 1, false)
+            .unwrap();
+        assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 1);
     }
 }
