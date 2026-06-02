@@ -6124,6 +6124,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     range: _,
                                     node_index: _,
                                     expression,
+                                    expression_source: _,
                                     debug_text,
                                     conversion,
                                     format_spec,

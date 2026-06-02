@@ -343,6 +343,8 @@ pub struct InterpolatedElement {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
     pub expression: Box<Expr>,
+    /// The source text of the expression (e.g., `00` in `t"{00}"`).
+    pub expression_source: compact_str::CompactString,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
     pub format_spec: Option<Box<InterpolatedStringFormatSpec>>,

@@ -128,6 +128,7 @@ mod print_arguments {
             expr => vec![InterpolatedStringElement::Interpolation(
                 InterpolatedElement {
                     expression: Box::new(expr.clone()),
+                    expression_source: "".into(),
                     debug_text: None,
                     conversion: ConversionFlag::None,
                     format_spec: None,

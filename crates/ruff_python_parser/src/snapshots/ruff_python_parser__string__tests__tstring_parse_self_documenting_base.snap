@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
+assertion_line: 745
 expression: suite
 ---
 [
@@ -29,6 +30,7 @@ expression: suite
                                                     ctx: Load,
                                                 },
                                             ),
+                                            expression_source: "user",
                                             debug_text: Some(
                                                 DebugText {
                                                     leading: "",

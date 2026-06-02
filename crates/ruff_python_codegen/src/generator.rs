@@ -1541,6 +1541,7 @@ impl<'a> Generator<'a> {
             }
             ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
                 expression,
+                expression_source: _,
                 debug_text,
                 conversion,
                 format_spec,

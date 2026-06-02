@@ -2100,6 +2100,7 @@ impl<'src> Parser<'src> {
         }
 
         ast::InterpolatedElement {
+            expression_source: self.src_text(value.range()).into(),
             expression: Box::new(value.expr),
             debug_text,
             conversion,

@@ -554,6 +554,12 @@ pub struct InterpolatedElement<'a> {
     format_spec: Option<Vec<ComparableInterpolatedStringElement<'a>>>,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct TStringInterpolatedElement<'a> {
+    expression_source: &'a str,
+    element: InterpolatedElement<'a>,
+}
+
 impl<'a> From<&'a ast::InterpolatedStringElement> for ComparableInterpolatedStringElement<'a> {
     fn from(interpolated_string_element: &'a ast::InterpolatedStringElement) -> Self {
         match interpolated_string_element {
@@ -572,6 +578,7 @@ impl<'a> From<&'a ast::InterpolatedElement> for InterpolatedElement<'a> {
     fn from(interpolated_element: &'a ast::InterpolatedElement) -> Self {
         let ast::InterpolatedElement {
             expression,
+            expression_source: _,
             debug_text,
             conversion,
             format_spec,
@@ -733,7 +740,7 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableTString<'a> {
     strings: Box<[ComparableInterpolatedStringElement<'a>]>,
-    interpolations: Box<[InterpolatedElement<'a>]>,
+    interpolations: Box<[TStringInterpolatedElement<'a>]>,
 }
 
 impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
@@ -750,7 +757,7 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
     fn from(value: &'a ast::TStringValue) -> Self {
         struct Collector<'a> {
             strings: Vec<ComparableInterpolatedStringElement<'a>>,
-            interpolations: Vec<InterpolatedElement<'a>>,
+            interpolations: Vec<TStringInterpolatedElement<'a>>,
         }
 
         impl Default for Collector<'_> {
@@ -785,7 +792,10 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
             }
 
             fn push_tstring_interpolation(&mut self, expression: &'a ast::InterpolatedElement) {
-                self.interpolations.push(expression.into());
+                self.interpolations.push(TStringInterpolatedElement {
+                    expression_source: &expression.expression_source,
+                    element: expression.into(),
+                });
                 self.start_new_literal();
             }
         }

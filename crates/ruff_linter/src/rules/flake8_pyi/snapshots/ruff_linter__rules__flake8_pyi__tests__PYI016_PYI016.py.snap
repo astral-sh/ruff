@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+assertion_line: 140
 ---
 PYI016 [*] Duplicate union member `str`
  --> PYI016.py:7:15
@@ -1218,3 +1219,19 @@ help: Remove duplicate union member `typing.Literal[f"{x}"]`
 156 + field54: typing.Literal[f"{x}"]  # Error (true duplicate)
 157 | field55: typing.Literal[f"{x =}"] | typing.Literal[f"{x=}"]  # OK (different debug text due to spaces)
 158 | field56: typing.Literal[f"{0x0=}"] | typing.Literal[f"{0o0=}"]  # OK (different source text: "0x0" vs "0o0")
+159 |
+
+PYI016 [*] Duplicate union member `typing.Annotated[int, t"{x}"]`
+   --> PYI016.py:164:42
+    |
+162 | field57: typing.Annotated[int, t"{00}"] | typing.Annotated[int, t"{000}"]  # OK (different expression source: "00" vs "000")
+163 | field58: typing.Annotated[int, t"{0x0=}"] | typing.Annotated[int, t"{0o0=}"]  # OK (different debug expression source: "0x0" vs "0o0")
+164 | field59: typing.Annotated[int, t"{x}"] | typing.Annotated[int, t"{x}"]  # Error (true duplicate)
+    |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Remove duplicate union member `typing.Annotated[int, t"{x}"]`
+161 | # t-string interpolations preserve their expression source text
+162 | field57: typing.Annotated[int, t"{00}"] | typing.Annotated[int, t"{000}"]  # OK (different expression source: "00" vs "000")
+163 | field58: typing.Annotated[int, t"{0x0=}"] | typing.Annotated[int, t"{0o0=}"]  # OK (different debug expression source: "0x0" vs "0o0")
+    - field59: typing.Annotated[int, t"{x}"] | typing.Annotated[int, t"{x}"]  # Error (true duplicate)
+164 + field59: typing.Annotated[int, t"{x}"]  # Error (true duplicate)

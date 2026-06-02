@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
+assertion_line: 822
 expression: suite
 ---
 [
@@ -28,6 +29,7 @@ expression: suite
                                                     value: None,
                                                 },
                                             ),
+                                            expression_source: "yield",
                                             debug_text: None,
                                             conversion: None,
                                             format_spec: None,
