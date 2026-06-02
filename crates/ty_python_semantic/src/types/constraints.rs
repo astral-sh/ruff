@@ -1303,21 +1303,13 @@ impl ConstraintId {
         }
 
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower = if self_constraint.lower == other_constraint.lower
-            || other_constraint.lower.is_never()
-        {
+        let lower = if self_constraint.lower == other_constraint.lower {
             self_constraint.lower
-        } else if self_constraint.lower.is_never() {
-            other_constraint.lower
         } else {
             UnionType::from_two_elements(db, self_constraint.lower, other_constraint.lower)
         };
-        let upper = if self_constraint.upper == other_constraint.upper
-            || other_constraint.upper.is_object()
-        {
+        let upper = if self_constraint.upper == other_constraint.upper {
             self_constraint.upper
-        } else if self_constraint.upper.is_object() {
-            other_constraint.upper
         } else {
             IntersectionType::from_two_elements(db, self_constraint.upper, other_constraint.upper)
         };
