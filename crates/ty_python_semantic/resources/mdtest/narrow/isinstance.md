@@ -774,7 +774,7 @@ T = TypeVar("T")
 
 def _(value: Movie | T):
     if isinstance(value, dict):
-        reveal_type(value)  # revealed: (T@_ & Top[dict[Unknown, Unknown]]) | Movie | (T@_ & TypedDictTop)
+        reveal_type(value)  # revealed: Movie | (T@_ & Top[dict[Unknown, Unknown]]) | (T@_ & TypedDictTop)
 ```
 
 This also needs to preserve common dict-key correlations:
@@ -788,6 +788,15 @@ def compare_common_keys(value: object, default: object):
             reveal_type(value[key])  # revealed: object
             reveal_type(default[key])  # revealed: object
             reveal_type(default.get(key))  # revealed: object
+```
+
+Non-mutating dictionary merges should remain valid after both operands are narrowed through runtime
+`dict` checks:
+
+```py
+def merge_narrowed_dicts(left: object, right: object) -> None:
+    if isinstance(left, dict) and isinstance(right, dict):
+        reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
 ```
 
 The `TypedDictTop` arm also has a stable surface name, so users can refer to it directly in
@@ -805,6 +814,20 @@ def takes_typed_dict_top_alias(value: Alias):
     reveal_type(value)  # revealed: TypedDictTop
 ```
 
+`TypedDictTop` should retain its known string-key projection when passed to generic APIs:
+
+```py
+from collections.abc import Mapping
+from ty_extensions import TypedDictTop
+
+def project[K, V](value: Mapping[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def project_typed_dict_top(value: TypedDictTop) -> None:
+    reveal_type(project(value))  # revealed: tuple[str, object]
+    reveal_type(iter(value))  # revealed: Iterator[str]
+```
+
 Since the schema is unknown, mutating operations are not available directly on `TypedDictTop`:
 
 ```py
@@ -814,6 +837,10 @@ def mutate_typed_dict_top(dst: TypedDictTop, src: TypedDictTop) -> None:
     reveal_type(dst | src)  # revealed: TypedDictTop
     dst.update(src)  # error: [unresolved-attribute]
     dst |= src  # error: [unsupported-operator]
+
+def merge_typed_dict_top_with_dict(dst: TypedDictTop, src: dict[int, bytes]) -> None:
+    reveal_type(dst | src)  # revealed: dict[str | int, object]
+    reveal_type(src | dst)  # revealed: dict[int | str, object]
 ```
 
 It should also keep `dict` methods callable for concrete `dict` unions keyed by `IntEnum` values:

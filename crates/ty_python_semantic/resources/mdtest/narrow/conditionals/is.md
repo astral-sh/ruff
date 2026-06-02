@@ -137,6 +137,21 @@ def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
         reveal_type(c)  # revealed: Literal[1]
 ```
 
+## `is` between a `TypedDict` and `dict`
+
+Every `TypedDict` inhabitant is a runtime dictionary, so the identity branch remains reachable:
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def _(x: Movie, y: dict[str, object]) -> None:
+    if x is y:
+        x.missing  # error: [unresolved-attribute]
+```
+
 ## `is` where the other operand is a call expression
 
 ```py

@@ -4395,6 +4395,7 @@ static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnl
 ## Disjointness with other types
 
 ```py
+from collections.abc import MutableMapping
 from typing import TypedDict, Mapping
 from ty_extensions import static_assert, is_disjoint_from
 
@@ -4405,10 +4406,11 @@ class RegularNonTD: ...
 
 static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
+static_assert(not is_disjoint_from(TD, MutableMapping[str, object]))
 static_assert(is_disjoint_from(TD, Mapping[int, object]))
 static_assert(is_disjoint_from(TD, RegularNonTD))
-static_assert(is_disjoint_from(TD, dict[str, int]))
-static_assert(is_disjoint_from(TD, dict[str, str]))
+static_assert(not is_disjoint_from(TD, dict[str, int]))
+static_assert(not is_disjoint_from(TD, dict[str, str]))
 ```
 
 ## Narrowing tagged unions of `TypedDict`s
@@ -4549,7 +4551,7 @@ We can still narrow `Literal` tags even when non-`TypedDict` types are present i
 ```py
 def _(u: Foo | Bar | dict):
     if u["tag"] == "foo":
-        reveal_type(u)  # revealed: Foo | dict[Unknown, Unknown]
+        reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
 
 # The negation(s) will simplify out if we add something to the union that doesn't inherit from
 # `dict`. It just needs to support indexing with a string key.
@@ -4789,7 +4791,7 @@ We can still narrow `Literal` tags even when non-`TypedDict` types are present i
 def match_with_dict(u: Foo | Bar | dict):
     match u["tag"]:
         case "foo":
-            reveal_type(u)  # revealed: Foo | dict[Unknown, Unknown]
+            reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
 ```
 
 ## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases

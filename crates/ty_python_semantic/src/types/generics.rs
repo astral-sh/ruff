@@ -2654,6 +2654,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            (formal @ Type::NominalInstance(_), Type::TypedDict(_) | Type::TypedDictTop) => {
+                let str_object_map = KnownClass::Mapping.to_specialized_instance(
+                    self.db,
+                    &[KnownClass::Str.to_instance(self.db), Type::object()],
+                );
+                return self.infer_map_impl(formal, str_object_map, polarity, seen);
+            }
+
             (Type::Intersection(formal_intersection), _) => {
                 // The actual type must be assignable to every (positive) element of the
                 // formal intersection, so we must infer type mappings for each of them. (The
@@ -2840,7 +2848,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return Ok(());
             }
 
-            (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
+            (
+                formal @ Type::ProtocolInstance(_),
+                actual @ (Type::TypedDict(_) | Type::TypedDictTop),
+            ) => {
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                 let when = self.constraints.load(self.db, when);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
