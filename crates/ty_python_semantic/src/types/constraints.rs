@@ -44,6 +44,14 @@
 //! When `if_uncertain` is `ALWAYS_FALSE` everywhere, the TDD degenerates to a standard BDD, and
 //! all operations have zero overhead compared to the binary case.
 //!
+//! The raw [`Node`] and [`NodeId`] layer only represents the TDD formula itself. The public
+//! [`ConstraintSet`] wrapper adds deferred existential quantification metadata for callable-local
+//! type variables. While constructing larger positive formulas, those variables remain visible in
+//! the raw TDD and the deferred metadata is merged globally. Before terminal semantic observations
+//! or solution extraction, the wrapper interprets the set as `∃ deferred_vars . raw_formula`.
+//! Operations that introduce negation-like semantics force this interpretation first, because
+//! preserving quantifier structure through negation would require a more expressive representation.
+//!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
 //! check whether it is ever or always satisfiable, as appropriate. We are not yet inferring
@@ -251,7 +259,8 @@ where
 }
 
 /// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
-/// arenas that hold its BDD.
+/// arenas that hold its BDD. It also stores any deferred-quantification metadata that should be
+/// applied to the raw BDD before terminal semantic observation or solution extraction.
 ///
 /// Owned constraint sets are immutable snapshots of a builder's arenas. They are used by
 /// Salsa-cached relation queries, and by the
@@ -341,6 +350,12 @@ impl<'db> OwnedConstraintSet<'db> {
 /// A set of constraints under which a type property holds.
 ///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
+///
+/// A `ConstraintSet` is a raw TDD formula plus a set of type variables whose existential
+/// quantification is deferred. Positive construction operations preserve the raw formula and merge
+/// deferred metadata so later constraints can still mention those type variables. Public semantic
+/// observations and solution extraction first interpret the set as
+/// `∃ deferred_vars . raw_formula`; raw [`NodeId`] operations intentionally do not.
 ///
 /// The underlying representation tracks the order that individual constraints are added to the
 /// constraint set, which typically tracks when they appear in the underlying Python source. For
@@ -724,9 +739,36 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        self.node
-            .simplify_for_display(db, self.builder)
-            .display(db, self.builder)
+        struct DisplayConstraintSet<'db, 'c> {
+            db: &'db dyn Db,
+            set: ConstraintSet<'db, 'c>,
+        }
+
+        impl Display for DisplayConstraintSet<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let formula = self
+                    .set
+                    .node
+                    .simplify_for_display(self.db, self.set.builder)
+                    .display(self.db, self.set.builder);
+
+                if matches!(self.set.deferred_quantification, InferableTypeVars::None) {
+                    return Display::fmt(&formula, f);
+                }
+
+                write!(
+                    f,
+                    "∃{} . {formula}",
+                    self.set
+                        .deferred_quantification
+                        .iter(self.db)
+                        .map(|identity| identity.display(self.db))
+                        .format(", ")
+                )
+            }
+        }
+
+        DisplayConstraintSet { db, set: self }
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
