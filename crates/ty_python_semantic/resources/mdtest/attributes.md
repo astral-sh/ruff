@@ -1721,8 +1721,8 @@ def f(x: list[int], y: list[int] | None, z: None):
     z.index
 ```
 
-This is also true of type aliases of unions, and of special-case `NewType`s that have a union as a
-base type:
+This is also true of type aliases of unions, special-case `NewType`s that have a union as a base
+type, and type variables with union upper bounds:
 
 ```toml
 [environment]
@@ -1740,6 +1740,10 @@ def g(x: MaybeList, y: FloatNT):
     x.index
     # error: [unresolved-attribute] "Attribute `hex` is not defined on `int` in union `FloatNT`"
     y.hex
+
+def h[T: list[int] | None](x: T):
+    # error: [unresolved-attribute] "Attribute `append` is not defined on `None` in union `list[int] | None`"
+    x.append
 ```
 
 ## Inherited class attributes
