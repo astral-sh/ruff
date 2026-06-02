@@ -58,7 +58,7 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
 }
 
 #[test]
-fn expected_types_are_collected_only_for_completion() -> anyhow::Result<()> {
+fn expected_types_are_collected_only_in_completion_mode() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(
         "src/a.py",

@@ -262,8 +262,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
-    /// The expression range for which IDE completion expected types should be collected.
-    expected_type_target_range: Option<TextRange>,
+    /// Whether IDE completion expected types should be collected.
+    expected_type_collection: ExpectedTypeCollection,
 
     /// The scope this region is part of.
     scope: ScopeId<'db>,
@@ -344,6 +344,31 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 /// An expression cache shared across builders during multi-inference.
 type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
 
+#[derive(Clone, Copy, Debug, Default)]
+enum ExpectedTypeCollection {
+    #[default]
+    Disabled,
+    Enabled {
+        target_range: TextRange,
+    },
+}
+
+impl ExpectedTypeCollection {
+    fn is_enabled(self) -> bool {
+        matches!(self, Self::Enabled { .. })
+    }
+
+    fn overlapping_target_range(self, range: TextRange) -> Option<TextRange> {
+        match self {
+            Self::Disabled => None,
+            Self::Enabled { target_range } => range
+                .intersect(target_range)
+                .is_some_and(|overlap| !overlap.is_empty())
+                .then_some(target_range),
+        }
+    }
+}
+
 enum ScopeInferenceForMode<'db> {
     Cached(&'db ScopeInference<'db>),
     Transient(ScopeInference<'db>),
@@ -389,7 +414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
             expected_types: FxHashMap::default(),
-            expected_type_target_range: None,
+            expected_type_collection: ExpectedTypeCollection::Disabled,
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
@@ -402,20 +427,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn with_expected_type_collection(mut self, target_range: TextRange) -> Self {
-        self.expected_type_target_range = Some(target_range);
+        self.expected_type_collection = ExpectedTypeCollection::Enabled { target_range };
         self
     }
 
-    fn collect_expected_types(&self) -> bool {
-        self.expected_type_target_range.is_some()
-    }
-
-    fn overlaps_expected_type_target_range(&self, range: TextRange) -> bool {
-        self.expected_type_target_range.is_some_and(|target| {
-            range
-                .intersect(target)
-                .is_some_and(|overlap| !overlap.is_empty())
-        })
+    fn should_bypass_standalone_cache(&self, range: TextRange) -> bool {
+        self.expected_type_collection
+            .overlapping_target_range(range)
+            .is_some()
     }
 
     fn discard_dict_key_assignments_for(&mut self, definition: Definition<'db>) {
@@ -1724,7 +1743,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
-        if self.should_bypass_standalone_definition(definition) {
+        let definition_range = definition.kind(self.db()).full_range(self.module());
+        if self.should_bypass_standalone_cache(definition_range) {
             self.infer_region_definition(definition);
         } else {
             let result = infer_definition_types(self.db(), definition);
@@ -5675,44 +5695,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn scope_overlaps_expected_type_target_range(&self, scope: ScopeId<'db>) -> bool {
-        let range = match scope.node(self.db()) {
-            NodeWithScopeKind::Module => self.module().syntax().range(),
-            NodeWithScopeKind::Function(function) => function.node(self.module()).range(),
-            NodeWithScopeKind::Lambda(lambda) => lambda.node(self.module()).range(),
-            NodeWithScopeKind::Class(class) => class.node(self.module()).range(),
-            NodeWithScopeKind::ClassTypeParameters(class) => class.node(self.module()).range(),
-            NodeWithScopeKind::FunctionTypeParameters(function) => {
-                function.node(self.module()).range()
-            }
-            NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
-                type_alias.node(self.module()).range()
-            }
-            NodeWithScopeKind::TypeAlias(type_alias) => type_alias.node(self.module()).range(),
-            NodeWithScopeKind::ListComprehension(comprehension) => {
-                comprehension.node(self.module()).range()
-            }
-            NodeWithScopeKind::SetComprehension(comprehension) => {
-                comprehension.node(self.module()).range()
-            }
-            NodeWithScopeKind::DictComprehension(comprehension) => {
-                comprehension.node(self.module()).range()
-            }
-            NodeWithScopeKind::GeneratorExpression(generator) => {
-                generator.node(self.module()).range()
-            }
-        };
-
-        self.overlaps_expected_type_target_range(range)
-    }
-
     fn infer_scope_types_for_mode(
         &self,
         scope: ScopeId<'db>,
         tcx: TypeContext<'db>,
     ) -> ScopeInferenceForMode<'db> {
-        if let Some(target_range) = self.expected_type_target_range
-            && self.scope_overlaps_expected_type_target_range(scope)
+        let scope_range = scope.node(self.db()).range(self.module());
+        if let Some(target_range) = self
+            .expected_type_collection
+            .overlapping_target_range(scope_range)
         {
             ScopeInferenceForMode::Transient(infer_scope_types_with_expected_types(
                 self.db(),
@@ -5725,24 +5716,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn should_bypass_standalone_definition(&self, definition: Definition<'db>) -> bool {
-        self.overlaps_expected_type_target_range(
-            definition.kind(self.db()).full_range(self.module()),
-        )
-    }
-
     fn builder_for_region(&self, region: InferenceRegion<'db>) -> Self {
         let mut builder = TypeInferenceBuilder::new(self.db(), region, self.index, self.module());
-        builder.expected_type_target_range = self.expected_type_target_range;
+        builder.expected_type_collection = self.expected_type_collection;
         builder
-    }
-
-    fn infer_definition_types_uncached(
-        &self,
-        definition: Definition<'db>,
-    ) -> DefinitionInference<'db> {
-        self.builder_for_region(InferenceRegion::Definition(definition))
-            .finish_definition()
     }
 
     fn infer_expression_types_uncached(
@@ -5761,7 +5738,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_maybe_standalone_statement(&mut self, statement: &ast::Stmt) {
         if let Some(standalone_statement) = self.index.try_statement(statement) {
-            if self.overlaps_expected_type_target_range(statement.range()) {
+            if self.should_bypass_standalone_cache(statement.range()) {
                 self.infer_statement(statement);
             } else {
                 self.infer_standalone_statement_impl(standalone_statement);
@@ -5834,7 +5811,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if self.overlaps_expected_type_target_range(expression.range()) {
+        if self.should_bypass_standalone_cache(expression.range()) {
             return self.infer_expression_types_uncached(expression, standalone_expression, tcx);
         }
 
@@ -5983,7 +5960,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: impl Into<ExpressionNodeKey>,
         ty: Type<'db>,
     ) {
-        if !self.collect_expected_types() {
+        if !self.expected_type_collection.is_enabled() {
             return;
         }
 
@@ -6014,7 +5991,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_expected_types(&mut self, expected_types: &FrozenMap<ExpressionNodeKey, Type<'db>>) {
-        if !self.collect_expected_types() {
+        if !self.expected_type_collection.is_enabled() {
             return;
         }
 
@@ -6022,7 +5999,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn union_expected_types(&mut self, expected_types: &FxHashMap<ExpressionNodeKey, Type<'db>>) {
-        if !self.collect_expected_types() {
+        if !self.expected_type_collection.is_enabled() {
             return;
         }
 
@@ -6394,7 +6371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `expected_types` is IDE completion metadata. If normal set inference already has a
         // string-literal context, preserve that semantic context for inference while also offering
         // the transient `TypedDict` key fallback as a completion candidate.
-        if self.collect_expected_types()
+        if self.expected_type_collection.is_enabled()
             && let (Some(elt_ty), Some(fallback_ty)) = (elt_tcx.annotation, fallback_tcx.annotation)
         {
             self.store_expected_type(
@@ -7444,8 +7421,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
-            if self.should_bypass_standalone_definition(definition) {
-                let result = self.infer_definition_types_uncached(definition);
+            let definition_range = definition.kind(self.db()).full_range(self.module());
+            if self.should_bypass_standalone_cache(definition_range) {
+                let result = self
+                    .builder_for_region(InferenceRegion::Definition(definition))
+                    .finish_definition();
                 let ty = result.binding_type(definition);
                 self.extend_definition(&result);
                 ty
@@ -10013,7 +9993,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut collection_use_constraints,
             string_annotations,
             expected_types,
-            expected_type_target_range: _,
+            expected_type_collection: _,
             scope,
             bindings,
             declarations,
@@ -10094,7 +10074,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut collection_use_constraints,
             string_annotations,
             expected_types,
-            expected_type_target_range: _,
+            expected_type_collection: _,
             scope,
             bindings,
             declarations,
@@ -10208,7 +10188,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             scope: _,
             string_annotations: _,
             expected_types: _,
-            expected_type_target_range: _,
+            expected_type_collection: _,
             return_types_and_ranges: _,
             collection_use_constraints: _,
             dataclass_field_specifiers: _,
@@ -10247,7 +10227,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut collection_use_constraints,
             string_annotations,
             expected_types,
-            expected_type_target_range: _,
+            expected_type_collection: _,
             scope,
             bindings,
             declarations,
@@ -10334,7 +10314,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             string_annotations,
             expected_types,
-            expected_type_target_range: _,
+            expected_type_collection: _,
             type_expression_flags,
             mut collection_use_constraints,
             expressions,
@@ -10416,7 +10396,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: _,
             string_annotations: _,
             expected_types: _,
-            expected_type_target_range,
+            expected_type_collection,
             scope: _,
             bindings: _,
             declarations: _,
@@ -10438,7 +10418,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
-        builder.expected_type_target_range = expected_type_target_range;
+        builder.expected_type_collection = expected_type_collection;
         builder.expression_cache.clone_from(expression_cache);
         builder
             .return_types_and_ranges
@@ -10459,7 +10439,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints,
             string_annotations,
             expected_types,
-            expected_type_target_range: _,
+            expected_type_collection: _,
             scope,
             bindings,
             declarations,
