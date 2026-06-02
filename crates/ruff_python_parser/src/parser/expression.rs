@@ -1245,8 +1245,7 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprBoolOp {
         self.bump(TokenKind::from(op));
 
-        let mut values = Vec::with_capacity(2);
-        values.push(lhs);
+        let mut values = vec![lhs];
         let mut progress = ParserProgress::default();
 
         // Keep adding the expression to `values` until we see a different
@@ -2626,7 +2625,7 @@ impl<'src> Parser<'src> {
     fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
         const GENERATOR_SET: TokenSet = TokenSet::new([TokenKind::For, TokenKind::Async]);
 
-        let mut generators = Vec::with_capacity(1);
+        let mut generators = vec![];
         let mut progress = ParserProgress::default();
 
         while self.at_ts(GENERATOR_SET) {
@@ -2669,7 +2668,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::In);
         let iter = self.parse_simple_expression(ExpressionContext::default());
 
-        let mut ifs = Vec::new();
+        let mut ifs = vec![];
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::If) {
@@ -2677,9 +2676,6 @@ impl<'src> Parser<'src> {
 
             let parsed_expr = self.parse_simple_expression(ExpressionContext::default());
 
-            if ifs.is_empty() {
-                ifs.reserve_exact(1);
-            }
             ifs.push(parsed_expr.expr);
         }
 
