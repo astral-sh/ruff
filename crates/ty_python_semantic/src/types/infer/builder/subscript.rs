@@ -1172,11 +1172,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
-        enum SliceArg<'db> {
-            Arg(Type<'db>),
-            Unsupported,
-        }
-
         let db = self.db();
 
         let ast::ExprSlice {
@@ -1191,29 +1186,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty_upper = self.infer_optional_expression(upper.as_deref(), TypeContext::default());
         let ty_step = self.infer_optional_expression(step.as_deref(), TypeContext::default());
 
-        let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(ty @ Type::LiteralValue(literal)) if literal.is_int() || literal.is_bool() => {
-                SliceArg::Arg(ty)
-            }
-            Some(ty @ Type::NominalInstance(instance))
-                if instance.has_known_class(db, KnownClass::NoneType) =>
-            {
-                SliceArg::Arg(ty)
-            }
-            None => SliceArg::Arg(Type::none(db)),
-            _ => SliceArg::Unsupported,
-        };
-
-        match (
-            type_to_slice_argument(ty_lower),
-            type_to_slice_argument(ty_upper),
-            type_to_slice_argument(ty_step),
-        ) {
-            (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
-                KnownClass::Slice.to_specialized_instance(db, &[lower, upper, step])
-            }
-            _ => KnownClass::Slice.to_instance(db),
-        }
+        KnownClass::Slice.to_specialized_instance(
+            db,
+            &[
+                ty_lower.unwrap_or_else(|| Type::none(db)),
+                ty_upper.unwrap_or_else(|| Type::none(db)),
+                ty_step.unwrap_or_else(|| Type::none(db)),
+            ],
+        )
     }
 
     /// Validate a subscript assignment of the form `object[key] = rhs_value`.
