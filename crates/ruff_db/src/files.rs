@@ -196,8 +196,21 @@ impl Files {
     }
 
     /// The same as [`Self::root`] but panics if no root is found.
+    ///
+    /// First-party search paths (e.g., roots configured in `ty.toml`) may not have
+    /// been registered as file roots during static initialization. This function
+    /// attempts to lazily register the path as a [`FileRootKind::LibrarySearchPath`]
+    /// before panicking.
     #[track_caller]
     pub fn expect_root(&self, db: &dyn Db, path: &SystemPath) -> FileRoot {
+        if let Some(root) = self.root(db, path) {
+            return root;
+        }
+
+        // A configured first-party search path may not have been registered
+        // as a file root. Try to add one lazily.
+        self.try_add_root(db, path, FileRootKind::LibrarySearchPath);
+
         if let Some(root) = self.root(db, path) {
             return root;
         }
