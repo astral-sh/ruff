@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use anyhow::Result;
 
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
@@ -88,18 +89,25 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
-        // The fix silently deletes inter-branch comments (those between the end
-        // of the current branch's last line and the `elif` keyword). Mark the
-        // fix as unsafe when inter-branch comments exist — the diagnostic still
-        // fires to keep `# noqa: SIM114` used and avoid RUF100 regressions.
+        // The fix silently deletes comments between the branches (inter-branch
+        // region) and inline comments on the `elif` header line. Mark the fix
+        // as unsafe when such comments exist — the diagnostic still fires to
+        // keep `# noqa: SIM114` used and avoid RUF100 regressions.
         let inter_branch = TextRange::new(
             checker.locator().full_line_end(current_branch.end()),
             following_branch.range().start(),
         );
-        let safe = checker
-            .comment_ranges()
-            .comments_in_range(inter_branch)
-            .is_empty();
+        let elif_header = TextRange::new(
+            following_branch.range().start(),
+            checker.locator().line_end(following_branch.test.end()),
+        );
+        let safe = has_only_noqa_or_empty(
+            checker.comment_ranges().comments_in_range(inter_branch),
+            checker.locator(),
+        ) && has_only_noqa_or_empty(
+            checker.comment_ranges().comments_in_range(elif_header),
+            checker.locator(),
+        );
 
         let mut diagnostic = checker.report_diagnostic(
             IfWithSameArms,
@@ -113,7 +121,11 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
                 following_branch,
                 checker.locator(),
                 checker.tokens(),
-                safe,
+                if safe {
+                    Applicability::Safe
+                } else {
+                    Applicability::Unsafe
+                },
             )
         });
     }
@@ -121,15 +133,15 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
 
 /// Generate a [`Fix`] to merge two [`IfElifBranch`] branches.
 ///
-/// If `safe` is `false`, the fix is marked as [`Fix::unsafe_edits`] because
-/// inter-branch comments would be silently deleted.
+/// The fix's [`Applicability`] is determined by whether comments exist in the
+/// regions that would be silently deleted (inter-branch gap, elif header line).
 fn merge_branches(
     stmt_if: &ast::StmtIf,
     current_branch: &IfElifBranch,
     following_branch: &IfElifBranch,
     locator: &Locator,
     tokens: &ruff_python_ast::token::Tokens,
-    safe: bool,
+    applicability: Applicability,
 ) -> Result<Fix> {
     // Identify the colon (`:`) at the end of the current branch's test.
     let Some(current_branch_colon) =
@@ -183,10 +195,10 @@ fn merge_branches(
         };
 
     let rest = parenthesize_edit.into_iter().chain(Some(insertion_edit));
-    if safe {
-        Ok(Fix::safe_edits(deletion_edit, rest))
-    } else {
-        Ok(Fix::unsafe_edits(deletion_edit, rest))
+    match applicability {
+        Applicability::Safe => Ok(Fix::safe_edits(deletion_edit, rest)),
+        Applicability::Unsafe => Ok(Fix::unsafe_edits(deletion_edit, rest)),
+        Applicability::DisplayOnly => unreachable!(),
     }
 }
 
@@ -197,4 +209,19 @@ fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
         locator.line_end(branch.test.end()),
         locator.line_end(branch.end()),
     )
+}
+
+/// Returns `true` if every comment in `comments` is a `# noqa` directive (or if
+/// the slice is empty). `# noqa` comments are tool directives, not content the
+/// user needs preserved, so they shouldn't force an unsafe fix.
+fn has_only_noqa_or_empty(comments: &[TextRange], locator: &Locator) -> bool {
+    comments
+        .iter()
+        .all(|range| is_noqa_directive(locator.slice(*range)))
+}
+
+/// Returns `true` if the comment text starts with `# noqa` (case-insensitive).
+fn is_noqa_directive(comment: &str) -> bool {
+    let text = comment.trim_start_matches('#').trim_start();
+    text.len() >= 4 && text[..4].eq_ignore_ascii_case("noqa")
 }

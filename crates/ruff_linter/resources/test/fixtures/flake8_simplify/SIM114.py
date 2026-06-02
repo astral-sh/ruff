@@ -74,23 +74,6 @@ elif result.eofs == "C":
     errors = 1
 
 
-# Inter-branch comments produce an unsafe fix
-if a:
-    pass
-
-# This comment separates the branches
-elif b:
-    pass
-
-if a:
-    pass
-
-# Multi-line comment
-# between branches
-elif b:
-    pass
-
-
 # OK
 def complicated_calc(*arg, **kwargs):
     return 42
@@ -152,14 +135,6 @@ def func():
         return 3
 
 
-# Known gap: inline comments on the elif header are silently deleted.
-# See https://github.com/astral-sh/ruff/issues/25470
-if a:  # we preserve comments, too!
-    b
-elif c:  # but not on the second branch
-    b
-
-
 if a: b  # here's a comment
 elif c: b
 
@@ -176,3 +151,46 @@ elif True:
     print(1)
 else:
     print(2)
+
+
+# Inter-branch comments produce an unsafe fix
+if a:
+    pass
+
+# This comment separates the branches
+elif b:
+    pass
+
+if a:
+    pass
+
+# Multi-line comment
+# between branches
+elif b:
+    pass
+
+# Inline comment on the elif header produces an unsafe fix
+if a:
+    b
+elif c:  # this comment would be deleted
+    b
+
+# noqa comments don't force an unsafe fix
+if x:
+    pass
+# noqa: SIM114
+elif y:
+    pass
+
+if x:
+    pass
+elif y:  # noqa: SIM114
+    pass
+
+# Only real comments make the fix unsafe
+if x:
+    pass
+# real comment
+# noqa: SIM114
+elif y:
+    pass
