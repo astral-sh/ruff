@@ -339,10 +339,11 @@ def drop[X, Y](x: X, y: Y) -> Y:
     return y
 
 # TODO: revealed: Literal["x"]
-# This requires combining the constraint sets from both arguments of the outer
+# We are correctly combining the constraint sets from both arguments of the outer
 # `partial(partial, drop)` call: one from passing `partial` as `c`, and one from passing `drop` as
-# `a`. We currently infer each argument independently, so this remains `Unknown` even after generic
-# callable occurrences are freshened.
+# `a`. However, we do that after having existentially quantified away the typevars from the generic
+# `partial` when it's used as an argument, so this remains `Unknown` even after generic callable
+# occurrences are freshened.
 reveal_type(partial(partial, drop)(1)("x"))  # revealed: Unknown
 # TODO: revealed: Literal[1]
 reveal_type(partial(partial, drop)("x")(1))  # revealed: Unknown
