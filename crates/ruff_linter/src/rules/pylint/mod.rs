@@ -310,6 +310,17 @@ mod tests {
     }
 
     #[test]
+    fn invalid_characters_py312() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/invalid_characters_pre_py312.py"),
+            &LinterSettings::for_rule(Rule::InvalidCharacterBackspace)
+                .with_target_version(PythonVersion::PY312),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn allow_magic_value_types() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/magic_value_comparison.py"),

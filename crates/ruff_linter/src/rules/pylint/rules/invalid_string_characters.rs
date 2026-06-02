@@ -246,9 +246,9 @@ pub(crate) fn invalid_string_characters(
             continue;
         };
 
-        if !token.unwrap_string_flags().is_raw_string()
-            && !is_escaped
-            && !(target_version < PythonVersion::PY312 && inside_interpolation)
+        if !(token.unwrap_string_flags().is_raw_string()
+            || is_escaped
+            || (!target_version.supports_pep_701() && inside_interpolation))
         {
             let edit = Edit::range_replacement(replacement.to_string(), range);
             diagnostic.set_fix(Fix::safe_edit(edit));

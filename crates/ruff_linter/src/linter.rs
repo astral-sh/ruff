@@ -162,7 +162,6 @@ pub fn check_path(
             stylist,
             source_type,
             source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
-            target_version.linter_version(),
             &mut context,
         );
     }
