@@ -805,6 +805,17 @@ def takes_typed_dict_top_alias(value: Alias):
     reveal_type(value)  # revealed: TypedDictTop
 ```
 
+Since the schema is unknown, mutating operations are not available directly on `TypedDictTop`:
+
+```py
+from ty_extensions import TypedDictTop
+
+def mutate_typed_dict_top(dst: TypedDictTop, src: TypedDictTop) -> None:
+    reveal_type(dst | src)  # revealed: TypedDictTop
+    dst.update(src)  # error: [unresolved-attribute]
+    dst |= src  # error: [unsupported-operator]
+```
+
 It should also keep `dict` methods callable for concrete `dict` unions keyed by `IntEnum` values:
 
 ```py

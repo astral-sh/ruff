@@ -218,6 +218,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
+        if target_type == Type::TypedDictTop {
+            let value_ty = infer_value_ty(self, TypeContext::default());
+            report_unsupported_augmented_assignment(
+                &self.context,
+                assignment,
+                target_type,
+                value_ty,
+            );
+            return Some(Type::TypedDictTop);
+        }
+
         let Type::TypedDict(typed_dict) = target_type else {
             return None;
         };

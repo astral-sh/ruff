@@ -133,6 +133,7 @@ pub enum KnownClass {
     // _typeshed._type_checker_internals
     NamedTupleFallback,
     NamedTupleLike,
+    TypedDictReadOnlyFallback,
     TypedDictFallback,
     // string.templatelib
     Template,
@@ -261,6 +262,7 @@ impl KnownClass {
             | Self::Specialization
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -355,6 +357,7 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
+            | KnownClass::TypedDictReadOnlyFallback
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -451,6 +454,7 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
+            | KnownClass::TypedDictReadOnlyFallback
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -541,6 +545,7 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
+            | KnownClass::TypedDictReadOnlyFallback
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
@@ -651,6 +656,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -758,7 +764,9 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization => false,
-            KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
+            KnownClass::NamedTupleFallback
+            | KnownClass::TypedDictReadOnlyFallback
+            | KnownClass::TypedDictFallback => true,
         }
     }
 
@@ -861,6 +869,7 @@ impl KnownClass {
             Self::ConstraintSet => "ConstraintSet",
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
+            Self::TypedDictReadOnlyFallback => "TypedDictReadOnlyFallback",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
             Self::Path => "Path",
@@ -1213,7 +1222,9 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
-            Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
+            Self::NamedTupleFallback
+            | Self::TypedDictReadOnlyFallback
+            | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
             | Self::ConstraintSet
             | Self::GenericContext
@@ -1312,6 +1323,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -1414,6 +1426,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -1519,6 +1532,7 @@ impl KnownClass {
             "ConstraintSet" => &[Self::ConstraintSet],
             "GenericContext" => &[Self::GenericContext],
             "Specialization" => &[Self::Specialization],
+            "TypedDictReadOnlyFallback" => &[Self::TypedDictReadOnlyFallback],
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
@@ -1595,6 +1609,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback
+            | Self::TypedDictReadOnlyFallback
             | Self::TypedDictFallback
             | Self::TypeVar
             | Self::ExtensionsTypeVar

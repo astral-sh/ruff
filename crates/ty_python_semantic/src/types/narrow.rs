@@ -257,15 +257,7 @@ impl ClassInfoConstraintFunction {
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                let constraint = Type::instance(db, class.top_materialization(db));
-                if class_literal_matches_typed_dict_runtime_supertype(db, class) {
-                    UnionBuilder::new(db)
-                        .add(constraint)
-                        .add(Type::TypedDictTop)
-                        .build()
-                } else {
-                    constraint
-                }
+                runtime_instance_constraint_for_class_literal(db, class)
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
@@ -422,14 +414,47 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-/// Returns `true` for classes that are runtime supertypes of all `TypedDict` instances
-/// (`dict` and `MutableMapping`), so that `isinstance()` narrowing can include a
-/// `TypedDictTop` arm alongside the ordinary top-materialized instance.
-fn class_literal_matches_typed_dict_runtime_supertype<'db>(
+/// Return the constraint imposed by an `isinstance()`-style runtime check against `class`.
+///
+/// `TypedDict` instances are runtime dictionaries, even though they are not statically assignable
+/// to mutable dictionary types. `Mapping` does not need an explicit `TypedDictTop` arm because
+/// `TypedDict` is already statically assignable to it.
+pub(crate) fn runtime_instance_constraint_for_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
-) -> bool {
-    class.is_known(db, KnownClass::Dict) || class.is_known(db, KnownClass::MutableMapping)
+) -> Type<'db> {
+    let constraint = Type::instance(db, class.top_materialization(db));
+    if class.is_known(db, KnownClass::Dict) || class.is_known(db, KnownClass::MutableMapping) {
+        UnionBuilder::new(db)
+            .add(constraint)
+            .add(Type::TypedDictTop)
+            .build()
+    } else {
+        constraint
+    }
+}
+
+fn exact_class_narrowing_constraint<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    is_positive: bool,
+) -> Option<Type<'db>> {
+    let instance = Type::instance(db, class.top_materialization(db));
+    if is_positive {
+        Some(if class.is_known(db, KnownClass::Dict) {
+            runtime_instance_constraint_for_class_literal(db, class)
+        } else {
+            instance
+        })
+    } else if class.is_final(db) {
+        Some(instance.negate(db))
+    } else if class.is_known(db, KnownClass::Dict) {
+        // `dict` subclasses can fail an exact-class check, but `TypedDict` instances cannot:
+        // every `TypedDict` inhabitant has an exact runtime type of `dict`.
+        Some(Type::TypedDictTop.negate(db))
+    } else {
+        None
+    }
 }
 
 fn negate_classinfo_constraint<'db>(db: &'db dyn Db, constraint: Type<'db>) -> Type<'db> {
@@ -1679,18 +1704,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if let Some(is_positive) = is_positive
                     && let Some(target) = PlaceExpr::try_from_expr(target_expr)
                     && let Some(other_class) = find_underlying_class(self.db, other)
-                    // `else`-branch narrowing for `if type(x) is Y` can only be done
-                    // if `Y` is a final class
-                    && (is_positive || other_class.is_final(self.db))
+                    && let Some(constraint) =
+                        exact_class_narrowing_constraint(self.db, other_class, is_positive)
                 {
                     let place = self.expect_place(&target);
-                    constraints.insert(
-                        place,
-                        NarrowingConstraint::intersection(
-                            Type::instance(self.db, other_class.top_materialization(self.db))
-                                .negate_if(self.db, !is_positive),
-                        ),
-                    );
+                    constraints.insert(place, NarrowingConstraint::intersection(constraint));
                 }
             }
 
@@ -1930,8 +1948,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let narrowed_type = match class_type {
             Type::ClassLiteral(class) => {
-                Type::instance(self.db, class.top_materialization(self.db))
-                    .negate_if(self.db, !is_positive)
+                let constraint = runtime_instance_constraint_for_class_literal(self.db, class);
+                if is_positive {
+                    constraint
+                } else {
+                    negate_classinfo_constraint(self.db, constraint)
+                }
             }
             dynamic @ Type::Dynamic(_) => dynamic,
             _ => return None,

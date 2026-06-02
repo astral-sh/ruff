@@ -350,7 +350,7 @@ impl<'db> AllMembers<'db> {
 
             Type::TypedDictTop => {
                 if let Type::ClassLiteral(ClassLiteral::Static(class)) =
-                    KnownClass::TypedDictFallback.to_class_literal(db)
+                    KnownClass::TypedDictReadOnlyFallback.to_class_literal(db)
                 {
                     self.extend_with_instance_members(db, ty, class);
                 }

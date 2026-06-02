@@ -200,7 +200,7 @@ use crate::{
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
         TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
-        infer_narrowing_constraint,
+        infer_narrowing_constraint, narrow::runtime_instance_constraint_for_class_literal,
     },
 };
 use ruff_index::IndexSlice;
@@ -265,9 +265,9 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
                 infer_expression_type(db, *class_expr, TypeContext::default())
-                    .to_instance(db)
+                    .as_class_literal()
+                    .map(|class| runtime_instance_constraint_for_class_literal(db, class))
                     .unwrap_or(Type::Never)
-                    .top_materialization(db)
             } else {
                 Type::Never
             }
@@ -1045,7 +1045,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Class(class_expr, kind) => {
             let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
                 .as_class_literal()
-                .map(|class| Type::instance(db, class.top_materialization(db)));
+                .map(|class| runtime_instance_constraint_for_class_literal(db, class));
 
             class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                 if subject_ty.is_subtype_of(db, class_ty) {

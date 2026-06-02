@@ -2637,7 +2637,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::TypedDictTop => KnownClass::TypedDictFallback
+            Type::TypedDictTop => KnownClass::TypedDictReadOnlyFallback
                 .to_class_literal(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
                 .expect("`find_name_in_mro` should return `Some` for a class literal")
@@ -2831,7 +2831,7 @@ impl<'db> Type<'db> {
                 Place::Undefined.into()
             }
 
-            Type::TypedDictTop => KnownClass::TypedDictFallback
+            Type::TypedDictTop => KnownClass::TypedDictReadOnlyFallback
                 .to_instance(db)
                 .instance_member(db, name),
             Type::TypedDict(_) => Place::Undefined.into(),
@@ -5706,15 +5706,15 @@ impl<'db> Type<'db> {
     /// instances of `dict` at runtime.
     #[must_use]
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
-        if self.is_typed_dict_like() {
-            return KnownClass::Dict
+        match self {
+            Type::TypedDict(_) | Type::TypedDictTop => KnownClass::Dict
                 .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), Type::object()])
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
-                .unwrap_or_else(Type::unknown);
+                .unwrap_or_else(Type::unknown),
+            Type::Union(union) => union.map(db, |element| element.dunder_class(db)),
+            _ => self.to_meta_type(db),
         }
-
-        self.to_meta_type(db)
     }
 
     #[must_use]
