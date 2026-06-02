@@ -6797,12 +6797,26 @@ mod tests {
         let deferred_quantification =
             InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
         let builder = ConstraintSetBuilder::new();
-        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
-            .with_deferred_quantification(&db, &builder, deferred_quantification);
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let eager = ConstraintSet::from_node(
+            &builder,
+            t_int
+                .node
+                .exists(&db, &builder, deferred_quantification.iter(&db)),
+        );
+        let deferred = t_int.with_deferred_quantification(&db, &builder, deferred_quantification);
 
-        assert!(!t_int.node.is_always_satisfied(&db, &builder));
-        assert!(t_int.is_always_satisfied(&db));
-        assert!(t_int.satisfied_by_all_typevars(&db, &builder, InferableTypeVars::None));
+        assert!(!deferred.node.is_always_satisfied(&db, &builder));
+        assert_eq!(
+            deferred.is_always_satisfied(&db),
+            eager.is_always_satisfied(&db)
+        );
+        assert_eq!(
+            deferred.is_never_satisfied(&db),
+            eager.is_never_satisfied(&db)
+        );
+        assert!(deferred.is_always_satisfied(&db));
+        assert!(deferred.satisfied_by_all_typevars(&db, &builder, InferableTypeVars::None));
     }
 
     #[test]
@@ -6837,6 +6851,52 @@ mod tests {
     }
 
     #[test]
+    fn deferred_quantification_preserves_raw_constraints_until_solving() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let t_deferred =
+            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, t_deferred);
+        let u_equals_t =
+            ConstraintSet::constrain_typevar(&db, &builder, u, Type::TypeVar(t), Type::TypeVar(t));
+        let set = t_int.and(&db, &builder, || u_equals_t);
+
+        let Solutions::Constrained(raw_solutions) = ConstraintSet::from_node(&builder, set.node)
+            .solutions(&db, &builder, SolutionProjection::AllTypeVars)
+        else {
+            panic!("expected constrained raw solutions");
+        };
+        assert_eq!(raw_solutions.len(), 1);
+        let raw_identities: FxHashSet<_> = raw_solutions
+            .into_iter()
+            .flatten()
+            .map(|binding| binding.bound_typevar.identity(&db))
+            .collect();
+        assert_eq!(
+            raw_identities,
+            FxHashSet::from_iter([t.identity(&db), u.identity(&db)])
+        );
+
+        let Solutions::Constrained(solutions) =
+            set.solutions(&db, &builder, SolutionProjection::AllTypeVars)
+        else {
+            panic!("expected constrained deferred solutions");
+        };
+        assert_eq!(solutions.len(), 1);
+        let [solution] = solutions.as_slice() else {
+            panic!("expected one solution path");
+        };
+        let [binding] = solution.as_slice() else {
+            panic!("expected one typevar solution");
+        };
+        assert_eq!(binding.bound_typevar.identity(&db), u.identity(&db));
+        assert_eq!(binding.solution, KnownClass::Int.to_instance(&db));
+    }
+
+    #[test]
     fn deferred_quantification_negates_effective_formula() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
@@ -6845,8 +6905,19 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
             .with_deferred_quantification(&db, &builder, deferred_quantification);
+        let quantified_after_negation = ConstraintSet::from_node_with_deferred_quantification(
+            &builder,
+            t_int.node.negate(&builder),
+            deferred_quantification,
+        );
 
         assert!(t_int.negate(&db, &builder).is_never_satisfied(&db));
+        assert!(
+            t_int
+                .implies(&db, &builder, || ConstraintSet::never(&builder))
+                .is_never_satisfied(&db)
+        );
+        assert!(quantified_after_negation.is_always_satisfied(&db));
     }
 
     #[test]
@@ -6902,6 +6973,7 @@ mod tests {
         let deferred_quantification =
             InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
 
+        let expected = FxHashSet::from_iter([t.identity(&db)]);
         let builder = ConstraintSetBuilder::new();
         let owned = builder.into_owned(|builder| {
             let t_int = create_constraint(&db, builder, t, KnownClass::Int);
@@ -6914,11 +6986,25 @@ mod tests {
 
         owned.query(|_builder, set| {
             assert_eq!(set.deferred_quantification, deferred_quantification);
+            assert_eq!(
+                set.deferred_quantification
+                    .iter(&db)
+                    .collect::<FxHashSet<_>>(),
+                expected
+            );
+            assert!(set.is_always_satisfied(&db));
         });
 
         let builder = ConstraintSetBuilder::new();
         let set = builder.load(&db, &owned);
         assert_eq!(set.deferred_quantification, deferred_quantification);
+        assert_eq!(
+            set.deferred_quantification
+                .iter(&db)
+                .collect::<FxHashSet<_>>(),
+            expected
+        );
+        assert!(set.is_always_satisfied(&db));
     }
 
     /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to

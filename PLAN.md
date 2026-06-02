@@ -26,7 +26,9 @@
 - `[x]` Phase 4 is implemented: solution generation goes through `ConstraintSet::path_bounds` with an explicit `SolutionProjection`, applies deferred quantification before projection/solving, and former manual projection callers use the centralized API.
 - `[x]` Existing mdtests are updated and full `ty_python_semantic` tests pass. The higher-order `partial(partial, drop)` TODOs are not fully fixed; deferred quantification now exposes an existing returned-callable generic-context inference gap, so those TODOs were updated to the current leak/error behavior and should be fixed separately.
 - `[x]` Phase 5 is implemented: module/struct docs describe the deferred-quantification boundary, operation-local TODO comments are present, terminal-observation and `KnownInstanceType::ConstraintSet` display/truthiness audit is complete, and detailed display renders a deferred existential prefix.
-- `[ ]` Next step: Phase 6 should finish any remaining focused Rust unit tests for deferred quantification; the returned-callable generic-context inference gap is a separate follow-up.
+- `[x]` Phase 6 is implemented: focused Rust unit tests now cover eager-vs-deferred semantic observations, positive construction before solving, owned metadata round trips with collected metadata, negation/implies compatibility semantics, and solution projection modes. Full `ty_python_semantic` tests pass with no pending snapshots.
+- `[x]` Deferred quantification feature work is complete.
+- `[ ]` Separate follow-up: fix the returned-callable generic-context inference gap exposed by `partial(partial, drop)`.
 
 ## Background and goal
 
@@ -164,19 +166,19 @@ Each phase should generally become its own jj revision if it can be made clean i
 
 ### Phase 6: Tests
 
-- `[~]` Add focused Rust unit tests in `constraints.rs` for deferred-quantification metadata:
+- `[x]` Add focused Rust unit tests in `constraints.rs` for deferred-quantification metadata:
     - semantic satisfiability matches eager existential quantification for final observations;
     - positive conjunction preserves raw constraints and applies existential reduction at solving, e.g. `(T = int)` with deferred `{T}` conjoined with `U = T` can solve `U = int` after quantifying `T`;
     - owned round-trip preserves metadata through `into_owned` / `query` / `load`; because this is a Rust unit test, directly collect the metadata field into an `FxHashSet` and assert equivalence before and after, in addition to any semantic check;
     - negation/implies behavior follows the chosen compatibility semantics, including a case where `¬(∃T. P)` differs from `∃T. ¬P`;
     - `SolutionProjection::AllTypeVars` vs `SolutionProjection::InferableOnly(...)` behave differently as intended.
     - Do not add tests that assert or otherwise exercise exact constraint-set display text.
-- `[ ]` Do not add new mdtests unless implementation uncovers a missing user-visible regression case. Existing mdtests already cover the relevant callable/generic/ParamSpec behavior.
+- `[x]` Do not add new mdtests unless implementation uncovers a missing user-visible regression case. Existing mdtests already cover the relevant callable/generic/ParamSpec behavior. No new mdtests were added in Phase 6.
 - `[x]` Update existing mdtests and TODO comments if behavior improves. In particular, this work was expected to resolve the “Multiple occurrences of a higher-order generic callable” TODOs in:
     - `crates/ty_python_semantic/resources/mdtest/generics/legacy/callables.md`
     - `crates/ty_python_semantic/resources/mdtest/generics/pep695/callables.md`
     - Status: deferred quantification now gets past the original `Unknown` result, but the tests are still TODOs because an existing returned-callable generic-context inference gap leaks `Y@drop` and produces argument errors. The TODO comments now document that separate follow-up.
-- `[ ]` Existing mdtests to run/review include:
+- `[x]` Existing mdtests to run/review include:
     - `generics/legacy/callables.md`
     - `generics/pep695/callables.md`
     - generic callable assigned/passed cases where existential specialization should succeed;
@@ -186,7 +188,7 @@ Each phase should generally become its own jj revision if it can be made clean i
 - `[x]` Run targeted tests first:
     - `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic`
     - or narrower mdtest commands while iterating.
-- `[x]` Review all updated snapshots / pending snapshots. No `.pending-snap` files were produced.
+- `[x]` Review all updated snapshots / pending snapshots. No `.pending-snap` files were produced after the full `ty_python_semantic` test run.
 - `[x]` Run `jpk` (the jj-aware wrapper for `prek`) before declaring implementation complete.
 
 ## Open questions for plan review
