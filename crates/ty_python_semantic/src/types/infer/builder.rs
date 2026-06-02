@@ -3583,6 +3583,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         add.insert(self, target_ty);
     }
 
+    fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
+        if self.in_stub() && value.is_ellipsis_literal_expr() {
+            Some(Type::unknown())
+        } else {
+            None
+        }
+    }
+
     fn infer_assignment_definition_impl(
         &mut self,
         assignment: &AssignmentDefinitionKind<'db>,
@@ -3707,10 +3715,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
                     Type::bool_literal(true)
-                } else if self.in_stub() && value.is_ellipsis_literal_expr() {
-                    Type::unknown()
                 } else {
-                    value_ty
+                    self.stub_placeholder_binding_type(value)
+                        .unwrap_or(value_ty)
                 }
             }
         };
@@ -4375,21 +4382,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.declarations
                 .insert(definition, InferredDeclaration::Rejected);
 
-            if let Some(value) = value {
+            if !definition
+                .kind(self.db())
+                .category(self.in_stub(), self.module())
+                .is_binding()
+            {
+                return;
+            }
+
+            let node = target.into();
+            let add = AddBinding {
+                declared_ty: self.fallback_member_declared_type(node),
+                binding: definition,
+                node,
+                qualifiers: TypeQualifiers::empty(),
+                is_local: true,
+            };
+            let target_ty = if let Some(value) = value {
                 // The value remains an ordinary assignment, but normal binding resolution
                 // would consult this rejected annotation as a declaration.
-                let node = target.into();
-                let add = AddBinding {
-                    declared_ty: self.fallback_member_declared_type(node),
-                    binding: definition,
-                    node,
-                    qualifiers: TypeQualifiers::empty(),
-                    is_local: true,
-                };
-                let target_ty = self.infer_maybe_standalone_expression(value, add.type_context());
-                self.store_expression_type(target, target_ty);
-                add.insert(self, target_ty);
-            }
+                let value_ty = self.infer_maybe_standalone_expression(value, add.type_context());
+                self.stub_placeholder_binding_type(value)
+                    .unwrap_or(value_ty)
+            } else {
+                // Annotation-only definitions are bindings in stubs.
+                add.declared_ty.unwrap_or(Type::unknown())
+            };
+            self.store_expression_type(target, target_ty);
+            add.insert(self, target_ty);
 
             return;
         }
@@ -10303,7 +10323,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: bindings.into_boxed_slice(),
             declarations: declarations
                 .into_iter()
-                .filter_map(|(definition, declaration)| Some((definition, declaration.declared()?)))
+                .filter_map(|(definition, declaration)| {
+                    declaration
+                        .declared()
+                        .map(|declared| (definition, declared))
+                })
                 .collect(),
             extra,
         }

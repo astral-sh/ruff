@@ -325,3 +325,24 @@ def _(y: Y):
     # error: [invalid-argument-type]
     f1(**y.inner)
 ```
+
+## Rejected annotations in stubs
+
+Annotation-only declarations in stubs are also bindings. A rejected annotation should fall back to
+the type obtained by normal member lookup:
+
+`stub.pyi`:
+
+```pyi
+x: dict[str, object]
+# error: [invalid-type-form]
+x["a"]: int
+reveal_type(x["a"])  # revealed: object
+
+x["b"] = ...
+reveal_type(x["b"])  # revealed: Unknown
+
+# error: [invalid-type-form]
+x["c"]: int = ...
+reveal_type(x["c"])  # revealed: Unknown
+```
