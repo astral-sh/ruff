@@ -84,6 +84,12 @@ impl Files {
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
 
+        if let Some(file) = self.inner.system_by_path.get(absolute.as_ref()) {
+            return *file.value();
+        }
+
+        let absolute = absolute.into_owned();
+
         *self
             .inner
             .system_by_path
@@ -122,7 +128,7 @@ impl Files {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         self.inner
             .system_by_path
-            .get(&absolute)
+            .get(absolute.as_ref())
             .map(|entry| *entry.value())
     }
 
@@ -192,7 +198,7 @@ impl Files {
         let roots = self.inner.roots.read().unwrap();
 
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        roots.at(&absolute)
+        roots.at(absolute.as_ref())
     }
 
     /// The same as [`Self::root`] but panics if no root is found.
@@ -212,7 +218,7 @@ impl Files {
     pub fn try_add_root(&self, db: &dyn Db, path: &SystemPath, kind: FileRootKind) -> FileRoot {
         let mut roots = self.inner.roots.write().unwrap();
 
-        let absolute = SystemPath::absolute(path, db.system().current_directory());
+        let absolute = SystemPath::absolute(path, db.system().current_directory()).into_owned();
         roots.try_add(db, absolute, kind)
     }
 
@@ -239,7 +245,7 @@ impl Files {
         let current_directory = db.system().current_directory();
         let paths = paths
             .into_iter()
-            .map(|path| SystemPath::absolute(path.as_ref(), current_directory))
+            .map(|path| SystemPath::absolute(path.as_ref(), current_directory).into_owned())
             .collect::<BTreeSet<_>>();
 
         if paths.is_empty() {

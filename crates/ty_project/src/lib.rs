@@ -599,12 +599,11 @@ impl Project {
         I: IntoIterator<Item = P>,
         P: AsRef<SystemPath>,
     {
-        let paths = deduplicate_nested_paths(
-            paths
-                .into_iter()
-                .map(|path| SystemPath::absolute(path, db.system().current_directory())),
-        )
-        .collect::<BTreeSet<_>>();
+        let paths =
+            deduplicate_nested_paths(paths.into_iter().map(|path| {
+                SystemPath::absolute(&path, db.system().current_directory()).into_owned()
+            }))
+            .collect::<BTreeSet<_>>();
 
         if paths.is_empty() {
             return;

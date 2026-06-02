@@ -119,7 +119,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .as_ref()
         .map(|project| {
             if project.as_std_path().is_dir() {
-                Ok(SystemPath::absolute(project, &cwd))
+                Ok(SystemPath::absolute(project, &cwd).into_owned())
             } else {
                 Err(anyhow!(
                     "Provided project path `{project}` is not a directory"
@@ -132,7 +132,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let check_paths: Vec<_> = args
         .paths
         .iter()
-        .map(|path| SystemPath::absolute(path, &cwd))
+        .map(|path| SystemPath::absolute(path, &cwd).into_owned())
         .collect();
 
     let mode = if args.fix {
@@ -149,7 +149,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let config_file = args
         .config_file
         .as_ref()
-        .map(|path| SystemPath::absolute(path, &cwd));
+        .map(|path| SystemPath::absolute(path, &cwd).into_owned());
     let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {

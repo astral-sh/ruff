@@ -382,7 +382,7 @@ impl Options {
                     }
                 };
 
-                let abspath = SystemPath::absolute(path, system.current_directory());
+                let abspath = SystemPath::absolute(&path, system.current_directory()).into_owned();
 
                 if !system.is_directory(&abspath) {
                     tracing::debug!(

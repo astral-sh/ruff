@@ -36,7 +36,7 @@ struct TestCase {
 
 impl TestCase {
     fn project_path(&self, relative: impl AsRef<SystemPath>) -> SystemPathBuf {
-        SystemPath::absolute(relative, self.db.project().root(&self.db))
+        SystemPath::absolute(&relative, self.db.project().root(&self.db)).into_owned()
     }
 
     fn root_path(&self) -> &SystemPath {

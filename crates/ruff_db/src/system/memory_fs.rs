@@ -358,8 +358,8 @@ impl MemoryFileSystem {
     }
 
     fn normalize_path(&self, path: impl AsRef<SystemPath>) -> Utf8PathBuf {
-        let normalized = SystemPath::absolute(path, &self.inner.cwd);
-        normalized.into_utf8_path_buf()
+        let normalized = SystemPath::absolute(&path, &self.inner.cwd);
+        normalized.into_owned().into_utf8_path_buf()
     }
 
     pub fn read_directory(&self, path: impl AsRef<SystemPath>) -> Result<ReadDirectory> {

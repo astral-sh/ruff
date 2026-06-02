@@ -413,13 +413,15 @@ impl RelativePathBuf {
         );
 
         match &expanded {
-            Ok(path) => SystemPath::absolute(SystemPath::new(path.as_ref()), relative_to),
+            Ok(path) => {
+                SystemPath::absolute(SystemPath::new(path.as_ref()), relative_to).into_owned()
+            }
             Err(err) => {
                 tracing::warn!(
                     "Failed to expand variables in path `{}`: {err}",
                     self.0.as_str()
                 );
-                SystemPath::absolute(&self.0, relative_to)
+                SystemPath::absolute(&self.0, relative_to).into_owned()
             }
         }
     }

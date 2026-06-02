@@ -228,7 +228,7 @@ impl WorkspaceOptions {
                     Err(e) => Err(e),
                 },
             ) {
-                Ok(path) => Some(SystemPath::absolute(&*path, root)),
+                Ok(path) => Some(SystemPath::absolute(&*path, root).into_owned()),
                 Err(error) => {
                     client.show_error_message(format_args!(
                         "Failed to expand the environment variables \

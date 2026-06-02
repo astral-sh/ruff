@@ -187,7 +187,7 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "openFile")]
     pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
-        let path = SystemPath::absolute(path, self.db.project().root(&self.db));
+        let path = SystemPath::absolute(path, self.db.project().root(&self.db)).into_owned();
 
         self.system
             .fs

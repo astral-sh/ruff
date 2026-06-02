@@ -32,6 +32,7 @@ filetime = { workspace = true }
 get-size2 = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
+memchr = { workspace = true }
 path-slash = { workspace = true }
 pathdiff = { workspace = true }
 quick-junit = { workspace = true, optional = true }

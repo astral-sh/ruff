@@ -987,7 +987,7 @@ impl<'db> PthFile<'db> {
                 return None;
             }
 
-            Some(SystemPath::absolute(line, site_packages))
+            Some(SystemPath::absolute(line, site_packages).into_owned())
         })
     }
 }

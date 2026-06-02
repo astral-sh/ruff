@@ -58,7 +58,7 @@ impl<'a> Benchmark<'a> {
             installed_project
                 .check_paths()
                 .iter()
-                .map(|path| SystemPath::absolute(path, &root))
+                .map(|path| SystemPath::absolute(path, &root).into_owned())
                 .collect(),
         );
         db

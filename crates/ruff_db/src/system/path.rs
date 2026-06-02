@@ -1,5 +1,5 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::path::{Path, PathBuf, StripPrefixError};
@@ -395,6 +395,9 @@ impl SystemPath {
 
     /// Makes a path absolute and normalizes it without accessing the file system.
     ///
+    /// Paths that don't contain `.` or `..` components may be returned borrowed. In that case,
+    /// repeated separators are preserved because [`SystemPath`] treats them as equivalent.
+    ///
     /// Adapted from [cargo](https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61)
     ///
     /// # Examples
@@ -404,19 +407,19 @@ impl SystemPath {
     /// ```
     /// # #[cfg(unix)]
     /// # fn main() {
-    ///   use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///   use ruff_db::system::SystemPath;
     ///
     ///   // Relative to absolute
     ///   let absolute = SystemPath::absolute("foo/./bar", "/tmp");
-    ///   assert_eq!(absolute, SystemPathBuf::from("/tmp/foo/bar"));
+    ///   assert_eq!(absolute.as_ref(), SystemPath::new("/tmp/foo/bar"));
     ///
     ///   // Path's going past the root are normalized to the root
     ///   let absolute = SystemPath::absolute("../../../", "/tmp");
-    ///   assert_eq!(absolute, SystemPathBuf::from("/"));
+    ///   assert_eq!(absolute.as_ref(), SystemPath::new("/"));
     ///
     ///   // Absolute to absolute
     ///   let absolute = SystemPath::absolute("/foo//test/.././bar.rs", "/tmp");
-    ///   assert_eq!(absolute, SystemPathBuf::from("/foo/bar.rs"));
+    ///   assert_eq!(absolute.as_ref(), SystemPath::new("/foo/bar.rs"));
     /// # }
     /// # #[cfg(not(unix))]
     /// # fn main() {}
@@ -427,25 +430,68 @@ impl SystemPath {
     /// ```
     /// # #[cfg(windows)]
     /// # fn main() {
-    ///   use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///   use ruff_db::system::SystemPath;
     ///
     ///   // Relative to absolute
     ///   let absolute = SystemPath::absolute(r"foo\.\bar", r"C:\tmp");
-    ///   assert_eq!(absolute, SystemPathBuf::from(r"C:\tmp\foo\bar"));
+    ///   assert_eq!(absolute.as_ref(), SystemPath::new(r"C:\tmp\foo\bar"));
     ///
     ///   // Path's going past the root are normalized to the root
     ///   let absolute = SystemPath::absolute(r"..\..\..\", r"C:\tmp");
-    ///   assert_eq!(absolute, SystemPathBuf::from(r"C:\"));
+    ///   assert_eq!(absolute.as_ref(), SystemPath::new(r"C:\"));
     ///
     ///   // Absolute to absolute
     ///   let absolute = SystemPath::absolute(r"C:\foo//test\..\./bar.rs", r"C:\tmp");
-    ///   assert_eq!(absolute, SystemPathBuf::from(r"C:\foo\bar.rs"));
+    ///   assert_eq!(absolute.as_ref(), SystemPath::new(r"C:\foo\bar.rs"));
     /// # }
     /// # #[cfg(not(windows))]
     /// # fn main() {}
     /// ```
-    pub fn absolute(path: impl AsRef<SystemPath>, cwd: impl AsRef<SystemPath>) -> SystemPathBuf {
-        fn absolute(path: &SystemPath, cwd: &SystemPath) -> SystemPathBuf {
+    pub fn absolute<'a>(
+        path: &'a (impl AsRef<SystemPath> + ?Sized),
+        cwd: &(impl AsRef<SystemPath> + ?Sized),
+    ) -> Cow<'a, SystemPath> {
+        fn is_separator(byte: u8) -> bool {
+            if cfg!(windows) {
+                matches!(byte, b'/' | b'\\')
+            } else {
+                byte == b'/'
+            }
+        }
+
+        fn has_dot_component(path: &SystemPath) -> bool {
+            let bytes = path.as_str().as_bytes();
+
+            memchr::memchr_iter(b'.', bytes).any(|index| {
+                (index == 0 || is_separator(bytes[index - 1]))
+                    && match bytes.get(index + 1..) {
+                        None | Some([]) => true,
+                        Some([next, ..]) if is_separator(*next) => true,
+                        Some([b'.']) => true,
+                        Some([b'.', next, ..]) if is_separator(*next) => true,
+                        _ => false,
+                    }
+            })
+        }
+
+        fn can_borrow_absolute(path: &SystemPath) -> bool {
+            if !path.is_absolute() {
+                return false;
+            }
+
+            !path
+                .as_str()
+                .as_bytes()
+                .last()
+                .is_some_and(|byte| is_separator(*byte))
+                && !has_dot_component(path)
+        }
+
+        fn absolute<'a>(path: &'a SystemPath, cwd: &SystemPath) -> Cow<'a, SystemPath> {
+            if can_borrow_absolute(path) {
+                return Cow::Borrowed(path);
+            }
+
             let path = &path.0;
 
             let mut components = path.components().peekable();
@@ -475,7 +521,7 @@ impl SystemPath {
                 }
             }
 
-            SystemPathBuf::from_utf8_path_buf(ret)
+            Cow::Owned(SystemPathBuf::from_utf8_path_buf(ret))
         }
 
         absolute(path.as_ref(), cwd.as_ref())
@@ -725,6 +771,39 @@ impl ruff_cache::CacheKey for SystemPath {
 impl ruff_cache::CacheKey for SystemPathBuf {
     fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
         self.as_path().cache_key(hasher);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SystemPath;
+    use std::borrow::Cow;
+
+    #[test]
+    fn absolute_borrows_normalized_absolute_path() {
+        for path in ["/foo/bar.py", "/foo/.git", "/foo/...", "/foo//bar.py"] {
+            let path = SystemPath::new(path);
+
+            assert!(matches!(
+                SystemPath::absolute(path, "/tmp"),
+                Cow::Borrowed(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn absolute_normalizes_path() {
+        for (path, expected) in [
+            ("foo/bar.py", "/tmp/foo/bar.py"),
+            ("/foo/./bar.py", "/foo/bar.py"),
+            ("/foo/baz/../bar.py", "/foo/bar.py"),
+            ("/foo/bar.py/", "/foo/bar.py"),
+        ] {
+            let absolute = SystemPath::absolute(path, "/tmp");
+
+            assert!(matches!(absolute, Cow::Owned(_)));
+            assert_eq!(absolute.as_ref(), SystemPath::new(expected));
+        }
     }
 }
 
