@@ -2710,21 +2710,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            (Type::ProtocolInstance(protocol), Type::TypedDictTop)
-            | (Type::TypedDictTop, Type::ProtocolInstance(protocol)) => {
-                self.with_recursion_guard(left, right, || {
+            (Type::ProtocolInstance(protocol), Type::TypedDictTop | Type::TypedDict(_))
+            | (Type::TypedDictTop | Type::TypedDict(_), Type::ProtocolInstance(protocol)) => self
+                .with_recursion_guard(left, right, || {
                     self.any_protocol_members_absent_or_disjoint(
                         db,
                         protocol,
-                        KnownClass::TypedDictFallback.to_instance(db),
+                        Self::typed_dict_runtime_dict(db),
                     )
-                })
-            }
-
-            (Type::ProtocolInstance(protocol), typed_dict @ Type::TypedDict(_))
-            | (typed_dict @ Type::TypedDict(_), Type::ProtocolInstance(protocol)) => self
-                .with_recursion_guard(left, right, || {
-                    self.any_protocol_members_absent_or_disjoint(db, protocol, typed_dict)
                 }),
 
             (Type::ProtocolInstance(protocol), other)
@@ -3092,10 +3085,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let other_mapping = KnownClass::Mapping
-            .try_to_class_literal(db)
-            .and_then(|mapping| {
-                other.nominal_class(db)?.iter_mro(db).find_map(|base| {
+        let other_mapping = other
+            .nominal_class(db)
+            .and_then(|class| {
+                let dict = KnownClass::Dict.try_to_class_literal(db)?;
+                dict.iter_mro(db, None)
+                    .filter_map(ClassBase::into_class)
+                    .any(|base| base.class_literal(db) == class.class_literal(db))
+                    .then_some(class)
+            })
+            .and_then(|class| {
+                let mapping = KnownClass::Mapping.try_to_class_literal(db)?;
+                class.iter_mro(db).find_map(|base| {
                     let ClassType::Generic(alias) = base.into_class()? else {
                         return None;
                     };
@@ -3112,12 +3113,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, KnownClass::Str.to_instance(db), *other_key);
         }
 
-        let dict_str_any = KnownClass::Dict
-            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
-
         self.as_relation_checker(TypeRelation::Assignability)
-            .check_type_pair(db, dict_str_any, other)
+            .check_type_pair(db, Self::typed_dict_runtime_dict(db), other)
             .negate(db, self.constraints)
+    }
+
+    fn typed_dict_runtime_dict(db: &'db dyn Db) -> Type<'db> {
+        KnownClass::Dict
+            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
     }
 
     fn check_property_instance_pair(

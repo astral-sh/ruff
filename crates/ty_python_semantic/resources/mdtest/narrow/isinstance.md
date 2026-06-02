@@ -879,6 +879,47 @@ def mutate_dict_like(value: object) -> None:
         takes_dict(value)  # error: [invalid-argument-type]
 ```
 
+The restricted static API for `TypedDictTop` should not make runtime protocol checks disjoint from
+`TypedDict`s. Every `TypedDict` inhabitant is a runtime `dict`, so it has mutating `dict` methods
+such as `clear()` even though those methods are intentionally hidden from direct static access:
+
+```py
+from typing import Protocol, TypedDict, runtime_checkable
+
+@runtime_checkable
+class HasClear(Protocol):
+    def clear(self) -> None: ...
+
+class Movie(TypedDict):
+    title: str
+
+def narrow_typed_dict_protocol(movie: Movie) -> None:
+    if isinstance(movie, HasClear):
+        movie.missing  # error: [unresolved-attribute]
+
+def preserve_typed_dict_top_protocol(value: object) -> None:
+    if isinstance(value, dict) and isinstance(value, HasClear):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | (TypedDictTop & HasClear)
+        value.clear()
+```
+
+`TypedDict` inhabitants have exact runtime type `dict`, so they remain disjoint from proper
+subclasses of `dict`:
+
+```py
+from collections import defaultdict
+
+class CustomDict(dict[str, object]): ...
+
+def narrow_typed_dict_defaultdict(movie: Movie) -> None:
+    if isinstance(movie, defaultdict):
+        reveal_type(movie)  # revealed: Never
+
+def narrow_typed_dict_custom_dict(movie: Movie) -> None:
+    if isinstance(movie, CustomDict):
+        reveal_type(movie)  # revealed: Never
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py
