@@ -535,6 +535,27 @@ class C:
     Metadata: TypeAlias = Annotated[int, tuple[Self]]
 ```
 
+## Disabled `invalid-type-form` `Self` fallback
+
+Rejected aliases recover as `Unknown` even when the diagnostic is disabled:
+
+```toml
+[rules]
+invalid-type-form = "ignore"
+```
+
+```py
+from typing_extensions import Self, TypeAlias
+
+class C:
+    Inner: TypeAlias = Self
+
+    def takes(self, value: Inner) -> None:
+        reveal_type(value)  # revealed: Unknown
+
+C().takes(1)
+```
+
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
 
 ```py

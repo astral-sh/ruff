@@ -4568,7 +4568,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let previous_deferred_state = self.deferred_state;
 
             if is_pep_613_type_alias {
-                self.context.inference_flags |= InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS;
+                self.context.inference_flags |=
+                    InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS | InferenceFlags::IN_TYPE_ALIAS;
                 if self.in_stub() {
                     self.deferred_state = DeferredExpressionState::Deferred;
                 }
@@ -4587,9 +4588,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.typevar_binding_context = previous_typevar_binding_context;
             self.deferred_state = previous_deferred_state;
             self.dataclass_field_specifiers.clear();
-            self.context
-                .inference_flags
-                .remove(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS);
+            self.context.inference_flags.remove(
+                InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS | InferenceFlags::IN_TYPE_ALIAS,
+            );
 
             let inferred_ty = if target
                 .as_name_expr()
@@ -5837,15 +5838,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
             ast::Expr::Name(name) => {
                 let ty = self.infer_name_expression(name);
-                tcx.annotation.map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
+                if tcx.is_typealias()
+                    && matches!(ty, Type::SpecialForm(SpecialFormType::TypingSelf))
+                {
+                    self.infer_name_or_attribute_type_expression(ty, expression)
+                } else {
+                    tcx.annotation.map_or(ty, |target| {
+                        self.specialize_generic_class_from_context(ty, target)
+                    })
+                }
             }
             ast::Expr::Attribute(attribute) => {
                 let ty = self.infer_attribute_expression(attribute);
-                tcx.annotation.map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
+                if tcx.is_typealias()
+                    && matches!(ty, Type::SpecialForm(SpecialFormType::TypingSelf))
+                {
+                    self.infer_name_or_attribute_type_expression(ty, expression)
+                } else {
+                    tcx.annotation.map_or(ty, |target| {
+                        self.specialize_generic_class_from_context(ty, target)
+                    })
+                }
             }
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
