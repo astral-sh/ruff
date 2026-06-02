@@ -63,6 +63,7 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_too_many_positional_patterns_for_callable_class_pattern,
     report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
@@ -2268,19 +2269,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
-        let is_valid_class_pattern_target = |db: &dyn Db, cls_ty: Type| -> bool {
-            if matches!(
-                cls_ty,
-                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
-            ) {
-                // Special-case for the `collections.abc.Callable` special form
-                //
-                // This is not a type object, but is valid as a class pattern
-                return true;
+        if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
+            if let Some(first_excess_pattern) = pattern.arguments.patterns.first() {
+                report_too_many_positional_patterns_for_callable_class_pattern(
+                    &self.context,
+                    first_excess_pattern,
+                    pattern.arguments.patterns.len(),
+                );
             }
-
-            cls_ty.is_assignable_to(db, KnownClass::Type.to_instance(db))
-        };
+            return;
+        }
 
         if let Type::ClassLiteral(class) = cls_ty {
             if class.is_typed_dict(self.db()) {
@@ -2294,7 +2292,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     protocol_class,
                 );
             }
-        } else if !is_valid_class_pattern_target(self.db(), cls_ty) {
+        } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {
             report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);
         }
     }

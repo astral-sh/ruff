@@ -208,6 +208,17 @@ def _(subj: None | abc.Callable[..., str]) -> None:
             reveal_type(subj)  # revealed: None
 ```
 
+`collections.abc.Callable` has no `__match_args__`, so it does not accept positional subpatterns:
+
+```py
+from collections import abc
+
+def _(subj: abc.Callable[..., str]) -> None:
+    match subj:
+        # error: [invalid-match-pattern] "Too many positional subpatterns for `collections.abc.Callable`: expected 0, got 1"
+        case abc.Callable(x): ...
+```
+
 ### `typing.Callable`
 
 ```py

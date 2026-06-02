@@ -4838,6 +4838,20 @@ pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
+pub(crate) fn report_too_many_positional_patterns_for_callable_class_pattern<T: Ranged>(
+    context: &InferContext,
+    first_excess_pattern: T,
+    positional_count: usize,
+) {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, first_excess_pattern) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Too many positional subpatterns for `collections.abc.Callable`: expected 0, got {positional_count}"
+    ));
+    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+}
+
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
     mut diag: LintDiagnosticGuard<'db, 'ctx>,
 ) -> LintDiagnosticGuard<'db, 'ctx> {
