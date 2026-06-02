@@ -96,7 +96,25 @@ class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     type Subscripted = Self[int]
 
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Bound[T: Self] = T
+
     type Metadata = Annotated[int, tuple[Self]]
+```
+
+## `Self` in type parameter defaults
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Self
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Default[T = Self] = T
 ```
 
 ## Aliased type aliases

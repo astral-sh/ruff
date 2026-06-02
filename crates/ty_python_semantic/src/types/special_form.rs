@@ -18,7 +18,7 @@ use ty_python_core::{
     definition::{Definition, DefinitionKind},
     place::ScopedPlaceId,
     place_table,
-    scope::ScopeId,
+    scope::{NodeWithScopeKind, ScopeId},
     semantic_index, use_def_map,
 };
 
@@ -744,7 +744,12 @@ impl SpecialFormType {
             )),
 
             Self::TypingSelf => {
-                if inference_flags.contains(InferenceFlags::IN_TYPE_ALIAS) {
+                if inference_flags.contains(InferenceFlags::IN_TYPE_ALIAS)
+                    || matches!(
+                        scope_id.node(db),
+                        NodeWithScopeKind::TypeAliasTypeParameters(_)
+                    )
+                {
                     return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
                 }
 
