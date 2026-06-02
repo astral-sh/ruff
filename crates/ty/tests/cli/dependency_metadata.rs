@@ -2,6 +2,51 @@ use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
+#[cfg(unix)]
+fn write_uv(case: &CliTest, metadata: &str) -> anyhow::Result<std::path::PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let bin = case.root().join("bin");
+    let uv = bin.join("uv");
+    case.write_file(
+        "bin/uv",
+        &format!(
+            r#"
+            #!/bin/sh
+            if [ "$*" != "workspace metadata --locked --sync" ]; then
+                echo "unexpected arguments: $*" >&2
+                exit 2
+            fi
+            cat <<'EOF'
+            {metadata}
+            EOF
+            "#,
+        ),
+    )?;
+    std::fs::set_permissions(&uv, std::fs::Permissions::from_mode(0o755))?;
+
+    Ok(bin)
+}
+
+#[cfg(unix)]
+fn write_failing_uv(case: &CliTest) -> anyhow::Result<std::path::PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let bin = case.root().join("bin");
+    let uv = bin.join("uv");
+    case.write_file(
+        "bin/uv",
+        r#"
+        #!/bin/sh
+        echo "workspace metadata is unavailable" >&2
+        exit 2
+        "#,
+    )?;
+    std::fs::set_permissions(&uv, std::fs::Permissions::from_mode(0o755))?;
+
+    Ok(bin)
+}
+
 fn write_dependency_metadata(case: &CliTest, dependencies: &str) -> anyhow::Result<()> {
     let root = format!("{:?}", case.root().to_str().unwrap());
     case.write_file(
@@ -18,12 +63,139 @@ fn write_dependency_metadata(case: &CliTest, dependencies: &str) -> anyhow::Resu
                 "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
               }},
               "module_owners": {{
-                "requests": ["requests==2.32.0@registry+https://pypi.org/simple"]
+                "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
               }}
             }}
             "#
         ),
     )
+}
+
+#[cfg(unix)]
+#[test]
+fn dependency_metadata_is_loaded_from_uv_workspace() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import requests"),
+        ("uv.lock", ""),
+        (
+            ".venv/lib/python3.13/site-packages/requests/__init__.py",
+            "",
+        ),
+    ])?;
+    let root = format!("{:?}", case.root().to_str().unwrap());
+    let bin = write_uv(
+        &case,
+        &format!(
+            r#"
+            {{
+              "schema": {{"version": "preview"}},
+              "members": [
+                {{"name": "app", "path": {root}, "id": "app"}}
+              ],
+              "resolution": {{
+                "app": {{"name": "app", "dependencies": []}},
+                "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
+              }},
+              "module_owners": {{
+                "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
+              }}
+            }}
+            "#
+        ),
+    )?;
+
+    assert_cmd_snapshot!(case.command()
+        .arg("--python").arg(".venv")
+        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[missing-direct-dependency]: Third-party import `requests` is used but no direct dependency on `requests` is declared
+     --> test.py:1:8
+      |
+    1 | import requests
+      |        ^^^^^^^^
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn dependency_metadata_is_not_loaded_without_uv_lock() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import requests"),
+        (
+            ".venv/lib/python3.13/site-packages/requests/__init__.py",
+            "",
+        ),
+    ])?;
+    let root = format!("{:?}", case.root().to_str().unwrap());
+    let bin = write_uv(
+        &case,
+        &format!(
+            r#"
+            {{
+              "schema": {{"version": "preview"}},
+              "members": [
+                {{"name": "app", "path": {root}, "id": "app"}}
+              ],
+              "resolution": {{
+                "app": {{"name": "app", "dependencies": []}},
+                "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
+              }},
+              "module_owners": {{
+                "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
+              }}
+            }}
+            "#
+        ),
+    )?;
+
+    assert_cmd_snapshot!(case.command()
+        .arg("--python").arg(".venv")
+        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn dependency_metadata_uv_failure_does_not_fail_check() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import requests"),
+        ("uv.lock", ""),
+        (
+            ".venv/lib/python3.13/site-packages/requests/__init__.py",
+            "",
+        ),
+    ])?;
+    let bin = write_failing_uv(&case)?;
+
+    assert_cmd_snapshot!(case.command()
+        .arg("--python").arg(".venv")
+        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
 }
 
 fn write_site_package(case: &CliTest, module: &str) -> anyhow::Result<()> {
@@ -172,8 +344,8 @@ fn dependency_group_dependency_is_reported_in_package_code() -> anyhow::Result<(
         &case,
         r#"[{"id": "inline-snapshot==0.20.8@registry+https://pypi.org/simple"}]"#,
         r#"
-                "app": ["app"],
-                "inline_snapshot": ["inline-snapshot==0.20.8@registry+https://pypi.org/simple"]
+                "app": [{"package_id": "app"}],
+                "inline_snapshot": [{"package_id": "inline-snapshot==0.20.8@registry+https://pypi.org/simple"}]
         "#,
     )?;
 
@@ -206,8 +378,8 @@ fn dependency_group_dependency_is_allowed_in_non_package_file() -> anyhow::Resul
         &case,
         r#"[{"id": "inline-snapshot==0.20.8@registry+https://pypi.org/simple"}]"#,
         r#"
-                "app": ["app"],
-                "inline_snapshot": ["inline-snapshot==0.20.8@registry+https://pypi.org/simple"]
+                "app": [{"package_id": "app"}],
+                "inline_snapshot": [{"package_id": "inline-snapshot==0.20.8@registry+https://pypi.org/simple"}]
         "#,
     )?;
 
@@ -232,7 +404,7 @@ fn dependency_group_dependency_does_not_allow_transitive_dependency() -> anyhow:
     write_dependency_group_metadata(
         &case,
         r#"[{"id": "pyx-test==1.0.0@registry+https://pypi.org/simple"}]"#,
-        r#""pytest": ["pytest==8.0.0@registry+https://pypi.org/simple"]"#,
+        r#""pytest": [{"package_id": "pytest==8.0.0@registry+https://pypi.org/simple"}]"#,
     )?;
 
     assert_cmd_snapshot!(case.command()
@@ -277,7 +449,7 @@ fn dependency_group_dependency_is_reported_in_editable_package_code() -> anyhow:
     write_dependency_group_metadata(
         &case,
         r#"[{"id": "inline-snapshot==0.20.8@registry+https://pypi.org/simple"}]"#,
-        r#""inline_snapshot": ["inline-snapshot==0.20.8@registry+https://pypi.org/simple"]"#,
+        r#""inline_snapshot": [{"package_id": "inline-snapshot==0.20.8@registry+https://pypi.org/simple"}]"#,
     )?;
 
     assert_cmd_snapshot!(case.command()

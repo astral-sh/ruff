@@ -64,16 +64,22 @@ impl Settings {
 
     pub(crate) fn with_dependency_metadata(
         mut self,
-        dependency_metadata: Option<Arc<DependencyMetadata>>,
+        dependency_metadata: Option<&Arc<DependencyMetadata>>,
     ) -> Self {
-        self.analysis.dependency_metadata = dependency_metadata.clone();
+        let dependency_metadata = dependency_metadata.cloned();
+        self.analysis
+            .dependency_metadata
+            .clone_from(&dependency_metadata);
 
         self.overrides = self
             .overrides
             .into_iter()
             .map(|mut override_| {
                 let mut settings = (*override_.settings).clone();
-                settings.analysis.dependency_metadata = dependency_metadata.clone();
+                settings
+                    .analysis
+                    .dependency_metadata
+                    .clone_from(&dependency_metadata);
                 override_.settings = Arc::new(settings);
                 override_
             })
@@ -218,12 +224,9 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
     // during `overrides.to_settings()`.
     let rules = rules.to_rule_selection(db, &mut Vec::new());
     let mut analysis = analysis.to_settings(db, &mut Vec::new());
-    analysis.dependency_metadata = db
-        .project()
-        .settings(db)
-        .analysis()
+    analysis
         .dependency_metadata
-        .clone();
+        .clone_from(&db.project().settings(db).analysis().dependency_metadata);
 
     FileSettings::File(Arc::new(OverrideSettings { rules, analysis }))
 }
