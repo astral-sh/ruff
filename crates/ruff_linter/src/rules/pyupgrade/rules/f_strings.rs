@@ -246,11 +246,8 @@ impl FStringConversion {
     fn try_convert(
         range: TextRange,
         summary: &mut FormatSummaryValues,
-        checker: &Checker,
+        locator: &Locator,
     ) -> Result<Self> {
-        let locator = checker.locator();
-        // Repeating a builtin initializer like `list()` is unsound, so treat every call as effectful.
-        let is_builtin = |_: &str| false;
         let contents = locator.slice(range);
 
         // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
@@ -330,7 +327,10 @@ impl FStringConversion {
                     // string, we can't convert the format string to an f-string. For example,
                     // converting `"{x} {x}".format(x=foo())` would result in `f"{foo()} {foo()}"`,
                     // which would call `foo()` twice.
-                    if !seen.insert(specifier) && contains_effect(arg, is_builtin) {
+                    //
+                    // This is also true for builtins, so we don't treat them as special when
+                    // checking for effects here.
+                    if !seen.insert(specifier) && contains_effect(arg, |_| false) {
                         return Ok(Self::SideEffects);
                     }
 
@@ -441,7 +441,8 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
                 break token.start();
             }
             TokenKind::String if !token.unwrap_string_flags().is_unclosed() => {
-                match FStringConversion::try_convert(token.range(), &mut summary, checker) {
+                match FStringConversion::try_convert(token.range(), &mut summary, checker.locator())
+                {
                     // If the format string contains side effects that would need to be repeated,
                     // we can't convert it to an f-string.
                     Ok(FStringConversion::SideEffects) => return,
