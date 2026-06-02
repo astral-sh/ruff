@@ -38,8 +38,8 @@ def g(**kwargs: int):
 
 ## Constructor diagnostics with custom `list` and `set`
 
-Collection-initializer inference should only replace the result type of a bare `list()` or `set()`
-call. We should still validate the call against custom typeshed constructor signatures.
+Collection-initializer inference should only replace the result type of a supported `list()` or
+`set()` call. We should still validate the call against custom typeshed constructor signatures.
 
 ```toml
 [environment]
@@ -82,6 +82,10 @@ def overload(func, /): ...
 ```
 
 ```py
+import builtins
+
 list()  # error: [no-matching-overload]
 set()  # error: [no-matching-overload]
+builtins.list()  # error: [no-matching-overload]
+builtins.set()  # error: [no-matching-overload]
 ```

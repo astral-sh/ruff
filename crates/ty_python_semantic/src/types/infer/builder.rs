@@ -8007,6 +8007,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .unwrap_or_else(|| collection_class.to_specialized_instance(self.db(), &[Type::unknown()]))
     }
 
+    fn collection_constructor_name(func: &ast::Expr) -> Option<&str> {
+        match func {
+            ast::Expr::Name(name) => Some(name.id.as_str()),
+            ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) if matches!(value.as_ref(), ast::Expr::Name(name) if name.id == "builtins") => {
+                Some(attr.id.as_str())
+            }
+            _ => None,
+        }
+    }
+
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -8050,16 +8060,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             arguments,
         } = call_expression;
 
-        // The semantic index only records the common bare constructor spellings. Confirm that a
-        // list or set constructor still resolves to the corresponding builtin before applying
-        // collection-initializer result inference. We still run normal call binding below so that
-        // custom typeshed constructor signatures are validated. Empty dict calls use the dict fast
-        // path below.
+        // The semantic index only records supported constructor spellings that it can prove refer
+        // to builtins. Confirm that a list or set constructor still resolves to the corresponding
+        // builtin before applying collection-initializer result inference. We still run normal call
+        // binding below so that custom typeshed constructor signatures are validated. Empty dict
+        // calls use the dict fast path below.
         let collection_initializer_ty = if arguments.is_empty()
-            && let ast::Expr::Name(name) = func.as_ref()
-            && let Some(collection_class) = (match name.id.as_str() {
-                "list" => Some(KnownClass::List),
-                "set" => Some(KnownClass::Set),
+            && let Some(collection_class) = (match Self::collection_constructor_name(func) {
+                Some("list") => Some(KnownClass::List),
+                Some("set") => Some(KnownClass::Set),
                 _ => None,
             })
             && callable_type

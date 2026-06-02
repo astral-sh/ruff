@@ -322,10 +322,10 @@ pub struct SemanticIndex<'db> {
     /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
 
-    // Map from a constraining use of a collection initializer to its definition.
+    // Map from a constraining use of a collection literal to its definition.
     collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
 
-    // Map from a collection initializer definition to statements containing a constraining use.
+    // Map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
@@ -540,8 +540,8 @@ impl<'db> SemanticIndex<'db> {
         self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
-    /// If this is a potentially constraining use of an unconstrained collection initializer,
-    /// returns its definition.
+    /// If this is a potentially constraining use of an unconstrained collection literal, returns
+    /// its definition.
     pub fn unconstrained_collection_binding(
         &self,
         collection_use: &ast::Expr,
@@ -549,7 +549,7 @@ impl<'db> SemanticIndex<'db> {
         self.collections_by_use.get(&collection_use.into()).copied()
     }
 
-    /// Returns all potentially constraining uses of the given unannotated collection initializer.
+    /// Returns all potentially constraining uses of the given unnannotated collection literal.
     pub fn constraining_collection_uses(
         &self,
         collection_def: Definition<'db>,

@@ -236,9 +236,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
-    // A map from a constraining use of a collection initializer to its definition.
+    // A map from a constraining use of a collection literal to its definition.
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
-    // A map from a collection initializer definition to statements containing a constraining use.
+    // A map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
@@ -966,28 +966,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.ast_ids[scope_id]
     }
 
-    /// If the given expression is a use of an unconstrained collection literal, returns the
-    /// definition of the literal.
+    /// If the given expression is a use of an unconstrained collection literal, returns its
+    /// definition.
     fn unconstrained_collection_literal_binding(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
-        self.unconstrained_collection_binding(collection_use, is_unconstrained_collection_literal)
+        self.unconstrained_collection_binding_impl(
+            collection_use,
+            is_unconstrained_collection_literal,
+        )
     }
 
     /// If the given expression is a use of a potentially unconstrained collection initializer,
-    /// returns the definition of the initializer.
-    fn potentially_unconstrained_collection_initializer_binding(
+    /// returns its definition.
+    fn unconstrained_collection_binding(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
-        self.unconstrained_collection_binding(
+        self.unconstrained_collection_binding_impl(
             collection_use,
             is_potentially_unconstrained_collection_initializer,
         )
     }
 
-    fn unconstrained_collection_binding(
+    fn unconstrained_collection_binding_impl(
         &self,
         collection_use: &ast::Expr,
         is_collection_initializer: impl Fn(&ast::Expr) -> bool,
@@ -2987,6 +2990,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if node.targets.len() == 1
                     && is_potentially_unconstrained_collection_initializer(&node.value)
                 {
+                    if let Some(func) = empty_collection_constructor_callable(&node.value) {
+                        self.add_standalone_expression(func);
+                    }
                     self.add_standalone_assigned_expression(&node.value, node);
                 }
 
@@ -3901,7 +3907,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         let mut current_statement = self.pop_statement();
 
         // We currently only consider certain types of statements to introduce constraints
-        // on collection initializers. This restriction is mostly for performance reasons, as we
+        // on collection literals. This restriction is mostly for performance reasons, as we
         // want to avoid "reads" of a collection contributing to the complexity of the cycles
         // created by full-scope collection inference.
         current_statement
@@ -3961,7 +3967,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 .map(|lambda| (lambda.into(), standalone_statement)),
         );
 
-        // The inferred element type of a collection initializer depends on uses of
+        // The inferred element type of collection literal depends on uses of
         // the collection in its containing scope, and so each use must be part
         // of an standalone inferable statement to avoid large scope-level cycles.
         let mut collection_defs = FxHashSet::default();
@@ -4089,9 +4095,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_use {
                         self.record_place_use(place_id, expr);
 
-                        // Keep track of any uses of potential collection initializers.
-                        if let Some(collection_def) =
-                            self.potentially_unconstrained_collection_initializer_binding(expr)
+                        // Keep track of any uses of collection literals.
+                        if let Some(collection_def) = self.unconstrained_collection_binding(expr)
                             && let Some(current_statement) = self.current_statements.last_mut()
                         {
                             current_statement
@@ -4608,7 +4613,7 @@ impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
 struct CurrentStatement<'ast, 'db> {
     /// A list of lambda expressions contained in this statement.
     lambda_expressions: Vec<&'ast ast::ExprLambda>,
-    /// A list of collection initializer definitions whose uses are contained in this statement.
+    /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
 }
 
@@ -4822,23 +4827,23 @@ pub(crate) fn is_unconstrained_collection_literal(expr: &ast::Expr) -> bool {
 }
 
 fn is_potentially_unconstrained_collection_initializer(expr: &ast::Expr) -> bool {
-    if is_unconstrained_collection_literal(expr) {
-        return true;
+    is_unconstrained_collection_literal(expr)
+        || empty_collection_constructor_callable(expr).is_some()
+}
+
+fn empty_collection_constructor_callable(expr: &ast::Expr) -> Option<&ast::Expr> {
+    let ast::Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
+        return None;
+    };
+    if !arguments.is_empty() {
+        return None;
     }
 
-    // Keep constructor support limited to the common bare spellings. Resolving aliases or
-    // qualified calls requires semantic information that is unavailable in this crate.
-    matches!(
-        expr,
-        ast::Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            ..
-        }) if arguments.is_empty()
-            && matches!(
-                func.as_ref(),
-                ast::Expr::Name(name)
-                    if matches!(name.id.as_str(), "list" | "set" | "dict")
-            )
-    )
+    match func.as_ref() {
+        ast::Expr::Name(name) if matches!(name.id.as_str(), "list" | "set" | "dict") => Some(func),
+        _ => None,
+    }
 }

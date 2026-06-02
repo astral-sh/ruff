@@ -794,58 +794,31 @@ reveal_type(x1_sorted)  # revealed: list[str]
 ```py
 x1_list = list()
 x1_list.append(1)
-x1_list.append("2")
-reveal_type(x1_list)  # revealed: list[int | str]
+reveal_type(x1_list)  # revealed: list[int]
 
 x1_set = set()
-x1_set.add(1)
 x1_set.add("2")
-reveal_type(x1_set)  # revealed: set[int | str]
+reveal_type(x1_set)  # revealed: set[str]
 
 x1_dict = dict()
 x1_dict["a"] = 1
-x1_dict["b"] = "2"
-reveal_type(x1_dict)  # revealed: dict[str, int | str]
+reveal_type(x1_dict)  # revealed: dict[str, int]
+```
 
-def make_list() -> list[str]:
-    result = list()
-    result.append(1)
-    reveal_type(result)  # revealed: list[int | str]
-    return result  # error: [invalid-return-type]
-
-def make_set() -> set[str]:
+```py
+def ignore_unreachable_constructor_uses(flag: bool) -> None:
     result = set()
-    result.add(1)
-    reveal_type(result)  # revealed: set[int | str]
-    return result  # error: [invalid-return-type]
+    result_alias: set[str] = result
 
-def make_dict() -> dict[str, str]:
-    result = dict()
-    result["x"] = 1
-    reveal_type(result)  # revealed: dict[str, int | str]
-    return result  # error: [invalid-return-type]
+    if False:
+        result.add(1)
 
-def shadowed_constructors() -> None:
-    class list:
-        def append(self, value: str) -> None: ...
+    if flag:
+        return
+    if flag:
+        result.add(2)
 
-    class set:
-        def add(self, value: str) -> None: ...
-
-    class dict:
-        def update(self, **kwargs: int) -> None: ...
-
-    list_result = list()
-    list_result.append("x")
-    reveal_type(list_result)  # revealed: list
-
-    set_result = set()
-    set_result.add("x")
-    reveal_type(set_result)  # revealed: set
-
-    dict_result = dict()
-    dict_result.update(x=1)
-    reveal_type(dict_result)  # revealed: dict
+    reveal_type(result)  # revealed: set[str]
 ```
 
 ```py
@@ -1019,6 +992,54 @@ def _(flag: bool):
 
     # TODO: This should reveal `list[int]`.
     reveal_type(x22)  # revealed: list[Unknown]
+```
+
+## Collection constructor shadowing
+
+Bare constructor names are only special-cased when they are not bound in any visible scope.
+
+```py
+import builtins
+
+from typing_extensions import Never
+
+class Result:
+    def append(self, value: object) -> Never: ...  # error: [empty-body]
+
+def qualified_builtins_are_not_special_cased() -> None:
+    result_list = builtins.list()
+    result_list.append(1)
+    reveal_type(result_list)  # revealed: list[Unknown]
+
+    result_set = builtins.set()
+    result_set.add(1)
+    reveal_type(result_set)  # revealed: set[Unknown]
+
+    result_dict = builtins.dict()
+    result_dict["a"] = 1
+    reveal_type(result_dict)  # revealed: dict[Unknown, Unknown]
+
+def shadowed_builtins_reachability() -> None:
+    class Builtins:
+        list = Result
+
+    builtins = Builtins()
+    result = builtins.list()
+    result.append(1)
+    reveal_type(result)  # revealed: Never
+
+def module_shadowed_constructor_reachability() -> None:
+    result = list()
+    result.append(1)
+    reveal_type(result)  # revealed: Never
+
+list = Result
+
+def builtin_alias_is_not_special_cased() -> None:
+    list = builtins.list
+    result = list()
+    result.append(1)
+    reveal_type(result)  # revealed: list[Unknown]
 ```
 
 ## Multi-inference diagnostics
