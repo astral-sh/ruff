@@ -43,11 +43,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             visitor: &DictMergeProjectionVisitor<'db>,
         ) -> Option<Type<'db>> {
             match ty {
-                Type::TypedDict(_) | Type::TypedDictTop => {
-                    Some(KnownClass::Dict.to_specialized_instance(
-                        db,
-                        &[KnownClass::Str.to_instance(db), Type::object()],
-                    ))
+                typed_dict @ (Type::TypedDict(_) | Type::TypedDictTop) => {
+                    typed_dict.dunder_class(db).to_instance(db)
                 }
                 Type::Union(union) => union
                     .elements(db)

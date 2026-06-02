@@ -1,8 +1,6 @@
-use crate::Db;
 use crate::types::class::{
     ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
 };
-use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
     report_instance_layout_conflict,
@@ -13,47 +11,12 @@ use crate::types::infer::builder::{
         DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
     },
 };
-use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
+use crate::types::{
+    KnownClass, SubclassOfType, Type, TypeContext, UnionType, definition_expression_type,
+};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 use ty_python_core::definition::Definition;
-
-struct DynamicClassNamespace;
-type DynamicClassNamespaceVisitor<'db> = CycleDetector<DynamicClassNamespace, Type<'db>, bool>;
-
-/// Return whether every inhabitant of `ty` can be used as the namespace in a three-argument
-/// `type()` call.
-fn is_assignable_to_dynamic_class_namespace<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    fn imp<'db>(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        visitor: &DynamicClassNamespaceVisitor<'db>,
-    ) -> bool {
-        match ty {
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .all(|element| imp(db, *element, visitor)),
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .any(|element| imp(db, *element, visitor)),
-            Type::TypeAlias(alias) => visitor.visit(ty, || imp(db, alias.value_type(db), visitor)),
-            _ => {
-                ty.is_typed_dict_like()
-                    || ty.is_assignable_to(
-                        db,
-                        KnownClass::Dict.to_specialized_instance(
-                            db,
-                            &[KnownClass::Str.to_instance(db), Type::any()],
-                        ),
-                    )
-            }
-        }
-    }
-
-    imp(db, ty, &DynamicClassNamespaceVisitor::default())
-}
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a call to `builtins.type()`.
@@ -212,7 +175,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 (Box::new([]), true)
             };
 
-        if !is_assignable_to_dynamic_class_namespace(db, namespace_type)
+        let namespace_target = UnionType::from_two_elements(
+            db,
+            KnownClass::Dict
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
+            Type::TypedDictTop,
+        );
+
+        if !namespace_type.is_assignable_to(db, namespace_target)
             && let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)

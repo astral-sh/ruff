@@ -2332,6 +2332,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             })
     }
 
+    fn any_protocol_members_absent(
+        &self,
+        db: &'db dyn Db,
+        protocol: ProtocolInstanceType<'db>,
+        other: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        protocol
+            .interface(db)
+            .members(db)
+            .when_any(db, self.constraints, |member| {
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    other.member(db, member.name()).place.is_undefined(),
+                )
+            })
+    }
+
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, true)
     }
@@ -2711,10 +2728,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            // TypedDict inhabitants have exact runtime type `dict`. Protocol member types cannot
+            // prove disjointness here because runtime protocol checks only inspect attribute
+            // presence.
             (Type::ProtocolInstance(protocol), Type::TypedDictTop | Type::TypedDict(_))
             | (Type::TypedDictTop | Type::TypedDict(_), Type::ProtocolInstance(protocol)) => self
                 .with_recursion_guard(left, right, || {
-                    self.any_protocol_members_absent_or_disjoint(
+                    self.any_protocol_members_absent(
                         db,
                         protocol,
                         Self::typed_dict_runtime_dict(db),

@@ -892,7 +892,9 @@ def mutate_dict_like(value: object) -> None:
 
 The restricted static API for `TypedDictTop` should not make runtime protocol checks disjoint from
 `TypedDict`s. Every `TypedDict` inhabitant is a runtime `dict`, so it has mutating `dict` methods
-such as `clear()` even though those methods are intentionally hidden from direct static access:
+such as `clear()` even though those methods are intentionally hidden from direct static access.
+Runtime protocol checks only test whether an attribute is present, not whether its type is
+compatible with the protocol member:
 
 ```py
 from typing import Protocol, TypedDict, runtime_checkable
@@ -901,12 +903,28 @@ from typing import Protocol, TypedDict, runtime_checkable
 class HasClear(Protocol):
     def clear(self) -> None: ...
 
+@runtime_checkable
+class BadClear(Protocol):
+    def clear(self, value: int) -> str: ...
+
+@runtime_checkable
+class HasMissing(Protocol):
+    def missing(self) -> None: ...
+
 class Movie(TypedDict):
     title: str
 
 def narrow_typed_dict_protocol(movie: Movie) -> None:
     if isinstance(movie, HasClear):
         movie.missing  # error: [unresolved-attribute]
+
+def narrow_typed_dict_incompatible_protocol(movie: Movie) -> None:
+    if isinstance(movie, BadClear):
+        movie.missing  # error: [unresolved-attribute]
+
+def narrow_typed_dict_missing_protocol_member(movie: Movie) -> None:
+    if isinstance(movie, HasMissing):
+        reveal_type(movie)  # revealed: Never
 
 def preserve_typed_dict_top_protocol(value: object) -> None:
     if isinstance(value, dict) and isinstance(value, HasClear):

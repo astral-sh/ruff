@@ -3715,8 +3715,9 @@ impl<'db> Type<'db> {
                 );
 
                 if result.is_class_var() && self.is_typed_dict_like() {
-                    // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
-                    // They can only be accessed on `SomeTypedDict` directly.
+                    // `ClassVar`s on the TypedDict fallback classes cannot be accessed on
+                    // TypedDict inhabitants. They can only be accessed on concrete TypedDict
+                    // classes directly.
                     return Place::Undefined.into();
                 }
 

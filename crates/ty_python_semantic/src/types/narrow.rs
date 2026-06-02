@@ -425,10 +425,7 @@ pub(crate) fn runtime_instance_constraint_for_class_literal<'db>(
 ) -> Type<'db> {
     let constraint = Type::instance(db, class.top_materialization(db));
     if class.is_known(db, KnownClass::Dict) || class.is_known(db, KnownClass::MutableMapping) {
-        UnionBuilder::new(db)
-            .add(constraint)
-            .add(Type::TypedDictTop)
-            .build()
+        UnionType::from_two_elements(db, constraint, Type::TypedDictTop)
     } else {
         constraint
     }
@@ -454,19 +451,6 @@ fn exact_class_narrowing_constraint<'db>(
         Some(Type::TypedDictTop.negate(db))
     } else {
         None
-    }
-}
-
-fn negate_classinfo_constraint<'db>(db: &'db dyn Db, constraint: Type<'db>) -> Type<'db> {
-    match constraint {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .fold(IntersectionBuilder::new(db), |builder, element| {
-                builder.add_negative(*element)
-            })
-            .build(),
-        _ => constraint.negate(db),
     }
 }
 
@@ -1849,7 +1833,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             NarrowingConstraint::intersection(if is_positive {
                                 classinfo
                             } else {
-                                negate_classinfo_constraint(self.db, classinfo)
+                                classinfo.negate(self.db)
                             }),
                         )])
                     })
@@ -1952,7 +1936,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if is_positive {
                     constraint
                 } else {
-                    negate_classinfo_constraint(self.db, constraint)
+                    constraint.negate(self.db)
                 }
             }
             dynamic @ Type::Dynamic(_) => dynamic,
