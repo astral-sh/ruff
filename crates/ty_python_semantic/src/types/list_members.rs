@@ -334,15 +334,23 @@ impl<'db> AllMembers<'db> {
                 _ => {}
             },
 
-            Type::TypedDict(_) => {
-                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
-                    self.extend_with_class_members(db, ty, class_literal);
-                }
+            Type::TypedDict(typed_dict) => {
+                if typed_dict.is_open_empty(db) {
+                    if let Type::ClassLiteral(ClassLiteral::Static(class)) =
+                        KnownClass::TypedDictReadOnlyFallback.to_class_literal(db)
+                    {
+                        self.extend_with_instance_members(db, ty, class);
+                    }
+                } else {
+                    if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+                        self.extend_with_class_members(db, ty, class_literal);
+                    }
 
-                if let Type::ClassLiteral(ClassLiteral::Static(class)) =
-                    KnownClass::TypedDictFallback.to_class_literal(db)
-                {
-                    self.extend_with_instance_members(db, ty, class);
+                    if let Type::ClassLiteral(ClassLiteral::Static(class)) =
+                        KnownClass::TypedDictFallback.to_class_literal(db)
+                    {
+                        self.extend_with_instance_members(db, ty, class);
+                    }
                 }
             }
 

@@ -1824,6 +1824,10 @@ impl<'db> Type<'db> {
         Self::TypedDict(TypedDictType::new(defining_class.into()))
     }
 
+    pub(crate) fn open_empty_typed_dict(db: &'db dyn Db) -> Self {
+        Self::TypedDict(TypedDictType::open_empty(db))
+    }
+
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         // Avoid invoking the `IntersectionBuilder` for negations that are trivial.
@@ -2760,6 +2764,22 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::TypedDict(typed_dict) if typed_dict.is_open_empty(db) => {
+                KnownClass::TypedDictReadOnlyFallback
+                    .to_class_literal(db)
+                    .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                    .expect("`find_name_in_mro` should return `Some` for a class literal")
+                    .map_type(|ty| {
+                        ty.apply_type_mapping(
+                            db,
+                            &TypeMapping::ReplaceSelf {
+                                new_upper_bound: self,
+                            },
+                            TypeContext::default(),
+                        )
+                    })
+            }
+
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
                 .to_meta_type(db)
                 .class_object_member(db, name.as_str(), policy),
@@ -2940,6 +2960,11 @@ impl<'db> Type<'db> {
                 Place::Undefined.into()
             }
 
+            Type::TypedDict(typed_dict) if typed_dict.is_open_empty(db) => {
+                KnownClass::TypedDictReadOnlyFallback
+                    .to_instance(db)
+                    .instance_member(db, name)
+            }
             Type::TypedDict(_) => Place::Undefined.into(),
 
             Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, name),
@@ -5907,15 +5932,15 @@ impl<'db> Type<'db> {
     /// instances of `dict` at runtime.
     #[must_use]
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
-        if self.is_typed_dict() {
-            return KnownClass::Dict
+        match self {
+            Type::TypedDict(_) => KnownClass::Dict
                 .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), Type::object()])
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
-                .unwrap_or_else(Type::unknown);
+                .unwrap_or_else(Type::unknown),
+            Type::Union(union) => union.map(db, |element| element.dunder_class(db)),
+            _ => self.to_meta_type(db),
         }
-
-        self.to_meta_type(db)
     }
 
     #[must_use]

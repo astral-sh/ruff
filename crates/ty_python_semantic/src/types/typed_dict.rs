@@ -221,6 +221,28 @@ impl<'db> TypedDictType<'db> {
         Self::Class(defining_class)
     }
 
+    /// Return the structural top type of all open `TypedDict`s.
+    ///
+    /// Every `TypedDict` is a subtype of an open empty `TypedDict`, because it imposes no
+    /// requirements on known fields and its implicit extra items are read-only `object`s.
+    pub(crate) fn open_empty(db: &'db dyn Db) -> Self {
+        Self::from_schema_items(db, TypedDictSchema::default())
+    }
+
+    /// Return whether this is an open empty `TypedDict`, the structural top of all `TypedDict`s.
+    ///
+    /// Synthesized patch types are implementation details used to validate `TypedDict` updates;
+    /// they are not ordinary schema types. Once `closed` and `extra_items` are modeled in
+    /// `TypedDictSchema`, this must also require implicit read-only `object` extra items.
+    pub(crate) fn is_open_empty(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Class(_) => self.items(db).is_empty(),
+            Self::Synthesized(synthesized) => {
+                !synthesized.is_patch(db) && synthesized.items(db).is_empty()
+            }
+        }
+    }
+
     pub(crate) fn defining_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(defining_class) => Some(defining_class),
