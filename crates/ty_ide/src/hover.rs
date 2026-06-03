@@ -334,17 +334,17 @@ impl<'db> DisplayHoverContent<'_, 'db> {
     }
 }
 
-fn create_qualifier_suffix(qualifiers: &TypeQualifiers) -> String {
+fn create_qualifier_suffix(qualifiers: TypeQualifiers) -> String {
     let mut standard = qualifiers
         .iter()
         .filter(|q| !q.is_non_standard())
         .peekable();
     if standard.peek().is_none() {
-        return String::new();
+        String::new()
     } else {
         let names: Vec<&str> = standard.map(TypeQualifiers::name).collect();
-        return format!(" ({})", names.join(", "));
-    };
+        format!(" ({})", names.join(", "))
+    }
 }
 
 impl fmt::Display for DisplayHoverContent<'_, '_> {
@@ -369,7 +369,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     None => "",
                 };
 
-                let qualifier_suffix = create_qualifier_suffix(qualifiers);
+                let qualifier_suffix = create_qualifier_suffix(*qualifiers);
 
                 let (ty_string, syntax) = self.ty_string_and_syntax(ty);
                 self.kind
@@ -384,7 +384,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                 let alias_type = Type::TypeAlias(*alias);
                 let alias_string = alias_type.display(self.db);
 
-                let qualifier_suffix = create_qualifier_suffix(qualifiers);
+                let qualifier_suffix = create_qualifier_suffix(*qualifiers);
 
                 let (ty_string, syntax) = self.ty_string_and_syntax(value_ty);
 
