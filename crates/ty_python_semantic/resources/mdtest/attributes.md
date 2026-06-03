@@ -2057,6 +2057,21 @@ def constrained(value: Intersection[T, ConstraintExtra]):
     reveal_type(value.other)  # revealed: T@constrained & ConstraintExtra
     reveal_type(value.other.extra)  # revealed: int
 
+class HasOther:
+    other: Self
+
+class NoOther: ...
+
+class OtherFallback:
+    other: object
+
+V = TypeVar("V", HasOther, NoOther)
+
+def takes_other_fallback(value: OtherFallback): ...
+def partial(value: Intersection[V, OtherFallback]):
+    # error: [invalid-argument-type]
+    takes_other_fallback(value.other)
+
 class BoundBase:
     other: Self
     callback: Callable[[Self], None]
