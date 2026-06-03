@@ -3471,6 +3471,7 @@ signatures when assigning to the explicit form. The reverse assignment is reject
 unpacked `TypedDict` may still receive hidden extra items.
 
 ```py
+from functools import partial
 from typing import Callable, ParamSpec, Protocol, TypeVar
 from typing_extensions import NotRequired, Required, TypedDict, Unpack
 
@@ -3541,6 +3542,9 @@ def preserve_signature(callback: Callable[P, R]) -> Callable[P, R]:
     return callback
 
 preserved_typed_dict_target: TypedDictKwargs = preserve_signature(func)
+
+partial_typed_dict_target: TypedDictKwargs = partial(func)
+partial_explicit_target: TypedDictKwargs = partial(func7)  # error: [invalid-assignment]
 ```
 
 ### Missing required keys remain incompatible
