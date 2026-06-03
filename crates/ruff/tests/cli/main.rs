@@ -22,6 +22,7 @@ mod show_settings;
 mod version;
 
 const BIN_NAME: &str = "ruff";
+const CHECK_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
@@ -213,6 +214,12 @@ impl CliTest {
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();
 
+        command
+    }
+
+    pub(crate) fn check_command(&self) -> Command {
+        let mut command = self.command();
+        command.args(CHECK_BASE_OPTIONS);
         command
     }
 

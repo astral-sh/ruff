@@ -13,14 +13,6 @@ use crate::CliTest;
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
-impl CliTest {
-    fn check_command(&self) -> Command {
-        let mut command = self.command();
-        command.args(STDIN_BASE_OPTIONS);
-        command
-    }
-}
-
 #[test]
 fn top_level_options() -> Result<()> {
     let test = CliTest::new()?;
@@ -475,9 +467,10 @@ ignore = ["D203", "D212"]
 }
 
 #[test]
-fn nonexistent_config_file() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn nonexistent_config_file() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "foo.toml", "."]), @"
     success: false
     exit_code: 2
@@ -495,12 +488,15 @@ fn nonexistent_config_file() {
 
     For more information, try '--help'.
     ");
+
+    Ok(())
 }
 
 #[test]
-fn config_override_rejected_if_invalid_toml() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn config_override_rejected_if_invalid_toml() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "foo = bar", "."]), @"
     success: false
     exit_code: 2
@@ -523,6 +519,8 @@ fn config_override_rejected_if_invalid_toml() {
 
     For more information, try '--help'.
     ");
+
+    Ok(())
 }
 
 #[test]
@@ -553,9 +551,10 @@ fn too_many_config_files() -> Result<()> {
 }
 
 #[test]
-fn extend_passed_via_config_argument() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn extend_passed_via_config_argument() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "extend = 'foo.toml'", "."]), @"
     success: false
     exit_code: 2
@@ -568,6 +567,8 @@ fn extend_passed_via_config_argument() {
 
     For more information, try '--help'.
     ");
+
+    Ok(())
 }
 
 #[test]
