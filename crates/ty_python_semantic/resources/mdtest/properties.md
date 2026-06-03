@@ -461,6 +461,20 @@ def _(value: Value):
 def _(value: Intersection[Value, Extra]):
     reveal_type(value.property)  # revealed: Value & Extra
     value.property.missing  # error: [unresolved-attribute]
+
+class SelfProperty:
+    @property
+    def value(self: Self) -> Self:
+        return self
+
+class Other: ...
+
+def _(other: Other):
+    # error: [call-non-callable]
+    reveal_type(SelfProperty.value.__get__(other, SelfProperty))  # revealed: Unknown
+    get = type(SelfProperty.value).__get__
+    # error: [call-non-callable]
+    reveal_type(get(SelfProperty.value, other, SelfProperty))  # revealed: Unknown
 ```
 
 When we access `attr` on the class itself, the descriptor protocol is also invoked, but the instance
