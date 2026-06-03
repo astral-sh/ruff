@@ -809,6 +809,9 @@ impl<'db> IntersectionType<'db> {
                 return None;
             }
             if let Some(instance) = element.to_instance(db) {
+                if instance.is_dynamic() {
+                    return None;
+                }
                 builder = builder.add_positive(instance);
                 found_instance = true;
             }

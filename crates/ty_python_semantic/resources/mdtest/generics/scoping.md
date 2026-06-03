@@ -74,7 +74,7 @@ constructed by the class object:
 
 ```py
 from typing import Any
-from ty_extensions import Intersection
+from ty_extensions import Intersection, Unknown
 
 class A: ...
 
@@ -84,6 +84,14 @@ def make[T](cls: type[T]) -> T:
 def takes_str(x: str): ...
 def _(cls: Intersection[type[A], Any]):
     reveal_type(make(cls))  # revealed: A | Any
+    takes_str(make(cls))  # error: [invalid-argument-type]
+
+def _(cls: Intersection[type[A], type[Any]]):
+    reveal_type(make(cls))  # revealed: A | Any
+    takes_str(make(cls))  # error: [invalid-argument-type]
+
+def _(cls: Intersection[type[A], type[Unknown]]):
+    reveal_type(make(cls))  # revealed: A | Unknown
     takes_str(make(cls))  # error: [invalid-argument-type]
 ```
 
