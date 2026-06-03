@@ -6066,6 +6066,18 @@ def _(key: str) -> None:
     bad_declared_item: WithDeclaredItem = {key: 1}  # error: [invalid-argument-type]
 ```
 
+### Non-literal keys in a closed TypedDict constructor are rejected
+
+```py
+from typing_extensions import TypedDict
+
+class Closed(TypedDict, closed=True): ...
+
+def _(key: str) -> None:
+    assigned: Closed = {key: 1}  # error: [invalid-key]
+    Closed({key: 1})  # error: [invalid-key]
+```
+
 ### Mixed constructors validate source-only keys against `extra_items`
 
 ```py

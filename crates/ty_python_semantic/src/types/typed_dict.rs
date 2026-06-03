@@ -2456,20 +2456,28 @@ fn validate_merged_dict_literal<'db, 'ast>(
         if let Some(key_expr) = &item.key {
             let key_ty = expression_type_fn(key_expr, TypeContext::default());
             let Some(key_literal) = key_ty.as_string_literal() else {
-                if key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                    && let Some(expected_ty) = typed_dict.arbitrary_key_value_type(db)
-                {
-                    let value_ty =
-                        expression_type_fn(&item.value, TypeContext::new(Some(expected_ty)));
-                    if !value_ty.is_assignable_to(db, expected_ty) {
+                if key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
+                    if let Some(expected_ty) = typed_dict.arbitrary_key_value_type(db) {
+                        let value_ty =
+                            expression_type_fn(&item.value, TypeContext::new(Some(expected_ty)));
+                        if !value_ty.is_assignable_to(db, expected_ty) {
+                            valid = false;
+                            if let Some(builder) =
+                                context.report_lint(&INVALID_ARGUMENT_TYPE, &item.value)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Value of type `{}` is not assignable to arbitrary key value type `{}` on TypedDict `{}`",
+                                    value_ty.display(db),
+                                    expected_ty.display(db),
+                                    Type::TypedDict(typed_dict).display(db),
+                                ));
+                            }
+                        }
+                    } else if typed_dict.openness(db).is_closed() {
                         valid = false;
-                        if let Some(builder) =
-                            context.report_lint(&INVALID_ARGUMENT_TYPE, &item.value)
-                        {
+                        if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
                             builder.into_diagnostic(format_args!(
-                                "Value of type `{}` is not assignable to arbitrary key value type `{}` on TypedDict `{}`",
-                                value_ty.display(db),
-                                expected_ty.display(db),
+                                "Non-literal string key may be unknown for TypedDict `{}`",
                                 Type::TypedDict(typed_dict).display(db),
                             ));
                         }
