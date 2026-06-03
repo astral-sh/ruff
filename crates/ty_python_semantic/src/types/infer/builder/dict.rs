@@ -183,23 +183,33 @@ fn is_typed_dict_or_union_of_typed_dicts<'db>(db: &'db dyn crate::Db, ty: Type<'
         db: &'db dyn crate::Db,
         ty: Type<'db>,
         resolving: &mut FxHashSet<Type<'db>>,
+        completed: &mut FxHashMap<Type<'db>, bool>,
     ) -> bool {
         let ty = ty.resolve_type_alias(db);
         match ty {
             Type::TypedDict(_) => true,
             Type::Union(union) => {
+                if let Some(result) = completed.get(&ty) {
+                    return *result;
+                }
                 if !resolving.insert(ty) {
                     return false;
                 }
                 let result = union.elements(db).iter().all(|element| {
-                    is_typed_dict_or_union_of_typed_dicts_impl(db, *element, resolving)
+                    is_typed_dict_or_union_of_typed_dicts_impl(db, *element, resolving, completed)
                 });
                 resolving.remove(&ty);
+                completed.insert(ty, result);
                 result
             }
             _ => false,
         }
     }
 
-    is_typed_dict_or_union_of_typed_dicts_impl(db, ty, &mut FxHashSet::default())
+    is_typed_dict_or_union_of_typed_dicts_impl(
+        db,
+        ty,
+        &mut FxHashSet::default(),
+        &mut FxHashMap::default(),
+    )
 }

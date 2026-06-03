@@ -2420,6 +2420,56 @@ type AliasedItem = FirstGroup | SecondGroup | Q | R | S | T | U | V | W | X
 
 def _(item: AliasedItem) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
+
+# Reusing sub-aliases should not make the fast-path check exponential.
+type Left0 = A
+type Right0 = B
+type Left1 = Left0 | Right0
+type Right1 = Left0 | Right0
+type Left2 = Left1 | Right1
+type Right2 = Left1 | Right1
+type Left3 = Left2 | Right2
+type Right3 = Left2 | Right2
+type Left4 = Left3 | Right3
+type Right4 = Left3 | Right3
+type Left5 = Left4 | Right4
+type Right5 = Left4 | Right4
+type Left6 = Left5 | Right5
+type Right6 = Left5 | Right5
+type Left7 = Left6 | Right6
+type Right7 = Left6 | Right6
+type Left8 = Left7 | Right7
+type Right8 = Left7 | Right7
+type Left9 = Left8 | Right8
+type Right9 = Left8 | Right8
+type Left10 = Left9 | Right9
+type Right10 = Left9 | Right9
+type Left11 = Left10 | Right10
+type Right11 = Left10 | Right10
+type Left12 = Left11 | Right11
+type Right12 = Left11 | Right11
+type Left13 = Left12 | Right12
+type Right13 = Left12 | Right12
+type Left14 = Left13 | Right13
+type Right14 = Left13 | Right13
+type Left15 = Left14 | Right14
+type Right15 = Left14 | Right14
+type Left16 = Left15 | Right15
+type Right16 = Left15 | Right15
+type Left17 = Left16 | Right16
+type Right17 = Left16 | Right16
+type Left18 = Left17 | Right17
+type Right18 = Left17 | Right17
+type Left19 = Left18 | Right18
+type Right19 = Left18 | Right18
+type Left20 = Left19 | Right19
+type Right20 = Left19 | Right19
+type Left21 = Left20 | Right20
+type Right21 = Left20 | Right20
+type Left22 = Left21 | Right21
+
+def _(item: Left22) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
