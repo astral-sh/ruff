@@ -1969,6 +1969,34 @@ def f():
     }
 
     #[test]
+    fn ordinary_statement_call_keeps_reachability_predicate() {
+        let TestCase { db, file } = test_case(
+            "
+def f():
+    C()
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file).load(&db);
+        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+        let function_scope = index.node_scope(NodeWithScopeRef::Function(function));
+
+        assert_eq!(
+            index
+                .use_def_map(function_scope)
+                .predicates()
+                .iter()
+                .filter(|predicate| matches!(
+                    predicate.node,
+                    predicate::PredicateNode::IsNonTerminalCall(_)
+                ))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn scope_iterators() {
         fn scope_names<'a, 'db>(
             scopes: impl Iterator<Item = (FileScopeId, &'db Scope)>,
