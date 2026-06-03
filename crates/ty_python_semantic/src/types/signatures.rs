@@ -769,7 +769,6 @@ impl<'db> Signature<'db> {
                     .zip(previous.parameters.iter())
                     .map(|(curr, prev)| curr.cycle_normalized(db, prev, cycle)),
             )
-            .with_hidden_open_typed_dict_tail(self.parameters.has_hidden_open_typed_dict_tail())
         } else {
             debug_assert_eq!(previous.parameters, Parameters::bottom());
             self.parameters.clone()
@@ -803,7 +802,6 @@ impl<'db> Signature<'db> {
                 parameters.push(param.recursive_type_normalized_impl(db, div, nested)?);
             }
             Parameters::new(db, parameters)
-                .with_hidden_open_typed_dict_tail(self.parameters.has_hidden_open_typed_dict_tail())
         };
         Some(Self {
             generic_context: self.generic_context,
@@ -988,8 +986,7 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
-        let mut parameters = Parameters::new(db, parameters)
-            .with_hidden_open_typed_dict_tail(self.parameters.has_hidden_open_typed_dict_tail());
+        let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type
@@ -1179,11 +1176,7 @@ impl<'db> Signature<'db> {
 
         // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
         // below can separate them, which would otherwise prevent expansion.
-        let remaining = Parameters::new(db, remaining)
-            .with_hidden_open_typed_dict_tail(
-                signature.parameters().has_hidden_open_typed_dict_tail(),
-            )
-            .expand_paramspec_variadics(db);
+        let remaining = Parameters::new(db, remaining).expand_paramspec_variadics(db);
 
         let mut reordered = Vec::with_capacity(remaining.len());
         let mut keyword_only = Vec::new();
@@ -1211,10 +1204,7 @@ impl<'db> Signature<'db> {
         reordered.extend(keyword_variadic);
 
         signature
-            .with_parameters(
-                Parameters::new(db, reordered)
-                    .with_hidden_open_typed_dict_tail(remaining.has_hidden_open_typed_dict_tail()),
-            )
+            .with_parameters(Parameters::new(db, reordered))
             .with_return_type(return_ty)
     }
 
@@ -1920,17 +1910,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
             }
         }
-
-        let source_with_hidden_tail = source
-            .parameters
-            .with_hidden_open_typed_dict_tail_for_relation()
-            .map(|parameters| source.clone().with_parameters(parameters));
-        let target_with_hidden_tail = target
-            .parameters
-            .with_hidden_open_typed_dict_tail_for_relation()
-            .map(|parameters| target.clone().with_parameters(parameters));
-        let source = source_with_hidden_tail.as_ref().unwrap_or(source);
-        let target = target_with_hidden_tail.as_ref().unwrap_or(target);
 
         // Fast path: if the target accepts positional calls that the source cannot accept, reject
         // without checking return types or individual parameter types. The full parameter
@@ -3212,11 +3191,6 @@ struct ParametersData<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
     value: Box<[Parameter<'db>]>,
     kind: ParametersKind<'db>,
-    /// Whether this parameter list came from `**kwargs: Unpack[OpenTypedDict]`.
-    ///
-    /// Open `TypedDict`s do not expose arbitrary keywords to direct calls, but hidden items still
-    /// need to participate in callable assignability.
-    has_hidden_open_typed_dict_tail: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -3226,19 +3200,10 @@ pub(crate) struct Parameters<'db> {
 
 impl<'db> Parameters<'db> {
     fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
-        Self::from_parts_with_hidden_open_typed_dict_tail(value, kind, false)
-    }
-
-    fn from_parts_with_hidden_open_typed_dict_tail(
-        value: impl Into<Box<[Parameter<'db>]>>,
-        kind: ParametersKind<'db>,
-        has_hidden_open_typed_dict_tail: bool,
-    ) -> Self {
         Self {
             data: Arc::new(ParametersData {
                 value: value.into(),
                 kind,
-                has_hidden_open_typed_dict_tail,
             }),
         }
     }
@@ -3257,11 +3222,9 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         let parameters = parameters.into_iter();
         let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
-        let mut has_hidden_open_typed_dict_tail = false;
 
         for parameter in parameters {
             if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db) {
-                has_hidden_open_typed_dict_tail |= unpacked_typed_dict.openness(db).is_open();
                 let unpacked_keys = parameter
                     .unpacked_typed_dict_keys(db)
                     .expect("a TypedDict should expose unpacked keys");
@@ -3374,11 +3337,7 @@ impl<'db> Parameters<'db> {
             }
         }
 
-        Self::from_parts_with_hidden_open_typed_dict_tail(
-            value,
-            kind,
-            has_hidden_open_typed_dict_tail,
-        )
+        Self::from_parts(value, kind)
     }
 
     /// Create an empty parameter list.
@@ -3715,35 +3674,8 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::from_parts_with_hidden_open_typed_dict_tail(
-            value,
-            self.data.kind,
-            self.data.has_hidden_open_typed_dict_tail,
-        )
+        Self::from_parts(value, self.data.kind)
     }
-
-    fn with_hidden_open_typed_dict_tail(mut self, has_hidden_tail: bool) -> Self {
-        Arc::make_mut(&mut self.data).has_hidden_open_typed_dict_tail = has_hidden_tail;
-        self
-    }
-
-    fn has_hidden_open_typed_dict_tail(&self) -> bool {
-        self.data.has_hidden_open_typed_dict_tail
-    }
-
-    fn with_hidden_open_typed_dict_tail_for_relation(&self) -> Option<Self> {
-        if !self.has_hidden_open_typed_dict_tail() {
-            return None;
-        }
-
-        let mut parameters = self.as_slice().to_vec();
-        parameters.push(
-            Parameter::keyword_variadic(Name::new_static("kwargs"))
-                .with_annotated_type(Type::object()),
-        );
-        Some(Self::from_parts(parameters, self.kind()))
-    }
-
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
     }
@@ -3865,7 +3797,6 @@ impl<'db> Parameters<'db> {
         expanded.extend_from_slice(mapped_signature.parameters().as_slice());
         expanded.extend_from_slice(&self.data.value[variadic_index + 2..]);
         Parameters::new(db, expanded)
-            .with_hidden_open_typed_dict_tail(self.has_hidden_open_typed_dict_tail())
     }
 }
 
