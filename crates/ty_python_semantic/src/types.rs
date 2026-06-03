@@ -3542,12 +3542,52 @@ impl<'db> Type<'db> {
                         })
                         .take(2)
                         .count();
+                    let shared_class_member = (always_defined_member_count > 1)
+                        .then(|| {
+                            let mut class_members = intersection
+                                .positive_elements_or_object(db)
+                                .filter(|element| {
+                                    matches!(
+                                        element
+                                            .member_lookup_with_policy(
+                                                db,
+                                                name_str.into(),
+                                                member_policy,
+                                            )
+                                            .place,
+                                        Place::Defined(DefinedPlace {
+                                            definedness: Definedness::AlwaysDefined,
+                                            ..
+                                        })
+                                    )
+                                })
+                                .map(|element| {
+                                    element.class_member_with_policy(
+                                        db,
+                                        name_str.into(),
+                                        member_policy,
+                                    )
+                                });
+                            let first = class_members.next()?;
+                            matches!(
+                                first.place,
+                                Place::Defined(DefinedPlace {
+                                    definedness: Definedness::AlwaysDefined,
+                                    ..
+                                })
+                            )
+                            .then(|| class_members.all(|member| member == first))
+                        })
+                        .flatten()
+                        .unwrap_or(false);
                     let result = intersection.map_with_boundness_and_qualifiers(db, |elem| {
                         // If multiple elements define the member, either one can shadow the other
-                        // at runtime. Keep each member bound to its local receiver.
+                        // at runtime, unless they inherit the same class member. Keep ambiguous
+                        // members bound to their local receiver.
                         let local_member =
                             elem.member_lookup_with_policy(db, name_str.into(), member_policy);
                         let can_be_shadowed = always_defined_member_count > 1
+                            && !shared_class_member
                             && matches!(
                                 local_member.place,
                                 Place::Defined(DefinedPlace {
