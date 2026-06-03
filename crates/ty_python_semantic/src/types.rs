@@ -3448,22 +3448,48 @@ impl<'db> Type<'db> {
             return fallback.member_lookup_with_policy_and_receiver(db, name, policy, receiver);
         }
 
-        // Keep a partially available member bound to the constraint that provides it, unless
+        // Keep a partially available member bound to the alternative that provides it, unless
         // another intersection element provides an always-defined fallback. We cannot preserve
         // the correlation between the optional member and that fallback, so use the fallback.
-        if receiver.is_some()
-            && let Type::TypeVar(typevar) = self
-            && let Some(bound_or_constraints) = typevar.typevar(db).bound_or_constraints(db)
-        {
-            let local_member = match bound_or_constraints {
-                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
-                    .map_with_boundness_and_qualifiers(db, |constraint| {
-                        constraint.member_lookup_with_policy(db, name.clone(), policy)
-                    }),
-                TypeVarBoundOrConstraints::UpperBound(bound) => {
-                    bound.member_lookup_with_policy(db, name.clone(), policy)
+        let local_member = if receiver.is_some() {
+            match self {
+                Type::TypeVar(typevar) => {
+                    typevar
+                        .typevar(db)
+                        .bound_or_constraints(db)
+                        .map(|bound_or_constraints| match bound_or_constraints {
+                            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                                .map_with_boundness_and_qualifiers(db, |constraint| {
+                                    constraint.member_lookup_with_policy(db, name.clone(), policy)
+                                }),
+                            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                                bound.member_lookup_with_policy(db, name.clone(), policy)
+                            }
+                        })
                 }
-            };
+                Type::SubclassOf(subclass_of) => subclass_of
+                    .subclass_of()
+                    .into_type_var()
+                    .and_then(|typevar| typevar.typevar(db).bound_or_constraints(db))
+                    .map(|bound_or_constraints| match bound_or_constraints {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                            .map_with_boundness_and_qualifiers(db, |constraint| {
+                                constraint.to_meta_type(db).member_lookup_with_policy(
+                                    db,
+                                    name.clone(),
+                                    policy,
+                                )
+                            }),
+                        TypeVarBoundOrConstraints::UpperBound(bound) => bound
+                            .to_meta_type(db)
+                            .member_lookup_with_policy(db, name.clone(), policy),
+                    }),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        if let Some(local_member) = local_member {
             if let Place::Defined(DefinedPlace {
                 definedness: Definedness::PossiblyUndefined,
                 ..

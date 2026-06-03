@@ -435,6 +435,28 @@ def upper_bounded[V: HasGet | NoGet](value: Intersection[V, GetFallback]):
     # error: [invalid-argument-type]
     takes_has_get(value.get())
 
+class HasClassGet:
+    @classmethod
+    def get(cls) -> Self:
+        raise NotImplementedError
+
+class NoClassGet: ...
+
+class ClassGetFallback:
+    @classmethod
+    def get(cls) -> object:
+        return object()
+
+W = TypeVar("W", HasClassGet, NoClassGet)
+
+def takes_has_class_get(value: HasClassGet): ...
+def takes_class_get_fallback(value: ClassGetFallback): ...
+def _(cls: Intersection[type[W], type[ClassGetFallback]]):
+    # error: [invalid-argument-type]
+    takes_class_get_fallback(cls.get())
+    # error: [invalid-argument-type]
+    takes_has_class_get(cls.get())
+
 class GenericDefaults:
     def choose[T = Self](self) -> T:
         raise NotImplementedError
