@@ -1901,6 +1901,7 @@ def _(a_and_b: Intersection[A, B]):
 ```py
 from typing import Callable, ParamSpec, Protocol, TypeVar, runtime_checkable
 from typing_extensions import Self, TypeIs
+from ty_extensions import Intersection
 
 class VariableTruth:
     other: Self
@@ -1979,10 +1980,17 @@ class MyTuple(tuple[int, ...]):
         return type(self)((1, 2, 3))
 
 def takes_pair(value: tuple[int, int]): ...
+def takes_object_pair(value: tuple[object, object]): ...
 def _(value: tuple[int, int]):
     if isinstance(value, MyTuple):
         reveal_type(value.fresh())  # revealed: MyTuple
         takes_pair(value.fresh())  # error: [invalid-argument-type]
+
+T = TypeVar("T", tuple[int, int], tuple[str, str])
+
+def _(value: Intersection[MyTuple, T]):
+    reveal_type(value.fresh())  # revealed: MyTuple
+    takes_object_pair(value.fresh())  # error: [invalid-argument-type]
 
 class TypeIsMarker(Protocol):
     marker: int

@@ -1095,12 +1095,7 @@ impl<'db> Type<'db> {
             // `NamedTupleLike` is deliberately combined with a tuple type to describe
             // `typing.NamedTuple`; unlike a user protocol, it is not a flow refinement.
             let is_value_refinement = matches!(positive, Type::AlwaysTruthy | Type::AlwaysFalsy)
-                || matches!(
-                    positive,
-                    Type::NominalInstance(instance)
-                        if instance.own_tuple_spec(db).is_some()
-                            && !has_named_tuple_like_constraint
-                )
+                || (type_is_tuple_refinement(db, *positive) && !has_named_tuple_like_constraint)
                 || matches!(
                     positive,
                     Type::ProtocolInstance(ProtocolInstanceType {
@@ -7208,6 +7203,31 @@ fn type_inherits_from_owner<'db>(
         _ => ty.nominal_class(db).is_some_and(|class| {
             class_mro_literals(db, class.class_literal(db)).contains(&owner_class)
         }),
+    }
+}
+
+fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some(),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| type_is_tuple_refinement(db, *element)),
+        Type::TypeVar(typevar) => {
+            typevar
+                .typevar(db)
+                .bound_or_constraints(db)
+                .is_some_and(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| type_is_tuple_refinement(db, *constraint)),
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        type_is_tuple_refinement(db, bound)
+                    }
+                })
+        }
+        _ => false,
     }
 }
 
