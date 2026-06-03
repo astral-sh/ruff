@@ -1145,7 +1145,8 @@ fn symbol_impl<'db>(
         file_to_module(db, scope.file(db)).is_some_and(|module| module.is_known(db, known_module))
     };
 
-    if is_known_module(KnownModule::Sys) {
+    // Check the symbol name first to avoid a module-resolution query for every symbol lookup.
+    if matches!(name, "version_info" | "platform") && is_known_module(KnownModule::Sys) {
         match name {
             "version_info" => {
                 return Place::bound(Type::sys_version_info(db)).into();
