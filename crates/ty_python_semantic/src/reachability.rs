@@ -199,8 +199,8 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
-        TypeContext, UnionType, enum_metadata, infer_narrowing_constraints,
-        infer_same_file_expression_type, sequence_pattern_type,
+        TypeContext, UnionType, enum_metadata, exact_sequence_pattern_type,
+        infer_narrowing_constraints, infer_same_file_expression_type, sequence_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -216,7 +216,7 @@ use ty_python_core::{
     place_table,
     predicate::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        ScopedPredicateId,
+        ScopedPredicateId, SequencePatternPredicateKind,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
@@ -235,9 +235,13 @@ fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
     KnownClass::Mapping.to_instance(db).top_materialization(db)
 }
 
-/// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
-/// match that pattern.
-fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
+/// Return the values that are guaranteed to match `kind`.
+///
+/// Reachability and negative narrowing can only subtract this under-approximation.
+fn definite_match_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+) -> Type<'db> {
     match kind {
         PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
         PatternPredicateKind::Value(value) => {
@@ -268,21 +272,44 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
                 Type::Never
             }
         }
-        PatternPredicateKind::Sequence(kind) => {
-            if kind.is_irrefutable() {
-                sequence_pattern_type(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Or(predicates) => {
-            UnionType::from_elements(db, predicates.iter().map(|p| pattern_kind_to_type(db, p)))
-        }
+        PatternPredicateKind::Sequence(kind) => definite_sequence_pattern_type(db, kind),
+        PatternPredicateKind::Or(predicates) => UnionType::from_elements(
+            db,
+            predicates
+                .iter()
+                .map(|p| definite_match_pattern_type(db, p)),
+        ),
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
-            .map(|p| pattern_kind_to_type(db, p))
+            .map(|p| definite_match_pattern_type(db, p))
             .unwrap_or_else(Type::object),
         PatternPredicateKind::Unsupported => Type::Never,
+    }
+}
+
+/// Return the values that are guaranteed to match a sequence pattern.
+pub(crate) fn definite_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+) -> Type<'db> {
+    if kind.is_irrefutable() {
+        return sequence_pattern_type(db);
+    }
+
+    if kind.is_exact_length() {
+        let element_types: Vec<_> = kind
+            .patterns
+            .iter()
+            .map(|pattern| definite_match_pattern_type(db, pattern))
+            .collect();
+
+        if element_types.iter().any(Type::is_never) {
+            Type::Never
+        } else {
+            exact_sequence_pattern_type(db, &element_types)
+        }
+    } else {
+        Type::Never
     }
 }
 
@@ -334,7 +361,7 @@ fn type_narrowed_by_pattern<'db>(
 ) -> Type<'db> {
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
+        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
         .build()
 }
 
@@ -400,7 +427,7 @@ fn enum_member_pattern_name<'db>(
     enum_class: ClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
-    let value_ty = pattern_kind_to_type(db, kind);
+    let value_ty = definite_match_pattern_type(db, kind);
     let enum_literal = value_ty.as_enum_literal()?;
     if enum_literal.enum_class(db) != enum_class {
         return None;
@@ -1039,7 +1066,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                         .add_negative(UnionType::from_elements(db, excluded_types.iter()))
                         .build();
 
-                    excluded_types.push(pattern_kind_to_type(db, p));
+                    excluded_types.push(definite_match_pattern_type(db, p));
 
                     analyze_single_pattern_predicate_kind(db, p, narrowed_subject_ty)
                 })
