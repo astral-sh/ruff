@@ -331,6 +331,27 @@ def f[U: Bar](x: Foo[U]):
     reveal_type(x.foo())  # revealed: U@f
 ```
 
+Intersection receivers must also preserve unrelated occurrences of `Self`:
+
+```py
+from typing import Self
+from ty_extensions import Intersection
+
+class Box[T]:
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+class Owner:
+    def inspect(self: Self, value: Intersection[Box[Self], "Owner"]) -> None:
+        reveal_type(value.value)  # revealed: Self@inspect
+        value.value.value  # error: [unresolved-attribute]
+
+class ConcreteOwner(Owner): ...
+class Both(Box[ConcreteOwner], Owner): ...
+
+ConcreteOwner().inspect(Both(ConcreteOwner()))
+```
+
 ## typing_extensions
 
 ```toml

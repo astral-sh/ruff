@@ -7201,6 +7201,16 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
+        // Context-free attribute binding must not replace a method-owned `Self`.
+        if self.binding_context.is_none()
+            && bound_typevar
+                .binding_context(db)
+                .definition()
+                .is_some_and(|definition| definition.kind(db).is_function_def())
+        {
+            return false;
+        }
+
         // An intersection has no single nominal class, but a positive element can still inherit
         // from the class or protocol that owns this `Self`.
         let Some(owner_class) = owner_class else {
