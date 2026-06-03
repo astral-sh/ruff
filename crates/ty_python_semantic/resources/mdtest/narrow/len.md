@@ -154,10 +154,11 @@ def _(value: Literal[b"a", b"bb", b"ccc"]):
         reveal_type(value)  # revealed: Literal[b"a", b"ccc"]
 ```
 
-Types that define a precise `__len__` method can also be narrowed by an exact length comparison:
+Exact length comparisons intersect arbitrary `Sized` values with `ExactlySized`. This persists the
+observed length even for mutable or stateful values, consistent with other forms of narrowing:
 
 ```py
-from typing import Literal
+from typing import Literal, Sized
 
 class LengthThree:
     def __len__(self) -> Literal[3]:
@@ -189,48 +190,27 @@ def _(value: TrueLength | FalseLength):
 
 def _(value: LengthThree | list[int]):
     if len(value) == 3:
-        reveal_type(value)  # revealed: (LengthThree & ExactlySized[Literal[3]]) | list[int]
+        # revealed: (LengthThree & ExactlySized[Literal[3]]) | (list[int] & ExactlySized[Literal[3]])
+        reveal_type(value)
     else:
-        reveal_type(value)  # revealed: list[int]
+        reveal_type(value)  # revealed: list[int] & ~ExactlySized[Literal[3]]
 ```
 
-A length check does not make the current length of an arbitrary mutable or stateful value
-persistent:
+The length constraint remains after mutation. This is an accepted limitation:
 
 ```py
-class StatefulLength:
-    def __len__(self) -> int:
-        return 1
-
-class VaryingLength:
-    def __len__(self) -> Literal[0, 1]:
-        return 1
+def _(value: Sized):
+    if len(value) == 3:
+        reveal_type(value)  # revealed: ExactlySized[Literal[3]]
+        reveal_type(len(value))  # revealed: Literal[3]
+    else:
+        reveal_type(value)  # revealed: Sized & ~ExactlySized[Literal[3]]
 
 def _(items: list[int]):
     if len(items) == 3:
-        reveal_type(items)  # revealed: list[int]
+        reveal_type(items)  # revealed: list[int] & ExactlySized[Literal[3]]
         items.clear()
-        reveal_type(len(items))  # revealed: int
-
-def _(items: list[int]):
-    assert len(items) == 1
-    items.append(1)
-    assert len(items) == 2
-    1 + ""  # error: [unsupported-operator]
-
-def _(items: set[int]):
-    if len(items) == 1:
-        items[0]  # error: [not-subscriptable]
-
-def _(value: StatefulLength):
-    if len(value) == 1:
-        reveal_type(value)  # revealed: StatefulLength
-        reveal_type(len(value))  # revealed: int
-
-def _(value: VaryingLength):
-    if len(value) == 1:
-        reveal_type(value)  # revealed: VaryingLength
-        reveal_type(len(value))  # revealed: Literal[0, 1]
+        reveal_type(len(items))  # revealed: Literal[3]
 ```
 
 ## Aliased exact lengths
