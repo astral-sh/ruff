@@ -6069,6 +6069,15 @@ def _(key: str) -> None:
 
     # The runtime key may be `label`, so the value must also be assignable to `str`.
     bad_declared_item: WithDeclaredItem = {key: 1}  # error: [invalid-argument-type]
+
+    # A later literal value overrides the arbitrary key if it resolves to `label`.
+    shadowed_declared_item: WithDeclaredItem = {key: 1, "label": "ok"}
+
+    # In the reverse order, the arbitrary key may overwrite `label`.
+    bad_shadowing_declared_item: WithDeclaredItem = {
+        "label": "ok",
+        key: 1,  # error: [invalid-argument-type]
+    }
 ```
 
 ### Non-literal keys in a closed TypedDict constructor are rejected

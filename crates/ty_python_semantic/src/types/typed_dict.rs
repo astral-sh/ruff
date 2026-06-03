@@ -309,12 +309,24 @@ impl<'db> TypedDictType<'db> {
     }
 
     pub(crate) fn arbitrary_key_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.arbitrary_key_value_type_excluding(db, &OrderSet::new())
+    }
+
+    fn arbitrary_key_value_type_excluding(
+        self,
+        db: &'db dyn Db,
+        excluded_keys: &OrderSet<Name>,
+    ) -> Option<Type<'db>> {
         let extra_items = self.explicit_extra_items(db)?;
 
         Some(IntersectionType::from_elements(
             db,
-            std::iter::once(extra_items.declared_ty)
-                .chain(self.items(db).values().map(|field| field.declared_ty)),
+            std::iter::once(extra_items.declared_ty).chain(
+                self.items(db)
+                    .iter()
+                    .filter(|(name, _)| !excluded_keys.contains(*name))
+                    .map(|(_, field)| field.declared_ty),
+            ),
         ))
     }
 
@@ -2479,7 +2491,9 @@ fn validate_merged_dict_literal<'db, 'ast>(
             let key_ty = expression_type_fn(key_expr, TypeContext::default());
             let Some(key_literal) = key_ty.as_string_literal() else {
                 if key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
-                    if let Some(expected_ty) = typed_dict.arbitrary_key_value_type(db) {
+                    if let Some(expected_ty) =
+                        typed_dict.arbitrary_key_value_type_excluding(db, shadowed_keys)
+                    {
                         let value_ty =
                             expression_type_fn(&item.value, TypeContext::new(Some(expected_ty)));
                         if !value_ty.is_assignable_to(db, expected_ty) {
