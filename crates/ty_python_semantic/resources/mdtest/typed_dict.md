@@ -6051,6 +6051,27 @@ def _(key: str) -> None:
     bad_declared_item: WithDeclaredItem = {key: 1}  # error: [invalid-argument-type]
 ```
 
+### Mixed constructors validate source-only keys against `extra_items`
+
+```py
+from typing_extensions import TypedDict
+
+class Target(TypedDict, extra_items=int): ...
+
+class GoodSource(TypedDict, extra_items=int):
+    source_only: int
+
+class BadSource(TypedDict, extra_items=int):
+    source_only: str
+
+def _(good: GoodSource, bad: BadSource) -> None:
+    Target(good, keyword=1)
+    Target(bad, keyword=1)  # error: [invalid-argument-type]
+
+    # An explicit keyword shadows the source key.
+    Target(bad, source_only=1)
+```
+
 ### Assignability between TypedDicts accounts for the type of extra items
 
 ```py

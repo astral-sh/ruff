@@ -1983,10 +1983,11 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
     let unpacked = extract_unpacked_typed_dict_from_value_type(db, arg_ty)?;
+    let validate_extra_keys = typed_dict.explicit_extra_items(db).is_some();
     let unpacked_keys = unpacked
         .keys
         .into_iter()
-        .filter(|(key_name, _)| typed_dict_items.contains_key(key_name))
+        .filter(|(key_name, _)| validate_extra_keys || typed_dict_items.contains_key(key_name))
         .collect();
 
     let nodes = TypedDictAssignmentNodes {
