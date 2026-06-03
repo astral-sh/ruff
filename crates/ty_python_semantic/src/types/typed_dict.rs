@@ -1079,27 +1079,37 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         .map(|(name, field)| (name, field, left_items, left.openness(db))),
                 )
                 .filter_map(|(name, field, other_items, other_openness)| {
-                    if field.is_required() || field.is_read_only() || other_items.contains_key(name)
-                    {
+                    if field.is_required() || other_items.contains_key(name) {
                         return None;
                     }
                     let TypedDictOpenness::Extra(extra_items) = other_openness else {
                         return None;
                     };
-                    (!extra_items.is_read_only()).then_some((field, extra_items))
+                    (!field.is_read_only() || !extra_items.is_read_only())
+                        .then_some((field, extra_items))
                 })
                 .when_any(db, self.constraints, |(field, extra_items)| {
                     let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
-                    relation_checker
-                        .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
-                        .and(db, self.constraints, || {
-                            relation_checker.check_type_pair(
-                                db,
-                                extra_items.declared_ty,
-                                field.declared_ty,
-                            )
-                        })
-                        .negate(db, self.constraints)
+                    if field.is_read_only() {
+                        relation_checker
+                            .check_type_pair(db, extra_items.declared_ty, field.declared_ty)
+                            .negate(db, self.constraints)
+                    } else if extra_items.is_read_only() {
+                        relation_checker
+                            .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
+                            .negate(db, self.constraints)
+                    } else {
+                        relation_checker
+                            .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
+                            .and(db, self.constraints, || {
+                                relation_checker.check_type_pair(
+                                    db,
+                                    extra_items.declared_ty,
+                                    field.declared_ty,
+                                )
+                            })
+                            .negate(db, self.constraints)
+                    }
                 })
         });
 

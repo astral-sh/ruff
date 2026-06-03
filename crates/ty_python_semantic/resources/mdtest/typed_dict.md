@@ -6244,11 +6244,22 @@ class ClosedEmpty(TypedDict, closed=True): ...
 class OpenEmpty(TypedDict): ...
 class ReadOnlyIntExtras(TypedDict, extra_items=ReadOnly[int]): ...
 class ReadOnlyStrExtras(TypedDict, extra_items=ReadOnly[str]): ...
+class ReadOnlyObjectExtras(TypedDict, extra_items=ReadOnly[object]): ...
 class MutableIntExtras(TypedDict, extra_items=int): ...
 class MutableStrExtras(TypedDict, extra_items=str): ...
+class MutableObjectExtras(TypedDict, extra_items=object): ...
 
 class OptionalInt(TypedDict):
     value: NotRequired[int]
+
+class OptionalObject(TypedDict):
+    value: NotRequired[object]
+
+class OptionalReadOnlyInt(TypedDict):
+    value: NotRequired[ReadOnly[int]]
+
+class OptionalReadOnlyObject(TypedDict):
+    value: NotRequired[ReadOnly[object]]
 
 static_assert(is_disjoint_from(RequiredInt, ClosedEmpty))
 static_assert(not is_disjoint_from(RequiredInt, ReadOnlyIntExtras))
@@ -6263,6 +6274,19 @@ static_assert(not is_disjoint_from(OpenEmpty, MutableIntExtras))
 static_assert(is_disjoint_from(OptionalInt, MutableStrExtras))
 static_assert(is_disjoint_from(MutableStrExtras, OptionalInt))
 static_assert(not is_disjoint_from(OptionalInt, MutableIntExtras))
+static_assert(is_disjoint_from(OptionalInt, ReadOnlyStrExtras))
+static_assert(is_disjoint_from(ReadOnlyStrExtras, OptionalInt))
+static_assert(not is_disjoint_from(OptionalInt, ReadOnlyIntExtras))
+static_assert(not is_disjoint_from(OptionalInt, ReadOnlyObjectExtras))
+static_assert(is_disjoint_from(OptionalObject, ReadOnlyIntExtras))
+static_assert(is_disjoint_from(ReadOnlyIntExtras, OptionalObject))
+static_assert(is_disjoint_from(OptionalReadOnlyInt, MutableStrExtras))
+static_assert(is_disjoint_from(MutableStrExtras, OptionalReadOnlyInt))
+static_assert(not is_disjoint_from(OptionalReadOnlyInt, MutableIntExtras))
+static_assert(is_disjoint_from(OptionalReadOnlyInt, MutableObjectExtras))
+static_assert(not is_disjoint_from(OptionalReadOnlyObject, MutableIntExtras))
+static_assert(not is_disjoint_from(OptionalReadOnlyInt, OpenEmpty))
+static_assert(not is_disjoint_from(OpenEmpty, OptionalReadOnlyInt))
 ```
 
 ### A `TypedDict` with `extra_items: T` is a subtype of `Mapping[str, T1]`, where `T1` is the union of `T` and all declared item types
