@@ -4049,17 +4049,30 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
+                let function = bound_method.function(db);
+                let signatures = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
-                let bound_type =
-                    if Type::FunctionLiteral(bound_method.function(db)).needs_self_binding(db) {
-                        self_instance.self_binding_type(db)
-                    } else {
-                        self_instance
-                    };
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_type)
-                    .into()
+                let self_binding_type = self_instance.self_binding_type(db);
+                let needs_self_binding = Type::FunctionLiteral(function).needs_self_binding(db);
+                let separate_self_binding = needs_self_binding
+                    && !function.is_classmethod(db)
+                    && self_binding_type != self_instance;
+                CallableBinding::from_overloads(
+                    self,
+                    signatures.overloads.iter().map(|signature| {
+                        if separate_self_binding && signature.needs_self_mapping(db, true) {
+                            signature.apply_self(db, self_binding_type)
+                        } else {
+                            signature.clone()
+                        }
+                    }),
+                )
+                .with_bound_type(if separate_self_binding || !needs_self_binding {
+                    self_instance
+                } else {
+                    self_binding_type
+                })
+                .into()
             }
 
             Type::KnownBoundMethod(method) => {
