@@ -9580,7 +9580,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the attribute but others definitely don't. That's a very different case, and
                     // we want it to be an error. Use `as_union_like` here to handle type aliases
                     // of unions and `NewType`s of float/complex in addition to explicit unions.
-                    if let Some(union) = value_type.as_union_like(db) {
+                    //
+                    // Attribute lookup on a bounded type variable delegates to its upper bound, so
+                    // use that bound here too when determining whether the lookup was on a union.
+                    let union_like_type = if let Type::TypeVar(typevar) = value_type
+                        && let Some(bound) = typevar.typevar(db).upper_bound(db)
+                    {
+                        bound
+                    } else {
+                        value_type
+                    };
+
+                    if let Some(union) = union_like_type.as_union_like(db) {
                         let mut elements_missing_the_attribute = FxIndexSet::default();
                         for element in union.elements(db) {
                             union_elements_missing_attribute(
@@ -9602,9 +9613,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .join(", ");
 
                                 builder.into_diagnostic(format_args!(
-                                    "Attribute `{attr_name}` is not defined on {} in union `{value_type}`",
+                                    "Attribute `{attr_name}` is not defined on {} in union `{union_like_type}`",
                                     missing_types,
-                                    value_type = value_type.display(db),
+                                    union_like_type = union_like_type.display(db),
                                 ));
                             }
                             return type_when_bound;
