@@ -669,10 +669,7 @@ mod tests {
     fn ruf100_sim114() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_SIM114.py"),
-            &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedNOQA,
-                Rule::IfWithSameArms,
-            ]),
+            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::IfWithSameArms]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
