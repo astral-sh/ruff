@@ -8028,6 +8028,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             return unknown_instance;
         }
+        if collection_class == KnownClass::Dict
+            && let Some(ty) = self.infer_keyword_only_dict_call(
+                &call_expression.func,
+                &call_expression.arguments,
+                Some(call_expression.into()),
+                tcx,
+            )
+        {
+            return ty;
+        }
 
         let elements: [[Option<&ast::Expr>; 1]; 0] = [];
         let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
@@ -8126,13 +8136,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if known_class == Some(KnownClass::Dict)
-            && let Some(ty) = self.infer_keyword_only_dict_call(
-                func,
-                arguments,
-                (collection_initializer_class == Some(KnownClass::Dict))
-                    .then_some(call_expression.into()),
-                call_expression_tcx,
-            )
+            && collection_initializer_class != Some(KnownClass::Dict)
+            && let Some(ty) =
+                self.infer_keyword_only_dict_call(func, arguments, None, call_expression_tcx)
         {
             return ty;
         }

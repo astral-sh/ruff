@@ -197,6 +197,50 @@ def explicit_unspecialized_return() -> None:
     value: str = xs.get()
 ```
 
+## Explicit unspecialized `dict` constructor returns
+
+An empty `dict()` call still preserves explicit constructor return semantics.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class int: ...
+class str: ...
+class tuple: ...
+
+class dict[K, V]:
+    def __new__(cls) -> dict: ...
+    def __setitem__(self, key: K, value: V) -> None: ...
+    def value(self) -> V: ...
+```
+
+`/typeshed/stdlib/types.pyi`:
+
+```pyi
+class FunctionType: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+```py
+from typing_extensions import reveal_type
+
+xs = dict()
+xs["a"] = 1
+reveal_type(xs)  # revealed: dict[Unknown, Unknown]
+value: str = xs.value()
+```
+
 ## Collection constructors with nonstandard variance
 
 Collection-constructor inference is specific to the standard invariant builtin collections.
@@ -212,11 +256,16 @@ python-version = "3.12"
 ```pyi
 class object: ...
 class int: ...
+class str: ...
 class tuple: ...
 
 class list[T]:
     def __init__(self) -> None: ...
     def append(self, value: T) -> None: ...
+
+class dict[K, V]:
+    def __init__(self) -> None: ...
+    def __setitem__(self, key: K, value: V) -> None: ...
 ```
 
 `/typeshed/stdlib/types.pyi`:
@@ -237,6 +286,10 @@ from typing_extensions import reveal_type
 xs = list()
 xs.append(1)
 reveal_type(xs)  # revealed: list[Unknown]
+
+mapping = dict()
+mapping["a"] = 1
+reveal_type(mapping)  # revealed: dict[Unknown, Unknown]
 ```
 
 ## Reachability for specialized custom collection constructor returns

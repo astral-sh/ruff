@@ -182,7 +182,21 @@ impl<'db> ConstructorBinding<'db> {
                     })
                 })
         {
-            return true;
+            let mut matching_overloads = self
+                .callable()
+                .matching_overloads()
+                .map(|(_, overload)| overload);
+            let has_non_self_like_return = if matching_overloads.clone().next().is_none() {
+                self.callable()
+                    .overloads()
+                    .iter()
+                    .any(|overload| !overload.has_self_like_new_return_annotation(db))
+            } else {
+                matching_overloads.any(|overload| !overload.has_self_like_new_return_annotation(db))
+            };
+            if has_non_self_like_return {
+                return true;
+            }
         }
 
         self.downstream_constructor()
@@ -613,6 +627,20 @@ fn constructor_returns_instance<'db>(
 }
 
 impl<'db> Binding<'db> {
+    fn has_self_like_new_return_annotation(&self, db: &'db dyn Db) -> bool {
+        if !matches!(
+            self.constructor_context.map(ConstructorContext::kind),
+            Some(ConstructorCallableKind::New)
+        ) {
+            return false;
+        }
+
+        let Type::TypeVar(typevar) = self.signature.return_ty.resolve_type_alias(db) else {
+            return false;
+        };
+        self.is_self_like_constructor_return_typevar(db, typevar)
+    }
+
     /// Is a type variable returned from a constructor method a representation of the self type?
     ///
     /// Handles `typing.Self` annotations and `__new__` methods returning `T` where `self:
