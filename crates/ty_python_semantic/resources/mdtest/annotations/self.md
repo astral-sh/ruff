@@ -421,10 +421,13 @@ class GetFallback:
 
 U = TypeVar("U", HasGet, NoGet)
 
+def takes_has_get(value: HasGet): ...
 def takes_get_fallback(value: GetFallback): ...
 def _(value: Intersection[U, GetFallback]):
     # error: [invalid-argument-type]
     takes_get_fallback(value.get())
+    # error: [invalid-argument-type]
+    takes_has_get(value.get())
 
 class GenericDefaults:
     def choose[T = Self](self) -> T:

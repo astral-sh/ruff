@@ -3448,9 +3448,9 @@ impl<'db> Type<'db> {
             return fallback.member_lookup_with_policy_and_receiver(db, name, policy, receiver);
         }
 
-        // Keep a partially available member bound to the constraint that provides it. Another
-        // intersection element can make the lookup total, but cannot make that member's `Self`
-        // refer to the full intersection.
+        // Keep a partially available member bound to the constraint that provides it, unless
+        // another intersection element provides an always-defined fallback. We cannot preserve
+        // the correlation between the optional member and that fallback, so use the fallback.
         if receiver.is_some()
             && let Type::TypeVar(typevar) = self
             && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
@@ -3464,6 +3464,22 @@ impl<'db> Type<'db> {
                 ..
             }) = local_member.place
             {
+                if let Some(Type::Intersection(receiver)) = receiver
+                    && receiver.positive(db).iter().any(|positive| {
+                        *positive != self
+                            && matches!(
+                                positive
+                                    .member_lookup_with_policy(db, name.clone(), policy)
+                                    .place,
+                                Place::Defined(DefinedPlace {
+                                    definedness: Definedness::AlwaysDefined,
+                                    ..
+                                })
+                            )
+                    })
+                {
+                    return Place::Undefined.into();
+                }
                 return local_member;
             }
         }
