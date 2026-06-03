@@ -1029,13 +1029,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let use_def = &self.use_def_maps[use_scope];
         let use_id = self.ast_ids[use_scope].try_use_id(use_expression)?;
 
-        use_def
+        if let Ok(definition) = use_def
             .bindings_at_use(use_id)
             .filter_map(|binding| use_def.definition(binding.binding()).definition())
             // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
             // cycle-related panics.
             .exactly_one()
-            .ok()
+        {
+            return Some(definition);
+        }
+
+        let place_expr = PlaceExpr::try_from_expr(use_expression)?;
+        self.visible_ancestor_scopes(use_scope)
+            .skip(1)
+            .find_map(|(scope, _)| {
+                let place = self.place_tables[scope].place_id((&place_expr).into())?;
+                self.use_def_maps[scope]
+                    .definitions_for_place(place)
+                    .exactly_one()
+                    .ok()
+            })
     }
 
     fn unconstrained_collection_literal_binding(

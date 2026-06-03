@@ -812,6 +812,15 @@ preserve key/value correlation.
 ```py
 def accepts_float_keywords(*, p: float = 1.0, out: str | None = None) -> None: ...
 def accepts_int_list(values: list[int]) -> None: ...
+
+captured_kwargs = dict()
+captured_kwargs["p"] = 1.23
+
+def forward_captured_kwargs():
+    accepts_float_keywords(**captured_kwargs)
+
+reveal_type(captured_kwargs)  # revealed: dict[Unknown, Unknown]
+
 def constructor_inference_remains_gradual(flag: bool, name: str, value):
     kwargs = dict()
     if flag:

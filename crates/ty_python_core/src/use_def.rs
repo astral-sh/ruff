@@ -1269,6 +1269,20 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_use[use_id].iter()
     }
 
+    pub(crate) fn definitions_for_place(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = Definition<'db>> + '_ {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        bindings
+            .iter()
+            .filter_map(|binding| self.definition(binding.binding()).definition())
+    }
+
     pub(super) fn add_predicate(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
