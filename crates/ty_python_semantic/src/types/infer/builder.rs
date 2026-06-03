@@ -1504,12 +1504,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
-        self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-        let value_ty = self.infer_type_expression(&type_alias.value);
-        let value_ty = self.validate_type_alias_type(&type_alias.value, value_ty);
-        self.context
-            .inference_flags
-            .remove(InferenceFlags::IN_TYPE_ALIAS);
+        let value_ty = self.infer_type_alias_type_expression(&type_alias.value);
         self.context.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
@@ -4146,16 +4141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Match the binding context used by eager assignment inference so legacy type variables
         // in the alias value are bound to the alias definition.
         let previous_context = self.typevar_binding_context.replace(definition);
-        let previous_in_type_alias = self
-            .context
-            .inference_flags
-            .replace(InferenceFlags::IN_TYPE_ALIAS, true);
-
-        let value_ty = self.infer_type_expression(&arguments.args[1]);
-        self.validate_type_alias_type(&arguments.args[1], value_ty);
-        self.context
-            .inference_flags
-            .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);
+        self.infer_type_alias_type_expression(&arguments.args[1]);
 
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
         for keyword in &arguments.keywords {
@@ -4570,8 +4556,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let previous_deferred_state = self.deferred_state;
 
             if is_pep_613_type_alias {
-                self.context.inference_flags |=
-                    InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS | InferenceFlags::IN_TYPE_ALIAS;
+                self.context.inference_flags |= InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS;
                 if self.in_stub() {
                     self.deferred_state = DeferredExpressionState::Deferred;
                 }
@@ -4586,13 +4571,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
+            // Preserve a bare `Self` as a type so that alias validation can reject it.
+            let inferred_ty = if is_pep_613_type_alias
+                && target.is_name_expr()
+                && matches!(inferred_ty, Type::SpecialForm(SpecialFormType::TypingSelf))
+            {
+                let inferred_ty = self.infer_name_or_attribute_type_expression(inferred_ty, value);
+                self.expressions.insert(value.into(), inferred_ty);
+                inferred_ty
+            } else {
+                inferred_ty
+            };
 
             self.typevar_binding_context = previous_typevar_binding_context;
             self.deferred_state = previous_deferred_state;
             self.dataclass_field_specifiers.clear();
-            self.context.inference_flags.remove(
-                InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS | InferenceFlags::IN_TYPE_ALIAS,
-            );
+            self.context
+                .inference_flags
+                .remove(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS);
 
             let inferred_ty = if target
                 .as_name_expr()
@@ -5840,33 +5836,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
             ast::Expr::Name(name) => {
                 let ty = self.infer_name_expression(name);
-                if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
-                    && tcx.is_typealias()
-                    && matches!(ty, Type::SpecialForm(SpecialFormType::TypingSelf))
-                {
-                    self.infer_name_or_attribute_type_expression(ty, expression)
-                } else {
-                    tcx.annotation.map_or(ty, |target| {
-                        self.specialize_generic_class_from_context(ty, target)
-                    })
-                }
+                tcx.annotation.map_or(ty, |target| {
+                    self.specialize_generic_class_from_context(ty, target)
+                })
             }
             ast::Expr::Attribute(attribute) => {
                 let ty = self.infer_attribute_expression(attribute);
-                if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
-                    && tcx.is_typealias()
-                    && matches!(ty, Type::SpecialForm(SpecialFormType::TypingSelf))
-                {
-                    self.infer_name_or_attribute_type_expression(ty, expression)
-                } else {
-                    tcx.annotation.map_or(ty, |target| {
-                        self.specialize_generic_class_from_context(ty, target)
-                    })
-                }
+                tcx.annotation.map_or(ty, |target| {
+                    self.specialize_generic_class_from_context(ty, target)
+                })
             }
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),

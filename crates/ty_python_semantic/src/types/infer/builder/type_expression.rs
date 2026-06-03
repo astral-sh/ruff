@@ -101,6 +101,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             })
     }
 
+    /// Rejects aliases whose completed type contains `Self`.
+    ///
+    /// This checks the inferred type rather than syntax because value-expression positions such as
+    /// `TypeOf[...]` can either consume an encountered `Self` or produce `Self` indirectly.
     pub(super) fn validate_type_alias_type(
         &mut self,
         expression: &ast::Expr,
@@ -116,18 +120,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         fallback
     }
 
-    pub(super) fn validate_type_alias_type_parameter_type(
+    pub(super) fn infer_type_alias_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let previous_in_type_alias = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_TYPE_ALIAS, true);
+        let value_ty = self.infer_type_expression(expression);
+        let value_ty = self.validate_type_alias_type(expression, value_ty);
+        self.context
+            .inference_flags
+            .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);
+        value_ty
+    }
+
+    pub(super) fn validate_type_alias_type_parameter_component(
         &mut self,
         expression: &ast::Expr,
-        value_ty: Type<'db>,
+        ty: Type<'db>,
     ) -> Type<'db> {
         if matches!(
             self.scope().node(self.db()),
             NodeWithScopeKind::TypeAliasTypeParameters(_)
         ) {
-            self.validate_type_alias_type(expression, value_ty)
+            self.validate_type_alias_type(expression, ty)
         } else {
-            value_ty
+            ty
         }
     }
 
@@ -880,7 +897,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = starred;
 
         let starred_type = self.infer_type_expression(value);
-        let starred_type = self.validate_type_alias_type_parameter_type(value, starred_type);
+        let starred_type = self.validate_type_alias_type_parameter_component(value, starred_type);
         if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
             starred_type
         } else {
@@ -1392,26 +1409,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let ast::ExprSubscript {
             range: _,
             node_index: _,
-            value,
+            value: _,
             slice,
             ctx: _,
         } = subscript;
 
         match value_ty {
-            Type::SpecialForm(SpecialFormType::TypingSelf)
-                if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_TYPE_ALIAS) =>
-            {
-                if !self.in_string_annotation() {
-                    self.infer_expression(slice, TypeContext::default());
-                }
-                self.report_invalid_type_expression(
-                    &**value,
-                    "`Self` cannot be used in a type alias",
-                );
-                Type::unknown()
-            }
             Type::Never => {
                 // This case can be entered when we use a type annotation like `Literal[1]`
                 // in unreachable code, since we infer `Never` for `Literal`.  We call
@@ -2376,7 +2379,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
                 let inner_ty = self.infer_type_expression(arguments_slice);
                 let inner_ty =
-                    self.validate_type_alias_type_parameter_type(arguments_slice, inner_ty);
+                    self.validate_type_alias_type_parameter_component(arguments_slice, inner_ty);
                 self.context.inference_flags.set(
                     InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
                     previously_in_unpack_type_argument,

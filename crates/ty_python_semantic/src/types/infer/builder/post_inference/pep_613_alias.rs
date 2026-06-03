@@ -1,7 +1,4 @@
-use crate::types::{
-    TypeCheckDiagnostics,
-    infer::{InferenceFlags, TypeInferenceBuilder},
-};
+use crate::types::{TypeCheckDiagnostics, infer::TypeInferenceBuilder};
 use ty_python_core::definition::{AnnotatedAssignmentDefinitionKind, Definition};
 
 pub(crate) fn check_pep_613_alias<'db>(
@@ -24,8 +21,6 @@ pub(crate) fn check_pep_613_alias<'db>(
     let mut speculative = builder.speculate();
 
     speculative.typevar_binding_context = Some(definition);
-    speculative.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-    let value_ty = speculative.infer_type_expression(value);
-    speculative.validate_type_alias_type(value, value_ty);
+    speculative.infer_type_alias_type_expression(value);
     Some(speculative.context.finish())
 }

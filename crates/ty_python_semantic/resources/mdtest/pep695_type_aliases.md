@@ -84,8 +84,9 @@ def f() -> None:
 
 ## `Self`
 
-Type aliases cannot contain `Self` as part of the aliased type, even when they are defined in a
-class body. `Self` is allowed in nested positions that are evaluated as runtime expressions:
+Type aliases cannot have `Self` in their resulting type, even when they are defined in a class body.
+Using the runtime `Self` object in a value expression is allowed if the resulting type does not
+contain `Self`:
 
 ```py
 from typing import Annotated, Self, cast
@@ -97,9 +98,6 @@ def consume(value: object) -> int:
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     type Alias = tuple[Self]
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type Subscripted = Self[int]
 
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     type Bound[T: Self] = T
