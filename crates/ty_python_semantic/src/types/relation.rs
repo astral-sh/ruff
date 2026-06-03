@@ -1359,6 +1359,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::Union(union), _) => {
+                if let Some(fallback) = union.common_literal_fallback_instance(db) {
+                    // Use the broader fallback only as a positive proof. If it has the requested
+                    // relation to the target, then every literal in the union does too. Otherwise,
+                    // check each literal individually.
+                    let fallback_result = self
+                        .without_context_collection(|| self.check_type_pair(db, fallback, target));
+                    if fallback_result.is_always_satisfied(db) {
+                        return fallback_result;
+                    }
+                }
+
                 union
                     .elements(db)
                     .iter()

@@ -226,6 +226,19 @@ impl<'db> UnionType<'db> {
         self.try_map(db, |element| element.to_instance(db))
     }
 
+    /// Returns the shared fallback instance type for a union whose elements all have one.
+    ///
+    /// The returned type is broader than the literal types themselves. For example, the fallback
+    /// for `Literal["a"] | Literal["b"]` is `str`.
+    pub(crate) fn common_literal_fallback_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let mut elements = self.elements(db).iter();
+        let fallback = elements.next()?.literal_fallback_instance(db)?;
+        elements.try_fold(fallback, |fallback, element| {
+            let next = element.literal_fallback_instance(db)?;
+            (next == fallback).then_some(fallback)
+        })
+    }
+
     pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
         let current = self.elements(db);
         let new: Box<[Type<'db>]> = current.iter().copied().filter(f).collect();

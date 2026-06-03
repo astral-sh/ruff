@@ -1814,6 +1814,36 @@ mod tests {
         assert_eq!(union.elements(&db), &[t0, t1]);
     }
 
+    #[test]
+    fn union_common_literal_fallback_instance() {
+        let db = setup_db();
+
+        let str_union = UnionType::from_elements(
+            &db,
+            [
+                Type::string_literal(&db, "a"),
+                Type::string_literal(&db, "b"),
+            ],
+        )
+        .expect_union();
+        assert_eq!(
+            str_union.common_literal_fallback_instance(&db),
+            Some(KnownClass::Str.to_instance(&db))
+        );
+
+        let int_union = UnionType::from_elements(&db, [Type::int_literal(1), Type::int_literal(2)])
+            .expect_union();
+        assert_eq!(
+            int_union.common_literal_fallback_instance(&db),
+            Some(KnownClass::Int.to_instance(&db))
+        );
+
+        let mixed_union =
+            UnionType::from_elements(&db, [Type::string_literal(&db, "a"), Type::int_literal(1)])
+                .expect_union();
+        assert_eq!(mixed_union.common_literal_fallback_instance(&db), None);
+    }
+
     fn map_marker<'db>(ty: &Type<'db>, marker: Type<'db>, replacement: Type<'db>) -> Type<'db> {
         if *ty == marker { replacement } else { *ty }
     }
