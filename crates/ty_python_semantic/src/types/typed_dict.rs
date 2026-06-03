@@ -1578,6 +1578,23 @@ fn extract_unpacked_typed_dict_with_effective_tail_from_value_type<'db>(
     extract_unpacked_typed_dict_from_value_type_impl(db, ty, UnpackedTypedDictTail::Effective)
 }
 
+/// Extracts the tail that must be checked when constructing `target`.
+///
+/// Ordinary open `TypedDict`s have hidden items, but open constructors retain ty's existing
+/// leniency for those items. Explicit extra items must still be rejected because open constructors
+/// accept no unrecognized keys.
+fn extract_unpacked_typed_dict_for_constructor<'db>(
+    db: &'db dyn Db,
+    target: TypedDictType<'db>,
+    ty: Type<'db>,
+) -> Option<UnpackedTypedDict<'db>> {
+    if target.openness(db).is_open() {
+        extract_unpacked_typed_dict_from_value_type(db, ty)
+    } else {
+        extract_unpacked_typed_dict_with_effective_tail_from_value_type(db, ty)
+    }
+}
+
 #[derive(Clone, Copy)]
 enum UnpackedTypedDictTail {
     Explicit,
@@ -2083,10 +2100,6 @@ fn validate_extracted_typed_dict_extra_items<'db, 'ast>(
     let db = context.db();
     let typed_dict_ty = Type::TypedDict(typed_dict);
 
-    if typed_dict.openness(db).is_open() {
-        return true;
-    }
-
     if let Some(target_extra_items) = typed_dict.explicit_extra_items(db) {
         if let Some((target_name, target_field)) =
             typed_dict.items(db).iter().find(|(name, field)| {
@@ -2162,7 +2175,7 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
 ) -> Option<OrderSet<Name>> {
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
-    let unpacked = extract_unpacked_typed_dict_with_effective_tail_from_value_type(db, arg_ty)?;
+    let unpacked = extract_unpacked_typed_dict_for_constructor(db, typed_dict, arg_ty)?;
     let validate_extra_keys = !typed_dict.openness(db).is_open();
     let unpacked_keys = unpacked
         .keys
@@ -2664,7 +2677,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         }
         return true;
     } else if let Some(unpacked) =
-        extract_unpacked_typed_dict_with_effective_tail_from_value_type(db, unpacked_type)
+        extract_unpacked_typed_dict_for_constructor(db, typed_dict, unpacked_type)
     {
         let ignored_keys = shadowed_keys.clone();
         let (_, mut unpacked_valid) = validate_extracted_typed_dict_keys(

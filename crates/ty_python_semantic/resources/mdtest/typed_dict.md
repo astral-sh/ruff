@@ -6023,6 +6023,9 @@ class StrSource(TypedDict, extra_items=str):
 class OpenSource(TypedDict):
     name: str
 
+class OpenTarget(TypedDict):
+    name: str
+
 class IntTarget(TypedDict, extra_items=int):
     name: str
 
@@ -6053,6 +6056,9 @@ def _(
     accepts_ints(**strings)  # error: [invalid-argument-type]
     accepts_name(**ints)  # error: [unknown-argument]
     accepts_optional_label(**extra_only)  # error: [invalid-argument-type]
+
+    OpenTarget(name="ok", **extra_only)  # error: [invalid-key]
+    copied_into_open: OpenTarget = {"name": "ok", **extra_only}  # error: [invalid-key]
 
     IntTarget(**ints)
     IntTarget(**strings)  # error: [invalid-argument-type]
