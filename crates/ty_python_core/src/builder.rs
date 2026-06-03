@@ -1250,12 +1250,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.add_standalone_type_expression(&ann_assign.annotation);
                 let assignment = self.add_definition(
                     place_id,
-                    AnnotatedAssignmentDefinitionNodeRef {
-                        node: ann_assign,
-                        annotation: &ann_assign.annotation,
-                        value: ann_assign.value.as_deref(),
-                        target: expr,
-                    },
+                    AnnotatedAssignmentDefinitionNodeRef { node: ann_assign },
                 );
 
                 if let Some(value) = ann_assign.value.as_deref() {
@@ -1274,9 +1269,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     place_id,
                     ForStmtDefinitionNodeRef {
                         unpack,
-                        iterable: &node.iter,
+                        node,
                         target: expr,
-                        is_async: node.is_async,
                     },
                 );
             }
@@ -1295,10 +1289,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     place_id,
                     ComprehensionDefinitionNodeRef {
                         unpack,
-                        iterable: &node.iter,
+                        node,
                         target: expr,
                         first,
-                        is_async: node.is_async,
                     },
                 );
             }
@@ -1311,7 +1304,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     place_id,
                     WithItemDefinitionNodeRef {
                         unpack,
-                        context_expr: &item.context_expr,
+                        item,
                         target: expr,
                         is_async,
                     },
@@ -2741,7 +2734,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
 
-                    if let Some(module_node) = &node.module
+                    if node.module.is_some()
                         && let Some(relative_submodule) = module_name.relative_to(&thispackage)
                         && let Some(direct_submodule) = relative_submodule.components().next()
                         && !self.seen_submodule_imports.contains(direct_submodule)
@@ -2764,11 +2757,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         };
                         self.add_definition(
                             symbol.into(),
-                            ImportFromSubmoduleDefinitionNodeRef {
-                                node,
-                                module: module_node,
-                                module_index,
-                            },
+                            ImportFromSubmoduleDefinitionNodeRef { node, module_index },
                         );
                     }
                 }
