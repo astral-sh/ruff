@@ -2448,6 +2448,7 @@ impl<'db> StaticClassLiteral<'db> {
                             ..
                         }),
                     qualifiers,
+                    ..
                 } => {
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
@@ -2583,6 +2584,7 @@ impl<'db> StaticClassLiteral<'db> {
                 PlaceAndQualifiers {
                     place: Place::Undefined,
                     qualifiers: _,
+                    ..
                 } => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.

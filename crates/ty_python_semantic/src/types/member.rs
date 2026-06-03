@@ -75,6 +75,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             if let PlaceAndQualifiers {
                 place: Place::Defined(DefinedPlace { ty, .. }),
                 qualifiers,
+                deprecated,
             } = place_and_quals
             {
                 // Otherwise, we need to check if the symbol has bindings
@@ -86,10 +87,12 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
                 Member {
                     inner: match inferred {
-                        Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined(place) => {
-                            Place::Defined(DefinedPlace { ty, ..place }).with_qualifiers(qualifiers)
-                        }
+                        Place::Undefined => Place::Undefined
+                            .with_qualifiers(qualifiers)
+                            .with_deprecated(deprecated),
+                        Place::Defined(place) => Place::Defined(DefinedPlace { ty, ..place })
+                            .with_qualifiers(qualifiers)
+                            .with_deprecated(deprecated),
                     },
                 }
             } else {

@@ -10,8 +10,9 @@ use crate::dunder_all::dunder_all_names;
 use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachability};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    DeprecatedInstance, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type, inferred_declaration,
+    is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -31,6 +32,13 @@ use ty_python_core::{
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
 };
+
+pub(crate) fn common_deprecation<'db>(
+    first: Option<DeprecatedInstance<'db>>,
+    second: Option<DeprecatedInstance<'db>>,
+) -> Option<DeprecatedInstance<'db>> {
+    (first == second).then_some(first).flatten()
+}
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum Definedness {
@@ -242,6 +250,7 @@ impl<'db> Place<'db> {
         PlaceAndQualifiers {
             place: self,
             qualifiers,
+            deprecated: None,
         }
     }
 
@@ -303,14 +312,16 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
                 DefinedPlace::new(type_and_qualifiers.inner_type())
                     .with_origin(type_and_qualifiers.origin()),
             )
-            .with_qualifiers(type_and_qualifiers.qualifiers()),
+            .with_qualifiers(type_and_qualifiers.qualifiers())
+            .with_deprecated(type_and_qualifiers.deprecated()),
             Err(LookupError::Undefined(qualifiers)) => Place::Undefined.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUndefined(type_and_qualifiers)) => Place::Defined(
                 DefinedPlace::new(type_and_qualifiers.inner_type())
                     .with_origin(type_and_qualifiers.origin())
                     .with_definedness(Definedness::PossiblyUndefined),
             )
-            .with_qualifiers(type_and_qualifiers.qualifiers()),
+            .with_qualifiers(type_and_qualifiers.qualifiers())
+            .with_deprecated(type_and_qualifiers.deprecated()),
         }
     }
 }
@@ -337,13 +348,17 @@ impl<'db> LookupError<'db> {
                 UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
                 ty.origin().merge(ty2.origin()),
                 ty.qualifiers().union(ty2.qualifiers()),
-            )),
+            )
+            .with_deprecated(common_deprecation(ty.deprecated(), ty2.deprecated()))),
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
-                Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
-                    UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
-                    ty.origin().merge(ty2.origin()),
-                    ty.qualifiers().union(ty2.qualifiers()),
-                )))
+                Err(LookupError::PossiblyUndefined(
+                    TypeAndQualifiers::new(
+                        UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
+                        ty.origin().merge(ty2.origin()),
+                        ty.qualifiers().union(ty2.qualifiers()),
+                    )
+                    .with_deprecated(common_deprecation(ty.deprecated(), ty2.deprecated())),
+                ))
             }
         }
     }
@@ -658,6 +673,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
+    pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 }
 
 impl<'db> PlaceAndQualifiers<'db> {
@@ -698,14 +714,29 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::READ_ONLY)
     }
 
+    /// Return `self` with deprecation metadata attached to the binding.
+    #[must_use]
+    pub(crate) fn with_deprecated(mut self, deprecated: Option<DeprecatedInstance<'db>>) -> Self {
+        self.deprecated = deprecated;
+        self
+    }
+
+    /// Return `self` with the given type qualifiers.
+    #[must_use]
+    pub(crate) fn with_qualifiers(mut self, qualifiers: TypeQualifiers) -> Self {
+        self.qualifiers = qualifiers;
+        self
+    }
+
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
         match self {
-            PlaceAndQualifiers { place, qualifiers }
-                if (qualifiers.contains(TypeQualifiers::FINAL)
-                    && place
-                        .ignore_possibly_undefined()
-                        .is_some_and(|ty| ty.is_unknown())) =>
+            PlaceAndQualifiers {
+                place, qualifiers, ..
+            } if (qualifiers.contains(TypeQualifiers::FINAL)
+                && place
+                    .ignore_possibly_undefined()
+                    .is_some_and(|ty| ty.is_unknown())) =>
             {
                 Some(*qualifiers)
             }
@@ -721,6 +752,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         PlaceAndQualifiers {
             place: self.place.map_type(f),
             qualifiers: self.qualifiers,
+            deprecated: self.deprecated,
         }
     }
 
@@ -735,9 +767,11 @@ impl<'db> PlaceAndQualifiers<'db> {
             PlaceAndQualifiers {
                 place: Place::Defined(place),
                 qualifiers,
+                deprecated,
             } => {
                 let ty = place.public_type_policy.apply_if_needed(db, place.ty);
-                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers);
+                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
+                    .with_deprecated(deprecated);
                 match place.definedness {
                     Definedness::AlwaysDefined => Ok(type_and_qualifiers),
                     Definedness::PossiblyUndefined => {
@@ -748,6 +782,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             PlaceAndQualifiers {
                 place: Place::Undefined,
                 qualifiers,
+                deprecated: _,
             } => Err(LookupError::Undefined(qualifiers)),
         }
     }
@@ -798,6 +833,11 @@ impl<'db> PlaceAndQualifiers<'db> {
         } else {
             previous_place.qualifiers.union(self.qualifiers)
         };
+        let deprecated = if cycle.iteration() <= 1 {
+            self.deprecated
+        } else {
+            common_deprecation(previous_place.deprecated, self.deprecated)
+        };
         let place = match (previous_place.place, self.place) {
             // In fixed-point iteration of type inference, the member result must be monotonically
             // widened and not "oscillate". The type component is widened by unioning the previous
@@ -847,7 +887,11 @@ impl<'db> PlaceAndQualifiers<'db> {
             }
             (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
-        PlaceAndQualifiers { place, qualifiers }
+        PlaceAndQualifiers {
+            place,
+            qualifiers,
+            deprecated,
+        }
     }
 }
 
@@ -894,7 +938,7 @@ pub(crate) fn place_by_id<'db>(
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
         return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
-            .place
+            .into_place_and_qualifiers()
             .with_qualifiers(qualifiers);
     }
 
@@ -910,28 +954,32 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers,
+            ..
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport).place {
+            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            match inferred.place {
                 Place::Defined(DefinedPlace {
-                    ty: inferred,
+                    ty: inferred_ty,
                     origin,
                     definedness: boundness,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, Type::unknown(), inferred),
+                    ty: UnionType::from_two_elements(db, Type::unknown(), inferred_ty),
                     origin,
                     definedness: boundness,
                     public_type_policy: PublicTypePolicy::Raw,
                 })
-                .with_qualifiers(qualifiers),
+                .with_qualifiers(qualifiers)
+                .with_deprecated(inferred.deprecated),
                 Place::Undefined => Place::Defined(DefinedPlace {
                     ty: Type::unknown(),
                     origin,
                     definedness,
                     public_type_policy: PublicTypePolicy::Raw,
                 })
-                .with_qualifiers(qualifiers),
+                .with_qualifiers(qualifiers)
+                .with_deprecated(inferred.deprecated),
             }
         }
         // Place is declared, trust the declared type
@@ -942,6 +990,7 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers: _,
+            ..
         } => place_and_quals,
         // Place is possibly declared
         PlaceAndQualifiers {
@@ -953,23 +1002,27 @@ pub(crate) fn place_by_id<'db>(
                     ..
                 }),
             qualifiers,
+            deprecated: declared_deprecated,
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
-            let place = match inferred.place {
+            let (place, deprecated) = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
                 Place::Undefined => {
                     // TODO: We probably don't want to report `AlwaysDefined` here. This requires a bit of
                     // design work though as we might want a different behavior for stubs and for
                     // normal modules.
-                    Place::Defined(DefinedPlace {
-                        ty: declared_ty,
-                        origin,
-                        definedness: Definedness::AlwaysDefined,
-                        public_type_policy: PublicTypePolicy::Raw,
-                    })
+                    (
+                        Place::Defined(DefinedPlace {
+                            ty: declared_ty,
+                            origin,
+                            definedness: Definedness::AlwaysDefined,
+                            public_type_policy: PublicTypePolicy::Raw,
+                        }),
+                        declared_deprecated,
+                    )
                 }
                 // Place is possibly undeclared and (possibly) bound
                 Place::Defined(DefinedPlace {
@@ -977,34 +1030,42 @@ pub(crate) fn place_by_id<'db>(
                     origin,
                     definedness: boundness,
                     ..
-                }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
-                    origin,
-                    definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
-                        Definedness::AlwaysDefined
-                    } else {
-                        boundness
-                    },
-                    public_type_policy: PublicTypePolicy::Raw,
-                }),
+                }) => (
+                    Place::Defined(DefinedPlace {
+                        ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
+                        origin,
+                        definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
+                            Definedness::AlwaysDefined
+                        } else {
+                            boundness
+                        },
+                        public_type_policy: PublicTypePolicy::Raw,
+                    }),
+                    common_deprecation(declared_deprecated, inferred.deprecated),
+                ),
             };
 
-            PlaceAndQualifiers { place, qualifiers }
+            PlaceAndQualifiers {
+                place,
+                qualifiers,
+                deprecated,
+            }
         }
         // Place is undeclared, infer the type from bindings
         PlaceAndQualifiers {
             place: Place::Undefined,
             qualifiers: _,
+            ..
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let mut inferred =
-                place_from_bindings_impl(db, bindings, requires_explicit_reexport).place;
+            let mut inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport)
+                .into_place_and_qualifiers();
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
-                if let Place::Defined(defined) = inferred {
+                if let Place::Defined(defined) = inferred.place {
                     if defined.definedness == Definedness::PossiblyUndefined {
-                        inferred =
+                        inferred.place =
                             Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
                     }
                 }
@@ -1046,14 +1107,15 @@ pub(crate) fn place_by_id<'db>(
                 || scope_has_private_visibility
                 || in_stub_file
             {
-                inferred.into()
+                inferred
             } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
+                inferred.place = inferred
+                    .place
+                    .with_public_type_policy(PublicTypePolicy::Promote);
                 inferred
-                    .with_public_type_policy(PublicTypePolicy::Promote)
-                    .into()
             }
         }
     }
@@ -1352,6 +1414,7 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
+    let mut deprecated = None;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
 
@@ -1464,6 +1527,17 @@ fn place_from_bindings_impl<'db>(
             }
 
             first_definition.get_or_insert(binding);
+            let binding_deprecated = if matches!(binding.kind(db), DefinitionKind::Function(_)) {
+                inferred_declaration(db, binding)
+                    .declared()
+                    .and_then(|declared| declared.deprecated())
+            } else {
+                None
+            };
+            deprecated = Some(match deprecated {
+                None => binding_deprecated,
+                Some(deprecated) => common_deprecation(deprecated, binding_deprecated),
+            });
             let binding_ty = binding_type(db, binding);
             Some((
                 narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
@@ -1522,12 +1596,22 @@ fn place_from_bindings_impl<'db>(
     PlaceWithDefinition {
         place,
         first_definition,
+        deprecated: deprecated.flatten(),
     }
 }
 
 pub(super) struct PlaceWithDefinition<'db> {
     pub(super) place: Place<'db>,
     pub(super) first_definition: Option<Definition<'db>>,
+    pub(super) deprecated: Option<DeprecatedInstance<'db>>,
+}
+
+impl<'db> PlaceWithDefinition<'db> {
+    pub(super) fn into_place_and_qualifiers(self) -> PlaceAndQualifiers<'db> {
+        self.place
+            .with_qualifiers(TypeQualifiers::empty())
+            .with_deprecated(self.deprecated)
+    }
 }
 
 /// Accumulates types from multiple bindings or declarations, and eventually builds a
@@ -1620,6 +1704,8 @@ impl<'db> PublicTypeBuilder<'db> {
 struct DeclaredTypeBuilder<'db> {
     inner: PublicTypeBuilder<'db>,
     qualifiers: TypeQualifiers,
+    deprecated: Option<DeprecatedInstance<'db>>,
+    has_deprecated_candidate: bool,
     first_type: Option<Type<'db>>,
     conflicting_types: FxOrderSet<Type<'db>>,
 }
@@ -1629,6 +1715,8 @@ impl<'db> DeclaredTypeBuilder<'db> {
         DeclaredTypeBuilder {
             inner: PublicTypeBuilder::new(db),
             qualifiers: TypeQualifiers::empty(),
+            deprecated: None,
+            has_deprecated_candidate: false,
             first_type: None,
             conflicting_types: FxOrderSet::default(),
         }
@@ -1648,11 +1736,18 @@ impl<'db> DeclaredTypeBuilder<'db> {
         }
 
         self.qualifiers = self.qualifiers.union(element.qualifiers());
+        self.deprecated = if self.has_deprecated_candidate {
+            common_deprecation(self.deprecated, element.deprecated())
+        } else {
+            self.has_deprecated_candidate = true;
+            element.deprecated()
+        };
     }
 
     fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
         let type_and_quals =
-            TypeAndQualifiers::new(self.inner.build(), TypeOrigin::Declared, self.qualifiers);
+            TypeAndQualifiers::new(self.inner.build(), TypeOrigin::Declared, self.qualifiers)
+                .with_deprecated(self.deprecated);
         if self.conflicting_types.is_empty() {
             (type_and_quals, None)
         } else {
@@ -1756,7 +1851,8 @@ fn place_from_declarations_impl<'db>(
                 .with_origin(TypeOrigin::Declared)
                 .with_definedness(boundness),
         )
-        .with_qualifiers(declared.qualifiers());
+        .with_qualifiers(declared.qualifiers())
+        .with_deprecated(declared.deprecated());
 
         if let Some(conflicting) = conflicting {
             PlaceFromDeclarationsResult::conflict(place_and_quals, conflicting, first_declaration)

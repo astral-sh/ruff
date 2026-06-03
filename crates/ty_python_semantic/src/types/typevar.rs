@@ -1260,6 +1260,7 @@ impl<'db> TypeVarConstraints<'db> {
             let PlaceAndQualifiers {
                 place: ty_member,
                 qualifiers: new_qualifiers,
+                ..
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
             match ty_member {
@@ -1298,6 +1299,7 @@ impl<'db> TypeVarConstraints<'db> {
                 })
             },
             qualifiers,
+            deprecated: None,
         }
     }
 

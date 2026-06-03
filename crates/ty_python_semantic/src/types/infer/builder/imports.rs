@@ -240,7 +240,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if definition.kind(db).as_star_import().is_none() {
                     // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.
                     for ty in inferred.declaration_types() {
-                        self.check_deprecated(alias, ty.inner);
+                        self.check_deprecated(
+                            alias,
+                            ty.inner_type(),
+                            ty.deprecated(),
+                            Some(alias.name.id.as_str()),
+                        );
                     }
                 }
                 self.extend_definition(inferred);
@@ -371,6 +376,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
+                deprecated,
             } = module_ty.member(db, name)
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
@@ -386,7 +392,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
-                    from_module_getattr = Some((ty, qualifiers));
+                    from_module_getattr = Some((ty, qualifiers, deprecated));
                 } else {
                     self.add_declaration_with_binding(
                         alias.into(),
@@ -396,6 +402,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 inner: ty,
                                 origin: TypeOrigin::Declared,
                                 qualifiers,
+                                deprecated,
                             },
                             inferred_ty: ty,
                         },
@@ -443,7 +450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // We've checked for a submodule, so now we can go ahead and use a type from module
         // `__getattr__`.
-        if let Some((ty, qualifiers)) = from_module_getattr {
+        if let Some((ty, qualifiers, deprecated)) = from_module_getattr {
             self.add_declaration_with_binding(
                 alias.into(),
                 definition,
@@ -452,6 +459,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         inner: ty,
                         origin: TypeOrigin::Declared,
                         qualifiers,
+                        deprecated,
                     },
                     inferred_ty: ty,
                 },

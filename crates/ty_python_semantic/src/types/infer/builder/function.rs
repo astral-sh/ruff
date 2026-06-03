@@ -448,15 +448,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let mut binding_deprecated = None;
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+            let undecorated_ty = inferred_ty;
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
+            if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty
+                && matches!(inferred_ty, Type::FunctionLiteral(_))
+            {
+                binding_deprecated = Some(*deprecated);
+            } else if inferred_ty != undecorated_ty {
+                binding_deprecated = None;
+            }
         }
 
-        self.add_declaration_with_binding(
-            function.into(),
-            definition,
-            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
+        if function_decorators.contains(FunctionDecorators::OVERLOAD) {
+            binding_deprecated = None;
+        }
+
+        let declared_and_inferred_ty = binding_deprecated.map_or_else(
+            || DeclaredAndInferredType::are_the_same_type(inferred_ty),
+            |deprecated| {
+                DeclaredAndInferredType::are_the_same_type_with_deprecated(inferred_ty, deprecated)
+            },
         );
+        self.add_declaration_with_binding(function.into(), definition, &declared_and_inferred_ty);
 
         if function_decorators.contains(FunctionDecorators::OVERLOAD) {
             for stmt in &function.body {

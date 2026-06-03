@@ -288,6 +288,7 @@ impl<'db> UnionType<'db> {
             let PlaceAndQualifiers {
                 place: ty_member,
                 qualifiers: new_qualifiers,
+                ..
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
             match ty_member {
@@ -328,6 +329,7 @@ impl<'db> UnionType<'db> {
                 })
             },
             qualifiers,
+            deprecated: None,
         }
     }
 
@@ -859,6 +861,7 @@ impl<'db> IntersectionType<'db> {
             let PlaceAndQualifiers {
                 place: member,
                 qualifiers: new_qualifiers,
+                ..
             } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
             match member {
@@ -896,6 +899,7 @@ impl<'db> IntersectionType<'db> {
                 })
             },
             qualifiers,
+            deprecated: None,
         }
     }
 

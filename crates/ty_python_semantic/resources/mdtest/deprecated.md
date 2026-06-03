@@ -38,6 +38,44 @@ MyClass.afunc()  # error: [deprecated] "use something else"
 MyClass().amethod()  # error: [deprecated] "don't use this!"
 ```
 
+## Decorator order
+
+`@deprecated` applies to the result of any inner decorators. If an inner decorator replaces a
+function with a different function, the public binding should be deprecated without marking the
+replacement function itself as deprecated.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+from ty_extensions import TypeOf, is_assignable_to, is_equivalent_to, is_subtype_of, static_assert
+from typing_extensions import deprecated
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+def replacement() -> str:
+    return "replacement"
+
+def replace_with(replacement: F) -> Callable[[Callable[..., Any]], F]:
+    def decorator(_: Callable[..., Any]) -> F:
+        return replacement
+    return decorator
+
+@deprecated("use replacement directly")
+@replace_with(replacement)
+def deprecated_binding() -> None: ...
+@replace_with(replacement)
+@deprecated("only the replaced function is deprecated")
+def replaced_deprecated_function() -> None: ...
+
+deprecated_binding()  # error: [deprecated] "use replacement directly"
+replacement()
+replaced_deprecated_function()
+
+static_assert(is_equivalent_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
+static_assert(is_subtype_of(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
+static_assert(is_assignable_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
+```
+
 ## Syntax
 
 <!-- snapshot-diagnostics -->

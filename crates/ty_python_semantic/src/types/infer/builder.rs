@@ -92,13 +92,14 @@ use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
-    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SentinelInstance,
-    Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    DeprecatedInstance, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
+    binding_type, infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment,
+    todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -161,6 +162,16 @@ impl<'db> DeclaredAndInferredType<'db> {
             TypeOrigin::Inferred,
             TypeQualifiers::empty(),
         ))
+    }
+
+    fn are_the_same_type_with_deprecated(
+        ty: Type<'db>,
+        deprecated: DeprecatedInstance<'db>,
+    ) -> Self {
+        Self::AreTheSame(
+            TypeAndQualifiers::new(ty, TypeOrigin::Inferred, TypeQualifiers::empty())
+                .with_deprecated(Some(deprecated)),
+        )
     }
 }
 
@@ -1265,6 +1276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let PlaceAndQualifiers {
             place: resolved_place,
             qualifiers,
+            ..
         } = place_and_quals;
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
@@ -2704,6 +2716,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 PlaceAndQualifiers {
                                     place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
                                     qualifiers: _,
+                                    ..
                                 } => attr_ty.is_callable_type(),
                                 _ => false,
                             };
@@ -2765,6 +2778,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ty: meta_attr_ty, ..
                             }),
                         qualifiers,
+                        ..
                     } => {
                         // Resolve `Self` type variables to the concrete instance type.
                         let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
@@ -2836,6 +2850,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             ..
                                         }),
                                     qualifiers,
+                                    ..
                                 } = fallback_attr
                                 {
                                     // Bind `Self` via MRO matching.
@@ -2889,6 +2904,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ..
                                 }),
                             qualifiers,
+                            ..
                         }) = fallback_attr
                         {
                             // Bind `Self` via MRO matching.
@@ -2974,6 +2990,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ty: meta_attr_ty, ..
                             }),
                         qualifiers,
+                        ..
                     } => {
                         if emit_diagnostics
                             && self.invalid_assignment_to_final_attribute(
@@ -3090,6 +3107,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ..
                                 }),
                             qualifiers,
+                            ..
                         }) = fallback_attr
                         {
                             let class_attr_ty =
@@ -8738,8 +8756,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
-    /// Check if the given ty is `@deprecated` or not
-    fn check_deprecated<T: Ranged>(&self, ranged: T, ty: Type) {
+    /// Check if the given type or public binding is `@deprecated`.
+    fn check_deprecated<T: Ranged>(
+        &self,
+        ranged: T,
+        ty: Type,
+        binding_deprecated: Option<DeprecatedInstance>,
+        binding_name: Option<&str>,
+    ) {
+        if let Some(deprecated) = binding_deprecated
+            && let Some(binding_name) = binding_name
+        {
+            let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
+                return;
+            };
+
+            let mut diag = builder.into_diagnostic(format_args!(
+                r#"The function `{binding_name}` is deprecated"#
+            ));
+            if let Some(message) = deprecated.message {
+                diag.set_primary_message(message.value(self.db()));
+            }
+            diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+            return;
+        }
+
         // First handle classes
         if let Type::ClassLiteral(class_literal) = ty {
             let Some(deprecated) = class_literal.deprecated(self.db()) else {
@@ -8861,7 +8902,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
-    ) -> (Place<'db>, Option<ScopedUseId>) {
+    ) -> (PlaceAndQualifiers<'db>, Option<ScopedUseId>) {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
@@ -8871,13 +8912,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                place_from_bindings(db, use_def.reachable_bindings(place_id))
+                    .into_place_and_qualifiers()
             } else {
                 assert!(
                     self.in_string_annotation(),
                     "Expected the place table to create a place for every valid PlaceExpr node"
                 );
-                Place::Undefined
+                Place::Undefined.into()
             };
             (place, None)
         } else {
@@ -8885,7 +8927,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_name_expr()
                 .is_some_and(|name| name.is_invalid())
             {
-                return (Place::Undefined, None);
+                return (Place::Undefined.into(), None);
             }
 
             // A named expression can show up here when resolving the parent place of something
@@ -8894,15 +8936,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
                     let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(db, definition))
+                    Place::bound(binding_type(db, definition)).into()
                 } else {
-                    Place::Undefined
+                    Place::Undefined.into()
                 };
                 return (place, None);
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.file());
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
+            let place = place_from_bindings(db, use_def.bindings_at_use(use_id))
+                .into_place_and_qualifiers();
 
             (place, Some(use_id))
         }
@@ -8951,12 +8994,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Place::Undefined.into();
                 }
                 EnclosingSnapshotResult::FoundBindings(bindings) => {
-                    let mut place_and_qualifiers = place_from_bindings(db, bindings);
+                    let mut place_and_qualifiers =
+                        place_from_bindings(db, bindings).into_place_and_qualifiers();
                     if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
                         place_and_qualifiers.place =
                             Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
                     }
-                    let place = place_and_qualifiers.place.map_type(|ty| {
+                    let place = place_and_qualifiers.map_type(|ty| {
                         self.narrow_place_with_applicable_constraints(
                             place_expr,
                             ty,
@@ -8967,7 +9011,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         FileScopeId::global(),
                         ConstraintKey::NestedScope(current_scope_id),
                     ));
-                    return place.into();
+                    return place;
                 }
                 // There are no visible bindings / constraint here.
                 EnclosingSnapshotResult::NotFound => {
@@ -9005,7 +9049,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
 
-        let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
+        let place = local_scope_place.or_fall_back_to(db, || {
             let mut symbol_resolves_locally = false;
             if let Some(symbol) = place_expr.as_symbol()
                 && let Some(symbol_id) = place_table.symbol_id(symbol.name())
@@ -9052,7 +9096,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let (parent_place, _use_id) = self.infer_local_place_load(parent_expr, expr_ref);
-                if let Place::Defined(_) = parent_place {
+                if let Place::Defined(_) = parent_place.place {
                     return Place::Undefined.into();
                 }
             }
@@ -9156,18 +9200,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings(db, bindings).place.map_type(|ty| {
-                                self.narrow_place_with_applicable_constraints(
-                                    place_expr,
-                                    ty,
-                                    &constraint_keys,
-                                )
-                            });
+                            let place = place_from_bindings(db, bindings)
+                                .into_place_and_qualifiers()
+                                .map_type(|ty| {
+                                    self.narrow_place_with_applicable_constraints(
+                                        place_expr,
+                                        ty,
+                                        &constraint_keys,
+                                    )
+                                });
                             constraint_keys.push((
                                 enclosing_scope_file_id,
                                 ConstraintKey::NestedScope(file_scope_id),
                             ));
-                            return place.into();
+                            return place;
                         }
                         // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager place resolution.
@@ -9272,7 +9318,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if let Some(ty) = place.place.ignore_possibly_undefined() {
-            self.check_deprecated(expr_ref, ty);
+            let binding_name = place_expr.as_symbol().map(|symbol| symbol.name().as_str());
+            self.check_deprecated(
+                expr_ref,
+                ty,
+                binding_name.and(place.deprecated),
+                binding_name,
+            );
         }
 
         (place, constraint_keys)
@@ -9702,9 +9754,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             });
 
+        let resolved_deprecated = resolved_type.deprecated();
         let resolved_type = resolved_type.inner_type();
 
-        self.check_deprecated(attr, resolved_type);
+        self.check_deprecated(
+            attr,
+            resolved_type,
+            resolved_deprecated,
+            Some(attr.as_str()),
+        );
 
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).
