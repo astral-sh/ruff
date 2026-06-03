@@ -182,13 +182,12 @@ impl Project {
             settings_diagnostics,
             program_settings_diagnostics,
         );
-        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
+
+        Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
-            .new(db);
-
-        project
+            .new(db)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
