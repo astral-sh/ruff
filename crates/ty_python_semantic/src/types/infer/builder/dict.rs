@@ -189,6 +189,8 @@ fn is_typed_dict_or_union_of_typed_dicts<'db>(db: &'db dyn crate::Db, ty: Type<'
         match ty {
             Type::TypedDict(_) => true,
             Type::Union(union) => {
+                // Recursive aliases are ineligible for this fast path. Cache completed results
+                // separately so shared alias graphs are classified once per union.
                 if let Some(result) = completed.get(&ty) {
                     return *result;
                 }

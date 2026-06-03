@@ -2470,6 +2470,12 @@ type Left22 = Left21 | Right21
 
 def _(item: Left22) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
+
+type RecursiveItem = A | RecursiveItem
+
+def _(item: RecursiveItem) -> None:
+    # The fast-path check must terminate when an alias refers back to its containing union.
+    reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
