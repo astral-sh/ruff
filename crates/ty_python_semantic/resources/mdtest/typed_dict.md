@@ -5957,7 +5957,6 @@ class StrPatch(TypedDict, extra_items=str):
     name: NotRequired[str]
 
 class OpenPatch(TypedDict): ...
-
 class MutableExtraOnly(TypedDict, extra_items=int): ...
 
 def _(
