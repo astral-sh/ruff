@@ -452,9 +452,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             let undecorated_ty = inferred_ty;
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
-            if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty
-                && matches!(inferred_ty, Type::FunctionLiteral(_))
-            {
+            if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty {
                 binding_deprecated = Some(*deprecated);
             } else if inferred_ty != undecorated_ty {
                 binding_deprecated = None;

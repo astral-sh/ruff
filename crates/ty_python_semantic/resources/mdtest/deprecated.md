@@ -76,6 +76,37 @@ static_assert(is_subtype_of(TypeOf[deprecated_binding], TypeOf[replacement]))  #
 static_assert(is_assignable_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
 ```
 
+## Union-valued decorator results
+
+Deprecation applies to a public binding even if an inner decorator gives it a callable union type.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+from typing_extensions import deprecated
+
+F = TypeVar("F", bound=Callable[..., Any])
+G = TypeVar("G", bound=Callable[..., Any])
+
+def other(value: int) -> int:
+    return value
+
+def choose_with(other: G) -> Callable[[F], F | G]:
+    def decorator(function: F) -> F | G:
+        return function
+    return decorator
+
+@deprecated("use another function")
+@choose_with(other)
+def union_binding(value: int) -> int:
+    return value
+
+union_binding(1)  # error: [deprecated] "use another function"
+
+if union_binding is not other:  # error: [deprecated] "use another function"
+    union_binding(1)  # error: [deprecated] "use another function"
+```
+
 ## Syntax
 
 <!-- snapshot-diagnostics -->
