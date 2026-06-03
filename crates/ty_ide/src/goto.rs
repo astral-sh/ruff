@@ -1244,7 +1244,7 @@ impl GotoTarget<'_> {
                         _ => node.as_expr_ref().map(GotoTarget::Expression),
                     }
                 } else if let Some(target) =
-                    typed_dict_dict_literal_key_target(model, covering_node, string_expr)
+                    dict_string_literal_key_target(covering_node, string_expr)
                 {
                     Some(target)
                 } else {
@@ -1334,32 +1334,37 @@ fn named_tuple_subscript_target<'a>(
     })
 }
 
-fn typed_dict_dict_literal_key_target<'a>(
-    model: &SemanticModel,
+fn dict_string_literal_key_target<'a>(
     covering_node: &CoveringNode<'a>,
     string_expr: &'a ast::ExprStringLiteral,
 ) -> Option<GotoTarget<'a>> {
-    let dict = covering_node.ancestors().find_map(|ancestor| {
-        let AnyNodeRef::ExprDict(dict) = ancestor else {
-            return None;
-        };
-        dict.items
-            .iter()
-            .any(|item| {
-                item.key
-                    .as_ref()
-                    .is_some_and(|key| key.range() == string_expr.range())
-            })
-            .then_some(dict)
-    })?;
-
-    let key = string_expr.value.to_str();
-    typed_dict_dict_literal_key_definition(model, dict, key)?;
+    let dict = enclosing_dict_with_key(covering_node, string_expr)?;
 
     Some(GotoTarget::DictStringLiteralKey {
         dict,
         string_expr,
-        literal_key: key,
+        literal_key: string_expr.value.to_str(),
+    })
+}
+
+fn enclosing_dict_with_key<'a>(
+    covering_node: &CoveringNode<'a>,
+    string_expr: &ast::ExprStringLiteral,
+) -> Option<&'a ast::ExprDict> {
+    covering_node
+        .ancestors()
+        .find_map(|ancestor| match ancestor {
+            AnyNodeRef::ExprDict(dict) if dict_has_key(dict, string_expr) => Some(dict),
+            _ => None,
+        })
+}
+
+fn dict_has_key(dict: &ast::ExprDict, key: &ast::ExprStringLiteral) -> bool {
+    let key_range = key.range();
+    dict.items.iter().any(|item| {
+        item.key
+            .as_ref()
+            .is_some_and(|item_key| item_key.range() == key_range)
     })
 }
 
