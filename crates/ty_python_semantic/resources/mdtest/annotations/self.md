@@ -352,6 +352,34 @@ class Both(Box[ConcreteOwner], Owner): ...
 ConcreteOwner().inspect(Both(ConcreteOwner()))
 ```
 
+## Classmethods preserve unrelated occurrences of `Self`
+
+```py
+from __future__ import annotations
+
+from typing import Self, cast
+from ty_extensions import Intersection
+
+class Factory[T]:
+    @classmethod
+    def identity(cls, value: object) -> T:
+        return cast(T, value)
+
+class Owner:
+    def inspect(
+        self: Self,
+        cls: Intersection[type[Factory[Self]], type[Owner]],
+    ) -> None:
+        result = cls.identity(self)
+        reveal_type(result)  # revealed: Self@inspect
+        result.identity(self)  # error: [unresolved-attribute]
+
+class ConcreteOwner(Owner): ...
+class Both(Factory[ConcreteOwner], Owner): ...
+
+ConcreteOwner().inspect(Both)
+```
+
 ## typing_extensions
 
 ```toml

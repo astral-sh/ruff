@@ -7201,10 +7201,10 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
-        // Context-free attribute binding must not replace a method-owned `Self`.
-        if self.binding_context.is_none()
-            && bound_typevar
-                .binding_context(db)
+        // An intersection can only bind a method-owned `Self` through the matching signature.
+        let bound_binding_context = bound_typevar.binding_context(db);
+        if self.binding_context != Some(bound_binding_context)
+            && bound_binding_context
                 .definition()
                 .is_some_and(|definition| definition.kind(db).is_function_def())
         {
