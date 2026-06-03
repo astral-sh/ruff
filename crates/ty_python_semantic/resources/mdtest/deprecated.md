@@ -115,6 +115,33 @@ conditionally_defined()  # TODO: error: [deprecated]
 Deprecation attached to a decorated binding is currently only reported for direct module-level name
 loads with a single live binding. Merging this metadata across control flow is future work.
 
+## Deferred annotations
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, TypeVar
+from typing_extensions import deprecated
+
+C = TypeVar("C", bound=type)
+
+def replace_with(replacement: C) -> Callable[[Callable[..., Any]], C]:
+    def decorator(_: Callable[..., Any]) -> C:
+        return replacement
+    return decorator
+
+class Replacement: ...
+
+@deprecated("use Replacement")
+@replace_with(Replacement)
+def Old() -> None: ...
+
+value: Old  # TODO: error: [deprecated] "use Replacement"
+```
+
+Deprecation attached to decorated bindings is not yet propagated into deferred annotation scopes.
+
 ## Syntax
 
 <!-- snapshot-diagnostics -->
