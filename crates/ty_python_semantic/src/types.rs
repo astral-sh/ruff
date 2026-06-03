@@ -3608,7 +3608,7 @@ impl<'db> Type<'db> {
             Type::NewTypeInstance(new_type_instance) if self.as_union_like(db).is_some() => {
                 new_type_instance
                     .concrete_base_type(db)
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                    .member_lookup_with_policy(db, name, policy)
             }
 
             Type::TypeAlias(alias) => alias

@@ -525,6 +525,7 @@ ComplexNewType = NewType("ComplexNewType", complex)
 
 def expects_float(x: float): ...
 def expects_complex(x: complex): ...
+def expects_str(x: str): ...
 def f(floaty: FloatNewType, complexy: ComplexNewType):
     if floaty:
         reveal_type(floaty)  # revealed:FloatNewType & ~AlwaysFalsy
@@ -532,6 +533,8 @@ def f(floaty: FloatNewType, complexy: ComplexNewType):
 
     if complexy:
         reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
+        reveal_type(complexy.real)  # revealed: int | float
         expects_complex(complexy)  # fine
         expects_float(complexy)  # error: [invalid-argument-type]
+        expects_str(complexy.real)  # error: [invalid-argument-type]
 ```
