@@ -548,7 +548,7 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         };
 
-        self.push_typed_dict_string_key_reference(string_expr, current_definition);
+        self.push_typed_dict_string_key_reference(string_expr, &current_definition);
     }
 
     fn check_typed_dict_dict_literal_key(&mut self, string_expr: &ast::ExprStringLiteral) {
@@ -567,7 +567,7 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         };
 
-        self.push_typed_dict_string_key_reference(string_expr, current_definition);
+        self.push_typed_dict_string_key_reference(string_expr, &current_definition);
     }
 
     fn enclosing_dict_with_key(
@@ -595,9 +595,9 @@ impl<'a> LocalReferencesFinder<'a> {
     fn push_typed_dict_string_key_reference(
         &mut self,
         string_expr: &ast::ExprStringLiteral,
-        current_definition: ResolvedDefinition<'a>,
+        current_definition: &ResolvedDefinition<'a>,
     ) {
-        if !self.target_definitions.contains(&current_definition) {
+        if !self.target_definitions.contains(current_definition) {
             return;
         }
 

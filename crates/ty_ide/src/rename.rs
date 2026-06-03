@@ -43,7 +43,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
         }
     }
 
-    Some(rename_range(goto_target)?)
+    rename_range(&goto_target)
 }
 
 /// Perform a rename operation on the symbol at the given position.
@@ -88,7 +88,7 @@ fn is_file_in_project(db: &dyn Db, file: File) -> bool {
     file.path(db).is_system_virtual_path() || db.project().files(db).contains(&file)
 }
 
-fn rename_range(goto_target: GotoTarget<'_>) -> Option<ruff_text_size::TextRange> {
+fn rename_range(goto_target: &GotoTarget<'_>) -> Option<ruff_text_size::TextRange> {
     match goto_target {
         GotoTarget::SubscriptStringLiteralKey { subscript, .. } => Some(
             subscript
