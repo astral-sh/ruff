@@ -1,10 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::{is_const_true, map_callable};
+use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{Decorator, Expr};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 
 /// ## What it does
 /// Checks for `pytest` fixtures that set the parameter `autouse=True` in the decorator constructor.
@@ -115,20 +116,9 @@ impl Violation for PytestFixtureAutouse {
 
 /// RUF076
 pub(crate) fn pytest_fixture_autouse(checker: &Checker, decorators: &[Decorator]) {
-    // TODO: Consider adding configuration options to:
-    // 1. Only flag this rule when the fixture is defined inside a `conftest.py` file.
-    // 2. Only flag this rule when the fixture has a specific scope (e.g. `function`, `session`, etc),
-    //    supporting a whitelist or blacklist approach.
     let semantic = checker.semantic();
     for decorator in decorators {
-        // Resolve the qualified name to see if it is a pytest.fixture
-        let is_fixture = semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["pytest", "fixture"])
-            });
-
-        if !is_fixture {
+        if !is_pytest_fixture(decorator, semantic) {
             continue;
         }
 
