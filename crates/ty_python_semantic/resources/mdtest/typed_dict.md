@@ -2491,6 +2491,32 @@ def _(value: ItemsA | ItemsB) -> None:
     accept(value, takes_dict_items)
 ```
 
+Rejected common-constraint probes must not affect fallback protocol inference:
+
+```py
+from typing import Literal, Protocol, TypeVar, TypedDict
+
+ConstrainedValue = TypeVar("ConstrainedValue", int, object, covariant=True)
+
+class GetValue(Protocol[ConstrainedValue]):
+    def __getitem__(self, key: Literal["value"], /) -> ConstrainedValue: ...
+
+class ValueA(TypedDict):
+    value: int
+
+class ValueB(TypedDict):
+    value: int
+
+def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
+    raise NotImplementedError
+
+def takes_str(value: str) -> None: ...
+
+def _(value: ValueA | ValueB) -> None:
+    reveal_type(get_value(value))  # revealed: object
+    takes_str(get_value(value))  # error: [invalid-argument-type]
+```
+
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
 `TypedDict`:
 

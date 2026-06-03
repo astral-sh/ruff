@@ -2340,22 +2340,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // are equivalent to the actual constraints for every union member.
         let spec = &[KnownClass::Str.to_instance(self.db), Type::object()];
         let dict = KnownClass::Dict.to_specialized_instance(self.db, spec);
-        let dict_when = self.constraints.load(
-            self.db,
-            dict.when_constraint_set_assignable_to_owned(self.db, formal),
-        );
+        let dict_when = dict.when_constraint_set_assignable_to_owned(self.db, formal);
+        let probe_constraints = ConstraintSetBuilder::new();
+        let probe_dict_when = probe_constraints.load(self.db, dict_when);
         typed_dicts
             .into_iter()
             .all(|element| {
-                let element_when = self.constraints.load(
+                let element_when = probe_constraints.load(
                     self.db,
                     element.when_constraint_set_assignable_to_owned(self.db, formal),
                 );
                 element_when
-                    .iff(self.db, self.constraints, dict_when)
+                    .iff(self.db, &probe_constraints, probe_dict_when)
                     .is_always_satisfied(self.db)
             })
-            .then_some(dict_when)
+            .then(|| self.constraints.load(self.db, dict_when))
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
