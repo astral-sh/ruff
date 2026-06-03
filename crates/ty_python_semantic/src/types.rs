@@ -7319,7 +7319,7 @@ impl TypeQualifiers {
 /// When inferring the type of an annotation expression, we can also encounter type qualifiers
 /// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
 /// control how a particular place can be accessed or modified. This struct holds a type and
-/// a set of type qualifiers.
+/// a set of type qualifiers, along with other binding metadata.
 ///
 /// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
 /// qualifier `ClassVar`.
@@ -7350,7 +7350,7 @@ impl<'db> TypeAndQualifiers<'db> {
         }
     }
 
-    /// Forget about type qualifiers and only return the inner type.
+    /// Forget about type qualifiers and binding metadata and only return the inner type.
     pub(crate) fn inner_type(&self) -> Type<'db> {
         self.inner
     }

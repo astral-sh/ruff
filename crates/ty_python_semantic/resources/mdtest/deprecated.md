@@ -80,9 +80,6 @@ An outer decorator that returns the same non-singleton callable type can still r
 deprecated callable:
 
 ```py
-from collections.abc import Callable
-from typing_extensions import deprecated
-
 C = Callable[[int], int]
 
 def same_type_replacement(value: int) -> int:

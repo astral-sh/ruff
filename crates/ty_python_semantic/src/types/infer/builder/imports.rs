@@ -243,8 +243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.check_deprecated(
                             alias,
                             ty.inner_type(),
-                            ty.deprecated(),
-                            Some(alias.name.id.as_str()),
+                            Some(alias.name.id.as_str()).zip(ty.deprecated()),
                         );
                     }
                 }

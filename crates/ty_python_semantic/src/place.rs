@@ -655,7 +655,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
     }
 }
 
-/// A type with declaredness information, and a set of type qualifiers.
+/// A type with declaredness information, a set of type qualifiers, and binding metadata.
 ///
 /// This is used to represent the result of looking up the declared type. Consider this
 /// example:
@@ -718,13 +718,6 @@ impl<'db> PlaceAndQualifiers<'db> {
     #[must_use]
     pub(crate) fn with_deprecated(mut self, deprecated: Option<DeprecatedInstance<'db>>) -> Self {
         self.deprecated = deprecated;
-        self
-    }
-
-    /// Return `self` with the given type qualifiers.
-    #[must_use]
-    pub(crate) fn with_qualifiers(mut self, qualifiers: TypeQualifiers) -> Self {
-        self.qualifiers = qualifiers;
         self
     }
 
@@ -937,9 +930,12 @@ pub(crate) fn place_by_id<'db>(
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
-            .into_place_and_qualifiers()
-            .with_qualifiers(qualifiers);
+        let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
+        return PlaceAndQualifiers {
+            place: inferred.place,
+            qualifiers,
+            deprecated: inferred.deprecated,
+        };
     }
 
     match declared {

@@ -157,20 +157,16 @@ enum DeclaredAndInferredType<'db> {
 
 impl<'db> DeclaredAndInferredType<'db> {
     fn are_the_same_type(ty: Type<'db>) -> Self {
-        Self::AreTheSame(TypeAndQualifiers::new(
-            ty,
-            TypeOrigin::Inferred,
-            TypeQualifiers::empty(),
-        ))
+        Self::are_the_same_type_with_deprecation(ty, None)
     }
 
-    fn are_the_same_type_with_deprecated(
+    fn are_the_same_type_with_deprecation(
         ty: Type<'db>,
-        deprecated: DeprecatedInstance<'db>,
+        deprecated: Option<DeprecatedInstance<'db>>,
     ) -> Self {
         Self::AreTheSame(
             TypeAndQualifiers::new(ty, TypeOrigin::Inferred, TypeQualifiers::empty())
-                .with_deprecated(Some(deprecated)),
+                .with_deprecated(deprecated),
         )
     }
 }
@@ -8756,17 +8752,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
-    /// Check if the given type or public binding is `@deprecated`.
+    /// Check if the given type or binding is `@deprecated`.
     fn check_deprecated<T: Ranged>(
         &self,
         ranged: T,
         ty: Type,
-        binding_deprecated: Option<DeprecatedInstance>,
-        binding_name: Option<&str>,
+        deprecated_binding: Option<(&str, DeprecatedInstance)>,
     ) {
-        if let Some(deprecated) = binding_deprecated
-            && let Some(binding_name) = binding_name
-        {
+        if let Some((binding_name, deprecated)) = deprecated_binding {
             let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
                 return;
             };
@@ -9319,12 +9312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(ty) = place.place.ignore_possibly_undefined() {
             let binding_name = place_expr.as_symbol().map(|symbol| symbol.name().as_str());
-            self.check_deprecated(
-                expr_ref,
-                ty,
-                binding_name.and(place.deprecated),
-                binding_name,
-            );
+            self.check_deprecated(expr_ref, ty, binding_name.zip(place.deprecated));
         }
 
         (place, constraint_keys)
@@ -9760,8 +9748,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.check_deprecated(
             attr,
             resolved_type,
-            resolved_deprecated,
-            Some(attr.as_str()),
+            Some(attr.as_str()).zip(resolved_deprecated),
         );
 
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference

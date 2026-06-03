@@ -463,11 +463,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             binding_deprecated = None;
         }
 
-        let declared_and_inferred_ty = binding_deprecated.map_or_else(
-            || DeclaredAndInferredType::are_the_same_type(inferred_ty),
-            |deprecated| {
-                DeclaredAndInferredType::are_the_same_type_with_deprecated(inferred_ty, deprecated)
-            },
+        let declared_and_inferred_ty = DeclaredAndInferredType::are_the_same_type_with_deprecation(
+            inferred_ty,
+            binding_deprecated,
         );
         self.add_declaration_with_binding(function.into(), definition, &declared_and_inferred_ty);
 
