@@ -2920,8 +2920,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let when = self
                     .common_typed_dict_protocol_constraints(formal, actual_union)
                     .unwrap_or_else(|| {
-                        let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
-                        self.constraints.load(self.db, when)
+                        actual.when_constraint_set_assignable_to(self.db, formal, self.constraints)
                     });
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
