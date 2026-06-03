@@ -100,6 +100,29 @@ def _(value: Intersection[Context, Extra]):
         reveal_type(entered.extra)  # revealed: int
 ```
 
+## Distinct intersection context managers can shadow each other
+
+```py
+from ty_extensions import Intersection
+
+class ObjectContext:
+    def __enter__(self) -> object:
+        return object()
+
+    def __exit__(self, *args) -> None: ...
+
+class IntContext:
+    def __enter__(self: ObjectContext) -> int:
+        return 1
+
+    def __exit__(self: ObjectContext, *args) -> None: ...
+
+def takes_int(value: int): ...
+def _(value: Intersection[IntContext, ObjectContext]):
+    with value as entered:
+        takes_int(entered)  # error: [invalid-argument-type]
+```
+
 ## Context manager without an `__enter__` or `__exit__` method
 
 ```py

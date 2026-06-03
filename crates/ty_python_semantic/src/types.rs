@@ -7051,7 +7051,15 @@ impl<'db> IntersectionType<'db> {
         // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
         // `__iter__`, `__enter__`, `__bool__`).
         let positive = self.positive(db);
-        let receiver = Some(Type::Intersection(self));
+        let member_policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
+        let mut class_members = positive.iter().filter_map(|element| {
+            let member = element.class_member_with_policy(db, name.into(), member_policy);
+            (!member.place.is_undefined()).then_some(member)
+        });
+        let has_ambiguous_class_members = class_members
+            .next()
+            .is_some_and(|first| class_members.any(|member| member != first));
+        let receiver = (!has_ambiguous_class_members).then_some(Type::Intersection(self));
         let mut successful_bindings = Vec::with_capacity(positive.len());
         let mut last_error = None;
 
