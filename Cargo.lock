@@ -2055,7 +2055,7 @@ dependencies = [
  "rustc-stable-hash",
  "salsa",
  "serde",
- "similar 3.1.0",
+ "similar 3.1.1",
  "smallvec",
  "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
@@ -3057,7 +3057,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar 3.1.0",
+ "similar 3.1.1",
  "supports-hyperlinks",
  "tempfile",
  "thiserror 2.0.18",
@@ -3099,7 +3099,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar 3.1.0",
+ "similar 3.1.1",
  "strum",
  "tempfile",
  "toml 1.1.2+spec-1.1.0",
@@ -3217,7 +3217,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar 3.1.0",
+ "similar 3.1.1",
  "smallvec",
  "strum",
  "strum_macros",
@@ -3380,7 +3380,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar 3.1.0",
+ "similar 3.1.1",
  "smallvec",
  "static_assertions",
  "thiserror 2.0.18",
@@ -3934,9 +3934,9 @@ checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 
 [[package]]
 name = "similar"
-version = "3.1.0"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04d93e861ede2e497b47833469b8ec9d5c07fa4c78ce7a00f6eb7dd8168b4b3f"
+checksum = "e6505efef05804732ed8a3f2d4f279429eb485bd69d5b0cc6b19cc02005cda16"
 dependencies = [
  "bstr",
 ]
