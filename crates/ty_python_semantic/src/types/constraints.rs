@@ -658,6 +658,7 @@ struct ConstraintSetStorage<'db> {
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
@@ -876,6 +877,25 @@ impl<'db> ConstraintSetBuilder<'db> {
 
     fn constraint_data(&self, constraint: ConstraintId) -> Constraint<'db> {
         self.storage.borrow().constraints[constraint]
+    }
+
+    fn cached_constraint_implies(
+        &self,
+        db: &'db dyn Db,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) -> bool {
+        let key = (ante, post);
+        if let Some(result) = self.storage.borrow().constraint_implication_cache.get(&key) {
+            return *result;
+        }
+
+        let result = ante.implies(db, self, post);
+        self.storage
+            .borrow_mut()
+            .constraint_implication_cache
+            .insert(key, result);
+        result
     }
 
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
@@ -5312,7 +5332,7 @@ impl SequentMap {
         ante: ConstraintId,
         post: ConstraintId,
     ) {
-        if ante.implies(db, builder, post) {
+        if builder.cached_constraint_implies(db, ante, post) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 ante = %ante.display(db, builder),
@@ -6472,6 +6492,56 @@ mod tests {
             .unwrap();
 
         assert!(narrower_path.assignment_holds(t_int.when_true()));
+    }
+
+    #[test]
+    fn path_assignments_caches_direct_implications_for_later_pairs() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Int.to_instance(&db),
+        );
+        let t_bool = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Bool.to_instance(&db),
+        );
+        let mut path = PathAssignments::new([t_int, t_bool]);
+
+        path.add_assignment(&db, &builder, t_bool.when_false(), 0, false)
+            .unwrap();
+
+        {
+            let storage = builder.storage.borrow();
+            assert_eq!(
+                storage.constraint_implication_cache.get(&(t_bool, t_int)),
+                Some(&true)
+            );
+            assert_eq!(storage.constraint_implication_cache.len(), 1);
+            assert_eq!(storage.pair_sequent_cache.len(), 0);
+        }
+
+        path.add_assignment(&db, &builder, t_int.when_true(), 1, false)
+            .unwrap();
+
+        let storage = builder.storage.borrow();
+        assert_eq!(
+            storage.constraint_implication_cache.get(&(t_bool, t_int)),
+            Some(&true)
+        );
+        assert_eq!(
+            storage.constraint_implication_cache.get(&(t_int, t_bool)),
+            Some(&false)
+        );
+        assert_eq!(storage.constraint_implication_cache.len(), 2);
+        assert_eq!(storage.pair_sequent_cache.len(), 1);
     }
 
     #[test]
