@@ -2001,6 +2001,12 @@ def _(value: Intersection[MyTuple, MixedTupleBound]):
 class TypeIsMarker(Protocol):
     marker: int
 
+ProtocolBoundMarker = TypeVar("ProtocolBoundMarker", bound=TypeIsMarker)
+
+def protocol_bounded(value: Intersection[Value, ProtocolBoundMarker]):
+    reveal_type(value.other)  # revealed: Value
+    value.other.marker  # error: [unresolved-attribute]
+
 def is_marker(value: object) -> TypeIs[TypeIsMarker]:
     return hasattr(value, "marker")
 

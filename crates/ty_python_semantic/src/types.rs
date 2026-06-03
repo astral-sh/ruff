@@ -1105,6 +1105,12 @@ impl<'db> Type<'db> {
                 )
                 || matches!(
                     positive,
+                    Type::TypeVar(typevar)
+                        if has_nominal_class_constraint
+                            && typevar_is_protocol_refinement(db, *typevar, owner)
+                )
+                || matches!(
+                    positive,
                     Type::ProtocolInstance(ProtocolInstanceType {
                         inner: Protocol::FromClass(class),
                         ..
@@ -7329,6 +7335,40 @@ fn type_inherits_from_owner<'db>(
             class_mro_literals(db, class.class_literal(db)).contains(&owner_class)
         }),
     }
+}
+
+fn typevar_is_protocol_refinement<'db>(
+    db: &'db dyn Db,
+    typevar: BoundTypeVarInstance<'db>,
+    owner: Option<ClassLiteral<'db>>,
+) -> bool {
+    let is_protocol_refinement = |ty: Type<'db>| match ty {
+        Type::ProtocolInstance(ProtocolInstanceType {
+            inner: Protocol::FromClass(class),
+            ..
+        }) => {
+            !class.is_known(db, KnownClass::NamedTupleLike)
+                && owner.is_none_or(|owner| {
+                    !class_mro_literals(db, class.class_literal(db)).contains(&owner)
+                })
+        }
+        _ => false,
+    };
+
+    typevar
+        .typevar(db)
+        .bound_or_constraints(db)
+        .is_some_and(|bound_or_constraints| match bound_or_constraints {
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                .elements(db)
+                .iter()
+                .any(|constraint| is_protocol_refinement(*constraint)),
+            TypeVarBoundOrConstraints::UpperBound(Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .any(|bound| is_protocol_refinement(*bound)),
+            TypeVarBoundOrConstraints::UpperBound(bound) => is_protocol_refinement(bound),
+        })
 }
 
 fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
