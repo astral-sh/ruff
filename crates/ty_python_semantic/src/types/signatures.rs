@@ -964,6 +964,7 @@ impl<'db> Signature<'db> {
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
+        let mut generic_context = self.generic_context;
         let binding_context = self.self_binding_context(db);
         if let Some(self_type) = self_type
             && self.needs_self_mapping(db, removed_receiver)
@@ -977,10 +978,12 @@ impl<'db> Signature<'db> {
                 &ApplyTypeMappingVisitor::default(),
             );
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
+            generic_context = generic_context.map(|generic_context| {
+                self_mapping.update_signature_generic_context(db, generic_context)
+            });
         }
         Self {
-            generic_context: self
-                .generic_context
+            generic_context: generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             parameters,

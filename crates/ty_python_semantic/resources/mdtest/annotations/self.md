@@ -444,6 +444,15 @@ class Value:
     def copy(self) -> Self:
         return self
 
+    @identity
+    def choose[T = Self](self) -> T:
+        raise NotImplementedError
+
+    @classmethod
+    @identity
+    def choose_class[T = Self](cls) -> T:
+        raise NotImplementedError
+
     @property
     @identity
     def choice[T = Self](self) -> T:
@@ -452,9 +461,16 @@ class Value:
 class Extra:
     extra: int
 
-def _(value: Intersection[Value, Extra]):
+def _(
+    value: Intersection[Value, Extra],
+    cls: Intersection[type[Value], type[Extra]],
+):
     reveal_type(value.copy())  # revealed: Value & Extra
     value.copy().missing  # error: [unresolved-attribute]
+    reveal_type(value.choose())  # revealed: Value & Extra
+    reveal_type(value.choose().extra)  # revealed: int
+    reveal_type(cls.choose_class())  # revealed: Value & Extra
+    reveal_type(cls.choose_class().extra)  # revealed: int
     reveal_type(value.choice)  # revealed: Value & Extra
     reveal_type(value.choice.extra)  # revealed: int
 ```
