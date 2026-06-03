@@ -102,6 +102,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .iter()
                     .map(|expr| {
                         let constraint = self.infer_type_expression(expr);
+                        let constraint =
+                            self.validate_type_alias_type_parameter_type(expr, constraint);
                         if constraint.has_typevar_or_typevar_instance(db)
                             && let Some(builder) = self
                                 .context
@@ -128,6 +130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Some(expr) => {
                 let bound_ty = self.infer_type_expression(expr);
+                let bound_ty = self.validate_type_alias_type_parameter_type(expr, bound_ty);
                 if bound_ty.has_typevar_or_typevar_instance(db)
                     && let Some(builder) =
                         self.context.report_lint(&INVALID_TYPE_VARIABLE_BOUND, expr)
@@ -141,6 +144,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         if let Some(default_expr) = default.as_deref() {
             let default_ty = self.infer_type_expression(default_expr);
+            let default_ty = self.validate_type_alias_type_parameter_type(default_expr, default_ty);
             if !self.check_default_for_outer_scope_typevars(default_ty, default_expr, &name.id) {
                 let bound_node = bound_node.map(|n| match n {
                     ast::Expr::Tuple(tuple) => BoundOrConstraintsNodes::Constraints(&tuple.elts),
@@ -612,7 +616,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 let types = elts
                     .iter()
-                    .map(|elt| self.infer_type_expression(elt))
+                    .map(|elt| {
+                        let ty = self.infer_type_expression(elt);
+                        self.validate_type_alias_type_parameter_type(elt, ty)
+                    })
                     .collect::<Vec<_>>();
                 self.context.inference_flags.set(
                     InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
@@ -625,6 +632,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Name(_) => {
                 let ty = self.infer_type_expression(default_expr);
+                let ty = self.validate_type_alias_type_parameter_type(default_expr, ty);
                 if let Some(name) = paramspec_name
                     && self.check_default_for_outer_scope_typevars(ty, default_expr, name)
                 {
@@ -667,7 +675,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .context
                 .inference_flags
                 .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
-            self.infer_type_expression(default);
+            let default_ty = self.infer_type_expression(default);
+            self.validate_type_alias_type_parameter_type(default, default_ty);
             self.context.inference_flags.set(
                 InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                 previous_in_valid_unpack_context,

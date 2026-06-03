@@ -103,6 +103,15 @@ pub(crate) fn bind_typevar<'db>(
             let definition = index.expect_single_definition(class_node);
             return Some(typevar.with_binding_context(db, definition));
         }
+
+        // Preserve `Self` in explicit type alias scopes so that alias validation can reject it
+        // after inferring the completed alias type.
+        if let NodeWithScopeKind::TypeAlias(type_alias)
+        | NodeWithScopeKind::TypeAliasTypeParameters(type_alias) = scope.node()
+        {
+            let definition = index.expect_single_definition(type_alias);
+            return Some(typevar.with_binding_context(db, definition));
+        }
     }
     // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
     // Class-scoped type variables are not visible from inner class scopes.

@@ -1506,6 +1506,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
         let value_ty = self.infer_type_expression(&type_alias.value);
+        let value_ty = self.validate_type_alias_type(&type_alias.value, value_ty);
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_TYPE_ALIAS);
@@ -4150,7 +4151,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .inference_flags
             .replace(InferenceFlags::IN_TYPE_ALIAS, true);
 
-        self.infer_type_expression(&arguments.args[1]);
+        let value_ty = self.infer_type_expression(&arguments.args[1]);
+        self.validate_type_alias_type(&arguments.args[1], value_ty);
         self.context
             .inference_flags
             .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);

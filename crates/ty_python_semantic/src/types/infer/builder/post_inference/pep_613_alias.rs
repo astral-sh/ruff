@@ -25,6 +25,7 @@ pub(crate) fn check_pep_613_alias<'db>(
 
     speculative.typevar_binding_context = Some(definition);
     speculative.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-    speculative.infer_type_expression(value);
+    let value_ty = speculative.infer_type_expression(value);
+    speculative.validate_type_alias_type(value, value_ty);
     Some(speculative.context.finish())
 }

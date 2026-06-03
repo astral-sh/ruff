@@ -1451,9 +1451,6 @@ bitflags::bitflags! {
         /// Whether we're in a context where `Unpack` can be legal.
         const IN_VALID_UNPACK_CONTEXT = 1 << 10;
 
-        /// Whether the visitor is currently visiting `Annotated` metadata.
-        const IN_ANNOTATED_METADATA = 1 << 11;
-
         /// Whether the visitor is currently visiting a type expression.
         const IN_TYPE_EXPRESSION = 1 << 12;
 

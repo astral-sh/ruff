@@ -18,7 +18,7 @@ use ty_python_core::{
     definition::{Definition, DefinitionKind},
     place::ScopedPlaceId,
     place_table,
-    scope::{NodeWithScopeKind, ScopeId},
+    scope::ScopeId,
     semantic_index, use_def_map,
 };
 
@@ -744,18 +744,6 @@ impl SpecialFormType {
             )),
 
             Self::TypingSelf => {
-                let in_type_alias_type_parameters = matches!(
-                    scope_id.node(db),
-                    NodeWithScopeKind::TypeAliasTypeParameters(_)
-                ) && !inference_flags
-                    .contains(InferenceFlags::IN_ANNOTATED_METADATA);
-
-                if inference_flags.contains(InferenceFlags::IN_TYPE_ALIAS)
-                    || in_type_alias_type_parameters
-                {
-                    return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
-                }
-
                 let index = semantic_index(db, scope_id.file(db));
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                     return Err(InvalidTypeExpression::InvalidType(

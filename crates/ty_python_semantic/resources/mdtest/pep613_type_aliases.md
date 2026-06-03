@@ -521,8 +521,11 @@ Type aliases cannot contain `Self` as part of the aliased type, even when they a
 class body. `Self` is allowed in nested positions that are evaluated as runtime expressions:
 
 ```py
-from typing_extensions import Annotated, Self, TypeAlias
+from typing_extensions import Annotated, Self, TypeAlias, cast
 from ty_extensions import TypeOf
+
+def consume(value: object) -> int:
+    return 1
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
@@ -541,6 +544,16 @@ class C:
 
     def use_value_expression(self, value: ValueExpression) -> None:
         reveal_type(value)  # revealed: @Todo(Inference of subscript on special form)
+
+    value: Self = cast(Self, object())
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    IndirectValueExpression: TypeAlias = TypeOf[value]
+
+    def use_indirect_value_expression(self, value: IndirectValueExpression) -> None:
+        reveal_type(value)  # revealed: @Todo(Inference of subscript on special form)
+
+    ConsumedValueExpression: TypeAlias = TypeOf[consume(cast(Self, object()))]
 ```
 
 ## Disabled `invalid-type-form` `Self` fallback

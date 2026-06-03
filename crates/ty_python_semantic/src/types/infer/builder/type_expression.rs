@@ -15,7 +15,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
-use ty_python_core::scope::ScopeKind;
+use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
@@ -99,6 +99,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .map(|builder| {
                 diagnostic::add_type_expression_reference_link(builder.into_diagnostic(message))
             })
+    }
+
+    pub(super) fn validate_type_alias_type(
+        &mut self,
+        expression: &ast::Expr,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        if !value_ty.contains_self(self.db()) {
+            return value_ty;
+        }
+
+        self.report_invalid_type_expression(expression, "`Self` cannot be used in a type alias");
+        let fallback = value_ty.replace_self_with_unknown(self.db());
+        self.expressions.insert(expression.into(), fallback);
+        fallback
+    }
+
+    pub(super) fn validate_type_alias_type_parameter_type(
+        &mut self,
+        expression: &ast::Expr,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        if matches!(
+            self.scope().node(self.db()),
+            NodeWithScopeKind::TypeAliasTypeParameters(_)
+        ) {
+            self.validate_type_alias_type(expression, value_ty)
+        } else {
+            value_ty
+        }
     }
 
     pub(super) fn infer_name_or_attribute_type_expression(
@@ -850,6 +880,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = starred;
 
         let starred_type = self.infer_type_expression(value);
+        let starred_type = self.validate_type_alias_type_parameter_type(value, starred_type);
         if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
             starred_type
         } else {
@@ -2344,6 +2375,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .inference_flags
                     .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
                 let inner_ty = self.infer_type_expression(arguments_slice);
+                let inner_ty =
+                    self.validate_type_alias_type_parameter_type(arguments_slice, inner_ty);
                 self.context.inference_flags.set(
                     InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
                     previously_in_unpack_type_argument,

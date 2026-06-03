@@ -1029,6 +1029,26 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Replaces every `Self` type variable in this type with `Unknown`.
+    pub(crate) fn replace_self_with_unknown(self, db: &'db dyn Db) -> Self {
+        let mut typevars = FxOrderSet::default();
+        self.find_legacy_typevars(db, None, &mut typevars);
+
+        let self_typevars = typevars
+            .into_iter()
+            .filter(|typevar| typevar.typevar(db).is_self(db))
+            .collect::<Vec<_>>();
+        if self_typevars.is_empty() {
+            return self;
+        }
+
+        let generic_context = GenericContext::from_typevar_instances(db, self_typevars);
+        self.apply_specialization(
+            db,
+            generic_context.specialize(db, vec![Type::unknown(); generic_context.len(db)]),
+        )
+    }
+
     /// Returns `true` if this type supports eager `Self` binding via `bind_self_typevars`.
     ///
     /// `FunctionLiteral`, `BoundMethod`, and function-like `Callable` types return `false`
@@ -7420,8 +7440,6 @@ enum InvalidTypeExpression<'db> {
     TypeQualifier(TypeQualifier),
     /// `typing.Self` cannot be used in `@staticmethod` definitions.
     TypingSelfInStaticMethod,
-    /// `typing.Self` cannot be used in type aliases.
-    TypingSelfInTypeAlias,
     /// `typing.Self` cannot be used in metaclass definitions.
     TypingSelfInMetaclass,
     /// Some types are always invalid in type expressions
@@ -7519,9 +7537,6 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::TypingSelfInStaticMethod => {
                         f.write_str("`Self` cannot be used in a static method")
-                    }
-                    InvalidTypeExpression::TypingSelfInTypeAlias => {
-                        f.write_str("`Self` cannot be used in a type alias")
                     }
                     InvalidTypeExpression::TypingSelfInMetaclass => {
                         f.write_str("`Self` cannot be used in a metaclass")
