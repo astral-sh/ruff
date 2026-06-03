@@ -1473,6 +1473,69 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
             let constrain_with_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
 
+            let mut narrow_len_call = |call: &ast::ExprCall, length_type: Type<'db>| {
+                let Type::FunctionLiteral(function_type) = inference.expression_type(&*call.func)
+                else {
+                    return;
+                };
+                if function_type.known(self.db) != Some(KnownFunction::Len)
+                    || !call.arguments.keywords.is_empty()
+                {
+                    return;
+                }
+                let [arg] = &*call.arguments.args else {
+                    return;
+                };
+                let Some(length_literal) = length_type
+                    .resolve_type_alias(self.db)
+                    .as_int_like_literal()
+                else {
+                    return;
+                };
+                if length_literal < 0 {
+                    return;
+                }
+                let Some(target) = PlaceExpr::try_from_expr(arg) else {
+                    return;
+                };
+
+                // `False == 0` and `True == 1`, so the protocol must accept both literals.
+                let protocol_length = match length_literal {
+                    0 => UnionType::from_two_elements(
+                        self.db,
+                        Type::int_literal(0),
+                        Type::bool_literal(false),
+                    ),
+                    1 => UnionType::from_two_elements(
+                        self.db,
+                        Type::int_literal(1),
+                        Type::bool_literal(true),
+                    ),
+                    _ => Type::int_literal(length_literal),
+                };
+                let exactly_sized =
+                    KnownClass::ExactlySized.to_specialized_instance(self.db, &[protocol_length]);
+                let constraint = NarrowingConstraint::intersection(
+                    exactly_sized.negate_if(self.db, !constrain_with_equality),
+                );
+                constraints
+                    .entry(self.expect_place(&target))
+                    .and_modify(|existing| {
+                        *existing = existing.merge_constraint_and(constraint.clone());
+                    })
+                    .or_insert(constraint);
+            };
+
+            // E.g., `len(items) == 2`
+            if let ast::Expr::Call(call) = left.expression_value() {
+                narrow_len_call(call, inference.expression_type(&comparators[0]));
+            }
+
+            // E.g., `2 == len(items)`
+            if let ast::Expr::Call(call) = comparators[0].expression_value() {
+                narrow_len_call(call, inference.expression_type(&**left));
+            }
+
             let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
                 let value_type = inference.expression_type(&*subscript.value);
                 let slice_type = inference.expression_type(&*subscript.slice);
