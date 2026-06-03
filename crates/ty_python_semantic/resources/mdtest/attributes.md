@@ -1858,6 +1858,8 @@ def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.method())  # revealed: A & B
 
 def _(a_and_b: Intersection[type[A], type[B]]):
+    # revealed: bound method type[A] & type[B].classmethod() -> A & B
+    reveal_type(a_and_b.classmethod)
     reveal_type(a_and_b.classmethod())  # revealed: A & B
 ```
 
