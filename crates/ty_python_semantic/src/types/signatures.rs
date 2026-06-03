@@ -3111,17 +3111,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        if target.parameters.has_hidden_open_typed_dict_tail() {
-            let source_hidden_tail = source
-                .parameters
-                .has_hidden_open_typed_dict_tail()
-                .then_some(Type::object());
-            let Some(source_tail_ty) = source_keyword_variadic.or(source_hidden_tail) else {
-                return self.never();
-            };
-            if !check_types(Type::object(), source_tail_ty, None, target_index) {
-                return result;
-            }
+        if target.parameters.has_hidden_open_typed_dict_tail()
+            && source_keyword_variadic.is_none()
+            && !source.parameters.has_hidden_open_typed_dict_tail()
+        {
+            return self.never();
         }
 
         // If there are still unmatched keyword parameters from `source`, then they should be

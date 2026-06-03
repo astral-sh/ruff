@@ -3511,6 +3511,17 @@ class ClosedTypedDictKwargs(Protocol):
     def __call__(self, **kwargs: Unpack[ClosedTD]) -> None: ...
 
 closed_typed_dict_from_explicit: ClosedTypedDictKwargs = func7
+
+class TraditionalKwargsTD(TypedDict):
+    value: int
+
+class TraditionalKwargsTarget(Protocol):
+    def __call__(self, **kwargs: Unpack[TraditionalKwargsTD]) -> None: ...
+
+def traditional_kwargs_source(**kwargs: int) -> None:
+    pass
+
+traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source
 ```
 
 ### Missing required keys remain incompatible
