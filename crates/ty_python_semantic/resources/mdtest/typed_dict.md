@@ -2376,6 +2376,11 @@ def mixed(movie_or_int: Movie | int) -> None:
 
 The same result is inferred efficiently for a union of `TypedDict`s:
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Literal, TypedDict
 
@@ -2407,6 +2412,13 @@ X = TypedDict("X", {"type": Literal["x"]})
 Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X
 
 def _(item: Item) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
+
+type FirstGroup = A | B | C | D | E | F | G | H
+type SecondGroup = I | J | K | L | M | N | O | P
+type AliasedItem = FirstGroup | SecondGroup | Q | R | S | T | U | V | W | X
+
+def _(item: AliasedItem) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 

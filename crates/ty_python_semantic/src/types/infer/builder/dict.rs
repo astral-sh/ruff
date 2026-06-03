@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, HasNodeIndex};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::{ArgExpr, TypeInferenceBuilder};
 use crate::Program;
@@ -179,12 +179,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 }
 
 fn is_typed_dict_or_union_of_typed_dicts<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::TypedDict(_) => true,
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| element.resolve_type_alias(db).is_typed_dict()),
-        _ => false,
+    fn is_typed_dict_or_union_of_typed_dicts_impl<'db>(
+        db: &'db dyn crate::Db,
+        ty: Type<'db>,
+        resolving: &mut FxHashSet<Type<'db>>,
+    ) -> bool {
+        let ty = ty.resolve_type_alias(db);
+        match ty {
+            Type::TypedDict(_) => true,
+            Type::Union(union) => {
+                if !resolving.insert(ty) {
+                    return false;
+                }
+                let result = union.elements(db).iter().all(|element| {
+                    is_typed_dict_or_union_of_typed_dicts_impl(db, *element, resolving)
+                });
+                resolving.remove(&ty);
+                result
+            }
+            _ => false,
+        }
     }
+
+    is_typed_dict_or_union_of_typed_dicts_impl(db, ty, &mut FxHashSet::default())
 }
