@@ -36,6 +36,7 @@ pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
     definite_match_pattern_type, definite_sequence_pattern_type, exact_sequence_pattern_type,
     mapping_pattern_type, sequence_pattern_type, singleton_pattern_type,
+    starred_sequence_pattern_type,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;

@@ -13,6 +13,7 @@ use crate::types::{
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
     UnionBuilder, definite_sequence_pattern_type, exact_sequence_pattern_type,
     infer_expression_types, mapping_pattern_type, sequence_pattern_type, singleton_pattern_type,
+    starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -2059,8 +2060,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Fixed-length patterns preserve element constraints. Starred patterns
-    /// only prove that the subject is a valid sequence-pattern value.
+    /// Preserve the element constraints that can be addressed at fixed indices.
     fn necessary_sequence_pattern_type(
         &self,
         kind: &SequencePatternPredicateKind<'db>,
@@ -2073,7 +2073,20 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .collect();
             exact_sequence_pattern_type(self.db, &element_types)
         } else {
-            sequence_pattern_type(self.db)
+            let Some((prefix_patterns, suffix_patterns)) = kind.split_around_star() else {
+                return sequence_pattern_type(self.db);
+            };
+
+            let prefix_element_types: Vec<_> = prefix_patterns
+                .iter()
+                .map(|pattern| self.necessary_match_pattern_type(pattern))
+                .collect();
+            let suffix_element_types: Vec<_> = suffix_patterns
+                .iter()
+                .map(|pattern| self.necessary_match_pattern_type(pattern))
+                .collect();
+
+            starred_sequence_pattern_type(self.db, &prefix_element_types, &suffix_element_types)
         }
     }
 
