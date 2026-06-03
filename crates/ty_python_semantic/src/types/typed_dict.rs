@@ -1407,7 +1407,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     extract_unpacked_typed_dict_from_value_type(db, ty).map(|unpacked| unpacked.keys)
 }
 
-/// Extracts the declared keys and explicit extra-items tail from a `TypedDict`-shaped value.
+/// Extracts the declared keys and effective extra-items tail from a `TypedDict`-shaped value.
 pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1430,7 +1430,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                 .collect();
             Some(UnpackedTypedDict {
                 keys,
-                extra_items_ty: td.explicit_extra_items(db).map(|extra| extra.declared_ty),
+                extra_items_ty: td.effective_extra_items(db).map(|extra| extra.declared_ty),
                 is_closed: td.openness(db).is_closed(),
             })
         }

@@ -5978,6 +5978,9 @@ class IntSource(TypedDict, extra_items=int):
 class StrSource(TypedDict, extra_items=str):
     name: str
 
+class OpenSource(TypedDict):
+    name: str
+
 class IntTarget(TypedDict, extra_items=int):
     name: str
 
@@ -5992,7 +5995,7 @@ class ExtraOnly(TypedDict, extra_items=int): ...
 def accepts_ints(name: str, **kwargs: int) -> None: ...
 def accepts_name(name: str) -> None: ...
 def accepts_optional_label(*, label: str = "", **kwargs: int) -> None: ...
-def _(ints: IntSource, strings: StrSource, extra_only: ExtraOnly) -> None:
+def _(ints: IntSource, strings: StrSource, open_source: OpenSource, extra_only: ExtraOnly) -> None:
     accepts_ints(**ints)
     accepts_ints(**strings)  # error: [invalid-argument-type]
     accepts_name(**ints)  # error: [unknown-argument]
@@ -6000,7 +6003,10 @@ def _(ints: IntSource, strings: StrSource, extra_only: ExtraOnly) -> None:
 
     IntTarget(**ints)
     IntTarget(**strings)  # error: [invalid-argument-type]
+    IntTarget(**open_source)  # error: [invalid-argument-type]
     ClosedTarget(**ints)  # error: [invalid-key]
+
+    copied: IntTarget = {**open_source}  # error: [invalid-argument-type]
 
     # The extra-items tail may contain the target's optional `label` key with an incompatible type.
     OptionalTarget(**extra_only)  # error: [invalid-argument-type]
