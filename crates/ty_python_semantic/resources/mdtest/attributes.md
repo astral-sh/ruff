@@ -2019,7 +2019,7 @@ def _(value: CopyableProtocol):
 ### `Self` binding checks intersection element MROs
 
 ```py
-from typing import Callable, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 from typing_extensions import Self
 from ty_extensions import Intersection
 
@@ -2069,6 +2069,20 @@ U = TypeVar("U", bound=BoundA | BoundB)
 def bounded(value: Intersection[U, ConstraintExtra]):
     reveal_type(value.other)  # revealed: U@bounded & ConstraintExtra
     value.callback(value)
+
+S = TypeVar("S")
+
+class Box(Generic[S]):
+    other: Self
+
+    @classmethod
+    def make(cls) -> Self:
+        raise NotImplementedError
+
+def gradual_class(cls: Intersection[type[Box[Any]], type[ConstraintExtra]]):
+    reveal_type(cls.other)  # revealed: Box[Any] & ConstraintExtra
+    reveal_type(cls.make())  # revealed: Box[Any] & ConstraintExtra
+    reveal_type(cls.other.extra)  # revealed: int
 ```
 
 ### Descriptor binding uses the full intersection type

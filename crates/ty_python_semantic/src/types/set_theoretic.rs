@@ -795,45 +795,11 @@ impl<'db> IntersectionType<'db> {
         }
     }
 
-    /// Returns the intersection of instance types contributed by class-like positive elements.
-    ///
-    /// Other fully static elements constrain the class object itself, not the instances it
-    /// constructs. Dynamic elements prevent this projection because they could materialize to
-    /// additional class-object constraints.
-    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let mut builder = IntersectionBuilder::new(db);
-        let mut found_instance = false;
-
-        for element in self.positive(db) {
-            if element.is_dynamic() {
-                return None;
-            }
-            if let Some(instance) = element.to_instance(db) {
-                // `has_dynamic` does not walk into a type variable's bound or constraints.
-                let has_dynamic_typevar_bound = matches!(
-                    instance,
-                    Type::TypeVar(typevar)
-                        if typevar
-                            .typevar(db)
-                            .bound_or_constraints(db)
-                            .is_none_or(|bound| bound.as_type(db).has_dynamic(db))
-                );
-                if instance.has_dynamic(db) || has_dynamic_typevar_bound {
-                    return None;
-                }
-                builder = builder.add_positive(instance);
-                found_instance = true;
-            }
-        }
-
-        found_instance.then(|| builder.build())
-    }
-
-    /// Returns the instance type used to bind `Self` for a classmethod receiver.
+    /// Returns the instance type used to bind `Self` for a class-object receiver.
     ///
     /// Unlike general instance projection, gradual elements are retained because they represent
     /// uncertainty about the runtime class without invalidating guaranteed static constraints.
-    pub(crate) fn to_instance_for_classmethod_receiver(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn to_instance_for_class_receiver(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let mut builder = IntersectionBuilder::new(db);
         let mut found_instance = false;
 

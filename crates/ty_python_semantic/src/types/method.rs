@@ -51,9 +51,7 @@ impl<'db> BoundMethodType<'db> {
         let mut self_instance = self.self_instance(db);
         if self.function(db).is_classmethod(db) {
             self_instance = match self_instance {
-                Type::Intersection(intersection) => {
-                    intersection.to_instance_for_classmethod_receiver(db)
-                }
+                Type::Intersection(intersection) => intersection.to_instance_for_class_receiver(db),
                 _ => self_instance.to_instance(db),
             }
             .unwrap_or_else(Type::unknown);

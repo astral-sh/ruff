@@ -3013,7 +3013,7 @@ impl<'db> Type<'db> {
                         // For classmethod-like callables, bind to the owner class.
                         match owner {
                             Type::Intersection(intersection) => intersection
-                                .to_instance_for_classmethod_receiver(db)
+                                .to_instance_for_class_receiver(db)
                                 .unwrap_or(owner),
                             _ => owner.to_instance(db).unwrap_or(owner),
                         }
@@ -3890,9 +3890,9 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
                 let self_instance = match receiver {
-                    Type::Intersection(intersection) => {
-                        intersection.to_instance(db).unwrap_or(self_instance)
-                    }
+                    Type::Intersection(intersection) => intersection
+                        .to_instance_for_class_receiver(db)
+                        .unwrap_or(self_instance),
                     _ => receiver.to_instance(db).unwrap_or(self_instance),
                 };
                 let class_attr_plain =
