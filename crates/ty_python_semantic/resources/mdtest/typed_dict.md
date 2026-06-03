@@ -6036,6 +6036,15 @@ def _(
     # The extra-items tail may contain the target's optional `label` key with an incompatible type.
     OptionalTarget(**extra_only)  # error: [invalid-argument-type]
     optional: OptionalTarget = {**extra_only}  # error: [invalid-argument-type]
+
+    # A later value for `label` shadows the potentially incompatible value from the extra-items
+    # tail.
+    OptionalTarget(**{**extra_only, "label": "ok"})
+    shadowed: OptionalTarget = {**extra_only, "label": "ok"}
+    OptionalTarget(extra_only, label="ok")
+
+    # In the reverse order, the extra-items tail may overwrite `label`.
+    OptionalTarget(**{"label": "ok", **extra_only})  # error: [invalid-argument-type]
 ```
 
 ### Non-literal keys in an `extra_items` TypedDict constructor must be safe for every possible key

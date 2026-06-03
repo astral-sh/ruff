@@ -1909,6 +1909,7 @@ fn validate_extracted_typed_dict_extra_items<'db, 'ast>(
     source_keys: &BTreeMap<Name, UnpackedTypedDictKey<'db>>,
     extra_items_ty: Type<'db>,
     nodes: TypedDictAssignmentNodes<'ast>,
+    ignored_keys: &OrderSet<Name>,
 ) -> bool {
     let db = context.db();
     let typed_dict_ty = Type::TypedDict(typed_dict);
@@ -1921,6 +1922,7 @@ fn validate_extracted_typed_dict_extra_items<'db, 'ast>(
         if let Some((target_name, target_field)) =
             typed_dict.items(db).iter().find(|(name, field)| {
                 !source_keys.contains_key(*name)
+                    && !ignored_keys.contains(*name)
                     && !extra_items_ty.is_assignable_to(db, field.declared_ty)
             })
         {
@@ -2020,6 +2022,7 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
             &unpacked_keys,
             extra_items_ty,
             nodes,
+            ignored_keys,
         );
     }
 
@@ -2487,6 +2490,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
                 &unpacked.keys,
                 extra_items_ty,
                 nodes,
+                &ignored_keys,
             );
         }
 
@@ -2514,6 +2518,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             &BTreeMap::new(),
             value_ty,
             nodes,
+            shadowed_keys,
         );
     }
 
