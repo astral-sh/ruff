@@ -46,7 +46,7 @@ replacement function itself as deprecated.
 
 ```py
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, overload
 from ty_extensions import TypeOf, is_equivalent_to, static_assert
 from typing_extensions import deprecated
 
@@ -58,6 +58,10 @@ def replacement() -> str:
 
 def other() -> str:
     return "other"
+
+@deprecated("deprecated replacement")
+def deprecated_replacement() -> str:
+    return "deprecated replacement"
 
 def replace_with(replacement: F) -> Callable[[Callable[..., Any]], F]:
     def decorator(_: Callable[..., Any]) -> F:
@@ -93,6 +97,10 @@ def deprecated_object_binding() -> None: ...
 @deprecated("use ReplacementClass directly")
 @replace_with(ReplacementClass)
 def deprecated_class_binding() -> None: ...
+@deprecated("overload binding")
+@overload
+@replace_with(deprecated_replacement)  # error: [deprecated] "deprecated replacement"
+def deprecated_overload_binding() -> str: ...
 
 deprecated_binding()  # error: [deprecated] "use replacement directly"
 replacement()
@@ -101,6 +109,7 @@ deprecated_union_binding  # error: [deprecated] "use replacement or other direct
 deprecated_outer_binding()  # error: [deprecated] "outer deprecation"
 deprecated_object_binding
 deprecated_class_binding  # TODO: error: [deprecated] "use ReplacementClass directly"
+deprecated_overload_binding()  # error: [deprecated] "deprecated replacement"
 
 static_assert(is_equivalent_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
 

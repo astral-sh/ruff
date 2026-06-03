@@ -8768,6 +8768,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let DefinitionKind::Function(function) = definition.kind(self.db()) else {
             return None;
         };
+        let decorator_inference = function_known_decorators(self.db(), definition);
+        if decorator_inference
+            .known_decorators()
+            .contains(FunctionDecorators::OVERLOAD)
+        {
+            return None;
+        }
+
         let function_ty = infer_definition_types(self.db(), definition).function_type(definition)?;
         if ty == Type::FunctionLiteral(function_ty) {
             return None;
@@ -8775,8 +8783,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let decorator = function.node(self.module()).decorator_list.first()?;
         let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) =
-            function_known_decorators(self.db(), definition)
-                .expression_type(&decorator.expression)?
+            decorator_inference.expression_type(&decorator.expression)?
         else {
             return None;
         };
