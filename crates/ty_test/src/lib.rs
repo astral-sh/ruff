@@ -220,7 +220,7 @@ fn run_test(
     // Create a custom typeshed `VERSIONS` file if none was provided.
     if let Some(typeshed_path) = custom_typeshed_path {
         db.files()
-            .try_add_root(db, typeshed_path, FileRootKind::LibrarySearchPath);
+            .try_add_root(db, typeshed_path, FileRootKind::SearchPath);
         if !has_custom_versions_file {
             let versions_file = typeshed_path.join("stdlib/VERSIONS");
             let contents = typeshed_files

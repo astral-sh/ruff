@@ -43,14 +43,14 @@ pub enum FileRootKind {
     Project,
 
     /// A non-project module resolution search path.
-    LibrarySearchPath,
+    SearchPath,
 }
 
 impl FileRootKind {
     const fn durability(self) -> Durability {
         match self {
             FileRootKind::Project => Durability::LOW,
-            FileRootKind::LibrarySearchPath => Durability::HIGH,
+            FileRootKind::SearchPath => Durability::HIGH,
         }
     }
 }
