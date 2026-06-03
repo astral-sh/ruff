@@ -18,13 +18,14 @@ use smallvec::{SmallVec, smallvec};
 use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
-use crate::preview::is_ruff_ignore_enabled;
+use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
+use crate::settings::types::PreviewMode;
 use crate::{Locator, Violation, warn_user_once};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -172,6 +173,8 @@ pub struct Suppressions {
 
     /// Parse errors from suppression comments
     errors: Vec<ParseError>,
+
+    preview: PreviewMode,
 }
 
 #[derive(Debug)]
@@ -257,9 +260,6 @@ impl Suppressions {
             return false;
         }
 
-        let Some(code) = diagnostic.secondary_code() else {
-            return false;
-        };
         let Some(span) = diagnostic.primary_span() else {
             return false;
         };
@@ -271,7 +271,14 @@ impl Suppressions {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
 
-            if *code != suppression_code {
+            let code_matches = diagnostic
+                .secondary_code()
+                .is_some_and(|code| *code == suppression_code);
+
+            let name_matches = is_human_readable_names_enabled(self.preview)
+                && diagnostic.name() == suppression_code;
+
+            if !code_matches && !name_matches {
                 continue;
             }
 
@@ -758,6 +765,7 @@ impl<'a> SuppressionsBuilder<'a> {
             valid: self.valid,
             invalid: self.invalid,
             errors,
+            preview: self.settings.preview,
         }
     }
 
