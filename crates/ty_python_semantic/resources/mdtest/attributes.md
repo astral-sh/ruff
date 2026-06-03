@@ -2002,6 +2002,40 @@ def _(a: A):
         reveal_type(a.desc)  # revealed: A & Mixin
 ```
 
+### Dynamic attribute fallback uses the full intersection type
+
+```py
+from typing import Literal, overload
+from ty_extensions import Intersection
+
+class B: ...
+
+class GetAttr:
+    @overload
+    def __getattr__(self: B, name: Literal["x"]) -> int: ...
+    @overload
+    def __getattr__(self, name: str) -> str: ...
+    def __getattr__(self: object, name: str) -> int | str:
+        return 1 if name == "x" else ""
+
+class GetAttribute:
+    @overload
+    def __getattribute__(self: B, name: Literal["x"]) -> int: ...
+    @overload
+    def __getattribute__(self, name: str) -> str: ...
+    def __getattribute__(self: object, name: str) -> int | str:
+        return 1 if name == "x" else ""
+
+def takes_str(value: str): ...
+def _(value: Intersection[GetAttr, B]):
+    reveal_type(value.x)  # revealed: int
+    takes_str(value.x)  # error: [invalid-argument-type]
+
+def _(value: Intersection[GetAttribute, B]):
+    reveal_type(value.x)  # revealed: int
+    takes_str(value.x)  # error: [invalid-argument-type]
+```
+
 ### Negation types
 
 Make sure that attributes accessible on `object` are also accessible on a negation type like `~P`,

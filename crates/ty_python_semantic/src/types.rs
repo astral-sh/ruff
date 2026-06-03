@@ -3819,7 +3819,7 @@ impl<'db> Type<'db> {
                     return Place::Undefined.into();
                 }
 
-                let result = self.fallback_to_getattr(db, &name, result, policy);
+                let result = self.fallback_to_getattr(db, receiver, &name, result, policy);
 
                 result.map_type(|ty| ty.bind_self_typevars(db, receiver))
             }
@@ -3879,7 +3879,7 @@ impl<'db> Type<'db> {
                 // attribute access falls back to `__getattr__`/`__getattribute__` on the
                 // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                 // lookup to hit the catch-all that only checks the meta-type (the metaclass).
-                let result = self.fallback_to_getattr(db, &name, result, policy);
+                let result = self.fallback_to_getattr(db, receiver, &name, result, policy);
 
                 // `type[Any]`/`type[Unknown]` are gradual forms with an unknown metaclass
                 // (which is at least `type`). Attributes resolved via `type`'s descriptors
@@ -5084,21 +5084,38 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        if let Type::Intersection(intersection) = self {
+        self.try_call_dunder_with_policy_and_receiver(db, None, name, argument_types, tcx, policy)
+    }
+
+    fn try_call_dunder_with_policy_and_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver: Option<Type<'db>>,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        if receiver.is_none()
+            && let Type::Intersection(intersection) = self
+        {
             return intersection.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
         }
 
-        if let Type::Union(union) = self {
+        if receiver.is_none()
+            && let Type::Union(union) = self
+        {
             return union.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies:
         match self
-            .member_lookup_with_policy(
+            .member_lookup_with_policy_and_receiver(
                 db,
                 name.into(),
                 policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                receiver,
             )
             .place
         {
@@ -5170,6 +5187,7 @@ impl<'db> Type<'db> {
     fn fallback_to_getattr(
         self,
         db: &'db dyn Db,
+        receiver: Type<'db>,
         name: &Name,
         result: PlaceAndQualifiers<'db>,
         policy: MemberLookupPolicy,
@@ -5179,11 +5197,13 @@ impl<'db> Type<'db> {
                 return Place::Undefined.into();
             }
 
-            self.try_call_dunder(
+            self.try_call_dunder_with_policy_and_receiver(
                 db,
+                Some(receiver),
                 "__getattr__",
-                CallArguments::positional([Type::string_literal(db, name)]),
+                &mut CallArguments::positional([Type::string_literal(db, name)]),
                 TypeContext::default(),
+                MemberLookupPolicy::default(),
             )
             .map(|outcome| Place::bound(outcome.return_type(db)))
             // TODO: Handle call errors here.
@@ -5198,8 +5218,9 @@ impl<'db> Type<'db> {
 
             // Skip `object.__getattribute__`, which is the default mechanism we
             // already model via the normal attribute-lookup path.
-            self.try_call_dunder_with_policy(
+            self.try_call_dunder_with_policy_and_receiver(
                 db,
+                Some(receiver),
                 "__getattribute__",
                 &mut CallArguments::positional([Type::string_literal(db, name)]),
                 TypeContext::default(),
