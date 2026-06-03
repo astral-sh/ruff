@@ -8001,31 +8001,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    fn is_unshadowed_builtin_name(&self, name: &ast::ExprName) -> bool {
-        if self.index.has_wildcard_import() {
-            return false;
-        }
-
-        let db = self.db();
-        self.index
-            .visible_ancestor_scopes(self.scope().file_scope_id(db))
-            .all(|(scope, _)| {
-                let place_table = self.index.place_table(scope);
-                place_table
-                    .symbol_id(name.id.as_str())
-                    .is_none_or(|symbol| !place_table.symbol(symbol).is_local())
-            })
-    }
-
-    fn collection_constructor_name<'expr>(&self, func: &'expr ast::Expr) -> Option<&'expr str> {
-        match func {
-            ast::Expr::Name(name) if self.is_unshadowed_builtin_name(name) => {
-                Some(name.id.as_str())
-            }
-            _ => None,
-        }
-    }
-
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -8091,7 +8066,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownClass::Dict => "dict",
                     _ => return false,
                 };
-                self.collection_constructor_name(func) == Some(name)
+                func.as_name_expr()
+                    .is_some_and(|func| func.id.as_str() == name)
             })
         } else {
             None

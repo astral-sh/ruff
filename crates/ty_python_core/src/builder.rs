@@ -188,12 +188,6 @@ impl ConditionFlowSnapshot {
     }
 }
 
-#[derive(Default)]
-struct GlobalScopeFlags {
-    has_future_annotations: bool,
-    has_wildcard_import: bool,
-}
-
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -215,8 +209,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
 
-    /// Flags about the file's global scope.
-    global_scope_flags: GlobalScopeFlags,
+    /// Flags about the file's global scope
+    has_future_annotations: bool,
     /// Whether we are currently visiting an `if TYPE_CHECKING` block.
     in_type_checking_block: bool,
 
@@ -277,7 +271,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
-            global_scope_flags: GlobalScopeFlags::default(),
+            has_future_annotations: false,
             in_type_checking_block: false,
 
             scopes: IndexVec::new(),
@@ -2511,8 +2505,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
             imported_modules: Arc::new(FrozenSet::from(self.imported_modules)),
-            has_wildcard_import: self.global_scope_flags.has_wildcard_import,
-            has_future_annotations: self.global_scope_flags.has_future_annotations,
+            has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
@@ -2825,8 +2818,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        self.global_scope_flags.has_wildcard_import = true;
-
                         let Ok(module_name) =
                             ModuleName::from_import_statement(self.db, self.file, node)
                         else {
@@ -2923,7 +2914,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // imports here, we assume the user's intent was to apply the `__future__`
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
-                    self.global_scope_flags.has_future_annotations |= !node.is_lazy
+                    self.has_future_annotations |= !node.is_lazy
                         && alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
@@ -4374,7 +4365,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
 impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
-        self.global_scope_flags.has_future_annotations
+        self.has_future_annotations
     }
 
     fn lazy_import_context(&self) -> Option<LazyImportContext> {

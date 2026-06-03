@@ -343,9 +343,6 @@ pub struct SemanticIndex<'db> {
     /// The set of modules that are imported anywhere within this file.
     imported_modules: Arc<FrozenSet<ModuleName>>,
 
-    /// Whether this file contains a valid wildcard import.
-    has_wildcard_import: bool,
-
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
@@ -404,10 +401,6 @@ impl<'db> SemanticIndex<'db> {
     /// of why this analysis is intentionally limited.
     pub fn imported_modules(&self) -> impl Iterator<Item = &ModuleName> {
         self.imported_modules.iter()
-    }
-
-    pub fn has_wildcard_import(&self) -> bool {
-        self.has_wildcard_import
     }
 
     #[track_caller]

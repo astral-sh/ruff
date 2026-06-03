@@ -806,17 +806,20 @@ reveal_type(x1_dict)  # revealed: dict[str, int]
 ```
 
 ```py
+from builtins import list
+
+imported_list = list()
+imported_list.append(1)
+reveal_type(imported_list)  # revealed: list[int]
+```
+
+```py
 class Result: ...
 
 def shadowed_constructor_semantics_are_preserved() -> None:
     list = Result
     result = list()
     reveal_type(result)  # revealed: Result
-
-def later_shadowed_constructor_is_not_refined() -> None:
-    result = list()
-    list = Result
-    reveal_type(result)  # revealed: list[Unknown]
 ```
 
 ```py

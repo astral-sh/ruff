@@ -1450,10 +1450,6 @@ If the module is unresolved, we emit a diagnostic just like for any other unreso
 ```py
 # TODO: not a great error message
 from foo import *  # error: [unresolved-import] "Cannot resolve imported module `foo`"
-
-result = list()
-result.append(1)
-reveal_type(result)  # revealed: list[Unknown]
 ```
 
 ### Nested scope
