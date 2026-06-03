@@ -8487,14 +8487,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 let collection_generic_context = collection_literal.generic_context(self.db());
 
-                let mut identity_bindings = self
+                let mut speculative_builder = self.speculate();
+                let mut identity_bindings = speculative_builder
                     .infer_attribute_load_impl(attribute, identity_instance)
                     .bindings(self.db())
                     .match_parameters(self.db(), &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(self.db(), collection_generic_context);
 
-                let call_result = self.speculate().infer_and_check_argument_types(
+                let call_result = speculative_builder.infer_and_check_argument_types(
                     ArgumentsIter::from_ast(arguments),
                     &mut call_arguments,
                     // TODO: The argument types have already been inferred and stored in `call_arguments`.

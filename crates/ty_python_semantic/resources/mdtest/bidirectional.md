@@ -849,6 +849,10 @@ def concrete_heterogeneous_constructor() -> set[str]:
     values.add(2.0)
     reveal_type(values)  # revealed: set[int | float | str]
     return values  # error: [invalid-return-type]
+
+def invalid_constructor_method():
+    values = list()
+    values.nope()  # error: [unresolved-attribute]
 ```
 
 ```py
