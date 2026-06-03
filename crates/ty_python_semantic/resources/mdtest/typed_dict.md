@@ -5949,16 +5949,23 @@ class IntPatch(TypedDict, extra_items=int):
 class StrPatch(TypedDict, extra_items=str):
     name: NotRequired[str]
 
+class OpenPatch(TypedDict): ...
+
+class MutableExtraOnly(TypedDict, extra_items=int): ...
+
 def _(
     mutable: MutableExtra,
+    mutable_extra_only: MutableExtraOnly,
     read_only: ReadOnlyExtra,
     ints: IntPatch,
     strings: StrPatch,
+    open_patch: OpenPatch,
 ) -> None:
     mutable.update(year=1982)
     mutable.update(ints)
     mutable.update(year="not an int")  # error: [invalid-argument-type]
     mutable.update(strings)  # error: [invalid-argument-type]
+    mutable_extra_only.update(open_patch)  # error: [invalid-argument-type]
 
     read_only.update(year=1982)  # error: [unknown-argument]
     read_only.update(ints)  # error: [invalid-argument-type]

@@ -529,7 +529,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
 
-            if let Some(source_extra_items) = source.openness(db).explicit_extra_items() {
+            if let Some(source_extra_items) = source.openness(db).effective_extra_items() {
                 for (target_item_name, target_item_field) in target_items {
                     if source_items.contains_key(target_item_name) {
                         continue;
