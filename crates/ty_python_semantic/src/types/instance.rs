@@ -587,7 +587,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 self.constraints,
                 !left
                     .class(db)
-                    .could_coexist_in_mro_with(db, right.class(db), self.constraints),
+                    .could_coexist_in_mro_with_disjointness_checker(db, right.class(db), self),
             )
         })
     }

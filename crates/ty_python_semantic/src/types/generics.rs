@@ -1667,17 +1667,27 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             right.types(db)
         );
 
-        types.when_all(
+        types.when_any(
             db,
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
-                // TODO: This check can lead to false negatives.
-                //
-                // For example, `Foo[int]` and `Foo[bool]` are disjoint, even though `bool` is a subtype
-                // of `int`. However, given two non-inferable type variables `T` and `U`, `Foo[T]` and
-                // `Foo[U]` should not be considered disjoint, as `T` and `U` could be specialized to the
-                // same type. We don't currently have a good typing relationship to represent this.
-                TypeVarVariance::Invariant => self.check_type_pair(db, *left_type, *right_type),
+                TypeVarVariance::Invariant => {
+                    let left_type = left_type.resolve_type_alias(db);
+                    let right_type = right_type.resolve_type_alias(db);
+
+                    // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
+                    // and `R` have any common materialization, so this is symmetric despite
+                    // using a directional subtyping checker.
+                    self.as_relation_checker(TypeRelation::Subtyping)
+                        .check_subtyping_in_invariant_position(
+                            db,
+                            left_type,
+                            MaterializationKind::Bottom,
+                            right_type,
+                            MaterializationKind::Top,
+                        )
+                        .negate(db, self.constraints)
+                }
 
                 // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
                 TypeVarVariance::Covariant => self.never(),

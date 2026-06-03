@@ -6852,6 +6852,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, typevar),
             Type::TypeForm(typeform_type) => typeform_type.variance_of(db, typevar),
             Type::KnownInstance(known_instance) => known_instance.variance_of(db, typevar),
+            Type::TypeAlias(alias) => alias.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -6867,7 +6868,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
             | Type::TypedDict(_)
-            | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
         };
 
@@ -7420,6 +7420,8 @@ enum InvalidTypeExpression<'db> {
     TypeQualifier(TypeQualifier),
     /// `typing.Self` cannot be used in `@staticmethod` definitions.
     TypingSelfInStaticMethod,
+    /// `typing.Self` cannot be used in type aliases.
+    TypingSelfInTypeAlias,
     /// `typing.Self` cannot be used in metaclass definitions.
     TypingSelfInMetaclass,
     /// Some types are always invalid in type expressions
@@ -7517,6 +7519,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::TypingSelfInStaticMethod => {
                         f.write_str("`Self` cannot be used in a static method")
+                    }
+                    InvalidTypeExpression::TypingSelfInTypeAlias => {
+                        f.write_str("`Self` cannot be used in a type alias")
                     }
                     InvalidTypeExpression::TypingSelfInMetaclass => {
                         f.write_str("`Self` cannot be used in a metaclass")
