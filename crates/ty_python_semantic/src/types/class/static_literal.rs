@@ -3046,8 +3046,23 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
                 })
             });
 
+        let extra_items_variance = TypedDictType::new(self.identity_specialization(db))
+            .explicit_extra_items(db)
+            .map(|extra_items| {
+                let polarity = if extra_items.is_read_only() {
+                    TypeVarVariance::Covariant
+                } else {
+                    TypeVarVariance::Invariant
+                };
+                extra_items
+                    .declared_ty
+                    .with_polarity(polarity)
+                    .variance_of(db, typevar)
+            });
+
         attribute_variances
             .chain(explicit_bases_variances)
+            .chain(extra_items_variance)
             .collect()
     }
 }

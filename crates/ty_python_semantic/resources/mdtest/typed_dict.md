@@ -5536,6 +5536,7 @@ python-version = "3.12"
 
 ```py
 from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import is_subtype_of, static_assert
 
 class NativeGenericExtra[T](TypedDict, extra_items=T): ...
 class NativeReadOnlyExtra[T](TypedDict, extra_items=ReadOnly[T]): ...
@@ -5543,6 +5544,11 @@ class NativeReadOnlyExtra[T](TypedDict, extra_items=ReadOnly[T]): ...
 def _(extra: NativeGenericExtra[int], read_only: NativeReadOnlyExtra[int]) -> None:
     reveal_type(extra["other"])  # revealed: int
     read_only["other"] = 1  # error: [invalid-assignment]
+
+static_assert(not is_subtype_of(NativeGenericExtra[int], NativeGenericExtra[object]))
+static_assert(not is_subtype_of(NativeGenericExtra[object], NativeGenericExtra[int]))
+static_assert(is_subtype_of(NativeReadOnlyExtra[int], NativeReadOnlyExtra[object]))
+static_assert(not is_subtype_of(NativeReadOnlyExtra[object], NativeReadOnlyExtra[int]))
 ```
 
 ### `closed=False` TypedDict cannot inherit from an `extra_items` TypedDict
