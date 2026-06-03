@@ -1041,6 +1041,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn is_bound_method_like(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::BoundMethod(_) => true,
+            Type::Callable(callable) => callable.is_function_like(db),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| element.is_bound_method_like(db)),
+            _ => false,
+        }
+    }
+
     /// Bind `Self` type variables in this type to a concrete self type.
     ///
     /// Uses MRO-based matching: a `Self` typevar is only bound if its owner class
@@ -3446,6 +3458,28 @@ impl<'db> Type<'db> {
         tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.member_lookup_with_policy_and_receiver(db, name, policy, receiver);
+        }
+
+        // Keep a partially available method bound to the constraint that provides it. Another
+        // intersection element can make the lookup total, but cannot make that method's `Self`
+        // refer to the full intersection.
+        if receiver.is_some()
+            && let Type::TypeVar(typevar) = self
+            && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                typevar.typevar(db).bound_or_constraints(db)
+        {
+            let local_member = constraints.map_with_boundness_and_qualifiers(db, |constraint| {
+                constraint.member_lookup_with_policy(db, name.clone(), policy)
+            });
+            if let Place::Defined(DefinedPlace {
+                ty,
+                definedness: Definedness::PossiblyUndefined,
+                ..
+            }) = local_member.place
+                && ty.is_bound_method_like(db)
+            {
+                return local_member;
+            }
         }
 
         if name == "__class__" {

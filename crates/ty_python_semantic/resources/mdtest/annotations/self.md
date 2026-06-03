@@ -409,6 +409,23 @@ def _(value: Intersection[T, Extra]):
     # error: [possibly-missing-attribute]
     value.copy()
 
+class HasGet:
+    def get(self) -> Self:
+        return self
+
+class NoGet: ...
+
+class GetFallback:
+    def get(self) -> object:
+        return object()
+
+U = TypeVar("U", HasGet, NoGet)
+
+def takes_get_fallback(value: GetFallback): ...
+def _(value: Intersection[U, GetFallback]):
+    # error: [invalid-argument-type]
+    takes_get_fallback(value.get())
+
 class GenericDefaults:
     def choose[T = Self](self) -> T:
         raise NotImplementedError
