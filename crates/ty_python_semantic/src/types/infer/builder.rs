@@ -22,10 +22,10 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion, ScopeInference,
-    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    DefinitionInference, DefinitionInferenceExtra, DefinitionTypes, ExpressionInference,
+    ExpressionInferenceExtra, FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion,
+    ScopeInference, ScopeInferenceExtra, infer_deferred_types, infer_definition_types,
+    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -10476,8 +10476,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
-            bindings: bindings.into_boxed_slice(),
-            declarations: declarations.into_boxed_slice(),
+            types: DefinitionTypes::from_parts(bindings.into_vec(), declarations.into_vec()),
             extra,
         }
     }
@@ -10913,6 +10912,10 @@ impl<K, V> VecMap<K, V> {
 
     fn into_boxed_slice(self) -> Box<[(K, V)]> {
         self.0.into_boxed_slice()
+    }
+
+    fn into_vec(self) -> Vec<(K, V)> {
+        self.0
     }
 }
 
