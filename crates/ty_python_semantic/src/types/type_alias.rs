@@ -361,7 +361,7 @@ fn contains_type_alias_definition<'db>(
     })
 }
 
-fn type_alias_from_type<'db>(ty: Type<'db>) -> Option<TypeAliasType<'db>> {
+fn type_alias_from_type(ty: Type<'_>) -> Option<TypeAliasType<'_>> {
     match ty {
         Type::TypeAlias(alias) => Some(alias),
         Type::KnownInstance(crate::types::KnownInstanceType::TypeAliasType(alias)) => Some(alias),
@@ -405,8 +405,11 @@ fn variance_of_type_ignoring_alias<'db>(
             .signatures(db)
             .iter()
             .map(|signature| {
-                let parameter_variances = signature.parameters().iter().filter_map(|parameter| {
-                    (parameter.form == ParameterForm::Value).then(|| {
+                let parameter_variances = signature
+                    .parameters()
+                    .iter()
+                    .filter(|parameter| parameter.form == ParameterForm::Value)
+                    .map(|parameter| {
                         variance_of_type_ignoring_alias(
                             db,
                             parameter.annotated_type(),
@@ -414,8 +417,7 @@ fn variance_of_type_ignoring_alias<'db>(
                             definition,
                             polarity.compose(TypeVarVariance::Contravariant),
                         )
-                    })
-                });
+                    });
 
                 parameter_variances
                     .chain(std::iter::once(variance_of_type_ignoring_alias(
