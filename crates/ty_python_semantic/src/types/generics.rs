@@ -2722,6 +2722,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.infer_map_impl(positive, actual, polarity, seen)?;
                 }
             }
+            (Type::SubclassOf(formal_subclass_of), Type::Intersection(actual_intersection))
+                if let Some(formal_typevar) = formal_subclass_of.into_type_var()
+                    && let Some(actual_instance) = actual_intersection.to_instance(self.db) =>
+            {
+                let formal_instance = Type::TypeVar(formal_typevar);
+                return self.infer_map_impl(formal_instance, actual_instance, polarity, seen);
+            }
             (_, Type::Intersection(actual_intersection)) => {
                 // Try to infer type mappings by checking against each intersection element. This
                 // is the dual of the `union_formal` arm above, and it handles cases like:

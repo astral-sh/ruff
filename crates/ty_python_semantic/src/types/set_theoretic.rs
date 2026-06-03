@@ -795,6 +795,23 @@ impl<'db> IntersectionType<'db> {
         }
     }
 
+    /// Returns the intersection of instance types contributed by class-like positive elements.
+    ///
+    /// Other elements constrain the class object itself, not the instances it constructs.
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let mut builder = IntersectionBuilder::new(db);
+        let mut found_instance = false;
+
+        for element in self.positive(db) {
+            if let Some(instance) = element.to_instance(db) {
+                builder = builder.add_positive(instance);
+                found_instance = true;
+            }
+        }
+
+        found_instance.then(|| builder.build())
+    }
+
     /// Map a type transformation over all positive elements of the intersection. Leave the
     /// negative elements unchanged.
     pub(crate) fn map_positive(

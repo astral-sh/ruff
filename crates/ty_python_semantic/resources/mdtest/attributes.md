@@ -1838,6 +1838,54 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
+### Method binding uses the full intersection type
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class A:
+    def method(self) -> Self:
+        return self
+
+    @classmethod
+    def classmethod(cls) -> Self:
+        return cls()
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.method())  # revealed: A & B
+
+def _(a_and_b: Intersection[type[A], type[B]]):
+    reveal_type(a_and_b.classmethod())  # revealed: A & B
+```
+
+### Descriptor binding uses the full intersection type
+
+```py
+from typing import Any, TypeVar, overload
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Descriptor:
+    @overload
+    def __get__(self, instance: None, owner: type, /) -> Self: ...
+    @overload
+    def __get__(self, instance: T, owner: type | None = None, /) -> T: ...
+    def __get__(self, instance: object, owner: type | None = None, /) -> Any: ...
+
+class A:
+    desc = Descriptor()
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.desc)  # revealed: A & B
+```
+
 ### Negation types
 
 Make sure that attributes accessible on `object` are also accessible on a negation type like `~P`,
