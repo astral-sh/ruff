@@ -260,7 +260,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -295,6 +296,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => false,
@@ -666,9 +668,11 @@ enum ProtocolMemberSourceKey<'db> {
 
 impl<'db> ProtocolMemberSourceKey<'db> {
     fn from_type_member(db: &'db dyn Db, source: Type<'db>, member_name: &str) -> Self {
-        ClassMemberKey::from_type_member(db, source, member_name)
-            .map(Self::ClassMember)
-            .or_else(|| source_type_alias_key(db, source, member_name).map(Self::TypeAlias))
+        source_type_alias_key(db, source, member_name)
+            .map(Self::TypeAlias)
+            .or_else(|| {
+                ClassMemberKey::from_type_member(db, source, member_name).map(Self::ClassMember)
+            })
             .unwrap_or(Self::Type(source))
     }
 
@@ -796,11 +800,11 @@ impl<'db> ProtocolMemberRelationKey<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct ProtocolMemberDisjointnessKey<'db> {
     left: ClassMemberKey<'db>,
-    right: ClassMemberKey<'db>,
+    right: ProtocolMemberSourceKey<'db>,
 }
 
 impl<'db> ProtocolMemberDisjointnessKey<'db> {
-    fn new(left: ClassMemberKey<'db>, right: ClassMemberKey<'db>) -> Self {
+    fn new(left: ClassMemberKey<'db>, right: ProtocolMemberSourceKey<'db>) -> Self {
         Self { left, right }
     }
 
@@ -852,7 +856,7 @@ impl<'db> ProtocolMemberVisitors<'db> {
         &self,
         db: &'db dyn Db,
         left: ClassMemberKey<'db>,
-        right: ClassMemberKey<'db>,
+        right: ProtocolMemberSourceKey<'db>,
         on_cycle: impl FnOnce() -> ConstraintSet<'db, 'c>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
@@ -1015,6 +1019,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let result = f();
         self.context_tree.set_enabled(was_enabled);
         result
+    }
+
+    fn should_provide_callable_upcast_context(&self, source: Type<'db>) -> bool {
+        if !self.is_context_collection_enabled() {
+            return false;
+        }
+
+        // These displays already expose the signature being compared; wrapping them would
+        // duplicate the lower-level callable mismatch context.
+        !matches!(
+            source,
+            Type::Callable(_)
+                | Type::FunctionLiteral(_)
+                | Type::BoundMethod(_)
+                | Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+        )
     }
 
     fn with_recursion_guard(
@@ -1243,6 +1263,66 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         UnionType::from_elements(db, union.elements(db).iter().copied()),
                     )
                 })
+            }
+
+            (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
+                .with_recursion_guard(source, target, || {
+                    self.check_type_pair(
+                        db,
+                        source_typeform.type_argument(db),
+                        target_typeform.type_argument(db),
+                    )
+                }),
+
+            (Type::SubclassOf(source_subclass), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    source_subclass.to_instance(db),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::NominalInstance(source_instance), Type::TypeForm(target_typeform))
+                if source_instance.has_known_class(db, KnownClass::Type) =>
+            {
+                self.check_type_pair(db, Type::object(), target_typeform.type_argument(db))
+            }
+
+            (Type::ClassLiteral(source_class), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    Type::instance(db, source_class.default_specialization(db)),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::GenericAlias(source_alias), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    Type::instance(db, ClassType::Generic(source_alias)),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
+                if source_instance.is_type_form_value() =>
+            {
+                source_instance.type_form_argument(db).when_some_and(
+                    db,
+                    self.constraints,
+                    |source_argument| {
+                        self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
+                    },
+                )
+            }
+
+            (Type::SpecialForm(source_form), Type::TypeForm(target_typeform)) => source_form
+                .type_form_argument(db)
+                .when_some_and(db, self.constraints, |source_argument| {
+                    self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
+                }),
+
+            (Type::GenericAlias(_), Type::NominalInstance(target_instance))
+                if target_instance.has_known_class(db, KnownClass::GenericAlias) =>
+            {
+                self.always()
             }
 
             (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
@@ -1870,11 +1950,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(source, target, || {
-                    source
+                    let Some(callables) = source
                         .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
-                        .when_some_and(db, self.constraints, |callables| {
-                            self.check_callables_vs_callable(db, &callables, target_callable)
-                        })
+                    else {
+                        return self.never();
+                    };
+
+                    let result = self.check_callables_vs_callable(db, &callables, target_callable);
+
+                    if self.should_provide_callable_upcast_context(source)
+                        && result.is_never_satisfied(db)
+                    {
+                        self.provide_context(|| ErrorContext::InferredCallableType {
+                            source,
+                            callable: callables.into_type(db),
+                        });
+                    }
+
+                    result
                 })
             }
 
@@ -2204,6 +2297,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 target,
             ),
 
+            (Type::TypeForm(_), _) => self.check_type_pair(db, Type::object(), target),
+
             // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
             // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
             // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
@@ -2458,7 +2553,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         protocol: ClassMemberKey<'db>,
-        other: ClassMemberKey<'db>,
+        other: ProtocolMemberSourceKey<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         self.protocol_member_visitors
@@ -2469,13 +2564,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         protocol_key: Option<ClassMemberKey<'db>>,
-        other_key: Option<ClassMemberKey<'db>>,
+        other: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let check_member = || self.protocol_member_has_disjoint_type_from_ty(db, member, ty);
-        if let (Some(protocol_key), Some(other_key)) = (protocol_key, other_key) {
-            self.with_protocol_member_disjointness_guard(db, protocol_key, other_key, check_member)
+        if let Some(protocol_key) = protocol_key {
+            self.with_protocol_member_disjointness_guard(
+                db,
+                protocol_key,
+                ProtocolMemberSourceKey::from_type_member(db, other, member.name()),
+                check_member,
+            )
         } else {
             check_member()
         }
@@ -2496,7 +2596,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     Type::ProtocolInstance(protocol),
                     member.name(),
                 );
-                let other_key = ClassMemberKey::from_type_member(db, other, member.name());
                 other
                     .member(db, member.name())
                     .place
@@ -2505,7 +2604,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         self.protocol_member_has_disjoint_type_from_ty_with_guard(
                             db,
                             protocol_key,
-                            other_key,
+                            other,
                             &member,
                             attribute_type,
                         )
@@ -2904,15 +3003,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                 Type::ProtocolInstance(protocol),
                                 member.name(),
                             );
-                            let other_key =
-                                ClassMemberKey::from_type_member(db, other, member.name());
                             match other.member(db, member.name()).place {
                                 Place::Defined(DefinedPlace {
                                     ty: attribute_type, ..
                                 }) => self.protocol_member_has_disjoint_type_from_ty_with_guard(
                                     db,
                                     protocol_key,
-                                    other_key,
+                                    other,
                                     &member,
                                     attribute_type,
                                 ),
@@ -2956,10 +3053,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
+                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
                             db,
                             ClassType::NonGeneric(class_b),
-                            self.constraints,
+                            self,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
@@ -2972,10 +3069,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
+                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
                             db,
                             ClassType::Generic(alias_b),
-                            self.constraints,
+                            self,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
@@ -3236,6 +3333,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 self.check_type_pair(db, KnownClass::Super.to_instance(db), other)
             }
+
+            (Type::TypeForm(_), _) | (_, Type::TypeForm(_)) => self.never(),
 
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
 

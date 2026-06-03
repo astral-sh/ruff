@@ -704,7 +704,20 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
     // def test_foo(x):
     //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
     // ```
-    let argvalues_edits = unpack_single_element_items(checker, argvalues);
+    //
+    // In some cases, it's not possible to unpack all `argvalues`:
+    //
+    // ```python
+    // @pytest.mark.parametrize(("x",), [(1,), variable])
+    // def test_foo(x):
+    //     assert isinstance(x, int)
+    //
+    // In this case, it is left unchanged.
+    // ```
+    let Some(argvalues_edits) = unpack_single_element_items(checker, argvalues) else {
+        return;
+    };
+
     let argnames_edit =
         Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
     let fix = if checker.comment_ranges().intersects(argnames_edit.range())
@@ -721,10 +734,13 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
 
 /// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
 /// For instance, `[(1,) (2,)]` will be transformed into `[1, 2]`.
-fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
+///
+/// If the elements of `expr` are not literal lists or tuples, `None` is returned to avoid changing
+/// behavior.
+fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Option<Vec<Edit>> {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
     else {
-        return vec![];
+        return None;
     };
 
     let mut edits = Vec::with_capacity(elts.len());
@@ -732,15 +748,15 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
         let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
             value
         else {
-            return vec![];
+            return None;
         };
 
         let [elt] = elts.as_slice() else {
-            return vec![];
+            return None;
         };
 
         if matches!(elt, Expr::Starred(_)) {
-            return vec![];
+            return None;
         }
 
         edits.push(Edit::range_replacement(
@@ -748,7 +764,7 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
             value.range(),
         ));
     }
-    edits
+    Some(edits)
 }
 
 fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {

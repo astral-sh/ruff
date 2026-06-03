@@ -41,8 +41,8 @@ use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, UnionType,
+    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
+    SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -1403,6 +1403,38 @@ impl<'db> InnerIntersectionBuilder<'db> {
             return;
         }
 
+        // A runtime class value of `TypeForm[T]` has type `type[T]`.
+        match new_positive {
+            Type::TypeForm(typeform) => {
+                if let Some(narrowed) = SubclassOfType::try_from_instance(
+                    db,
+                    typeform.type_argument(db).resolve_type_alias(db),
+                ) && self.positive.swap_remove(&KnownClass::Type.to_instance(db))
+                {
+                    new_positive = narrowed;
+                }
+            }
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                if let Some((index, narrowed)) =
+                    self.positive
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, positive)| match positive {
+                            Type::TypeForm(typeform) => SubclassOfType::try_from_instance(
+                                db,
+                                typeform.type_argument(db).resolve_type_alias(db),
+                            )
+                            .map(|narrowed| (index, narrowed)),
+                            _ => None,
+                        })
+                {
+                    self.positive.swap_remove_index(index);
+                    new_positive = narrowed;
+                }
+            }
+            _ => {}
+        }
+
         match new_positive {
             // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::literal_string()) => {
@@ -1639,7 +1671,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                                 existing_enum.enum_class(db) == new_enum.enum_class(db)
                             })
                     {
-                        if existing_negative == &new_negative {
+                        if existing_negative.as_enum_literal() == Some(new_enum) {
                             return;
                         }
                         continue;
@@ -1663,7 +1695,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         if let Some(existing_enum) = existing_positive.as_enum_literal()
                             && existing_enum.enum_class(db) == new_enum.enum_class(db)
                         {
-                            if existing_positive == &new_negative {
+                            if existing_enum == new_enum {
                                 *self = Self::default();
                                 self.positive.insert(Type::Never);
                             }

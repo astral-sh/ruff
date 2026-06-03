@@ -42,6 +42,27 @@ class Identity:
 reveal_type(Identity()[0])  # revealed: int
 ```
 
+## Slice bounds for user-defined `__getitem__`
+
+```py
+class IntegerSlices:
+    def __getitem__(self, key: slice[int | None, int | None, int | None]) -> str:
+        return ""
+
+class ArbitrarySlices:
+    def __getitem__(self, key: slice) -> str:
+        return ""
+
+def _(
+    integer_slices: IntegerSlices,
+    arbitrary_slices: ArbitrarySlices,
+    bound: object,
+    invalid_bound: float,
+) -> None:
+    integer_slices[invalid_bound:]  # error: [invalid-argument-type]
+    arbitrary_slices[bound:bound:bound]
+```
+
 ## `__getitem__` union
 
 ```py

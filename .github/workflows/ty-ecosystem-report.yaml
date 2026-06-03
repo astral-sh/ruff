@@ -20,6 +20,7 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+  ECOSYSTEM_ANALYZER_COMMIT: 745435446f068540fe5f73e34aa5dd15418d0f3c
 
 jobs:
   ty-ecosystem-report:
@@ -35,7 +36,7 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-          version: "0.11.15"
+          version: "0.11.18"
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -57,7 +58,7 @@ jobs:
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@88eb3e1ceaf6a573a5b21155a40b15b3d54b6a6c"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
           ecosystem-analyzer \
             --verbose \
@@ -65,7 +66,6 @@ jobs:
             --flaky-runs 20 \
             analyze \
             --profile=profiling \
-            --projects crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
           mkdir dist

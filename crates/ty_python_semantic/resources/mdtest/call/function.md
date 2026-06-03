@@ -89,6 +89,57 @@ def get_int[T]() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Generic callable chains
+
+Inferring a chain of generic callable parameters should discard internal typevar artifacts from
+transitive constraints instead of expanding them recursively.
+
+```py
+from typing import Callable, TypeVar
+
+_A = TypeVar("_A")
+_B = TypeVar("_B")
+_C = TypeVar("_C")
+_D = TypeVar("_D")
+_E = TypeVar("_E")
+_F = TypeVar("_F")
+_G = TypeVar("_G")
+_H = TypeVar("_H")
+
+def compose(
+    fn1: Callable[[_A], _B],
+    fn2: Callable[[_B], _C],
+    fn3: Callable[[_C], _D],
+    fn4: Callable[[_D], _E],
+    fn5: Callable[[_E], _F],
+    fn6: Callable[[_F], _G],
+    fn7: Callable[[_G], _H],
+) -> Callable[[_A], _H]:
+    raise NotImplementedError
+
+Func = Callable[[int], int]
+fn: Func = lambda x: x + 42
+
+cn = compose(fn, fn, fn, fn, fn, fn, fn)
+reveal_type(cn)  # revealed: (int, /) -> int
+```
+
+## Recursive callable constraints in constructors
+
+When inferring the generic constructor for `map`, an overloaded callable together with a gradual
+iterable can produce expanding recursive constraints. We should fall back rather than repeatedly
+substituting those constraints.
+
+```py
+import operator
+from typing import Any
+
+ints: list[int] = []
+dynamic: Any = []
+
+reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
+```
+
 ## Decorated
 
 ```py

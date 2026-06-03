@@ -3,7 +3,6 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
@@ -31,7 +30,7 @@ use crate::types::{
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
     class::ClassMemberKey,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 use ty_python_core::definition::Definition;
 
@@ -483,16 +482,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
-        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
-        // out assignability). We don't want generators with different return types to be
-        // assignable to each other. In this case we use the result of the nominal check above.
+        // `Generator` special case: compare the type parameters nominally. Prior to 3.13, its
+        // return type does not appear non-recursively in the protocol; from 3.13 onward,
+        // structurally inferring through `close() -> ReturnT | None` can spuriously infer `None`.
+        // TODO: Remove the Python 3.13+ extension of this special case once
+        // https://github.com/astral-sh/ty/issues/3596 is fixed.
         if let Some(source_protocol) = ty.as_protocol_instance()
             && let Protocol::FromClass(source_class) = source_protocol.inner
             && let Protocol::FromClass(proto_class) = protocol.inner
             && source_class.is_known(db, KnownClass::Generator)
             && proto_class.is_known(db, KnownClass::Generator)
-            && Program::get(db).python_version(db) < PythonVersion::PY313
         {
             return result;
         }
@@ -589,7 +588,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 self.constraints,
                 !left
                     .class(db)
-                    .could_coexist_in_mro_with(db, right.class(db), self.constraints),
+                    .could_coexist_in_mro_with_disjointness_checker(db, right.class(db), self),
             )
         })
     }

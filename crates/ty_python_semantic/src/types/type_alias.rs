@@ -3,10 +3,12 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        ApplyTypeMappingVisitor, GenericContext, Type, TypeContext, TypeMapping,
-        definition_expression_type,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
+        TypeMapping, TypeVarVariance, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, RecursiveSpecializationRelation, Specialization},
+        signatures::ParameterForm,
+        variance::VarianceInferable,
         visitor,
     },
 };
@@ -323,6 +325,110 @@ impl<'db> TypeAliasType<'db> {
     /// Returns a struct that can display the fully qualified name of this type alias.
     pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
         QualifiedTypeAliasName::from_type_alias(db, self)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
+    #[salsa::tracked(
+        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let definition = self.definition(db);
+        let raw_value_type = self.raw_value_type(db);
+        if contains_type_alias_definition(db, raw_value_type, definition) {
+            return variance_of_type_ignoring_alias(
+                db,
+                raw_value_type,
+                typevar,
+                definition,
+                TypeVarVariance::Covariant,
+            );
+        }
+
+        self.value_type(db).variance_of(db, typevar)
+    }
+}
+
+fn contains_type_alias_definition<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    definition: Definition<'db>,
+) -> bool {
+    visitor::any_over_type(db, ty, false, |ty| {
+        type_alias_from_type(ty).is_some_and(|alias| alias.definition(db) == definition)
+    })
+}
+
+fn type_alias_from_type<'db>(ty: Type<'db>) -> Option<TypeAliasType<'db>> {
+    match ty {
+        Type::TypeAlias(alias) => Some(alias),
+        Type::KnownInstance(crate::types::KnownInstanceType::TypeAliasType(alias)) => Some(alias),
+        _ => None,
+    }
+}
+
+fn variance_of_type_ignoring_alias<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    typevar: BoundTypeVarInstance<'db>,
+    definition: Definition<'db>,
+    polarity: TypeVarVariance,
+) -> TypeVarVariance {
+    if !contains_type_alias_definition(db, ty, definition) {
+        return ty.with_polarity(polarity).variance_of(db, typevar);
+    }
+
+    match ty {
+        Type::TypeAlias(alias) if alias.definition(db) == definition => TypeVarVariance::Bivariant,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .map(|ty| variance_of_type_ignoring_alias(db, *ty, typevar, definition, polarity))
+            .collect(),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .map(|ty| variance_of_type_ignoring_alias(db, *ty, typevar, definition, polarity))
+            .chain(intersection.negative(db).iter().map(|ty| {
+                variance_of_type_ignoring_alias(
+                    db,
+                    *ty,
+                    typevar,
+                    definition,
+                    polarity.compose(TypeVarVariance::Contravariant),
+                )
+            }))
+            .collect(),
+        Type::Callable(callable) => callable
+            .signatures(db)
+            .iter()
+            .map(|signature| {
+                let parameter_variances = signature.parameters().iter().filter_map(|parameter| {
+                    (parameter.form == ParameterForm::Value).then(|| {
+                        variance_of_type_ignoring_alias(
+                            db,
+                            parameter.annotated_type(),
+                            typevar,
+                            definition,
+                            polarity.compose(TypeVarVariance::Contravariant),
+                        )
+                    })
+                });
+
+                parameter_variances
+                    .chain(std::iter::once(variance_of_type_ignoring_alias(
+                        db,
+                        signature.return_ty,
+                        typevar,
+                        definition,
+                        polarity,
+                    )))
+                    .collect::<TypeVarVariance>()
+            })
+            .collect(),
+        _ => TypeVarVariance::Bivariant,
     }
 }
 

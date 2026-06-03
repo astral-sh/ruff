@@ -29,6 +29,7 @@ pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_RE
 pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
     infer_expression_type, infer_expression_types, infer_scope_types,
+    is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -585,6 +586,17 @@ macro_rules! todo_type {
 pub use crate::types::definition::TypeDefinition;
 pub(crate) use todo_type;
 
+/// The role a function definition plays in a property's descriptor protocol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PropertyAccessorRole {
+    /// `@property def x(self)` — runs on read.
+    Getter,
+    /// `@x.setter def x(self, value)` — runs on write.
+    Setter,
+    /// `@x.deleter def x(self)` — runs on `del`.
+    Deleter,
+}
+
 /// Represents an instance of `builtins.property`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
@@ -613,6 +625,37 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for PropertyInstanceType<'_> {}
 
 impl<'db> PropertyInstanceType<'db> {
+    /// Returns the [`PropertyAccessorRole`] that `def` plays in this property, or `None` when
+    /// `def` is not one of this property's accessors.
+    ///
+    /// Each accessor slot is a function-literal `Type`; an accessor may be overloaded, so a
+    /// definition is matched against every overload signature and the implementation, not just
+    /// the implementation's definition.
+    pub fn accessor_role(
+        self,
+        db: &'db dyn Db,
+        def: Definition<'db>,
+    ) -> Option<PropertyAccessorRole> {
+        let slot_matches = |accessor: Option<Type<'db>>| -> bool {
+            accessor
+                .and_then(Type::as_function_literal)
+                .into_iter()
+                .flat_map(|function| function.iter_overloads_and_implementation(db))
+                .filter_map(|overload| overload.signature(db).definition())
+                .any(|accessor_def| accessor_def == def)
+        };
+
+        if slot_matches(self.getter(db)) {
+            Some(PropertyAccessorRole::Getter)
+        } else if slot_matches(self.setter(db)) {
+            Some(PropertyAccessorRole::Setter)
+        } else if slot_matches(self.deleter(db)) {
+            Some(PropertyAccessorRole::Deleter)
+        } else {
+            None
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -784,6 +827,24 @@ impl<'db> DataclassParams<'db> {
             params.field_specifiers(db),
         )
     }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let field_specifiers = self
+            .field_specifiers(db)
+            .iter()
+            .map(|ty| {
+                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                if nested { ty } else { Some(ty.unwrap_or(div)) }
+            })
+            .collect::<Option<Box<_>>>()?;
+
+        Some(Self::new(db, self.flags(db), field_specifiers))
+    }
 }
 
 /// Representation of a type: a set of possible values at runtime.
@@ -880,6 +941,8 @@ pub enum Type<'db> {
     TypeIs(TypeIsType<'db>),
     /// A subtype of `bool` that allows narrowing in only the positive case.
     TypeGuard(TypeGuardType<'db>),
+    /// The set of type-form objects that represent a type assignable to the argument.
+    TypeForm(TypeFormType<'db>),
     /// A type that represents an inhabitant of a `TypedDict`.
     TypedDict(TypedDictType<'db>),
     /// An aliased type (lazily not-yet-unpacked to its value type).
@@ -1743,6 +1806,7 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypeVar(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_)
@@ -1796,7 +1860,8 @@ impl<'db> Type<'db> {
             | Type::Dynamic(_)
             | Type::TypeVar(_)
             | Type::TypeAlias(_)
-            | Type::SubclassOf(_)=> true,
+            | Type::SubclassOf(_) => true,
+            Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
@@ -1841,6 +1906,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::ModuleLiteral(_)
@@ -2068,6 +2134,9 @@ impl<'db> Type<'db> {
             Type::GenericAlias(generic) => generic
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::GenericAlias),
+            Type::ClassLiteral(class) => class
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::ClassLiteral),
             Type::SubclassOf(subclass_of) => subclass_of
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::SubclassOf),
@@ -2081,6 +2150,10 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => {
                 recursive_type_normalize_type_guard_like(db, type_guard, div, nested)
             }
+            Type::TypeForm(typeform) => typeform
+                .type_argument(db)
+                .recursive_type_normalized_impl(db, div, true)
+                .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
@@ -2098,7 +2171,6 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
             | Type::LiteralValue(_) => Some(self),
         }
@@ -2300,6 +2372,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
+            Type::TypeForm(_) => false,
             Type::TypedDict(_) => false,
             Type::TypeAlias(alias) => alias.value_type(db).is_singleton(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
@@ -2374,6 +2447,7 @@ impl<'db> Type<'db> {
 
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
+            Type::TypeForm(_) => false,
 
             Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
 
@@ -2530,6 +2604,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::EnumComplement(_)
             | Type::NewTypeInstance(_) => None,
@@ -2576,6 +2651,10 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
+        if let Some(fallback) = self.materialized_divergent_fallback() {
+            return fallback.class_member_with_policy(db, name, policy);
+        }
+
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
@@ -2609,12 +2688,71 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
+                .to_meta_type(db)
+                .class_object_member(db, name.as_str(), policy),
+
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
+        }
+    }
+
+    /// Look up attributes stored in the namespace of a class object.
+    ///
+    /// Besides attributes present in the class MRO, this includes attributes assigned to
+    /// instances of its metaclass. For example, `cls.x = ...` in `Meta.__init__` stores `x`
+    /// on each class object constructed by `Meta`.
+    fn class_object_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let class_attr = self.find_name_in_mro_with_policy(db, name, policy).expect(
+            "Calling `class_object_member` on class literals and subclass-of types should always find an MRO",
+        );
+
+        let own_class = match self {
+            Type::SubclassOf(subclass_of) => subclass_of.subclass_of().into_class(db),
+            _ => self.to_class_type(db),
+        };
+        let own_class_attr = own_class.map(|class| class.own_class_member(db, None, name).inner);
+
+        // A definitely-declared attribute in this class's own namespace is the contract for
+        // values populated by metaclass initialization, analogous to a declared instance
+        // attribute initialized in `__init__`. An inherited declaration does not mask a value
+        // that the metaclass stores directly on the newly constructed subclass.
+        let own_declaration_definedness = match own_class_attr {
+            Some(PlaceAndQualifiers {
+                place:
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Declared,
+                        definedness,
+                        ..
+                    }),
+                ..
+            }) => Some(definedness),
+            _ => None,
+        };
+        if own_declaration_definedness == Some(Definedness::AlwaysDefined) {
+            return class_attr;
+        }
+
+        let Some(metaclass_instance) = self.to_meta_type(db).to_instance(db) else {
+            return class_attr;
+        };
+        let metaclass_attr = metaclass_instance.instance_member(db, name);
+
+        if own_declaration_definedness.is_some() {
+            // A conditionally-declared attribute is a contract only on paths where that
+            // declaration is present; the metaclass value is the fallback on other paths.
+            class_attr.or_fall_back_to(db, || metaclass_attr)
+        } else {
+            metaclass_attr.or_fall_back_to(db, || class_attr)
         }
     }
 
@@ -2702,7 +2840,9 @@ impl<'db> Type<'db> {
 
             Type::LiteralValue(literal) => literal.fallback_instance(db).instance_member(db, name),
 
-            Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object().instance_member(db, name),
+            Type::AlwaysTruthy | Type::AlwaysFalsy | Type::TypeForm(_) => {
+                Type::object().instance_member(db, name)
+            }
             Type::ModuleLiteral(_) => KnownClass::ModuleType
                 .to_instance(db)
                 .instance_member(db, name),
@@ -3319,6 +3459,14 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "with_detailed_display" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
+                ))
+                .into()
+            }
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
@@ -3572,6 +3720,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(..)
             | Type::TypeGuard(..)
+            | Type::TypeForm(..)
             | Type::TypedDict(_) => {
                 // Enum members can be accessed through enum instances and other enum members,
                 // e.g. `answer.YES` or `Answer.YES.NO`.
@@ -3630,9 +3779,7 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
-                    "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
-                );
+                let class_attr_plain = self.class_object_member(db, name_str, policy);
 
                 let self_instance = self
                     .to_instance(db)
@@ -3882,46 +4029,6 @@ impl<'db> Type<'db> {
             .into(),
 
             Type::FunctionLiteral(function_type) => match function_type.known(db) {
-                Some(
-                    KnownFunction::IsEquivalentTo
-                    | KnownFunction::IsAssignableTo
-                    | KnownFunction::IsSubtypeOf
-                    | KnownFunction::IsDisjointFrom,
-                ) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_only(Some(Name::new_static("a")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                                Parameter::positional_only(Some(Name::new_static("b")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
-                            ],
-                        ),
-                        KnownClass::ConstraintSet.to_instance(db),
-                    ),
-                )
-                .into(),
-
-                Some(KnownFunction::IsSingleton | KnownFunction::IsSingleValued) => {
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new(
-                                db,
-                                [Parameter::positional_only(Some(Name::new_static("a")))
-                                    .type_form()
-                                    .with_annotated_type(Type::any())],
-                            ),
-                            KnownClass::Bool.to_instance(db),
-                        ),
-                    )
-                    .into()
-                }
-
                 Some(KnownFunction::AssertType) => {
                     let val_ty = BoundTypeVarInstance::synthetic(
                         db,
@@ -4231,6 +4338,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
         }
     }
@@ -5305,6 +5413,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::EnumComplement(_)
             | Type::NewTypeInstance(_) => None,
@@ -5360,6 +5469,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                     *self, scope_id
@@ -5560,6 +5670,7 @@ impl<'db> Type<'db> {
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
+            Type::TypeForm(_) => Type::object().to_meta_type(db),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db),
                 LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db),
@@ -5904,6 +6015,15 @@ impl<'db> Type<'db> {
                 )
             }),
 
+            Type::TypeForm(typeform) => visitor.visit(db, self, type_mapping, || {
+                TypeFormType::from_type_expression(
+                    db,
+                    typeform
+                        .type_argument(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
+
             Type::TypeAlias(alias) => {
                 match type_mapping {
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
@@ -5957,7 +6077,16 @@ impl<'db> Type<'db> {
 
                         // If the type mapping does not result in any change to this type alias, keep the
                         // alias node instead of eagerly expanding it.
-                        if alias.value_type(db) == mapped {
+                        let contains_recursive_alias = any_over_type(db, mapped, false, |ty| {
+                            match ty {
+                                Type::TypeAlias(nested)
+                                | Type::KnownInstance(KnownInstanceType::TypeAliasType(nested)) => {
+                                    nested.definition(db) == alias.definition(db)
+                                }
+                                _ => false,
+                            }
+                        });
+                        if !contains_recursive_alias && alias.value_type(db) == mapped {
                             self
                         } else {
                             mapped
@@ -6019,6 +6148,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6185,6 +6315,15 @@ impl<'db> Type<'db> {
                 );
             }
 
+            Type::TypeForm(typeform) => {
+                typeform.type_argument(db).find_legacy_typevars_impl(
+                    db,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+            }
+
             Type::TypeAlias(alias) => {
                 visitor.visit_type(db, self, || {
                     alias.value_type(db).find_legacy_typevars_impl(
@@ -6257,7 +6396,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6497,7 +6637,8 @@ impl<'db> Type<'db> {
             )
             | Self::Callable(_)
             | Self::TypeIs(_)
-            | Self::TypeGuard(_) => None,
+            | Self::TypeGuard(_)
+            | Self::TypeForm(_) => None,
         }
     }
 
@@ -6792,7 +6933,9 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
             Type::TypeIs(type_is_type) => type_is_type.variance_of(db, typevar),
             Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, typevar),
+            Type::TypeForm(typeform_type) => typeform_type.variance_of(db, typevar),
             Type::KnownInstance(known_instance) => known_instance.variance_of(db, typevar),
+            Type::TypeAlias(alias) => alias.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -6808,7 +6951,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
             | Type::TypedDict(_)
-            | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
         };
 
@@ -6861,7 +7003,7 @@ fn self_typevar_owner_class_literal<'db>(
 fn class_mro_literals<'db>(
     db: &'db dyn Db,
     class_literal: ClassLiteral<'db>,
-) -> Vec<ClassLiteral<'db>> {
+) -> Box<[ClassLiteral<'db>]> {
     class_literal
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
@@ -7361,6 +7503,8 @@ enum InvalidTypeExpression<'db> {
     TypeQualifier(TypeQualifier),
     /// `typing.Self` cannot be used in `@staticmethod` definitions.
     TypingSelfInStaticMethod,
+    /// `typing.Self` cannot be used in type aliases.
+    TypingSelfInTypeAlias,
     /// `typing.Self` cannot be used in metaclass definitions.
     TypingSelfInMetaclass,
     /// Some types are always invalid in type expressions
@@ -7459,6 +7603,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypingSelfInStaticMethod => {
                         f.write_str("`Self` cannot be used in a static method")
                     }
+                    InvalidTypeExpression::TypingSelfInTypeAlias => {
+                        f.write_str("`Self` cannot be used in a type alias")
+                    }
                     InvalidTypeExpression::TypingSelfInMetaclass => {
                         f.write_str("`Self` cannot be used in a metaclass")
                     }
@@ -7514,9 +7661,7 @@ impl<'db> InvalidTypeExpression<'db> {
             self
         {
             let module = module.module(db);
-            let Some(module_name_final_part) = module.name(db).components().next_back() else {
-                return;
-            };
+            let module_name_final_part = module.name(db).last_component();
             let Some(module_member_with_same_name) = ty
                 .member(db, module_name_final_part)
                 .place
@@ -7566,7 +7711,7 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
         } else if matches!(self, InvalidTypeExpression::Concatenate) {
             diagnostic.info("`typing.Concatenate` is only valid:");
-            diagnostic.info(" - as the first argument to `typing.Callable`");
+            diagnostic.info(" - as the first argument to `Callable`");
             diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
     }
@@ -7843,6 +7988,26 @@ impl<'db> ModuleLiteralType<'db> {
             return self.try_module_getattr(db, name);
         }
 
+        // typeshed re-exports some special forms across modules (e.g. `collections.abc.Callable`
+        // is `from typing import Callable as Callable`). The resolved type still carries the
+        // definition-site variant (`SpecialFormType::TypingCallable`), so we recover the
+        // import-path identity here while it's still observable.
+        if let Place::Defined(defined) = place_and_qualifiers.place
+            && let Type::SpecialForm(special) = defined.ty
+            && let Some(import_module) = self.module(db).known(db)
+        {
+            let rewrapped = special.rewrap_for_import_module(name, import_module);
+            if rewrapped != special {
+                return PlaceAndQualifiers {
+                    place: Place::Defined(DefinedPlace {
+                        ty: Type::SpecialForm(rewrapped),
+                        ..defined
+                    }),
+                    qualifiers: place_and_qualifiers.qualifiers,
+                };
+            }
+        }
+
         place_and_qualifiers
     }
 }
@@ -8010,6 +8175,35 @@ impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
     // section of mdtest/generics/pep695/variance.md for details.
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.return_type(db).variance_of(db, typevar)
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct TypeFormType<'db> {
+    type_argument: Type<'db>,
+}
+
+fn walk_typeform_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typeform_type: TypeFormType<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, typeform_type.type_argument(db));
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypeFormType<'_> {}
+
+impl<'db> TypeFormType<'db> {
+    pub(crate) fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        Type::TypeForm(Self::new(db, ty))
+    }
+}
+
+impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
+    // `TypeForm` is covariant in its type argument.
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.type_argument(db).variance_of(db, typevar)
     }
 }
 

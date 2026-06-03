@@ -333,6 +333,16 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
+    pub fn function_kind(name: &str, defined_in_class: bool) -> Self {
+        if !defined_in_class {
+            SymbolKind::Function
+        } else if name == "__init__" {
+            SymbolKind::Constructor
+        } else {
+            SymbolKind::Method
+        }
+    }
+
     /// Returns the string representation of the symbol kind.
     pub fn to_string(self) -> &'static str {
         match self {
@@ -792,9 +802,15 @@ impl<'db> SymbolVisitor<'db> {
             remap.push(Some(new_id));
             new.push(symbol);
         }
+
+        new.shrink_to_fit();
+
         FlatSymbols {
             symbols: new,
-            all_names: self.all_origin.map(|_| self.all_names),
+            all_names: self.all_origin.map(|_| {
+                self.all_names.shrink_to_fit();
+                self.all_names
+            }),
         }
     }
 
@@ -1217,18 +1233,12 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(func_def) => {
-                let kind = if self
-                    .iter_symbol_stack()
-                    .any(|s| s.kind == SymbolKind::Class)
-                {
-                    if func_def.name.as_str() == "__init__" {
-                        SymbolKind::Constructor
-                    } else {
-                        SymbolKind::Method
-                    }
-                } else {
-                    SymbolKind::Function
-                };
+                let kind = SymbolKind::function_kind(
+                    &func_def.name,
+                    self.iter_symbol_stack()
+                        .last()
+                        .is_some_and(|tree| tree.kind == SymbolKind::Class),
+                );
 
                 let symbol = SymbolTree {
                     parent: None,

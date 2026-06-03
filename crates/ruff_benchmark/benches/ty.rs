@@ -1248,6 +1248,53 @@ fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
+    const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
+
+    setup_rayon();
+
+    // Minimized from the pydantic and hydra-zen ecosystem regressions seen during the
+    // SpecializationBuilder pending-constraint-set migration. Pydantic has several empty dict
+    // literals with a type context equivalent to `dict[Hashable, core_schema.CoreSchema]`
+    // (including `schema.setdefault("metadata", {})` and tagged-union choice tables).
+    // `CoreSchema` is a large union of TypedDict schema types; this local `CoreSchema` alias is
+    // derived from pydantic-core's real `CoreSchema`, but reduced to enough variants to show the
+    // regression quickly. Solving the empty-dict specialization creates one lower-bound constraint
+    // per union element for `_VT@dict`. Combined with `_KT@dict = Hashable`,
+    // PathAssignments/SequentMap traversal derives cross-typevar facts like
+    // `TypedDictSchema <= _VT@dict <= Hashable`. This benchmark tracks the cost until constraint
+    // projection / path-bounds solving can avoid that work.
+    let mut code = "from collections.abc import Hashable\nfrom typing import Literal, NotRequired, TypedDict\n\n"
+        .to_string();
+    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Schema{i}(TypedDict):\n    type: Literal['schema-{i}']\n    ref: NotRequired[str]\n    value_{i}: NotRequired[int]\n"
+        )
+        .ok();
+    }
+    code.push_str("type CoreSchema = ");
+    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Schema{i}").ok();
+    }
+    code.push_str("\n\nchoices: dict[Hashable, CoreSchema] = {}\n");
+
+    criterion.bench_function("ty_micro[pydantic_core_schema_dict]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -1422,6 +1469,7 @@ criterion_group!(
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
+    benchmark_pydantic_core_schema_dict,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

@@ -530,6 +530,10 @@ impl RemoveSoftLineBreaksState {
             Self::Default => match element {
                 FormatElement::Line(LineMode::Soft) => true,
 
+                // `BestFitting` is resolved to its most-flat entry by this buffer, so we can drop
+                // the start and end tags, leaving only their contents.
+                FormatElement::Tag(Tag::StartBestFittingEntry | Tag::EndBestFittingEntry) => true,
+
                 // Entered the start of an `if_group_breaks` or `if_group_fits`
                 // For `if_group_breaks`: Remove the start and end tag and all content in between.
                 // For `if_group_fits_on_line`: Unwrap the content. This is important because the enclosing group

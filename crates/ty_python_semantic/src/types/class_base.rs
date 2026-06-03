@@ -175,6 +175,7 @@ impl<'db> ClassBase<'db> {
             | Type::AlwaysTruthy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
@@ -237,7 +238,8 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::RegularCallableTypeOf
                 | SpecialFormType::AlwaysTruthy
-                | SpecialFormType::AlwaysFalsy => None,
+                | SpecialFormType::AlwaysFalsy
+                | SpecialFormType::TypeForm => None,
 
                 SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),
@@ -273,11 +275,13 @@ impl<'db> ClassBase<'db> {
                     Self::try_from_type(db, alias.aliased_class().to_class_literal(db), subclass)
                 }
 
-                SpecialFormType::Callable => Self::try_from_type(
-                    db,
-                    todo_type!("Support for Callable as a base class"),
-                    subclass,
-                ),
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
+                    Self::try_from_type(
+                        db,
+                        todo_type!("Support for Callable as a base class"),
+                        subclass,
+                    )
+                }
             },
         }
     }

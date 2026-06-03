@@ -1014,6 +1014,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
         | Type::BoundSuper(_)
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
+        | Type::TypeForm(_)
         | Type::NewTypeInstance(_) => None,
     }
 }
@@ -1890,6 +1891,31 @@ impl<'db> SynthesizedTypedDictType<'db> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, get_size2::GetSize, salsa::Update)]
 pub struct TypedDictSchema<'db>(BTreeMap<Name, TypedDictField<'db>>);
+
+impl<'db> TypedDictSchema<'db> {
+    pub(super) fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        self.iter()
+            .map(|(name, field)| {
+                let declared_ty = field
+                    .declared_ty
+                    .recursive_type_normalized_impl(db, div, true);
+                let declared_ty = if nested {
+                    declared_ty?
+                } else {
+                    declared_ty.unwrap_or(div)
+                };
+                let mut field = field.clone();
+                field.declared_ty = declared_ty;
+                Some((name.clone(), field))
+            })
+            .collect()
+    }
+}
 
 impl<'db> Deref for TypedDictSchema<'db> {
     type Target = BTreeMap<Name, TypedDictField<'db>>;

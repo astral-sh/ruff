@@ -12,6 +12,8 @@ If request handlers need shared helper functions, they can go in a sibling
 module. For example, see `super::type_hierarchy`.
 */
 
+mod call_hierarchy_incoming_calls;
+mod call_hierarchy_outgoing_calls;
 mod code_action;
 mod completion;
 mod diagnostic;
@@ -24,6 +26,7 @@ mod goto_definition;
 mod goto_type_definition;
 mod hover;
 mod inlay_hints;
+mod prepare_call_hierarchy;
 mod prepare_rename;
 mod prepare_type_hierarchy;
 mod references;
@@ -38,6 +41,8 @@ mod type_hierarchy_supertypes;
 mod workspace_diagnostic;
 mod workspace_symbols;
 
+pub(super) use call_hierarchy_incoming_calls::CallHierarchyIncomingCallsRequestHandler;
+pub(super) use call_hierarchy_outgoing_calls::CallHierarchyOutgoingCallsRequestHandler;
 pub(super) use code_action::CodeActionRequestHandler;
 pub(super) use completion::CompletionRequestHandler;
 pub(super) use diagnostic::DocumentDiagnosticRequestHandler;
@@ -50,6 +55,7 @@ pub(super) use goto_definition::GotoDefinitionRequestHandler;
 pub(super) use goto_type_definition::GotoTypeDefinitionRequestHandler;
 pub(super) use hover::HoverRequestHandler;
 pub(super) use inlay_hints::InlayHintRequestHandler;
+pub(super) use prepare_call_hierarchy::PrepareCallHierarchyRequestHandler;
 pub(super) use prepare_rename::PrepareRenameRequestHandler;
 pub(super) use prepare_type_hierarchy::PrepareTypeHierarchyRequestHandler;
 pub(super) use references::ReferencesRequestHandler;
