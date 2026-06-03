@@ -59,3 +59,20 @@ but obviously continue working with rule codes:
 ```py
 import math  # noqa: F401
 ```
+
+### `unused-noqa`
+
+Unused suppressions with rule codes should still emit `RUF100`:
+
+```py
+# error: [unused-noqa]
+import math  # noqa: F401
+
+# error: [unused-noqa]
+import math  # ruff:ignore[F401]
+
+# error: [unused-noqa]
+import math  # ruff:ignore[unused-import]
+
+math.cos(1)
+```

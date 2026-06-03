@@ -393,9 +393,15 @@ impl Suppressions {
                 group.invalid_codes.push(code_str);
             } else if !suppression.used.get() {
                 // UnusedNOQA
-                let Ok(rule) = Rule::from_code(
+                let rule = if let Ok(rule) = Rule::from_code(
                     get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
-                ) else {
+                ) {
+                    rule
+                } else if is_human_readable_names_enabled(context.settings().preview)
+                    && let Ok(rule) = Rule::from_name(&suppression.code)
+                {
+                    rule
+                } else {
                     continue; // "external" lint code, don't treat it as unused
                 };
 
