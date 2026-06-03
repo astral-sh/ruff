@@ -508,30 +508,6 @@ fn accumulate_constraint<'db>(
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
-    /// Return whether evaluating the given reachability roots could visit more than `max_nodes`
-    /// interior TDD nodes.
-    ///
-    /// Reachability evaluates each root independently and follows one branch at each interior node.
-    /// Follow all three branches here to conservatively bound that work, and count shared nodes
-    /// again for each root.
-    fn reachability_evaluation_exceeds_budget(
-        &self,
-        roots: impl IntoIterator<Item = ScopedReachabilityConstraintId>,
-        max_nodes: usize,
-    ) -> bool;
-
-    /// Return whether projecting the given narrowing roots could visit more than `max_nodes`
-    /// interior TDD nodes.
-    ///
-    /// Narrowing projects each root independently and never follows ambiguous branches. Follow
-    /// both true and false branches here to conservatively bound that work, and count shared nodes
-    /// again for each root.
-    fn narrowing_projection_exceeds_budget(
-        &self,
-        roots: impl IntoIterator<Item = ScopedReachabilityConstraintId>,
-        max_nodes: usize,
-    ) -> bool;
-
     /// Narrow a type by walking a TDD narrowing constraint.
     fn narrow_by_constraint(
         &self,
@@ -552,22 +528,6 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
 }
 
 impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
-    fn reachability_evaluation_exceeds_budget(
-        &self,
-        roots: impl IntoIterator<Item = ScopedReachabilityConstraintId>,
-        max_nodes: usize,
-    ) -> bool {
-        constraint_traversal_exceeds_budget(self, roots, max_nodes, true)
-    }
-
-    fn narrowing_projection_exceeds_budget(
-        &self,
-        roots: impl IntoIterator<Item = ScopedReachabilityConstraintId>,
-        max_nodes: usize,
-    ) -> bool {
-        constraint_traversal_exceeds_budget(self, roots, max_nodes, false)
-    }
-
     /// Narrow a type by walking a TDD narrowing constraint.
     ///
     /// The TDD represents a ternary formula over predicates that encodes which predicates
@@ -633,42 +593,6 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             }
         }
     }
-}
-
-fn constraint_traversal_exceeds_budget(
-    constraints: &ReachabilityConstraints,
-    roots: impl IntoIterator<Item = ScopedReachabilityConstraintId>,
-    max_nodes: usize,
-    include_ambiguous_branch: bool,
-) -> bool {
-    let mut remaining = max_nodes;
-    let mut visited = FxHashSet::default();
-    let mut pending = Vec::new();
-
-    for root in roots {
-        visited.clear();
-        pending.clear();
-        pending.push(root);
-
-        while let Some(id) = pending.pop() {
-            if id.is_terminal() || !visited.insert(id) {
-                continue;
-            }
-            let Some(next_remaining) = remaining.checked_sub(1) else {
-                return true;
-            };
-            remaining = next_remaining;
-
-            let node = constraints.get_interior_node(id);
-            pending.push(node.if_true());
-            pending.push(node.if_false());
-            if include_ambiguous_branch {
-                pending.push(node.if_ambiguous());
-            }
-        }
-    }
-
-    false
 }
 
 fn apply_accumulated_narrowing<'db>(

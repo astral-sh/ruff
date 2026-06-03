@@ -18,9 +18,7 @@ use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
-use ty_python_core::reachability_constraints::{
-    ReachabilityConstraints, ScopedReachabilityConstraintId,
-};
+use ty_python_core::reachability_constraints::ReachabilityConstraints;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
@@ -1257,56 +1255,6 @@ pub(crate) fn loop_header_types<'db>(
     }
 }
 
-// These cutoffs were chosen by benchmarking real isort to keep loop analysis
-// overhead minimal while preserving diagnostics.
-const MAX_UNCONDITIONALLY_EXACT_LOOP_HEADER_SCOPE_NODES: usize = 2048;
-
-/// Return whether exact loop-header analysis would require too much work across `scope`.
-///
-/// This counts every loop-back binding and conservatively bounds the TDD work reachable from their
-/// reachability and narrowing roots because the real-world regression that motivated the limits
-/// was spread across many loop-header places.
-#[salsa::tracked]
-pub(crate) fn loop_header_scope_is_too_complex<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> bool {
-    const MAX_EXACT_LOOP_HEADER_SCOPE_BINDINGS: usize = 128;
-    const MAX_EXACT_LOOP_HEADER_SCOPE_REACHABILITY_NODES: usize = 2048;
-    const MAX_EXACT_LOOP_HEADER_SCOPE_NARROWING_NODES: usize = 4096;
-
-    let use_def = use_def_map(db, scope);
-    let constraints = use_def.reachability_constraints();
-    if constraints.used_interiors().len() <= MAX_UNCONDITIONALLY_EXACT_LOOP_HEADER_SCOPE_NODES {
-        return false;
-    }
-
-    let mut reachability_roots = Vec::new();
-    let mut narrowing_roots = Vec::new();
-
-    for (_, state, _) in use_def.all_definitions_with_usage() {
-        let DefinitionState::Defined(definition) = state else {
-            continue;
-        };
-        let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
-            continue;
-        };
-        let loop_header = get_loop_header(db, loop_header_definition.loop_token());
-        for binding in loop_header.bindings_for_place(loop_header_definition.place()) {
-            reachability_roots.push(binding.reachability_constraint());
-            narrowing_roots.push(binding.narrowing_constraint());
-            if reachability_roots.len() > MAX_EXACT_LOOP_HEADER_SCOPE_BINDINGS {
-                return true;
-            }
-        }
-    }
-
-    constraints.reachability_evaluation_exceeds_budget(
-        reachability_roots,
-        MAX_EXACT_LOOP_HEADER_SCOPE_REACHABILITY_NODES,
-    ) || constraints.narrowing_projection_exceeds_budget(
-        narrowing_roots,
-        MAX_EXACT_LOOP_HEADER_SCOPE_NARROWING_NODES,
-    )
-}
-
 fn loop_header_reachability_cycle_recover<'db>(
     _db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -1333,20 +1281,12 @@ fn loop_header_reachability_impl<'db>(
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
-    let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
-    let use_exact_reachability = !loop_header_scope_is_too_complex(db, scope);
 
-    for live_binding in live_bindings {
+    for live_binding in loop_header.bindings_for_place(place) {
         let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
-        } else if use_exact_reachability {
-            evaluate_reachability(db, use_def, live_binding.reachability_constraint())
-        } else if live_binding.reachability_constraint()
-            == ScopedReachabilityConstraintId::ALWAYS_FALSE
-        {
-            Truthiness::AlwaysFalse
         } else {
-            Truthiness::Ambiguous
+            evaluate_reachability(db, use_def, live_binding.reachability_constraint())
         };
         // Skip unreachable bindings.
         if reachability.is_always_false() {

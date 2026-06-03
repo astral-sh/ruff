@@ -657,11 +657,11 @@ while True:
     break
 ```
 
-### A large surrounding scope does not discard a cheap loop header
+### Loop headers remain precise in large scopes
 
-The scope-wide reachability graph is large, but its loop headers only have a few loop-back bindings
-with cheap reachability and narrowing roots. Inferring their exact types does not require traversing
-the entire graph, so its size should not cause us to fall back to `Unknown`.
+Loop-header reachability and type inference should remain exact regardless of the size of the
+scope-wide reachability graph. The statically unreachable assignment below must remain excluded, and
+narrowing must still apply after enough surrounding control flow to exceed the previous cutoffs.
 
 ```py
 from typing import Any
