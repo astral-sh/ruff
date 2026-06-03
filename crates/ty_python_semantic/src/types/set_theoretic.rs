@@ -829,6 +829,27 @@ impl<'db> IntersectionType<'db> {
         found_instance.then(|| builder.build())
     }
 
+    /// Returns the instance type used to bind `Self` for a classmethod receiver.
+    ///
+    /// Unlike general instance projection, gradual elements are retained because they represent
+    /// uncertainty about the runtime class without invalidating guaranteed static constraints.
+    pub(crate) fn to_instance_for_classmethod_receiver(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let mut builder = IntersectionBuilder::new(db);
+        let mut found_instance = false;
+
+        for element in self.positive(db) {
+            if let Some(instance) = element.to_instance(db) {
+                builder = builder.add_positive(instance);
+                found_instance = true;
+            } else if element.is_dynamic() {
+                builder = builder.add_positive(*element);
+                found_instance = true;
+            }
+        }
+
+        found_instance.then(|| builder.build())
+    }
+
     /// Map a type transformation over all positive elements of the intersection. Leave the
     /// negative elements unchanged.
     pub(crate) fn map_positive(

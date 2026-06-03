@@ -1841,8 +1841,9 @@ def _(a_and_b: Intersection[type[A], type[B]]):
 ### Method binding uses the full intersection type
 
 ```py
+from typing import Any
 from typing_extensions import Self
-from ty_extensions import Intersection
+from ty_extensions import Intersection, Unknown
 
 class A:
     def method(self) -> Self:
@@ -1861,6 +1862,15 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     # revealed: bound method type[A] & type[B].classmethod() -> A & B
     reveal_type(a_and_b.classmethod)
     reveal_type(a_and_b.classmethod())  # revealed: A & B
+
+def _(cls: Intersection[type[A], Any]):
+    reveal_type(cls.classmethod())  # revealed: A & Any
+
+def _(cls: Intersection[type[A], type[Any]]):
+    reveal_type(cls.classmethod())  # revealed: A & Any
+
+def _(cls: Intersection[type[A], type[Unknown]]):
+    reveal_type(cls.classmethod())  # revealed: A & Unknown
 ```
 
 ### Descriptor owner for an intersection
