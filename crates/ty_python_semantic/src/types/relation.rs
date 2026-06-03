@@ -943,20 +943,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
-                return ConstraintSet::constrain_typevar(
+                return ConstraintSet::constrain_typevar_upper_bound(
                     db,
                     self.constraints,
                     bound_typevar,
-                    Type::Never,
                     target,
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
-                return ConstraintSet::constrain_typevar(
+                return ConstraintSet::constrain_typevar_lower_bound(
                     db,
                     self.constraints,
                     bound_typevar,
                     source,
-                    Type::object(),
                 );
             }
         }

@@ -1315,11 +1315,10 @@ impl<'db> Signature<'db> {
                 CallableTypeKind::ParamSpecValue,
                 CallableFunctionProvenance::None,
             ));
-            let param_spec_matches = ConstraintSet::constrain_typevar(
+            let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                 db,
                 constraints,
                 self_bound_typevar,
-                Type::Never,
                 upper,
             );
             let return_types_match = other
@@ -1558,11 +1557,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_tvar,
-                        Type::Never,
                         upper,
                     );
                     let return_types_match = || {
@@ -1611,12 +1609,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_tvar,
                         lower,
-                        Type::object(),
                     );
                     let return_types_match = || {
                         // TODO: Similar to how we do this for unions, we should collect error
@@ -1964,12 +1961,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
                     return result;
@@ -1995,11 +1991,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -2118,13 +2113,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
                         ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            target_bound_typevar,
-                            lower,
-                            Type::object(),
-                        );
+                        let param_spec_prefix_matches =
+                            ConstraintSet::constrain_typevar_lower_bound(
+                                db,
+                                self.constraints,
+                                target_bound_typevar,
+                                lower,
+                            );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else if let Some(target_param) = target_params.next() {
                         let upper = Type::Callable(CallableType::new(
@@ -2143,13 +2138,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
                         ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            source_bound_typevar,
-                            Type::Never,
-                            upper,
-                        );
+                        let param_spec_prefix_matches =
+                            ConstraintSet::constrain_typevar_upper_bound(
+                                db,
+                                self.constraints,
+                                source_bound_typevar,
+                                upper,
+                            );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else {
                         // When the prefixes match exactly, we just relate the remaining tails.
@@ -2178,12 +2173,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
                     return result;
@@ -2316,12 +2310,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
 
@@ -2341,11 +2334,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -2451,11 +2443,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
