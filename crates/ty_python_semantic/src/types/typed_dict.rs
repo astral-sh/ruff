@@ -475,9 +475,12 @@ impl<'db> TypedDictType<'db> {
             })
             .collect();
 
-        let openness = match self.explicit_extra_items(db) {
-            Some(extra_items) if !extra_items.is_read_only() => self.openness(db),
-            Some(_) | None => TypedDictOpenness::Closed,
+        let openness = match self.openness(db) {
+            TypedDictOpenness::Open => TypedDictOpenness::Open,
+            TypedDictOpenness::Extra(extra_items) if !extra_items.is_read_only() => {
+                TypedDictOpenness::Extra(extra_items)
+            }
+            TypedDictOpenness::Closed | TypedDictOpenness::Extra(_) => TypedDictOpenness::Closed,
         };
 
         Self::from_patch_items(db, items, openness)
@@ -538,7 +541,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
 
-            if let Some(source_extra_items) = source.openness(db).effective_extra_items() {
+            if !target_openness.is_open()
+                && let Some(source_extra_items) = source.openness(db).effective_extra_items()
+            {
                 for (target_item_name, target_item_field) in target_items {
                     if source_items.contains_key(target_item_name) {
                         continue;
@@ -1907,6 +1912,10 @@ fn validate_extracted_typed_dict_extra_items<'db, 'ast>(
 ) -> bool {
     let db = context.db();
     let typed_dict_ty = Type::TypedDict(typed_dict);
+
+    if typed_dict.openness(db).is_open() {
+        return true;
+    }
 
     if let Some(target_extra_items) = typed_dict.explicit_extra_items(db) {
         if let Some((target_name, target_field)) =
