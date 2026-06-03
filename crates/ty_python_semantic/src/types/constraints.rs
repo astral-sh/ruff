@@ -5492,9 +5492,9 @@ pub(crate) struct PathAssignments {
     assignments: FxIndexMap<ConstraintAssignment, usize>,
     /// Nested substitutions that we have already applied on the current root→terminal path.
     nested_substitutions: FxIndexSet<NestedSubstitution>,
-    /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
-    /// ensures a stable order for all of the derived constraints that we create, while still
-    /// letting us create them lazily.)
+    /// Constraints that we have discovered, mapped to whether we have processed their single
+    /// sequents and direct implications yet. (This ensures a stable order for all of the derived
+    /// constraints that we create, while still letting us create them lazily.)
     discovered: FxIndexMap<ConstraintId, bool>,
 }
 
@@ -5616,37 +5616,37 @@ impl PathAssignments {
     /// constraint.
     ///
     /// We call [`SequentMap::for_constraint`] and
-    /// [`for_constraint_pair`][SequentMap::for_constraint_pair] for constraints that have already
-    /// been encountered, so that if we walk another constraint set containing them, we reuse the
-    /// work to calculate their sequents. `discovered` also contains constraints from unvisited
-    /// branch alternatives. If the current constraint is fully static, only a direct implication
-    /// from it can affect the current path, so we add it without calculating or caching the full
-    /// pair map.
+    /// [`for_constraint_pair`][SequentMap::for_constraint_pair] for constraints represented in the
+    /// current path, so that if we walk another constraint set containing them, we reuse the work
+    /// to calculate their sequents. `discovered` also contains constraints from unvisited branch
+    /// alternatives and previously traversed sibling paths. If the current constraint is fully
+    /// static, only a direct implication from it can affect the current path, so we add it without
+    /// calculating or caching the full pair map.
     fn discover_constraint<'db>(
         &mut self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         constraint: ConstraintId,
     ) {
-        // If we've already processed this constraint, we can skip it.
+        // If we've already processed this constraint, its single sequents and direct implications
+        // are already in the map. We still need to discover pair sequents for constraints that are
+        // represented in the current path.
         let existing = self.discovered.insert(constraint, true);
         let already_processed = existing.is_some_and(|existing| existing);
-        if already_processed {
-            return;
+        if !already_processed {
+            let single_map = SequentMap::for_constraint(db, builder, constraint);
+            self.map.merge(&single_map);
+            drop(single_map);
         }
 
-        let single_map = SequentMap::for_constraint(db, builder, constraint);
-        self.map.merge(&single_map);
-        drop(single_map);
-
         let mut constraint_is_before_existing = false;
-        for (existing, processed) in &self.discovered {
+        for existing in self.discovered.keys() {
             if *existing == constraint {
                 constraint_is_before_existing = true;
                 continue;
             }
 
-            if *processed {
+            if self.contains_constraint(*existing) {
                 // Pair sequent maps are not commutative. Preserve the source order recorded in
                 // `discovered`, even if BDD traversal encounters the constraints in another order.
                 let (left, right) = if constraint_is_before_existing {
@@ -5656,11 +5656,11 @@ impl PathAssignments {
                 };
                 let pair_map = SequentMap::for_constraint_pair(db, builder, left, right);
                 self.map.merge(&pair_map);
-            } else {
+            } else if !already_processed {
                 // An unvisited branch alternative can still be implied by a fully static current
                 // constraint. Keep that implication, but defer implications from gradual
                 // constraints and all sequents that require both constraints until we actually
-                // encounter the alternative.
+                // encounter the alternative on the current path.
                 self.map
                     .add_direct_implication_from_unvisited(db, builder, constraint, *existing);
             }
@@ -6492,6 +6492,31 @@ mod tests {
         // `Any` is assignable to `int`, but not every materialization of `Any` is a subtype of
         // `int`, so this implication cannot collapse an unvisited branch.
         assert!(t_any.implies(&db, &builder, t_int));
+
+        path.add_assignment(&db, &builder, t_any.when_true(), 0, false)
+            .unwrap();
+
+        assert!(!path.assignment_holds(t_int.when_true()));
+        assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 0);
+    }
+
+    #[test]
+    fn path_assignments_does_not_discover_gradual_implications_from_sibling_paths() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_any = ConstraintId::new(&db, &builder, t, Type::any(), Type::object());
+        let t_int = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+            Type::object(),
+        );
+        let mut path = PathAssignments::new([t_any, t_int]);
+
+        path.walk_edge(&db, &builder, t_int.when_false(), 1, |_, _| ())
+            .unwrap();
 
         path.add_assignment(&db, &builder, t_any.when_true(), 0, false)
             .unwrap();
