@@ -1863,6 +1863,52 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     reveal_type(a_and_b.classmethod())  # revealed: A & B
 ```
 
+### `Self` binding excludes flow-only refinements
+
+```py
+from typing import Protocol, runtime_checkable
+from typing_extensions import Self
+
+class VariableTruth:
+    other: Self
+
+    def __bool__(self) -> bool:
+        return False
+
+    def copy(self) -> Self:
+        return self
+
+    @property
+    def property(self) -> Self:
+        return self
+
+def _(value: VariableTruth):
+    if value:
+        reveal_type(value.copy())  # revealed: VariableTruth
+        reveal_type(value.other)  # revealed: VariableTruth
+        reveal_type(value.property)  # revealed: VariableTruth
+
+@runtime_checkable
+class InstanceMarker(Protocol):
+    marker: int
+
+class Value:
+    other: Self
+
+    def copy(self) -> Self:
+        return self
+
+    @property
+    def property(self) -> Self:
+        return self
+
+def _(value: Value):
+    if isinstance(value, InstanceMarker):
+        reveal_type(value.copy())  # revealed: Value
+        reveal_type(value.other)  # revealed: Value
+        reveal_type(value.property)  # revealed: Value
+```
+
 ### Descriptor binding uses the full intersection type
 
 ```py
@@ -1883,9 +1929,14 @@ class A:
     desc = Descriptor()
 
 class B: ...
+class Mixin: ...
 
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.desc)  # revealed: A & B
+
+def _(a: A):
+    if isinstance(a, Mixin):
+        reveal_type(a.desc)  # revealed: A & Mixin
 ```
 
 ### Negation types

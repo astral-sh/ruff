@@ -1053,11 +1053,49 @@ impl<'db> Type<'db> {
             return self;
         }
 
+        let self_type = self_type.self_binding_type(db);
         self.apply_type_mapping(
             db,
             &TypeMapping::BindSelf(SelfBinding::new(db, self_type, None)),
             TypeContext::default(),
         )
+    }
+
+    /// Return the part of a receiver type that describes its runtime class for `Self` binding.
+    ///
+    /// Negative constraints and runtime-checkable protocol or truthiness refinements describe the
+    /// current value, but do not necessarily apply to another instance returned as `Self`.
+    pub(crate) fn self_binding_type(self, db: &'db dyn Db) -> Self {
+        let Type::Intersection(intersection) = self else {
+            return self;
+        };
+
+        let mut builder = IntersectionBuilder::new(db);
+        for positive in intersection.positive(db) {
+            let is_flow_refinement = matches!(positive, Type::AlwaysTruthy | Type::AlwaysFalsy)
+                || matches!(
+                    positive,
+                    Type::ProtocolInstance(protocol)
+                        if matches!(
+                            protocol.inner,
+                            Protocol::FromClass(class) if class.is_runtime_checkable(db)
+                        )
+                );
+            if !is_flow_refinement {
+                builder = builder.add_positive(*positive);
+            }
+        }
+        builder.build()
+    }
+
+    pub(crate) fn needs_self_binding(self, db: &'db dyn Db) -> bool {
+        self.as_function_literal().is_some_and(|function| {
+            function
+                .signature(db)
+                .overloads
+                .iter()
+                .any(|signature| signature.needs_self_mapping(db, true))
+        })
     }
 
     /// Returns `true` if `self` is [`Type::Callable`].
@@ -4007,8 +4045,15 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
+                let self_instance = bound_method.self_instance(db);
+                let bound_type =
+                    if Type::FunctionLiteral(bound_method.function(db)).needs_self_binding(db) {
+                        self_instance.self_binding_type(db)
+                    } else {
+                        self_instance
+                    };
                 CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
+                    .with_bound_type(bound_type)
                     .into()
             }
 

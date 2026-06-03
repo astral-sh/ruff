@@ -1196,7 +1196,7 @@ impl<'db> Signature<'db> {
         ))
     }
 
-    fn needs_self_mapping(&self, db: &'db dyn Db, receiver_is_removed: bool) -> bool {
+    pub(crate) fn needs_self_mapping(&self, db: &'db dyn Db, receiver_is_removed: bool) -> bool {
         // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
         // triggers binding when a method is accessed on a concrete receiver.
         self.return_ty.contains_self(db)
