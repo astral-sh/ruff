@@ -1483,10 +1483,32 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     extract_unpacked_typed_dict_from_value_type(db, ty).map(|unpacked| unpacked.keys)
 }
 
-/// Extracts the declared keys and effective extra-items tail from a `TypedDict`-shaped value.
+/// Extracts the declared keys and explicit extra-items tail from a `TypedDict`-shaped value.
 pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
+) -> Option<UnpackedTypedDict<'db>> {
+    extract_unpacked_typed_dict_from_value_type_impl(db, ty, UnpackedTypedDictTail::Explicit)
+}
+
+/// Extracts the declared keys and effective extra-items tail from a `TypedDict`-shaped value.
+fn extract_unpacked_typed_dict_with_effective_tail_from_value_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<UnpackedTypedDict<'db>> {
+    extract_unpacked_typed_dict_from_value_type_impl(db, ty, UnpackedTypedDictTail::Effective)
+}
+
+#[derive(Clone, Copy)]
+enum UnpackedTypedDictTail {
+    Explicit,
+    Effective,
+}
+
+fn extract_unpacked_typed_dict_from_value_type_impl<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    tail: UnpackedTypedDictTail,
 ) -> Option<UnpackedTypedDict<'db>> {
     match ty {
         Type::TypedDict(td) => {
@@ -1504,9 +1526,13 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                     )
                 })
                 .collect();
+            let extra_items = match tail {
+                UnpackedTypedDictTail::Explicit => td.explicit_extra_items(db),
+                UnpackedTypedDictTail::Effective => td.effective_extra_items(db),
+            };
             Some(UnpackedTypedDict {
                 keys,
-                extra_items_ty: td.effective_extra_items(db).map(|extra| extra.declared_ty),
+                extra_items_ty: extra_items.map(|extra| extra.declared_ty),
                 is_closed: td.openness(db).is_closed(),
             })
         }
@@ -1515,7 +1541,9 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
             let unpacked_elements: Vec<_> = intersection
                 .positive(db)
                 .iter()
-                .filter_map(|element| extract_unpacked_typed_dict_from_value_type(db, *element))
+                .filter_map(|element| {
+                    extract_unpacked_typed_dict_from_value_type_impl(db, *element, tail)
+                })
                 .collect();
 
             if unpacked_elements.is_empty() {
@@ -1582,7 +1610,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
             let unpacked_elements: Vec<_> = union
                 .elements(db)
                 .iter()
-                .map(|element| extract_unpacked_typed_dict_from_value_type(db, *element))
+                .map(|element| extract_unpacked_typed_dict_from_value_type_impl(db, *element, tail))
                 .collect::<Option<_>>()?;
 
             let all_keys: OrderSet<Name> = unpacked_elements
@@ -1646,7 +1674,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
             })
         }
         Type::TypeAlias(alias) => {
-            extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
+            extract_unpacked_typed_dict_from_value_type_impl(db, alias.value_type(db), tail)
         }
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
@@ -2055,7 +2083,7 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
 ) -> Option<OrderSet<Name>> {
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
-    let unpacked = extract_unpacked_typed_dict_from_value_type(db, arg_ty)?;
+    let unpacked = extract_unpacked_typed_dict_with_effective_tail_from_value_type(db, arg_ty)?;
     let validate_extra_keys = typed_dict.explicit_extra_items(db).is_some();
     let unpacked_keys = unpacked
         .keys
@@ -2535,7 +2563,9 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             guaranteed_keys.entry(key_name.clone()).or_insert(None);
         }
         return true;
-    } else if let Some(unpacked) = extract_unpacked_typed_dict_from_value_type(db, unpacked_type) {
+    } else if let Some(unpacked) =
+        extract_unpacked_typed_dict_with_effective_tail_from_value_type(db, unpacked_type)
+    {
         let ignored_keys = shadowed_keys.clone();
         let (_, mut unpacked_valid) = validate_extracted_typed_dict_keys(
             context,
