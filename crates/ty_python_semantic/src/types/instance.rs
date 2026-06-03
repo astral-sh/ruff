@@ -119,11 +119,10 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
-    pub(crate) fn sys_version_info(db: &'db dyn Db) -> Self {
-        if sys_version_info_class(db).is_none() {
-            return Type::unknown();
-        }
-
+    pub(crate) const fn sys_version_info() -> Self {
+        // Keep construction query-free: resolving the backing typeshed class here is on the hot
+        // path for projects with many version guards. Resolve it lazily when class behavior is
+        // actually needed instead.
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::SysVersionInfo))
     }
 
