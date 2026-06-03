@@ -149,7 +149,7 @@ not: a covariant container can be inhabited by an empty value.
 ```py
 from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import Intersection, is_disjoint_from, static_assert
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -179,6 +179,12 @@ static_assert(is_disjoint_from(Invariant[A], Invariant[B]))
 static_assert(is_disjoint_from(InvSubA, Invariant[B]))
 static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
 static_assert(not is_disjoint_from(Invariant[Any], Invariant[B]))
+static_assert(not is_disjoint_from(Invariant[B], Invariant[Any]))
+# `A | Any` cannot materialize to be equivalent to `B`.
+static_assert(is_disjoint_from(Invariant[A | Any], Invariant[B]))
+static_assert(is_disjoint_from(Invariant[B], Invariant[A | Any]))
+static_assert(is_disjoint_from(Invariant[Intersection[A, Any]], Invariant[B]))
+static_assert(is_disjoint_from(Invariant[B], Invariant[Intersection[A, Any]]))
 static_assert(is_disjoint_from(InvariantPair[A, A], InvariantPair[A, B]))
 static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
 static_assert(not is_disjoint_from(Covariant[A], CoSubB))
@@ -204,11 +210,16 @@ class Invariant(Generic[T]):
 type Id[V] = V
 
 def _[U]():
+    static_assert(not is_disjoint_from(Invariant[U], Invariant[int]))
     static_assert(not is_disjoint_from(Invariant[Id[U]], Invariant[int]))
+
+static_assert(not is_disjoint_from(Invariant[Id[int]], Invariant[int]))
+static_assert(is_disjoint_from(Invariant[Id[int]], Invariant[str]))
 
 class Mixed[T, U]:
     x: T
 
+# `Mixed` is bivariant in `U`, so the differing second argument cannot make these disjoint.
 static_assert(not is_disjoint_from(Mixed[Never, int], Mixed[Never, str]))
 
 class Left(Invariant[Never]): ...

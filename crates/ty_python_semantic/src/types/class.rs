@@ -31,7 +31,7 @@ use crate::types::generics::{
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
@@ -1230,6 +1230,33 @@ impl<'db> ClassType<'db> {
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
+        self.could_exist_in_mro_of_impl(db, other, |this, other| {
+            this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                .is_always_satisfied(db)
+        })
+    }
+
+    /// Like [`ClassType::could_exist_in_mro_of`], but reuses an active disjointness checker for
+    /// nested specialization checks so recursive class graphs keep the same cycle guard.
+    pub(super) fn could_exist_in_mro_of_with_disjointness_checker<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        checker: &DisjointnessChecker<'_, 'c, 'db>,
+    ) -> bool {
+        self.could_exist_in_mro_of_impl(db, other, |this, other| {
+            checker
+                .check_specialization_pair(db, this, other)
+                .is_always_satisfied(db)
+        })
+    }
+
+    fn could_exist_in_mro_of_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+    ) -> bool {
         other
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -1239,18 +1266,39 @@ impl<'db> ClassType<'db> {
                 }
                 (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
                     this_alias.origin(db) == other_alias.origin(db)
-                        && !this_alias
-                            .specialization(db)
-                            .is_disjoint_from(
-                                db,
-                                other_alias.specialization(db),
-                                constraints,
-                                InferableTypeVars::None,
-                            )
-                            .is_always_satisfied(db)
+                        && !specializations_are_disjoint(
+                            this_alias.specialization(db),
+                            other_alias.specialization(db),
+                        )
                 }
                 (ClassType::NonGeneric(_), ClassType::Generic(_))
                 | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
+            })
+    }
+
+    fn has_incompatible_generic_base(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+    ) -> bool {
+        let other_generic_bases: Vec<_> = other
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .collect();
+
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .any(|self_alias| {
+                other_generic_bases.iter().any(|other_alias| {
+                    self_alias.origin(db) == other_alias.origin(db)
+                        && specializations_are_disjoint(
+                            self_alias.specialization(db),
+                            other_alias.specialization(db),
+                        )
+                })
             })
     }
 
@@ -1265,51 +1313,68 @@ impl<'db> ClassType<'db> {
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
+        self.could_coexist_in_mro_with_impl(
+            db,
+            other,
+            |this, other| this.could_exist_in_mro_of(db, other, constraints),
+            |this, other| {
+                this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                    .is_always_satisfied(db)
+            },
+            |this, other| {
+                this.when_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                    .is_always_satisfied(db)
+            },
+        )
+    }
+
+    pub(super) fn could_coexist_in_mro_with_disjointness_checker<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        checker: &DisjointnessChecker<'_, 'c, 'db>,
+    ) -> bool {
+        // Reuse the active disjointness checker for nested specialization and
+        // metaclass checks so recursive class graphs keep the same cycle guard.
+        self.could_coexist_in_mro_with_impl(
+            db,
+            other,
+            |this, other| this.could_exist_in_mro_of_with_disjointness_checker(db, other, checker),
+            |this, other| {
+                checker
+                    .check_specialization_pair(db, this, other)
+                    .is_always_satisfied(db)
+            },
+            |this, other| {
+                checker
+                    .check_type_pair(db, this, other)
+                    .is_always_satisfied(db)
+            },
+        )
+    }
+
+    fn could_coexist_in_mro_with_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        could_exist_in_mro_of: impl Fn(Self, Self) -> bool,
+        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+        types_are_disjoint: impl Fn(Type<'db>, Type<'db>) -> bool,
+    ) -> bool {
         if self == other {
             return true;
         }
 
         if self.is_final(db) {
-            return other.could_exist_in_mro_of(db, self, constraints);
+            return could_exist_in_mro_of(other, self);
         }
 
         if other.is_final(db) {
-            return self.could_exist_in_mro_of(db, other, constraints);
+            return could_exist_in_mro_of(self, other);
         }
 
         // A class cannot implement two incompatible specializations of an invariant base.
-        let other_generic_bases: Vec<_> = other
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .filter_map(ClassType::into_generic_alias)
-            .collect();
-
-        if self
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .filter_map(ClassType::into_generic_alias)
-            .any(|self_alias| {
-                other_generic_bases.iter().any(|other_alias| {
-                    self_alias.origin(db) == other_alias.origin(db)
-                        && self_alias
-                            .specialization(db)
-                            .generic_context(db)
-                            .variables(db)
-                            .any(|typevar| {
-                                matches!(typevar.variance(db), TypeVarVariance::Invariant)
-                            })
-                        && self_alias
-                            .specialization(db)
-                            .is_disjoint_from(
-                                db,
-                                other_alias.specialization(db),
-                                constraints,
-                                InferableTypeVars::None,
-                            )
-                            .is_always_satisfied(db)
-                })
-            })
-        {
+        if self.has_incompatible_generic_base(db, other, specializations_are_disjoint) {
             return false;
         }
 
@@ -1347,15 +1412,7 @@ impl<'db> ClassType<'db> {
         let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
             return true;
         };
-        if self_metaclass_instance
-            .when_disjoint_from(
-                db,
-                other_metaclass_instance,
-                constraints,
-                InferableTypeVars::None,
-            )
-            .is_always_satisfied(db)
-        {
+        if types_are_disjoint(self_metaclass_instance, other_metaclass_instance) {
             return false;
         }
 
