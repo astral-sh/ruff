@@ -7220,10 +7220,26 @@ impl<'db> SelfBinding<'db> {
         let Type::Intersection(intersection) = self.ty else {
             return false;
         };
-        intersection.positive(db).iter().any(|positive| {
-            positive.nominal_class(db).is_some_and(|class| {
+        let inherits_from_owner = |ty: Type<'db>| {
+            ty.nominal_class(db).is_some_and(|class| {
                 class_mro_literals(db, class.class_literal(db)).contains(&owner_class)
             })
+        };
+        intersection.positive(db).iter().any(|positive| {
+            inherits_from_owner(*positive)
+                || match positive {
+                    Type::TypeVar(typevar) => typevar
+                        .typevar(db)
+                        .bound_or_constraints(db)
+                        .is_some_and(|bound_or_constraints| match bound_or_constraints {
+                            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                                .elements(db)
+                                .iter()
+                                .any(|constraint| inherits_from_owner(*constraint)),
+                            TypeVarBoundOrConstraints::UpperBound(_) => false,
+                        }),
+                    _ => false,
+                }
         })
     }
 }
