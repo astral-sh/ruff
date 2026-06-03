@@ -199,7 +199,7 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, Type, TypeContext,
-        UnionBuilder, UnionType, definite_match_pattern_type, enum_metadata, infer_expression_type,
+        UnionType, definite_match_pattern_type, enum_metadata, infer_expression_type,
         infer_narrowing_constraint, mapping_pattern_type, sequence_pattern_type,
         singleton_pattern_type,
     },
@@ -221,21 +221,56 @@ use ty_python_core::{
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
 
-/// Go through the list of previous match cases, and accumulate a union of all types that were already
-/// matched by these patterns.
-fn type_excluded_by_previous_patterns<'db>(
+/// Narrow `subject_ty` by all preceding unguarded match patterns.
+///
+/// Caching each prefix lets the next case reuse the already-normalized subject instead of
+/// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
+/// same intersections.
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
-    mut predicate: PatternPredicate<'db>,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let mut builder = UnionBuilder::new(db);
-    while let Some(previous) = predicate.previous_predicate(db) {
-        predicate = *previous;
+    let Some(previous) = predicate.previous_predicate(db) else {
+        return subject_ty;
+    };
+    let previous = *previous;
 
-        if predicate.guard(db).is_none() {
-            builder = builder.add(definite_match_pattern_type(db, predicate.kind(db)));
-        }
+    if previous.guard(db).is_some() {
+        type_narrowed_by_previous_patterns(db, previous, subject_ty)
+    } else {
+        type_narrowed_by_pattern(db, previous, subject_ty)
     }
-    builder.build()
+}
+
+/// Narrow `subject_ty` by a match pattern and all preceding unguarded patterns.
+///
+/// This result is also the preceding-pattern prefix for the next unguarded case.
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_pattern<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    IntersectionBuilder::new(db)
+        .add_positive(type_narrowed_by_previous_patterns(
+            db, predicate, subject_ty,
+        ))
+        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
+        .build()
 }
 
 /// Return the enum class and canonical member names represented by an enum-literal subject type.
@@ -430,11 +465,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let narrowed_subject = IntersectionBuilder::new(db)
-        .add_positive(subject_ty)
-        .add_negative(type_excluded_by_previous_patterns(db, predicate));
-
-    let narrowed_subject_ty = narrowed_subject.clone().build();
+    let narrowed_subject_ty = type_narrowed_by_previous_patterns(db, predicate, subject_ty);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -445,9 +476,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty = narrowed_subject
-        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
-        .build();
+    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, subject_ty);
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }

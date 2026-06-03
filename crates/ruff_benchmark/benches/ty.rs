@@ -946,6 +946,38 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Benchmark reachability analysis for many adjacent exact sequence patterns.
+///
+/// Each case adds an exact synthesized protocol to the exclusions used by later cases. Rebuilding
+/// the narrowed subject from all preceding patterns causes repeated DNF distribution.
+fn benchmark_adjacent_exact_sequence_patterns(criterion: &mut Criterion) {
+    const NUM_MATCH_BRANCHES: usize = 16;
+
+    setup_rayon();
+
+    let mut code = "def process(value: tuple[str, str]) -> None:\n    match value:\n".to_string();
+    for i in 0..NUM_MATCH_BRANCHES {
+        writeln!(
+            &mut code,
+            "        case [\"value{i}\", _]:\n            pass"
+        )
+        .ok();
+    }
+    code.push_str("        case _:\n            pass\n");
+
+    criterion.bench_function("ty_micro[adjacent_exact_sequence_patterns]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmark for narrowing through a long `isinstance` elif chain.
 ///
 /// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
@@ -1463,6 +1495,7 @@ criterion_group!(
     benchmark_typevar_mapping_small_accumulations,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
+    benchmark_adjacent_exact_sequence_patterns,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
