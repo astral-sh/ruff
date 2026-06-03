@@ -204,6 +204,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 pub(crate) struct PytestParametrizeValuesWrongType {
     values: types::ParametrizeValuesType,
     row: types::ParametrizeValuesRowType,
+    is_single_param: bool,
 }
 
 impl Violation for PytestParametrizeValuesWrongType {
@@ -211,8 +212,12 @@ impl Violation for PytestParametrizeValuesWrongType {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestParametrizeValuesWrongType { values, row } = self;
-        if values.to_string() == row.to_string() {
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_single_param,
+        } = self;
+        if *is_single_param {
             format!("Wrong values type in `pytest.mark.parametrize` expected `{values}`")
         } else {
             format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
@@ -220,8 +225,12 @@ impl Violation for PytestParametrizeValuesWrongType {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestParametrizeValuesWrongType { values, row } = self;
-        if values.to_string() == row.to_string() {
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_single_param,
+        } = self;
+        if *is_single_param {
             Some(format!("Use `{values}` for parameter values"))
         } else {
             Some(format!("Use `{values}` of `{row}` for parameter values"))
@@ -532,6 +541,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_single_param: !is_multi_named,
                     },
                     values.range(),
                 );
@@ -579,6 +589,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_single_param: !is_multi_named,
                     },
                     values.range(),
                 );
@@ -800,6 +811,7 @@ fn handle_value_rows(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_single_param: false,
                     },
                     elt.range(),
                 );
@@ -839,6 +851,7 @@ fn handle_value_rows(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_single_param: false,
                     },
                     elt.range(),
                 );
