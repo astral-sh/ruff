@@ -673,6 +673,8 @@ pub(crate) mod testing {
                 .to_search_paths(self.system(), self.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings");
 
+            self.files().try_add_root(self, root, FileRootKind::Project);
+
             Program::from_settings(
                 self,
                 ProgramSettings {
@@ -684,8 +686,6 @@ pub(crate) mod testing {
                     search_paths,
                 },
             );
-
-            self.files().try_add_root(self, root, FileRootKind::Project);
 
             Ok(())
         }
