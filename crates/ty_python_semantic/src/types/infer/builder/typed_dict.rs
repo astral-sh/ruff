@@ -343,6 +343,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
+            } else if key_ty.is_some_and(|key_ty| {
+                key_ty.is_assignable_to(self.db(), KnownClass::Str.to_instance(self.db()))
+            }) && let Some(value_ty) = typed_dict.arbitrary_key_value_type(self.db())
+            {
+                self.infer_expression(&item.value, TypeContext::new(Some(value_ty)))
             } else {
                 self.infer_expression(&item.value, TypeContext::default())
             };
@@ -468,14 +473,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             TypeContext::new(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
         for item in &dict_expr.items {
-            let value_tcx = item
+            let key_ty = item
                 .key
                 .as_ref()
-                .map(|key| self.get_or_infer_expression(key, key_tcx))
-                .and_then(Type::as_string_literal)
-                .and_then(|key| typed_dict.item(self.db(), key.value(self.db())))
-                .map(|field| TypeContext::new(Some(field.declared_ty)))
-                .unwrap_or_default();
+                .map(|key| self.get_or_infer_expression(key, key_tcx));
+            let value_tcx = if let Some(key) = key_ty.and_then(Type::as_string_literal)
+                && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
+            {
+                TypeContext::new(Some(field.declared_ty))
+            } else if key_ty.is_some_and(|key_ty| {
+                key_ty.is_assignable_to(self.db(), KnownClass::Str.to_instance(self.db()))
+            }) {
+                TypeContext::new(typed_dict.arbitrary_key_value_type(self.db()))
+            } else {
+                TypeContext::default()
+            };
             self.get_or_infer_expression(&item.value, value_tcx);
         }
     }

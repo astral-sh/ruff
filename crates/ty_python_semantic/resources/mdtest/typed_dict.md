@@ -6033,6 +6033,24 @@ def _(
     optional: OptionalTarget = {**extra_only}  # error: [invalid-argument-type]
 ```
 
+### Non-literal keys in an `extra_items` TypedDict constructor must be safe for every possible key
+
+```py
+from typing_extensions import NotRequired, TypedDict
+
+class ExtraIntOnly(TypedDict, extra_items=int): ...
+
+class WithDeclaredItem(TypedDict, extra_items=int):
+    label: NotRequired[str]
+
+def _(key: str) -> None:
+    bad_literal: ExtraIntOnly = {key: "bad"}  # error: [invalid-argument-type]
+    ExtraIntOnly({key: "bad"})  # error: [invalid-argument-type]
+
+    # The runtime key may be `label`, so the value must also be assignable to `str`.
+    bad_declared_item: WithDeclaredItem = {key: 1}  # error: [invalid-argument-type]
+```
+
 ### Assignability between TypedDicts accounts for the type of extra items
 
 ```py

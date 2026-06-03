@@ -10,7 +10,7 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field};
+use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY, PARAMETER_ALREADY_ASSIGNED,
@@ -308,17 +308,26 @@ impl<'db> TypedDictType<'db> {
         })
     }
 
-    pub(crate) fn arbitrary_key_write_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn arbitrary_key_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let extra_items = self.explicit_extra_items(db)?;
-        if extra_items.is_read_only() || self.items(db).values().any(TypedDictField::is_read_only) {
-            return None;
-        }
 
         Some(IntersectionType::from_elements(
             db,
             std::iter::once(extra_items.declared_ty)
                 .chain(self.items(db).values().map(|field| field.declared_ty)),
         ))
+    }
+
+    pub(crate) fn arbitrary_key_write_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if self
+            .explicit_extra_items(db)
+            .is_some_and(TypedDictExtraItems::is_read_only)
+            || self.items(db).values().any(TypedDictField::is_read_only)
+        {
+            return None;
+        }
+
+        self.arbitrary_key_value_type(db)
     }
 
     pub(crate) fn supports_arbitrary_key_deletion(self, db: &'db dyn Db) -> bool {
@@ -2344,6 +2353,25 @@ fn validate_merged_dict_literal<'db, 'ast>(
         if let Some(key_expr) = &item.key {
             let key_ty = expression_type_fn(key_expr, TypeContext::default());
             let Some(key_literal) = key_ty.as_string_literal() else {
+                if key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+                    && let Some(expected_ty) = typed_dict.arbitrary_key_value_type(db)
+                {
+                    let value_ty =
+                        expression_type_fn(&item.value, TypeContext::new(Some(expected_ty)));
+                    if !value_ty.is_assignable_to(db, expected_ty) {
+                        valid = false;
+                        if let Some(builder) =
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, &item.value)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Value of type `{}` is not assignable to arbitrary key value type `{}` on TypedDict `{}`",
+                                value_ty.display(db),
+                                expected_ty.display(db),
+                                Type::TypedDict(typed_dict).display(db),
+                            ));
+                        }
+                    }
+                }
                 continue;
             };
 
