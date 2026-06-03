@@ -1119,8 +1119,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             };
             let aliased_expression = Expression::new(
                 self.db,
-                self.file,
-                alias.expression_scope,
+                self.scope_ids_by_scope[alias.expression_scope],
                 AstNodeRef::new(self.module, alias.expression),
                 None,
                 ExpressionKind::Normal,
@@ -1381,10 +1380,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
-        let definition: Definition<'db> = Definition::new(
+        let definition: Definition<'db> = Definition::create(
             self.db,
-            self.file,
-            self.current_scope(),
+            self.scope_ids_by_scope[self.current_scope()],
             place,
             kind,
             is_reexported,
@@ -1628,10 +1626,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
 
             let place: ScopedPlaceId = self.add_symbol(name.clone()).into();
-            let definition = Definition::new(
+            let definition = Definition::create(
                 self.db,
-                self.file,
-                self.current_scope(),
+                self.scope_ids_by_scope[self.current_scope()],
                 place,
                 DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
                     name,
@@ -2059,8 +2056,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
-            self.file,
-            self.current_scope(),
+            self.scope_ids_by_scope[self.current_scope()],
             AstNodeRef::new(self.module, expression_node),
             assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,

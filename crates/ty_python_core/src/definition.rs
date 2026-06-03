@@ -12,6 +12,7 @@ use smallvec::SmallVec;
 use crate::Db;
 use crate::LoopToken;
 use crate::ast_node_ref::AstNodeRef;
+use crate::member::ScopedMemberId;
 use crate::node_key::NodeKey;
 use crate::place::ScopedPlaceId;
 use crate::scope::{FileScopeId, ScopeId};
@@ -30,14 +31,11 @@ use crate::unpack::{Unpack, UnpackPosition};
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(Ord, PartialOrd)]
 pub struct Definition<'db> {
-    /// The file in which the definition occurs.
-    pub file: File,
-
     /// The scope in which the definition occurs.
-    pub file_scope: FileScopeId,
+    pub scope_id: ScopeId<'db>,
 
-    /// The place ID of the definition.
-    pub place: ScopedPlaceId,
+    /// The place ID and re-export state of the definition.
+    place_info: DefinitionPlace,
 
     /// WARNING: Only access this field when doing type inference for the same
     /// file as where `Definition` is defined to avoid cross-file query dependencies.
@@ -45,17 +43,45 @@ pub struct Definition<'db> {
     #[returns(ref)]
     #[tracked]
     pub kind: DefinitionKind<'db>,
-
-    /// This is a dedicated field to avoid accessing `kind` to compute this value.
-    pub is_reexported: bool,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Definition<'_> {}
 
 impl<'db> Definition<'db> {
+    pub(crate) fn create(
+        db: &'db dyn Db,
+        scope_id: ScopeId<'db>,
+        place: ScopedPlaceId,
+        kind: DefinitionKind<'db>,
+        is_reexported: bool,
+    ) -> Self {
+        Self::new(
+            db,
+            scope_id,
+            DefinitionPlace::new(place, is_reexported),
+            kind,
+        )
+    }
+
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.scope_id(db)
+    }
+
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.scope_id(db).file(db)
+    }
+
+    pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
+        self.scope_id(db).file_scope_id(db)
+    }
+
+    pub fn place(self, db: &'db dyn Db) -> ScopedPlaceId {
+        self.place_info(db).place()
+    }
+
+    pub fn is_reexported(self, db: &'db dyn Db) -> bool {
+        self.place_info(db).is_reexported()
     }
 
     pub fn full_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
@@ -131,6 +157,45 @@ impl<'db> Definition<'db> {
                     .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
             }
             _ => None,
+        }
+    }
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, salsa::Update, get_size2::GetSize,
+)]
+#[doc(hidden)]
+pub enum DefinitionPlace {
+    Symbol {
+        id: ScopedSymbolId,
+        is_reexported: bool,
+    },
+    Member {
+        id: ScopedMemberId,
+        is_reexported: bool,
+    },
+}
+
+impl DefinitionPlace {
+    fn new(place: ScopedPlaceId, is_reexported: bool) -> Self {
+        match place {
+            ScopedPlaceId::Symbol(id) => Self::Symbol { id, is_reexported },
+            ScopedPlaceId::Member(id) => Self::Member { id, is_reexported },
+        }
+    }
+
+    fn place(self) -> ScopedPlaceId {
+        match self {
+            Self::Symbol { id, .. } => ScopedPlaceId::Symbol(id),
+            Self::Member { id, .. } => ScopedPlaceId::Member(id),
+        }
+    }
+
+    fn is_reexported(self) -> bool {
+        match self {
+            Self::Symbol { is_reexported, .. } | Self::Member { is_reexported, .. } => {
+                is_reexported
+            }
         }
     }
 }
