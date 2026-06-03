@@ -3471,7 +3471,7 @@ signatures when assigning to the explicit form. The reverse assignment is reject
 unpacked `TypedDict` may still receive hidden extra items.
 
 ```py
-from typing import Protocol
+from typing import Callable, ParamSpec, Protocol, TypeVar
 from typing_extensions import NotRequired, Required, TypedDict, Unpack
 
 class TD1(TypedDict):
@@ -3522,6 +3522,14 @@ def traditional_kwargs_source(**kwargs: int) -> None:
     pass
 
 traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def preserve_signature(callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+preserved_typed_dict_target: TypedDictKwargs = preserve_signature(func)
 ```
 
 ### Missing required keys remain incompatible
