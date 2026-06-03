@@ -1,6 +1,7 @@
 use super::{ArgumentForms, Binding, Bindings, CallableBinding, CallableItem};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
+use crate::types::callable::CallableFunctionProvenance;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
@@ -167,6 +168,25 @@ impl<'db> ConstructorBinding<'db> {
 
     pub(super) fn downstream_constructor_mut(&mut self) -> Option<&mut Bindings<'db>> {
         self.downstream_constructor.as_deref_mut()
+    }
+
+    pub(super) fn has_explicit_return_annotation(&self, db: &'db dyn Db) -> bool {
+        if !self.constructor_kind().is_init()
+            && self
+                .callable()
+                .callable_type
+                .try_upcast_to_callable(db)
+                .is_some_and(|callables| {
+                    callables.iter().any(|callable| {
+                        callable.provenance(db) == CallableFunctionProvenance::ExplicitReturn
+                    })
+                })
+        {
+            return true;
+        }
+
+        self.downstream_constructor()
+            .is_some_and(|bindings| bindings.has_explicit_constructor_return_annotation(db))
     }
 
     pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>

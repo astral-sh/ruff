@@ -152,6 +152,51 @@ def constructor_return_reachability() -> None:
     after: str = 1
 ```
 
+## Explicit unspecialized collection constructor returns
+
+An explicit unspecialized collection return is still part of the constructor's semantics.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class int: ...
+class str: ...
+class tuple: ...
+
+class list[T]:
+    def __new__(cls) -> list: ...
+    def append(self, value: T) -> None: ...
+    def get(self) -> T: ...
+```
+
+`/typeshed/stdlib/types.pyi`:
+
+```pyi
+class FunctionType: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+```py
+from typing_extensions import reveal_type
+
+def explicit_unspecialized_return() -> None:
+    xs = list()
+    reveal_type(xs)  # revealed: list[Unknown]
+    xs.append(1)
+    value: str = xs.get()
+```
+
 ## Reachability for specialized custom collection constructor returns
 
 Collection method calls still need normal reachability analysis when a custom typeshed preserves a

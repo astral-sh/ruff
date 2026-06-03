@@ -7989,6 +7989,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
         bound_return_ty: Type<'db>,
+        has_explicit_return_annotation: bool,
     ) -> Type<'db> {
         let Some(collection_class) = collection_class else {
             return bound_return_ty;
@@ -8007,6 +8008,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Refine only the normal unconstrained constructed instance. An explicit `__new__` or
         // metaclass `__call__` return type is part of the constructor's semantics and must win.
+        if has_explicit_return_annotation {
+            return if bound_return_ty == identity_instance {
+                unknown_instance
+            } else {
+                bound_return_ty
+            };
+        }
         if bound_return_ty != identity_instance && bound_return_ty != unknown_instance {
             return bound_return_ty;
         }
@@ -8528,12 +8536,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let scope = self.scope();
+        let has_explicit_return_annotation =
+            bindings.has_explicit_constructor_return_annotation(db);
         let bound_return_ty = bindings.return_type(db);
         let return_ty = self.infer_collection_constructor_return_type(
             collection_initializer_class,
             call_expression,
             call_expression_tcx,
             bound_return_ty,
+            has_explicit_return_annotation,
         );
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
