@@ -507,6 +507,18 @@ impl fmt::Display for SuppressionKind {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub(crate) struct FileSuppressionId(TextRange);
 
+impl Ord for FileSuppressionId {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.0.start(), self.0.end()).cmp(&(other.0.start(), other.0.end()))
+    }
+}
+
+impl PartialOrd for FileSuppressionId {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 enum SuppressionTarget {
     /// Suppress all lints

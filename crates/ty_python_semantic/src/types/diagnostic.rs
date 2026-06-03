@@ -44,8 +44,9 @@ use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, StringFlags};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::fmt::{self, Formatter};
+use thin_vec::ThinVec;
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
@@ -3516,8 +3517,11 @@ declare_lint! {
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
-    diagnostics: Vec<Diagnostic>,
-    used_suppressions: FxHashSet<FileSuppressionId>,
+    /// Most inference regions do not emit any diagnostics.
+    diagnostics: ThinVec<Diagnostic>,
+
+    /// Most inference regions do not use any suppressions.
+    used_suppressions: ThinVec<FileSuppressionId>,
 }
 
 pub(crate) fn report_mismatched_type_name<'db>(
@@ -3552,7 +3556,10 @@ impl TypeCheckDiagnostics {
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
-        self.used_suppressions.extend(&other.used_suppressions);
+        self.used_suppressions
+            .extend_from_slice(&other.used_suppressions);
+        self.used_suppressions.sort_unstable();
+        self.used_suppressions.dedup();
     }
 
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
@@ -3560,11 +3567,15 @@ impl TypeCheckDiagnostics {
     }
 
     pub(crate) fn mark_used(&mut self, suppression_id: FileSuppressionId) {
-        self.used_suppressions.insert(suppression_id);
+        if let Err(index) = self.used_suppressions.binary_search(&suppression_id) {
+            self.used_suppressions.insert(index, suppression_id);
+        }
     }
 
     pub(crate) fn is_used(&self, suppression_id: FileSuppressionId) -> bool {
-        self.used_suppressions.contains(&suppression_id)
+        self.used_suppressions
+            .binary_search(&suppression_id)
+            .is_ok()
     }
 
     pub(crate) fn used_len(&self) -> usize {
@@ -3577,7 +3588,7 @@ impl TypeCheckDiagnostics {
     }
 
     pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
-        self.diagnostics
+        self.diagnostics.into()
     }
 
     pub(crate) fn is_empty(&self) -> bool {
