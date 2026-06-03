@@ -1874,6 +1874,46 @@ result.add(1)
     }
 
     #[test]
+    fn later_shadowed_collection_constructor_is_not_indexed() {
+        let TestCase { db, file } = test_case(
+            "
+def f():
+    result = set()
+    result.add(1)
+    set = factory
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file).load(&db);
+        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+
+        let assignment = function.body[0].as_assign_stmt().unwrap();
+        let constructor = assignment.value.as_call_expr().unwrap();
+        let use_statement = &function.body[1];
+        let use_expression = use_statement
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap()
+            .func
+            .as_attribute_expr()
+            .unwrap()
+            .value
+            .as_ref();
+
+        assert!(!index.is_standalone_expression(&assignment.value));
+        assert!(!index.is_standalone_expression(constructor.func.as_ref()));
+        assert!(index.try_statement(use_statement).is_none());
+        assert!(
+            index
+                .unconstrained_collection_binding(use_expression)
+                .is_none()
+        );
+    }
+
+    #[test]
     fn scope_iterators() {
         fn scope_names<'a, 'db>(
             scopes: impl Iterator<Item = (FileScopeId, &'db Scope)>,

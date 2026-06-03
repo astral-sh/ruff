@@ -154,6 +154,20 @@ pub enum GlobalOrNonlocal {
     Nonlocal,
 }
 
+struct CollectionConstructorCandidate<'ast> {
+    scope: FileScopeId,
+    initializer: &'ast ast::Expr,
+    callable: &'ast ast::Expr,
+    assigned_to: Option<&'ast ast::StmtAssign>,
+}
+
+struct PendingCollectionConstructorUse<'ast, 'db> {
+    scope: FileScopeId,
+    statement: &'ast ast::Stmt,
+    definition: Definition<'db>,
+    use_expression: ExpressionNodeKey,
+}
+
 #[derive(Clone)]
 struct ConditionFlowSnapshots {
     truthy: FlowSnapshot,
@@ -240,6 +254,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
     // A map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
+    collection_constructor_candidates: Vec<CollectionConstructorCandidate<'ast>>,
+    pending_collection_constructor_uses: Vec<PendingCollectionConstructorUse<'ast, 'db>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -289,6 +305,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FxHashMap::default(),
             collections_by_use: FxHashMap::default(),
             uses_by_collection: FxHashMap::default(),
+            collection_constructor_candidates: Vec::new(),
+            pending_collection_constructor_uses: Vec::new(),
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
@@ -1040,6 +1058,61 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // cycle-related panics.
             .exactly_one()
             .ok()
+    }
+
+    fn is_potentially_unconstrained_collection_definition(
+        &self,
+        definition: Definition<'db>,
+    ) -> bool {
+        definition
+            .kind(self.db)
+            .as_unannotated_assignment()
+            .is_some_and(|assignment| {
+                self.is_potentially_unconstrained_collection_initializer(
+                    assignment.value(self.module),
+                    definition.file_scope(self.db),
+                )
+            })
+    }
+
+    fn materialize_collection_constructor_candidates(&mut self) {
+        for candidate in std::mem::take(&mut self.collection_constructor_candidates) {
+            if !self.is_potentially_unconstrained_collection_initializer(
+                candidate.initializer,
+                candidate.scope,
+            ) {
+                continue;
+            }
+
+            self.add_standalone_expression_in_scope(candidate.callable, candidate.scope);
+            if let Some(assigned_to) = candidate.assigned_to {
+                self.add_standalone_assigned_expression_in_scope(
+                    candidate.initializer,
+                    assigned_to,
+                    candidate.scope,
+                );
+            }
+        }
+
+        for pending in std::mem::take(&mut self.pending_collection_constructor_uses) {
+            if !self.is_potentially_unconstrained_collection_definition(pending.definition) {
+                continue;
+            }
+
+            let standalone_statement = self
+                .statements_by_node
+                .get(&pending.statement.into())
+                .copied()
+                .unwrap_or_else(|| {
+                    self.add_standalone_statement_in_scope(pending.statement, pending.scope)
+                });
+            self.uses_by_collection
+                .entry(pending.definition)
+                .or_default()
+                .push((standalone_statement, pending.use_expression));
+            self.collections_by_use
+                .insert(pending.use_expression, pending.definition);
+        }
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
@@ -2084,7 +2157,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
+        self.add_standalone_expression_in_scope(expression_node, self.current_scope())
+    }
+
+    fn add_standalone_expression_in_scope(
+        &mut self,
+        expression_node: &ast::Expr,
+        scope: FileScopeId,
+    ) -> Expression<'db> {
+        self.add_standalone_expression_impl(expression_node, scope, ExpressionKind::Normal, None)
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa
@@ -2095,8 +2176,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         expression_node: &ast::Expr,
         assigned_to: &ast::StmtAssign,
     ) -> Expression<'db> {
+        self.add_standalone_assigned_expression_in_scope(
+            expression_node,
+            assigned_to,
+            self.current_scope(),
+        )
+    }
+
+    fn add_standalone_assigned_expression_in_scope(
+        &mut self,
+        expression_node: &ast::Expr,
+        assigned_to: &ast::StmtAssign,
+        scope: FileScopeId,
+    ) -> Expression<'db> {
         self.add_standalone_expression_impl(
             expression_node,
+            scope,
             ExpressionKind::Normal,
             Some(assigned_to),
         )
@@ -2105,19 +2200,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Same as [`SemanticIndexBuilder::add_standalone_expression`], but marks the expression as a
     /// *type* expression, which makes sure that it will later be inferred as such.
     fn add_standalone_type_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, ExpressionKind::TypeExpression, None)
+        self.add_standalone_expression_impl(
+            expression_node,
+            self.current_scope(),
+            ExpressionKind::TypeExpression,
+            None,
+        )
     }
 
     fn add_standalone_expression_impl(
         &mut self,
         expression_node: &ast::Expr,
+        scope: FileScopeId,
         expression_kind: ExpressionKind,
         assigned_to: Option<&ast::StmtAssign>,
     ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
             self.file,
-            self.current_scope(),
+            scope,
             AstNodeRef::new(self.module, expression_node),
             assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
@@ -2128,6 +2229,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn add_standalone_statement(&mut self, statement_node: &ast::Stmt) -> Statement<'db> {
+        self.add_standalone_statement_in_scope(statement_node, self.current_scope())
+    }
+
+    fn add_standalone_statement_in_scope(
+        &mut self,
+        statement_node: &ast::Stmt,
+        scope: FileScopeId,
+    ) -> Statement<'db> {
         // Avoid allocating a salsa ingredient if the statement represents an existing
         // definition or standalone expression.
         let statement = match statement_node {
@@ -2137,9 +2246,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::ClassDef(class) => {
                 Some(Statement::Definition(self.expect_single_definition(class)))
             }
-            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                Some(Statement::Expression(self.add_standalone_expression(value)))
-            }
+            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => Some(Statement::Expression(
+                self.add_standalone_expression_in_scope(value, scope),
+            )),
             ast::Stmt::Assign(assign) => {
                 if let [ast::Expr::Name(name)] = &assign.targets[..] {
                     Some(Statement::Definition(self.expect_single_definition(name)))
@@ -2165,7 +2274,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             Statement::Other(StatementInner::new(
                 self.db,
                 self.file,
-                self.current_scope(),
+                scope,
                 AstNodeRef::new(self.module, statement_node),
             ))
         };
@@ -2496,6 +2605,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
+        self.materialize_collection_constructor_candidates();
 
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
@@ -3021,9 +3131,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     )
                 {
                     if let Some(func) = empty_collection_constructor_callable(&node.value) {
-                        self.add_standalone_expression(func);
+                        self.collection_constructor_candidates.push(
+                            CollectionConstructorCandidate {
+                                scope: self.current_scope(),
+                                initializer: &node.value,
+                                callable: func,
+                                assigned_to: matches!(
+                                    node.targets.as_slice(),
+                                    [ast::Expr::Name(_)]
+                                )
+                                .then_some(node),
+                            },
+                        );
+                    } else {
+                        self.add_standalone_assigned_expression(&node.value, node);
                     }
-                    self.add_standalone_assigned_expression(&node.value, node);
                 }
 
                 // Optimization for the common case: if there's just one target, and it's not an
@@ -3978,24 +4100,21 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             });
 
-        if current_statement.lambda_expressions.is_empty()
-            && current_statement.collection_uses.is_empty()
-        {
-            return;
-        }
-
-        let standalone_statement = self.add_standalone_statement(stmt);
-
         // The body of a lambda expression needs access to the `Callable` type
         // context the lambda is being inferred with, and so any statement
         // containing a lambda must be inferable as a standalone statement
         // to avoid large scope-level cycles.
-        self.enclosing_lambda_statements.extend(
-            current_statement
-                .lambda_expressions
-                .into_iter()
-                .map(|lambda| (lambda.into(), standalone_statement)),
-        );
+        let mut standalone_statement =
+            (!current_statement.lambda_expressions.is_empty()).then(|| {
+                let standalone_statement = self.add_standalone_statement(stmt);
+                self.enclosing_lambda_statements.extend(
+                    current_statement
+                        .lambda_expressions
+                        .into_iter()
+                        .map(|lambda| (lambda.into(), standalone_statement)),
+                );
+                standalone_statement
+            });
 
         // The inferred element type of collection literal depends on uses of
         // the collection in its containing scope, and so each use must be part
@@ -4009,6 +4128,30 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 continue;
             }
 
+            if collection_def
+                .kind(self.db)
+                .as_unannotated_assignment()
+                .is_some_and(|assignment| {
+                    empty_collection_constructor_callable(assignment.value(self.module)).is_some()
+                })
+            {
+                self.pending_collection_constructor_uses
+                    .push(PendingCollectionConstructorUse {
+                        scope: self.current_scope(),
+                        statement: stmt,
+                        definition: collection_def,
+                        use_expression,
+                    });
+                continue;
+            }
+
+            let standalone_statement = if let Some(standalone_statement) = standalone_statement {
+                standalone_statement
+            } else {
+                let statement = self.add_standalone_statement(stmt);
+                standalone_statement = Some(statement);
+                statement
+            };
             self.uses_by_collection
                 .entry(collection_def)
                 .or_default()
