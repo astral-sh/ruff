@@ -1643,40 +1643,6 @@ fn specialization_variance<'db>(
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
-    fn type_is_fully_static_for_invariant_disjointness(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        let ty = ty.expand_eagerly(db);
-        if ty.is_dynamic() || ty.has_typevar_or_typevar_instance(db) {
-            return false;
-        }
-
-        let visitor = ApplyTypeMappingVisitor::default();
-        let top = ty.materialize(db, MaterializationKind::Top, &visitor);
-        let bottom = ty.materialize(db, MaterializationKind::Bottom, &visitor);
-
-        visitor.is_equivalent_to_materialization(db, ty, top)
-            && visitor.is_equivalent_to_materialization(db, ty, bottom)
-    }
-
-    fn invariant_specialization_pair_is_disjoint(
-        &self,
-        db: &'db dyn Db,
-        left: Type<'db>,
-        right: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        // Unlike covariant parameters, unequal static invariant arguments cannot share a
-        // common specialization. Gradual and type-variable arguments may still overlap.
-        ConstraintSet::from_bool(
-            self.constraints,
-            Self::type_is_fully_static_for_invariant_disjointness(db, left)
-                && Self::type_is_fully_static_for_invariant_disjointness(db, right),
-        )
-        .and(db, self.constraints, || {
-            self.as_equivalence_checker()
-                .check_type_pair(db, left, right)
-                .negate(db, self.constraints)
-        })
-    }
-
     pub(super) fn check_specialization_pair(
         &self,
         db: &'db dyn Db,
@@ -1704,7 +1670,21 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
                 TypeVarVariance::Invariant => {
-                    self.invariant_specialization_pair_is_disjoint(db, *left_type, *right_type)
+                    let left_type = left_type.resolve_type_alias(db);
+                    let right_type = right_type.resolve_type_alias(db);
+
+                    // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
+                    // and `R` have any common materialization, so this is symmetric despite
+                    // using a directional subtyping checker.
+                    self.as_relation_checker(TypeRelation::Subtyping)
+                        .check_subtyping_in_invariant_position(
+                            db,
+                            left_type,
+                            MaterializationKind::Bottom,
+                            right_type,
+                            MaterializationKind::Top,
+                        )
+                        .negate(db, self.constraints)
                 }
 
                 // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`

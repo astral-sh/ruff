@@ -1293,13 +1293,6 @@ impl<'db> ClassType<'db> {
                     self_alias.origin(db) == other_alias.origin(db)
                         && self_alias
                             .specialization(db)
-                            .generic_context(db)
-                            .variables(db)
-                            .any(|typevar| {
-                                matches!(typevar.variance(db), TypeVarVariance::Invariant)
-                            })
-                        && self_alias
-                            .specialization(db)
                             .is_disjoint_from(
                                 db,
                                 other_alias.specialization(db),
