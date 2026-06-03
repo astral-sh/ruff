@@ -432,6 +432,29 @@ Alternatively, the above can also be written as a method call:
 reveal_type(attr_property.__get__(c, C))  # revealed: int
 ```
 
+The full receiver is used to match a getter with an explicit receiver annotation, while `Self` in
+the return type is bound to the receiver's runtime class:
+
+```py
+from typing import Protocol, runtime_checkable
+from typing_extensions import Self
+
+@runtime_checkable
+class Marker(Protocol):
+    marker: int
+
+class Value:
+    @property
+    def property(self: Marker) -> Self:
+        raise NotImplementedError
+
+def _(value: Value):
+    if isinstance(value, Marker):
+        reveal_type(value.property)  # revealed: Value
+        reveal_type(Value.property.__get__(value, Value))  # revealed: Value
+        reveal_type(type(Value.property).__get__(Value.property, value, Value))  # revealed: Value
+```
+
 When we access `attr` on the class itself, the descriptor protocol is also invoked, but the instance
 argument is set to `None`. When `instance` is `None`, the call to `property.__get__` returns the
 property instance itself. So the following expressions are all equivalent

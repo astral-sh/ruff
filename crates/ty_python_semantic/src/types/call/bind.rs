@@ -1342,9 +1342,9 @@ impl<'db> Bindings<'db> {
                             }
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    let instance = getter.self_binding_type(db, *instance);
+                                    let getter = getter.apply_self_binding(db, *instance);
                                     if let Ok(return_ty) = getter
-                                        .try_call(db, &CallArguments::positional([instance]))
+                                        .try_call(db, &CallArguments::positional([*instance]))
                                         .map(|binding| binding.return_type(db))
                                     {
                                         overload.set_return_type(return_ty);
@@ -1372,9 +1372,9 @@ impl<'db> Bindings<'db> {
                             }
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    let instance = getter.self_binding_type(db, *instance);
+                                    let getter = getter.apply_self_binding(db, *instance);
                                     if let Ok(return_ty) = getter
-                                        .try_call(db, &CallArguments::positional([instance]))
+                                        .try_call(db, &CallArguments::positional([*instance]))
                                         .map(|binding| binding.return_type(db))
                                     {
                                         overload.set_return_type(return_ty);

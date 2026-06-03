@@ -1136,15 +1136,22 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub(crate) fn self_binding_type(self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
+    /// Apply `Self` substitutions without binding or replacing the receiver parameter.
+    pub(crate) fn apply_self_binding(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         match self {
             Type::FunctionLiteral(function) => {
-                function.signature(db).self_binding_type(db, self_type)
+                let self_type = function.signature(db).self_binding_type(db, self_type);
+                self.apply_type_mapping(
+                    db,
+                    &TypeMapping::BindSelf(SelfBinding::new(db, self_type, None)),
+                    TypeContext::default(),
+                )
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
-                callable.signatures(db).self_binding_type(db, self_type)
+                let self_type = callable.signatures(db).self_binding_type(db, self_type);
+                Type::Callable(callable.apply_self(db, self_type))
             }
-            _ => self_type,
+            _ => self,
         }
     }
 
