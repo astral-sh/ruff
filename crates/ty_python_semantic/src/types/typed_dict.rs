@@ -1589,88 +1589,69 @@ pub(crate) struct UnpackedTypedDictKey<'db> {
 
 /// A normalized view of a `TypedDict`-shaped value used when expanding `**kwargs`.
 ///
-/// Union and intersection inputs are combined into one set of possible keys and one tail describing
-/// arbitrary undeclared keys.
+/// Union and intersection inputs are combined into one set of possible keys and one openness
+/// policy describing arbitrary undeclared keys.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct UnpackedTypedDict<'db> {
     /// Declared keys that may be present after unpacking.
     pub(crate) keys: BTreeMap<Name, UnpackedTypedDictKey<'db>>,
-    pub(crate) tail: UnpackedTypedDictTail<'db>,
+    pub(crate) openness: TypedDictOpenness<'db>,
 }
 
-/// The arbitrary-key tail of a normalized `TypedDict` shape.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum UnpackedTypedDictTail<'db> {
-    /// The shape cannot contain undeclared keys.
-    Closed,
-    /// An ordinary open `TypedDict` may contain undeclared values of type `object`.
-    ///
-    /// Hidden values constrain an existing `**kwargs` parameter but do not themselves cause an
-    /// unknown-key error when the destination has no `**kwargs`.
-    Hidden,
-    /// Undeclared keys are explicitly exposed with this value type.
-    Explicit(Type<'db>),
+fn intersect_unpacked_typed_dict_openness<'db>(
+    db: &'db dyn Db,
+    openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
+) -> TypedDictOpenness<'db> {
+    let mut explicit_value_types = Vec::new();
+
+    for openness in openness {
+        match openness {
+            TypedDictOpenness::Closed => return TypedDictOpenness::Closed,
+            TypedDictOpenness::Open => {}
+            TypedDictOpenness::Extra(extra_items) => {
+                explicit_value_types.push(extra_items.declared_ty);
+            }
+        }
+    }
+
+    if explicit_value_types.is_empty() {
+        TypedDictOpenness::Open
+    } else {
+        TypedDictOpenness::extra(
+            db,
+            IntersectionType::from_elements(db, explicit_value_types),
+            true,
+        )
+    }
 }
 
-impl<'db> UnpackedTypedDictTail<'db> {
-    pub(crate) const fn value_ty(self) -> Option<Type<'db>> {
-        match self {
-            Self::Closed => None,
-            Self::Hidden => Some(Type::object()),
-            Self::Explicit(value_ty) => Some(value_ty),
-        }
-    }
+fn union_unpacked_typed_dict_openness<'db>(
+    db: &'db dyn Db,
+    openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
+) -> TypedDictOpenness<'db> {
+    let mut value_types = UnionBuilder::new(db);
+    let mut has_open = false;
+    let mut has_explicit_extra_items = false;
 
-    pub(crate) const fn is_explicit(self) -> bool {
-        matches!(self, Self::Explicit(_))
-    }
-
-    fn intersection(
-        db: &'db dyn Db,
-        tails: impl IntoIterator<Item = UnpackedTypedDictTail<'db>>,
-    ) -> Self {
-        let mut explicit_value_types = Vec::new();
-
-        for tail in tails {
-            match tail {
-                Self::Closed => return Self::Closed,
-                Self::Hidden => {}
-                Self::Explicit(value_ty) => explicit_value_types.push(value_ty),
+    for openness in openness {
+        match openness {
+            TypedDictOpenness::Closed => {}
+            TypedDictOpenness::Open => has_open = true,
+            TypedDictOpenness::Extra(extra_items) => {
+                value_types = value_types.add(extra_items.declared_ty);
+                has_explicit_extra_items = true;
             }
         }
-
-        if explicit_value_types.is_empty() {
-            Self::Hidden
-        } else {
-            Self::Explicit(IntersectionType::from_elements(db, explicit_value_types))
-        }
     }
 
-    fn union(db: &'db dyn Db, tails: impl IntoIterator<Item = UnpackedTypedDictTail<'db>>) -> Self {
-        let mut value_types = UnionBuilder::new(db);
-        let mut has_hidden_tail = false;
-        let mut has_explicit_tail = false;
-
-        for tail in tails {
-            match tail {
-                Self::Closed => {}
-                Self::Hidden => has_hidden_tail = true,
-                Self::Explicit(value_ty) => {
-                    value_types = value_types.add(value_ty);
-                    has_explicit_tail = true;
-                }
-            }
-        }
-
-        if has_hidden_tail && has_explicit_tail {
-            Self::Explicit(Type::object())
-        } else if has_hidden_tail {
-            Self::Hidden
-        } else if has_explicit_tail {
-            Self::Explicit(value_types.build())
-        } else {
-            Self::Closed
-        }
+    if has_open && has_explicit_extra_items {
+        TypedDictOpenness::extra(db, Type::object(), true)
+    } else if has_open {
+        TypedDictOpenness::Open
+    } else if has_explicit_extra_items {
+        TypedDictOpenness::extra(db, value_types.build(), true)
+    } else {
+        TypedDictOpenness::Closed
     }
 }
 
@@ -1690,7 +1671,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     extract_unpacked_typed_dict_from_value_type(db, ty).map(|unpacked| unpacked.keys)
 }
 
-/// Extracts the declared keys and arbitrary-key tail from a `TypedDict`-shaped value.
+/// Extracts the declared keys and openness from a `TypedDict`-shaped value.
 pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1711,14 +1692,10 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                     )
                 })
                 .collect();
-            let tail = match td.openness(db) {
-                TypedDictOpenness::Open => UnpackedTypedDictTail::Hidden,
-                TypedDictOpenness::Closed => UnpackedTypedDictTail::Closed,
-                TypedDictOpenness::Extra(extra_items) => {
-                    UnpackedTypedDictTail::Explicit(extra_items.declared_ty)
-                }
-            };
-            Some(UnpackedTypedDict { keys, tail })
+            Some(UnpackedTypedDict {
+                keys,
+                openness: td.openness(db),
+            })
         }
         Type::Intersection(intersection) => {
             // Collect TypedDict shapes from all TypedDicts in the intersection.
@@ -1760,23 +1737,26 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                     if unpacked.keys.contains_key(key) {
                         continue;
                     }
-                    if let Some(extra_items_ty) = unpacked.tail.value_ty() {
+                    if let Some(extra_items) = unpacked.openness.effective_extra_items() {
                         unpacked_key.value_ty = IntersectionType::from_two_elements(
                             db,
                             unpacked_key.value_ty,
-                            extra_items_ty,
+                            extra_items.declared_ty,
                         );
                         unpacked_key.definition = None;
                     }
                 }
             }
 
-            let tail = UnpackedTypedDictTail::intersection(
+            let openness = intersect_unpacked_typed_dict_openness(
                 db,
-                unpacked_elements.iter().map(|unpacked| unpacked.tail),
+                unpacked_elements.iter().map(|unpacked| unpacked.openness),
             );
 
-            Some(UnpackedTypedDict { keys: result, tail })
+            Some(UnpackedTypedDict {
+                keys: result,
+                openness,
+            })
         }
         Type::Union(union) => {
             let unpacked_elements: Vec<_> = union
@@ -1807,9 +1787,9 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                         } else {
                             unpacked_key.definition
                         });
-                    } else if let Some(extra_items_ty) = unpacked.tail.value_ty() {
+                    } else if let Some(extra_items) = unpacked.openness.effective_extra_items() {
                         saw_key = true;
-                        value_ty = value_ty.add(extra_items_ty);
+                        value_ty = value_ty.add(extra_items.declared_ty);
                         is_required = false;
                         definition = Some(None);
                     } else {
@@ -1830,12 +1810,15 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                 }
             }
 
-            let tail = UnpackedTypedDictTail::union(
+            let openness = union_unpacked_typed_dict_openness(
                 db,
-                unpacked_elements.iter().map(|unpacked| unpacked.tail),
+                unpacked_elements.iter().map(|unpacked| unpacked.openness),
             );
 
-            Some(UnpackedTypedDict { keys: result, tail })
+            Some(UnpackedTypedDict {
+                keys: result,
+                openness,
+            })
         }
         Type::TypeAlias(alias) => {
             extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
@@ -2157,25 +2140,26 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
     (provided_keys, valid)
 }
 
-/// Validates the arbitrary-key tail of a `TypedDict`-shaped constructor argument.
+/// Validates the arbitrary keys of a `TypedDict`-shaped constructor argument.
 ///
-/// The source tail must be valid for every target field it could provide and for the target's
-/// explicit extra-items type. Hidden open tails retain ty's existing leniency when constructing
-/// another open `TypedDict`.
-fn validate_extracted_typed_dict_tail<'db, 'ast>(
+/// The source's effective extra items must be valid for every target field they could provide and
+/// for the target's explicit extra-items type. Open sources retain ty's existing leniency when
+/// constructing another open `TypedDict`.
+fn validate_extracted_typed_dict_openness<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
     source_keys: &BTreeMap<Name, UnpackedTypedDictKey<'db>>,
-    tail: UnpackedTypedDictTail<'db>,
+    source_openness: TypedDictOpenness<'db>,
     nodes: TypedDictAssignmentNodes<'ast>,
     ignored_keys: &OrderSet<Name>,
 ) -> bool {
     let db = context.db();
-    let Some(extra_items_ty) = tail.value_ty() else {
+    let Some(extra_items) = source_openness.effective_extra_items() else {
         return true;
     };
+    let extra_items_ty = extra_items.declared_ty;
 
-    if typed_dict.openness(db).is_open() && !tail.is_explicit() {
+    if typed_dict.openness(db).is_open() && source_openness.is_open() {
         return true;
     }
 
@@ -2257,7 +2241,7 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
     let unpacked = extract_unpacked_typed_dict_from_value_type(db, arg_ty)?;
-    let tail = unpacked.tail;
+    let source_openness = unpacked.openness;
     let validate_extra_keys = !typed_dict.openness(db).is_open();
     let unpacked_keys = unpacked
         .keys
@@ -2279,11 +2263,11 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
         ignored_keys,
     )
     .0;
-    validate_extracted_typed_dict_tail(
+    validate_extracted_typed_dict_openness(
         context,
         typed_dict,
         &unpacked_keys,
-        tail,
+        source_openness,
         nodes,
         ignored_keys,
     );
@@ -2766,11 +2750,11 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             full_object_ty_annotation(unpacked_type),
             &ignored_keys,
         );
-        unpacked_valid &= validate_extracted_typed_dict_tail(
+        unpacked_valid &= validate_extracted_typed_dict_openness(
             context,
             typed_dict,
             &unpacked.keys,
-            unpacked.tail,
+            unpacked.openness,
             nodes,
             &ignored_keys,
         );
@@ -2803,11 +2787,11 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             return false;
         }
 
-        return validate_extracted_typed_dict_tail(
+        return validate_extracted_typed_dict_openness(
             context,
             typed_dict,
             &BTreeMap::new(),
-            UnpackedTypedDictTail::Explicit(value_ty),
+            TypedDictOpenness::extra(db, value_ty, true),
             nodes,
             shadowed_keys,
         );
