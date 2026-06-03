@@ -5728,7 +5728,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
         );
 
-        self.infer_expression_impl(expression, tcx)
+        if !self
+            .inference_flags()
+            .contains(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION)
+        {
+            return self.infer_expression_impl(expression, tcx);
+        }
+
+        self.context
+            .inference_flags
+            .remove(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION);
+        let ty = self.infer_expression_impl(expression, tcx);
+        self.context
+            .inference_flags
+            .insert(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION);
+        ty
     }
 
     fn infer_expression_with_state(

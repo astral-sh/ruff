@@ -100,6 +100,9 @@ class C:
     type Alias = tuple[Self]
 
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Simplified = object | Self
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     type Bound[T: Self] = T
 
     type Metadata = Annotated[int, tuple[Self]]
