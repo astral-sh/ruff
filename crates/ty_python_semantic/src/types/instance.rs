@@ -642,7 +642,7 @@ enum NominalInstanceInner<'db> {
     SysVersionInfo,
 }
 
-fn sys_version_info_class<'db>(db: &'db dyn Db) -> Option<ClassType<'db>> {
+fn sys_version_info_class(db: &dyn Db) -> Option<ClassType<'_>> {
     KnownClass::VersionInfo
         .try_to_class_literal(db)
         .map(|class| class.default_specialization(db))
