@@ -151,3 +151,51 @@ def constructor_return_reachability() -> None:
 
     after: str = 1
 ```
+
+## Reachability for specialized custom collection constructor returns
+
+Collection method calls still need normal reachability analysis when a custom typeshed preserves a
+specialized collection return type.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+from typing_extensions import Never
+
+class object: ...
+class int: ...
+class str: ...
+class tuple: ...
+class type: ...
+
+class ListMeta(type):
+    def __call__(self) -> list[Never]: ...
+
+class list[T](metaclass=ListMeta):
+    def pop(self) -> T: ...
+```
+
+`/typeshed/stdlib/types.pyi`:
+
+```pyi
+class FunctionType: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+Never: object
+```
+
+```py
+def specialized_constructor_return_reachability() -> None:
+    result = list()
+    result.pop()
+
+    after: str = 1
+```

@@ -1106,7 +1106,15 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
-fn is_builtin_collection_method_call(db: &dyn Db, callable: Expression) -> bool {
+fn is_non_terminal_builtin_collection_method_call(
+    db: &dyn Db,
+    callable: Expression,
+    is_await: bool,
+) -> bool {
+    if is_await {
+        return false;
+    }
+
     let module = parsed_module(db, callable.file(db)).load(db);
     let ast::Expr::Attribute(attribute) = callable.node_ref(db).node(&module) else {
         return false;
@@ -1135,9 +1143,29 @@ fn is_builtin_collection_method_call(db: &dyn Db, callable: Expression) -> bool 
         return false;
     };
 
-    Type::call_return_type_with_no_arguments(db, constructor_ty)
+    let return_ty = Type::call_return_type_with_no_arguments(db, constructor_ty);
+    if !return_ty
         .class_specialization(db)
         .is_some_and(|(class, _)| class.is_known(db, collection_class))
+    {
+        return false;
+    }
+
+    let Place::Defined(DefinedPlace { ty: method_ty, .. }) =
+        return_ty.member(db, attribute.attr.as_str()).place
+    else {
+        return false;
+    };
+    let Some(method) = method_ty
+        .try_upcast_to_callable(db)
+        .and_then(CallableTypes::exactly_one)
+    else {
+        return false;
+    };
+
+    method.signatures(db).overloads.iter().all(|overload| {
+        !overload.return_ty.is_equivalent_to(db, Type::Never) && !overload.return_ty.has_typevar(db)
+    })
 }
 
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
@@ -1155,9 +1183,10 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             is_await,
         }) => {
             // Collection constructor inference depends on later method calls. Prove the
-            // constructor is a builtin before short-circuiting this call's reachability analysis,
-            // so the method call does not create a dependency back on the inferred collection.
-            if is_builtin_collection_method_call(db, callable) {
+            // constructor and selected method are nonterminal before short-circuiting this call's
+            // reachability analysis, so the method call does not create a dependency back on the
+            // inferred collection.
+            if is_non_terminal_builtin_collection_method_call(db, callable, is_await) {
                 return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
             }
 
