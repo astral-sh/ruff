@@ -62,13 +62,25 @@ impl Default for TypedDictParams {
 /// most operations. `TypedDict`s with explicit extra items expose those items with a known type.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub enum TypedDictOpenness<'db> {
+    /// Undeclared items may exist at runtime, but are not directly accessible through most
+    /// `TypedDict` operations.
     #[default]
     Open,
+    /// Undeclared items cannot exist.
     Closed,
+    /// Undeclared items are explicitly exposed with the given value type and mutability.
     Extra(TypedDictExtraItems<'db>),
 }
 
 impl<'db> TypedDictOpenness<'db> {
+    /// Creates an explicit extra-items policy, canonicalizing `Never` to [`Self::Closed`].
+    ///
+    /// This makes the two equivalent declarations below share the same internal representation:
+    ///
+    /// ```python
+    /// class ByExtraItems(TypedDict, extra_items=Never): ...
+    /// class ByClosed(TypedDict, closed=True): ...
+    /// ```
     pub(crate) fn extra(db: &'db dyn Db, declared_ty: Type<'db>, is_read_only: bool) -> Self {
         if declared_ty.resolve_type_alias(db).is_never() {
             Self::Closed
@@ -80,6 +92,11 @@ impl<'db> TypedDictOpenness<'db> {
         }
     }
 
+    /// Returns extra items only when they were explicitly declared.
+    ///
+    /// An ordinary open `TypedDict` returns `None` here because its hidden items are not directly
+    /// accessible. Use [`Self::effective_extra_items`] for structural relations that must account
+    /// for those hidden items.
     pub(crate) const fn explicit_extra_items(self) -> Option<TypedDictExtraItems<'db>> {
         match self {
             Self::Extra(extra_items) => Some(extra_items),
@@ -152,6 +169,10 @@ impl<'db> TypedDictOpenness<'db> {
     }
 }
 
+/// The value type and mutability of a `TypedDict`'s extra items.
+///
+/// This represents either an explicit `extra_items` declaration or the synthetic read-only
+/// `object` policy returned for an open `TypedDict` by [`TypedDictOpenness::effective_extra_items`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub struct TypedDictExtraItems<'db> {
     pub(crate) declared_ty: Type<'db>,
@@ -213,6 +234,10 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
+    /// Returns whether this `TypedDict` is open, closed, or has explicitly typed extra items.
+    ///
+    /// A class-based `TypedDict` inherits the first non-open policy from its bases unless it
+    /// declares its own `closed` or `extra_items` argument.
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
         #[salsa::tracked(
             cycle_initial=|_, _, _| TypedDictOpenness::Open,
@@ -288,14 +313,23 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
+    /// Returns extra items only when they were explicitly declared.
     pub(crate) fn explicit_extra_items(self, db: &'db dyn Db) -> Option<TypedDictExtraItems<'db>> {
         self.openness(db).explicit_extra_items()
     }
 
+    /// Returns the extra-items policy used by structural relations.
+    ///
+    /// Unlike [`Self::explicit_extra_items`], this treats an ordinary open `TypedDict` as having
+    /// read-only extra items of type `object`.
     pub(crate) fn effective_extra_items(self, db: &'db dyn Db) -> Option<TypedDictExtraItems<'db>> {
         self.openness(db).effective_extra_items()
     }
 
+    /// Returns a type that contains every value that may be stored in this `TypedDict`.
+    ///
+    /// An ordinary open `TypedDict` immediately returns `object` because hidden items may have any
+    /// value type. This also avoids unnecessarily materializing its declared items.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let openness = self.openness(db);
         if openness.is_open() {
@@ -312,6 +346,10 @@ impl<'db> TypedDictType<'db> {
         builder.build()
     }
 
+    /// Returns the field exposed by a literal key.
+    ///
+    /// Undeclared keys synthesize a field only for explicit extra items. Hidden items on an
+    /// ordinary open `TypedDict` are intentionally not directly accessible.
     pub(crate) fn item(self, db: &'db dyn Db, key: &str) -> Option<TypedDictField<'db>> {
         self.items(db).get(key).cloned().or_else(|| {
             let extra_items = self.explicit_extra_items(db)?;
@@ -323,10 +361,18 @@ impl<'db> TypedDictType<'db> {
         })
     }
 
+    /// Returns the value type that is safe to read through an arbitrary string key.
+    ///
+    /// The runtime key may name either an extra item or any declared item, so the result is the
+    /// intersection of all of those value types. Returns `None` unless extra items are explicit.
     pub(crate) fn arbitrary_key_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.arbitrary_key_value_type_excluding(db, &OrderSet::new())
     }
 
+    /// Returns the arbitrary-key read type after excluding keys that are known to be shadowed.
+    ///
+    /// This is used while validating merged dictionary literals, where later entries determine the
+    /// final value for a known key.
     fn arbitrary_key_value_type_excluding(
         self,
         db: &'db dyn Db,
@@ -345,6 +391,10 @@ impl<'db> TypedDictType<'db> {
         ))
     }
 
+    /// Returns the value type that is safe to write through an arbitrary string key.
+    ///
+    /// A write may target any declared or extra item, so no such write is allowed if any possible
+    /// destination is read-only.
     pub(crate) fn arbitrary_key_write_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self
             .explicit_extra_items(db)
@@ -357,6 +407,10 @@ impl<'db> TypedDictType<'db> {
         self.arbitrary_key_value_type(db)
     }
 
+    /// Returns whether operations that delete an arbitrary key are safe.
+    ///
+    /// Operations such as `clear()` and `popitem()` require mutable explicit extra items and cannot
+    /// be exposed when any declared item is required or read-only.
     pub(crate) fn supports_arbitrary_key_deletion(self, db: &'db dyn Db) -> bool {
         self.explicit_extra_items(db)
             .is_some_and(|extra_items| !extra_items.is_read_only())
@@ -367,6 +421,9 @@ impl<'db> TypedDictType<'db> {
     }
 
     /// Returns the value type if this `TypedDict` is a subtype of `dict[str, VT]`.
+    ///
+    /// This requires mutable explicit extra items and optional, mutable declared items whose value
+    /// types are equivalent to the extra-items type.
     pub(crate) fn dict_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let extra_items = self.explicit_extra_items(db)?;
         if extra_items.is_read_only()
@@ -384,6 +441,9 @@ impl<'db> TypedDictType<'db> {
     }
 
     /// Returns the value type if this `TypedDict` is assignable to `dict[str, VT]`.
+    ///
+    /// This uses mutual assignability rather than equivalence so gradual value types can satisfy
+    /// the mutable `dict` contract.
     pub(crate) fn assignable_dict_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let extra_items = self.explicit_extra_items(db)?;
         if extra_items.is_read_only()
@@ -474,6 +534,7 @@ impl<'db> TypedDictType<'db> {
         Self::from_schema_items_with_openness(db, items, TypedDictOpenness::Open)
     }
 
+    /// Creates a synthesized schema while preserving its undeclared-item policy.
     pub(crate) fn from_schema_items_with_openness(
         db: &'db dyn Db,
         items: TypedDictSchema<'db>,
@@ -1232,6 +1293,14 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
     schema
 }
 
+/// Resolves the undeclared-item policy of a functional `TypedDict` definition.
+///
+/// The `extra_items` expression is inferred as an annotation so qualifiers such as `ReadOnly` are
+/// preserved. `extra_items=Never` is canonicalized to the same closed policy as `closed=True`.
+///
+/// ```python
+/// Movie = TypedDict("Movie", {"name": str}, extra_items=ReadOnly[int])
+/// ```
 #[salsa::tracked(
     cycle_initial = |_, _, _| TypedDictOpenness::Open,
     heap_size = ruff_memory_usage::heap_size
@@ -1518,10 +1587,18 @@ pub(crate) struct UnpackedTypedDictKey<'db> {
     pub(crate) definition: Option<Definition<'db>>,
 }
 
+/// A normalized view of a `TypedDict`-shaped value used when expanding `**kwargs`.
+///
+/// Union and intersection inputs are combined into one set of possible keys. The caller chooses
+/// whether `extra_items_ty` includes only explicit extra items or also the effective `object` tail
+/// of an ordinary open `TypedDict`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct UnpackedTypedDict<'db> {
+    /// Declared keys that may be present after unpacking.
     pub(crate) keys: BTreeMap<Name, UnpackedTypedDictKey<'db>>,
+    /// The type of arbitrary undeclared keys, according to the selected tail policy.
     pub(crate) extra_items_ty: Option<Type<'db>>,
+    /// Whether the normalized shape cannot contain undeclared keys.
     pub(crate) is_closed: bool,
 }
 
@@ -1542,6 +1619,10 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
 }
 
 /// Extracts the declared keys and explicit extra-items tail from a `TypedDict`-shaped value.
+///
+/// Ordinary open `TypedDict`s contribute no tail here because their hidden items are not directly
+/// accessible. Use the effective-tail variant when structural compatibility must account for those
+/// hidden items.
 pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1549,7 +1630,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     extract_unpacked_typed_dict_from_value_type_impl(db, ty, UnpackedTypedDictTail::Explicit)
 }
 
-/// Extracts the declared keys and effective extra-items tail from a `TypedDict`-shaped value.
+/// Extracts declared keys while treating ordinary open `TypedDict`s as having an `object` tail.
 fn extract_unpacked_typed_dict_with_effective_tail_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1574,12 +1655,20 @@ fn extract_unpacked_typed_dict_for_constructor<'db>(
     }
 }
 
+/// Selects whether unpack extraction includes only directly accessible extra items or the
+/// effective tail used by structural relations.
 #[derive(Clone, Copy)]
 enum UnpackedTypedDictTail {
+    /// Include only an explicit `extra_items` declaration.
     Explicit,
+    /// Also treat an ordinary open `TypedDict` as having an `object` tail.
     Effective,
 }
 
+/// Extracts and combines the `TypedDict` shapes contained in `ty`.
+///
+/// Intersections combine keys and tails with intersections; unions combine them with unions and
+/// only keep a key required if every union arm requires it.
 fn extract_unpacked_typed_dict_from_value_type_impl<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -2068,6 +2157,11 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
     (provided_keys, valid)
 }
 
+/// Validates the arbitrary-key tail of a `TypedDict`-shaped constructor argument.
+///
+/// The source tail must be valid for every target field it could provide and for the target's
+/// explicit extra-items type. When validated, targets without explicit extra items reject such a
+/// tail.
 fn validate_extracted_typed_dict_extra_items<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
@@ -2762,6 +2856,7 @@ pub struct SynthesizedTypedDictType<'db> {
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,
     pub(crate) kind: SynthesizedTypedDictKind,
+    /// Whether keys absent from `items` are hidden, forbidden, or explicitly typed.
     pub(crate) openness: TypedDictOpenness<'db>,
 }
 

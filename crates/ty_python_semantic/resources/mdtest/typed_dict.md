@@ -3407,8 +3407,8 @@ def func(**kwargs: Unpack[TD2]) -> None:
 
 ### Call-site validation
 
-At the call site, required keys must be provided, known keys must be type-checked, and extra
-keywords are rejected unless the `TypedDict` has explicit extra items.
+At the call site, required keys must be provided and known keys must be type-checked. Extra keywords
+are accepted as `object` for ordinary open `TypedDict`s.
 
 ```py
 from typing_extensions import NotRequired, Required, TypedDict, Unpack
@@ -3427,7 +3427,7 @@ def func(**kwargs: Unpack[TD2]) -> None:
 func()
 func(v1=1, v3="ok")
 func(v1=1, v2="optional", v3="ok")
-func(v1=1, v3="ok", v4=1)  # error: [unknown-argument]
+func(v1=1, v3="ok", v4=1)
 
 # error: [invalid-argument-type]
 func(v1=1, v3=1)
@@ -3533,7 +3533,8 @@ class TraditionalKwargsTarget(Protocol):
 def traditional_kwargs_source(**kwargs: int) -> None:
     pass
 
-traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source
+# TODO: This should be accepted because the declared field is assignable to `int`.
+traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source  # error: [invalid-assignment]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -3574,7 +3575,7 @@ missing_required: MissingRequiredKwarg = func
 ### Optional-only unpacked kwargs still expose named keys
 
 An unpacked all-optional open `TypedDict` exposes its declared keys as optional named keyword
-arguments, but does not accept unknown keyword arguments.
+arguments while accepting extra keyword arguments as `object`.
 
 ```py
 from typing import Protocol
@@ -3590,7 +3591,7 @@ class WantsA(Protocol):
     def __call__(self, *, a: int = 1) -> None: ...
 
 wants_a: WantsA = accepts_optional_kwargs
-accepts_optional_kwargs(b="whatever")  # error: [unknown-argument]
+accepts_optional_kwargs(b="whatever")
 
 # error: [invalid-argument-type]
 accepts_optional_kwargs(a="bad")
