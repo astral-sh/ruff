@@ -14,8 +14,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         func: &ast::Expr,
         arguments: &ast::Arguments,
-        collection_expr: Option<ast::ExprRef<'_>>,
         call_expression_tcx: TypeContext<'db>,
+        typed_dict_only: bool,
     ) -> Option<Type<'db>> {
         if !arguments.args.is_empty() {
             return None;
@@ -71,6 +71,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
+        if typed_dict_only {
+            return None;
+        }
+
         if arguments
             .keywords
             .iter()
@@ -110,7 +114,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_collection_literal(
             KnownClass::Dict,
-            collection_expr,
+            None,
             &items,
             &mut infer_elt_ty,
             call_expression_tcx,

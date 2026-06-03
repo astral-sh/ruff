@@ -154,141 +154,6 @@ pub enum GlobalOrNonlocal {
     Nonlocal,
 }
 
-#[derive(Copy, Clone, Default)]
-struct CollectionConstructorBindings(u8);
-
-impl CollectionConstructorBindings {
-    const LIST: u8 = 1;
-    const SET: u8 = 1 << 1;
-    const DICT: u8 = 1 << 2;
-
-    fn from_body(body: &[ast::Stmt]) -> Self {
-        let mut visitor = CollectionConstructorBindingVisitor::default();
-        visitor.visit_body(body);
-        visitor.bindings
-    }
-
-    fn insert(&mut self, name: &str) {
-        self.0 |= match name {
-            "list" => Self::LIST,
-            "set" => Self::SET,
-            "dict" => Self::DICT,
-            "*" => Self::LIST | Self::SET | Self::DICT,
-            _ => 0,
-        };
-    }
-
-    fn contains(self, name: &str) -> bool {
-        let binding = match name {
-            "list" => Self::LIST,
-            "set" => Self::SET,
-            "dict" => Self::DICT,
-            _ => return false,
-        };
-        self.0 & binding != 0
-    }
-}
-
-#[derive(Default)]
-struct CollectionConstructorBindingVisitor {
-    bindings: CollectionConstructorBindings,
-}
-
-impl<'ast> Visitor<'ast> for CollectionConstructorBindingVisitor {
-    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
-        match stmt {
-            ast::Stmt::FunctionDef(function) => {
-                self.bindings.insert(function.name.id.as_str());
-                for decorator in &function.decorator_list {
-                    self.visit_decorator(decorator);
-                }
-                if let Some(type_params) = &function.type_params {
-                    self.visit_type_params(type_params);
-                }
-                self.visit_parameters(&function.parameters);
-                if let Some(returns) = &function.returns {
-                    self.visit_annotation(returns);
-                }
-            }
-            ast::Stmt::ClassDef(class) => {
-                self.bindings.insert(class.name.id.as_str());
-                for decorator in &class.decorator_list {
-                    self.visit_decorator(decorator);
-                }
-                if let Some(type_params) = &class.type_params {
-                    self.visit_type_params(type_params);
-                }
-                if let Some(arguments) = &class.arguments {
-                    self.visit_arguments(arguments);
-                }
-            }
-            ast::Stmt::Global(ast::StmtGlobal { names, .. })
-            | ast::Stmt::Nonlocal(ast::StmtNonlocal { names, .. }) => {
-                for name in names {
-                    self.bindings.insert(name.id.as_str());
-                }
-            }
-            _ => walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
-        match expr {
-            ast::Expr::Name(name)
-                if matches!(name.ctx, ast::ExprContext::Store | ast::ExprContext::Del) =>
-            {
-                self.bindings.insert(name.id.as_str());
-            }
-            ast::Expr::Lambda(lambda) => {
-                if let Some(parameters) = &lambda.parameters {
-                    self.visit_parameters(parameters);
-                }
-                return;
-            }
-            _ => {}
-        }
-        walk_expr(self, expr);
-    }
-
-    fn visit_alias(&mut self, alias: &'ast ast::Alias) {
-        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-        self.bindings
-            .insert(name.id.as_str().split('.').next().unwrap_or_default());
-    }
-
-    fn visit_except_handler(&mut self, handler: &'ast ast::ExceptHandler) {
-        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-            type_,
-            name,
-            body,
-            ..
-        }) = handler;
-        if let Some(name) = name {
-            self.bindings.insert(name.id.as_str());
-        }
-        if let Some(type_) = type_ {
-            self.visit_expr(type_);
-        }
-        self.visit_body(body);
-    }
-
-    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
-        match pattern {
-            ast::Pattern::MatchAs(ast::PatternMatchAs {
-                name: Some(name), ..
-            })
-            | ast::Pattern::MatchStar(ast::PatternMatchStar {
-                name: Some(name), ..
-            })
-            | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
-                rest: Some(name), ..
-            }) => self.bindings.insert(name.id.as_str()),
-            _ => {}
-        }
-        walk_pattern(self, pattern);
-    }
-}
-
 #[derive(Clone)]
 struct ConditionFlowSnapshots {
     truthy: FlowSnapshot,
@@ -323,6 +188,12 @@ impl ConditionFlowSnapshot {
     }
 }
 
+#[derive(Default)]
+struct GlobalScopeFlags {
+    has_future_annotations: bool,
+    has_wildcard_import: bool,
+}
+
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -344,8 +215,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
 
-    /// Flags about the file's global scope
-    has_future_annotations: bool,
+    /// Flags about the file's global scope.
+    global_scope_flags: GlobalScopeFlags,
     /// Whether we are currently visiting an `if TYPE_CHECKING` block.
     in_type_checking_block: bool,
 
@@ -359,7 +230,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    collection_constructor_bindings: IndexVec<FileScopeId, Option<CollectionConstructorBindings>>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
@@ -372,9 +242,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
-    // A map from a constraining use of a collection literal to its definition.
+    // A map from a constraining use of a collection initializer to its definition.
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
-    // A map from a collection literal definition to statements containing a constraining use.
+    // A map from a collection initializer definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
@@ -407,12 +277,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
-            has_future_annotations: false,
+            global_scope_flags: GlobalScopeFlags::default(),
             in_type_checking_block: false,
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
-            collection_constructor_bindings: IndexVec::new(),
             ast_ids: IndexVec::new(),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
@@ -589,7 +458,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let file_scope_id = self.scopes.push(scope);
         self.place_tables.push(PlaceTableBuilder::default());
-        self.collection_constructor_bindings.push(None);
         self.use_def_maps
             .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
@@ -1104,69 +972,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.ast_ids[scope_id]
     }
 
-    /// Returns whether `expr` can still be an unconstrained collection initializer based on the
-    /// bindings recorded so far.
-    ///
-    /// Type inference performs the final semantic qualification. This check only avoids indexing
-    /// constructor calls whose names are already known to be shadowed.
-    fn is_potentially_unconstrained_collection_initializer(
-        &self,
-        expr: &ast::Expr,
-        scope: FileScopeId,
-    ) -> bool {
-        let Some(func) = empty_collection_constructor_callable(expr) else {
-            return is_unconstrained_collection_literal(expr);
-        };
-        let ast::Expr::Name(name) = func else {
-            return false;
-        };
-
-        self.visible_ancestor_scopes(scope).all(|(scope, _)| {
-            let place_table = &self.place_tables[scope];
-            self.collection_constructor_bindings[scope]
-                .is_some_and(|bindings| !bindings.contains(name.id.as_str()))
-                && place_table
-                    .symbol_id(name.id.as_str())
-                    .is_none_or(|symbol| !place_table.symbol(symbol).is_local())
-        })
-    }
-
-    fn prepare_potentially_unconstrained_collection_initializer(
-        &mut self,
-        expr: &ast::Expr,
-        scope: FileScopeId,
-    ) -> bool {
-        if empty_collection_constructor_callable(expr).is_none() {
-            return is_unconstrained_collection_literal(expr);
-        }
-        if Program::get(self.db)
-            .custom_stdlib_search_path(self.db)
-            .is_some()
-        {
-            return false;
-        }
-
-        let visible_scopes: SmallVec<[_; 4]> = self
-            .visible_ancestor_scopes(scope)
-            .map(|(scope, _)| scope)
-            .collect();
-        for scope in visible_scopes {
-            if self.collection_constructor_bindings[scope].is_some() {
-                continue;
-            }
-            let body: &[ast::Stmt] = match self.scopes[scope].node() {
-                NodeWithScopeKind::Module => self.module.suite(),
-                NodeWithScopeKind::Class(class) => &class.node(self.module).body,
-                NodeWithScopeKind::Function(function) => &function.node(self.module).body,
-                _ => &[],
-            };
-            self.collection_constructor_bindings[scope] =
-                Some(CollectionConstructorBindings::from_body(body));
-        }
-
-        self.is_potentially_unconstrained_collection_initializer(expr, scope)
-    }
-
     /// If the given expression is a use of a potentially unconstrained collection initializer,
     /// returns its definition.
     fn unconstrained_collection_binding(
@@ -1184,9 +989,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .kind(self.db)
                     .as_unannotated_assignment()
                     .is_some_and(|assignment| {
-                        self.is_potentially_unconstrained_collection_initializer(
+                        is_potentially_unconstrained_collection_initializer(
                             assignment.value(self.module),
-                            definition.file_scope(self.db),
                         )
                     })
             })
@@ -1194,6 +998,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // cycle-related panics.
             .exactly_one()
             .ok()
+    }
+
+    fn unconstrained_collection_literal_binding(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        let definition = self.unconstrained_collection_binding(collection_use)?;
+        definition
+            .kind(self.db)
+            .as_unannotated_assignment()
+            .is_some_and(|assignment| {
+                is_unconstrained_collection_literal(assignment.value(self.module))
+            })
+            .then_some(definition)
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
@@ -2693,7 +2511,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
             imported_modules: Arc::new(FrozenSet::from(self.imported_modules)),
-            has_future_annotations: self.has_future_annotations,
+            has_wildcard_import: self.global_scope_flags.has_wildcard_import,
+            has_future_annotations: self.global_scope_flags.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
@@ -3006,6 +2825,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             continue;
                         }
 
+                        self.global_scope_flags.has_wildcard_import = true;
+
                         let Ok(module_name) =
                             ModuleName::from_import_statement(self.db, self.file, node)
                         else {
@@ -3102,7 +2923,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // imports here, we assume the user's intent was to apply the `__future__`
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
-                    self.has_future_annotations |= !node.is_lazy
+                    self.global_scope_flags.has_future_annotations |= !node.is_lazy
                         && alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
@@ -3169,14 +2990,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Potentially unconstrained collection initializers must be standalone expressions
                 // to participate in full-scope bidirectional inference.
                 if node.targets.len() == 1
-                    && self.prepare_potentially_unconstrained_collection_initializer(
-                        &node.value,
-                        self.current_scope(),
-                    )
+                    && is_potentially_unconstrained_collection_initializer(&node.value)
                 {
-                    if let Some(func) = empty_collection_constructor_callable(&node.value) {
-                        self.add_standalone_expression(func);
-                    }
                     self.add_standalone_assigned_expression(&node.value, node);
                 }
 
@@ -4018,7 +3833,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 if let Some((func, expr, is_await)) = call_info {
                     // Avoid creating reachability nodes for calls on unconstrained collection
-                    // initializers. Without this short-circuit, performing reachability analysis
+                    // literals. Without this short-circuit, performing reachability analysis
                     // can lead to quadratic blowup of cycle dependencies during full-scope
                     // collection inference, as Salsa flattens the dependencies of all cycle
                     // participants, and the reachability analysis of a given use of the
@@ -4028,14 +3843,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Note that built-in collection types do not have methods that explicitly
                     // return `Never`, so does not have a meaningful semantic impact, except in
                     // the rare case where a collection is explicitly marked as having elements
-                    // of type `Never`. Constructor calls with custom stdlib stubs are not indexed
-                    // as collection initializers, so they continue through normal reachability
-                    // analysis.
+                    // of type `Never`.
                     if !self.source_type.is_stub()
                         && func
                             .as_attribute_expr()
                             .and_then(|attribute| {
-                                self.unconstrained_collection_binding(&attribute.value)
+                                self.unconstrained_collection_literal_binding(&attribute.value)
                             })
                             .is_none()
                     {
@@ -4093,7 +3906,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         let mut current_statement = self.pop_statement();
 
         // We currently only consider certain types of statements to introduce constraints
-        // on collection literals. This restriction is mostly for performance reasons, as we
+        // on collection initializers. This restriction is mostly for performance reasons, as we
         // want to avoid "reads" of a collection contributing to the complexity of the cycles
         // created by full-scope collection inference.
         current_statement
@@ -4134,23 +3947,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             });
 
+        if current_statement.lambda_expressions.is_empty()
+            && current_statement.collection_uses.is_empty()
+        {
+            return;
+        }
+
+        let standalone_statement = self.add_standalone_statement(stmt);
+
         // The body of a lambda expression needs access to the `Callable` type
         // context the lambda is being inferred with, and so any statement
         // containing a lambda must be inferable as a standalone statement
         // to avoid large scope-level cycles.
-        let mut standalone_statement =
-            (!current_statement.lambda_expressions.is_empty()).then(|| {
-                let standalone_statement = self.add_standalone_statement(stmt);
-                self.enclosing_lambda_statements.extend(
-                    current_statement
-                        .lambda_expressions
-                        .into_iter()
-                        .map(|lambda| (lambda.into(), standalone_statement)),
-                );
-                standalone_statement
-            });
+        self.enclosing_lambda_statements.extend(
+            current_statement
+                .lambda_expressions
+                .into_iter()
+                .map(|lambda| (lambda.into(), standalone_statement)),
+        );
 
-        // The inferred element type of collection literal depends on uses of
+        // The inferred element type of a collection initializer depends on uses of
         // the collection in its containing scope, and so each use must be part
         // of an standalone inferable statement to avoid large scope-level cycles.
         let mut collection_defs = FxHashSet::default();
@@ -4162,13 +3978,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 continue;
             }
 
-            let standalone_statement = if let Some(standalone_statement) = standalone_statement {
-                standalone_statement
-            } else {
-                let statement = self.add_standalone_statement(stmt);
-                standalone_statement = Some(statement);
-                statement
-            };
             self.uses_by_collection
                 .entry(collection_def)
                 .or_default()
@@ -4285,7 +4094,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_use {
                         self.record_place_use(place_id, expr);
 
-                        // Keep track of any uses of collection literals.
+                        // Keep track of any uses of collection initializers.
                         if let Some(collection_def) = self.unconstrained_collection_binding(expr)
                             && let Some(current_statement) = self.current_statements.last_mut()
                         {
@@ -4565,7 +4374,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
 impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
-        self.has_future_annotations
+        self.global_scope_flags.has_future_annotations
     }
 
     fn lazy_import_context(&self) -> Option<LazyImportContext> {
@@ -5016,19 +4825,21 @@ pub(crate) fn is_unconstrained_collection_literal(expr: &ast::Expr) -> bool {
     }
 }
 
-fn empty_collection_constructor_callable(expr: &ast::Expr) -> Option<&ast::Expr> {
+fn is_potentially_unconstrained_collection_initializer(expr: &ast::Expr) -> bool {
+    is_unconstrained_collection_literal(expr) || is_empty_collection_constructor(expr)
+}
+
+fn is_empty_collection_constructor(expr: &ast::Expr) -> bool {
     let ast::Expr::Call(ast::ExprCall {
         func, arguments, ..
     }) = expr
     else {
-        return None;
+        return false;
     };
     if !arguments.is_empty() {
-        return None;
+        return false;
     }
 
-    match func.as_ref() {
-        ast::Expr::Name(name) if matches!(name.id.as_str(), "list" | "set" | "dict") => Some(func),
-        _ => None,
-    }
+    func.as_name_expr()
+        .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
 }

@@ -659,11 +659,6 @@ impl<'db> Bindings<'db> {
         self.implicit_dunder_init_is_possibly_unbound
     }
 
-    pub(crate) fn has_explicit_constructor_return_annotation(&self, db: &'db dyn Db) -> bool {
-        self.iter_constructor_items()
-            .any(|binding| binding.has_explicit_return_annotation(db))
-    }
-
     /// Returns an iterator over all `CallableBinding`s, flattening the two-level structure.
     ///
     /// Note: This loses the union/intersection distinction. The returned iterator yields

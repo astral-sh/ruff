@@ -806,6 +806,37 @@ reveal_type(x1_dict)  # revealed: dict[str, int]
 ```
 
 ```py
+class Result: ...
+
+def shadowed_constructor_semantics_are_preserved() -> None:
+    list = Result
+    result = list()
+    reveal_type(result)  # revealed: Result
+
+def later_shadowed_constructor_is_not_refined() -> None:
+    result = list()
+    list = Result
+    reveal_type(result)  # revealed: list[Unknown]
+```
+
+```py
+from typing import TypedDict
+
+class OptionalOptions(TypedDict, total=False):
+    value: int
+
+class RequiredOptions(TypedDict):
+    value: int
+
+optional_options: OptionalOptions
+optional_options = dict()
+
+required_options: RequiredOptions
+# error: [missing-typed-dict-key] "Missing required key 'value' in TypedDict `RequiredOptions` constructor"
+required_options = dict()
+```
+
+```py
 def ignore_unreachable_constructor_uses(flag: bool) -> None:
     result = set()
     result_alias: set[str] = result
@@ -992,54 +1023,6 @@ def _(flag: bool):
 
     # TODO: This should reveal `list[int]`.
     reveal_type(x22)  # revealed: list[Unknown]
-```
-
-## Collection constructor shadowing
-
-Bare constructor names are only special-cased when they are not bound in any visible scope.
-
-```py
-import builtins
-
-from typing_extensions import Never
-
-class Result:
-    def append(self, value: object) -> Never: ...  # error: [empty-body]
-
-def qualified_builtins_are_not_special_cased() -> None:
-    result_list = builtins.list()
-    result_list.append(1)
-    reveal_type(result_list)  # revealed: list[Unknown]
-
-    result_set = builtins.set()
-    result_set.add(1)
-    reveal_type(result_set)  # revealed: set[Unknown]
-
-    result_dict = builtins.dict()
-    result_dict["a"] = 1
-    reveal_type(result_dict)  # revealed: dict[Unknown, Unknown]
-
-def shadowed_builtins_reachability() -> None:
-    class Builtins:
-        list = Result
-
-    builtins = Builtins()
-    result = builtins.list()
-    result.append(1)
-    reveal_type(result)  # revealed: Never
-
-def module_shadowed_constructor_reachability() -> None:
-    result = list()
-    result.append(1)
-    reveal_type(result)  # revealed: Never
-
-list = Result
-
-def builtin_alias_is_not_special_cased() -> None:
-    list = builtins.list
-    result = list()
-    result.append(1)
-    reveal_type(result)  # revealed: list[Unknown]
 ```
 
 ## Multi-inference diagnostics

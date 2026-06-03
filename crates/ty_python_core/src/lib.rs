@@ -322,10 +322,10 @@ pub struct SemanticIndex<'db> {
     /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
 
-    // Map from a constraining use of a collection literal to its definition.
+    // Map from a constraining use of a collection initializer to its definition.
     collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
 
-    // Map from a collection literal definition to statements containing a constraining use.
+    // Map from a collection initializer definition to statements containing a constraining use.
     uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
@@ -342,6 +342,9 @@ pub struct SemanticIndex<'db> {
 
     /// The set of modules that are imported anywhere within this file.
     imported_modules: Arc<FrozenSet<ModuleName>>,
+
+    /// Whether this file contains a valid wildcard import.
+    has_wildcard_import: bool,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
@@ -401,6 +404,10 @@ impl<'db> SemanticIndex<'db> {
     /// of why this analysis is intentionally limited.
     pub fn imported_modules(&self) -> impl Iterator<Item = &ModuleName> {
         self.imported_modules.iter()
+    }
+
+    pub fn has_wildcard_import(&self) -> bool {
+        self.has_wildcard_import
     }
 
     #[track_caller]
@@ -540,8 +547,8 @@ impl<'db> SemanticIndex<'db> {
         self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
-    /// If this is a potentially constraining use of an unconstrained collection literal, returns
-    /// its definition.
+    /// If this is a potentially constraining use of an unconstrained collection initializer,
+    /// returns its definition.
     pub fn unconstrained_collection_binding(
         &self,
         collection_use: &ast::Expr,
@@ -549,7 +556,7 @@ impl<'db> SemanticIndex<'db> {
         self.collections_by_use.get(&collection_use.into()).copied()
     }
 
-    /// Returns all potentially constraining uses of the given unnannotated collection literal.
+    /// Returns all potentially constraining uses of the given unannotated collection initializer.
     pub fn constraining_collection_uses(
         &self,
         collection_def: Definition<'db>,
@@ -1834,215 +1841,6 @@ class C[T]:
         let y = &y_stmt.targets[0];
 
         assert_eq!(index.expression_scope(y).kind(), ScopeKind::Function);
-    }
-
-    #[test]
-    fn shadowed_collection_constructor_is_not_indexed() {
-        let TestCase { db, file } = test_case(
-            "
-def set(): ...
-result = set()
-result.add(1)
-",
-        );
-
-        let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
-        let ast = module.syntax();
-
-        let assignment = ast.body[1].as_assign_stmt().unwrap();
-        let constructor = assignment.value.as_call_expr().unwrap();
-        let use_expression = ast.body[2]
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap()
-            .func
-            .as_attribute_expr()
-            .unwrap()
-            .value
-            .as_ref();
-
-        assert!(!index.is_standalone_expression(&assignment.value));
-        assert!(!index.is_standalone_expression(constructor.func.as_ref()));
-        assert!(
-            index
-                .unconstrained_collection_binding(use_expression)
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn later_shadowed_collection_constructor_is_not_indexed() {
-        let TestCase { db, file } = test_case(
-            "
-def f():
-    result = set()
-    result.add(1)
-    set = factory
-",
-        );
-
-        let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
-        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
-
-        let assignment = function.body[0].as_assign_stmt().unwrap();
-        let constructor = assignment.value.as_call_expr().unwrap();
-        let use_statement = &function.body[1];
-        let use_expression = use_statement
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap()
-            .func
-            .as_attribute_expr()
-            .unwrap()
-            .value
-            .as_ref();
-
-        assert!(!index.is_standalone_expression(&assignment.value));
-        assert!(!index.is_standalone_expression(constructor.func.as_ref()));
-        assert!(index.try_statement(use_statement).is_none());
-        assert!(
-            index
-                .unconstrained_collection_binding(use_expression)
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn later_shadowed_collection_constructor_keeps_reachability_predicate() {
-        let TestCase { db, file } = test_case(
-            "
-def f():
-    result = set()
-    result.stop()
-    set = factory
-",
-        );
-
-        let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
-        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
-        let function_scope = index.node_scope(NodeWithScopeRef::Function(function));
-
-        assert!(
-            index
-                .use_def_map(function_scope)
-                .predicates()
-                .iter()
-                .any(|predicate| matches!(
-                    predicate.node,
-                    predicate::PredicateNode::IsNonTerminalCall(_)
-                ))
-        );
-    }
-
-    #[test]
-    fn wildcard_import_prevents_collection_constructor_indexing() {
-        let TestCase { db, file } = test_case(
-            "
-def f():
-    result = list()
-    result.append(1)
-
-from dep import *
-",
-        );
-
-        let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
-        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
-        let assignment = function.body[0].as_assign_stmt().unwrap();
-        let use_statement = &function.body[1];
-        let use_expression = use_statement
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap()
-            .func
-            .as_attribute_expr()
-            .unwrap()
-            .value
-            .as_ref();
-        let function_scope = index.node_scope(NodeWithScopeRef::Function(function));
-
-        assert!(!index.is_standalone_expression(&assignment.value));
-        assert!(index.try_statement(use_statement).is_none());
-        assert!(
-            index
-                .unconstrained_collection_binding(use_expression)
-                .is_none()
-        );
-        assert!(
-            index
-                .use_def_map(function_scope)
-                .predicates()
-                .iter()
-                .any(|predicate| matches!(
-                    predicate.node,
-                    predicate::PredicateNode::IsNonTerminalCall(_)
-                ))
-        );
-    }
-
-    #[test]
-    fn collection_constructor_method_call_has_no_reachability_predicate() {
-        let TestCase { db, file } = test_case(
-            "
-def f():
-    result = list()
-    result.append(1)
-",
-        );
-
-        let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
-        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
-        let function_scope = index.node_scope(NodeWithScopeRef::Function(function));
-
-        assert!(
-            !index
-                .use_def_map(function_scope)
-                .predicates()
-                .iter()
-                .any(|predicate| matches!(
-                    predicate.node,
-                    predicate::PredicateNode::IsNonTerminalCall(_)
-                ))
-        );
-    }
-
-    #[test]
-    fn ordinary_statement_call_keeps_reachability_predicate() {
-        let TestCase { db, file } = test_case(
-            "
-def f():
-    C()
-",
-        );
-
-        let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
-        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
-        let function_scope = index.node_scope(NodeWithScopeRef::Function(function));
-
-        assert_eq!(
-            index
-                .use_def_map(function_scope)
-                .predicates()
-                .iter()
-                .filter(|predicate| matches!(
-                    predicate.node,
-                    predicate::PredicateNode::IsNonTerminalCall(_)
-                ))
-                .count(),
-            1
-        );
     }
 
     #[test]

@@ -36,9 +36,10 @@ def g(**kwargs: int):
     reveal_type(kwargs)  # revealed: dict[Unknown, Unknown, Unknown]
 ```
 
-## Constructor diagnostics with custom `list` and `set`
+## Empty collection constructors with custom typeshed
 
-Collection-initializer inference should still validate custom constructor signatures.
+Collection-initializer inference is disabled under custom typeshed, leaving custom constructors on
+their existing call-inference paths.
 
 ```toml
 [environment]
@@ -48,79 +49,15 @@ typeshed = "/typeshed"
 `/typeshed/stdlib/builtins.pyi`:
 
 ```pyi
-from typing_extensions import overload
-
 class object: ...
 class int: ...
-class str: ...
 class tuple: ...
-
-class list[T]:
-    @overload
-    def __init__(self, required: int) -> None: ...
-    @overload
-    def __init__(self, required: str) -> None: ...
-    def append(self, value: T) -> None: ...
-
-class set[T](list[T]):
-    def add(self, value: T) -> None: ...
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class FunctionType: ...
-```
-
-`/typeshed/stdlib/typing_extensions.pyi`:
-
-```pyi
-def overload(func, /): ...
-```
-
-```py
-list()  # error: [no-matching-overload]
-set()  # error: [no-matching-overload]
-
-def assigned_failed_constructor_calls() -> None:
-    xs = list()  # error: [no-matching-overload]
-    xs.append(1)
-
-    ys = set()  # error: [no-matching-overload]
-    ys.add(1)
-```
-
-## Constructor return types with custom `list` and `set`
-
-Collection-initializer inference should not replace constructor return semantics supplied by a
-custom typeshed.
-
-```toml
-[environment]
-typeshed = "/typeshed"
-```
-
-`/typeshed/stdlib/builtins.pyi`:
-
-```pyi
-from typing_extensions import Never
-
-class object: ...
-
-class int:
-    def stop(self) -> Never: ...
-
-class str: ...
-class tuple: ...
-class type: ...
-
-class SetMeta(type):
-    def __call__(self) -> str: ...
 
 class list[T]:
     def __new__(cls) -> int: ...
 
-class set[T](metaclass=SetMeta): ...
+class set[T]:
+    def __init__(self, required: int) -> None: ...
 ```
 
 `/typeshed/stdlib/types.pyi`:
@@ -129,213 +66,9 @@ class set[T](metaclass=SetMeta): ...
 class FunctionType: ...
 ```
 
-`/typeshed/stdlib/typing_extensions.pyi`:
-
-```pyi
-Never: object
-
-def reveal_type(obj, /): ...
-```
-
 ```py
-from typing_extensions import reveal_type
+def custom_constructor_semantics() -> None:
+    result: int = list()
 
-list_result: int = list()
-set_result: str = set()
-
-def constructor_return_reachability() -> None:
-    result = list()
-    reveal_type(result)  # revealed: int
-    reveal_type(result.stop)  # revealed: bound method int.stop() -> Never
-    result.stop()
-
-    after: str = 1
-```
-
-## Explicit unspecialized collection constructor returns
-
-An explicit unspecialized collection return is still part of the constructor's semantics.
-
-```toml
-[environment]
-typeshed = "/typeshed"
-```
-
-`/typeshed/stdlib/builtins.pyi`:
-
-```pyi
-class object: ...
-class int: ...
-class str: ...
-class tuple: ...
-
-class list[T]:
-    def __new__(cls) -> list: ...
-    def append(self, value: T) -> None: ...
-    def get(self) -> T: ...
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class FunctionType: ...
-```
-
-`/typeshed/stdlib/typing_extensions.pyi`:
-
-```pyi
-def reveal_type(obj, /): ...
-```
-
-```py
-from typing_extensions import reveal_type
-
-def explicit_unspecialized_return() -> None:
-    xs = list()
-    reveal_type(xs)  # revealed: list[Unknown]
-    xs.append(1)
-    value: str = xs.get()
-```
-
-## Explicit unspecialized `dict` constructor returns
-
-An empty `dict()` call still preserves explicit constructor return semantics.
-
-```toml
-[environment]
-typeshed = "/typeshed"
-```
-
-`/typeshed/stdlib/builtins.pyi`:
-
-```pyi
-class object: ...
-class int: ...
-class str: ...
-class tuple: ...
-
-class dict[K, V]:
-    def __new__(cls) -> dict: ...
-    def __setitem__(self, key: K, value: V) -> None: ...
-    def value(self) -> V: ...
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class FunctionType: ...
-```
-
-`/typeshed/stdlib/typing_extensions.pyi`:
-
-```pyi
-def reveal_type(obj, /): ...
-```
-
-```py
-from typing_extensions import reveal_type
-
-xs = dict()
-xs["a"] = 1
-reveal_type(xs)  # revealed: dict[Unknown, Unknown]
-value: str = xs.value()
-```
-
-## Collection constructors with nonstandard variance
-
-Collection-constructor inference is specific to the standard invariant builtin collections.
-
-```toml
-[environment]
-typeshed = "/typeshed"
-python-version = "3.12"
-```
-
-`/typeshed/stdlib/builtins.pyi`:
-
-```pyi
-class object: ...
-class int: ...
-class str: ...
-class tuple: ...
-
-class list[T]:
-    def __init__(self) -> None: ...
-    def append(self, value: T) -> None: ...
-
-class dict[K, V]:
-    def __init__(self) -> None: ...
-    def __setitem__(self, key: K, value: V) -> None: ...
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class FunctionType: ...
-```
-
-`/typeshed/stdlib/typing_extensions.pyi`:
-
-```pyi
-def reveal_type(obj, /): ...
-```
-
-```py
-from typing_extensions import reveal_type
-
-xs = list()
-xs.append(1)
-reveal_type(xs)  # revealed: list[Unknown]
-
-mapping = dict()
-mapping["a"] = 1
-reveal_type(mapping)  # revealed: dict[Unknown, Unknown]
-```
-
-## Reachability for specialized custom collection constructor returns
-
-Collection method calls still need normal reachability analysis when a custom typeshed preserves a
-specialized collection return type.
-
-```toml
-[environment]
-typeshed = "/typeshed"
-```
-
-`/typeshed/stdlib/builtins.pyi`:
-
-```pyi
-from typing_extensions import Never
-
-class object: ...
-class int: ...
-class str: ...
-class tuple: ...
-class type: ...
-
-class ListMeta(type):
-    def __call__(self) -> list[Never]: ...
-
-class list[T](metaclass=ListMeta):
-    def pop(self) -> T: ...
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class FunctionType: ...
-```
-
-`/typeshed/stdlib/typing_extensions.pyi`:
-
-```pyi
-Never: object
-```
-
-```py
-def specialized_constructor_return_reachability() -> None:
-    result = list()
-    result.pop()
-
-    after: str = 1
+set()  # error: [missing-argument]
 ```

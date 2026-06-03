@@ -7983,63 +7983,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
 
-    fn infer_collection_constructor_return_type(
+    fn infer_empty_collection_constructor<const N: usize>(
         &mut self,
-        collection_class: Option<KnownClass>,
+        collection_class: KnownClass,
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
-        bound_return_ty: Type<'db>,
-        has_explicit_return_annotation: bool,
-    ) -> Type<'db> {
-        let Some(collection_class) = collection_class else {
-            return bound_return_ty;
-        };
-        let Some(collection_literal) = collection_class.try_to_class_literal(self.db()) else {
-            return bound_return_ty;
-        };
-        let identity_instance = Type::instance(
-            self.db(),
-            collection_literal.identity_specialization(self.db()),
-        );
-        let unknown_instance = Type::instance(
-            self.db(),
-            collection_literal.unknown_specialization(self.db()),
-        );
-
-        // Refine only the normal unconstrained constructed instance. An explicit `__new__` or
-        // metaclass `__call__` return type is part of the constructor's semantics and must win.
-        if has_explicit_return_annotation {
-            return if bound_return_ty == identity_instance {
-                unknown_instance
-            } else {
-                bound_return_ty
-            };
-        }
-        if bound_return_ty != identity_instance && bound_return_ty != unknown_instance {
-            return bound_return_ty;
-        }
-        if collection_literal
-            .generic_context(self.db())
-            .is_some_and(|generic_context| {
-                generic_context
-                    .variables(self.db())
-                    .any(|typevar| typevar.variance(self.db()) != TypeVarVariance::Invariant)
-            })
-        {
-            return unknown_instance;
-        }
-        if collection_class == KnownClass::Dict
-            && let Some(ty) = self.infer_keyword_only_dict_call(
-                &call_expression.func,
-                &call_expression.arguments,
-                Some(call_expression.into()),
-                tcx,
-            )
-        {
-            return ty;
-        }
-
-        let elements: [[Option<&ast::Expr>; 1]; 0] = [];
+    ) -> Option<Type<'db>> {
+        let elements: [[Option<&ast::Expr>; N]; 0] = [];
         let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
 
         self.infer_collection_literal(
@@ -8049,10 +7999,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut infer_element_ty,
             tcx,
         )
-        .unwrap_or(unknown_instance)
     }
 
     fn is_unshadowed_builtin_name(&self, name: &ast::ExprName) -> bool {
+        if self.index.has_wildcard_import() {
+            return false;
+        }
+
         let db = self.db();
         self.index
             .visible_ancestor_scopes(self.scope().file_scope_id(db))
@@ -8116,12 +8069,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             arguments,
         } = call_expression;
 
-        // Confirm the supported spelling still resolves to the builtin. Normal call binding below
-        // must still run so custom typeshed constructor signatures are validated.
+        // Confirm that a supported assignment initializer resolves to the corresponding builtin.
+        // Constructor refinement is disabled under custom typeshed.
         let known_class = callable_type
             .as_class_literal()
             .and_then(|class| class.known(self.db()));
-        let collection_initializer_class = if arguments.is_empty() {
+        let collection_initializer_class = if arguments.is_empty()
+            && self
+                .index
+                .try_expression(call_expression)
+                .and_then(|expression| expression.assigned_to(self.db()))
+                .is_some_and(|assignment| assignment.node(self.module()).targets.len() == 1)
+            && Program::get(self.db())
+                .custom_stdlib_search_path(self.db())
+                .is_none()
+        {
             known_class.filter(|class| {
                 let name = match class {
                     KnownClass::List => "list",
@@ -8136,9 +8098,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if known_class == Some(KnownClass::Dict)
-            && collection_initializer_class != Some(KnownClass::Dict)
-            && let Some(ty) =
-                self.infer_keyword_only_dict_call(func, arguments, None, call_expression_tcx)
+            && let Some(ty) = self.infer_keyword_only_dict_call(
+                func,
+                arguments,
+                call_expression_tcx,
+                collection_initializer_class == Some(KnownClass::Dict),
+            )
         {
             return ty;
         }
@@ -8493,10 +8458,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(collection_def) = self.index.unconstrained_collection_binding(value)
                 && let Some((collection_literal, _)) = value_type.class_specialization(self.db())
-                && matches!(
-                    collection_literal.known(self.db()),
-                    Some(KnownClass::List | KnownClass::Set | KnownClass::Dict)
-                )
             {
                 let identity_instance = Type::instance(
                     self.db(),
@@ -8552,16 +8513,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let scope = self.scope();
-        let has_explicit_return_annotation =
-            bindings.has_explicit_constructor_return_annotation(db);
-        let bound_return_ty = bindings.return_type(db);
-        let return_ty = self.infer_collection_constructor_return_type(
-            collection_initializer_class,
-            call_expression,
-            call_expression_tcx,
-            bound_return_ty,
-            has_explicit_return_annotation,
-        );
+        let return_ty = match collection_initializer_class {
+            Some(collection_class @ (KnownClass::List | KnownClass::Set)) => self
+                .infer_empty_collection_constructor::<1>(
+                    collection_class,
+                    call_expression,
+                    call_expression_tcx,
+                ),
+            Some(KnownClass::Dict) => self.infer_empty_collection_constructor::<2>(
+                KnownClass::Dict,
+                call_expression,
+                call_expression_tcx,
+            ),
+            _ => None,
+        }
+        .unwrap_or_else(|| bindings.return_type(db));
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {
