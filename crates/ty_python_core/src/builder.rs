@@ -1013,7 +1013,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let value = assignment.value(self.module);
                 if is_potentially_unconstrained_collection_initializer(value) {
                     collections.insert(definition);
-                } else if value.is_name_expr() {
+                } else if PlaceExpr::try_from_expr(value).is_some() {
                     uses.push((value, definition.file_scope(self.db)));
                 }
             }

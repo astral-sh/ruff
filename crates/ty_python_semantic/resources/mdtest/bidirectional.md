@@ -821,6 +821,15 @@ def forward_captured_kwargs():
 
 reveal_type(captured_kwargs)  # revealed: dict[Unknown, Unknown]
 
+class KeywordForwarder:
+    def forward(self):
+        kwargs = dict()
+        kwargs["p"] = 1.23
+        self.kwargs = kwargs
+        forwarded_kwargs = self.kwargs
+        accepts_float_keywords(**forwarded_kwargs)
+        reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
+
 def constructor_inference_remains_gradual(flag: bool, name: str, value):
     kwargs = dict()
     if flag:
