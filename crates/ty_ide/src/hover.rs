@@ -97,7 +97,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
             | Type::TypeAlias(alias) => {
-                let value_ty = alias.value_type(db);
+                let value_ty = alias.raw_value_type(db);
 
                 alias_docstring = Definitions::from_ty(db, ty)
                     .and_then(|def| def.docstring(db))
@@ -5762,7 +5762,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        type Wrapper = list[Unknown]
+        type Wrapper = list[T@Wrapper]
         ---------------------------------------------
         Built-in mutable sequence.
 
@@ -5771,7 +5771,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        type Wrapper = list[Unknown]
+        type Wrapper = list[T@Wrapper]
         ```
         ---
         Built-in mutable sequence.<HB>
