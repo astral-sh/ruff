@@ -2041,6 +2041,44 @@ def _(value: CopyableProtocol):
         value.property.marker  # error: [unresolved-attribute]
 ```
 
+### `Self` binding expands aliases around refinements
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self, TypeVar
+from ty_extensions import Intersection
+
+class AliasValue:
+    other: Self
+
+class AliasTuple(tuple[int, ...]):
+    def fresh(self) -> Self:
+        return type(self)((1, 2, 3))
+
+def takes_pair(value: tuple[int, int]): ...
+
+type PairAlias = tuple[int, int]
+AliasTupleBound = TypeVar("AliasTupleBound", bound=PairAlias)
+
+def _(value: Intersection[AliasTuple, AliasTupleBound]):
+    reveal_type(value.fresh())  # revealed: AliasTuple
+    takes_pair(value.fresh())  # error: [invalid-argument-type]
+
+class AliasMarker(Protocol):
+    marker: int
+
+type MarkerAlias = AliasMarker
+AliasProtocolBound = TypeVar("AliasProtocolBound", bound=MarkerAlias)
+
+def _(value: Intersection[AliasValue, AliasProtocolBound]):
+    reveal_type(value.other)  # revealed: AliasValue
+    value.other.marker  # error: [unresolved-attribute]
+```
+
 ### `Self` binding checks intersection element MROs
 
 ```py

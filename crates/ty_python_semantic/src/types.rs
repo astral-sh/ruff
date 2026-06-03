@@ -7342,7 +7342,7 @@ fn typevar_is_protocol_refinement<'db>(
     typevar: BoundTypeVarInstance<'db>,
     owner: Option<ClassLiteral<'db>>,
 ) -> bool {
-    let is_protocol_refinement = |ty: Type<'db>| match ty {
+    let is_protocol_refinement = |ty: Type<'db>| match ty.resolve_type_alias(db) {
         Type::ProtocolInstance(ProtocolInstanceType {
             inner: Protocol::FromClass(class),
             ..
@@ -7372,7 +7372,7 @@ fn typevar_is_protocol_refinement<'db>(
 }
 
 fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty {
+    match ty.resolve_type_alias(db) {
         Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some(),
         Type::Union(union) => union
             .elements(db)
