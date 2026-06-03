@@ -56,6 +56,20 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
 }
 
 #[test]
+fn many_constructor_backed_collection_mutations() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let content = format!(
+        "def f():\n    values = set()\n{}",
+        "    values.add(1)\n".repeat(100)
+    );
+    db.write_dedented("src/a.py", &content)?;
+
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+
+    Ok(())
+}
+
+#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(

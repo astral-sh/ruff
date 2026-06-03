@@ -197,12 +197,14 @@ use crate::{
     Db,
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
+    semantic_index,
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
         TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
         infer_narrowing_constraint,
     },
 };
+use ruff_db::parsed::parsed_module;
 use ruff_index::IndexSlice;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -211,7 +213,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
-    definition::DefinitionState,
+    definition::{DefinitionKind, DefinitionState},
+    expression::Expression,
     place::ScopedPlaceId,
     place_table,
     predicate::{
@@ -1103,6 +1106,68 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
+fn is_non_terminal_builtin_collection_method_call(
+    db: &dyn Db,
+    callable: Expression,
+    is_await: bool,
+) -> bool {
+    if is_await {
+        return false;
+    }
+
+    let module = parsed_module(db, callable.file(db)).load(db);
+    let ast::Expr::Attribute(attribute) = callable.node_ref(db).node(&module) else {
+        return false;
+    };
+
+    let index = semantic_index(db, callable.file(db));
+    let Some(definition) = index.unconstrained_collection_binding(&attribute.value) else {
+        return false;
+    };
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return false;
+    };
+    let ast::Expr::Call(call) = assignment.value(&module) else {
+        return false;
+    };
+    let Some(constructor) = index.try_expression(call.func.as_ref()) else {
+        return false;
+    };
+
+    let constructor_ty = infer_expression_type(db, constructor, TypeContext::default());
+    let Some(collection_class) = constructor_ty
+        .as_class_literal()
+        .and_then(|class| class.known(db))
+        .filter(|class| matches!(class, KnownClass::List | KnownClass::Set | KnownClass::Dict))
+    else {
+        return false;
+    };
+
+    let return_ty = Type::call_return_type_with_no_arguments(db, constructor_ty);
+    if !return_ty
+        .class_specialization(db)
+        .is_some_and(|(class, _)| class.is_known(db, collection_class))
+    {
+        return false;
+    }
+
+    let Place::Defined(DefinedPlace { ty: method_ty, .. }) =
+        return_ty.member(db, attribute.attr.as_str()).place
+    else {
+        return false;
+    };
+    let Some(method) = method_ty
+        .try_upcast_to_callable(db)
+        .and_then(CallableTypes::exactly_one)
+    else {
+        return false;
+    };
+
+    method.signatures(db).overloads.iter().all(|overload| {
+        !overload.return_ty.is_equivalent_to(db, Type::Never) && !overload.return_ty.has_typevar(db)
+    })
+}
+
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -1117,6 +1182,14 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             call_expr,
             is_await,
         }) => {
+            // Collection constructor inference depends on later method calls. Prove the
+            // constructor and selected method are nonterminal before short-circuiting this call's
+            // reachability analysis, so the method call does not create a dependency back on the
+            // inferred collection.
+            if is_non_terminal_builtin_collection_method_call(db, callable, is_await) {
+                return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
+            }
+
             // We first infer just the type of the callable. In the most likely case that the
             // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
             // doing so allows us to avoid the more expensive work of inferring the entire call
