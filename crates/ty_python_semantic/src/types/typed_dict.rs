@@ -2689,8 +2689,18 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
 
         return unpacked_valid;
     } else if !typed_dict.openness(db).is_open()
-        && let Some((_, value_ty)) = unpacked_type.unpack_keys_and_items(db)
+        && let Some((key_ty, value_ty)) = unpacked_type.unpack_keys_and_items(db)
     {
+        if !key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
+            if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
+                builder.into_diagnostic(format_args!(
+                    "Unpacked argument has key type `{}` that is not assignable to `str`",
+                    key_ty.display(db),
+                ));
+            }
+            return false;
+        }
+
         return validate_extracted_typed_dict_extra_items(
             context,
             typed_dict,

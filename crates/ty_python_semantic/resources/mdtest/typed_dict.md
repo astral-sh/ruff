@@ -6004,6 +6004,7 @@ An unpacked extra-items TypedDict can supply arbitrary additional keyword argume
 type must therefore be compatible with the target's extra-items policy:
 
 ```py
+from collections.abc import Mapping
 from typing_extensions import NotRequired, TypedDict
 
 class IntSource(TypedDict, extra_items=int):
@@ -6038,6 +6039,8 @@ def _(
     extra_only: ExtraOnly,
     int_mapping: dict[str, int],
     str_mapping: dict[str, str],
+    int_key_dict: dict[int, int],
+    int_key_mapping: Mapping[int, int],
 ) -> None:
     accepts_ints(**ints)
     accepts_ints(**strings)  # error: [invalid-argument-type]
@@ -6053,6 +6056,8 @@ def _(
 
     ExtraOnly(**str_mapping)  # error: [invalid-argument-type]
     copied_from_mapping: ExtraOnly = {**str_mapping}  # error: [invalid-argument-type]
+    copied_from_int_key_dict: ExtraOnly = {**int_key_dict}  # error: [invalid-argument-type]
+    copied_from_int_key_mapping: ExtraOnly = {**int_key_mapping}  # error: [invalid-argument-type]
 
     ClosedOnly(**int_mapping)  # error: [invalid-key]
     copied_into_closed: ClosedOnly = {**int_mapping}  # error: [invalid-key]
