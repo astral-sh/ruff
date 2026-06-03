@@ -156,6 +156,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
+from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
     match x:
@@ -176,6 +177,106 @@ def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[in
             reveal_type(x)  # revealed: list[int]
         case _:
             reveal_type(x)  # revealed: str | bytes | bytearray
+
+def test_match_exact_object_sequence(value: object) -> None:
+    match value:
+        case int(), str():
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[2]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
+
+def test_match_empty_object_sequence(value: object) -> None:
+    match value:
+        case []:
+            # revealed: Sequence[object] & <Protocol with members '__len__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[0]
+
+def test_match_singleton_object_sequence(value: object) -> None:
+    match value:
+        case [int()]:
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~bytearray & ~bytes
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[1]
+            reveal_type(value[0])  # revealed: int
+
+def test_match_prefix_star_object_sequence(value: object) -> None:
+    match value:
+        case [int(), *rest]:
+            reveal_type(value)  # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            reveal_type(len(value))  # revealed: int
+
+# Exact patterns are commonly used to validate parsed data before using it.
+
+def unwrap_single_int(value: object) -> int | None:
+    match value:
+        case [int()]:
+            return value[0]
+    return None
+
+# This deliberately accepts a small unsoundness: sequence matching can inspect
+# values yielded by `__iter__`, while a later indexed read calls `__getitem__`.
+# Custom `Sequence` implementations and tuple subclasses can override those
+# methods inconsistently. We assume conventional container behavior so exact
+# patterns remain useful for validating parsed data before indexing it.
+def accepted_unsound_indexed_reconstruction(value: Sequence[object]) -> int | None:
+    match value:
+        case [int()]:
+            return value[0]
+    return None
+
+def normalize_counted_label(value: object | None) -> str | None:
+    match value:
+        case [int(), str()]:
+            return value[1].upper() * value[0]
+    return None
+
+def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
+    match subj:
+        case x, str():
+            # revealed: tuple[int | str, int | str] & <Protocol with members '__getitem__', '__len__'>
+            reveal_type(subj)
+        case y:
+            # revealed: tuple[int | str, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(subj)
+
+def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
+    match value:
+        case int(value):
+            return value
+        case (left, right):
+            return left + right
+        case _:
+            assert_never(value)
+
+def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
+    match value:
+        case [int()]:
+            pass
+        case _:
+            # revealed: list[int] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+
+def normalize_nested_record(value: object) -> tuple[None, int, int] | None:
+    match value:
+        case [None, [int()], {}]:
+            return value[0], value[1][0], len(value[2])
+    return None
+
+def unwrap_number_or_label(value: object) -> int | str | None:
+    match value:
+        case [(int() | str()) as item]:
+            return value[0]
+    return None
+
+def test_match_value_sequence(value: object) -> None:
+    match value:
+        case [1]:
+            # Value patterns use equality, so matching `1` does not prove that
+            # the element is an `int`.
+            reveal_type(value[0])  # revealed: object
 ```
 
 ## Value patterns
