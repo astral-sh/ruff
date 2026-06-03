@@ -657,5 +657,148 @@ while True:
     break
 ```
 
+### A large surrounding scope does not discard a cheap loop header
+
+The scope-wide reachability graph is large, but its loop headers only have a few loop-back bindings
+with cheap reachability and narrowing roots. Inferring their exact types does not require traversing
+the entire graph, so its size should not cause us to fall back to `Unknown`.
+
+```py
+from typing import Any
+
+def touch() -> None:
+    pass
+
+def any_value() -> Any:
+    return "hare"
+
+def probe(flag: bool, choice: bool, badger: str, lynx: object, yak: str | None) -> None:
+    fox = any_value()
+    count = 1
+    if "otter" in badger:
+        lynx, badger = badger.rsplit("otter", 1)
+    if "badger" in badger:
+        badger = badger.replace("badger", "fox")
+    if yak is None:
+        touch()
+        touch()
+        touch()
+        mole = input("Lynx").strip()
+        touch()
+        if mole in {"otter", "lynx", "badger"}:
+            touch()
+        elif mole in {"fox", "yak"}:
+            touch()
+        else:
+            touch()
+    if lynx is None:
+        touch()
+        touch()
+        touch()
+        touch()
+        touch()
+        touch()
+        touch()
+        touch()
+        touch()
+        touch()
+        touch()
+        touch()
+        lynx = input("Yak").strip()
+        touch()
+        touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    while flag:
+        if 1 - 1:
+            count = "bad"
+        reveal_type(count)  # revealed: Literal[1]
+        count + 1
+        if not isinstance(fox, str):
+            if choice:
+                fox = ""
+            else:
+                fox = "hare"
+            continue
+        fox + 1  # error: [unsupported-operator]
+        fox.nonexistent()  # error: [unresolved-attribute]
+    touch()
+    while fox:
+        fox = any_value()
+        break
+    touch()
+    if fox:
+        touch()
+    else:
+        touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    if fox:
+        touch()
+    else:
+        touch()
+    touch()
+    with open("yak") as _mole:
+        touch()
+        touch()
+        if fox:
+            touch()
+        else:
+            touch()
+        touch()
+        if yak == "hare":
+            touch()
+        else:
+            touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+    touch()
+```
+
 [divergent_debugging]: https://github.com/astral-sh/ruff/pull/22794#issuecomment-3852095578
 [real cases]: https://github.com/Finistere/antidote/blob/7d64ff76b7e283e5d9593ca09ea7a52b9b054957/src/antidote/_internal/localns.py#L34-L35

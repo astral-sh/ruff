@@ -32,8 +32,9 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
     class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    loop_header_scope_is_too_complex, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place_by_id, place_from_bindings, place_from_declarations,
+    typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -2083,27 +2084,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         loop_header_kind: &LoopHeaderDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        // This cutoff was chosen by benchmarking real isort to keep loop analysis
-        // overhead minimal while preserving diagnostics.
-        const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
-
         let db = self.db();
-        let loop_header = loop_header_reachability(db, definition);
-        let use_def = self
-            .index
-            .use_def_map(self.scope().file_scope_id(self.db()));
 
-        // Loop-header types are an approximation point for loop fixpoint analysis. Inferring the
-        // exact union of every visible loop-back binding can recursively force inference of large
-        // boolean expressions and explode on real-world loops.
-        if use_def.reachability_constraints().used_interiors().len()
-            > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
-        {
+        // Loop-header types are an approximation point for loop fixpoint analysis. Bound the
+        // aggregate binding-inference and TDD work across the scope's loop headers.
+        if loop_header_scope_is_too_complex(db, definition.scope(db)) {
             self.bindings.insert(definition, Type::unknown());
             return;
         }
 
+        let loop_header = loop_header_reachability(db, definition);
         let place = loop_header_kind.place();
+        let use_def = self
+            .index
+            .use_def_map(self.scope().file_scope_id(self.db()));
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
 
