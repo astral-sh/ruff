@@ -242,7 +242,7 @@ export default function Playground() {
   }, [session, files]);
 
   return (
-    <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
+    <main className="flex flex-col h-full bg-white dark:bg-ayu-background-dark">
       <Header
         theme={theme}
         tool="ty"

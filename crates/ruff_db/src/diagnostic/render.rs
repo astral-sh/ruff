@@ -907,6 +907,12 @@ pub struct Input {
     pub(crate) line_index: LineIndex,
 }
 
+impl Input {
+    pub fn line_index(&self) -> &LineIndex {
+        &self.line_index
+    }
+}
+
 /// Returns the line number accounting for the given `len`
 /// number of preceding context lines.
 ///
@@ -2530,6 +2536,33 @@ watermelon
            | ------ secondary fruits 2
            |
         ",
+        );
+    }
+
+    #[test]
+    fn diagnostics_with_equal_locations_sort_by_concise_message() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
+        let mut diagnostics = [
+            env.invalid_syntax("checking mod.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+            env.invalid_syntax("checking main.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+        ];
+
+        diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(&env.db)
+                .cmp(&right.rendering_sort_key(&env.db))
+        });
+
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(Diagnostic::primary_message)
+                .collect::<Vec<_>>(),
+            ["checking main.py", "checking mod.py"]
         );
     }
 

@@ -45,15 +45,15 @@ expression: "[first_cell_ranges, second_cell_ranges]"
   [
     {
       "startLine": 0,
-      "startCharacter": 5,
+      "startCharacter": 7,
       "endLine": 2,
-      "endCharacter": 1
+      "endCharacter": 0
     },
     {
       "startLine": 4,
-      "startCharacter": 5,
+      "startCharacter": 7,
       "endLine": 12,
-      "endCharacter": 1
+      "endCharacter": 0
     }
   ]
 ]

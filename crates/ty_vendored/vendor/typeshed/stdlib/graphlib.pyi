@@ -17,6 +17,7 @@ class TopologicalSorter(Generic[_T]):
     def __init__(self, graph: None = None) -> None: ...
     @overload
     def __init__(self, graph: SupportsItems[_T, Iterable[_T]]) -> None: ...
+
     def add(self, node: _T, *predecessors: _T) -> None:
         """Add a new node and its predecessors to the graph.
 

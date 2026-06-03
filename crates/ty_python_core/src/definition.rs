@@ -3,9 +3,11 @@ use std::ops::Deref;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use smallvec::SmallVec;
 
 use crate::Db;
 use crate::LoopToken;
@@ -26,6 +28,7 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Ord, PartialOrd)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     pub file: File,
@@ -198,6 +201,10 @@ impl<'db> Definitions<'db> {
 
     pub fn push(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
+    }
+
+    pub(crate) fn into_boxed_slice(self) -> Box<[Definition<'db>]> {
+        self.definitions.into_vec().into_boxed_slice()
     }
 }
 
@@ -529,7 +536,7 @@ impl ParameterDefinitionNodeRef<'_> {
         match self {
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
-            Self::Parameter(node) => node.into(),
+            Self::Parameter(node) => (&node.parameter).into(),
         }
     }
 }
@@ -865,9 +872,11 @@ pub enum DefinitionKind<'db> {
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
     LoopHeader(LoopHeaderDefinitionKind<'db>),
+    // Boxing here helps avoid growing the memory footprint of this enum.
+    NestedBindings(Box<NestedBindingsDefinitionKind>),
 }
 
-impl DefinitionKind<'_> {
+impl<'db> DefinitionKind<'db> {
     pub fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
@@ -905,6 +914,13 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
+    pub fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
+        match self {
+            DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
+            _ => None,
+        }
+    }
+
     pub const fn is_function_def(&self) -> bool {
         matches!(self, DefinitionKind::Function(_))
     }
@@ -918,9 +934,12 @@ impl DefinitionKind<'_> {
     }
 
     /// Returns `true` if this definition is user-visible (i.e., not an internal
-    /// control-flow construct like a loop header definition).
+    /// synthetic definition like a loop header or nested bindings definition).
     pub const fn is_user_visible(&self) -> bool {
-        !self.is_loop_header()
+        !matches!(
+            self,
+            DefinitionKind::LoopHeader(_) | DefinitionKind::NestedBindings(_)
+        )
     }
 
     /// Returns the [`TextRange`] of the definition target.
@@ -967,6 +986,12 @@ impl DefinitionKind<'_> {
                 type_var_tuple.node(module).name.range()
             }
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                // TODO: We only return the `TextRange` of one of the `nonlocal` or `global`
+                // declarations that affect this variable, even if there's more than one. We could
+                // find a way to return all of them, or split up the synthetic definition somehow.
+                nested_bindings.nested_declarations[0].range
+            }
         }
     }
 
@@ -1016,6 +1041,12 @@ impl DefinitionKind<'_> {
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                // TODO: We only return the `TextRange` of one of the `nonlocal` or `global`
+                // declarations that affect this variable, even if there's more than one. We could
+                // find a way to return all of them, or split up the synthetic definition somehow.
+                nested_bindings.nested_declarations[0].range
+            }
         }
     }
 
@@ -1056,7 +1087,8 @@ impl DefinitionKind<'_> {
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
+            | DefinitionKind::LoopHeader(_)
+            | DefinitionKind::NestedBindings(_) => DefinitionCategory::Binding,
         }
     }
 
@@ -1488,8 +1520,32 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
     }
 }
 
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct NestedBindingsDefinitionKind {
+    pub name: Name,
+    // Note that in general this can include both `global` and `nonlocal` declarations from
+    // different nested scopes, because we don't necessarily know at synthesis time which of those
+    // kind will be visible in the current scope.
+    pub nested_declarations: SmallVec<[crate::builder::NestedDeclaration; 1]>,
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
 pub struct DefinitionNodeKey(NodeKey);
+
+impl DefinitionNodeKey {
+    pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
+        match node {
+            ast::AnyNodeRef::ParameterWithDefault(parameter) => parameter.into(),
+            _ => Self(NodeKey::from_node(node)),
+        }
+    }
+
+    pub fn from_assignment(node: &ast::StmtAssign) -> impl Iterator<Item = DefinitionNodeKey> {
+        node.targets
+            .iter()
+            .map(|target| Self(NodeKey::from_node(target)))
+    }
+}
 
 impl From<&ast::Alias> for DefinitionNodeKey {
     fn from(node: &ast::Alias) -> Self {
@@ -1577,7 +1633,7 @@ impl From<&ast::Parameter> for DefinitionNodeKey {
 
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
     fn from(node: &ast::ParameterWithDefault) -> Self {
-        Self(NodeKey::from_node(node))
+        Self(NodeKey::from_node(&node.parameter))
     }
 }
 
@@ -1585,7 +1641,7 @@ impl From<ast::AnyParameterRef<'_>> for DefinitionNodeKey {
     fn from(value: ast::AnyParameterRef) -> Self {
         Self(match value {
             ast::AnyParameterRef::Variadic(node) => NodeKey::from_node(node),
-            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(node),
+            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(&node.parameter),
         })
     }
 }

@@ -76,6 +76,7 @@ if sys.version_info >= (3, 11):
             and each may contain multiple levels separated by
             ``posixpath.sep`` (``/``).
             """
+
         # The documentation and runtime protocol allows *args, **kwargs arguments,
         # but this would mean that all implementers would have to support them,
         # which is not the case.
@@ -89,10 +90,10 @@ if sys.version_info >= (3, 11):
             When opening as text, accepts encoding parameters such as those
             accepted by io.TextIOWrapper.
             """
-
         @overload
         @abstractmethod
         def open(self, mode: Literal["rb"]) -> IO[bytes]: ...
+
         @property
         @abstractmethod
         def name(self) -> str:
@@ -110,12 +111,15 @@ if sys.version_info >= (3, 11):
             """
             Read contents of self as bytes
             """
-
-        @abstractmethod
-        def read_text(self, encoding: str | None = None) -> str:
-            """
-            Read contents of self as text
-            """
+        if sys.version_info >= (3, 15):
+            @abstractmethod
+            def read_text(self, encoding: str | None = None, errors: str | None = None) -> str: ...
+        else:
+            @abstractmethod
+            def read_text(self, encoding: str | None = None) -> str:
+                """
+                Read contents of self as text
+                """
 
     class TraversableResources(ResourceReader):
         """

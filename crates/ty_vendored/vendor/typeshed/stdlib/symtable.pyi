@@ -11,12 +11,16 @@ __all__ = ["symtable", "SymbolTable", "Class", "Function", "Symbol"]
 if sys.version_info >= (3, 13):
     __all__ += ["SymbolTableType"]
 
-def symtable(code: str, filename: str, compile_type: str) -> SymbolTable:
-    """Return the toplevel *SymbolTable* for the source code.
+if sys.version_info >= (3, 15):
+    def symtable(code: str, filename: str, compile_type: str, *, module: str | None = None) -> SymbolTable: ...
 
-    *filename* is the name of the file with the code
-    and *compile_type* is the *compile()* mode argument.
-    """
+else:
+    def symtable(code: str, filename: str, compile_type: str) -> SymbolTable:
+        """Return the toplevel *SymbolTable* for the source code.
+
+        *filename* is the name of the file with the code
+        and *compile_type* is the *compile()* mode argument.
+        """
 
 if sys.version_info >= (3, 13):
     from enum import StrEnum
@@ -105,18 +109,16 @@ class Function(SymbolTable):
 
     def get_frees(self) -> tuple[str, ...]:
         """Return a tuple of free variables in the function."""
+    if sys.version_info >= (3, 15):
+        def get_cells(self) -> tuple[str, ...]: ...
 
     def get_nonlocals(self) -> tuple[str, ...]:
         """Return a tuple of nonlocals in the function."""
 
 class Class(SymbolTable):
-    if sys.version_info >= (3, 14):
-        @deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
-        def get_methods(self) -> tuple[str, ...]:
-            """Return a tuple of methods declared in the class."""
-    else:
-        def get_methods(self) -> tuple[str, ...]:
-            """Return a tuple of methods declared in the class."""
+    @deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+    def get_methods(self) -> tuple[str, ...]:
+        """Return a tuple of methods declared in the class."""
 
 class Symbol:
     def __init__(
@@ -176,6 +178,8 @@ class Symbol:
 
         def is_comp_cell(self) -> bool:
             """Return *True* if the symbol is a cell in an inlined comprehension."""
+    if sys.version_info >= (3, 15):
+        def is_cell(self) -> bool: ...
 
     def is_namespace(self) -> bool:
         """Returns *True* if name binding introduces new namespace.

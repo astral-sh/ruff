@@ -298,6 +298,28 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
    |             |
    |             Declared type
    |
+info: unexpected extra parameter
+```
+
+Assigning a function with an extra required parameter to a `Callable`:
+
+```py
+def source(x: int, extra: str) -> bool:
+    raise NotImplementedError
+
+target: Callable[[int], bool] = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `def source(x: int, extra: str) -> bool` is not assignable to `(int, /) -> bool`
+  --> src/mdtest_snippet.py:16:9
+   |
+16 | target: Callable[[int], bool] = source  # snapshot
+   |         ---------------------   ^^^^^^ Incompatible value of type `def source(x: int, extra: str) -> bool`
+   |         |
+   |         Declared type
+   |
+info: unexpected extra parameter `extra`
 ```
 
 Assigning a class to a `Callable`
@@ -311,14 +333,114 @@ target: Callable[[str], Any] = Number  # snapshot
 
 ```snapshot
 error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable to `(str, /) -> Any`
-  --> src/mdtest_snippet.py:16:9
+  --> src/mdtest_snippet.py:20:9
    |
-16 | target: Callable[[str], Any] = Number  # snapshot
+20 | target: Callable[[str], Any] = Number  # snapshot
    |         --------------------   ^^^^^^ Incompatible value of type `<class 'Number'>`
    |         |
    |         Declared type
    |
-info: the first parameter has an incompatible type: `str` is not assignable to `int`
+info: type `<class 'Number'>` has inferred callable type `(value: int) -> Number`
+info: └── the first parameter has an incompatible type: `str` is not assignable to `int`
+```
+
+Passing a class to a function expecting a `Callable`:
+
+```py
+from typing import Any, Callable
+
+def accepts_callable(callback: Callable[[Any], Any]) -> None: ...
+
+class Foo:
+    def __init__(self, x: Any, y: Any): ...
+
+accepts_callable(Foo)  # snapshot
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `accepts_callable` is incorrect
+  --> src/mdtest_snippet.py:28:18
+   |
+28 | accepts_callable(Foo)  # snapshot
+   |                  ^^^ Expected `(Any, /) -> Any`, found `<class 'Foo'>`
+   |
+info: type `<class 'Foo'>` has inferred callable type `(x: Any, y: Any) -> Foo`
+info: └── unexpected extra parameter `y`
+info: Function defined here
+  --> src/mdtest_snippet.py:23:5
+   |
+23 | def accepts_callable(callback: Callable[[Any], Any]) -> None: ...
+   |     ^^^^^^^^^^^^^^^^ ------------------------------ Parameter declared here
+   |
+```
+
+Assigning a bound method to a `Callable`:
+
+```py
+class Greeter:
+    def greet(self, name: str, greeting: str = "Hello") -> str:
+        return f"{greeting}, {name}"
+
+greeter = Greeter()
+bound_method_target: Callable[[int], str] = greeter.greet  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `bound method Greeter.greet(name: str, greeting: str = "Hello") -> str` is not assignable to `(int, /) -> str`
+  --> src/mdtest_snippet.py:34:22
+   |
+34 | bound_method_target: Callable[[int], str] = greeter.greet  # snapshot
+   |                      --------------------   ^^^^^^^^^^^^^ Incompatible value of type `bound method Greeter.greet(name: str, greeting: str = "Hello") -> str`
+   |                      |
+   |                      Declared type
+   |
+info: the first parameter has an incompatible type: `int` is not assignable to `str`
+```
+
+Assigning a known bound method to a `Callable`:
+
+```py
+def callable_base(x: int) -> bool:
+    return True
+
+known_bound_method_target: Callable[[str], bool] = callable_base.__call__  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `<method-wrapper '__call__' of function 'callable_base'>` is not assignable to `(str, /) -> bool`
+  --> src/mdtest_snippet.py:38:28
+   |
+38 | known_bound_method_target: Callable[[str], bool] = callable_base.__call__  # snapshot
+   |                            ---------------------   ^^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `<method-wrapper '__call__' of function 'callable_base'>`
+   |                            |
+   |                            Declared type
+   |
+info: type `<method-wrapper '__call__' of function 'callable_base'>` has inferred callable type `(x: int) -> bool`
+info: └── the first parameter has an incompatible type: `str` is not assignable to `int`
+```
+
+Assigning a `functools.partial` result to a `Callable`:
+
+```py
+from functools import partial
+
+def predicate(x: int, y: str) -> bool:
+    return True
+
+partial_predicate = partial(predicate, 1)
+partial_target: Callable[[bytes], bool] = partial_predicate  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `partial[(y: str) -> bool]` is not assignable to `(bytes, /) -> bool`
+  --> src/mdtest_snippet.py:45:17
+   |
+45 | partial_target: Callable[[bytes], bool] = partial_predicate  # snapshot
+   |                 -----------------------   ^^^^^^^^^^^^^^^^^ Incompatible value of type `partial[(y: str) -> bool]`
+   |                 |
+   |                 Declared type
+   |
+info: the first parameter has an incompatible type: `bytes` is not assignable to `str`
 ```
 
 ## Function assignability and overrides

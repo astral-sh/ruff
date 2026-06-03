@@ -235,7 +235,8 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source))
             .or_else(|comment| handle_key_value_comment(comment, source)),
-        AnyNodeRef::ExprDictComp(_) => handle_key_value_comment(comment, source)
+        AnyNodeRef::ExprDictComp(_) => handle_dict_unpacking_comment(comment, source)
+            .or_else(|comment| handle_key_value_comment(comment, source))
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source)),
         AnyNodeRef::ExprIf(expr_if) => handle_expr_if_comment(comment, expr_if, source),
         AnyNodeRef::ExprSlice(expr_slice) => {
@@ -1323,7 +1324,10 @@ fn handle_dict_unpacking_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    debug_assert!(matches!(comment.enclosing_node(), AnyNodeRef::ExprDict(_)));
+    debug_assert!(matches!(
+        comment.enclosing_node(),
+        AnyNodeRef::ExprDict(_) | AnyNodeRef::ExprDictComp(_)
+    ));
 
     // no node after our comment so we can't be between `**` and the name (node)
     let Some(following) = comment.following_node() else {

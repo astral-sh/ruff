@@ -762,7 +762,7 @@
         },
         "invalid-key": {
           "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"namee\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"nickname\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1110,6 +1110,16 @@
             }
           ]
         },
+        "missing-override-decorator": {
+          "title": "detects methods that override a superclass member without an `@override` annotation",
+          "description": "## What it does\nChecks for methods that override a method or attribute in a superclass but are not decorated with `@override`.\n\nThis rule is disabled by default. Enable it to opt in to strict `@override` enforcement for a project.\n\n## Exemptions\nOverriding `__init__`, `__new__`, `__init_subclass__`, or `__post_init__` does not require\n`@override`, even if the method is explicitly declared by a superclass.\n\n## Why is this bad?\nWithout an `@override` annotation, refactors can silently change whether a method is an override.\nRequiring `@override` on every override lets ty report when an intended override stops overriding\nanything, and when a method unexpectedly starts overriding a superclass member.\n\n## Example\n\n```python\nfrom typing import override\n\nclass Parent:\n    def method(self) -> int:\n        return 1\n\nclass Child(Parent):\n    def method(self) -> int:  # Error raised here when the rule is enabled\n        return 2\n\nclass ExplicitChild(Parent):\n    @override\n    def method(self) -> int:  # fine\n        return 2\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-typed-dict-key": {
           "title": "detects missing required keys in `TypedDict` constructors",
           "description": "## What it does\nDetects missing required keys in `TypedDict` constructor calls.\n\n## Why is this bad?\n`TypedDict` requires all non-optional keys to be provided during construction.\nMissing items can lead to a `KeyError` at runtime.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice: Person = {\"name\": \"Alice\"}  # missing required key 'age'\n\nalice[\"age\"]  # KeyError\n```",
@@ -1294,6 +1304,16 @@
           "title": "Failed static assertion",
           "description": "## What it does\nMakes sure that the argument of `static_assert` is statically known to be true.\n\n## Why is this bad?\nA `static_assert` call represents an explicit request from the user\nfor the type checker to emit an error if the argument cannot be verified\nto evaluate to `True` in a boolean context.\n\n## Examples\n```python\nfrom ty_extensions import static_assert\n\nstatic_assert(1 + 1 == 3)  # error: evaluates to `False`\n\nstatic_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "subclass-of-dataclass-with-order": {
+          "title": "detects subclasses of dataclasses with `order=True`",
+          "description": "## What it does\nChecks for classes that inherit from a dataclass with `order=True`.\n\n## Why is this bad?\nWhen a dataclass has `order=True`, comparison methods (`__lt__`, `__le__`, `__gt__`, `__ge__`)\nare generated that compare instances as tuples of their fields. These methods raise a\n`TypeError` at runtime when comparing instances of different classes in the inheritance\nhierarchy, even if one is a subclass of the other.\n\nThis violates the [Liskov Substitution Principle] because child class instances cannot be\nused in all contexts where parent class instances are expected.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass(order=True)\nclass Parent:\n    value: int\n\nclass Child(Parent):  # Ty emits a warning here\n    pass\n\n# At runtime, this raises TypeError:\n# Child(1) < Parent(2)\n```\n\nConsider using [`functools.total_ordering`][total_ordering] instead, which does not have this limitation.\n\n[Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle\n[total_ordering]: https://docs.python.org/3/library/functools.html#functools.total_ordering",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

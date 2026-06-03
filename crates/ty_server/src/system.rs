@@ -125,11 +125,19 @@ impl LSPSystem {
     ) -> Option<PySourceType> {
         match document {
             Document::Text(text) => match text.language_id() {
-                LanguageId::Python => Some(
-                    extension
+                LanguageId::Python => {
+                    let source_type = extension
                         .and_then(PySourceType::try_from_extension)
-                        .unwrap_or(PySourceType::Python),
-                ),
+                        .unwrap_or(PySourceType::Python);
+
+                    // JupyterLab presents notebook virtual documents to language servers as
+                    // simple text files rather than serialized `.ipynb` contents. See:
+                    // https://github.com/jupyterlab/jupyterlab/blob/f51404192bf6d0ff79187c884f21e1f91b928146/packages/lsp/src/virtual/document.ts#L308-L314
+                    Some(match source_type {
+                        PySourceType::Ipynb => PySourceType::Python,
+                        source_type => source_type,
+                    })
+                }
                 LanguageId::Other => None,
             },
             Document::Notebook(_) => Some(PySourceType::Ipynb),

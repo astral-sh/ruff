@@ -105,6 +105,42 @@ pub enum DynamicClassAnchor<'db> {
     },
 }
 
+impl<'db> DynamicClassAnchor<'db> {
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Definition(definition) => Some(Self::Definition(*definition)),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                explicit_bases,
+            } => {
+                let explicit_bases = explicit_bases
+                    .iter()
+                    .map(|base| {
+                        let base = base.recursive_type_normalized_impl(db, div, true);
+                        if nested {
+                            base
+                        } else {
+                            Some(base.unwrap_or(div))
+                        }
+                    })
+                    .collect::<Option<Box<_>>>()?;
+
+                Some(Self::ScopeOffset {
+                    scope: *scope,
+                    offset: *offset,
+                    explicit_bases,
+                })
+            }
+        }
+    }
+}
+
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
 
 /// Returns the `bases` argument for a dynamic class constructor call.
@@ -422,7 +458,16 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
     /// an error (duplicate bases or C3 linearization failure).
-    #[salsa::tracked(returns(ref), cycle_initial=dynamic_class_try_mro_cycle_initial, heap_size = ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
+            Ok(Mro::from([
+                ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
+                ClassBase::object(db),
+            ]))
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic_class(db, self)
     }
@@ -488,6 +533,42 @@ impl<'db> DynamicClassLiteral<'db> {
     }
 }
 
+impl<'db> DynamicClassLiteral<'db> {
+    /// Normalize types that are part of this dynamic class's interned identity.
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let anchor = self
+            .anchor(db)
+            .recursive_type_normalized_impl(db, div, nested)?;
+        let members = self
+            .members(db)
+            .iter()
+            .map(|(name, ty)| {
+                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                Some((name.clone(), ty))
+            })
+            .collect::<Option<Box<_>>>()?;
+        let dataclass_params = match self.dataclass_params(db) {
+            Some(params) => Some(params.recursive_type_normalized_impl(db, div, nested)?),
+            None => None,
+        };
+
+        Some(Self::new(
+            db,
+            self.name(db).clone(),
+            anchor,
+            members,
+            self.has_dynamic_namespace(db),
+            dataclass_params,
+        ))
+    }
+}
+
 /// Error for metaclass conflicts in dynamic classes.
 ///
 /// This mirrors `MetaclassErrorKind::Conflict` for regular classes.
@@ -499,18 +580,4 @@ pub(crate) struct DynamicMetaclassConflict<'db> {
     /// The second conflicting metaclass and its originating base class.
     pub(crate) metaclass2: ClassType<'db>,
     pub(crate) base2: ClassBase<'db>,
-}
-
-#[expect(clippy::unnecessary_wraps)]
-fn dynamic_class_try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    self_: DynamicClassLiteral<'db>,
-) -> Result<Mro<'db>, DynamicMroError<'db>> {
-    // When there's a cycle, return a minimal MRO with just the class itself and object.
-    // This breaks the cycle and allows type checking to continue.
-    Ok(Mro::from([
-        ClassBase::Class(ClassType::NonGeneric(self_.into())),
-        ClassBase::object(db),
-    ]))
 }

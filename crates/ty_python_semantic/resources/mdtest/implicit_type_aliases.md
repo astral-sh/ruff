@@ -217,6 +217,57 @@ def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
 None | None  # error: [unsupported-operator] "Operator `|` is not supported between two objects of type `None`"
 ```
 
+Implicit aliases should also work when one union member is a `NewType` pseudo-class:
+
+```py
+from typing import NewType
+
+Foo = NewType("Foo", int)
+FooOrStr = Foo | str
+
+reveal_type(FooOrStr)  # revealed: <types.UnionType special-form 'Foo | str'>
+
+def _(x: FooOrStr):
+    reveal_type(x)  # revealed: Foo | str
+```
+
+Implicit aliases should also work when one union member is a `TypeAliasType`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAliasType, Union
+
+type Pep695IntOrStr = int | str
+
+Pep695OrBytes = Pep695IntOrStr | bytes
+BytesOrPep695 = bytes | Pep695IntOrStr
+
+ManualIntOrStr = TypeAliasType("ManualIntOrStr", Union[int, str])
+
+ManualOrBytes = ManualIntOrStr | bytes
+BytesOrManual = bytes | ManualIntOrStr
+
+reveal_type(Pep695OrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
+reveal_type(BytesOrPep695)  # revealed: <types.UnionType special-form 'bytes | int | str'>
+reveal_type(ManualOrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
+reveal_type(BytesOrManual)  # revealed: <types.UnionType special-form 'bytes | int | str'>
+
+def _(
+    pep695_or_bytes: Pep695OrBytes,
+    bytes_or_pep695: BytesOrPep695,
+    manual_or_bytes: ManualOrBytes,
+    bytes_or_manual: BytesOrManual,
+):
+    reveal_type(pep695_or_bytes)  # revealed: int | str | bytes
+    reveal_type(bytes_or_pep695)  # revealed: bytes | int | str
+    reveal_type(manual_or_bytes)  # revealed: int | str | bytes
+    reveal_type(bytes_or_manual)  # revealed: bytes | int | str
+```
+
 When constructing something nonsensical like `int | 1`, we emit a diagnostic for the expression
 itself, as it leads to a `TypeError` at runtime. The result of the expression is then inferred as
 `Unknown`, so we permit it to be used in a type expression.
@@ -394,7 +445,7 @@ reveal_type(Sum)  # revealed: <class 'tuple[T@Sum, U@Sum]'>
 reveal_type(ListOrTuple)  # revealed: <types.UnionType special-form 'list[T@ListOrTuple] | tuple[T@ListOrTuple, ...]'>
 # revealed: <types.UnionType special-form 'list[T@ListOrTupleLegacy] | tuple[T@ListOrTupleLegacy, ...]'>
 reveal_type(ListOrTupleLegacy)
-reveal_type(MyCallable)  # revealed: <typing.Callable special-form '(**P@MyCallable) -> T@MyCallable'>
+reveal_type(MyCallable)  # revealed: <Callable special-form '(**P@MyCallable) -> T@MyCallable'>
 reveal_type(AnnotatedType)  # revealed: <special-form 'typing.Annotated[T@AnnotatedType, <metadata>]'>
 reveal_type(TransparentAlias)  # revealed: TypeVar
 reveal_type(MyOptional)  # revealed: <types.UnionType special-form 'T@MyOptional | None'>
@@ -459,7 +510,7 @@ reveal_type(ListOfPairs)  # revealed: <class 'list[tuple[str, str]]'>
 reveal_type(ListOrTupleOfInts)  # revealed: <types.UnionType special-form 'list[int] | tuple[int, ...]'>
 reveal_type(AnnotatedInt)  # revealed: <special-form 'typing.Annotated[int, <metadata>]'>
 reveal_type(SubclassOfInt)  # revealed: <special-form 'type[int]'>
-reveal_type(CallableIntToStr)  # revealed: <typing.Callable special-form '(int, /) -> str'>
+reveal_type(CallableIntToStr)  # revealed: <Callable special-form '(int, /) -> str'>
 
 def _(
     ints_or_none: IntsOrNone,
@@ -1555,9 +1606,9 @@ CallableNoArgs = Callable[[], None]
 BasicCallable = Callable[[int, str], bytes]
 GradualCallable = Callable[..., str]
 
-reveal_type(CallableNoArgs)  # revealed: <typing.Callable special-form '() -> None'>
-reveal_type(BasicCallable)  # revealed: <typing.Callable special-form '(int, str, /) -> bytes'>
-reveal_type(GradualCallable)  # revealed: <typing.Callable special-form '(...) -> str'>
+reveal_type(CallableNoArgs)  # revealed: <Callable special-form '() -> None'>
+reveal_type(BasicCallable)  # revealed: <Callable special-form '(int, str, /) -> bytes'>
+reveal_type(GradualCallable)  # revealed: <Callable special-form '(...) -> str'>
 
 def _(
     callable_no_args: CallableNoArgs,
@@ -1583,14 +1634,14 @@ def _(takes_callable: TakesCallable, returns_callable: ReturnsCallable):
 Invalid uses result in diagnostics:
 
 ```py
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 InvalidCallable1 = Callable[[int]]
 
 # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
 InvalidCallable2 = Callable[int, str]
 
-reveal_type(InvalidCallable1)  # revealed: <typing.Callable special-form '(...) -> Unknown'>
-reveal_type(InvalidCallable2)  # revealed: <typing.Callable special-form '(...) -> Unknown'>
+reveal_type(InvalidCallable1)  # revealed: <Callable special-form '(...) -> Unknown'>
+reveal_type(InvalidCallable2)  # revealed: <Callable special-form '(...) -> Unknown'>
 
 def _(invalid_callable1: InvalidCallable1, invalid_callable2: InvalidCallable2):
     reveal_type(invalid_callable1)  # revealed: (...) -> Unknown

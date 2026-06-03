@@ -4,8 +4,8 @@ import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Callable
 from types import ModuleType
-from typing import AnyStr, Protocol, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import AnyStr, Protocol, TypeAlias, final, overload, type_check_only
+from typing_extensions import Self, disjoint_base
 
 _DigestMod: TypeAlias = str | Callable[[], _HashObject] | ModuleType | None
 
@@ -59,8 +59,7 @@ class HASH:
     def update(self, obj: ReadableBuffer, /) -> None:
         """Update this hash object's state with the provided string."""
 
-if sys.version_info >= (3, 10):
-    class UnsupportedDigestmodError(ValueError): ...
+class UnsupportedDigestmodError(ValueError): ...
 
 class HASHXOF(HASH):
     """A hash is an object used to calculate a checksum of a string of information.
@@ -137,9 +136,9 @@ def compare_digest(a: ReadableBuffer, b: ReadableBuffer, /) -> bool:
     a timing attack could theoretically reveal information about the
     types and lengths of a and b--but not their values.
     """
-
 @overload
 def compare_digest(a: AnyStr, b: AnyStr, /) -> bool: ...
+
 def get_fips_mode() -> int:
     """Determine the OpenSSL FIPS mode of operation.
 
@@ -151,7 +150,7 @@ def get_fips_mode() -> int:
     values other than 1 may have additional significance.
     """
 
-def hmac_new(key: bytes | bytearray, msg: ReadableBuffer = b"", digestmod: _DigestMod = None) -> HMAC:
+def hmac_new(key: ReadableBuffer, msg: ReadableBuffer = b"", digestmod: _DigestMod = None) -> HMAC:
     """Return a new hmac object."""
 
 if sys.version_info >= (3, 13):
@@ -258,7 +257,7 @@ else:
     def openssl_shake_256(string: ReadableBuffer = b"", *, usedforsecurity: bool = True) -> HASHXOF:
         """Returns a shake-256 variable hash object; optionally initialized with a string"""
 
-def hmac_digest(key: bytes | bytearray, msg: ReadableBuffer, digest: str) -> bytes:
+def hmac_digest(key: ReadableBuffer, msg: ReadableBuffer, digest: str) -> bytes:
     """Single-shot HMAC."""
 
 def pbkdf2_hmac(

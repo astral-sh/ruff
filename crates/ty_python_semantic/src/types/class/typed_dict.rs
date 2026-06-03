@@ -10,7 +10,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::place::PlaceAndQualifiers;
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
 use crate::types::mro::Mro;
@@ -153,6 +153,7 @@ fn synthesize_typed_dict_init<'db>(
         db,
         CallableSignature::from_overloads([map_overload, keyword_overload]),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -162,20 +163,36 @@ fn synthesize_typed_dict_getitem<'db>(
     instance_ty: Type<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
-    let overloads = fields.iter().map(|(field_name, field)| {
-        let key_type = Type::string_literal(db, field_name);
-        let parameters = [
-            Parameter::positional_only(Some(Name::new_static("self")))
-                .with_annotated_type(instance_ty),
-            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_type),
-        ];
-        Signature::new(Parameters::new(db, parameters), field.declared_ty)
-    });
+    let overloads = fields
+        .iter()
+        .map(|(field_name, field)| {
+            let key_type = Type::string_literal(db, field_name);
+            let parameters = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(key_type),
+            ];
+            Signature::new(Parameters::new(db, parameters), field.declared_ty)
+        })
+        .chain(std::iter::once(Signature::new(
+            Parameters::new(
+                db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                ],
+            ),
+            Type::object(),
+        )));
 
     Type::Callable(CallableType::new(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -219,6 +236,7 @@ fn synthesize_typed_dict_setitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -258,6 +276,7 @@ fn synthesize_typed_dict_delitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -377,6 +396,7 @@ fn synthesize_typed_dict_get<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -490,6 +510,7 @@ fn synthesize_typed_dict_pop<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -516,6 +537,7 @@ fn synthesize_typed_dict_setdefault<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -583,6 +605,7 @@ fn synthesize_typed_dict_merge<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
     ))
 }
 
@@ -615,6 +638,28 @@ pub enum DynamicTypedDictAnchor<'db> {
     },
 }
 
+impl<'db> DynamicTypedDictAnchor<'db> {
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Definition(definition) => Some(Self::Definition(*definition)),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                schema,
+            } => Some(Self::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                schema: schema.recursive_type_normalized_impl(db, div, nested)?,
+            }),
+        }
+    }
+}
+
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 pub struct DynamicTypedDictLiteral<'db> {
     /// The name of the TypedDict (from the first argument).
@@ -633,6 +678,22 @@ pub struct DynamicTypedDictLiteral<'db> {
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
+
+impl<'db> DynamicTypedDictLiteral<'db> {
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self::new(
+            db,
+            self.name(db).clone(),
+            self.anchor(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+        ))
+    }
+}
 
 #[salsa::tracked]
 impl<'db> DynamicTypedDictLiteral<'db> {

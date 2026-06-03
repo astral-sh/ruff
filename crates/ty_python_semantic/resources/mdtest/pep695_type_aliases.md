@@ -82,6 +82,29 @@ def f() -> None:
     reveal_type(x)  # revealed: int | str | bytes
 ```
 
+## `Self`
+
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` in alias type-parameter bounds and defaults.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
+
+```py
+from typing import Annotated, Self, cast
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Alias = tuple[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Simplified = object | Self
+
+    type Metadata = Annotated[int, cast(Self, object())]
+```
+
 ## Aliased type aliases
 
 ```py
@@ -209,6 +232,29 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+## Loop-carried augmented unions
+
+PEP 604 unions created by augmented assignment should converge when the previous loop iteration
+already contains the same type alias:
+
+```py
+def f(condition: bool):
+    type Left = int
+    alias = Left
+    reveal_type(alias)  # revealed: TypeAliasType
+
+    while condition:
+        type Right = str
+        alias |= Right
+        reveal_type(alias)  # revealed: <types.UnionType special-form 'int | str'>
+
+    reveal_type(alias)  # revealed: TypeAliasType | <types.UnionType special-form 'int | str'>
+
+    # it would be okay to emit an `invalid-type-form` error here
+    def inner(x: alias):
+        reveal_type(x)  # revealed: int | str
+```
+
 ## Multiple layers of union aliases
 
 ```py
@@ -224,6 +270,51 @@ type Y = W | X
 from ty_extensions import is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(Y, A | B | C | D))
+```
+
+## Unions of enum literal aliases
+
+A union of aliases covering every member of an enum is equivalent to the enum itself, including when
+the aliases occur inside a larger type.
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Choice(Enum):
+    A = "A"
+    B = "B"
+
+type A = Literal[Choice.A]
+type B = Literal[Choice.B]
+type Either = A | B
+type Selector = A | B | tuple[A, B]
+
+def accept_either(value: Either) -> None: ...
+def accept_optional_either(value: Either | None) -> None: ...
+def accept_selector(value: Selector) -> None: ...
+
+class Config:
+    either: Either
+    selector: Selector
+
+def _(choice: Choice, config: Config) -> None:
+    direct: Either = choice
+    accept_either(choice)
+    accept_optional_either(config.either)
+    values: list[Selector] = []
+    accept_selector(config.selector)
+
+class ExtendedChoice(Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+
+type ExtendedA = Literal[ExtendedChoice.A]
+type ExtendedB = Literal[ExtendedChoice.B]
+
+def _(choice: ExtendedChoice) -> None:
+    partial: ExtendedA | ExtendedB = choice  # error: [invalid-assignment]
 ```
 
 ## In binary ops

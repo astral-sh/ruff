@@ -117,6 +117,7 @@ pub enum KnownClass {
     Mapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
+    Sentinel,
     // Collections
     ChainMap,
     Counter,
@@ -139,6 +140,7 @@ pub enum KnownClass {
     // functools
     FunctoolsPartial,
     // ty_extensions
+    ExactlySized,
     ConstraintSet,
     GenericContext,
     Specialization,
@@ -180,6 +182,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::Super
             | Self::WrapperDescriptorType
             | Self::UnionType
@@ -252,6 +255,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -325,6 +329,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
@@ -346,6 +351,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
@@ -419,6 +425,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
@@ -440,6 +447,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
@@ -513,6 +521,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
@@ -533,6 +542,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
@@ -565,6 +575,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Awaitable
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::AsyncGenerator
             | Self::Generator => true,
 
@@ -610,6 +621,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::TypeAliasType
             | Self::NoDefaultType
             | Self::NewType
@@ -720,6 +732,7 @@ impl KnownClass {
             | KnownClass::ParamSpecKwargs
             | KnownClass::ProtocolMeta
             | KnownClass::TypeVarTuple
+            | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
@@ -738,6 +751,7 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
@@ -797,6 +811,7 @@ impl KnownClass {
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
+            Self::Sentinel => "Sentinel",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
@@ -836,28 +851,13 @@ impl KnownClass {
             // which is impossible to replicate in the stubs since the sole instance of the class
             // also has that name in the `sys` module.)
             Self::VersionInfo => "_version_info",
-            Self::EllipsisType => {
-                // Exposed as `types.EllipsisType` on Python >=3.10;
-                // backported as `builtins.ellipsis` by typeshed on Python <=3.9
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    "EllipsisType"
-                } else {
-                    "ellipsis"
-                }
-            }
-            Self::NotImplementedType => {
-                // Exposed as `types.NotImplementedType` on Python >=3.10;
-                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    "NotImplementedType"
-                } else {
-                    "_NotImplementedType"
-                }
-            }
+            Self::EllipsisType => "EllipsisType",
+            Self::NotImplementedType => "NotImplementedType",
             Self::Field => "Field",
             Self::KwOnly => "KW_ONLY",
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
+            Self::ExactlySized => "ExactlySized",
             Self::ConstraintSet => "ConstraintSet",
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
@@ -1038,15 +1038,7 @@ impl KnownClass {
             class: KnownClass,
         }
 
-        fn known_class_to_class_literal_initial<'db>(
-            _db: &'db dyn Db,
-            _id: salsa::Id,
-            _class: KnownClassArgument<'db>,
-        ) -> Option<StaticClassLiteral<'db>> {
-            None
-        }
-
-        #[salsa::tracked(cycle_initial=known_class_to_class_literal_initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn known_class_to_class_literal<'db>(
             db: &'db dyn Db,
             class: KnownClassArgument<'db>,
@@ -1175,6 +1167,8 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::UnionType
             | Self::BuiltinFunctionType
+            | Self::EllipsisType
+            | Self::NotImplementedType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
             Self::Awaitable
@@ -1189,22 +1183,17 @@ impl KnownClass {
             | Self::Sequence
             | Self::Mapping
             | Self::ProtocolMeta
+            | Self::ParamSpec
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
-            Self::ParamSpec => {
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    KnownModule::Typing
-                } else {
-                    KnownModule::TypingExtensions
-                }
-            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1217,24 +1206,6 @@ impl KnownClass {
                     KnownModule::TypingExtensions
                 }
             }
-            Self::EllipsisType => {
-                // Exposed as `types.EllipsisType` on Python >=3.10;
-                // backported as `builtins.ellipsis` by typeshed on Python <=3.9
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    KnownModule::Types
-                } else {
-                    KnownModule::Builtins
-                }
-            }
-            Self::NotImplementedType => {
-                // Exposed as `types.NotImplementedType` on Python >=3.10;
-                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                    KnownModule::Types
-                } else {
-                    KnownModule::Builtins
-                }
-            }
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -1243,6 +1214,7 @@ impl KnownClass {
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization => KnownModule::TyExtensions,
@@ -1261,8 +1233,6 @@ impl KnownClass {
             | Self::NoDefaultType
             | Self::VersionInfo
             | Self::EllipsisType
-            | Self::TypeAliasType
-            | Self::UnionType
             | Self::NotImplementedType => Some(true),
 
             Self::Bool
@@ -1308,6 +1278,7 @@ impl KnownClass {
             | Self::OrderedDict
             | Self::SupportsIndex
             | Self::StdlibAlias
+            | Self::TypeAliasType
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
@@ -1315,6 +1286,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -1336,6 +1308,7 @@ impl KnownClass {
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1344,6 +1317,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::UnionType
             | Self::FunctoolsPartial => Some(false),
 
             Self::Tuple => None,
@@ -1359,7 +1333,6 @@ impl KnownClass {
             | Self::EllipsisType
             | Self::NoDefaultType
             | Self::VersionInfo
-            | Self::TypeAliasType
             | Self::NotImplementedType => true,
 
             Self::Bool
@@ -1406,6 +1379,7 @@ impl KnownClass {
             | Self::Generator
             | Self::AsyncGenerator
             | Self::Deprecated
+            | Self::TypeAliasType
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
@@ -1413,6 +1387,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Sentinel
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -1435,6 +1410,7 @@ impl KnownClass {
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1506,6 +1482,7 @@ impl KnownClass {
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
             "TypeVarTuple" => &[Self::TypeVarTuple],
+            "Sentinel" => &[Self::Sentinel],
             "ChainMap" => &[Self::ChainMap],
             "Counter" => &[Self::Counter],
             "defaultdict" => &[Self::DefaultDict],
@@ -1532,22 +1509,13 @@ impl KnownClass {
             "ABCMeta" => &[Self::ABCMeta],
             "super" => &[Self::Super],
             "_version_info" => &[Self::VersionInfo],
-            "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                &[Self::EllipsisType]
-            }
-            "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
-                &[Self::EllipsisType]
-            }
-            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                &[Self::NotImplementedType]
-            }
-            "NotImplementedType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
-                &[Self::NotImplementedType]
-            }
+            "EllipsisType" => &[Self::EllipsisType],
+            "NotImplementedType" => &[Self::NotImplementedType],
             "Field" => &[Self::Field],
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
+            "ExactlySized" => &[Self::ExactlySized],
             "ConstraintSet" => &[Self::ConstraintSet],
             "GenericContext" => &[Self::GenericContext],
             "Specialization" => &[Self::Specialization],
@@ -1632,7 +1600,9 @@ impl KnownClass {
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
             | Self::ExtensionsParamSpec
+            | Self::Sentinel
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1941,16 +1911,14 @@ mod tests {
             .map(|class| {
                 let version_added = match class {
                     KnownClass::Template => PythonVersion::PY314,
-                    KnownClass::UnionType => PythonVersion::PY310,
+                    KnownClass::UnionType | KnownClass::KwOnly => PythonVersion::PY310,
                     KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => {
                         PythonVersion::PY311
                     }
                     KnownClass::GenericAlias => PythonVersion::PY39,
-                    KnownClass::KwOnly => PythonVersion::PY310,
                     KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
                         PythonVersion::PY311
                     }
-                    KnownClass::ParamSpec => PythonVersion::PY310,
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)

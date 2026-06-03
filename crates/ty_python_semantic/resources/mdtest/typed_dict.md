@@ -306,6 +306,18 @@ Empty({}, {})
 Person({}, {})
 ```
 
+Variadic positional arguments should not panic during `TypedDict` constructor preparation:
+
+```py
+class Empty(TypedDict):
+    pass
+
+args = []
+
+Empty(*args)
+Empty(*)  # error: [invalid-syntax] "Expected an expression"
+```
+
 Also, the value types ​​declared in a `TypedDict` affect generic call inference:
 
 ```py
@@ -521,6 +533,40 @@ def _(
     ChildKwargs(**maybe_name, count=1)
 ```
 
+TypedDict constructor validation should support unpacked dict literals with non-identifier keys:
+
+```py
+from typing import TypedDict
+
+KeywordTD = TypedDict("KeywordTD", {"in": int, "x-y": int})
+
+KeywordTD(**{"in": 1, "x-y": 2})
+
+# error: [missing-typed-dict-key] "Missing required key 'x-y' in TypedDict `KeywordTD` constructor"
+KeywordTD(**{"in": 1})
+
+# error: [invalid-argument-type] "Invalid argument to key "in" with declared type `int` on TypedDict `KeywordTD`: value of type `Literal["bad"]`"
+KeywordTD(**{"in": "bad", "x-y": 2})
+
+# error: [invalid-key] "Unknown key "extra" for TypedDict `KeywordTD`"
+KeywordTD(**{"in": 1, "x-y": 2, "extra": 3})
+```
+
+Malformed unpacked keyword literals should still trigger the shared `**kwargs` validation:
+
+```py
+from typing import TypedDict
+
+class SharedKwargsTD(TypedDict):
+    x: int
+
+# error: [invalid-argument-type]
+SharedKwargsTD(**{"x": 1, 1: 2})
+
+# error: [invalid-argument-type]
+SharedKwargsTD(**{"x": 1, **42})
+```
+
 TypedDict positional arguments in mixed constructors should validate their declared keys:
 
 ```py
@@ -699,6 +745,37 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
+Merged dict literals should preserve required keys contributed by unpacked `TypedDict`s:
+
+```py
+from typing import TypedDict
+
+class MergeSource(TypedDict):
+    aaa: int
+    bbb: int
+
+class MergeTarget(TypedDict):
+    aaa: int
+    bbb: int
+    ccc: int
+
+class MergeExtraSource(TypedDict):
+    aaa: int
+    bbb: int
+    extra: int
+
+def _(source: MergeSource):
+    merged: MergeTarget = {**source, "ccc": 3}
+    MergeTarget({**source, "ccc": 3})
+
+def _(source: MergeExtraSource):
+    # error: [invalid-key] "Unknown key "extra" for TypedDict `MergeTarget`"
+    merged: MergeTarget = {**source, "ccc": 3}
+
+    # error: [invalid-key] "Unknown key "extra" for TypedDict `MergeTarget`"
+    MergeTarget({**source, "ccc": 3})
+```
+
 ## Mixed positional and unpacked keyword constructors
 
 These calls mix a positional `TypedDict` argument with unpacked keyword arguments. They should
@@ -727,8 +804,6 @@ class TD(TypedDict):
     a: int
 
 def _(td: TD):
-    # TODO: this should pass like the explicit-keyword and `**TypedDict` cases below.
-    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
     TD({"a": "foo"}, **{"a": 1})
 
     TD({"a": "foo"}, a=1)
@@ -736,6 +811,22 @@ def _(td: TD):
 
 def _(x: Any):
     TD({"a": "foo"}, **x)
+
+class OptionalOverrideTarget(TypedDict, total=False):
+    a: int
+
+class BadOptionalSource(TypedDict):
+    a: str
+
+def _(source: BadOptionalSource, kwargs: Any):
+    OptionalOverrideTarget(source, **{"a": 1, **kwargs})
+
+class ExplicitDictValueTarget(TypedDict):
+    a: int
+    b: object
+
+def _(flag: bool):
+    ExplicitDictValueTarget({"a": 1} if flag else {"a": 2}, b={"a": 1})
 ```
 
 ## Union of `TypedDict`
@@ -940,6 +1031,36 @@ def duplicate_name_keys(
 
     # error: [parameter-already-assigned]
     return DuplicateNeedsName(**left, **right)
+```
+
+Merged unpacked dict literals should preserve dict overwrite semantics within a single `**{...}`:
+
+```py
+from typing import TypedDict
+
+class MergeTarget(TypedDict):
+    name: str
+
+class GoodName(TypedDict):
+    name: str
+
+class BadName(TypedDict):
+    name: int
+
+class MaybeGoodName(TypedDict, total=False):
+    name: str
+
+def _(
+    good: GoodName,
+    bad: BadName,
+    maybe_good: MaybeGoodName,
+):
+    MergeTarget(**{"name": "a", **good})
+    MergeTarget(**{**bad, "name": "ok"})
+    MergeTarget(**{"name": 1, **good})
+
+    # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `MergeTarget`: value of type `Literal[1]`"
+    MergeTarget(**{"name": 1, **maybe_good})
 ```
 
 Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
@@ -1863,6 +1984,11 @@ def _(
     # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
+    # Direct calls to the synthesized method accept any string key, including keys not declared
+    # by the TypedDict.
+    reveal_type(movie.__getitem__("anything"))  # revealed: object
+    reveal_type(movie.__getitem__(str_key))  # revealed: object
+
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
 
@@ -2215,6 +2341,42 @@ def _(p: Person) -> None:
     reveal_type(type(p))  # revealed: <class 'dict[str, object]'>
 
     reveal_type(p.__class__)  # revealed: <class 'dict[str, object]'>
+```
+
+Passing a `TypedDict` to `dict()` copies it into a regular dictionary:
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+    year: int
+
+def takes_dict(value: dict[str, object]) -> None: ...
+def _(movie: Movie) -> None:
+    reveal_type(dict(movie))  # revealed: dict[str, object]
+    takes_dict(dict(movie))
+```
+
+Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
+`TypedDict`:
+
+```py
+from _typeshed import SupportsKeysAndGetItem
+from typing import TypeVar, TypedDict
+
+class Movie(TypedDict):
+    title: str
+    year: int
+
+KT = TypeVar("KT")
+VT = TypeVar("VT")
+
+def copy(value: SupportsKeysAndGetItem[KT, VT]) -> dict[KT, VT]:
+    return dict(value)
+
+def _(movie: Movie) -> None:
+    reveal_type(copy(movie))  # revealed: dict[str, object]
 ```
 
 Also, the "attributes" on the class definition cannot be accessed. Neither on the class itself, nor
@@ -2690,6 +2852,21 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
+The `Self` special form can also appear in recursive `TypedDict` fields:
+
+```py
+from typing_extensions import Self
+
+class A(TypedDict):
+    pass
+
+class B(TypedDict):
+    foo: A | Self
+
+# error: [missing-typed-dict-key] "Missing required key 'foo' in TypedDict `B` constructor"
+_: B = {}
+```
+
 TypedDict constructor calls should also use field type context when inferring nested values:
 
 ```py
@@ -2842,6 +3019,10 @@ TotalNone = TypedDict("TotalNone", {"id": int}, total=None)
 def f(total: bool) -> None:
     # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
     TotalDynamic = TypedDict("TotalDynamic", {"id": int}, total=total)
+
+# An expression that evaluates to a bool literal is still not a literal expression:
+# error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+TotalExpression = TypedDict("TotalExpression", {"id": int}, total=1 == 1)
 ```
 
 ## Function syntax with `Required` and `NotRequired`
@@ -2911,6 +3092,10 @@ ClosedNone = TypedDict("ClosedNone", {"id": int}, closed=None)
 def f(closed: bool) -> None:
     # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
     ClosedDynamic = TypedDict("ClosedDynamic", {"id": int}, closed=closed)
+
+# An expression that evaluates to a bool literal is still not a literal expression:
+# error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+ClosedExpression = TypedDict("ClosedExpression", {"id": int}, closed=1 == 1)
 ```
 
 ## Function syntax with `extra_items`
@@ -4843,6 +5028,21 @@ class Foo(TypedDict("Foo", {"x": int, "y": str})):
     pass
 ```
 
+Other class decorators can replace the public TypedDict binding:
+
+```py
+from typing import TypedDict
+
+class ReplacesClass:
+    def __init__(self, cls: type[object]) -> None: ...
+
+@ReplacesClass
+class Decorated(TypedDict):
+    name: str
+
+reveal_type(Decorated)  # revealed: ReplacesClass
+```
+
 ## Class header validation
 
 <!-- snapshot-diagnostics -->
@@ -4897,6 +5097,13 @@ And variadic keywords are also banned:
 ```py
 def f(kwargs: dict):
     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
+```
+
+Literal-valued expressions are not literal arguments:
+
+```py
+class Qux(TypedDict, total=1 == 1): ...  # error: [invalid-argument-type]
+class Quux(TypedDict, closed=1 == 1): ...  # error: [invalid-argument-type]
 ```
 
 ## PEP 728 (`closed` and `extra_items`)

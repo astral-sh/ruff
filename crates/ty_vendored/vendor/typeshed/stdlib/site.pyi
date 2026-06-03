@@ -94,20 +94,31 @@ def addpackage(sitedir: StrPath, name: StrPath, known_paths: set[str] | None) ->
     and add that to known_paths, or execute it if it starts with 'import '.
     """
 
-def addsitedir(sitedir: str, known_paths: set[str] | None = None) -> None:
-    """Add 'sitedir' argument to sys.path if missing and handle .pth files in
-    'sitedir'
-    """
+if sys.version_info >= (3, 15):
+    def process_startup_files() -> None: ...  # undocumented
+    def addsitedir(sitedir: str, known_paths: set[str] | None = None, *, defer_processing_start_files: bool = False) -> None: ...
+    def addsitepackages(
+        known_paths: set[str] | None, prefixes: Iterable[str] | None = None, *, defer_processing_start_files: bool = False
+    ) -> set[str] | None: ...  # undocumented
+    def addusersitepackages(
+        known_paths: set[str] | None, *, defer_processing_start_files: bool = False
+    ) -> set[str] | None: ...  # undocumented
 
-def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None = None) -> set[str] | None:  # undocumented
-    """Add site-packages to sys.path"""
+else:
+    def addsitedir(sitedir: str, known_paths: set[str] | None = None) -> None:
+        """Add 'sitedir' argument to sys.path if missing and handle .pth files in
+        'sitedir'
+        """
 
-def addusersitepackages(known_paths: set[str] | None) -> set[str] | None:  # undocumented
-    """Add a per user site-package to sys.path
+    def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None = None) -> set[str] | None:  # undocumented
+        """Add site-packages to sys.path"""
 
-    Each user has its own python directory with site-packages in the
-    home directory.
-    """
+    def addusersitepackages(known_paths: set[str] | None) -> set[str] | None:  # undocumented
+        """Add a per user site-package to sys.path
+
+        Each user has its own python directory with site-packages in the
+        home directory.
+        """
 
 def check_enableusersite() -> bool | None:  # undocumented
     """Check if user site directory is safe for inclusion

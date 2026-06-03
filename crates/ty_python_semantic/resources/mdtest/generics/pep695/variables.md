@@ -896,6 +896,19 @@ def source[T: type | tuple[type, ...]](x: T) -> Intersection[T, Not[tuple[object
     raise NotImplementedError
 
 reveal_type(higher(source))  # revealed: type
+
+def iterable_after_negative_narrow[T: str | list[str]](foo: T) -> None:
+    if isinstance(foo, str):
+        return
+    reveal_type(foo)  # revealed: T@iterable_after_negative_narrow & ~str
+    for x in foo:
+        reveal_type(x)  # revealed: str
+
+def non_iterable_after_negative_narrow[T: int | list[str]](foo: T) -> None:
+    if isinstance(foo, list):
+        return
+    reveal_type(foo)  # revealed: T@non_iterable_after_negative_narrow & ~Top[list[Unknown]]
+    for x in foo: ...  # error: [not-iterable]
 ```
 
 ## Constrained typevars remain assignable to the union of their constraints after narrowing

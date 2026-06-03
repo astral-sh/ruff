@@ -4,18 +4,18 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 
 use crate::{
-    TypeQualifiers,
+    Db, TypeQualifiers,
     diagnostic::format_enumeration,
-    place::{place_from_bindings, place_from_declarations},
+    place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
+        CallArguments, ClassBase, ClassLiteral, ClassType, KnownClass, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type, binding_type,
+        StaticClassLiteral, Type, TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -29,11 +29,12 @@ use crate::{
             INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS,
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
             INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
-            SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
-            report_conflicting_metaclass_from_bases, report_duplicate_bases,
-            report_instance_layout_conflict, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference,
+            SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
+            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
+            report_duplicate_bases, report_inconsistent_generic_bases,
+            report_instance_layout_conflict, report_invalid_attribute_assignment,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
@@ -48,11 +49,14 @@ use crate::{
         overrides,
         tuple::Tuple,
         typevar::TypeVarInstance,
+        variance::VarianceInferable,
         visitor::find_over_type,
     },
 };
 use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
-use ty_python_core::{SemanticIndex, definition::DefinitionKind, scope::ScopeId};
+use ty_python_core::{
+    SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
+};
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition is semantically valid and will not cause an exception to be raised at runtime.
@@ -221,6 +225,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
     let expanded_base_entries =
         expanded_class_base_entries(db, class.known(db), class_node, class_definition);
+    let check_explicit_base_variance = context.is_lint_enabled(&INVALID_GENERIC_CLASS);
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
         let base_class = entry.ty();
@@ -311,7 +316,41 @@ pub(crate) fn check_static_class_definitions<'db>(
                 continue;
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
-            Type::GenericAlias(class) => ClassType::Generic(class),
+            Type::GenericAlias(base_alias) => {
+                if check_explicit_base_variance
+                    && let Some(node) = source_node
+                    && let Some(generic_context) = class.generic_context(db)
+                    && let Some((typevar, declared_variance, required_variance)) =
+                        generic_context.variables(db).find_map(|typevar| {
+                            let declared_variance = typevar.typevar(db).explicit_variance(db)?;
+                            if declared_variance == TypeVarVariance::Invariant {
+                                return None;
+                            }
+                            let required_variance = base_alias.variance_of(db, typevar);
+                            if declared_variance.join(required_variance) != declared_variance {
+                                Some((typevar, declared_variance, required_variance))
+                            } else {
+                                None
+                            }
+                        })
+                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Variance of type variable `{}` is incompatible with base class `{}`",
+                        typevar.typevar(db).name(db),
+                        base_alias.origin(db).name(db),
+                    ));
+                    diagnostic.help(format_args!(
+                        "Type variable `{}` is declared as {}, but base class `{}` requires it to be {}",
+                        typevar.typevar(db).name(db),
+                        declared_variance.as_str(),
+                        base_alias.origin(db).name(db),
+                        required_variance.as_str(),
+                    ));
+                }
+
+                ClassType::Generic(base_alias)
+            }
             _ => continue,
         };
 
@@ -381,6 +420,26 @@ pub(crate) fn check_static_class_definitions<'db>(
                 node,
                 base_is_frozen,
             );
+        }
+
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class)
+            && let Some(node) = source_node
+        {
+            // Suppress the diagnostic if the child class manually overrides all comparison
+            // methods, since the user has explicitly fixed the LSP violation.
+            if !class.has_own_comparison_methods(db)
+                && let Some(builder) = context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, node)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Class `{}` inherits from dataclass `{}` which has `order=True`",
+                    class.name(db),
+                    ordered_base_class.name(db),
+                ));
+                diagnostic.info(
+                    "Comparison of instances of the child class with instances \
+                    of the parent class will raise `TypeError` at runtime",
+                );
+            }
         }
     }
 
@@ -479,122 +538,16 @@ pub(crate) fn check_static_class_definitions<'db>(
                 );
             }
 
-            // Check for inconsistent specializations of the same generic
-            // base class. This detects when different explicit bases
-            // contribute conflicting specializations of a common generic
-            // ancestor to the MRO. For example:
-            //
-            //   class Grandparent(Generic[T1, T2]): ...
-            //   class Parent(Grandparent[T1, T2]): ...
-            //   class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
             let explicit_bases = class.explicit_bases(db);
-            let can_annotate_bases = || {
-                class_node.bases().len() == explicit_bases.len()
-                    && !class_node.bases().iter().any(ast::Expr::is_starred_expr)
-            };
-
-            // Maps each generic ancestor's class literal to the first
-            // specialization seen and the index of the explicit base it
-            // came from.
-            let mut ancestor_specs =
-                FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
-
-            'outer: for (i, base) in explicit_bases.iter().enumerate() {
-                let base_class = match base {
-                    Type::GenericAlias(c) => ClassType::Generic(*c),
-                    Type::ClassLiteral(c) if c.generic_context(db).is_none() => {
-                        ClassType::NonGeneric(*c)
-                    }
-                    _ => continue,
-                };
-
-                for supercls in base_class.iter_mro(db) {
-                    let ClassBase::Class(ClassType::Generic(supercls_alias)) = supercls else {
-                        continue;
-                    };
-                    let origin = supercls_alias.origin(db);
-
-                    if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin) {
-                        if earlier_idx != i
-                            && earlier_alias
-                                .specialization(db)
-                                .types(db)
-                                .iter()
-                                .zip(supercls_alias.specialization(db).types(db))
-                                .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
-                        {
-                            let Some(builder) =
-                                context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db))
-                            else {
-                                break 'outer;
-                            };
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Inconsistent type arguments for `{}` among class bases",
-                                origin.name(db)
-                            ));
-
-                            let later_is_direct = matches!(
-                                base,
-                                Type::GenericAlias(a)
-                                    if a.origin(db) == origin
-                            );
-
-                            if can_annotate_bases() {
-                                diagnostic.annotate(
-                                    context.secondary(&class_node.bases()[earlier_idx]).message(
-                                        format_args!(
-                                            "Earlier class base inherits from `{}`",
-                                            earlier_alias.display(db)
-                                        ),
-                                    ),
-                                );
-                                let later_annotation = context.secondary(&class_node.bases()[i]);
-                                diagnostic.annotate(if later_is_direct {
-                                    later_annotation.message(format_args!(
-                                        "Later class base is `{}`",
-                                        supercls_alias.display(db)
-                                    ))
-                                } else {
-                                    later_annotation.message(format_args!(
-                                        "Later class base inherits from `{}`",
-                                        supercls_alias.display(db)
-                                    ))
-                                });
-                            } else {
-                                diagnostic.info(format_args!(
-                                    "Earlier class base inherits from `{}`",
-                                    earlier_alias.display(db)
-                                ));
-                                if later_is_direct {
-                                    diagnostic.info(format_args!(
-                                        "Later class base is `{}`",
-                                        supercls_alias.display(db)
-                                    ));
-                                } else {
-                                    diagnostic.info(format_args!(
-                                        "Later class base inherits from `{}`",
-                                        supercls_alias.display(db)
-                                    ));
-                                }
-                            }
-                            diagnostic.set_concise_message(format_args!(
-                                "Inconsistent type arguments: class cannot \
-                                        inherit from both `{}` and `{}`",
-                                supercls_alias.display(db),
-                                earlier_alias.display(db)
-                            ));
-                            break 'outer;
-                        }
-                    } else if !supercls_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .all(Type::is_dynamic)
-                    {
-                        ancestor_specs.insert(origin, (supercls_alias, i));
-                    }
-                }
-            }
+            let base_nodes = (class_node.bases().len() == explicit_bases.len()
+                && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
+            .then_some(class_node.bases());
+            report_inconsistent_generic_bases(
+                context,
+                class.header_range(db),
+                explicit_bases,
+                base_nodes,
+            );
         }
     }
 
@@ -702,9 +655,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 match keyword.arg.as_deref() {
                     Some(arg_name @ ("total" | "closed")) => {
                         let passed_type = file_expression_type(&keyword.value);
-                        if passed_type
-                            .as_literal_value()
-                            .is_none_or(|literal| !literal.is_bool())
+                        if !keyword.value.is_boolean_literal_expr()
                             && let Some(builder) =
                                 context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
                         {
@@ -1033,10 +984,13 @@ pub(crate) fn check_static_class_definitions<'db>(
     // and for violations of other rules relating to invalid overrides of some sort.
     overrides::check_class(context, class);
 
-    // (14) Check for unimplemented abstract methods on final classes.
+    // (14) Check compatibility between class namespace values and metaclass-populated attributes.
+    check_class_namespace_against_metaclass_members(context, class, index);
+
+    // (15) Check for unimplemented abstract methods on final classes.
     check_final_class_abstract_methods(context, class, class_node);
 
-    // (15) Check for Final-qualified declarations without a value.
+    // (16) Check for Final-qualified declarations without a value.
     check_class_final_without_value(context, class, index);
 
     if let Some(protocol) = class.into_protocol_class(db) {
@@ -1048,6 +1002,177 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+/// Check compatibility between class namespace values and attributes populated by its metaclass.
+///
+/// A binding in a class body is passed through the namespace used to construct the class object
+/// before a metaclass can initialize that same attribute. If the metaclass declares a type for
+/// that attribute, an incompatible class-body value violates that contract.
+///
+/// Independently, an explicit attribute declaration in the class body constrains a value
+/// populated by metaclass initialization.
+fn check_class_namespace_against_metaclass_members<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    let metaclass = class.metaclass(db);
+    if metaclass == KnownClass::Type.to_class_literal(db) {
+        return;
+    }
+
+    let Some(metaclass_instance) = metaclass.to_instance(db) else {
+        return;
+    };
+
+    let scope = class.body_scope(db).file_scope_id(db);
+    let table = index.place_table(scope);
+    let use_def = index.use_def_map(scope);
+
+    let Some(metaclass) = metaclass.to_class_type(db) else {
+        return;
+    };
+
+    // Metaclass-populated members are generally sparse, while class namespaces such as enums can
+    // be large. Collect possible members first rather than probing the metaclass for every binding.
+    let mut metaclass_instance_members = FxHashSet::default();
+    let mut metaclass_assigned_members = FxHashSet::default();
+    for metaclass in metaclass
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
+    {
+        let body_scope = metaclass.body_scope(db);
+        let metaclass_index = semantic_index(db, body_scope.file(db));
+        let body_scope = body_scope.file_scope_id(db);
+        let metaclass_table = metaclass_index.place_table(body_scope);
+        let metaclass_use_def = metaclass_index.use_def_map(body_scope);
+
+        for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
+            metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().clone());
+        }
+
+        for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
+            for member in metaclass_index.place_table(function_scope).members() {
+                if let Some(name) = member.as_instance_attribute() {
+                    // A method-scope member may only be declared, as in `cls.attr: int`.
+                    // Only an assignment such as `cls.attr: int = 1` writes a value onto the
+                    // newly created class object, potentially overwriting a class-body value.
+                    let is_assigned = attribute_assignments(db, metaclass.body_scope(db), name)
+                        .any(|(bindings, _)| {
+                            bindings
+                                .into_iter()
+                                .any(|binding| binding.binding.definition().is_some())
+                        });
+                    let name = Name::new(name);
+                    if is_assigned {
+                        metaclass_assigned_members.insert(name.clone());
+                    }
+                    metaclass_instance_members.insert(name);
+                }
+            }
+        }
+    }
+
+    for name in metaclass_instance_members {
+        let Some(symbol_id) = table.symbol_id(name.as_str()) else {
+            continue;
+        };
+        let Place::Defined(DefinedPlace {
+            ty: metaclass_member_ty,
+            origin,
+            ..
+        }) = metaclass_instance.instance_member(db, name.as_str()).place
+        else {
+            continue;
+        };
+
+        if origin == TypeOrigin::Declared {
+            let mut reported_incompatible_binding = false;
+            for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
+                let Some(definition) = binding.binding.definition() else {
+                    continue;
+                };
+                let definition_kind = definition.kind(db);
+                if !definition_kind.is_user_visible() {
+                    continue;
+                }
+
+                let assigned_ty = binding_type(db, definition);
+                if !assigned_ty.is_assignable_to(db, metaclass_member_ty) {
+                    reported_incompatible_binding = true;
+                    report_invalid_attribute_assignment(
+                        context,
+                        definition_kind.target_range(context.module()),
+                        metaclass_member_ty,
+                        assigned_ty,
+                        name.as_str(),
+                    );
+                }
+            }
+
+            if reported_incompatible_binding {
+                continue;
+            }
+        }
+
+        // A declaration on the metaclass constrains class-object access, but does not itself
+        // populate a replacement value into the constructed class's namespace.
+        if !metaclass_assigned_members.contains(name.as_str()) {
+            continue;
+        }
+
+        let result =
+            place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id));
+        let Some(definition) = result.first_declaration else {
+            continue;
+        };
+        let Place::Defined(DefinedPlace {
+            ty: class_declared_ty,
+            ..
+        }) = result.ignore_conflicting_declarations().place
+        else {
+            continue;
+        };
+        let definition_kind = definition.kind(db);
+        // A metaclass may intentionally replace an ordinary class namespace value during class
+        // creation. Only an explicit attribute annotation constrains the replacement value.
+        if !matches!(definition_kind, DefinitionKind::AnnotatedAssignment(_)) {
+            continue;
+        }
+        if !metaclass_member_ty.is_assignable_to(db, class_declared_ty) {
+            report_invalid_attribute_assignment(
+                context,
+                definition_kind.target_range(context.module()),
+                class_declared_ty,
+                metaclass_member_ty,
+                name.as_str(),
+            );
+        }
+    }
+}
+
+fn ordered_dataclass_base_class<'db>(
+    db: &'db dyn Db,
+    base_class: ClassType<'db>,
+) -> Option<ClassType<'db>> {
+    for ancestor in base_class.iter_mro(db).filter_map(ClassBase::into_class) {
+        let Some((ancestor_literal, _)) = ancestor.static_class_literal(db) else {
+            continue;
+        };
+
+        if ancestor_literal.is_ordered_dataclass(db) {
+            return Some(ancestor);
+        }
+
+        if ancestor_literal.has_own_comparison_methods(db) {
+            return None;
+        }
+    }
+
+    None
 }
 
 /// Check that a `@final` class does not have unimplemented abstract methods.

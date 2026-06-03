@@ -9,10 +9,11 @@ use crate::{
     Db,
     place::{DefinedPlace, Definedness, Place, place_from_bindings},
     types::{
-        KnownClass, Type, binding_type,
+        KnownClass, Type,
         context::InferContext,
         diagnostic::INVALID_OVERLOAD,
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
+        infer::original_class_type,
         signatures::{ParameterConsistency, ReturnTypeConsistency},
     },
 };
@@ -58,11 +59,6 @@ pub(crate) fn check_overloaded_function<'db>(
 
     let place = definition.place(db);
 
-    if !seen_overloaded_places.insert(place) {
-        // We have already checked this overloaded function in this scope, so we can skip it.
-        return;
-    }
-
     let use_def = index.use_def_map(context.scope().file_scope_id(db));
 
     let Place::Defined(DefinedPlace {
@@ -77,6 +73,18 @@ pub(crate) fn check_overloaded_function<'db>(
     else {
         return;
     };
+
+    if !function.contains_definition(db, definition) {
+        // The public end-of-scope binding for this place can be a different overloaded function
+        // value assigned to the same name. In that case, the current local overload definition is
+        // shadowed, and checking the public function here would report against the wrong function.
+        return;
+    }
+
+    if !seen_overloaded_places.insert(place) {
+        // We have already checked this overloaded function in this scope, so we can skip it.
+        return;
+    }
 
     if !seen_public_functions.insert(function) {
         // We have already checked this overloaded function as a public function, so we can skip it.
@@ -127,13 +135,12 @@ pub(crate) fn check_overloaded_function<'db>(
             )
         }) {
             implementation_required = false;
-        } else if let NodeWithScopeKind::Class(class_node_ref) = scope {
-            let class = binding_type(
+        } else if let NodeWithScopeKind::Class(class_node_ref) = scope
+            && let Some(class) = original_class_type(
                 db,
                 index.expect_single_definition(class_node_ref.node(context.module())),
             )
-            .expect_class_literal();
-
+        {
             if class.is_protocol(db)
                 || (Type::ClassLiteral(class)
                     .is_subtype_of(db, KnownClass::ABCMeta.to_instance(db))

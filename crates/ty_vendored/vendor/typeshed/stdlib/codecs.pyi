@@ -13,8 +13,8 @@ from _codecs import *
 from _typeshed import ReadableBuffer
 from abc import abstractmethod
 from collections.abc import Callable, Generator, Iterable
-from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO, TypeAlias, overload, type_check_only
+from typing_extensions import Self, deprecated, disjoint_base
 
 __all__ = [
     "register",
@@ -229,9 +229,9 @@ def getincrementaldecoder(encoding: _BufferedEncoding) -> _BufferedIncrementalDe
     or the codecs doesn't provide an incremental decoder.
 
     """
-
 @overload
 def getincrementaldecoder(encoding: str) -> _IncrementalDecoder: ...
+
 def getreader(encoding: str) -> _StreamReader:
     """Lookup up the codec for the given encoding and return
     its StreamReader class or factory function.

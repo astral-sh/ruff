@@ -23,12 +23,12 @@ use crate::{
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
-            INVALID_NAMED_TUPLE_OVERRIDE, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
-            report_invalid_method_override, report_overridden_final_method,
-            report_overridden_final_variable,
+            INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
+            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
+            report_overridden_final_method, report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata},
-        function::{FunctionDecorators, FunctionType, KnownFunction},
+        function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
         tuple::Tuple,
     },
@@ -250,19 +250,36 @@ fn check_class_declaration<'db>(
             // `auto()` values are computed at runtime by the enum metaclass,
             // so we can't validate them against _value_ or __init__ at the type level.
             let is_auto = enum_info.auto_members.contains(&member.name);
-            let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
+            let skip_type_check = (context.in_stub() && is_ellipsis)
+                || is_auto
+                || enum_info.custom_enum_metaclass_new;
 
             if !skip_type_check {
+                if let Some(new_function) = enum_info.new_function {
+                    check_enum_member_against_constructor_hook(
+                        context,
+                        new_function,
+                        Type::from(class),
+                        member_value_type,
+                        &member.name,
+                        *first_reachable_definition,
+                        EnumConstructorHook::New,
+                    );
+                }
+
                 if let Some(init_function) = enum_info.init_function {
-                    check_enum_member_against_init(
+                    check_enum_member_against_constructor_hook(
                         context,
                         init_function,
                         instance_of_class,
                         member_value_type,
                         &member.name,
                         *first_reachable_definition,
+                        EnumConstructorHook::Init,
                     );
-                } else if let Some(expected_type) = enum_info.value_annotation {
+                } else if enum_info.new_function.is_none()
+                    && let Some(expected_type) = enum_info.value_annotation
+                {
                     if !member_value_type.is_assignable_to(db, expected_type) {
                         if let Some(builder) = context.report_lint(
                             &INVALID_ASSIGNMENT,
@@ -288,6 +305,7 @@ fn check_class_declaration<'db>(
     let mut has_dynamic_superclass = false;
     let mut has_typeddict_in_mro = false;
     let mut liskov_diagnostic_emitted = false;
+    let mut missing_override_target: Option<MissingOverrideTarget<'db>> = None;
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
@@ -363,6 +381,21 @@ fn check_class_declaration<'db>(
             };
 
             subclass_overrides_superclass_declaration = true;
+
+            // Record the first overridden superclass member that is subject to the missing override
+            // decorator check so that we can later confirm that the overriding definition is indeed
+            // marked with the decorator.
+            if configuration.check_missing_overrides()
+                && missing_override_target.is_none()
+                && !is_constructor_like_method(&member.name)
+            {
+                missing_override_target = Some(MissingOverrideTarget::for_superclass(
+                    db,
+                    superclass,
+                    superclass_scope,
+                    superclass_symbol_id,
+                ));
+            }
 
             // Record the first superclass that defines this method as the "immediate parent method"
             if immediate_parent_method.is_none() {
@@ -506,10 +539,7 @@ fn check_class_declaration<'db>(
             };
 
             // Constructor methods are not checked for Liskov compliance
-            if matches!(
-                &*member.name,
-                "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
-            ) {
+            if is_constructor_like_method(&member.name) {
                 continue;
             }
 
@@ -588,6 +618,12 @@ fn check_class_declaration<'db>(
                 subclass_overrides_superclass_declaration = true;
             }
         }
+    }
+
+    if let Some(target) = missing_override_target
+        && first_reachable_definition.kind(db).is_function_def()
+    {
+        check_missing_overrides(context, member, target);
     }
 
     if !subclass_overrides_superclass_declaration
@@ -911,6 +947,13 @@ pub(super) enum MethodKind<'db> {
     NotSynthesized,
 }
 
+fn is_constructor_like_method(name: &str) -> bool {
+    matches!(
+        name,
+        "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
+    )
+}
+
 bitflags! {
     /// Bitflags representing which override-related rules have been enabled.
     #[derive(Default, Debug, Copy, Clone)]
@@ -924,6 +967,7 @@ bitflags! {
         const INVALID_DATACLASS = 1 << 6;
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 7;
         const INVALID_ENUM_VALUE = 1 << 8;
+        const MISSING_OVERRIDE_DECORATOR = 1 << 9;
     }
 }
 
@@ -942,6 +986,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
             config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
+        }
+        if rule_selection.is_enabled(LintId::of(&MISSING_OVERRIDE_DECORATOR)) {
+            config |= OverrideRulesConfig::MISSING_OVERRIDE_DECORATOR;
         }
         if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_METHOD)) {
             config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
@@ -986,6 +1033,10 @@ impl OverrideRulesConfig {
 
     const fn check_final_method_overridden(self) -> bool {
         self.contains(OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN)
+    }
+
+    const fn check_missing_overrides(self) -> bool {
+        self.contains(OverrideRulesConfig::MISSING_OVERRIDE_DECORATOR)
     }
 
     const fn check_invalid_named_tuple_definitions(self) -> bool {
@@ -1047,6 +1098,102 @@ fn check_explicit_overrides<'db>(
         member = &member.name,
         class = class.name(db)
     ));
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MissingOverrideTarget<'db> {
+    superclass: ClassType<'db>,
+    /// The source definition for the overridden superclass member, if one is available.
+    definition: Option<Definition<'db>>,
+}
+
+impl<'db> MissingOverrideTarget<'db> {
+    fn for_superclass(
+        db: &'db dyn Db,
+        superclass: ClassType<'db>,
+        superclass_scope: ScopeId<'db>,
+        superclass_symbol_id: Option<ScopedSymbolId>,
+    ) -> Self {
+        let definition =
+            superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id));
+
+        Self {
+            superclass,
+            definition,
+        }
+    }
+}
+
+fn check_missing_overrides<'db>(
+    context: &InferContext<'db, '_>,
+    member: &Member<'db>,
+    target: MissingOverrideTarget<'db>,
+) {
+    let db = context.db();
+
+    let Some(undecorated_override) =
+        overriding_definition_without_decorator(db, member.ty, context.in_stub())
+    else {
+        return;
+    };
+
+    let Some(builder) = context.report_lint(
+        &MISSING_OVERRIDE_DECORATOR,
+        undecorated_override.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let MissingOverrideTarget {
+        superclass,
+        definition: superclass_definition,
+    } = target;
+    let superclass_name = superclass.name(db);
+    let superclass_member = format!("{superclass_name}.{}", member.name);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Method `{}` overrides `{superclass_member}` but is not decorated with `@override`",
+        member.name
+    ));
+    diagnostic.info("Decorate the method with `@typing.override` to make the override explicit");
+
+    if let Some(superclass_definition) = superclass_definition
+        && superclass_definition.file(db) == context.file()
+    {
+        diagnostic.annotate(
+            Annotation::secondary(
+                context.span(superclass_definition.focus_range(db, context.module())),
+            )
+            .message(format_args!("`{superclass_member}` defined here")),
+        );
+    }
+}
+
+fn overriding_definition_without_decorator<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    in_stub: bool,
+) -> Option<OverloadLiteral<'db>> {
+    for function in extract_underlying_functions(db, ty)? {
+        let definition = overriding_definition(db, function, in_stub);
+        if !definition.has_known_decorator(db, FunctionDecorators::OVERRIDE) {
+            return Some(definition);
+        }
+    }
+
+    None
+}
+
+fn overriding_definition<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    in_stub: bool,
+) -> OverloadLiteral<'db> {
+    let (_, implementation) = function.overloads_and_implementation(db);
+    if !in_stub && let Some(implementation) = implementation {
+        implementation
+    } else {
+        function.first_overload_or_implementation(db)
+    }
 }
 
 fn extract_underlying_functions<'db>(
@@ -1145,25 +1292,41 @@ fn check_post_init_signature<'db>(
     );
 }
 
-/// Validates an enum member value against the enum's `__init__` signature.
+#[derive(Clone, Copy, Debug)]
+enum EnumConstructorHook {
+    New,
+    Init,
+}
+
+impl EnumConstructorHook {
+    fn name(self) -> &'static str {
+        match self {
+            Self::New => "__new__",
+            Self::Init => "__init__",
+        }
+    }
+}
+
+/// Validates an enum member value against an enum construction hook signature.
 ///
-/// The enum metaclass unpacks tuple values as positional arguments to `__init__`,
+/// The enum metaclass unpacks tuple values as positional arguments to `__new__` and `__init__`,
 /// and passes non-tuple values as a single argument. This function synthesizes
-/// a call to `__init__` with the appropriate arguments and reports a diagnostic
+/// a call with the appropriate arguments and reports a diagnostic
 /// if the call would fail.
-fn check_enum_member_against_init<'db>(
+fn check_enum_member_against_constructor_hook<'db>(
     context: &InferContext<'db, '_>,
-    init_function: FunctionType<'db>,
-    self_type: Type<'db>,
+    function: FunctionType<'db>,
+    bound_self_type: Type<'db>,
     member_value_type: Type<'db>,
     member_name: &Name,
     definition: Definition<'db>,
+    hook: EnumConstructorHook,
 ) {
     let db = context.db();
 
     // The enum metaclass unpacks tuple values as positional args:
-    //   MEMBER = (a, b, c)  →  __init__(self, a, b, c)
-    //   MEMBER = x          →  __init__(self, x)
+    //   MEMBER = (a, b, c)  →  __new__(cls, a, b, c) / __init__(self, a, b, c)
+    //   MEMBER = x          →  __new__(cls, x) / __init__(self, x)
     let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type {
         if let Some(spec) = instance.tuple_spec(db) {
             if let Tuple::Fixed(fixed) = &*spec {
@@ -1180,10 +1343,10 @@ fn check_enum_member_against_init<'db>(
     };
 
     let call_args = CallArguments::positional(args);
-    let call_args = call_args.with_self(Some(self_type));
+    let call_args = call_args.with_self(Some(bound_self_type));
 
     let constraints = ConstraintSetBuilder::new();
-    let result = Type::FunctionLiteral(init_function)
+    let result = Type::FunctionLiteral(function)
         .bindings(db)
         .match_parameters(db, &call_args)
         .check_types(db, &constraints, &call_args, TypeContext::default(), &[]);
@@ -1194,11 +1357,12 @@ fn check_enum_member_against_init<'db>(
             definition.focus_range(db, context.module()),
         ) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Enum member `{member_name}` is incompatible with `__init__`",
+                "Enum member `{member_name}` is incompatible with `{}`",
+                hook.name(),
             ));
             diagnostic.info(format_args!(
                 "Expected compatible arguments for `{}`",
-                Type::FunctionLiteral(init_function).display(db),
+                Type::FunctionLiteral(function).display(db),
             ));
         }
     }

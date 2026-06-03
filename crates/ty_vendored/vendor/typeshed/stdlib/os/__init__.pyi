@@ -58,13 +58,14 @@ from typing import (
     Literal,
     NoReturn,
     Protocol,
+    TypeAlias,
     TypeVar,
     final,
     overload,
     runtime_checkable,
     type_check_only,
 )
-from typing_extensions import LiteralString, Self, TypeAlias, Unpack, deprecated
+from typing_extensions import LiteralString, Self, Unpack, deprecated
 
 from . import path as _path
 
@@ -199,9 +200,11 @@ __all__ = [
 if sys.version_info >= (3, 14):
     # reload_environ was added to __all__ in Python 3.14.1
     __all__ += ["readinto", "reload_environ"]
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    __all__ += ["_clearenv"]
 if sys.platform == "darwin" and sys.version_info >= (3, 12):
     __all__ += ["PRIO_DARWIN_BG", "PRIO_DARWIN_NONUI", "PRIO_DARWIN_PROCESS", "PRIO_DARWIN_THREAD"]
-if sys.platform == "darwin" and sys.version_info >= (3, 10):
+if sys.platform == "darwin":
     __all__ += ["O_EVTONLY", "O_NOFOLLOW_ANY", "O_SYMLINK"]
 if sys.platform == "linux":
     __all__ += [
@@ -249,6 +252,31 @@ if sys.platform == "linux":
     ]
 if sys.platform == "linux" and sys.version_info >= (3, 14):
     __all__ += ["SCHED_DEADLINE", "SCHED_NORMAL"]
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    __all__ += [
+        "AT_NO_AUTOMOUNT",
+        "AT_STATX_DONT_SYNC",
+        "AT_STATX_FORCE_SYNC",
+        "AT_STATX_SYNC_AS_STAT",
+        "STATX_ATIME",
+        "STATX_BASIC_STATS",
+        "STATX_BLOCKS",
+        "STATX_BTIME",
+        "STATX_CTIME",
+        "STATX_DIOALIGN",
+        "STATX_GID",
+        "STATX_INO",
+        "STATX_MNT_ID",
+        "STATX_MNT_ID_UNIQUE",
+        "STATX_MODE",
+        "STATX_MTIME",
+        "STATX_NLINK",
+        "STATX_SIZE",
+        "STATX_TYPE",
+        "STATX_UID",
+        "statx",
+        "statx_result",
+    ]
 if sys.platform == "linux" and sys.version_info >= (3, 13):
     __all__ += [
         "POSIX_SPAWN_CLOSEFROM",
@@ -282,7 +310,7 @@ if sys.platform == "linux" and sys.version_info >= (3, 12):
         "unshare",
         "PIDFD_NONBLOCK",
     ]
-if sys.platform == "linux" and sys.version_info >= (3, 10):
+if sys.platform == "linux":
     __all__ += [
         "EFD_CLOEXEC",
         "EFD_NONBLOCK",
@@ -469,7 +497,9 @@ if sys.platform != "win32" and sys.version_info >= (3, 13):
     __all__ += ["grantpt", "posix_openpt", "ptsname", "unlockpt"]
 if sys.platform != "win32" and sys.version_info >= (3, 11):
     __all__ += ["login_tty"]
-if sys.platform != "win32" and sys.version_info >= (3, 10):
+if sys.platform != "win32" and sys.version_info >= (3, 15):
+    __all__ += ["NODEV", "O_FSYNC"]
+elif sys.platform != "win32":
     __all__ += ["O_FSYNC"]
 if sys.platform != "darwin" and sys.platform != "win32":
     __all__ += [
@@ -684,12 +714,37 @@ if sys.platform != "linux" and sys.platform != "win32":
     O_SHLOCK: Final[int]
     O_EXLOCK: Final[int]
 
-if sys.platform == "darwin" and sys.version_info >= (3, 10):
+if sys.platform == "darwin":
     O_EVTONLY: Final[int]
     O_NOFOLLOW_ANY: Final[int]
     O_SYMLINK: Final[int]
 
-if sys.platform != "win32" and sys.version_info >= (3, 10):
+if sys.platform != "win32" and sys.version_info >= (3, 15):
+    NODEV: Final[int]
+
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    AT_NO_AUTOMOUNT: Final[int]
+    AT_STATX_DONT_SYNC: Final[int]
+    AT_STATX_FORCE_SYNC: Final[int]
+    AT_STATX_SYNC_AS_STAT: Final[int]
+    STATX_ATIME: Final[int]
+    STATX_BASIC_STATS: Final[int]
+    STATX_BLOCKS: Final[int]
+    STATX_BTIME: Final[int]
+    STATX_CTIME: Final[int]
+    STATX_DIOALIGN: Final[int]
+    STATX_GID: Final[int]
+    STATX_INO: Final[int]
+    STATX_MNT_ID: Final[int]
+    STATX_MNT_ID_UNIQUE: Final[int]
+    STATX_MODE: Final[int]
+    STATX_MTIME: Final[int]
+    STATX_NLINK: Final[int]
+    STATX_SIZE: Final[int]
+    STATX_TYPE: Final[int]
+    STATX_UID: Final[int]
+
+if sys.platform != "win32":
     O_FSYNC: Final[int]
 
 if sys.platform != "linux" and sys.platform != "win32" and sys.version_info >= (3, 13):
@@ -736,24 +791,25 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
         encodevalue: _EnvironCodeFunc[AnyStr],
         decodevalue: _EnvironCodeFunc[AnyStr],
     ) -> None: ...
+
     @overload
     def get(self, key: AnyStr, default: None = None) -> AnyStr | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
-
     @overload
     def get(self, key: AnyStr, default: AnyStr) -> AnyStr: ...
     @overload
     def get(self, key: AnyStr, default: _T) -> AnyStr | _T: ...
+
     @overload
     def pop(self, key: AnyStr) -> AnyStr:
         """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
         If key is not found, d is returned if given, otherwise KeyError is raised.
         """
-
     @overload
     def pop(self, key: AnyStr, default: AnyStr) -> AnyStr: ...
     @overload
     def pop(self, key: AnyStr, default: _T) -> AnyStr | _T: ...
+
     def setdefault(self, key: AnyStr, value: AnyStr) -> AnyStr: ...
     def copy(self) -> dict[AnyStr, AnyStr]: ...
     def __delitem__(self, key: AnyStr) -> None: ...
@@ -763,6 +819,7 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
     def __len__(self) -> int: ...
     def __or__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]: ...
     def __ror__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]: ...
+
     # We use @overload instead of a Union for reasons similar to those given for
     # overloading MutableMapping.update in stdlib/typing.pyi
     # The type: ignore is needed due to incompatible __or__/__ior__ signatures
@@ -777,6 +834,9 @@ if sys.platform != "win32":
 
 if sys.version_info >= (3, 14):
     def reload_environ() -> None: ...
+
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    def _clearenv() -> None: ...
 
 if sys.version_info >= (3, 11) or sys.platform != "win32":
     EX_OK: Final[int]
@@ -846,8 +906,7 @@ class stat_result(structseq[float], tuple[int, int, int, int, int, int, int, flo
     # st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime.
     #
     # More items may be added at the end by some implementations.
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("st_mode", "st_ino", "st_dev", "st_nlink", "st_uid", "st_gid", "st_size")
+    __match_args__: Final = ("st_mode", "st_ino", "st_dev", "st_nlink", "st_uid", "st_gid", "st_size")
 
     @property
     def st_mode(self) -> int:  # protection bits,
@@ -981,11 +1040,11 @@ On some platforms, path may also be specified as an open file descriptor;\\
 The list is in arbitrary order.  It does not include the special
 entries '.' and '..' even if they are present in the directory.
 """
-
 @overload
 def listdir(path: BytesPath) -> list[bytes]: ...
 @overload
 def listdir(path: int) -> list[str]: ...
+
 @final
 class DirEntry(Generic[AnyStr]):
     # This is what the scandir iterator yields
@@ -1034,19 +1093,18 @@ class statvfs_result(structseq[int], tuple[int, int, int, int, int, int, int, in
     See os.statvfs for more information.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = (
-            "f_bsize",
-            "f_frsize",
-            "f_blocks",
-            "f_bfree",
-            "f_bavail",
-            "f_files",
-            "f_ffree",
-            "f_favail",
-            "f_flag",
-            "f_namemax",
-        )
+    __match_args__: Final = (
+        "f_bsize",
+        "f_frsize",
+        "f_blocks",
+        "f_bfree",
+        "f_bavail",
+        "f_files",
+        "f_ffree",
+        "f_favail",
+        "f_flag",
+        "f_namemax",
+    )
 
     @property
     def f_bsize(self) -> int: ...
@@ -1094,11 +1152,11 @@ def fspath(path: str) -> str:
     object defines __fspath__(), then return the result of that method. All other
     types raise a TypeError.
     """
-
 @overload
 def fspath(path: bytes) -> bytes: ...
 @overload
 def fspath(path: PathLike[AnyStr]) -> AnyStr: ...
+
 def get_exec_path(env: Mapping[str, str] | None = None) -> list[str]:
     """Returns the sequence of directories that will be searched for the
     named executable (similar to a shell) when launching a process.
@@ -1137,8 +1195,7 @@ class uname_result(structseq[str], tuple[str, str, str, str, str]):
     See os.uname for more information.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("sysname", "nodename", "release", "version", "machine")
+    __match_args__: Final = ("sysname", "nodename", "release", "version", "machine")
 
     @property
     def sysname(self) -> str:
@@ -1266,7 +1323,6 @@ def getenv(key: str) -> str | None:
     The optional second argument can specify an alternate default.
     key, default and the result are str.
     """
-
 @overload
 def getenv(key: str, default: _T) -> str | _T: ...
 
@@ -1277,9 +1333,9 @@ if sys.platform != "win32":
         The optional second argument can specify an alternate default.
         key, default and the result are bytes.
         """
-
     @overload
     def getenvb(key: bytes, default: _T) -> bytes | _T: ...
+
     def putenv(name: StrOrBytesPath, value: StrOrBytesPath, /) -> None:
         """Change or add an environment variable."""
 
@@ -1372,6 +1428,7 @@ def fdopen(
     closefd: bool = True,
     opener: _Opener | None = None,
 ) -> IO[Any]: ...
+
 def close(fd: int) -> None:
     """Close a file descriptor."""
 
@@ -1599,8 +1656,7 @@ if sys.platform != "win32":
         Using non-zero flags requires Linux 4.7 or newer.
         """
     if sys.platform != "darwin":
-        if sys.version_info >= (3, 10):
-            RWF_APPEND: Final[int]  # docs say available on 3.7+, stubtest says otherwise
+        RWF_APPEND: Final[int]
         RWF_DSYNC: Final[int]
         RWF_SYNC: Final[int]
         RWF_HIPRI: Final[int]
@@ -1659,8 +1715,7 @@ if sys.version_info >= (3, 14):
 class terminal_size(structseq[int], tuple[int, int]):
     """A tuple of (columns, lines) for holding terminal window size"""
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("columns", "lines")
+    __match_args__: Final = ("columns", "lines")
 
     @property
     def columns(self) -> int:
@@ -2045,11 +2100,11 @@ def scandir(path: None = None) -> _ScandirIterator[str]:
 
     If path is None, uses the path='.'.
     """
-
 @overload
 def scandir(path: int) -> _ScandirIterator[str]: ...
 @overload
 def scandir(path: GenericPath[AnyStr]) -> _ScandirIterator[AnyStr]: ...
+
 def stat(path: FileDescriptorOrPath, *, dir_fd: int | None = None, follow_symlinks: bool = True) -> stat_result:
     """Perform a stat system call on the given path.
 
@@ -2081,6 +2136,70 @@ if sys.platform != "win32":
         On some platforms, path may also be specified as an open file descriptor.
           If this functionality is unavailable, using it raises an exception.
         """
+
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    @final
+    class statx_result:
+        @property
+        def stx_mask(self) -> int: ...
+        @property
+        def stx_blksize(self) -> int: ...
+        @property
+        def stx_attributes(self) -> int: ...
+        @property
+        def stx_attributes_mask(self) -> int: ...
+        @property
+        def stx_rdev_major(self) -> int: ...
+        @property
+        def stx_rdev_minor(self) -> int: ...
+        @property
+        def stx_rdev(self) -> int: ...
+        @property
+        def stx_dev_major(self) -> int: ...
+        @property
+        def stx_dev_minor(self) -> int: ...
+        @property
+        def stx_dev(self) -> int: ...
+        @property
+        def stx_mode(self) -> int | None: ...
+        @property
+        def stx_nlink(self) -> int | None: ...
+        @property
+        def stx_uid(self) -> int | None: ...
+        @property
+        def stx_gid(self) -> int | None: ...
+        @property
+        def stx_ino(self) -> int | None: ...
+        @property
+        def stx_size(self) -> int | None: ...
+        @property
+        def stx_blocks(self) -> int | None: ...
+        @property
+        def stx_atime(self) -> float | None: ...
+        @property
+        def stx_atime_ns(self) -> int | None: ...
+        @property
+        def stx_btime(self) -> float | None: ...
+        @property
+        def stx_btime_ns(self) -> int | None: ...
+        @property
+        def stx_ctime(self) -> float | None: ...
+        @property
+        def stx_ctime_ns(self) -> int | None: ...
+        @property
+        def stx_mtime(self) -> float | None: ...
+        @property
+        def stx_mtime_ns(self) -> int | None: ...
+        @property
+        def stx_mnt_id(self) -> int | None: ...
+        @property
+        def stx_dio_mem_align(self) -> int | None: ...
+        @property
+        def stx_dio_offset_align(self) -> int | None: ...
+
+    def statx(
+        path: FileDescriptorOrPath, mask: int, *, flags: int = 0, dir_fd: int | None = None, follow_symlinks: bool = True
+    ) -> statx_result: ...
 
 def symlink(src: StrOrBytesPath, dst: StrOrBytesPath, target_is_directory: bool = False, *, dir_fd: int | None = None) -> None:
     """Create a symbolic link pointing to src named dst.
@@ -2256,7 +2375,6 @@ if sys.platform != "win32":
             if '__pycache__' in dirs:
                 dirs.remove('__pycache__')  # don't visit __pycache__ directories
         """
-
     @overload
     def fwalk(
         top: BytesPath,
@@ -2266,6 +2384,7 @@ if sys.platform != "win32":
         follow_symlinks: bool = False,
         dir_fd: int | None = None,
     ) -> Iterator[tuple[bytes, list[bytes], list[bytes], int]]: ...
+
     if sys.platform == "linux":
         def getxattr(path: FileDescriptorOrPath, attribute: StrOrBytesPath, *, follow_symlinks: bool = True) -> bytes:
             """Return the value of extended attribute attribute on path.
@@ -2458,153 +2577,80 @@ class _wrap_close:
     def write(self, s: str, /) -> int: ...
     def writelines(self, lines: Iterable[str], /) -> None: ...
 
-if sys.version_info >= (3, 14):
-    @deprecated("Soft deprecated. Use the subprocess module instead.")
-    def popen(cmd: str, mode: str = "r", buffering: int = -1) -> _wrap_close: ...
-    @deprecated("Soft deprecated. Use the subprocess module instead.")
-    def spawnl(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
-        """spawnl(mode, file, *args) -> integer
+@deprecated("Soft deprecated. Use the subprocess module instead.")
+def popen(cmd: str, mode: str = "r", buffering: int = -1) -> _wrap_close: ...
+@deprecated("Soft deprecated. Use the subprocess module instead.")
+def spawnl(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
+    """spawnl(mode, file, *args) -> integer
 
-        Execute file with arguments from args in a subprocess.
-        If mode == P_NOWAIT return the pid of the process.
-        If mode == P_WAIT return the process's exit code if it exits normally;
-        otherwise return -SIG, where SIG is the signal that killed it.
-        """
+    Execute file with arguments from args in a subprocess.
+    If mode == P_NOWAIT return the pid of the process.
+    If mode == P_WAIT return the process's exit code if it exits normally;
+    otherwise return -SIG, where SIG is the signal that killed it.
+    """
 
-    @deprecated("Soft deprecated. Use the subprocess module instead.")
-    def spawnle(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise sig
-        """spawnle(mode, file, *args, env) -> integer
+@deprecated("Soft deprecated. Use the subprocess module instead.")
+def spawnle(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise sig
+    """spawnle(mode, file, *args, env) -> integer
 
-        Execute file with arguments from args in a subprocess with the
-        supplied environment.
-        If mode == P_NOWAIT return the pid of the process.
-        If mode == P_WAIT return the process's exit code if it exits normally;
-        otherwise return -SIG, where SIG is the signal that killed it.
-        """
-
-else:
-    def popen(cmd: str, mode: str = "r", buffering: int = -1) -> _wrap_close: ...
-    def spawnl(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
-        """spawnl(mode, file, *args) -> integer
-
-        Execute file with arguments from args in a subprocess.
-        If mode == P_NOWAIT return the pid of the process.
-        If mode == P_WAIT return the process's exit code if it exits normally;
-        otherwise return -SIG, where SIG is the signal that killed it.
-        """
-
-    def spawnle(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise sig
-        """spawnle(mode, file, *args, env) -> integer
-
-        Execute file with arguments from args in a subprocess with the
-        supplied environment.
-        If mode == P_NOWAIT return the pid of the process.
-        If mode == P_WAIT return the process's exit code if it exits normally;
-        otherwise return -SIG, where SIG is the signal that killed it.
-        """
+    Execute file with arguments from args in a subprocess with the
+    supplied environment.
+    If mode == P_NOWAIT return the pid of the process.
+    If mode == P_WAIT return the process's exit code if it exits normally;
+    otherwise return -SIG, where SIG is the signal that killed it.
+    """
 
 if sys.platform != "win32":
-    if sys.version_info >= (3, 14):
-        @deprecated("Soft deprecated. Use the subprocess module instead.")
-        def spawnv(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
-            """spawnv(mode, file, args) -> integer
-
-            Execute file with arguments from args in a subprocess.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
-
-        @deprecated("Soft deprecated. Use the subprocess module instead.")
-        def spawnve(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
-            """spawnve(mode, file, args, env) -> integer
-
-            Execute file with arguments from args in a subprocess with the
-            specified environment.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
-    else:
-        def spawnv(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
-            """spawnv(mode, file, args) -> integer
-
-            Execute file with arguments from args in a subprocess.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
-
-        def spawnve(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
-            """spawnve(mode, file, args, env) -> integer
-
-            Execute file with arguments from args in a subprocess with the
-            specified environment.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
-
-else:
-    if sys.version_info >= (3, 14):
-        @deprecated("Soft deprecated. Use the subprocess module instead.")
-        def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int:
-            """Execute the program specified by path in a new process.
-
-            mode
-              Mode of process creation.
-            path
-              Path of executable file.
-            argv
-              Tuple or list of strings.
-            """
-
-        @deprecated("Soft deprecated. Use the subprocess module instead.")
-        def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int:
-            """Execute the program specified by path in a new process.
-
-            mode
-              Mode of process creation.
-            path
-              Path of executable file.
-            argv
-              Tuple or list of strings.
-            env
-              Dictionary of strings mapping to strings.
-            """
-    else:
-        def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int:
-            """Execute the program specified by path in a new process.
-
-            mode
-              Mode of process creation.
-            path
-              Path of executable file.
-            argv
-              Tuple or list of strings.
-            """
-
-        def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int:
-            """Execute the program specified by path in a new process.
-
-            mode
-              Mode of process creation.
-            path
-              Path of executable file.
-            argv
-              Tuple or list of strings.
-            env
-              Dictionary of strings mapping to strings.
-            """
-
-if sys.version_info >= (3, 14):
     @deprecated("Soft deprecated. Use the subprocess module instead.")
-    def system(command: StrOrBytesPath) -> int:
-        """Execute the command in a subshell."""
+    def spawnv(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
+        """spawnv(mode, file, args) -> integer
 
+        Execute file with arguments from args in a subprocess.
+        If mode == P_NOWAIT return the pid of the process.
+        If mode == P_WAIT return the process's exit code if it exits normally;
+        otherwise return -SIG, where SIG is the signal that killed it.
+        """
+
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnve(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
+        """spawnve(mode, file, args, env) -> integer
+
+        Execute file with arguments from args in a subprocess with the
+        specified environment.
+        If mode == P_NOWAIT return the pid of the process.
+        If mode == P_WAIT return the process's exit code if it exits normally;
+        otherwise return -SIG, where SIG is the signal that killed it.
+        """
 else:
-    def system(command: StrOrBytesPath) -> int:
-        """Execute the command in a subshell."""
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int:
+        """Execute the program specified by path in a new process.
+
+        mode
+          Mode of process creation.
+        path
+          Path of executable file.
+        argv
+          Tuple or list of strings.
+        """
+
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int:
+        """Execute the program specified by path in a new process.
+
+        mode
+          Mode of process creation.
+        path
+          Path of executable file.
+        argv
+          Tuple or list of strings.
+        env
+          Dictionary of strings mapping to strings.
+        """
+
+@deprecated("Soft deprecated. Use the subprocess module instead.")
+def system(command: StrOrBytesPath) -> int:
+    """Execute the command in a subshell."""
 
 @final
 class times_result(structseq[float], tuple[float, float, float, float, float]):
@@ -2618,8 +2664,7 @@ class times_result(structseq[float], tuple[float, float, float, float, float]):
     See os.times for more information.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("user", "system", "children_user", "children_system", "elapsed")
+    __match_args__: Final = ("user", "system", "children_user", "children_system", "elapsed")
 
     @property
     def user(self) -> float:
@@ -2659,146 +2704,81 @@ def waitpid(pid: int, options: int, /) -> tuple[int, int]:
     """
 
 if sys.platform == "win32":
-    if sys.version_info >= (3, 10):
-        def startfile(
-            filepath: StrOrBytesPath,
-            operation: str = ...,
-            arguments: str = "",
-            cwd: StrOrBytesPath | None = None,
-            show_cmd: int = 1,
-        ) -> None:
-            """Start a file with its associated application.
+    def startfile(
+        filepath: StrOrBytesPath, operation: str = ..., arguments: str = "", cwd: StrOrBytesPath | None = None, show_cmd: int = 1
+    ) -> None:
+        """Start a file with its associated application.
 
-            When "operation" is not specified or "open", this acts like
-            double-clicking the file in Explorer, or giving the file name as an
-            argument to the DOS "start" command: the file is opened with whatever
-            application (if any) its extension is associated.
-            When another "operation" is given, it specifies what should be done with
-            the file.  A typical operation is "print".
+        When "operation" is not specified or "open", this acts like
+        double-clicking the file in Explorer, or giving the file name as an
+        argument to the DOS "start" command: the file is opened with whatever
+        application (if any) its extension is associated.
+        When another "operation" is given, it specifies what should be done with
+        the file.  A typical operation is "print".
 
-            "arguments" is passed to the application, but should be omitted if the
-            file is a document.
+        "arguments" is passed to the application, but should be omitted if the
+        file is a document.
 
-            "cwd" is the working directory for the operation. If "filepath" is
-            relative, it will be resolved against this directory. This argument
-            should usually be an absolute path.
+        "cwd" is the working directory for the operation. If "filepath" is
+        relative, it will be resolved against this directory. This argument
+        should usually be an absolute path.
 
-            "show_cmd" can be used to override the recommended visibility option.
-            See the Windows ShellExecute documentation for values.
+        "show_cmd" can be used to override the recommended visibility option.
+        See the Windows ShellExecute documentation for values.
 
-            startfile returns as soon as the associated application is launched.
-            There is no option to wait for the application to close, and no way
-            to retrieve the application's exit status.
+        startfile returns as soon as the associated application is launched.
+        There is no option to wait for the application to close, and no way
+        to retrieve the application's exit status.
 
-            The filepath is relative to the current directory.  If you want to use
-            an absolute path, make sure the first character is not a slash ("/");
-            the underlying Win32 ShellExecute function doesn't work if it is.
-            """
-    else:
-        def startfile(filepath: StrOrBytesPath, operation: str = ...) -> None:
-            """Start a file with its associated application.
-
-            When "operation" is not specified or "open", this acts like
-            double-clicking the file in Explorer, or giving the file name as an
-            argument to the DOS "start" command: the file is opened with whatever
-            application (if any) its extension is associated.
-            When another "operation" is given, it specifies what should be done with
-            the file.  A typical operation is "print".
-
-            startfile returns as soon as the associated application is launched.
-            There is no option to wait for the application to close, and no way
-            to retrieve the application's exit status.
-
-            The filepath is relative to the current directory.  If you want to use
-            an absolute path, make sure the first character is not a slash ("/");
-            the underlying Win32 ShellExecute function doesn't work if it is.
-            """
+        The filepath is relative to the current directory.  If you want to use
+        an absolute path, make sure the first character is not a slash ("/");
+        the underlying Win32 ShellExecute function doesn't work if it is.
+        """
 
 else:
-    if sys.version_info >= (3, 14):
-        @deprecated("Soft deprecated. Use the subprocess module instead.")
-        def spawnlp(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
-            """spawnlp(mode, file, *args) -> integer
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnlp(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
+        """spawnlp(mode, file, *args) -> integer
 
-            Execute file (which is looked for along $PATH) with arguments from
-            args in a subprocess with the supplied environment.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
+        Execute file (which is looked for along $PATH) with arguments from
+        args in a subprocess with the supplied environment.
+        If mode == P_NOWAIT return the pid of the process.
+        If mode == P_WAIT return the process's exit code if it exits normally;
+        otherwise return -SIG, where SIG is the signal that killed it.
+        """
 
-        @deprecated("Soft deprecated. Use the subprocess module instead.")
-        def spawnlpe(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise signature
-            """spawnlpe(mode, file, *args, env) -> integer
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnlpe(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise signature
+        """spawnlpe(mode, file, *args, env) -> integer
 
-            Execute file (which is looked for along $PATH) with arguments from
-            args in a subprocess with the supplied environment.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
+        Execute file (which is looked for along $PATH) with arguments from
+        args in a subprocess with the supplied environment.
+        If mode == P_NOWAIT return the pid of the process.
+        If mode == P_WAIT return the process's exit code if it exits normally;
+        otherwise return -SIG, where SIG is the signal that killed it.
+        """
 
-        @deprecated("Soft deprecated. Use the subprocess module instead.")
-        def spawnvp(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
-            """spawnvp(mode, file, args) -> integer
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnvp(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
+        """spawnvp(mode, file, args) -> integer
 
-            Execute file (which is looked for along $PATH) with arguments from
-            args in a subprocess.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
+        Execute file (which is looked for along $PATH) with arguments from
+        args in a subprocess.
+        If mode == P_NOWAIT return the pid of the process.
+        If mode == P_WAIT return the process's exit code if it exits normally;
+        otherwise return -SIG, where SIG is the signal that killed it.
+        """
 
-        @deprecated("Soft deprecated. Use the subprocess module instead.")
-        def spawnvpe(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
-            """spawnvpe(mode, file, args, env) -> integer
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnvpe(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
+        """spawnvpe(mode, file, args, env) -> integer
 
-            Execute file (which is looked for along $PATH) with arguments from
-            args in a subprocess with the supplied environment.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
-    else:
-        def spawnlp(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
-            """spawnlp(mode, file, *args) -> integer
-
-            Execute file (which is looked for along $PATH) with arguments from
-            args in a subprocess with the supplied environment.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
-
-        def spawnlpe(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise signature
-            """spawnlpe(mode, file, *args, env) -> integer
-
-            Execute file (which is looked for along $PATH) with arguments from
-            args in a subprocess with the supplied environment.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
-
-        def spawnvp(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
-            """spawnvp(mode, file, args) -> integer
-
-            Execute file (which is looked for along $PATH) with arguments from
-            args in a subprocess.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
-
-        def spawnvpe(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
-            """spawnvpe(mode, file, args, env) -> integer
-
-            Execute file (which is looked for along $PATH) with arguments from
-            args in a subprocess with the supplied environment.
-            If mode == P_NOWAIT return the pid of the process.
-            If mode == P_WAIT return the process's exit code if it exits normally;
-            otherwise return -SIG, where SIG is the signal that killed it.
-            """
+        Execute file (which is looked for along $PATH) with arguments from
+        args in a subprocess with the supplied environment.
+        If mode == P_NOWAIT return the pid of the process.
+        If mode == P_WAIT return the process's exit code if it exits normally;
+        otherwise return -SIG, where SIG is the signal that killed it.
+        """
 
     def wait() -> tuple[int, int]:  # Unix only
         """Wait for completion of a child process.
@@ -2819,8 +2799,7 @@ else:
             See os.waitid for more information.
             """
 
-            if sys.version_info >= (3, 10):
-                __match_args__: Final = ("si_pid", "si_uid", "si_signo", "si_status", "si_code")
+            __match_args__: Final = ("si_pid", "si_uid", "si_signo", "si_status", "si_code")
 
             @property
             def si_pid(self) -> int: ...
@@ -3084,8 +3063,7 @@ if sys.platform != "win32":
           A scheduling parameter.
         """
 
-        if sys.version_info >= (3, 10):
-            __match_args__: Final = ("sched_priority",)
+        __match_args__: Final = ("sched_priority",)
 
         def __new__(cls, sched_priority: int) -> Self: ...
         @property
@@ -3315,7 +3293,7 @@ if sys.version_info >= (3, 12) and sys.platform == "win32":
         Volumes are typically represented as a GUID path.
         """
 
-if sys.version_info >= (3, 10) and sys.platform == "linux":
+if sys.platform == "linux":
     EFD_CLOEXEC: Final[int]
     EFD_NONBLOCK: Final[int]
     EFD_SEMAPHORE: Final[int]

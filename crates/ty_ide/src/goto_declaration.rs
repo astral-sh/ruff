@@ -20,8 +20,9 @@ pub fn goto_declaration(
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let declaration_targets = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .declaration_targets(&model, &goto_target)?;
+        .definitions(&model, ImportAliasResolution::ResolveAliases)?
+        .goto_declaration(&model, &goto_target)?
+        .into_navigation_targets(model.db());
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),

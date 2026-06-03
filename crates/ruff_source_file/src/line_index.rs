@@ -294,7 +294,15 @@ impl LineIndex {
         if row_index.saturating_add(1) >= starts.len() {
             contents.text_len()
         } else {
-            starts[row_index + 1] - TextSize::new(1)
+            let next_line_start = starts[row_index + 1].to_usize();
+            let bytes = contents.as_bytes();
+
+            let line_ending_len = if bytes[..next_line_start].ends_with(b"\r\n") {
+                2
+            } else {
+                1
+            };
+            starts[row_index + 1] - TextSize::new(line_ending_len)
         }
     }
 
@@ -809,6 +817,42 @@ mod tests {
                 line: OneIndexed::from_zero_indexed(1),
                 column: OneIndexed::from_zero_indexed(1)
             }
+        );
+    }
+
+    #[test]
+    fn line_end_exclusive_handles_different_line_endings() {
+        let lf_contents = "a\nb";
+        let lf_index = LineIndex::from_source_text(lf_contents);
+        assert_eq!(
+            lf_index.line_end_exclusive(OneIndexed::from_zero_indexed(0), lf_contents),
+            TextSize::from(1)
+        );
+        assert_eq!(
+            lf_index.line_end_exclusive(OneIndexed::from_zero_indexed(1), lf_contents),
+            TextSize::from(3)
+        );
+
+        let crlf_contents = "a\r\nb";
+        let crlf_index = LineIndex::from_source_text(crlf_contents);
+        assert_eq!(
+            crlf_index.line_end_exclusive(OneIndexed::from_zero_indexed(0), crlf_contents),
+            TextSize::from(1)
+        );
+        assert_eq!(
+            crlf_index.line_end_exclusive(OneIndexed::from_zero_indexed(1), crlf_contents),
+            TextSize::from(4)
+        );
+
+        let cr_contents = "a\rb";
+        let cr_index = LineIndex::from_source_text(cr_contents);
+        assert_eq!(
+            cr_index.line_end_exclusive(OneIndexed::from_zero_indexed(0), cr_contents),
+            TextSize::from(1)
+        );
+        assert_eq!(
+            cr_index.line_end_exclusive(OneIndexed::from_zero_indexed(1), cr_contents),
+            TextSize::from(3)
         );
     }
 

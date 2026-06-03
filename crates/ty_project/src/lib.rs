@@ -6,7 +6,7 @@ use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
-pub use db::tests::TestDb;
+pub use db::testing::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 
@@ -15,13 +15,13 @@ pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
-use ruff_db::files::{File, FileRootKind};
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
-use std::collections::hash_set;
+use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
@@ -182,24 +182,12 @@ impl Project {
             settings_diagnostics,
             program_settings_diagnostics,
         );
-        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
+
+        Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
-            .new(db);
-
-        project.try_add_file_root(db);
-
-        project
-    }
-
-    fn try_add_file_root(self, db: &dyn Db) {
-        // This adds a file root for the project itself. This enables
-        // tracking of when changes are made to the files in a project
-        // at the directory level. At time of writing (2025-07-17),
-        // this is used for caching completions for submodules.
-        db.files()
-            .try_add_root(db, self.root(db), FileRootKind::Project);
+            .new(db)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -220,18 +208,15 @@ impl Project {
         self.settings(db).to_rules()
     }
 
-    /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).
+    /// Returns whether `path` is part of the project and included (see `included_paths_list`).
     ///
     /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
-    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        matches!(
-            ProjectFilesFilter::from_project(db, self)
-                .is_file_included(path, GlobFilterCheckMode::Adhoc),
-            IncludeResult::Included { .. }
-        )
+    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> IncludeResult {
+        ProjectFilesFilter::from_project(db, self)
+            .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
     pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
@@ -253,7 +238,7 @@ impl Project {
         settings: Option<Settings>,
         settings_diagnostics: Vec<OptionDiagnostic>,
         program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
-    ) {
+    ) -> ProjectReloadResult {
         tracing::debug!("Reloading project");
         let metadata_changed = &metadata != self.metadata(db);
         let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
@@ -262,24 +247,38 @@ impl Project {
             program_settings_diagnostics,
         );
 
-        self.reload_files(db);
-
-        if let Some(settings) = settings
+        let root_changed = metadata.root() != self.root(db);
+        let (settings_changed, files_changed) = if let Some(settings) = settings
             && self.settings(db) != &settings
         {
+            let files_changed = root_changed || settings.src() != self.settings(db).src();
             self.set_settings(db).to(Box::new(settings));
-        }
+            (true, files_changed)
+        } else {
+            (false, root_changed)
+        };
 
         if self.settings_diagnostics(db) != settings_diagnostics {
             self.set_settings_diagnostics(db).to(settings_diagnostics);
         }
 
-        if !metadata_changed {
-            return;
+        if files_changed {
+            // The project file set only depends on the project root, explicit check paths,
+            // force-exclude, and `src` settings. Check paths and force-exclude are updated
+            // through their own setters, so a config reload only needs to reindex when the
+            // root or resolved `src` settings changed.
+            self.reload_files(db);
         }
 
-        self.set_metadata(db).to(Box::new(metadata));
-        self.try_add_file_root(db);
+        if metadata_changed {
+            self.set_metadata(db).to(Box::new(metadata));
+        }
+
+        if metadata_changed || settings_changed {
+            ProjectReloadResult::Changed { files_changed }
+        } else {
+            ProjectReloadResult::Unchanged
+        }
     }
 
     /// Replace stored settings diagnostics after recomputing program settings.
@@ -578,6 +577,59 @@ impl Project {
         index.remove(file);
     }
 
+    /// Removes all indexed project files under `paths`.
+    ///
+    /// This is a no-op if the project files are still lazily indexed.
+    #[tracing::instrument(level = "debug", skip(self, db, paths))]
+    pub(crate) fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<SystemPath>,
+    {
+        let paths = deduplicate_nested_paths(
+            paths
+                .into_iter()
+                .map(|path| SystemPath::absolute(path, db.system().current_directory())),
+        )
+        .collect::<BTreeSet<_>>();
+
+        if paths.is_empty() {
+            return;
+        }
+
+        if self.file_set(db).is_lazy() {
+            return;
+        }
+
+        let files_to_remove = {
+            let files = self.files(db);
+            files
+                .iter()
+                .copied()
+                .filter(|file| {
+                    file.path(db).as_system_path().is_some_and(|file_path| {
+                        paths
+                            .range(..=file_path.to_path_buf())
+                            .next_back()
+                            .is_some_and(|path| file_path.starts_with(path))
+                    })
+                })
+                .collect::<Vec<_>>()
+        };
+
+        if files_to_remove.is_empty() {
+            return;
+        }
+
+        let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
+            return;
+        };
+
+        for file in files_to_remove {
+            index.remove(file);
+        }
+    }
+
     pub fn add_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
             "Adding file `{}` to project `{}`",
@@ -614,7 +666,7 @@ impl Project {
                         .entered();
                 let start = ruff_db::Instant::now();
 
-                let walker = ProjectFilesWalker::new(db);
+                let walker = ProjectFilesWalker::full();
                 let (files, diagnostics) = walker.collect_set(db);
 
                 tracing::info!(
@@ -644,6 +696,17 @@ impl Project {
             .map(OptionDiagnostic::to_diagnostic)
             .collect()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectReloadResult {
+    /// Neither project metadata nor settings changed.
+    Unchanged,
+    /// Project metadata or settings changed.
+    Changed {
+        /// Whether the indexed project files changed.
+        files_changed: bool,
+    },
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
@@ -789,9 +852,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ProjectMetadata;
     use crate::check_file_impl;
-    use crate::db::tests::TestDb;
+    use crate::db::Db as _;
+    use crate::db::testing::TestDb;
+    use crate::{IncludeResult, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -842,5 +906,23 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn explicit_nested_included_file_is_a_literal_match() {
+        let root = SystemPathBuf::from("/project");
+        let explicit_file = root.join("build/keep.txt");
+        let project = ProjectMetadata::new(Name::new_static("test"), root.clone());
+        let mut db = TestDb::new(project);
+        let project = db.project();
+
+        project.set_included_paths(&mut db, vec![root, explicit_file.clone()]);
+
+        assert_eq!(
+            project.is_file_included(&db, &explicit_file),
+            IncludeResult::Included {
+                literal_match: Some(true)
+            }
+        );
     }
 }

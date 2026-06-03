@@ -47,7 +47,7 @@ pub struct MarkdownTestSuite<'s, C> {
 }
 
 impl<'s, C> MarkdownTestSuite<'s, C> {
-    pub fn tests(&self) -> MarkdownTestIterator<'_, 's, C> {
+    pub(crate) fn tests(&self) -> MarkdownTestIterator<'_, 's, C> {
         MarkdownTestIterator {
             suite: self,
             current_file_index: 0,
@@ -136,11 +136,11 @@ impl<'m, 's, C> MarkdownTest<'m, 's, C> {
         contracted_name
     }
 
-    pub fn uncontracted_name(&self) -> String {
+    pub(crate) fn uncontracted_name(&self) -> String {
         self.joined_name(false)
     }
 
-    pub fn name(&self) -> String {
+    pub(crate) fn name(&self) -> String {
         self.joined_name(true)
     }
 
@@ -152,7 +152,7 @@ impl<'m, 's, C> MarkdownTest<'m, 's, C> {
         &self.section.config
     }
 
-    pub fn should_snapshot_diagnostics(&self) -> bool {
+    pub(crate) fn should_snapshot_diagnostics(&self) -> bool {
         self.section
             .directives
             .has_directive_set(MdtestDirective::SnapshotDiagnostics)
@@ -284,12 +284,12 @@ impl Ranged for InlineSnapshotBlock<'_> {
 /// count of the first block, and then add the new relative line number (1)
 /// to the absolute start line of the second block (12), resulting in an
 /// absolute line number of 13.
-pub struct EmbeddedFileSourceMap {
+pub(crate) struct EmbeddedFileSourceMap {
     start_line_and_line_count: Vec<(usize, usize)>,
 }
 
 impl EmbeddedFileSourceMap {
-    pub fn new(
+    pub(crate) fn new(
         md_index: &LineIndex,
         dimensions: impl IntoIterator<Item = BacktickOffsets>,
     ) -> EmbeddedFileSourceMap {
@@ -314,7 +314,7 @@ impl EmbeddedFileSourceMap {
     ///
     /// # Panics
     ///  If called when the markdown file has no code blocks.
-    pub fn to_absolute_line_number(
+    pub(crate) fn to_absolute_line_number(
         &self,
         relative_line_number: OneIndexed,
     ) -> std::result::Result<OneIndexed, OneIndexed> {

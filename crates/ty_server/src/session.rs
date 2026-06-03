@@ -175,6 +175,10 @@ impl Session {
         })
     }
 
+    pub(crate) fn system(&self) -> &dyn System {
+        &*self.native_system
+    }
+
     pub(crate) fn request_queue(&self) -> &RequestQueue {
         &self.request_queue
     }
@@ -1229,7 +1233,7 @@ impl Session {
 
                         // Only mark this file as open if it's part of the project.
                         // This ensures that we don't show diagnostics for files outside the project.
-                        if project.is_file_included(db, system_path) {
+                        if project.is_file_included(db, system_path).is_included() {
                             project.open_file(db, file);
                         }
                     }

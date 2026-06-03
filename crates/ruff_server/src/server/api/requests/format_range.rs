@@ -16,11 +16,22 @@ impl super::RequestHandler for FormatRange {
 
 impl super::BackgroundDocumentRequestHandler for FormatRange {
     super::define_document_url!(params: &types::DocumentRangeFormattingParams);
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         params: types::DocumentRangeFormattingParams,
     ) -> Result<super::FormatResponse> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(url) => {
+                tracing::warn!(
+                    "Returning no range formatting edits because document `{url}` isn't open."
+                );
+                return Ok(None);
+            }
+        };
+
         format_document_range(&snapshot, params.range)
     }
 }

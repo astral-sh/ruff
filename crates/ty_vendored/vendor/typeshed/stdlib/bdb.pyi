@@ -1,12 +1,11 @@
 """Debugger basics"""
 
 import sys
-from _typeshed import ExcInfo, TraceFunction, Unused
+from _typeshed import ExcInfo, ReadableBuffer, TraceFunction, Unused
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from types import CodeType, FrameType, TracebackType
-from typing import IO, Any, Final, Literal, SupportsInt, TypeVar
-from typing_extensions import ParamSpec, TypeAlias
+from typing import IO, Any, Final, Literal, ParamSpec, SupportsInt, TypeAlias, TypeVar
 
 __all__ = ["BdbQuit", "Bdb", "Breakpoint"]
 
@@ -281,20 +280,32 @@ class Bdb:
 
         """
 
-    def run(self, cmd: str | CodeType, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
+    def run(  # matches `builtins.exec`
+        self,
+        cmd: str | ReadableBuffer | CodeType,
+        globals: dict[str, Any] | None = None,
+        locals: Mapping[str, object] | None = None,
+    ) -> None:
         """Debug a statement executed via the exec() function.
 
         globals defaults to __main__.dict; locals defaults to globals.
         """
 
-    def runeval(self, expr: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
+    def runctx(  # matches `builtins.exec`
+        self, cmd: str | ReadableBuffer | CodeType, globals: dict[str, Any] | None, locals: Mapping[str, object] | None
+    ) -> None:
+        """For backwards-compatibility.  Defers to run()."""
+
+    def runeval(  # matches `builtins.eval`
+        self,
+        expr: str | ReadableBuffer | CodeType,
+        globals: dict[str, Any] | None = None,
+        locals: Mapping[str, object] | None = None,
+    ) -> Any:
         """Debug an expression executed via the eval() function.
 
         globals defaults to __main__.dict; locals defaults to globals.
         """
-
-    def runctx(self, cmd: str | CodeType, globals: dict[str, Any] | None, locals: Mapping[str, Any] | None) -> None:
-        """For backwards-compatibility.  Defers to run()."""
 
     def runcall(self, func: Callable[_P, _T], /, *args: _P.args, **kwds: _P.kwargs) -> _T | None:
         """Debug a single function call.
