@@ -69,6 +69,16 @@ def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
     # Exact sequence alternatives remain as negative protocol constraints.
     # revealed: (Sequence[str] & ~<Protocol with members '__len__'> & ~<Protocol with members '__getitem__', '__len__'>) | str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
     reveal_type(paths)
+
+def exact_sequence_pattern_is_exhaustive(value: tuple[int, str]) -> int:
+    match value:
+        case int(), str():
+            return 1
+
+def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int:  # error: [invalid-return-type]
+    match value:
+        case [int(real=0)]:
+            return 1
 ```
 
 ## Basic match
