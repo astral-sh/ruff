@@ -491,7 +491,7 @@ from typing import Callable, Concatenate
 type Foo[**P, R] = Callable[Concatenate[int, P], R]
 
 def _(f: Foo[[str], bool]) -> None:
-    reveal_type(f)  # revealed: (int, str, /) -> bool
+    reveal_type(f)  # revealed: Foo[(str, /), bool]
 ```
 
 ### Using `TypeAlias`

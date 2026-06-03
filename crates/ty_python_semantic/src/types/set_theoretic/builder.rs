@@ -435,7 +435,6 @@ const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
-    unpack_aliases: bool,
     /// This is enabled when joining types in a `cycle_recovery` function.
     /// Since a cycle cannot be created within a `cycle_recovery` function,
     /// execution of `is_redundant_with` is skipped.
@@ -504,22 +503,13 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
-            unpack_aliases: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
         }
     }
 
-    pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
-        self.unpack_aliases = val;
-        self
-    }
-
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
-        if self.cycle_recovery {
-            self.unpack_aliases = false;
-        }
         self
     }
 
@@ -538,7 +528,7 @@ impl<'db> UnionBuilder<'db> {
         self.elements.push(UnionElement::Type(Type::object()));
     }
 
-    fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
+    fn widen_literal_types(&mut self) {
         let mut replace_with = vec![];
         for elem in &self.elements {
             match elem {
@@ -559,7 +549,7 @@ impl<'db> UnionBuilder<'db> {
             }
         }
         for ty in replace_with {
-            self.add_in_place_impl(ty, seen_aliases);
+            self.add_in_place(ty);
         }
     }
 
@@ -571,10 +561,6 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
-        self.add_in_place_impl(ty, &mut vec![]);
-    }
-
-    pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
@@ -592,7 +578,7 @@ impl<'db> UnionBuilder<'db> {
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
                 for element in new_elements {
-                    self.add_in_place_impl(*element, seen_aliases);
+                    self.add_in_place(*element);
                 }
                 self.recursively_defined = self
                     .recursively_defined
@@ -606,21 +592,12 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::Type(_) => acc,
                     });
                     if should_widen(literals, self.recursively_defined) {
-                        self.widen_literal_types(seen_aliases);
+                        self.widen_literal_types();
                     }
                 }
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
-            Type::TypeAlias(alias) if self.unpack_aliases => {
-                if seen_aliases.contains(&ty) {
-                    // Union contains itself recursively via a type alias. This is an error, just
-                    // leave out the recursive alias. TODO surface this error.
-                } else {
-                    seen_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
-                }
-            }
             Type::LiteralValue(literal) => {
                 self.recursively_defined =
                     self.recursively_defined.or(literal.recursively_defined());
@@ -637,7 +614,7 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::StringLiterals(literals) => {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with = KnownClass::Str.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        self.add_in_place(replace_with);
                                         return;
                                     }
                                     found = Some(literals);
@@ -684,7 +661,7 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::BytesLiterals(literals) => {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with = KnownClass::Bytes.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        self.add_in_place(replace_with);
                                         return;
                                     }
                                     found = Some(literals);
@@ -733,7 +710,7 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::IntLiterals(literals) => {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with = KnownClass::Int.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        self.add_in_place(replace_with);
                                         return;
                                     }
                                     found = Some(literals);
@@ -787,10 +764,7 @@ impl<'db> UnionBuilder<'db> {
                         let metadata = enum_metadata(self.db, enum_class);
 
                         if metadata.is_some_and(|metadata| metadata.members.len() == 1) {
-                            self.add_in_place_impl(
-                                enum_member_to_add.enum_class_instance(self.db),
-                                seen_aliases,
-                            );
+                            self.add_in_place(enum_member_to_add.enum_class_instance(self.db));
                             return;
                         }
 
@@ -816,7 +790,7 @@ impl<'db> UnionBuilder<'db> {
                                     if literals.len() >= enum_literals_limit {
                                         let (literal, _) = literals.first().unwrap();
                                         let replace_with = literal.enum_class_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        self.add_in_place(replace_with);
                                         return;
                                     }
                                     found = Some(literals);
@@ -850,9 +824,8 @@ impl<'db> UnionBuilder<'db> {
                                     if metadata.is_some_and(|metadata| {
                                         found.len() == metadata.members.len()
                                     }) {
-                                        self.add_in_place_impl(
+                                        self.add_in_place(
                                             enum_member_to_add.enum_class_instance(self.db),
-                                            seen_aliases,
                                         );
                                         return;
                                     }
@@ -874,16 +847,16 @@ impl<'db> UnionBuilder<'db> {
                             self.elements.swap_remove(index);
                         }
                     }
-                    _ => self.push_type(ty, seen_aliases),
+                    _ => self.push_type(ty),
                 }
             }
             // Adding `object` to a union results in `object`.
             ty if ty.is_object() => self.collapse_to_object(),
-            _ => self.push_type(ty, seen_aliases),
+            _ => self.push_type(ty),
         }
     }
 
-    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn push_type(&mut self, ty: Type<'db>) {
         let mut ty = ty;
         let bool_pair = |ty: Type<'db>| {
             if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
@@ -892,11 +865,6 @@ impl<'db> UnionBuilder<'db> {
                 None
             }
         };
-
-        // If an alias gets here, it means we aren't unpacking aliases, and we also
-        // shouldn't try to simplify aliases out of the union, because that will require
-        // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -935,7 +903,7 @@ impl<'db> UnionBuilder<'db> {
                 .zip(bool_pair(ty))
                 .is_some_and(|(element, pair)| element == pair)
             {
-                self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
+                self.add_in_place(KnownClass::Bool.to_instance(self.db));
                 return;
             }
 
@@ -947,7 +915,7 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+            if !self.cycle_recovery {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
                 }
@@ -992,7 +960,6 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
         let db = self.db;
-        let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
         let recursively_defined = self.recursively_defined;
 
@@ -1038,7 +1005,6 @@ impl<'db> UnionBuilder<'db> {
 
         if normalize_enum_complement_unions(db, &mut types) {
             let builder = UnionBuilder::new(db)
-                .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
                 .recursively_defined(recursively_defined);
             return types
@@ -1089,11 +1055,7 @@ impl<'db> IntersectionBuilder<'db> {
         self.add_positive_impl(ty, &mut vec![])
     }
 
-    pub(crate) fn add_positive_impl(
-        mut self,
-        ty: Type<'db>,
-        seen_aliases: &mut Vec<Type<'db>>,
-    ) -> Self {
+    fn add_positive_impl(mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) -> Self {
         match ty {
             Type::TypeAlias(alias) => {
                 if seen_aliases.contains(&ty) {
@@ -1155,12 +1117,8 @@ impl<'db> IntersectionBuilder<'db> {
         self.add_negative_impl(ty, &mut vec![])
     }
 
-    pub(crate) fn add_negative_impl(
-        mut self,
-        ty: Type<'db>,
-        seen_aliases: &mut Vec<Type<'db>>,
-    ) -> Self {
-        // See comments above in `add_positive`; this is just the negated version.
+    fn add_negative_impl(mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) -> Self {
+        // See comments above in `add_positive_impl`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
                 if seen_aliases.contains(&ty) {
@@ -1837,10 +1795,6 @@ mod tests {
             expected
         );
         assert_eq!(
-            union.map_leave_aliases(&db, |ty| map_marker(ty, marker, widening_literal)),
-            expected
-        );
-        assert_eq!(
             union.try_map(&db, |ty| Some(map_marker(ty, marker, widening_literal))),
             Some(expected)
         );
@@ -1861,14 +1815,11 @@ mod tests {
 
         let alias = Type::TypeAlias(TypeAliasType::PEP695(alias));
         let str_instance = KnownClass::Str.to_instance(&db);
-        let union_ty = UnionType::from_elements_leave_aliases(&db, [alias, str_instance]);
+        let union_ty = UnionType::from_elements(&db, [alias, str_instance]);
         let union = union_ty.expect_union();
-        let unpacked =
-            UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), str_instance]);
 
-        assert_eq!(union.map(&db, |ty| *ty), unpacked);
-        assert_eq!(union.try_map(&db, |ty| Some(*ty)), Some(unpacked));
-        assert_eq!(union.map_leave_aliases(&db, |ty| *ty), union_ty);
+        assert_eq!(union.map(&db, |ty| *ty), union_ty);
+        assert_eq!(union.try_map(&db, |ty| Some(*ty)), Some(union_ty));
     }
 
     #[test]

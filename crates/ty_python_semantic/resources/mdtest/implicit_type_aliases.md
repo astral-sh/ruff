@@ -251,10 +251,10 @@ ManualIntOrStr = TypeAliasType("ManualIntOrStr", Union[int, str])
 ManualOrBytes = ManualIntOrStr | bytes
 BytesOrManual = bytes | ManualIntOrStr
 
-reveal_type(Pep695OrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(BytesOrPep695)  # revealed: <types.UnionType special-form 'bytes | int | str'>
-reveal_type(ManualOrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(BytesOrManual)  # revealed: <types.UnionType special-form 'bytes | int | str'>
+reveal_type(Pep695OrBytes)  # revealed: <types.UnionType special-form 'Pep695IntOrStr | bytes'>
+reveal_type(BytesOrPep695)  # revealed: <types.UnionType special-form 'bytes | Pep695IntOrStr'>
+reveal_type(ManualOrBytes)  # revealed: <types.UnionType special-form 'ManualIntOrStr | bytes'>
+reveal_type(BytesOrManual)  # revealed: <types.UnionType special-form 'bytes | ManualIntOrStr'>
 
 def _(
     pep695_or_bytes: Pep695OrBytes,
@@ -262,10 +262,10 @@ def _(
     manual_or_bytes: ManualOrBytes,
     bytes_or_manual: BytesOrManual,
 ):
-    reveal_type(pep695_or_bytes)  # revealed: int | str | bytes
-    reveal_type(bytes_or_pep695)  # revealed: bytes | int | str
-    reveal_type(manual_or_bytes)  # revealed: int | str | bytes
-    reveal_type(bytes_or_manual)  # revealed: bytes | int | str
+    reveal_type(pep695_or_bytes)  # revealed: Pep695IntOrStr | bytes
+    reveal_type(bytes_or_pep695)  # revealed: bytes | Pep695IntOrStr
+    reveal_type(manual_or_bytes)  # revealed: ManualIntOrStr | bytes
+    reveal_type(bytes_or_manual)  # revealed: bytes | ManualIntOrStr
 ```
 
 When constructing something nonsensical like `int | 1`, we emit a diagnostic for the expression

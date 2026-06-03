@@ -337,7 +337,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         }
 
-                        UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
+                        UnionType::from_elements(self.db(), [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
                     op => {
@@ -1188,7 +1188,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let parameters_ty = match self.infer_expression(value, TypeContext::default()) {
                     Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
-                            let ty = UnionType::from_elements_leave_aliases(
+                            let ty = UnionType::from_elements(
                                 self.db(),
                                 tuple
                                     .iter()
@@ -1903,11 +1903,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements_leave_aliases(db, [param_type, Type::none(db)])
+                UnionType::from_elements(db, [param_type, Type::none(db)])
             }
             SpecialFormType::Union => match arguments_slice {
                 ast::Expr::Tuple(t) => {
-                    let union_ty = UnionType::from_elements_leave_aliases(
+                    let union_ty = UnionType::from_elements(
                         db,
                         t.iter().map(|elt| self.infer_type_expression(elt)),
                     );

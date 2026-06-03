@@ -1434,7 +1434,12 @@ impl<'db> Type<'db> {
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
         let mut ty = self;
+        let mut seen: smallvec::SmallVec<[TypeAliasType<'db>; 2]> = smallvec::SmallVec::new();
         while let Type::TypeAlias(alias) = ty {
+            if seen.contains(&alias) {
+                break;
+            }
+            seen.push(alias);
             ty = alias.value_type(db);
         }
         ty
@@ -5898,7 +5903,7 @@ impl<'db> Type<'db> {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::Union(union) => union.map_leave_aliases(db, |element| {
+            Type::Union(union) => union.map(db, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
             Type::Intersection(intersection) => {
@@ -6479,7 +6484,17 @@ impl<'db> Type<'db> {
                 )),
             },
 
-            Self::TypeAlias(alias) => alias.value_type(db).definition(db),
+            Self::TypeAlias(alias) => {
+                // Salsa cycle normalization can make `value_type(alias)` return
+                // `Type::TypeAlias(alias)` itself for self-referential aliases
+                // (e.g. `type T = T | None`). Guard against the resulting infinite recursion.
+                let value = alias.value_type(db);
+                if matches!(value, Type::TypeAlias(inner) if inner == *alias) {
+                    Some(TypeDefinition::TypeAlias(alias.definition(db)))
+                } else {
+                    value.definition(db)
+                }
+            }
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
 
             Self::PropertyInstance(property) => property

@@ -4314,7 +4314,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             if var_types.is_empty() {
                                 None
                             } else {
-                                Some(UnionType::from_elements_leave_aliases(db, var_types))
+                                Some(UnionType::from_elements(db, var_types))
                             }
                         };
 
@@ -4328,8 +4328,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             if positional_types.is_empty() {
                                 break;
                             }
-                            argument_types_vec
-                                .push(UnionType::from_elements_leave_aliases(db, positional_types));
+                            argument_types_vec.push(UnionType::from_elements(db, positional_types));
                         }
 
                         let length = if any_variable || argument_types_vec.len() > min_len {

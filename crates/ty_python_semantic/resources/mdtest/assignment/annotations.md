@@ -150,7 +150,7 @@ reveal_type(l)  # revealed: tuple[list[int], list[Any], list[Any], list[str]]
 type IntList = list[int]
 
 m: IntList = [1, 2, 3]
-reveal_type(m)  # revealed: list[int]
+reveal_type(m)  # revealed: IntList
 
 n: list[typing.Literal[1, 2, 3]] = [1, 2, 3]
 reveal_type(n)  # revealed: list[Literal[1, 2, 3]]
@@ -769,7 +769,7 @@ x1: Callable[[Any], bool] = make_callable(0)
 reveal_type(x1)  # revealed: (Any, /) -> bool
 
 x2: AnyToBool = make_callable(0)
-reveal_type(x2)  # revealed: (Any, /) -> bool
+reveal_type(x2)  # revealed: AnyToBool
 
 x3: Callable[[list[Any]], bool] = make_callable([0])
 reveal_type(x3)  # revealed: (list[Any], /) -> bool

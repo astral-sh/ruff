@@ -3461,7 +3461,7 @@ class TD2(TD1):
 type TD2Alias = TD2
 
 def func_alias(**kwargs: Unpack[TD2Alias]) -> None:
-    reveal_type(kwargs)  # revealed: TD2
+    reveal_type(kwargs)  # revealed: TD2Alias
 ```
 
 ### Stringified annotations are followed
@@ -4833,7 +4833,7 @@ def test_in(x: ThingWithBaz):
     if "baz" not in x:
         reveal_type(x)  # revealed: Foo
     else:
-        reveal_type(x)  # revealed: Foo | Baz
+        reveal_type(x)  # revealed: ThingWithBaz
 ```
 
 Nested PEP 695 type aliases (an alias referring to another alias) also work:
@@ -4862,7 +4862,7 @@ def test_nested_in(x: OuterWithBaz):
     if "baz" not in x:
         reveal_type(x)  # revealed: Foo
     else:
-        reveal_type(x)  # revealed: Foo | Baz
+        reveal_type(x)  # revealed: OuterWithBaz
 ```
 
 ## Only annotated declarations are allowed in the class body

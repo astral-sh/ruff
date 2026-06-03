@@ -20,7 +20,7 @@ x: IntOrStr = 1
 reveal_type(x)  # revealed: Literal[1]
 
 def f() -> None:
-    reveal_type(x)  # revealed: int | str
+    reveal_type(x)  # revealed: IntOrStr
 ```
 
 ## `__value__` attribute
@@ -79,7 +79,7 @@ type IntOrStrOrBytes = IntOrStr | bytes
 x: IntOrStrOrBytes = 1
 
 def f() -> None:
-    reveal_type(x)  # revealed: int | str | bytes
+    reveal_type(x)  # revealed: IntOrStrOrBytes
 ```
 
 ## `Self`
@@ -117,6 +117,19 @@ x: MyIntOrStr = 1
 y: MyIntOrStr = None
 ```
 
+## Union containing both an alias and its value type collapses
+
+The redundancy check within a union type is first-win, meaning the compatible type added later is
+considered redundant.
+
+```py
+type Alias = int
+
+def f(x: Alias | int, y: int | Alias):
+    reveal_type(x)  # revealed: Alias
+    reveal_type(y)  # revealed: int
+```
+
 ## Unpacking from a type alias
 
 ```py
@@ -137,7 +150,7 @@ eager) nested scope.
 type Alias = Foo | str
 
 def f(x: Alias):
-    reveal_type(x)  # revealed: Foo | str
+    reveal_type(x)  # revealed: Alias
 
 class Foo:
     pass
@@ -151,7 +164,7 @@ def _(flag: bool):
     if t is not None:
         type Alias = t | str
         def f(x: Alias):
-            reveal_type(x)  # revealed: int | str
+            reveal_type(x)  # revealed: Alias
 ```
 
 ## Generic type aliases
@@ -165,7 +178,7 @@ def _(cond: bool):
     Generic = ListOrSet if cond else Tuple1
 
     def _(x: Generic[int]):
-        reveal_type(x)  # revealed: list[int] | set[int] | tuple[int]
+        reveal_type(x)  # revealed: ListOrSet[int] | Tuple1[int]
 
 try:
     class Foo[T]:
@@ -192,7 +205,7 @@ Stringifying the right-hand side of a type alias is redundant, but allowed:
 type X = "int | str"
 
 def f(obj: X):
-    reveal_type(obj)  # revealed: int | str
+    reveal_type(obj)  # revealed: X
 ```
 
 The right-hand side of a PEP-695 type alias will not usually be executed, but can be if the user
@@ -204,7 +217,7 @@ stringified alias values:
 type Y = "int" | str
 
 def g(obj: Y):
-    reveal_type(obj)  # revealed: int | str
+    reveal_type(obj)  # revealed: Y
 ```
 
 ```snapshot
@@ -246,13 +259,13 @@ def f(condition: bool):
     while condition:
         type Right = str
         alias |= Right
-        reveal_type(alias)  # revealed: <types.UnionType special-form 'int | str'>
+        reveal_type(alias)  # revealed: <types.UnionType special-form 'Left | Right'>
 
-    reveal_type(alias)  # revealed: TypeAliasType | <types.UnionType special-form 'int | str'>
+    reveal_type(alias)  # revealed: TypeAliasType | <types.UnionType special-form 'Left | Right'>
 
     # it would be okay to emit an `invalid-type-form` error here
     def inner(x: alias):
-        reveal_type(x)  # revealed: int | str
+        reveal_type(x)  # revealed: Left | Right
 ```
 
 ## Multiple layers of union aliases
@@ -367,7 +380,7 @@ reveal_type(IntOrStr)  # revealed: TypeAliasType
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
 def f(x: IntOrStr) -> None:
-    reveal_type(x)  # revealed: int | str
+    reveal_type(x)  # revealed: IntOrStr
 ```
 
 ### Generic example
@@ -450,10 +463,10 @@ A = TypeAliasType("A", Union[str, "B"])
 B = TypeAliasType("B", list[A])
 
 def f(x: A) -> None:
-    reveal_type(x)  # revealed: str | list[A]
+    reveal_type(x)  # revealed: A
 
 def g(x: B) -> None:
-    reveal_type(x)  # revealed: list[A]
+    reveal_type(x)  # revealed: B
 ```
 
 ## Cyclic aliases
@@ -464,26 +477,27 @@ def g(x: B) -> None:
 type OptNestedInt = int | tuple[OptNestedInt, ...] | None
 
 def f(x: OptNestedInt) -> None:
-    reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
+    reveal_type(x)  # revealed: OptNestedInt
     if x is not None:
         reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
 
 type RecursiveList = list[RecursiveList]
 
 def g(x: RecursiveList):
-    reveal_type(x[0])  # revealed: list[RecursiveList]
+    reveal_type(x[0])  # revealed: RecursiveList
 ```
 
 ### Invalid self-referential
 
 ```py
-# TODO emit a diagnostic on these two lines
+# TODO emit a diagnostic on the `IntOr` line too
 type IntOr = int | IntOr
+# error: [cyclic-type-alias-definition] "Cyclic definition of `OrInt`"
 type OrInt = OrInt | int
 
 def f(x: IntOr, y: OrInt):
-    reveal_type(x)  # revealed: int
-    reveal_type(y)  # revealed: int
+    reveal_type(x)  # revealed: IntOr
+    reveal_type(y)  # revealed: OrInt
     if not isinstance(x, int):
         reveal_type(x)  # revealed: Never
     if not isinstance(y, int):
@@ -497,7 +511,7 @@ def foo(
     Itself: Itself,
 ):
     x: Itself
-    reveal_type(Itself)  # revealed: Divergent
+    reveal_type(Itself)  # revealed: Itself
 
 # A type alias defined with invalid recursion behaves as a dynamic type.
 foo(42)
@@ -510,7 +524,7 @@ type B = A
 
 def bar(B: B):
     x: B
-    reveal_type(B)  # revealed: Divergent
+    reveal_type(B)  # revealed: B
 
 # error: [cyclic-type-alias-definition] "Cyclic definition of `G`"
 type G[T] = G[T]
@@ -527,7 +541,7 @@ type Foo[T] = list[T] | Bar[T]
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
-    reveal_type(x)  # revealed: int | list[int]
+    reveal_type(x)  # revealed: Bar[int]
 ```
 
 ### With legacy generic
@@ -547,7 +561,7 @@ class B(A[Alias]):
 
 def f(b: B):
     reveal_type(b)  # revealed: B
-    reveal_type(b.attr)  # revealed: list[Alias] | int
+    reveal_type(b.attr)  # revealed: Alias
 ```
 
 ### Mutually recursive
@@ -564,7 +578,7 @@ def f(x: A):
             reveal_type(y)  # revealed: tuple[A]
 
 def g(x: A | B):
-    reveal_type(x)  # revealed: tuple[B] | None
+    reveal_type(x)  # revealed: A
 
 from ty_extensions import Intersection
 
@@ -580,7 +594,7 @@ from typing import Callable
 type C = Callable[[], C | None]
 
 def _(x: C):
-    reveal_type(x)  # revealed: () -> C | None
+    reveal_type(x)  # revealed: C
 ```
 
 ### Subtyping of materializations of cyclic aliases
@@ -672,9 +686,9 @@ from typing import Union
 type A = list[Union["A", str]]
 
 def f(x: A):
-    reveal_type(x)  # revealed: list[A | str]
+    reveal_type(x)  # revealed: A
     for item in x:
-        reveal_type(item)  # revealed: list[A | str] | str
+        reveal_type(item)  # revealed: A | str
 ```
 
 #### With new-style union
@@ -683,9 +697,9 @@ def f(x: A):
 type A = list[A | str]
 
 def f(x: A):
-    reveal_type(x)  # revealed: list[A | str]
+    reveal_type(x)  # revealed: A
     for item in x:
-        reveal_type(item)  # revealed: list[A | str] | str
+        reveal_type(item)  # revealed: A | str
 ```
 
 #### With Optional
@@ -696,9 +710,9 @@ from typing import Optional, Union
 type A = list[Optional[Union["A", str]]]
 
 def f(x: A):
-    reveal_type(x)  # revealed: list[A | str | None]
+    reveal_type(x)  # revealed: A
     for item in x:
-        reveal_type(item)  # revealed: list[A | str | None] | str | None
+        reveal_type(item)  # revealed: A | str | None
 ```
 
 ### Tuple comparison

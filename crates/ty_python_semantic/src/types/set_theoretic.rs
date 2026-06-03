@@ -78,21 +78,6 @@ impl<'db> UnionType<'db> {
         UnionBuilder::new(db).add(a).add(b).build()
     }
 
-    /// Create a union from a list of elements without unpacking type aliases.
-    pub(crate) fn from_elements_leave_aliases<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        elements
-            .into_iter()
-            .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
-                |builder, element| builder.add(element.into()),
-            )
-            .build()
-    }
-
     pub(crate) fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
@@ -136,34 +121,6 @@ impl<'db> UnionType<'db> {
         mapped
     }
 
-    /// A version of [`UnionType::map`] that does not unpack type aliases.
-    pub(crate) fn map_leave_aliases(
-        self,
-        db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
-    ) -> Type<'db> {
-        let elements = self.elements(db);
-        let mut iter = elements.iter().enumerate();
-        while let Some((i, ty)) = iter.next() {
-            let new_ty = transform_fn(ty);
-            if &new_ty != ty {
-                let mut builder = UnionBuilder::new(db).unpack_aliases(false);
-                for prev in &elements[..i] {
-                    builder = builder.add(*prev);
-                }
-                builder = builder.add(new_ty);
-                for (_, element) in iter {
-                    builder = builder.add(transform_fn(element));
-                }
-                return builder
-                    .recursively_defined(self.recursively_defined(db))
-                    .build();
-            }
-        }
-
-        Type::Union(self)
-    }
-
     /// A fallible version of [`UnionType::map`].
     ///
     /// For each element in `self`, `transform_fn` is called on that element.
@@ -189,7 +146,7 @@ impl<'db> UnionType<'db> {
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
-            if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
+            if &new_ty != ty {
                 let mut builder = elements[..i]
                     .iter()
                     .copied()
@@ -338,7 +295,6 @@ impl<'db> UnionType<'db> {
         nested: bool,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db)
-            .unpack_aliases(false)
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
         let mut empty = true;
