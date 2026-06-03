@@ -518,71 +518,59 @@ fn synthesize_typed_dict_pop<'db>(
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
+    let pop_overloads = |key_ty, value_ty| {
+        let pop_parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_ty),
+        ];
+        let pop_sig = Signature::new(Parameters::new(db, pop_parameters), value_ty);
+
+        // Non-generic overload that accepts the value type as the default,
+        // providing bidirectional inference context for the default argument.
+        let pop_with_typed_default_parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_ty),
+            Parameter::positional_only(Some(Name::new_static("default")))
+                .with_annotated_type(value_ty),
+        ];
+        let pop_with_typed_default_sig = Signature::new(
+            Parameters::new(db, pop_with_typed_default_parameters),
+            value_ty,
+        );
+
+        let t_default =
+            BoundTypeVarInstance::synthetic(db, Name::new_static("T"), TypeVarVariance::Covariant);
+        let pop_with_default_parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_ty),
+            Parameter::positional_only(Some(Name::new_static("default")))
+                .with_annotated_type(Type::TypeVar(t_default)),
+        ];
+        let pop_with_default_sig = Signature::new_generic(
+            Some(GenericContext::from_typevar_instances(db, [t_default])),
+            Parameters::new(db, pop_with_default_parameters),
+            UnionType::from_two_elements(db, value_ty, Type::TypeVar(t_default)),
+        );
+
+        [pop_sig, pop_with_typed_default_sig, pop_with_default_sig]
+    };
+
     let overloads = fields
         .iter()
         .filter(|(_, field)| !field.is_required() && !field.is_read_only())
         .flat_map(|(field_name, field)| {
-            let key_type = Type::string_literal(db, field_name);
-
-            let pop_parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(key_type),
-            ];
-            let pop_sig = Signature::new(Parameters::new(db, pop_parameters), field.declared_ty);
-
-            // Non-generic overload that accepts the field type as the default,
-            // providing bidirectional inference context for the default argument.
-            let pop_with_typed_default_sig = Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(key_type),
-                        Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_annotated_type(field.declared_ty),
-                    ],
-                ),
-                field.declared_ty,
-            );
-
-            let t_default = BoundTypeVarInstance::synthetic(
-                db,
-                Name::new_static("T"),
-                TypeVarVariance::Covariant,
-            );
-
-            let pop_with_default_parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(key_type),
-                Parameter::positional_only(Some(Name::new_static("default")))
-                    .with_annotated_type(Type::TypeVar(t_default)),
-            ];
-            let pop_with_default_sig = Signature::new_generic(
-                Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(db, pop_with_default_parameters),
-                UnionType::from_two_elements(db, field.declared_ty, Type::TypeVar(t_default)),
-            );
-
-            [pop_sig, pop_with_typed_default_sig, pop_with_default_sig]
+            pop_overloads(Type::string_literal(db, field_name), field.declared_ty)
         })
-        .chain(typed_dict.supports_arbitrary_key_deletion(db).then(|| {
-            let pop_parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(KnownClass::Str.to_instance(db)),
-            ];
-            Signature::new(
-                Parameters::new(db, pop_parameters),
-                typed_dict.value_type(db),
-            )
-        }));
+        .chain(
+            typed_dict
+                .supports_arbitrary_key_deletion(db)
+                .then(|| pop_overloads(KnownClass::Str.to_instance(db), typed_dict.value_type(db)))
+                .into_iter()
+                .flatten(),
+        );
 
     Type::Callable(CallableType::new(
         db,

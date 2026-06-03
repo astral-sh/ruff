@@ -5930,6 +5930,8 @@ def _(extra: Extra, arbitrary: ArbitraryPop, key: str) -> None:
     reveal_type(extra.pop("year", "missing"))  # revealed: int | Literal["missing"]
     reveal_type(extra.setdefault("year", 1982))  # revealed: int
     reveal_type(arbitrary.pop(key))  # revealed: str | int
+    reveal_type(arbitrary.pop(key, 0))  # revealed: str | int
+    reveal_type(arbitrary.pop(key, None))  # revealed: str | int | None
 
     # error: [invalid-argument-type]
     extra.setdefault("year", "not an int")
