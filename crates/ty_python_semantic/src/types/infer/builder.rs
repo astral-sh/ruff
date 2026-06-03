@@ -23,9 +23,9 @@ use ty_python_core::statement::StatementInner;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion, InferredDeclaration,
-    ScopeInference, ScopeInferenceExtra, infer_deferred_types, infer_definition_types,
-    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
+    FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -270,10 +270,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The list should only contain one entry per binding at most.
     bindings: VecMap<Definition<'db>, Type<'db>>,
 
-    /// The inferred outcome of every declaration recorded by the semantic index in this region.
+    /// The types and type qualifiers of every valid declaration in this region.
     ///
     /// The list should only contain one entry per declaration at most.
-    declarations: VecMap<Definition<'db>, InferredDeclaration<'db>>,
+    declarations: VecMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
     /// The definitions with deferred sub-parts.
     ///
@@ -424,11 +424,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.expressions
             .extend(inference.expressions.iter().copied());
-        self.declarations.extend(
-            inference.declarations().map(|(definition, declared)| {
-                (definition, InferredDeclaration::Declared(declared))
-            }),
-        );
+        self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings.extend(inference.bindings());
@@ -469,11 +465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.expressions
             .extend(inference.expressions.iter().copied());
-        self.declarations.extend(
-            inference.declarations().map(|(definition, declared)| {
-                (definition, InferredDeclaration::Declared(declared))
-            }),
-        );
+        self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings.extend(inference.bindings());
@@ -846,10 +838,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut seen_overloaded_places = FxHashSet::default();
             let mut seen_public_functions = FxHashSet::default();
 
-            for (&definition, inferred_declaration) in &self.declarations {
-                let Some(ty_and_quals) = inferred_declaration.declared() else {
-                    continue;
-                };
+            for (&definition, ty_and_quals) in &self.declarations {
                 let ty = ty_and_quals.inner_type();
                 match definition.kind(self.db()) {
                     DefinitionKind::Function(function) => {
@@ -1388,8 +1377,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             TypeAndQualifiers::declared(Type::unknown())
         };
-        self.declarations
-            .insert(declaration, InferredDeclaration::Declared(ty));
+        self.declarations.insert(declaration, ty);
     }
 
     fn add_declaration_with_binding(
@@ -1477,8 +1465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.declarations
-            .insert(definition, InferredDeclaration::Declared(declared_ty));
+        self.declarations.insert(definition, declared_ty);
         self.bindings.insert(definition, inferred_ty);
     }
 
@@ -4379,9 +4366,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value = assignment.value(self.module());
 
         if !target.is_name_expr() && !self.is_valid_receiver_annotation_target(target) {
-            self.declarations
-                .insert(definition, InferredDeclaration::Rejected);
-
+            // Omit this definition from `self.declarations`; declaration lookup treats an absent
+            // inferred declaration as rejected.
             if !definition
                 .kind(self.db())
                 .category(self.in_stub(), self.module())
@@ -10321,14 +10307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
-            declarations: declarations
-                .into_iter()
-                .filter_map(|(definition, declaration)| {
-                    declaration
-                        .declared()
-                        .map(|declared| (definition, declared))
-                })
-                .collect(),
+            declarations: declarations.into_boxed_slice(),
             extra,
         }
     }
@@ -10478,14 +10457,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
-            declarations: declarations
-                .into_iter()
-                .filter_map(|(definition, declaration)| {
-                    declaration
-                        .declared()
-                        .map(|declared| (definition, declared))
-                })
-                .collect(),
+            declarations: declarations.into_boxed_slice(),
             extra,
         }
     }
@@ -10963,15 +10935,6 @@ impl<'a, K, V> IntoIterator for &'a VecMap<K, V> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-impl<K, V> IntoIterator for VecMap<K, V> {
-    type Item = (K, V);
-    type IntoIter = std::vec::IntoIter<(K, V)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
     }
 }
 
