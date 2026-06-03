@@ -5,7 +5,11 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
+#[cfg(test)]
+use ruff_db::files::system_path_to_file;
 use ruff_db::parsed::parsed_module;
+#[cfg(test)]
+use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
@@ -22,6 +26,10 @@ use super::{
     UnionBuilder, definition_expression_qualifiers, definition_expression_type, visitor,
 };
 use crate::Db;
+#[cfg(test)]
+use crate::db::tests::setup_db;
+#[cfg(test)]
+use crate::place::global_symbol;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
@@ -289,6 +297,10 @@ impl<'db> TypedDictType<'db> {
     }
 
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        if self.openness(db).is_open() {
+            return Type::object();
+        }
+
         let mut builder = UnionBuilder::new(db);
         for field in self.items(db).values() {
             builder = builder.add(field.declared_ty);
@@ -3066,4 +3078,47 @@ fn test_btreemap_overlapping_items() {
             .next()
             .is_none()
     );
+}
+
+#[test]
+fn open_value_type_does_not_compute_items() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        "
+        from typing import TypedDict
+
+        class TD(TypedDict):
+            field: int
+        ",
+    )?;
+
+    let file = system_path_to_file(&db, "src/a.py").unwrap();
+    {
+        let class = global_symbol(&db, file, "TD")
+            .place
+            .expect_type()
+            .expect_class_literal();
+        let typed_dict = TypedDictType::new(ClassType::NonGeneric(class));
+        assert!(typed_dict.openness(&db).is_open());
+    }
+    db.clear_salsa_events();
+
+    {
+        let class = global_symbol(&db, file, "TD")
+            .place
+            .expect_type()
+            .expect_class_literal();
+        let typed_dict = TypedDictType::new(ClassType::NonGeneric(class));
+        assert_eq!(typed_dict.value_type(&db), Type::object());
+    }
+    let events = db.take_salsa_events();
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event.kind, salsa::EventKind::WillExecute { .. })),
+        "Computing the value type of an open TypedDict should not require its items: {events:#?}"
+    );
+
+    Ok(())
 }
