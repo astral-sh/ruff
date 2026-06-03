@@ -1963,6 +1963,16 @@ def _(value: VariableTruthProtocol):
     if value:
         reveal_type(value.copy())  # revealed: VariableTruthProtocol
 
+class MyTuple(tuple[int, ...]):
+    def fresh(self) -> Self:
+        return type(self)((1, 2, 3))
+
+def takes_pair(value: tuple[int, int]): ...
+def _(value: tuple[int, int]):
+    if isinstance(value, MyTuple):
+        reveal_type(value.fresh())  # revealed: MyTuple
+        takes_pair(value.fresh())  # error: [invalid-argument-type]
+
 class TypeIsMarker(Protocol):
     marker: int
 

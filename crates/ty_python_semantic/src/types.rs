@@ -1079,11 +1079,28 @@ impl<'db> Type<'db> {
         let has_nominal_class_constraint = intersection.positive(db).iter().any(|positive| {
             !matches!(positive, Type::ProtocolInstance(_)) && positive.nominal_class(db).is_some()
         });
+        let has_named_tuple_like_constraint =
+            intersection
+                .positive(db)
+                .iter()
+                .any(|positive| match positive {
+                    Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::FromClass(class),
+                        ..
+                    }) => class.is_known(db, KnownClass::NamedTupleLike),
+                    _ => false,
+                });
         let mut builder = IntersectionBuilder::new(db);
         for positive in intersection.positive(db) {
             // `NamedTupleLike` is deliberately combined with a tuple type to describe
             // `typing.NamedTuple`; unlike a user protocol, it is not a flow refinement.
-            let is_flow_refinement = matches!(positive, Type::AlwaysTruthy | Type::AlwaysFalsy)
+            let is_value_refinement = matches!(positive, Type::AlwaysTruthy | Type::AlwaysFalsy)
+                || matches!(
+                    positive,
+                    Type::NominalInstance(instance)
+                        if instance.own_tuple_spec(db).is_some()
+                            && !has_named_tuple_like_constraint
+                )
                 || matches!(
                     positive,
                     Type::ProtocolInstance(ProtocolInstanceType {
@@ -1100,7 +1117,7 @@ impl<'db> Type<'db> {
                         || owner.is_some_and(|owner| class.class_literal(db) != owner))
                         && !class.is_known(db, KnownClass::NamedTupleLike)
                 );
-            if !is_flow_refinement {
+            if !is_value_refinement {
                 builder = builder.add_positive(*positive);
             }
         }
