@@ -6171,13 +6171,22 @@ class RequiredStr(TypedDict, closed=True):
     value: str
 
 class ClosedEmpty(TypedDict, closed=True): ...
+class OpenEmpty(TypedDict): ...
 class ReadOnlyIntExtras(TypedDict, extra_items=ReadOnly[int]): ...
+class ReadOnlyStrExtras(TypedDict, extra_items=ReadOnly[str]): ...
 class MutableIntExtras(TypedDict, extra_items=int): ...
+class MutableStrExtras(TypedDict, extra_items=str): ...
 
 static_assert(is_disjoint_from(RequiredInt, ClosedEmpty))
 static_assert(not is_disjoint_from(RequiredInt, ReadOnlyIntExtras))
 static_assert(is_disjoint_from(RequiredStr, ReadOnlyIntExtras))
 static_assert(is_disjoint_from(RequiredInt, MutableIntExtras))
+static_assert(is_disjoint_from(ClosedEmpty, MutableIntExtras))
+static_assert(is_disjoint_from(MutableIntExtras, MutableStrExtras))
+static_assert(is_disjoint_from(MutableIntExtras, ReadOnlyStrExtras))
+static_assert(not is_disjoint_from(MutableIntExtras, ReadOnlyIntExtras))
+static_assert(not is_disjoint_from(ClosedEmpty, ReadOnlyIntExtras))
+static_assert(not is_disjoint_from(OpenEmpty, MutableIntExtras))
 ```
 
 ### A `TypedDict` with `extra_items: T` is a subtype of `Mapping[str, T1]`, where `T1` is the union of `T` and all declared item types

@@ -988,7 +988,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 }
             });
 
-        common_fields_disjoint.or(db, self.constraints, || {
+        let required_fields_disjoint = common_fields_disjoint.or(db, self.constraints, || {
             left_items
                 .iter()
                 .filter(|(name, field)| field.is_required() && !right_items.contains_key(*name))
@@ -1035,6 +1035,68 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         }
                     }
                 })
+        });
+
+        required_fields_disjoint.or(db, self.constraints, || {
+            let left_openness = left.openness(db);
+            let right_openness = right.openness(db);
+            let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
+
+            match (left_openness, right_openness) {
+                (TypedDictOpenness::Closed, TypedDictOpenness::Extra(extra_items))
+                | (TypedDictOpenness::Extra(extra_items), TypedDictOpenness::Closed)
+                    if !extra_items.is_read_only() =>
+                {
+                    self.always()
+                }
+                (TypedDictOpenness::Extra(left_extra), TypedDictOpenness::Extra(right_extra))
+                    if !left_extra.is_read_only() && !right_extra.is_read_only() =>
+                {
+                    relation_checker
+                        .check_type_pair(db, left_extra.declared_ty, right_extra.declared_ty)
+                        .and(db, self.constraints, || {
+                            relation_checker.check_type_pair(
+                                db,
+                                right_extra.declared_ty,
+                                left_extra.declared_ty,
+                            )
+                        })
+                        .negate(db, self.constraints)
+                }
+                (TypedDictOpenness::Extra(mutable_extra), other)
+                    if !mutable_extra.is_read_only() =>
+                {
+                    other.effective_extra_items().map_or_else(
+                        || self.always(),
+                        |other_extra| {
+                            relation_checker
+                                .check_type_pair(
+                                    db,
+                                    mutable_extra.declared_ty,
+                                    other_extra.declared_ty,
+                                )
+                                .negate(db, self.constraints)
+                        },
+                    )
+                }
+                (other, TypedDictOpenness::Extra(mutable_extra))
+                    if !mutable_extra.is_read_only() =>
+                {
+                    other.effective_extra_items().map_or_else(
+                        || self.always(),
+                        |other_extra| {
+                            relation_checker
+                                .check_type_pair(
+                                    db,
+                                    mutable_extra.declared_ty,
+                                    other_extra.declared_ty,
+                                )
+                                .negate(db, self.constraints)
+                        },
+                    )
+                }
+                _ => self.never(),
+            }
         })
     }
 }
