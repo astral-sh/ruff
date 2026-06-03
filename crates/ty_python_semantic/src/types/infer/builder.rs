@@ -80,6 +80,7 @@ use crate::types::infer::{
     TypeExpressionFlags, function_known_decorators, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
+use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -8748,7 +8749,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         definition: Definition<'db>,
         ty: Type<'db>,
-    ) -> Option<FunctionType<'db>> {
+    ) -> Option<DeprecatedInstance<'db>> {
         fn is_function_type(db: &dyn Db, ty: Type) -> bool {
             match ty {
                 Type::FunctionLiteral(_) | Type::BoundMethod(_) => true,
@@ -8773,14 +8774,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let decorator = function.node(self.module()).decorator_list.first()?;
-        let Type::KnownInstance(KnownInstanceType::Deprecated(_)) =
+        let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) =
             function_known_decorators(self.db(), definition)
                 .expression_type(&decorator.expression)?
         else {
             return None;
         };
+        Some(deprecated)
+    }
 
-        Some(function_ty)
+    fn report_deprecated_function<T: Ranged>(
+        &self,
+        ranged: T,
+        name: &str,
+        deprecated: DeprecatedInstance,
+    ) {
+        let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
+            return;
+        };
+
+        let mut diag =
+            builder.into_diagnostic(format_args!(r#"The function `{name}` is deprecated"#));
+        if let Some(message) = deprecated.message {
+            diag.set_primary_message(message.value(self.db()));
+        }
+        diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
     /// Check if the given type is `@deprecated`.
@@ -8820,20 +8838,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let Some(builder) = self
-            .context
-            .report_lint(&crate::types::diagnostic::DEPRECATED, ranged)
-        else {
-            return;
-        };
-
-        let func_name = function.name(self.db());
-        let mut diag =
-            builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
-        if let Some(message) = deprecated.message {
-            diag.set_primary_message(message.value(self.db()));
-        }
-        diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+        self.report_deprecated_function(ranged, function.name(self.db()).as_str(), deprecated);
     }
 
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
@@ -9051,7 +9056,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
 
-        let deprecated_function_binding = if file_scope_id.is_global()
+        let binding_deprecation = if file_scope_id.is_global()
             && place_expr.as_symbol().is_some()
             && local_scope_place.is_definitely_bound()
             && let Some(ty) = local_scope_place.ignore_possibly_undefined()
@@ -9338,8 +9343,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if let Some(ty) = place.place.ignore_possibly_undefined() {
-            if let Some(function) = deprecated_function_binding {
-                self.check_deprecated(expr_ref, Type::FunctionLiteral(function));
+            if let Some(deprecated) = binding_deprecation
+                && let Some(symbol) = place_expr.as_symbol()
+            {
+                self.report_deprecated_function(expr_ref, symbol.name().as_str(), deprecated);
             } else {
                 self.check_deprecated(expr_ref, ty);
             }

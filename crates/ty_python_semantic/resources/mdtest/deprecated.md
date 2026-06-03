@@ -83,6 +83,10 @@ def replaced_deprecated_function() -> None: ...
 @deprecated("use replacement or other directly")
 @replace_with_one_of(replacement, other)
 def deprecated_union_binding() -> None: ...
+@deprecated("outer deprecation")
+@replace_with(replacement)
+@deprecated("inner deprecation")
+def deprecated_outer_binding() -> None: ...
 @deprecated("this object is not callable")
 @replace_with_object
 def deprecated_object_binding() -> None: ...
@@ -94,6 +98,7 @@ deprecated_binding()  # error: [deprecated] "use replacement directly"
 replacement()
 replaced_deprecated_function()
 deprecated_union_binding  # error: [deprecated] "use replacement or other directly"
+deprecated_outer_binding()  # error: [deprecated] "outer deprecation"
 deprecated_object_binding
 deprecated_class_binding  # TODO: error: [deprecated] "use ReplacementClass directly"
 
