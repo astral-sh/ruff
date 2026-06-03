@@ -3453,12 +3453,17 @@ impl<'db> Type<'db> {
         // the correlation between the optional member and that fallback, so use the fallback.
         if receiver.is_some()
             && let Type::TypeVar(typevar) = self
-            && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                typevar.typevar(db).bound_or_constraints(db)
+            && let Some(bound_or_constraints) = typevar.typevar(db).bound_or_constraints(db)
         {
-            let local_member = constraints.map_with_boundness_and_qualifiers(db, |constraint| {
-                constraint.member_lookup_with_policy(db, name.clone(), policy)
-            });
+            let local_member = match bound_or_constraints {
+                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                    .map_with_boundness_and_qualifiers(db, |constraint| {
+                        constraint.member_lookup_with_policy(db, name.clone(), policy)
+                    }),
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    bound.member_lookup_with_policy(db, name.clone(), policy)
+                }
+            };
             if let Place::Defined(DefinedPlace {
                 definedness: Definedness::PossiblyUndefined,
                 ..

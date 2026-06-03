@@ -429,6 +429,12 @@ def _(value: Intersection[U, GetFallback]):
     # error: [invalid-argument-type]
     takes_has_get(value.get())
 
+def upper_bounded[V: HasGet | NoGet](value: Intersection[V, GetFallback]):
+    # error: [invalid-argument-type]
+    takes_get_fallback(value.get())
+    # error: [invalid-argument-type]
+    takes_has_get(value.get())
+
 class GenericDefaults:
     def choose[T = Self](self) -> T:
         raise NotImplementedError
