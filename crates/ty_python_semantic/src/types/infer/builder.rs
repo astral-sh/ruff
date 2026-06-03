@@ -31,10 +31,9 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
-    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
-    loop_header_scope_is_too_complex, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place_by_id, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    class_body_implicit_symbol, explicit_global_symbol, loop_header_types,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -2085,32 +2084,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
-
-        // Loop-header types are an approximation point for loop fixpoint analysis. Bound the
-        // aggregate binding-inference and TDD work across the scope's loop headers.
-        if loop_header_scope_is_too_complex(db, definition.scope(db)) {
-            self.bindings.insert(definition, Type::unknown());
-            return;
-        }
-
-        let loop_header = loop_header_reachability(db, definition);
-        let place = loop_header_kind.place();
-        let use_def = self
-            .index
-            .use_def_map(self.scope().file_scope_id(self.db()));
-
-        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
-
-        for reachable_binding in &loop_header.reachable_bindings {
-            let binding_ty = binding_type(db, reachable_binding.definition);
-            let narrowed_ty = use_def
-                .narrowing_evaluator(reachable_binding.narrowing_constraint)
-                .narrow(db, binding_ty, place);
-
-            union.add_in_place(narrowed_ty);
-        }
-
-        self.bindings.insert(definition, union.build());
+        let ty = loop_header_types(db, definition.scope(db), loop_header_kind.place())
+            .binding_type(definition);
+        self.bindings.insert(definition, ty);
     }
 
     fn infer_nested_bindings_definition(

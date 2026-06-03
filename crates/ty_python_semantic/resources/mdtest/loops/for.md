@@ -1603,15 +1603,13 @@ for _ in range(1_000_000):
         x = 2
 ```
 
-### Large reachability constraint graphs fall back to `Unknown`
+### Large reachability constraint graphs preserve exact loop-header types
 
 ```py
 def f(items, flags):
     x = 1
     for item in items:
-        # This example is just over the exact loop-header reachability cutoff. If it falls
-        # below the cutoff, this line reveals `Literal[1, 2]`.
-        reveal_type(x)  # revealed: Literal[1] | Unknown
+        reveal_type(x)  # revealed: Literal[1, 2]
         if flags[200]:
             x = 2
     for item0 in items:

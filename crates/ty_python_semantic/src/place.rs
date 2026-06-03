@@ -1203,6 +1203,60 @@ pub(crate) fn loop_header_reachability<'db>(
     loop_header_reachability_impl(db, definition, false)
 }
 
+/// Infer all loop-header types for one place in a scope.
+///
+/// Nested loops can synthesize several mutually recursive loop headers for the same place. Solving
+/// those headers as one vector fixed point avoids repeating their shared inference work without
+/// eagerly coupling unrelated places.
+#[salsa::tracked(
+    cycle_initial=|db, id, scope, place| {
+        LoopHeaderTypes::cycle_initial(db, scope, place, Type::divergent(id))
+    },
+    cycle_fn=|db, cycle, previous, result: LoopHeaderTypes<'db>, _, _| {
+        result.cycle_normalized(db, previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size,
+)]
+pub(crate) fn loop_header_types<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    place: ScopedPlaceId,
+) -> LoopHeaderTypes<'db> {
+    let use_def = use_def_map(db, scope);
+    let mut types = Vec::new();
+
+    for (_, state, _) in use_def.all_definitions_with_usage() {
+        let DefinitionState::Defined(definition) = state else {
+            continue;
+        };
+        let DefinitionKind::LoopHeader(loop_header_kind) = definition.kind(db) else {
+            continue;
+        };
+        if loop_header_kind.place() != place {
+            continue;
+        }
+
+        let loop_header = loop_header_reachability(db, definition);
+        let mut union =
+            UnionBuilder::new(db).recursively_defined(crate::types::RecursivelyDefined::Yes);
+
+        for reachable_binding in &loop_header.reachable_bindings {
+            let binding_ty = binding_type(db, reachable_binding.definition);
+            let narrowed_ty = use_def
+                .narrowing_evaluator(reachable_binding.narrowing_constraint)
+                .narrow(db, binding_ty, place);
+
+            union.add_in_place(narrowed_ty);
+        }
+
+        types.push((definition, union.build()));
+    }
+
+    LoopHeaderTypes {
+        types: types.into_boxed_slice(),
+    }
+}
+
 // These cutoffs were chosen by benchmarking real isort to keep loop analysis
 // overhead minimal while preserving diagnostics.
 const MAX_UNCONDITIONALLY_EXACT_LOOP_HEADER_SCOPE_NODES: usize = 2048;
@@ -1220,12 +1274,6 @@ pub(crate) fn loop_header_scope_is_too_complex<'db>(db: &'db dyn Db, scope: Scop
 
     let use_def = use_def_map(db, scope);
     let constraints = use_def.reachability_constraints();
-    // A size-limit fallback produces an `AMBIGUOUS` terminal that is indistinguishable from
-    // genuine ambiguity. Never treat a graph containing such a fallback as exact, even if
-    // compaction discarded most of its interior nodes.
-    if constraints.was_truncated() {
-        return true;
-    }
     if constraints.used_interiors().len() <= MAX_UNCONDITIONALLY_EXACT_LOOP_HEADER_SCOPE_NODES {
         return false;
     }
@@ -1340,6 +1388,64 @@ pub(crate) struct LoopHeaderReachability<'db> {
     pub(crate) deleted_reachability: Truthiness,
     /// Reachable loop-back bindings that are not `del`s.
     pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
+}
+
+/// The loop-header types for one place in a scope.
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct LoopHeaderTypes<'db> {
+    types: Box<[(Definition<'db>, Type<'db>)]>,
+}
+
+impl<'db> LoopHeaderTypes<'db> {
+    fn cycle_initial(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        place: ScopedPlaceId,
+        ty: Type<'db>,
+    ) -> Self {
+        let use_def = use_def_map(db, scope);
+        let types = use_def
+            .all_definitions_with_usage()
+            .filter_map(|(_, state, _)| {
+                let DefinitionState::Defined(definition) = state else {
+                    return None;
+                };
+                let DefinitionKind::LoopHeader(loop_header_kind) = definition.kind(db) else {
+                    return None;
+                };
+                (loop_header_kind.place() == place).then_some((definition, ty))
+            })
+            .collect();
+
+        Self { types }
+    }
+
+    fn cycle_normalized(
+        mut self,
+        db: &'db dyn Db,
+        previous: &LoopHeaderTypes<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        for (definition, ty) in &mut self.types {
+            *ty = if let Some(previous) = previous.try_binding_type(*definition) {
+                ty.cycle_normalized(db, previous, cycle)
+            } else {
+                ty.recursive_type_normalized(db, cycle)
+            };
+        }
+        self
+    }
+
+    pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
+        self.try_binding_type(definition)
+            .expect("loop header definition should belong to this place")
+    }
+
+    fn try_binding_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+        self.types
+            .iter()
+            .find_map(|(candidate, ty)| (*candidate == definition).then_some(*ty))
+    }
 }
 
 impl<'db> LoopHeaderReachability<'db> {

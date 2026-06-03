@@ -40,6 +40,7 @@ pub(crate) use self::match_pattern::{
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
+pub(crate) use self::set_theoretic::RecursivelyDefined;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
