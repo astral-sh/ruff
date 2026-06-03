@@ -1985,6 +1985,25 @@ def _(value: CopyableProtocol):
         value.property.marker  # error: [unresolved-attribute]
 ```
 
+### `Self` binding checks intersection element MROs
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class Base:
+    other: Self
+
+class Child(Base): ...
+class Extra: ...
+
+def _(value: Intersection[Child, Extra]):
+    reveal_type(value.other)  # revealed: Child & Extra
+
+def _(cls: Intersection[type[Child], type[Extra]]):
+    reveal_type(cls.other)  # revealed: Child & Extra
+```
+
 ### Descriptor binding uses the full intersection type
 
 ```py

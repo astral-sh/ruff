@@ -7175,8 +7175,8 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
-        // An intersection of structural types has no single nominal class, but it can still
-        // contain the protocol class that owns this `Self`.
+        // An intersection has no single nominal class, but a positive element can still inherit
+        // from the class or protocol that owns this `Self`.
         let Some(owner_class) = owner_class else {
             return false;
         };
@@ -7184,9 +7184,9 @@ impl<'db> SelfBinding<'db> {
             return false;
         };
         intersection.positive(db).iter().any(|positive| {
-            positive
-                .nominal_class(db)
-                .is_some_and(|class| class.class_literal(db) == owner_class)
+            positive.nominal_class(db).is_some_and(|class| {
+                class_mro_literals(db, class.class_literal(db)).contains(&owner_class)
+            })
         })
     }
 }
