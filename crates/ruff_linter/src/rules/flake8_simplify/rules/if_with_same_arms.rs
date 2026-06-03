@@ -8,7 +8,7 @@ use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_pragma_comment};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -101,13 +101,16 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             following_branch.range().start(),
             checker.locator().line_end(following_branch.test.end()),
         );
-        let safe = has_only_noqa_or_empty(
-            checker.comment_ranges().comments_in_range(inter_branch),
-            checker.locator(),
-        ) && has_only_noqa_or_empty(
-            checker.comment_ranges().comments_in_range(elif_header),
-            checker.locator(),
-        );
+        let safe = checker
+            .comment_ranges()
+            .comments_in_range(inter_branch)
+            .iter()
+            .all(|r| is_pragma_comment(checker.locator().slice(*r)))
+            && checker
+                .comment_ranges()
+                .comments_in_range(elif_header)
+                .iter()
+                .all(|r| is_pragma_comment(checker.locator().slice(*r)));
 
         let mut diagnostic = checker.report_diagnostic(
             IfWithSameArms,
@@ -195,11 +198,7 @@ fn merge_branches(
         };
 
     let rest = parenthesize_edit.into_iter().chain(Some(insertion_edit));
-    match applicability {
-        Applicability::Safe => Ok(Fix::safe_edits(deletion_edit, rest)),
-        Applicability::Unsafe => Ok(Fix::unsafe_edits(deletion_edit, rest)),
-        Applicability::DisplayOnly => unreachable!(),
-    }
+    Ok(Fix::applicable_edits(deletion_edit, rest, applicability))
 }
 
 /// Return the [`TextRange`] of an [`IfElifBranch`]'s body (from the end of the test to the end of
@@ -209,19 +208,4 @@ fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
         locator.line_end(branch.test.end()),
         locator.line_end(branch.end()),
     )
-}
-
-/// Returns `true` if every comment in `comments` is a `# noqa` directive (or if
-/// the slice is empty). `# noqa` comments are tool directives, not content the
-/// user needs preserved, so they shouldn't force an unsafe fix.
-fn has_only_noqa_or_empty(comments: &[TextRange], locator: &Locator) -> bool {
-    comments
-        .iter()
-        .all(|range| is_noqa_directive(locator.slice(*range)))
-}
-
-/// Returns `true` if the comment text starts with `# noqa` (case-insensitive).
-fn is_noqa_directive(comment: &str) -> bool {
-    let text = comment.trim_start_matches('#').trim_start();
-    text.len() >= 4 && text[..4].eq_ignore_ascii_case("noqa")
 }

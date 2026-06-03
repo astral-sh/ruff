@@ -665,6 +665,19 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn ruf100_sim114() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_SIM114.py"),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedNOQA,
+                Rule::IfWithSameArms,
+            ]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("ruff/RUF102.py"))]
     #[test_case(Path::new("ruff/RUF102_1.py"))]
     fn invalid_rule_code_external_rules(path: &Path) -> Result<()> {

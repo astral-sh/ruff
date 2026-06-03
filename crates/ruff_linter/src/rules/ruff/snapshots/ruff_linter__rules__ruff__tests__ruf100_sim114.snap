@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF100 [*] Unused `noqa` directive (unused: `SIM114`)
+  --> RUF100_SIM114.py:14:1
+   |
+12 | if a:
+13 |     print("a")
+14 | # noqa: SIM114
+   | ^^^^^^^^^^^^^^
+15 | elif b:
+16 |     print("b")
+   |
+help: Remove unused `noqa` directive
+11 | # RUF100 *should* fire (the noqa is unused).
+12 | if a:
+13 |     print("a")
+   - # noqa: SIM114
+14 | elif b:
+15 |     print("b")
