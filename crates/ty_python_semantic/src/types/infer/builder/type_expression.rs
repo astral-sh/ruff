@@ -115,12 +115,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// erasing `Self`. This checks types rather than syntax because value-expression positions such
     /// as `TypeOf[...]` can either consume an encountered `Self` or produce `Self` indirectly.
     fn validate_type_alias_type(&self, expression: &ast::Expr, value_ty: Type<'db>) -> Type<'db> {
-        if !value_ty.contains_self(self.db()) {
+        let unmodified_function_contains_self = value_ty
+            .as_function_literal()
+            .is_some_and(|function| function.unmodified_signature_contains_self(self.db()));
+
+        if !unmodified_function_contains_self && !value_ty.contains_self(self.db()) {
             return value_ty;
         }
 
         self.report_invalid_type_expression(expression, "`Self` cannot be used in a type alias");
-        value_ty.replace_self_with_unknown(self.db())
+        if unmodified_function_contains_self {
+            // Type-alias specialization intentionally does not rebuild unmodified function
+            // signatures, so recover the function-literal component directly.
+            Type::unknown()
+        } else {
+            value_ty.replace_self_with_unknown(self.db())
+        }
     }
 
     pub(super) fn infer_type_alias_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {

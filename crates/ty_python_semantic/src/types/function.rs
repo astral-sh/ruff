@@ -1286,6 +1286,10 @@ impl<'db> FunctionType<'db> {
             .unwrap_or_else(|| self.literal(db).signature(db))
     }
 
+    pub(crate) fn unmodified_signature_contains_self(self, db: &'db dyn Db) -> bool {
+        self.updated_signature(db).is_none() && self.signature(db).contains_self(db)
+    }
+
     /// Infer the variance of a type variable within this function's signature.
     ///
     /// This is tracked because signatures can contain recursive `TypeOf` references back to the

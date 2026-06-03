@@ -135,6 +135,15 @@ class C:
     type ConsumedValueExpression = TypeOf[consume(cast(Self, object()))]
     consumed_value_expression: ConsumedValueExpression = 1
     invalid_consumed_value_expression: ConsumedValueExpression = "x"  # error: [invalid-assignment]
+
+    def method(self, other: Self) -> Self:
+        return self
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Method = TypeOf[method]
+
+    def use_method(self, method: Method) -> None:
+        reveal_type(method)  # revealed: Unknown
 ```
 
 ## `Self` in type parameter defaults

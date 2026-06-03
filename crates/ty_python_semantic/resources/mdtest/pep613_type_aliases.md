@@ -555,6 +555,12 @@ class C:
         reveal_type(value)  # revealed: @Todo(Inference of subscript on special form)
 
     ConsumedValueExpression: TypeAlias = TypeOf[consume(cast(Self, object()))]
+
+    def method(self, other: Self) -> Self:
+        return self
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Method: TypeAlias = TypeOf[method]
 ```
 
 ## Disabled `invalid-type-form` `Self` fallback
