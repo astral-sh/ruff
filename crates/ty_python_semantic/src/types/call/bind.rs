@@ -55,7 +55,9 @@ use crate::types::signatures::{
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
-use crate::types::typed_dict::extract_unpacked_typed_dict_from_value_type;
+use crate::types::typed_dict::{
+    UnpackedTypedDictTail, extract_unpacked_typed_dict_from_value_type,
+};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
@@ -4673,6 +4675,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         if let Some(unpacked) =
             argument_type.and_then(|ty| extract_unpacked_typed_dict_from_value_type(db, ty))
         {
+            let tail = unpacked.tail;
+
             // Special case TypedDict-shaped values because we know which keys are present.
             for (name, unpacked_key) in unpacked.keys {
                 let _ = self.match_keyword(
@@ -4682,11 +4686,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     name.as_str(),
                 );
             }
-            if let Some(extra_items_ty) = unpacked.extra_items_ty {
-                self.match_typed_dict_extra_items(argument_index, extra_items_ty);
-            } else if !unpacked.is_closed {
-                self.match_open_typed_dict_extra_items(argument_index);
-            }
+            self.match_typed_dict_tail(argument_index, tail);
         } else {
             for (parameter_index, parameter) in self.parameters.iter().enumerate() {
                 if self.parameter_info[parameter_index].matched && !parameter.is_keyword_variadic()
@@ -4728,34 +4728,15 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
     }
 
-    /// Match the possible hidden keyword arguments in an implicitly-open `TypedDict`.
+    /// Match the possible arbitrary keyword arguments represented by a `TypedDict` tail.
     ///
-    /// Hidden extra items can constrain an existing keyword-variadic parameter, but they should
-    /// not cause unknown-key errors when the destination has no `**kwargs`.
-    fn match_open_typed_dict_extra_items(&mut self, argument_index: usize) {
-        let Some((parameter_index, parameter)) = self.parameters.keyword_variadic() else {
+    /// Explicit tail items can constrain named parameters without satisfying required parameters,
+    /// and require a keyword-variadic parameter to accept all remaining names. A hidden open tail
+    /// only constrains an existing keyword-variadic parameter.
+    fn match_typed_dict_tail(&mut self, argument_index: usize, tail: UnpackedTypedDictTail<'db>) {
+        let Some(extra_items_ty) = tail.value_ty() else {
             return;
         };
-
-        self.assign_argument(
-            argument_index,
-            Argument::Keywords,
-            // TODO: Use the `TypedDict`'s extra-items type once PEP 728 is fully supported, and
-            // omit this match for closed `TypedDict`s.
-            Some(Type::object()),
-            InvalidArgumentTypeProvenance::OpenTypedDictExtraItems,
-            parameter_index,
-            parameter,
-            false,
-            true,
-        );
-    }
-
-    /// Match the possible arbitrary keyword arguments exposed by explicit `TypedDict` extra items.
-    ///
-    /// Extra items are non-required, so they can constrain named parameters without satisfying
-    /// required parameters. Any remaining names are accepted only by a keyword-variadic parameter.
-    fn match_typed_dict_extra_items(&mut self, argument_index: usize, extra_items_ty: Type<'db>) {
         let mut has_keyword_variadic = false;
 
         for (parameter_index, parameter) in self.parameters.iter().enumerate() {
@@ -4775,13 +4756,17 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     argument_index,
                     Argument::Keywords,
                     Some(extra_items_ty),
-                    InvalidArgumentTypeProvenance::Argument,
+                    if matches!(tail, UnpackedTypedDictTail::Hidden) {
+                        InvalidArgumentTypeProvenance::OpenTypedDictExtraItems
+                    } else {
+                        InvalidArgumentTypeProvenance::Argument
+                    },
                     parameter_index,
                     parameter,
                     false,
                     true,
                 );
-            } else {
+            } else if tail.is_explicit() {
                 let matched_argument = &mut self.argument_matches[argument_index];
                 matched_argument.parameters.push(MatchedParameter {
                     index: parameter_index,
@@ -4791,7 +4776,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             }
         }
 
-        if !has_keyword_variadic {
+        if tail.is_explicit() && !has_keyword_variadic {
             self.errors
                 .push(BindingError::UnknownKeywordVariadicArgument {
                     argument_index: self.get_argument_index(argument_index),

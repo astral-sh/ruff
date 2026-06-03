@@ -1589,17 +1589,89 @@ pub(crate) struct UnpackedTypedDictKey<'db> {
 
 /// A normalized view of a `TypedDict`-shaped value used when expanding `**kwargs`.
 ///
-/// Union and intersection inputs are combined into one set of possible keys. The caller chooses
-/// whether `extra_items_ty` includes only explicit extra items or also the effective `object` tail
-/// of an ordinary open `TypedDict`.
+/// Union and intersection inputs are combined into one set of possible keys and one tail describing
+/// arbitrary undeclared keys.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct UnpackedTypedDict<'db> {
     /// Declared keys that may be present after unpacking.
     pub(crate) keys: BTreeMap<Name, UnpackedTypedDictKey<'db>>,
-    /// The type of arbitrary undeclared keys, according to the selected tail policy.
-    pub(crate) extra_items_ty: Option<Type<'db>>,
-    /// Whether the normalized shape cannot contain undeclared keys.
-    pub(crate) is_closed: bool,
+    pub(crate) tail: UnpackedTypedDictTail<'db>,
+}
+
+/// The arbitrary-key tail of a normalized `TypedDict` shape.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum UnpackedTypedDictTail<'db> {
+    /// The shape cannot contain undeclared keys.
+    Closed,
+    /// An ordinary open `TypedDict` may contain undeclared values of type `object`.
+    ///
+    /// Hidden values constrain an existing `**kwargs` parameter but do not themselves cause an
+    /// unknown-key error when the destination has no `**kwargs`.
+    Hidden,
+    /// Undeclared keys are explicitly exposed with this value type.
+    Explicit(Type<'db>),
+}
+
+impl<'db> UnpackedTypedDictTail<'db> {
+    pub(crate) const fn value_ty(self) -> Option<Type<'db>> {
+        match self {
+            Self::Closed => None,
+            Self::Hidden => Some(Type::object()),
+            Self::Explicit(value_ty) => Some(value_ty),
+        }
+    }
+
+    pub(crate) const fn is_explicit(self) -> bool {
+        matches!(self, Self::Explicit(_))
+    }
+
+    fn intersection(
+        db: &'db dyn Db,
+        tails: impl IntoIterator<Item = UnpackedTypedDictTail<'db>>,
+    ) -> Self {
+        let mut explicit_value_types = Vec::new();
+
+        for tail in tails {
+            match tail {
+                Self::Closed => return Self::Closed,
+                Self::Hidden => {}
+                Self::Explicit(value_ty) => explicit_value_types.push(value_ty),
+            }
+        }
+
+        if explicit_value_types.is_empty() {
+            Self::Hidden
+        } else {
+            Self::Explicit(IntersectionType::from_elements(db, explicit_value_types))
+        }
+    }
+
+    fn union(db: &'db dyn Db, tails: impl IntoIterator<Item = UnpackedTypedDictTail<'db>>) -> Self {
+        let mut value_types = UnionBuilder::new(db);
+        let mut has_hidden_tail = false;
+        let mut has_explicit_tail = false;
+
+        for tail in tails {
+            match tail {
+                Self::Closed => {}
+                Self::Hidden => has_hidden_tail = true,
+                Self::Explicit(value_ty) => {
+                    value_types = value_types.add(value_ty);
+                    has_explicit_tail = true;
+                }
+            }
+        }
+
+        if has_hidden_tail && has_explicit_tail {
+            Self::Explicit(Type::object())
+        } else if has_hidden_tail {
+            Self::Hidden
+        } else if has_explicit_tail {
+            Self::Explicit(value_types.build())
+        } else {
+            Self::Closed
+        }
+    }
 }
 
 /// Extracts `TypedDict` keys, their value types, and whether they are required when an unpacked
@@ -1618,61 +1690,10 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     extract_unpacked_typed_dict_from_value_type(db, ty).map(|unpacked| unpacked.keys)
 }
 
-/// Extracts the declared keys and explicit extra-items tail from a `TypedDict`-shaped value.
-///
-/// Ordinary open `TypedDict`s contribute no tail here because their hidden items are not directly
-/// accessible. Use the effective-tail variant when structural compatibility must account for those
-/// hidden items.
+/// Extracts the declared keys and arbitrary-key tail from a `TypedDict`-shaped value.
 pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-) -> Option<UnpackedTypedDict<'db>> {
-    extract_unpacked_typed_dict_from_value_type_impl(db, ty, UnpackedTypedDictTail::Explicit)
-}
-
-/// Extracts declared keys while treating ordinary open `TypedDict`s as having an `object` tail.
-fn extract_unpacked_typed_dict_with_effective_tail_from_value_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<UnpackedTypedDict<'db>> {
-    extract_unpacked_typed_dict_from_value_type_impl(db, ty, UnpackedTypedDictTail::Effective)
-}
-
-/// Extracts the tail that must be checked when constructing `target`.
-///
-/// Ordinary open `TypedDict`s have hidden items, but open constructors retain ty's existing
-/// leniency for those items. Explicit extra items must still be rejected because open constructors
-/// accept no unrecognized keys.
-fn extract_unpacked_typed_dict_for_constructor<'db>(
-    db: &'db dyn Db,
-    target: TypedDictType<'db>,
-    ty: Type<'db>,
-) -> Option<UnpackedTypedDict<'db>> {
-    if target.openness(db).is_open() {
-        extract_unpacked_typed_dict_from_value_type(db, ty)
-    } else {
-        extract_unpacked_typed_dict_with_effective_tail_from_value_type(db, ty)
-    }
-}
-
-/// Selects whether unpack extraction includes only directly accessible extra items or the
-/// effective tail used by structural relations.
-#[derive(Clone, Copy)]
-enum UnpackedTypedDictTail {
-    /// Include only an explicit `extra_items` declaration.
-    Explicit,
-    /// Also treat an ordinary open `TypedDict` as having an `object` tail.
-    Effective,
-}
-
-/// Extracts and combines the `TypedDict` shapes contained in `ty`.
-///
-/// Intersections combine keys and tails with intersections; unions combine them with unions and
-/// only keep a key required if every union arm requires it.
-fn extract_unpacked_typed_dict_from_value_type_impl<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    tail: UnpackedTypedDictTail,
 ) -> Option<UnpackedTypedDict<'db>> {
     match ty {
         Type::TypedDict(td) => {
@@ -1690,24 +1711,21 @@ fn extract_unpacked_typed_dict_from_value_type_impl<'db>(
                     )
                 })
                 .collect();
-            let extra_items = match tail {
-                UnpackedTypedDictTail::Explicit => td.explicit_extra_items(db),
-                UnpackedTypedDictTail::Effective => td.effective_extra_items(db),
+            let tail = match td.openness(db) {
+                TypedDictOpenness::Open => UnpackedTypedDictTail::Hidden,
+                TypedDictOpenness::Closed => UnpackedTypedDictTail::Closed,
+                TypedDictOpenness::Extra(extra_items) => {
+                    UnpackedTypedDictTail::Explicit(extra_items.declared_ty)
+                }
             };
-            Some(UnpackedTypedDict {
-                keys,
-                extra_items_ty: extra_items.map(|extra| extra.declared_ty),
-                is_closed: td.openness(db).is_closed(),
-            })
+            Some(UnpackedTypedDict { keys, tail })
         }
         Type::Intersection(intersection) => {
             // Collect TypedDict shapes from all TypedDicts in the intersection.
             let unpacked_elements: Vec<_> = intersection
                 .positive(db)
                 .iter()
-                .filter_map(|element| {
-                    extract_unpacked_typed_dict_from_value_type_impl(db, *element, tail)
-                })
+                .filter_map(|element| extract_unpacked_typed_dict_from_value_type(db, *element))
                 .collect();
 
             if unpacked_elements.is_empty() {
@@ -1742,7 +1760,7 @@ fn extract_unpacked_typed_dict_from_value_type_impl<'db>(
                     if unpacked.keys.contains_key(key) {
                         continue;
                     }
-                    if let Some(extra_items_ty) = unpacked.extra_items_ty {
+                    if let Some(extra_items_ty) = unpacked.tail.value_ty() {
                         unpacked_key.value_ty = IntersectionType::from_two_elements(
                             db,
                             unpacked_key.value_ty,
@@ -1753,28 +1771,18 @@ fn extract_unpacked_typed_dict_from_value_type_impl<'db>(
                 }
             }
 
-            let is_closed = unpacked_elements.iter().any(|unpacked| unpacked.is_closed);
-            let extra_items_ty = if is_closed {
-                None
-            } else {
-                let extra_items: Vec<_> = unpacked_elements
-                    .iter()
-                    .filter_map(|unpacked| unpacked.extra_items_ty)
-                    .collect();
-                (!extra_items.is_empty()).then(|| IntersectionType::from_elements(db, extra_items))
-            };
+            let tail = UnpackedTypedDictTail::intersection(
+                db,
+                unpacked_elements.iter().map(|unpacked| unpacked.tail),
+            );
 
-            Some(UnpackedTypedDict {
-                keys: result,
-                extra_items_ty,
-                is_closed,
-            })
+            Some(UnpackedTypedDict { keys: result, tail })
         }
         Type::Union(union) => {
             let unpacked_elements: Vec<_> = union
                 .elements(db)
                 .iter()
-                .map(|element| extract_unpacked_typed_dict_from_value_type_impl(db, *element, tail))
+                .map(|element| extract_unpacked_typed_dict_from_value_type(db, *element))
                 .collect::<Option<_>>()?;
 
             let all_keys: OrderSet<Name> = unpacked_elements
@@ -1799,7 +1807,7 @@ fn extract_unpacked_typed_dict_from_value_type_impl<'db>(
                         } else {
                             unpacked_key.definition
                         });
-                    } else if let Some(extra_items_ty) = unpacked.extra_items_ty {
+                    } else if let Some(extra_items_ty) = unpacked.tail.value_ty() {
                         saw_key = true;
                         value_ty = value_ty.add(extra_items_ty);
                         is_required = false;
@@ -1822,23 +1830,15 @@ fn extract_unpacked_typed_dict_from_value_type_impl<'db>(
                 }
             }
 
-            let mut extra_items = UnionBuilder::new(db);
-            let mut has_extra_items = false;
-            for unpacked in &unpacked_elements {
-                if let Some(extra_items_ty) = unpacked.extra_items_ty {
-                    has_extra_items = true;
-                    extra_items = extra_items.add(extra_items_ty);
-                }
-            }
+            let tail = UnpackedTypedDictTail::union(
+                db,
+                unpacked_elements.iter().map(|unpacked| unpacked.tail),
+            );
 
-            Some(UnpackedTypedDict {
-                keys: result,
-                extra_items_ty: has_extra_items.then(|| extra_items.build()),
-                is_closed: unpacked_elements.iter().all(|unpacked| unpacked.is_closed),
-            })
+            Some(UnpackedTypedDict { keys: result, tail })
         }
         Type::TypeAlias(alias) => {
-            extract_unpacked_typed_dict_from_value_type_impl(db, alias.value_type(db), tail)
+            extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
         }
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
@@ -2160,17 +2160,25 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
 /// Validates the arbitrary-key tail of a `TypedDict`-shaped constructor argument.
 ///
 /// The source tail must be valid for every target field it could provide and for the target's
-/// explicit extra-items type. When validated, targets without explicit extra items reject such a
-/// tail.
-fn validate_extracted_typed_dict_extra_items<'db, 'ast>(
+/// explicit extra-items type. Hidden open tails retain ty's existing leniency when constructing
+/// another open `TypedDict`.
+fn validate_extracted_typed_dict_tail<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
     source_keys: &BTreeMap<Name, UnpackedTypedDictKey<'db>>,
-    extra_items_ty: Type<'db>,
+    tail: UnpackedTypedDictTail<'db>,
     nodes: TypedDictAssignmentNodes<'ast>,
     ignored_keys: &OrderSet<Name>,
 ) -> bool {
     let db = context.db();
+    let Some(extra_items_ty) = tail.value_ty() else {
+        return true;
+    };
+
+    if typed_dict.openness(db).is_open() && !tail.is_explicit() {
+        return true;
+    }
+
     let typed_dict_ty = Type::TypedDict(typed_dict);
 
     if let Some(target_extra_items) = typed_dict.explicit_extra_items(db) {
@@ -2248,7 +2256,8 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
 ) -> Option<OrderSet<Name>> {
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
-    let unpacked = extract_unpacked_typed_dict_for_constructor(db, typed_dict, arg_ty)?;
+    let unpacked = extract_unpacked_typed_dict_from_value_type(db, arg_ty)?;
+    let tail = unpacked.tail;
     let validate_extra_keys = !typed_dict.openness(db).is_open();
     let unpacked_keys = unpacked
         .keys
@@ -2270,16 +2279,14 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
         ignored_keys,
     )
     .0;
-    if let Some(extra_items_ty) = unpacked.extra_items_ty {
-        validate_extracted_typed_dict_extra_items(
-            context,
-            typed_dict,
-            &unpacked_keys,
-            extra_items_ty,
-            nodes,
-            ignored_keys,
-        );
-    }
+    validate_extracted_typed_dict_tail(
+        context,
+        typed_dict,
+        &unpacked_keys,
+        tail,
+        nodes,
+        ignored_keys,
+    );
 
     Some(provided_keys)
 }
@@ -2749,9 +2756,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             guaranteed_keys.entry(key_name.clone()).or_insert(None);
         }
         return true;
-    } else if let Some(unpacked) =
-        extract_unpacked_typed_dict_for_constructor(db, typed_dict, unpacked_type)
-    {
+    } else if let Some(unpacked) = extract_unpacked_typed_dict_from_value_type(db, unpacked_type) {
         let ignored_keys = shadowed_keys.clone();
         let (_, mut unpacked_valid) = validate_extracted_typed_dict_keys(
             context,
@@ -2761,16 +2766,14 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             full_object_ty_annotation(unpacked_type),
             &ignored_keys,
         );
-        if let Some(extra_items_ty) = unpacked.extra_items_ty {
-            unpacked_valid &= validate_extracted_typed_dict_extra_items(
-                context,
-                typed_dict,
-                &unpacked.keys,
-                extra_items_ty,
-                nodes,
-                &ignored_keys,
-            );
-        }
+        unpacked_valid &= validate_extracted_typed_dict_tail(
+            context,
+            typed_dict,
+            &unpacked.keys,
+            unpacked.tail,
+            nodes,
+            &ignored_keys,
+        );
 
         for (key_name, unpacked_key) in unpacked.keys {
             if unpacked_key.is_required && !ignored_keys.contains(&key_name) {
@@ -2800,11 +2803,11 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             return false;
         }
 
-        return validate_extracted_typed_dict_extra_items(
+        return validate_extracted_typed_dict_tail(
             context,
             typed_dict,
             &BTreeMap::new(),
-            value_ty,
+            UnpackedTypedDictTail::Explicit(value_ty),
             nodes,
             shadowed_keys,
         );

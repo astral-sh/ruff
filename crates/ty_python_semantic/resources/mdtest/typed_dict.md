@@ -6099,6 +6099,7 @@ class ExtraOnly(TypedDict, extra_items=int): ...
 
 def accepts_ints(name: str, **kwargs: int) -> None: ...
 def accepts_name(name: str) -> None: ...
+def accepts_optional_int_label(name: str, *, label: int = 0) -> None: ...
 def accepts_optional_label(*, label: str = "", **kwargs: int) -> None: ...
 def _(
     ints: IntSource,
@@ -6112,7 +6113,10 @@ def _(
 ) -> None:
     accepts_ints(**ints)
     accepts_ints(**strings)  # error: [invalid-argument-type]
+    accepts_ints(**open_source)  # error: [invalid-argument-type]
     accepts_name(**ints)  # error: [unknown-argument]
+    accepts_name(**open_source)
+    accepts_optional_int_label(**open_source)
     accepts_optional_label(**extra_only)  # error: [invalid-argument-type]
 
     OpenTarget(name="ok", **extra_only)  # error: [invalid-key]
