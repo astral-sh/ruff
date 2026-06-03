@@ -824,6 +824,12 @@ def constructor_inference_remains_gradual(flag: bool, name: str, value):
     accepts_float_keywords(**nested_kwargs[name])
     reveal_type(nested_kwargs)  # revealed: dict[Unknown, Unknown]
 
+    aliased_kwargs = dict()
+    aliased_kwargs["p"] = 1.23
+    forwarded_kwargs = aliased_kwargs
+    accepts_float_keywords(**forwarded_kwargs)
+    reveal_type(aliased_kwargs)  # revealed: dict[Unknown, Unknown]
+
     values = list()
     values.append(value)
     values.append("value")

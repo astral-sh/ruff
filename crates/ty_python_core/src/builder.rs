@@ -959,11 +959,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.use_def_maps[scope_id].reachability_constraints
     }
 
-    fn current_ast_ids(&self) -> &AstIdsBuilder {
-        let scope_id = self.current_scope();
-        &self.ast_ids[scope_id]
-    }
-
     fn current_ast_ids_mut(&mut self) -> &mut AstIdsBuilder {
         let scope_id = self.current_scope();
         &mut self.ast_ids[scope_id]
@@ -975,8 +970,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
-        let use_def = self.current_use_def_map();
-        let use_id = self.current_ast_ids().try_use_id(collection_use)?;
+        let use_scope = self.current_scope();
+        let use_def = &self.use_def_maps[use_scope];
+        let use_id = self.ast_ids[use_scope].try_use_id(collection_use)?;
 
         use_def
             .bindings_at_use(use_id)
@@ -991,6 +987,51 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         )
                     })
             })
+            // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
+            // cycle-related panics.
+            .exactly_one()
+            .ok()
+    }
+
+    fn unconstrained_collection_binding_following_aliases(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        let mut use_expression = collection_use;
+        let mut use_scope = self.current_scope();
+        let mut seen = FxHashSet::default();
+
+        loop {
+            let definition = self.binding_at_use(use_expression, use_scope)?;
+            if !seen.insert(definition) {
+                return None;
+            }
+
+            let assignment = definition.kind(self.db).as_unannotated_assignment()?;
+            let value = assignment.value(self.module);
+            if is_potentially_unconstrained_collection_initializer(value) {
+                return Some(definition);
+            }
+            if !value.is_name_expr() {
+                return None;
+            }
+
+            use_expression = value;
+            use_scope = definition.file_scope(self.db);
+        }
+    }
+
+    fn binding_at_use(
+        &self,
+        use_expression: &ast::Expr,
+        use_scope: FileScopeId,
+    ) -> Option<Definition<'db>> {
+        let use_def = &self.use_def_maps[use_scope];
+        let use_id = self.ast_ids[use_scope].try_use_id(use_expression)?;
+
+        use_def
+            .bindings_at_use(use_id)
+            .filter_map(|binding| use_def.definition(binding.binding()).definition())
             // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
             // cycle-related panics.
             .exactly_one()
@@ -3991,6 +4032,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
         if keyword.arg.is_some() {
             return;
+        }
+
+        if let Some(definition) =
+            self.unconstrained_collection_binding_following_aliases(&keyword.value)
+        {
+            self.keyword_splatted_collections.insert(definition);
         }
 
         if let Some(collection_use_start) = collection_use_start {
