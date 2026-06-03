@@ -69,50 +69,22 @@ reveal_type(f("a"))  # revealed: Literal["a"]
 
 ## Typevar inferred from a class-object intersection
 
-Dynamic elements in a class-object intersection cannot be projected into the type of instances
-constructed by the class object:
+General instance-type projection for class-object intersections is not yet supported. Inference
+continues to consider the elements separately:
 
 ```py
-from typing import Any, TypeVar
-from ty_extensions import Intersection, Unknown
+from ty_extensions import Intersection
 
 class A: ...
-class DynamicB: ...
-class DynamicC: ...
-
-TAny = TypeVar("TAny", bound=type[Any])
-TUnknown = TypeVar("TUnknown", bound=type[Unknown])
+class B: ...
 
 def make[T](cls: type[T]) -> T:
     raise NotImplementedError
 
-def identity_dynamic[T](cls: type[T]) -> type[T]:
-    return cls
-
-def takes_str(x: str): ...
-def takes_dynamic_c(x: DynamicC): ...
-def takes_type_dynamic_c(x: type[DynamicC]): ...
-def _(cls: Intersection[type[A], Any]):
-    reveal_type(make(cls))  # revealed: A | Any
-    takes_str(make(cls))  # error: [invalid-argument-type]
-
-def _(cls: Intersection[type[A], type[Any]]):
-    reveal_type(make(cls))  # revealed: A | Any
-    takes_str(make(cls))  # error: [invalid-argument-type]
-
-def _(cls: Intersection[type[A], type[Unknown]]):
-    reveal_type(make(cls))  # revealed: A | Unknown
-    takes_str(make(cls))  # error: [invalid-argument-type]
-
-def _(cls: Intersection[type[DynamicB], TAny]):
-    takes_dynamic_c(make(cls))  # error: [invalid-argument-type]
-    # error: 26 [invalid-argument-type]
-    takes_type_dynamic_c(identity_dynamic(cls))
-
-def _(cls: Intersection[type[DynamicB], TUnknown]):
-    takes_dynamic_c(make(cls))  # error: [invalid-argument-type]
-    # error: 26 [invalid-argument-type]
-    takes_type_dynamic_c(identity_dynamic(cls))
+def _(cls: Intersection[type[A], type[B]]):
+    # TODO: This could reveal `A & B` once general class-object intersection projection is
+    # supported. Receiver-specific projection is handled separately.
+    reveal_type(make(cls))  # revealed: A | B
 ```
 
 ## Methods can mention class typevars
