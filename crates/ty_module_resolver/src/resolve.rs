@@ -692,7 +692,7 @@ impl SearchPaths {
         }
     }
 
-    /// Registers the file roots for all non-dynamically discovered search paths that aren't first-party.
+    /// Registers file roots for all non-dynamically discovered search paths.
     pub fn try_register_static_roots(&self, db: &dyn Db) {
         let files = db.files();
         for path in self
@@ -702,8 +702,10 @@ impl SearchPaths {
             .chain(&self.stdlib_path)
         {
             if let Some(system_path) = path.as_system_path() {
-                if !path.is_first_party() {
-                    files.try_add_root(db, system_path, FileRootKind::LibrarySearchPath);
+                // Nested first-party paths reuse the project root. Other nested paths, such as
+                // site-packages inside `.venv`, need their own search-path root.
+                if !path.is_first_party() || files.root(db, system_path).is_none() {
+                    files.try_add_root(db, system_path, FileRootKind::SearchPath);
                 }
             }
         }
@@ -892,11 +894,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                         // than they would otherwise.
                         if let Some(dynamic_path) = search_path.as_system_path() {
                             if files.root(db, dynamic_path).is_none() {
-                                files.try_add_root(
-                                    db,
-                                    dynamic_path,
-                                    FileRootKind::LibrarySearchPath,
-                                );
+                                files.try_add_root(db, dynamic_path, FileRootKind::SearchPath);
                             }
                         }
 

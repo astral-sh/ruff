@@ -515,8 +515,7 @@ mod tests {
                 if let Some(top) = top {
                     let top = SystemPath::new(top);
                     if db.system().is_directory(top) {
-                        db.files()
-                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                        db.files().try_add_root(&db, top, FileRootKind::SearchPath);
                     }
                 }
 
@@ -656,7 +655,7 @@ mod tests {
             db.files()
                 .try_add_root(&db, &project_root, FileRootKind::Project);
             db.files()
-                .try_add_root(&db, &site_packages_path, FileRootKind::LibrarySearchPath);
+                .try_add_root(&db, &site_packages_path, FileRootKind::SearchPath);
 
             let mut cursor: Option<Cursor> = None;
             for &Source {
