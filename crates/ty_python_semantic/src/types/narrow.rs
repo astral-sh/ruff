@@ -34,46 +34,6 @@ use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
 
-/// Return the distinct non-negative integer values represented by an int-like literal union.
-///
-/// Boolean literals are int-like at runtime, so this collapses `Literal[1, True]` to one value.
-fn exact_len_alternatives<'db>(db: &'db dyn Db, ty: Type<'db>) -> SmallVec<[(i64, usize); 2]> {
-    fn collect<'db>(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        lengths: &mut SmallVec<[(i64, usize); 2]>,
-    ) -> bool {
-        match ty.resolve_type_alias(db) {
-            Type::Union(union) => {
-                for element in union.elements(db) {
-                    if !collect(db, *element, lengths) {
-                        return false;
-                    }
-                }
-            }
-            ty => {
-                let Some(literal) = ty.as_int_like_literal() else {
-                    return false;
-                };
-                let Ok(length) = usize::try_from(literal) else {
-                    return false;
-                };
-                if !lengths.iter().any(|(_, existing)| *existing == length) {
-                    lengths.push((literal, length));
-                }
-            }
-        }
-        true
-    }
-
-    let mut lengths = SmallVec::new();
-    if collect(db, ty, &mut lengths) {
-        lengths
-    } else {
-        SmallVec::new()
-    }
-}
-
 fn is_union_of_single_valued<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
     ty.as_union().is_some_and(|union| {
@@ -1074,77 +1034,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Narrow a type using an equality or inequality comparison against an exact length.
-    ///
-    /// The observed length is represented by an `ExactlySized` constraint.
-    fn narrow_type_by_exact_len(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        length: usize,
-        exactly_sized: Type<'db>,
-        constrain_with_equality: bool,
-    ) -> Type<'db> {
-        fn constrain<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            exactly_sized: Type<'db>,
-            constrain_with_equality: bool,
-        ) -> Type<'db> {
-            if constrain_with_equality {
-                IntersectionType::from_two_elements(db, ty, exactly_sized)
-            } else {
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_negative(exactly_sized)
-                    .build()
-            }
-        }
-
-        let resolved = ty.resolve_type_alias(db);
-        let narrowed = match resolved {
-            Type::Union(union) => UnionType::from_elements(
-                db,
-                union.elements(db).iter().map(|element| {
-                    Self::narrow_type_by_exact_len(
-                        db,
-                        *element,
-                        length,
-                        exactly_sized,
-                        constrain_with_equality,
-                    )
-                }),
-            ),
-            Type::Intersection(intersection) => intersection.map_positive(db, |element| {
-                Self::narrow_type_by_exact_len(
-                    db,
-                    *element,
-                    length,
-                    exactly_sized,
-                    constrain_with_equality,
-                )
-            }),
-            Type::LiteralValue(_) => match resolved.len(db).and_then(Type::as_int_literal) {
-                Some(actual_length) if usize::try_from(actual_length).ok() == Some(length) => {
-                    if constrain_with_equality {
-                        resolved
-                    } else {
-                        Type::Never
-                    }
-                }
-                Some(_) => {
-                    if constrain_with_equality {
-                        Type::Never
-                    } else {
-                        resolved
-                    }
-                }
-                None => resolved,
-            },
-            ty => constrain(db, ty, exactly_sized, constrain_with_equality),
-        };
-        if narrowed == resolved { ty } else { narrowed }
-    }
-
     fn evaluate_simple_expr(
         &mut self,
         expr: &ast::Expr,
@@ -1597,48 +1486,37 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let [arg] = &*call.arguments.args else {
                     return;
                 };
-                let lengths = exact_len_alternatives(self.db, length_type);
-                if lengths.is_empty() || (!constrain_with_equality && lengths.len() > 1) {
+                let Some(length_literal) = length_type
+                    .resolve_type_alias(self.db)
+                    .as_int_like_literal()
+                else {
+                    return;
+                };
+                if length_literal < 0 {
                     return;
                 }
                 let Some(target) = PlaceExpr::try_from_expr(arg) else {
                     return;
                 };
 
-                let narrow_to_length = |(length_literal, length)| {
-                    let protocol_length = match length_literal {
-                        0 => UnionType::from_two_elements(
-                            self.db,
-                            Type::int_literal(0),
-                            Type::bool_literal(false),
-                        ),
-                        1 => UnionType::from_two_elements(
-                            self.db,
-                            Type::int_literal(1),
-                            Type::bool_literal(true),
-                        ),
-                        _ => Type::int_literal(length_literal),
-                    };
-                    let exactly_sized = KnownClass::ExactlySized
-                        .to_specialized_instance(self.db, &[protocol_length]);
-                    Self::narrow_type_by_exact_len(
+                let protocol_length = match length_literal {
+                    0 => UnionType::from_two_elements(
                         self.db,
-                        inference.expression_type(arg),
-                        length,
-                        exactly_sized,
-                        constrain_with_equality,
-                    )
+                        Type::int_literal(0),
+                        Type::bool_literal(false),
+                    ),
+                    1 => UnionType::from_two_elements(
+                        self.db,
+                        Type::int_literal(1),
+                        Type::bool_literal(true),
+                    ),
+                    _ => Type::int_literal(length_literal),
                 };
-                let arg_type = inference.expression_type(arg);
-                let narrowed = if lengths.len() == 1 {
-                    narrow_to_length(lengths[0])
-                } else {
-                    UnionType::from_elements(self.db, lengths.into_iter().map(narrow_to_length))
-                };
-                if narrowed == arg_type {
-                    return;
-                }
-                let constraint = NarrowingConstraint::intersection(narrowed);
+                let exactly_sized =
+                    KnownClass::ExactlySized.to_specialized_instance(self.db, &[protocol_length]);
+                let constraint = NarrowingConstraint::intersection(
+                    exactly_sized.negate_if(self.db, !constrain_with_equality),
+                );
                 constraints
                     .entry(self.expect_place(&target))
                     .and_modify(|existing| {

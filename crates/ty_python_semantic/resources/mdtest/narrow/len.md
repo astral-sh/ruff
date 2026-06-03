@@ -117,45 +117,6 @@ def _(val: tuple[int, ...]):
         reveal_type(val)  # revealed: tuple[int, ...] & ExactlySized[Literal[65]]
 ```
 
-Finite literal unions can also narrow exact tuple lengths. A failed comparison against distinct
-literal lengths cannot narrow the tuple, because the runtime value of the comparator is unknown:
-
-```py
-from typing import Literal
-
-def _(val: tuple[int] | tuple[str, str, str], n: Literal[1, 2]):
-    if len(val) == n:
-        reveal_type(val)  # revealed: tuple[int]
-    else:
-        reveal_type(val)  # revealed: tuple[int] | tuple[str, str, str]
-
-def _(val: tuple[int] | tuple[str, str], n: Literal[1, True]):
-    if len(val) == n:
-        reveal_type(val)  # revealed: tuple[int]
-    else:
-        reveal_type(val)  # revealed: tuple[str, str]
-```
-
-Literal string and bytes values can be filtered directly because their lengths are known:
-
-```py
-from typing import Literal
-
-def _(value: Literal["a", "bb", "ccc"]):
-    if len(value) == 2:
-        reveal_type(value)  # revealed: Literal["bb"]
-        exact: Literal["bb"] = value
-    else:
-        reveal_type(value)  # revealed: Literal["a", "ccc"]
-
-def _(value: Literal[b"a", b"bb", b"ccc"]):
-    if len(value) == 2:
-        reveal_type(value)  # revealed: Literal[b"bb"]
-        exact: Literal[b"bb"] = value
-    else:
-        reveal_type(value)  # revealed: Literal[b"a", b"ccc"]
-```
-
 Exact length comparisons intersect arbitrary `Sized` values with `ExactlySized`. This persists the
 observed length even for mutable or stateful values, consistent with other forms of narrowing:
 
