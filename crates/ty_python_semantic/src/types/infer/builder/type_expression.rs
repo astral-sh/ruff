@@ -5,9 +5,9 @@ use ruff_text_size::Ranged;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
-    report_invalid_concatenate_last_arg,
+    self, INVALID_TYPE_FORM, MISSING_TYPE_ARGUMENT, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
+    UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -112,6 +112,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             return ty;
         }
+        self.check_for_missing_type_arguments(ty, annotation);
         let result_ty = ty
             .default_specialize(self.db())
             .in_type_expression(
@@ -2853,6 +2854,45 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     report_invalid_concatenate_last_arg(&self.context, expr, ty);
                 }
                 None
+            }
+        }
+    }
+
+    fn check_for_missing_type_arguments(&self, ty: Type<'db>, annotation: &ast::Expr) {
+        let Type::ClassLiteral(class) = ty else {
+            return;
+        };
+        let db = self.db();
+
+        let Some(generic_context) = class.generic_context(db) else {
+            return;
+        };
+
+        // Don't warn if all type parameters have defaults (PEP 696).
+        if generic_context
+            .variables(db)
+            .all(|tv| tv.default_type(db).is_some())
+        {
+            return;
+        }
+
+        let required_count = generic_context
+            .variables(db)
+            .filter(|tv| tv.default_type(db).is_none())
+            .count();
+
+        if let Some(builder) = self.context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+            let class_name = class.name(db);
+            if required_count == 1 {
+                builder.into_diagnostic(format_args!(
+                    "Missing type parameter for generic class `{class_name}` \
+                     (expected 1 type argument)"
+                ));
+            } else {
+                builder.into_diagnostic(format_args!(
+                    "Missing type parameters for generic class `{class_name}` \
+                     (expected {required_count} type arguments)"
+                ));
             }
         }
     }

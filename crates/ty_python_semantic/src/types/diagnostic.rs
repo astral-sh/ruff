@@ -116,6 +116,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
     registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
@@ -2025,6 +2026,35 @@ declare_lint! {
         summary: "detects missing required arguments in a call",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for generic types used without type parameters in type annotations.
+    ///
+    /// ## Why is this bad?
+    /// Using a generic type without specifying its type parameters results in the
+    /// type parameters being implicitly filled with `Unknown`, reducing the
+    /// precision of type checking. Explicit type parameters make the intended types
+    /// clear and enable the type checker to catch more errors.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// import re
+    ///
+    /// def handle(m: re.Match) -> str:  # error: [missing-type-argument]
+    ///     return m.string
+    ///
+    /// # Use explicit type parameters instead:
+    /// def handle(m: re.Match[str]) -> str:
+    ///     return m.string
+    /// ```
+    pub(crate) static MISSING_TYPE_ARGUMENT = {
+        summary: "detects generic types used without explicit type parameters in annotations",
+        status: LintStatus::stable("0.0.42"),
+        default_level: Level::Ignore,
     }
 }
 

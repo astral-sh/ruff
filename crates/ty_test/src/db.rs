@@ -247,12 +247,16 @@ fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
     // are ignored by default in mdtests so that their behaviour is covered alongside the default
     // rules.
     //
-    // `missing-override-decorator` is an exception: because it is extremely pedantic we have chosen
-    // to keep it opt-in to minimize churn in unrelated tests.
+    // `missing-override-decorator` and `missing-type-argument` are exceptions: because they are
+    // extremely pedantic we have chosen to keep them opt-in to minimize churn in unrelated tests.
     let missing_override_decorator = registry
         .get("missing-override-decorator")
         .expect("missing-override-decorator is a known lint rule");
     selection.disable(missing_override_decorator);
+    let missing_type_argument = registry
+        .get("missing-type-argument")
+        .expect("missing-type-argument is a known lint rule");
+    selection.disable(missing_type_argument);
 
     if let Some(rules) = rules {
         let set_lint_level =
