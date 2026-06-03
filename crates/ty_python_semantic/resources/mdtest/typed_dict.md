@@ -6201,8 +6201,8 @@ static_assert(not is_assignable_to(SourceWithStrExtra, Target))
 
 ### Disjointness accounts for openness
 
-A required item on one side can conflict with the other side's closed or extra-items policy.
-An optional mutable item can also conflict with a mutable extra-items policy.
+A required item on one side can conflict with the other side's closed or extra-items policy. An
+optional mutable item can also conflict with a mutable extra-items policy.
 
 ```py
 from typing_extensions import NotRequired, ReadOnly, TypedDict
