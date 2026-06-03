@@ -80,8 +80,17 @@ impl<'db> SemanticModel<'db> {
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
         let mut members = FxHashMap::default();
+        let index = semantic_index(self.db, self.file);
+        let Some(file_scope) = self.scope(node) else {
+            return members;
+        };
 
-        for (file_scope, _) in self.ancestor_scopes(node) {
+        for (file_scope, _) in index
+            .visible_ancestor_scopes(file_scope)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
             for memberdef in
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file))
             {
