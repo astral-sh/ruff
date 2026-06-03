@@ -2084,7 +2084,7 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
     let unpacked = extract_unpacked_typed_dict_with_effective_tail_from_value_type(db, arg_ty)?;
-    let validate_extra_keys = typed_dict.explicit_extra_items(db).is_some();
+    let validate_extra_keys = !typed_dict.openness(db).is_open();
     let unpacked_keys = unpacked
         .keys
         .into_iter()

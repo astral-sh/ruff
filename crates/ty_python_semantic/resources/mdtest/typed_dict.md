@@ -6096,9 +6096,16 @@ class GoodSource(TypedDict, extra_items=int):
 class BadSource(TypedDict, extra_items=int):
     source_only: str
 
-def _(good: GoodSource, bad: BadSource) -> None:
+class ClosedTarget(TypedDict, closed=True):
+    keyword: int
+
+class ClosedSource(TypedDict, closed=True):
+    source_only: str
+
+def _(good: GoodSource, bad: BadSource, closed: ClosedSource) -> None:
     Target(good, keyword=1)
     Target(bad, keyword=1)  # error: [invalid-argument-type]
+    ClosedTarget(closed, keyword=1)  # error: [invalid-key]
 
     # An explicit keyword shadows the source key.
     Target(bad, source_only=1)
