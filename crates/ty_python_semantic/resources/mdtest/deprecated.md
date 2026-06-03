@@ -88,6 +88,9 @@ static_assert(is_equivalent_to(TypeOf[deprecated_binding], TypeOf[replacement]))
 static_assert(is_subtype_of(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
 static_assert(is_assignable_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
 
+if deprecated_binding is not replacement:  # error: [deprecated] "use replacement directly"
+    deprecated_binding()
+
 flag = bool(input())
 if flag:
     @deprecated("use replacement directly")

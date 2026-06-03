@@ -9025,6 +9025,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding_deprecation = if file_scope_id.is_global()
             && place_expr.as_symbol().is_some()
             && local_scope_place.is_definitely_bound()
+            && local_scope_place
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| !ty.is_never())
             && let Some(use_id) = use_id
         {
             let mut bindings = use_def.bindings_at_use(use_id);
