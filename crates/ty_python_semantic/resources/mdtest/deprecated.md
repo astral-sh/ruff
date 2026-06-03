@@ -69,6 +69,9 @@ def replace_with_one_of(first: F, second: G) -> Callable[[Callable[..., Any]], F
         return first
     return decorator
 
+def replace_with_object(_: Callable[..., Any]) -> object:
+    return object()
+
 @deprecated("use replacement directly")
 @replace_with(replacement)
 def deprecated_binding() -> None: ...
@@ -78,11 +81,15 @@ def replaced_deprecated_function() -> None: ...
 @deprecated("use replacement or other directly")
 @replace_with_one_of(replacement, other)
 def deprecated_union_binding() -> None: ...
+@deprecated("this object is not callable")
+@replace_with_object
+def deprecated_object_binding() -> None: ...
 
 deprecated_binding()  # error: [deprecated] "use replacement directly"
 replacement()
 replaced_deprecated_function()
 deprecated_union_binding  # error: [deprecated] "use replacement or other directly"
+deprecated_object_binding
 
 static_assert(is_equivalent_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
 static_assert(is_subtype_of(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]

@@ -456,6 +456,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .contains(FunctionDecorators::OVERLOAD)
             && definition.file_scope(db).is_global()
             && inferred_ty != function_ty
+            && inferred_ty.try_upcast_to_callable(db).is_some()
         {
             decorator_list.first().and_then(|decorator| {
                 let decorator_ty = decorator_inference
