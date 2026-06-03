@@ -3,10 +3,11 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        ApplyTypeMappingVisitor, GenericContext, Type, TypeContext, TypeMapping,
-        definition_expression_type,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
+        TypeMapping, TypeVarVariance, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
+        variance::VarianceInferable,
         visitor,
     },
 };
@@ -300,6 +301,17 @@ impl<'db> TypeAliasType<'db> {
     /// Returns a struct that can display the fully qualified name of this type alias.
     pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
         QualifiedTypeAliasName::from_type_alias(db, self)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
+    #[salsa::tracked(
+        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.value_type(db).variance_of(db, typevar)
     }
 }
 
