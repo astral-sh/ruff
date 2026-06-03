@@ -270,7 +270,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The list should only contain one entry per binding at most.
     bindings: VecMap<Definition<'db>, Type<'db>>,
 
-    /// The types and type qualifiers of every declaration in this region.
+    /// The types and type qualifiers of every valid declaration in this region.
     ///
     /// The list should only contain one entry per declaration at most.
     declarations: VecMap<Definition<'db>, TypeAndQualifiers<'db>>,
@@ -1267,40 +1267,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers,
         } = place_and_quals;
 
-        // If the place is unbound and its an attribute or subscript place, fall back to normal
-        // attribute/subscript inference on the root type.
-        let declared_ty =
-            if resolved_place.is_undefined() && !place_table.place(place_id).is_symbol() {
-                if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-                    let value_type =
-                        self.infer_maybe_standalone_expression(value, TypeContext::default());
-                    if let Place::Defined(DefinedPlace {
-                        ty,
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    }) = value_type.member(db, attr).place
-                    {
-                        // TODO: also consider qualifiers on the attribute
-                        Some(ty)
-                    } else {
-                        None
-                    }
-                } else if let AnyNodeRef::ExprSubscript(
-                    subscript @ ast::ExprSubscript {
-                        value, slice, ctx, ..
-                    },
-                ) = node
-                {
-                    let value_ty = self.infer_expression(value, TypeContext::default());
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-            .or_else(|| resolved_place.ignore_possibly_undefined());
+        let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
+            self.fallback_member_declared_type(node)
+        } else {
+            None
+        }
+        .or_else(|| resolved_place.ignore_possibly_undefined());
 
         AddBinding {
             declared_ty,
@@ -1308,6 +1280,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node,
             qualifiers,
             is_local,
+        }
+    }
+
+    /// For a member binding without a live place declaration, obtain its declared type from
+    /// normal attribute or subscript lookup on its receiver.
+    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+        let db = self.db();
+
+        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+            let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
+            if let Place::Defined(DefinedPlace {
+                ty,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) = value_type.member(db, attr).place
+            {
+                // TODO: also consider qualifiers on the attribute
+                Some(ty)
+            } else {
+                None
+            }
+        } else if let AnyNodeRef::ExprSubscript(
+            subscript @ ast::ExprSubscript {
+                value, slice, ctx, ..
+            },
+        ) = node
+        {
+            let value_ty = self.infer_expression(value, TypeContext::default());
+            let slice_ty = self.infer_expression(slice, TypeContext::default());
+            Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
+        } else {
+            None
         }
     }
 
@@ -3566,6 +3570,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         add.insert(self, target_ty);
     }
 
+    fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
+        if self.in_stub() && value.is_ellipsis_literal_expr() {
+            Some(Type::unknown())
+        } else {
+            None
+        }
+    }
+
     fn infer_assignment_definition_impl(
         &mut self,
         assignment: &AssignmentDefinitionKind<'db>,
@@ -3690,10 +3702,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
                     Type::bool_literal(true)
-                } else if self.in_stub() && value.is_ellipsis_literal_expr() {
-                    Type::unknown()
                 } else {
-                    value_ty
+                    self.stub_placeholder_binding_type(value)
+                        .unwrap_or(value_ty)
                 }
             }
         };
@@ -4153,6 +4164,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.typevar_binding_context = previous_context;
     }
 
+    fn is_valid_receiver_annotation_target(&self, target: &ast::Expr) -> bool {
+        target
+            .as_attribute_expr()
+            .is_some_and(|target| self.is_receiver_attribute_annotation_target(target))
+    }
+
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
         if assignment.target.is_name_expr() {
             self.infer_definition(assignment);
@@ -4234,10 +4251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Disallow annotations on non-name targets unless they are valid receivers (e.g.
             // `self.x: int` or `cls.x: int`).
-            let is_receiver_attribute = target
-                .as_attribute_expr()
-                .is_some_and(|target| self.is_receiver_attribute_annotation_target(target));
-            if !is_receiver_attribute {
+            if !self.is_valid_receiver_annotation_target(target) {
                 let message = match target.as_ref() {
                     ast::Expr::Attribute(_) => {
                         "Type annotations are not allowed on this attribute expression"
@@ -4348,10 +4362,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let annotation = assignment.annotation(self.module());
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
+        if !target.is_name_expr() && !self.is_valid_receiver_annotation_target(target) {
+            // Omit this definition from `self.declarations`; declaration lookup treats an absent
+            // inferred declaration as rejected.
+            if !definition
+                .kind(self.db())
+                .category(self.in_stub(), self.module())
+                .is_binding()
+            {
+                return;
+            }
+
+            let node = target.into();
+            let add = AddBinding {
+                declared_ty: self.fallback_member_declared_type(node),
+                binding: definition,
+                node,
+                qualifiers: TypeQualifiers::empty(),
+                is_local: true,
+            };
+            let target_ty = if let Some(value) = value {
+                // Infer the value as an ordinary assignment without using the rejected annotation
+                // as its declared type.
+                let value_ty = self.infer_maybe_standalone_expression(value, add.type_context());
+                self.stub_placeholder_binding_type(value)
+                    .unwrap_or(value_ty)
+            } else {
+                // Annotation-only definitions are bindings in stubs.
+                add.declared_ty.unwrap_or(Type::unknown())
+            };
+            self.store_expression_type(target, target_ty);
+            add.insert(self, target_ty);
+
+            return;
+        }
+
+        let annotation = assignment.annotation(self.module());
         let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),

@@ -17,7 +17,8 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+    CycleDetector, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
+    inferred_declaration,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
@@ -466,7 +467,10 @@ impl<'db> SemanticModel<'db> {
                 {
                     return TypeQualifiers::empty();
                 }
-                declaration_type(self.db, definition).qualifiers()
+                let Some(declared) = inferred_declaration(self.db, definition).declared() else {
+                    return TypeQualifiers::empty();
+                };
+                declared.qualifiers()
             }
             ExprRef::Attribute(attr) => {
                 let Some(value_ty) = attr.value.inferred_type(self) else {

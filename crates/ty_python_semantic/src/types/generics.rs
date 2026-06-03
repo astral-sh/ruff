@@ -32,8 +32,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
-    infer_definition_types,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
+    infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -523,8 +523,9 @@ impl<'db> GenericContext<'db> {
         match type_param_node {
             ast::TypeParam::TypeVar(node) => {
                 let definition = index.expect_single_definition(node);
+                let declared = inferred_declaration(db, definition).declared()?;
                 let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declaration_type(db, definition).inner_type()
+                    declared.inner_type()
                 else {
                     return None;
                 };
@@ -532,8 +533,9 @@ impl<'db> GenericContext<'db> {
             }
             ast::TypeParam::ParamSpec(node) => {
                 let definition = index.expect_single_definition(node);
+                let declared = inferred_declaration(db, definition).declared()?;
                 let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declaration_type(db, definition).inner_type()
+                    declared.inner_type()
                 else {
                     return None;
                 };

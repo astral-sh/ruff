@@ -843,6 +843,27 @@ impl<'db> ScopeInference<'db> {
     }
 }
 
+/// The result of inferring a declaration recorded by the semantic index.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum InferredDeclaration<'db> {
+    /// A valid declaration with an inferred declared type.
+    Declared(TypeAndQualifiers<'db>),
+    /// An invalid declaration that should not participate in declaration resolution.
+    ///
+    /// For example, `obj.attr: int` when `obj` is not a valid implicit receiver, or
+    /// `items[0]: int`, which is never a valid annotation target.
+    Rejected,
+}
+
+impl<'db> InferredDeclaration<'db> {
+    pub(crate) fn declared(self) -> Option<TypeAndQualifiers<'db>> {
+        match self {
+            InferredDeclaration::Declared(declared) => Some(declared),
+            InferredDeclaration::Rejected => None,
+        }
+    }
+}
+
 /// The inferred types for a definition region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionInference<'db> {
@@ -859,7 +880,7 @@ pub(crate) struct DefinitionInference<'db> {
     /// Because of that, use a slice with linear search over a hash map.
     pub(crate) bindings: Box<[(Definition<'db>, Type<'db>)]>,
 
-    /// The types and type qualifiers of every declaration in this region.
+    /// The types and type qualifiers of every valid declaration in this region.
     ///
     /// About 50% of the definition inference regions have no declarations.
     /// The other 50% have less than 10 declarations. Because of that, use a
@@ -1055,22 +1076,25 @@ impl<'db> DefinitionInference<'db> {
         self.bindings.iter().copied()
     }
 
-    #[track_caller]
-    pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
+    pub(crate) fn inferred_declaration(
+        &self,
+        definition: Definition<'db>,
+    ) -> InferredDeclaration<'db> {
         self.declarations
             .iter()
-            .find_map(|(def, qualifiers)| {
+            .find_map(|(def, declaration)| {
                 if def == &definition {
-                    Some(*qualifiers)
+                    Some(InferredDeclaration::Declared(*declaration))
                 } else {
                     None
                 }
             })
-            .or_else(|| self.fallback_type().map(TypeAndQualifiers::declared))
-            .expect(
-                "definition should belong to this TypeInference region and \
-                TypeInferenceBuilder should have inferred a type for it",
-            )
+            .or_else(|| {
+                self.fallback_type()
+                    .map(TypeAndQualifiers::declared)
+                    .map(InferredDeclaration::Declared)
+            })
+            .unwrap_or(InferredDeclaration::Rejected)
     }
 
     fn declarations(
@@ -1098,9 +1122,15 @@ impl<'db> DefinitionInference<'db> {
     }
 
     pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {
-        self.undecorated_type()
-            .unwrap_or_else(|| self.declaration_type(definition).inner_type())
-            .as_function_literal()
+        let ty = if let Some(undecorated) = self.undecorated_type() {
+            undecorated
+        } else {
+            self.inferred_declaration(definition)
+                .declared()?
+                .inner_type()
+        };
+
+        ty.as_function_literal()
     }
 }
 

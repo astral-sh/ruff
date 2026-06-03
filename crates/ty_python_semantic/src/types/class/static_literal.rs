@@ -32,7 +32,7 @@ use crate::{
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
-        declaration_type, definition_expression_type, determine_upper_bound,
+        definition_expression_type, determine_upper_bound,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{
@@ -41,7 +41,7 @@ use crate::{
         },
         generics::Specialization,
         infer::infer_unpack_types,
-        infer_expression_type,
+        infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
@@ -2185,7 +2185,9 @@ impl<'db> StaticClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                let annotation = declaration_type(db, declaration);
+                let Some(annotation) = inferred_declaration(db, declaration).declared() else {
+                    continue;
+                };
                 let annotation = Place::declared(annotation.inner).with_qualifiers(
                     annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
                 );

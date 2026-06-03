@@ -155,6 +155,7 @@ Narrowing is also performed for dictionary unpacking expressions:
 def f1(a: int): ...
 def f2(a: int, b: str): ...
 def f3(a: int, b: str, c: float): ...
+def accepts_inner(inner: dict[str, int]): ...
 
 x1: dict[str, float | str] = {"a": 1, "b": "a"}
 
@@ -216,10 +217,22 @@ def _(x: dict[str, object]):
     # error: [invalid-argument-type]
     f3(**x["inner"])
 
+    # The rejected annotation does not widen the assigned dictionary's value type.
+    # error: [invalid-assignment]
     x["inner"]["c"] = 1.0
-    f3(**x["inner"])  # ok
 
     x["inner"] = {"inner": {"a": 1}}
+    accepts_inner(**x["inner"])  # ok
+    # error: [invalid-argument-type]
+    f1(**x["inner"])
+
+def _(x: dict[str, object]):
+    # An annotation-only subscript likewise cannot declare the nested dictionary's type.
+    # error: [invalid-type-form]
+    x["inner"]: dict[str, float | str]
+
+    x["inner"] = {"inner": {"a": 1}}
+    accepts_inner(**x["inner"])  # ok
     # error: [invalid-argument-type]
     f1(**x["inner"])
 
@@ -289,6 +302,15 @@ class Y:
     inner: dict[str, object]
 
 def _(y: Y):
+    # error: [invalid-type-form]
+    y.inner: dict[str, float | str] = {"a": 1, "b": "a"}
+
+    y.inner = {"inner": {"a": 1}}
+    accepts_inner(**y.inner)  # ok
+    # error: [invalid-argument-type]
+    f1(**y.inner)
+
+def _(y: Y):
     y.inner = {"a": 1, "b": "a"}
 
     f2(**y.inner)  # ok
@@ -302,4 +324,25 @@ def _(y: Y):
     y.inner = {"inner": {"a": 1}}
     # error: [invalid-argument-type]
     f1(**y.inner)
+```
+
+## Rejected annotations in stubs
+
+Annotation-only declarations in stubs are also bindings. A rejected annotation should fall back to
+the type obtained by normal member lookup:
+
+`stub.pyi`:
+
+```pyi
+x: dict[str, object]
+# error: [invalid-type-form]
+x["a"]: int
+reveal_type(x["a"])  # revealed: object
+
+x["b"] = ...
+reveal_type(x["b"])  # revealed: Unknown
+
+# error: [invalid-type-form]
+x["c"]: int = ...
+reveal_type(x["c"])  # revealed: Unknown
 ```
