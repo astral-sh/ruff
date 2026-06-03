@@ -78,6 +78,28 @@ def f3(x: UnionAB3) -> None:
         reveal_type(y)  # revealed: A | B
 ```
 
+## Intersection receivers preserve context manager `Self`
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class Context:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+class Extra:
+    extra: int
+
+def _(value: Intersection[Context, Extra]):
+    reveal_type(value.__enter__())  # revealed: Context & Extra
+    with value as entered:
+        reveal_type(entered)  # revealed: Context & Extra
+        reveal_type(entered.extra)  # revealed: int
+```
+
 ## Context manager without an `__enter__` or `__exit__` method
 
 ```py

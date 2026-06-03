@@ -6848,7 +6848,8 @@ impl<'db> Type<'db> {
 }
 
 impl<'db> IntersectionType<'db> {
-    // Calls the dunder on each element separately and combines the results.
+    // Looks up the dunder on each element separately, binds it to the full intersection receiver,
+    // and combines the results.
     // This avoids intersecting bound methods (which often collapses to Never)
     // and instead intersects the return types.
     //
@@ -6871,11 +6872,19 @@ impl<'db> IntersectionType<'db> {
         // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
         // `__iter__`, `__enter__`, `__bool__`).
         let positive = self.positive(db);
+        let receiver = Some(Type::Intersection(self));
         let mut successful_bindings = Vec::with_capacity(positive.len());
         let mut last_error = None;
 
         for element in positive {
-            match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
+            match element.try_call_dunder_with_policy_and_receiver(
+                db,
+                receiver,
+                name,
+                argument_types,
+                tcx,
+                policy,
+            ) {
                 Ok(bindings) => successful_bindings.push(bindings),
                 Err(err) => last_error = Some(err),
             }
