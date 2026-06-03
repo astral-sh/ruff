@@ -35,6 +35,7 @@ use crate::types::typed_dict::{
     extract_unpacked_typed_dict_keys_from_value_type,
 };
 use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::visitor::find_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
@@ -927,12 +928,20 @@ impl<'db> Signature<'db> {
             generic_context
                 .variables(db)
                 .find(|typevar| typevar.typevar(db).is_self(db))
+                .or_else(|| {
+                    generic_context.variables(db).find_map(|typevar| {
+                        find_over_type(db, typevar.default_type(db)?, false, |ty| {
+                            ty.as_typevar()
+                                .filter(|typevar| typevar.typevar(db).is_self(db))
+                        })
+                    })
+                })
         })
     }
 
     fn self_binding_context(&self, db: &'db dyn Db) -> Option<BindingContext<'db>> {
         // Callable-returning decorators can erase the source definition while retaining the
-        // method's `Self` in the callable's generic context.
+        // method's `Self` in the callable's generic context or a generic default.
         self.definition.map(BindingContext::Definition).or_else(|| {
             self.self_typevar(db)
                 .map(|typevar| typevar.binding_context(db))

@@ -444,11 +444,19 @@ class Value:
     def copy(self) -> Self:
         return self
 
-class Extra: ...
+    @property
+    @identity
+    def choice[T = Self](self) -> T:
+        raise NotImplementedError
+
+class Extra:
+    extra: int
 
 def _(value: Intersection[Value, Extra]):
     reveal_type(value.copy())  # revealed: Value & Extra
     value.copy().missing  # error: [unresolved-attribute]
+    reveal_type(value.choice)  # revealed: Value & Extra
+    reveal_type(value.choice.extra)  # revealed: int
 ```
 
 ## typing_extensions
