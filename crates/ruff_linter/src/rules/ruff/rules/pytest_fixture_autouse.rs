@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 /// make test suites slower, and make debugging difficult.
 ///
 /// Instead, prefer to explicitly request/inject fixtures in tests, test classes,
-/// or other fixtures (by declaring them in the function parameters) that need them.
+/// or other fixtures that need them by declaring them in the function parameters.
 ///
 /// ## Example
 /// ```python
