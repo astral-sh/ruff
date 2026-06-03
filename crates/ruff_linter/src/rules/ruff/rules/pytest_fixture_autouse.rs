@@ -103,7 +103,7 @@ use crate::checkers::ast::Checker;
 /// - [`pytest` documentation: Sharing fixtures across classes, modules, packages or session](https://docs.pytest.org/en/stable/how-to/fixtures.html#scope-sharing-fixtures-across-classes-modules-packages-or-session)
 /// - [`pytest` documentation: Fixtures can request other fixtures](https://docs.pytest.org/en/stable/how-to/fixtures.html#fixtures-can-request-other-fixtures)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.16")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct PytestFixtureAutouse;
 
 impl Violation for PytestFixtureAutouse {
