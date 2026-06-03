@@ -100,6 +100,25 @@ methods, even though it is not available on `types.MethodType`:
 reveal_type(bound_method.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
+Narrowing a bound method must not change the receiver used when looking up attributes on the
+underlying function object:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class ReturnsStr(Protocol):
+    def __call__(self, x: str) -> str: ...
+
+def takes_str(x: str): ...
+def narrowed_bound_method_attribute():
+    method = C().f
+    if isinstance(method, ReturnsStr):
+        reveal_type(method)  # revealed: (bound method C.f(x: int) -> str) & ReturnsStr
+        reveal_type(method.__globals__)  # revealed: dict[str, Any]
+        takes_str(method.__globals__)  # error: [invalid-argument-type]
+```
+
 ## Basic method calls on class objects and instances
 
 ```py

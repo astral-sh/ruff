@@ -3516,7 +3516,7 @@ impl<'db> Type<'db> {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
                             Type::FunctionLiteral(bound_method.function(db))
-                                .member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                                .member_lookup_with_policy(db, name, policy)
                         })
                 }
             },
