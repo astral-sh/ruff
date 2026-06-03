@@ -383,7 +383,7 @@ ConcreteOwner().inspect(Both)
 ## Intersection receivers bind `Self` before inferring arguments
 
 ```py
-from typing import Self, TypeVar
+from typing import Self, TypeVar, cast
 from ty_extensions import Intersection
 
 class Value:
@@ -476,6 +476,19 @@ def _(
     reveal_type(value.choose())  # revealed: GenericDefaults & Extra
     reveal_type(cls.choose_class())  # revealed: GenericDefaults & Extra
     reveal_type(value.choice)  # revealed: GenericDefaults & Extra
+
+class ForeignDefaultOwner:
+    def choose[T = Self](self) -> T:
+        return cast(T, ForeignDefaultOwner())
+
+class ForeignDefaultAlias:
+    choose = ForeignDefaultOwner.choose
+
+class ForeignDefaultExtra: ...
+
+def takes_foreign_default_intersection(value: Intersection[ForeignDefaultAlias, ForeignDefaultExtra]): ...
+def _(value: Intersection[ForeignDefaultAlias, ForeignDefaultExtra]):
+    takes_foreign_default_intersection(value.choose())  # error: [invalid-argument-type]
 ```
 
 ## Callable-returning decorators preserve `Self` on intersections

@@ -7414,13 +7414,42 @@ impl<'db> SelfBinding<'db> {
             return false;
         }
 
-        // Fast path for the common method-signature case where the bound `Self`
-        // carries the same binding context as this mapping.
-        if self.binding_context == Some(bound_typevar.binding_context(db)) {
-            return true;
-        }
-
         let owner_class = self_typevar_owner_class_literal(db, bound_typevar);
+        let intersection_inherits_from_owner = |owner_class| {
+            let Type::Intersection(intersection) = self.ty else {
+                return false;
+            };
+            intersection.positive(db).iter().any(|positive| {
+                type_inherits_from_owner(db, *positive, owner_class)
+                    || match positive {
+                        Type::TypeVar(typevar) => typevar
+                            .typevar(db)
+                            .bound_or_constraints(db)
+                            .is_some_and(|bound_or_constraints| match bound_or_constraints {
+                                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                                    constraints.elements(db).iter().any(|constraint| {
+                                        type_inherits_from_owner(db, *constraint, owner_class)
+                                    })
+                                }
+                                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                                    type_inherits_from_owner(db, bound, owner_class)
+                                }
+                            }),
+                        _ => false,
+                    }
+            })
+        };
+
+        // Fast path for the common method-signature case where the bound `Self`
+        // carries the same binding context as this mapping. For intersection receivers, also
+        // verify that an element inherits from the method owner; attributes can alias methods
+        // from unrelated classes.
+        if self.binding_context == Some(bound_typevar.binding_context(db)) {
+            return owner_class.is_none_or(|owner_class| {
+                !matches!(self.ty, Type::Intersection(_))
+                    || intersection_inherits_from_owner(owner_class)
+            });
+        }
 
         // Check that the Self typevar's owner class is in the MRO of the self type's class.
         if self.class_literal.is_some_and(|class_literal| {
@@ -7445,28 +7474,7 @@ impl<'db> SelfBinding<'db> {
         let Some(owner_class) = owner_class else {
             return false;
         };
-        let Type::Intersection(intersection) = self.ty else {
-            return false;
-        };
-        intersection.positive(db).iter().any(|positive| {
-            type_inherits_from_owner(db, *positive, owner_class)
-                || match positive {
-                    Type::TypeVar(typevar) => typevar
-                        .typevar(db)
-                        .bound_or_constraints(db)
-                        .is_some_and(|bound_or_constraints| match bound_or_constraints {
-                            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                                constraints.elements(db).iter().any(|constraint| {
-                                    type_inherits_from_owner(db, *constraint, owner_class)
-                                })
-                            }
-                            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                                type_inherits_from_owner(db, bound, owner_class)
-                            }
-                        }),
-                    _ => false,
-                }
-        })
+        intersection_inherits_from_owner(owner_class)
     }
 }
 
