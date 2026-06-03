@@ -3,7 +3,8 @@ use itertools::Either;
 use std::convert::Infallible;
 
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
+    DefinedPlace, Definedness, DeprecationBuilder, Place, PlaceAndQualifiers, PublicTypePolicy,
+    TypeOrigin,
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
@@ -299,12 +300,15 @@ impl<'db> UnionType<'db> {
         let mut all_unbound = true;
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
+        let mut deprecation = DeprecationBuilder::default();
         for ty in self.elements(db) {
             let PlaceAndQualifiers {
                 place: ty_member,
                 qualifiers: new_qualifiers,
+                deprecation: new_deprecation,
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
+            deprecation.add(new_deprecation);
             match ty_member {
                 Place::Undefined => {
                     possibly_unbound = true;
@@ -343,6 +347,7 @@ impl<'db> UnionType<'db> {
                 })
             },
             qualifiers,
+            deprecation: deprecation.build(),
         }
     }
 
@@ -870,10 +875,12 @@ impl<'db> IntersectionType<'db> {
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
         let mut origin = TypeOrigin::Declared;
+        let mut deprecation = DeprecationBuilder::default();
         for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {
                 place: member,
                 qualifiers: new_qualifiers,
+                deprecation: new_deprecation,
             } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
             match member {
@@ -890,6 +897,7 @@ impl<'db> IntersectionType<'db> {
                         any_definitely_bound = true;
                     }
 
+                    deprecation.add(new_deprecation);
                     builder = builder.add_positive(ty_member);
                 }
             }
@@ -911,6 +919,7 @@ impl<'db> IntersectionType<'db> {
                 })
             },
             qualifiers,
+            deprecation: deprecation.build(),
         }
     }
 

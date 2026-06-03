@@ -77,7 +77,7 @@ use crate::types::infer::builder::paramspec_validation::validate_paramspec_compo
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
-    TypeExpressionFlags, function_known_decorators, infer_statement_types, nearest_enclosing_class,
+    TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::known_instance::DeprecatedInstance;
@@ -1266,6 +1266,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let PlaceAndQualifiers {
             place: resolved_place,
             qualifiers,
+            ..
         } = place_and_quals;
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
@@ -2705,6 +2706,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 PlaceAndQualifiers {
                                     place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
                                     qualifiers: _,
+                                    ..
                                 } => attr_ty.is_callable_type(),
                                 _ => false,
                             };
@@ -2766,6 +2768,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ty: meta_attr_ty, ..
                             }),
                         qualifiers,
+                        ..
                     } => {
                         // Resolve `Self` type variables to the concrete instance type.
                         let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
@@ -2837,6 +2840,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             ..
                                         }),
                                     qualifiers,
+                                    ..
                                 } = fallback_attr
                                 {
                                     // Bind `Self` via MRO matching.
@@ -2890,6 +2894,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ..
                                 }),
                             qualifiers,
+                            ..
                         }) = fallback_attr
                         {
                             // Bind `Self` via MRO matching.
@@ -2975,6 +2980,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ty: meta_attr_ty, ..
                             }),
                         qualifiers,
+                        ..
                     } => {
                         if emit_diagnostics
                             && self.invalid_assignment_to_final_attribute(
@@ -3091,6 +3097,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ..
                                 }),
                             qualifiers,
+                            ..
                         }) = fallback_attr
                         {
                             let class_attr_ty =
@@ -8745,60 +8752,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
-    fn deprecated_function_binding(
-        &self,
-        definition: Definition<'db>,
-    ) -> Option<DeprecatedInstance<'db>> {
-        fn is_replaced_function_type(
-            db: &dyn Db,
-            definition: Definition,
-            ty: Type,
-        ) -> Option<bool> {
-            match ty {
-                Type::FunctionLiteral(function) => {
-                    Some(!function.contains_definition(db, definition))
-                }
-                Type::BoundMethod(bound) => {
-                    Some(!bound.function(db).contains_definition(db, definition))
-                }
-                Type::Union(union) => {
-                    union
-                        .elements(db)
-                        .iter()
-                        .try_fold(false, |replaced, element| {
-                            Some(replaced || is_replaced_function_type(db, definition, *element)?)
-                        })
-                }
-                _ => None,
-            }
-        }
-
-        let DefinitionKind::Function(function) = definition.kind(self.db()) else {
-            return None;
-        };
-        let decorator_inference = function_known_decorators(self.db(), definition);
-        if decorator_inference
-            .known_decorators()
-            .contains(FunctionDecorators::OVERLOAD)
-        {
-            return None;
-        }
-
-        let definition_inference = infer_definition_types(self.db(), definition);
-        let binding_ty = definition_inference.binding_type(definition);
-        if is_replaced_function_type(self.db(), definition, binding_ty) != Some(true) {
-            return None;
-        }
-
-        let decorator = function.node(self.module()).decorator_list.first()?;
-        let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) =
-            decorator_inference.expression_type(&decorator.expression)?
-        else {
-            return None;
-        };
-        Some(deprecated)
-    }
-
     fn report_deprecated_function<T: Ranged>(
         &self,
         ranged: T,
@@ -8927,7 +8880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
-    ) -> (Place<'db>, Option<ScopedUseId>) {
+    ) -> (PlaceAndQualifiers<'db>, Option<ScopedUseId>) {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
@@ -8937,13 +8890,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                place_from_bindings(db, use_def.reachable_bindings(place_id))
+                    .into_place_and_qualifiers()
             } else {
                 assert!(
                     self.in_string_annotation(),
                     "Expected the place table to create a place for every valid PlaceExpr node"
                 );
-                Place::Undefined
+                Place::Undefined.into()
             };
             (place, None)
         } else {
@@ -8951,7 +8905,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_name_expr()
                 .is_some_and(|name| name.is_invalid())
             {
-                return (Place::Undefined, None);
+                return (Place::Undefined.into(), None);
             }
 
             // A named expression can show up here when resolving the parent place of something
@@ -8960,15 +8914,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
                     let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(db, definition))
+                    Place::bound(binding_type(db, definition)).into()
                 } else {
-                    Place::Undefined
+                    Place::Undefined.into()
                 };
                 return (place, None);
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.file());
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
+            let place = place_from_bindings(db, use_def.bindings_at_use(use_id))
+                .into_place_and_qualifiers();
 
             (place, Some(use_id))
         }
@@ -9017,12 +8972,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Place::Undefined.into();
                 }
                 EnclosingSnapshotResult::FoundBindings(bindings) => {
-                    let mut place_and_qualifiers = place_from_bindings(db, bindings);
+                    let mut place_and_qualifiers =
+                        place_from_bindings(db, bindings).into_place_and_qualifiers();
                     if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
                         place_and_qualifiers.place =
                             Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
                     }
-                    let place = place_and_qualifiers.place.map_type(|ty| {
+                    place_and_qualifiers = place_and_qualifiers.map_type(|ty| {
                         self.narrow_place_with_applicable_constraints(
                             place_expr,
                             ty,
@@ -9033,7 +8989,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         FileScopeId::global(),
                         ConstraintKey::NestedScope(current_scope_id),
                     ));
-                    return place.into();
+                    return place_and_qualifiers;
                 }
                 // There are no visible bindings / constraint here.
                 EnclosingSnapshotResult::NotFound => {
@@ -9064,7 +9020,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
         let place_table = self.index.place_table(file_scope_id);
-        let use_def = self.index.use_def_map(file_scope_id);
 
         let mut constraint_keys = vec![];
         let (local_scope_place, use_id) = self.infer_local_place_load(place_expr, expr_ref);
@@ -9072,28 +9027,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
 
-        let binding_deprecation = if file_scope_id.is_global()
-            && place_expr.as_symbol().is_some()
-            && local_scope_place.is_definitely_bound()
-            && let Some(ty) = local_scope_place.ignore_possibly_undefined()
-            && !ty.is_never()
-            && let Some(use_id) = use_id
-        {
-            let mut bindings = use_def.bindings_at_use(use_id);
-            match (
-                bindings.next().map(|binding| binding.binding),
-                bindings.next(),
-            ) {
-                (Some(DefinitionState::Defined(binding)), None) => {
-                    self.deprecated_function_binding(binding)
-                }
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
+        let place = local_scope_place.or_fall_back_to(db, || {
             let mut symbol_resolves_locally = false;
             if let Some(symbol) = place_expr.as_symbol()
                 && let Some(symbol_id) = place_table.symbol_id(symbol.name())
@@ -9140,7 +9074,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let (parent_place, _use_id) = self.infer_local_place_load(parent_expr, expr_ref);
-                if let Place::Defined(_) = parent_place {
+                if let Place::Defined(_) = parent_place.place {
                     return Place::Undefined.into();
                 }
             }
@@ -9244,18 +9178,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings(db, bindings).place.map_type(|ty| {
-                                self.narrow_place_with_applicable_constraints(
-                                    place_expr,
-                                    ty,
-                                    &constraint_keys,
-                                )
-                            });
+                            let place = place_from_bindings(db, bindings)
+                                .into_place_and_qualifiers()
+                                .map_type(|ty| {
+                                    self.narrow_place_with_applicable_constraints(
+                                        place_expr,
+                                        ty,
+                                        &constraint_keys,
+                                    )
+                                });
                             constraint_keys.push((
                                 enclosing_scope_file_id,
                                 ConstraintKey::NestedScope(file_scope_id),
                             ));
-                            return place.into();
+                            return place;
                         }
                         // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager place resolution.
@@ -9360,10 +9296,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if let Some(ty) = place.place.ignore_possibly_undefined() {
-            if let Some(deprecated) = binding_deprecation
-                && let Some(symbol) = place_expr.as_symbol()
+            if !ty.is_never()
+                && let Some(deprecated) = place.deprecation
+                && let Some(name) = match expr_ref {
+                    ast::ExprRef::Name(name) => Some(name.id.as_str()),
+                    ast::ExprRef::Attribute(attribute) => Some(attribute.attr.as_str()),
+                    _ => None,
+                }
             {
-                self.report_deprecated_function(expr_ref, symbol.name().as_str(), deprecated);
+                self.report_deprecated_function(expr_ref, name, deprecated);
             } else {
                 self.check_deprecated(expr_ref, ty);
             }
@@ -9796,9 +9737,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             });
 
+        let deprecation = resolved_type.deprecation();
         let resolved_type = resolved_type.inner_type();
 
-        self.check_deprecated(attr, resolved_type);
+        if let Some(deprecated) = deprecation {
+            self.report_deprecated_function(attr, attr.id.as_str(), deprecated);
+        } else {
+            self.check_deprecated(attr, resolved_type);
+        }
 
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).

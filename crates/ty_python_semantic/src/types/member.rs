@@ -75,6 +75,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             if let PlaceAndQualifiers {
                 place: Place::Defined(DefinedPlace { ty, .. }),
                 qualifiers,
+                ..
             } = place_and_quals
             {
                 // Otherwise, we need to check if the symbol has bindings

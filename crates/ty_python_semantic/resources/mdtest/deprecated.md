@@ -76,6 +76,9 @@ def replace_with_one_of(first: F, second: G) -> Callable[[Callable[..., Any]], F
 def replace_with_object(_: Callable[..., Any]) -> object:
     return object()
 
+def replace_with_callable(_: Callable[..., Any]) -> Callable[[], str]:
+    return replacement
+
 def is_replacement(value: object) -> TypeGuard[TypeOf[replacement]]:
     return True
 
@@ -102,6 +105,9 @@ def deprecated_outer_binding() -> None: ...
 @deprecated("this object is not callable")
 @replace_with_object
 def deprecated_object_binding() -> None: ...
+@deprecated("callable replacement")
+@replace_with_callable
+def deprecated_callable_binding() -> None: ...
 @deprecated("use ReplacementClass directly")
 @replace_with(ReplacementClass)
 def deprecated_class_binding() -> None: ...
@@ -116,6 +122,7 @@ replaced_deprecated_function()
 deprecated_union_binding  # error: [deprecated] "use replacement or other directly"
 deprecated_outer_binding()  # error: [deprecated] "outer deprecation"
 deprecated_object_binding
+deprecated_callable_binding()  # error: [deprecated] "callable replacement"
 deprecated_class_binding  # TODO: error: [deprecated] "use ReplacementClass directly"
 deprecated_overload_binding()  # error: [deprecated] "deprecated replacement"
 
@@ -142,37 +149,92 @@ else:
     def conditionally_defined() -> None: ...
 
 conditionally_defined()  # TODO: error: [deprecated]
+
+if flag:
+    @deprecated("same message")
+    @replace_with(replacement)
+    def same_message() -> None: ...
+
+else:
+    @deprecated("same message")
+    @replace_with(other)
+    def same_message() -> None: ...
+
+same_message()  # error: [deprecated] "same message"
+
+if True:
+    @deprecated("reachable binding")
+    @replace_with(replacement)
+    def statically_reachable() -> None: ...
+
+else:
+    @deprecated("unreachable binding")
+    @replace_with(other)
+    def statically_reachable() -> None: ...
+
+statically_reachable()  # error: [deprecated] "reachable binding"
+
+class C:
+    def replacement(self) -> str:
+        return "replacement"
+
+    @deprecated("use replacement directly")
+    @replace_with(replacement)
+    def deprecated_binding(self) -> None: ...
+
+C.deprecated_binding  # error: [deprecated] "use replacement directly"
+C().deprecated_binding  # error: [deprecated] "use replacement directly"
+
+class D(C): ...
+class E(C): ...
+
+T = TypeVar("T", D, E)
+
+def use_union(instance: D | E) -> None:
+    instance.deprecated_binding  # error: [deprecated] "use replacement directly"
+
+def use_typevar(instance: T) -> None:
+    instance.deprecated_binding  # error: [deprecated] "use replacement directly"
 ```
 
-Deprecation attached to a decorated binding is currently only reported for direct module-level name
-loads with a single live binding. Following it through multiple live bindings is future work.
+If control flow exposes multiple live decorated bindings with different deprecation messages, there
+is no single message to report.
 
-## Deferred annotations
+## Imported decorated binding
+
+`module.py`:
 
 ```py
-from __future__ import annotations
-
 from collections.abc import Callable
 from typing import Any, TypeVar
 from typing_extensions import deprecated
 
-C = TypeVar("C", bound=type)
+F = TypeVar("F", bound=Callable[..., Any])
 
-def replace_with(replacement: C) -> Callable[[Callable[..., Any]], C]:
-    def decorator(_: Callable[..., Any]) -> C:
+def replacement() -> str:
+    return "replacement"
+
+def replace_with(replacement: F) -> Callable[[Callable[..., Any]], F]:
+    def decorator(_: Callable[..., Any]) -> F:
         return replacement
     return decorator
 
-class Replacement: ...
-
-@deprecated("use Replacement")
-@replace_with(Replacement)
-def Old() -> None: ...
-
-value: Old  # TODO: error: [deprecated] "use Replacement"
+@deprecated("use replacement directly")
+@replace_with(replacement)
+def deprecated_binding() -> None: ...
 ```
 
-Deprecation attached to decorated bindings is not yet propagated into deferred annotation scopes.
+`main.py`:
+
+```py
+import module
+
+# error: [deprecated] "use replacement directly"
+from module import deprecated_binding
+
+deprecated_binding()  # error: [deprecated] "use replacement directly"
+module.deprecated_binding  # error: [deprecated] "use replacement directly"
+```
 
 ## Syntax
 

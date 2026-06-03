@@ -326,6 +326,7 @@ impl<'db> ProtocolInterface<'db> {
             .map(|member| PlaceAndQualifiers {
                 place: Place::bound(member.ty()),
                 qualifiers: member.qualifiers(),
+                deprecation: None,
             })
             .unwrap_or_else(|| Type::object().member(db, name))
     }

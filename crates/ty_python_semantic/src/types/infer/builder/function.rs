@@ -1,9 +1,10 @@
 use crate::{
     Db,
+    place::TypeOrigin,
     reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
-        TypeContext, UnionType,
+        TypeAndQualifiers, TypeContext, TypeQualifiers, UnionType,
         diagnostic::{
             FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_FORM,
             USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
@@ -451,10 +452,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
         }
 
+        // If decorators preserve the original function type, its function literal already carries
+        // the deprecation. If the inferred type loses that identity, attach it to the binding.
+        let deprecation = if function_decorators.contains(FunctionDecorators::OVERLOAD)
+            || function_type_loses_definition(db, definition, inferred_ty) != Some(true)
+        {
+            None
+        } else {
+            decorator_list.first().and_then(|decorator| {
+                match decorator_inference
+                    .as_ref()?
+                    .expression_type(&decorator.expression)?
+                {
+                    Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) => {
+                        Some(deprecated)
+                    }
+                    _ => None,
+                }
+            })
+        };
+
         self.add_declaration_with_binding(
             function.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
+            &DeclaredAndInferredType::AreTheSame(
+                TypeAndQualifiers::new(inferred_ty, TypeOrigin::Inferred, TypeQualifiers::empty())
+                    .with_deprecation(deprecation),
+            ),
         );
 
         if function_decorators.contains(FunctionDecorators::OVERLOAD) {
@@ -1168,5 +1192,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             Some(parameter_type)
         }
+    }
+}
+
+fn function_type_loses_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    ty: Type<'db>,
+) -> Option<bool> {
+    match ty {
+        Type::FunctionLiteral(function) => Some(!function.contains_definition(db, definition)),
+        Type::BoundMethod(bound) => Some(!bound.function(db).contains_definition(db, definition)),
+        Type::Callable(_) => Some(true),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .try_fold(false, |replaced, element| {
+                Some(replaced || function_type_loses_definition(db, definition, *element)?)
+            }),
+        _ => None,
     }
 }
