@@ -15,7 +15,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
-use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
+use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
@@ -62,14 +62,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let ty = self.infer_type_expression_no_store(expression);
-        let ty = if self
-            .inference_flags()
-            .contains(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION)
-        {
-            self.validate_type_alias_type(expression, ty)
-        } else {
-            ty
-        };
         self.deferred_state = previous_deferred_state;
         self.context.inference_flags.set(
             InferenceFlags::IN_NESTED_TYPE_EXPRESSION,
@@ -107,73 +99,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .map(|builder| {
                 diagnostic::add_type_expression_reference_link(builder.into_diagnostic(message))
             })
-    }
-
-    /// Rejects alias type-expression components whose inferred type contains `Self`.
-    ///
-    /// Checking each inferred component before its parent is built prevents simplification from
-    /// erasing `Self`. This checks types rather than syntax because value-expression positions such
-    /// as `TypeOf[...]` can either consume an encountered `Self` or produce `Self` indirectly.
-    fn validate_type_alias_type(&self, expression: &ast::Expr, value_ty: Type<'db>) -> Type<'db> {
-        let unmodified_function_contains_self = value_ty
-            .as_function_literal()
-            .is_some_and(|function| function.unmodified_signature_contains_self(self.db()));
-
-        if !unmodified_function_contains_self && !value_ty.contains_self(self.db()) {
-            return value_ty;
-        }
-
-        self.report_invalid_type_expression(expression, "`Self` cannot be used in a type alias");
-        if unmodified_function_contains_self {
-            // Type-alias specialization intentionally does not rebuild unmodified function
-            // signatures, so recover the function-literal component directly.
-            Type::unknown()
-        } else {
-            value_ty.replace_self_with_unknown(self.db())
-        }
-    }
-
-    pub(super) fn infer_type_alias_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let previous_in_type_alias = self
-            .context
-            .inference_flags
-            .replace(InferenceFlags::IN_TYPE_ALIAS, true);
-        let previous_in_type_alias_type_expression = self
-            .context
-            .inference_flags
-            .replace(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION, true);
-        let value_ty = self.infer_type_expression(expression);
-        self.context.inference_flags.set(
-            InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION,
-            previous_in_type_alias_type_expression,
-        );
-        self.context
-            .inference_flags
-            .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);
-        value_ty
-    }
-
-    pub(super) fn infer_type_alias_type_parameter_component(
-        &mut self,
-        expression: &ast::Expr,
-    ) -> Type<'db> {
-        if matches!(
-            self.scope().node(self.db()),
-            NodeWithScopeKind::TypeAliasTypeParameters(_)
-        ) {
-            let previous_in_type_alias_type_expression = self
-                .context
-                .inference_flags
-                .replace(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION, true);
-            let ty = self.infer_type_expression(expression);
-            self.context.inference_flags.set(
-                InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION,
-                previous_in_type_alias_type_expression,
-            );
-            ty
-        } else {
-            self.infer_type_expression(expression)
-        }
     }
 
     pub(super) fn infer_name_or_attribute_type_expression(

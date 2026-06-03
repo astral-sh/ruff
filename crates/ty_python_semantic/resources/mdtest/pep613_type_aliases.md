@@ -517,16 +517,14 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 
 ## `Self`
 
-Type aliases cannot have `Self` in their resulting type, even when they are defined in a class body.
-Using the runtime `Self` object in a value expression is allowed if the resulting type does not
-contain `Self`:
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
 
 ```py
 from typing_extensions import Annotated, Self, TypeAlias, cast
-from ty_extensions import TypeOf
-
-def consume(value: object) -> int:
-    return 1
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
@@ -538,29 +536,7 @@ class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     Stringified: TypeAlias = "tuple[Self]"
 
-    Metadata: TypeAlias = Annotated[int, tuple[Self]]
-
-    ValueExpression: TypeAlias = TypeOf[Self]
-    value_expression: ValueExpression = Self
-
-    def use_value_expression(self, value: ValueExpression) -> None:
-        reveal_type(value)  # revealed: @Todo(Inference of subscript on special form)
-
-    value: Self = cast(Self, object())
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    IndirectValueExpression: TypeAlias = TypeOf[value]
-
-    def use_indirect_value_expression(self, value: IndirectValueExpression) -> None:
-        reveal_type(value)  # revealed: @Todo(Inference of subscript on special form)
-
-    ConsumedValueExpression: TypeAlias = TypeOf[consume(cast(Self, object()))]
-
-    def method(self, other: Self) -> Self:
-        return self
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    Method: TypeAlias = TypeOf[method]
+    Metadata: TypeAlias = Annotated[int, cast(Self, object())]
 ```
 
 ## Disabled `invalid-type-form` `Self` fallback
@@ -577,13 +553,17 @@ from typing_extensions import Self, TypeAlias
 
 class C:
     Inner: TypeAlias = Self
+    Tuple: TypeAlias = tuple[Self]
     Stringified: TypeAlias = "tuple[Self, int]"
 
     def takes(self, value: Inner) -> None:
         reveal_type(value)  # revealed: Unknown
 
+    def takes_tuple(self, value: Tuple) -> None:
+        reveal_type(value)  # revealed: tuple[Unknown]
+
     def takes_stringified(self, value: Stringified) -> None:
-        reveal_type(value)  # revealed: tuple[Unknown, int]
+        reveal_type(value)  # revealed: Unknown
 
     def invalid_attribute(self) -> Self:
         self.attribute: TypeAlias = Self

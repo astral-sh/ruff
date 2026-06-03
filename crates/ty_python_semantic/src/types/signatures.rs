@@ -179,12 +179,6 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(crate) fn contains_self(&self, db: &'db dyn Db) -> bool {
-        self.overloads
-            .iter()
-            .any(|signature| signature.contains_self(db))
-    }
-
     /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
     pub(crate) fn overload_return_type_or_unknown(&self, db: &'db dyn Db) -> Type<'db> {
         match self.overloads.as_slice() {
@@ -1212,14 +1206,6 @@ impl<'db> Signature<'db> {
                 .enumerate()
                 .skip(usize::from(receiver_is_removed))
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(db))
-    }
-
-    pub(crate) fn contains_self(&self, db: &'db dyn Db) -> bool {
-        self.return_ty.contains_self(db)
-            || self
-                .parameters
-                .iter()
-                .any(|parameter| parameter.annotated_type().contains_self(db))
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {

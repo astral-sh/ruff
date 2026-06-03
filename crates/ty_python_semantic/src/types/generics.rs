@@ -148,16 +148,6 @@ pub(crate) fn typing_self<'db>(
     let file = scope_id.file(db);
     let index = semantic_index(db, file);
 
-    // Preserve `Self` in explicit type alias scopes so that alias validation can reject it after
-    // inferring the completed alias type.
-    let typevar_binding_context = typevar_binding_context.or_else(|| match scope_id.node(db) {
-        NodeWithScopeKind::TypeAlias(type_alias)
-        | NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
-            Some(index.expect_single_definition(type_alias))
-        }
-        _ => None,
-    });
-
     let identity = TypeVarIdentity::new(
         db,
         ast::name::Name::new_static("Self"),

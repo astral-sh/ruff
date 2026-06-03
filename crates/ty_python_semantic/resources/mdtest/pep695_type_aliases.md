@@ -84,16 +84,16 @@ def f() -> None:
 
 ## `Self`
 
-Type aliases cannot have `Self` in their resulting type, even when they are defined in a class body.
-Using the runtime `Self` object in a value expression is allowed if the resulting type does not
-contain `Self`:
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` in alias type-parameter bounds and defaults.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
 
 ```py
 from typing import Annotated, Self, cast
-from ty_extensions import TypeOf
-
-def consume(value: object) -> int:
-    return 1
 
 class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
@@ -102,82 +102,7 @@ class C:
     # error: [invalid-type-form] "`Self` cannot be used in a type alias"
     type Simplified = object | Self
 
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type Bound[T: Self] = T
-
-    type Metadata = Annotated[int, tuple[Self]]
-    type BoundMetadata[T: Annotated[int, cast(Self, object())]] = T
-    type BoundValueExpression[T: TypeOf[Self]] = T
-
-    type ValueExpression = TypeOf[Self]
-    value_expression: ValueExpression = Self
-    invalid_value_expression: ValueExpression = int  # error: [invalid-assignment]
-
-    value: Self = cast(Self, object())
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type IndirectBound[T: TypeOf[value]] = T
-
-    type ConsumedBound[T: TypeOf[consume(cast(Self, object()))]] = T
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type IndirectValueExpression = TypeOf[value]
-
-    def use_indirect_value_expression(self, value: IndirectValueExpression) -> None:
-        reveal_type(value)  # revealed: Unknown
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type StructuredIndirectValueExpression = tuple[TypeOf[value], int]
-
-    def use_structured_indirect_value_expression(self, value: StructuredIndirectValueExpression) -> None:
-        reveal_type(value)  # revealed: tuple[Unknown, int]
-
-    type ConsumedValueExpression = TypeOf[consume(cast(Self, object()))]
-    consumed_value_expression: ConsumedValueExpression = 1
-    invalid_consumed_value_expression: ConsumedValueExpression = "x"  # error: [invalid-assignment]
-
-    def method(self, other: Self) -> Self:
-        return self
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type Method = TypeOf[method]
-
-    def use_method(self, method: Method) -> None:
-        reveal_type(method)  # revealed: Unknown
-```
-
-## `Self` in type parameter defaults
-
-```toml
-[environment]
-python-version = "3.13"
-```
-
-```py
-from typing import Annotated, Self, Unpack, cast
-from ty_extensions import TypeOf
-
-def consume(value: object) -> int:
-    return 1
-
-class C:
-    value: Self = cast(Self, object())
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type Default[T = Self] = T
-
-    type DefaultMetadata[T = Annotated[int, cast(Self, object())]] = T
-    type DefaultValueExpression[T = TypeOf[Self]] = T
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type IndirectDefault[T = TypeOf[value]] = T
-
-    type ConsumedDefault[T = TypeOf[consume(cast(Self, object()))]] = T
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    type VariadicDefault[*Ts = *Self] = tuple[*Ts]
-
-    type ValidVariadicDefault[*Ts = Unpack[tuple[int, str]]] = tuple[*Ts]
+    type Metadata = Annotated[int, cast(Self, object())]
 ```
 
 ## Aliased type aliases
@@ -457,41 +382,6 @@ IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 def f(x: IntAndT[str]) -> None:
     # TODO: This should be `tuple[int, str]`
     reveal_type(x)  # revealed: Unknown
-```
-
-### `Self`
-
-```py
-from typing_extensions import Annotated, Self, TypeAliasType, cast
-from ty_extensions import TypeOf
-
-def consume(value: object) -> int:
-    return 1
-
-class C:
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    Alias = TypeAliasType("Alias", tuple[Self])
-
-    Metadata = TypeAliasType("Metadata", Annotated[int, tuple[Self]])
-
-    ValueExpression = TypeAliasType("ValueExpression", TypeOf[Self])
-    value_expression: ValueExpression = Self
-    invalid_value_expression: ValueExpression = int  # error: [invalid-assignment]
-
-    value: Self = cast(Self, object())
-
-    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
-    IndirectValueExpression = TypeAliasType("IndirectValueExpression", TypeOf[value])
-
-    def use_indirect_value_expression(self, value: IndirectValueExpression) -> None:
-        reveal_type(value)  # revealed: Unknown
-
-    ConsumedValueExpression = TypeAliasType(
-        "ConsumedValueExpression",
-        TypeOf[consume(cast(Self, object()))],
-    )
-    consumed_value_expression: ConsumedValueExpression = 1
-    invalid_consumed_value_expression: ConsumedValueExpression = "x"  # error: [invalid-assignment]
 ```
 
 ### Generic value binds type variables to alias definition

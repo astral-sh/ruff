@@ -101,7 +101,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let constraint_tys: Box<[Type<'_>]> = elts
                     .iter()
                     .map(|expr| {
-                        let constraint = self.infer_type_alias_type_parameter_component(expr);
+                        let constraint = self.infer_type_expression(expr);
                         if constraint.has_typevar_or_typevar_instance(db)
                             && let Some(builder) = self
                                 .context
@@ -127,7 +127,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             Some(expr) => {
-                let bound_ty = self.infer_type_alias_type_parameter_component(expr);
+                let bound_ty = self.infer_type_expression(expr);
                 if bound_ty.has_typevar_or_typevar_instance(db)
                     && let Some(builder) =
                         self.context.report_lint(&INVALID_TYPE_VARIABLE_BOUND, expr)
@@ -140,7 +140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None => None,
         };
         if let Some(default_expr) = default.as_deref() {
-            let default_ty = self.infer_type_alias_type_parameter_component(default_expr);
+            let default_ty = self.infer_type_expression(default_expr);
             if !self.check_default_for_outer_scope_typevars(default_ty, default_expr, &name.id) {
                 let bound_node = bound_node.map(|n| match n {
                     ast::Expr::Tuple(tuple) => BoundOrConstraintsNodes::Constraints(&tuple.elts),
@@ -612,7 +612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 let types = elts
                     .iter()
-                    .map(|elt| self.infer_type_alias_type_parameter_component(elt))
+                    .map(|elt| self.infer_type_expression(elt))
                     .collect::<Vec<_>>();
                 self.context.inference_flags.set(
                     InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
@@ -624,7 +624,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
             ast::Expr::Name(_) => {
-                let ty = self.infer_type_alias_type_parameter_component(default_expr);
+                let ty = self.infer_type_expression(default_expr);
                 if let Some(name) = paramspec_name
                     && self.check_default_for_outer_scope_typevars(ty, default_expr, name)
                 {
@@ -662,17 +662,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             name: _,
             default,
         } = node;
-        if let Some(default) = default.as_deref() {
-            let previous_in_valid_unpack_context = self
-                .context
-                .inference_flags
-                .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
-            self.infer_type_alias_type_parameter_component(default);
-            self.context.inference_flags.set(
-                InferenceFlags::IN_VALID_UNPACK_CONTEXT,
-                previous_in_valid_unpack_context,
-            );
-        }
+        self.infer_optional_expression(default.as_deref(), TypeContext::default());
         let pep_695_todo = todo_type!("PEP-695 TypeVarTuple definition types");
         self.add_declaration_with_binding(
             node.into(),

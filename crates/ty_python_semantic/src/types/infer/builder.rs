@@ -1504,7 +1504,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
-        let value_ty = self.infer_type_alias_type_expression(&type_alias.value);
+        self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
+        let value_ty = self.infer_type_expression(&type_alias.value);
+        self.context
+            .inference_flags
+            .remove(InferenceFlags::IN_TYPE_ALIAS);
         self.context.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
@@ -3553,8 +3557,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &AssignmentDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        // TODO: Reject `Self` in implicit type aliases once we can distinguish them from ordinary
-        // assignments without speculatively reinterpreting value expressions.
         let target = assignment.target(self.module());
 
         let add = self.add_binding(target.into(), definition);
@@ -4141,8 +4143,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Match the binding context used by eager assignment inference so legacy type variables
         // in the alias value are bound to the alias definition.
         let previous_context = self.typevar_binding_context.replace(definition);
-        self.infer_type_alias_type_expression(&arguments.args[1]);
 
+        self.infer_type_expression(&arguments.args[1]);
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
         for keyword in &arguments.keywords {
             self.infer_expression(&keyword.value, TypeContext::default());
@@ -4572,24 +4574,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeContext::new(Some(declared.inner_type())),
             );
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
+                // The post-inference pass emits the diagnostic, but this first-pass value is
+                // retained as the alias binding.
                 match inferred_ty {
-                    // Preserve a bare `Self` as a type so that alias validation can reject it.
                     Type::SpecialForm(SpecialFormType::TypingSelf) => {
-                        let inferred_ty =
-                            self.infer_name_or_attribute_type_expression(inferred_ty, value);
-                        self.expressions.insert(value.into(), inferred_ty);
-                        inferred_ty
+                        self.expressions.insert(value.into(), Type::unknown());
+                        Type::unknown()
                     }
-                    // The post-inference pass emits the diagnostic, but this first-pass value is
-                    // retained as the alias binding.
                     Type::KnownInstance(KnownInstanceType::LiteralStringAlias(ty))
                         if ty.inner(self.db()).contains_self(self.db()) =>
                     {
                         Type::KnownInstance(KnownInstanceType::LiteralStringAlias(
-                            InternedType::new(
-                                self.db(),
-                                ty.inner(self.db()).replace_self_with_unknown(self.db()),
-                            ),
+                            InternedType::new(self.db(), Type::unknown()),
                         ))
                     }
                     _ => inferred_ty,
@@ -5728,21 +5724,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
         );
 
-        if !self
-            .inference_flags()
-            .contains(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION)
-        {
-            return self.infer_expression_impl(expression, tcx);
-        }
-
-        self.context
-            .inference_flags
-            .remove(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION);
-        let ty = self.infer_expression_impl(expression, tcx);
-        self.context
-            .inference_flags
-            .insert(InferenceFlags::IN_TYPE_ALIAS_TYPE_EXPRESSION);
-        ty
+        self.infer_expression_impl(expression, tcx)
     }
 
     fn infer_expression_with_state(
