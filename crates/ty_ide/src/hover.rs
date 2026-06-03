@@ -8,7 +8,8 @@ use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
-use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
+use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
+
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
@@ -85,44 +86,39 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                         ty,
                         variance: None,
                         qualifiers,
-                        alias_ty: None,
                     },
                     |typevar| HoverContent::Type {
                         ty: Type::TypeVar(typevar),
                         variance: Some(typevar.variance(db)),
                         qualifiers,
-                        alias_ty: None,
                     },
                 )
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
             | Type::TypeAlias(alias) => {
-                let value_type = alias.value_type(db);
+                let value_ty = alias.value_type(db);
 
                 docstring = Definitions::from_ty(db, ty)
                     .and_then(|def| def.docstring(db))
                     .or_else(|| {
-                        Definitions::from_ty(db, value_type).and_then(|def| def.docstring(db))
+                        Definitions::from_ty(db, value_ty).and_then(|def| def.docstring(db))
                     });
 
-                HoverContent::Type {
-                    ty: value_type,
-                    variance: None,
+                HoverContent::TypeAlias {
+                    alias,
+                    value_ty,
                     qualifiers,
-                    alias_ty: Some(Type::TypeAlias(alias)),
                 }
             }
             Type::TypeVar(typevar) => HoverContent::Type {
                 ty,
                 variance: Some(typevar.variance(db)),
                 qualifiers,
-                alias_ty: None,
             },
             _ => HoverContent::Type {
                 ty,
                 variance: None,
                 qualifiers,
-                alias_ty: None,
             },
         };
         contents.push(inferred_type_hover_content);
@@ -290,8 +286,11 @@ pub enum HoverContent<'db> {
         variance: Option<TypeVarVariance>,
         // The type's qualifiers
         qualifiers: TypeQualifiers,
-        // (If applicable) the type that the target is aliasing
-        alias_ty: Option<Type<'db>>,
+    },
+    TypeAlias {
+        alias: TypeAliasType<'db>,
+        value_ty: Type<'db>,
+        qualifiers: TypeQualifiers,
     },
     TypedDictKey {
         owner: String,
@@ -333,6 +332,19 @@ impl<'db> DisplayHoverContent<'_, 'db> {
     }
 }
 
+fn create_qualifier_suffix(qualifiers: &TypeQualifiers) -> String {
+    let mut standard = qualifiers
+        .iter()
+        .filter(|q| !q.is_non_standard())
+        .peekable();
+    if standard.peek().is_none() {
+        return String::new();
+    } else {
+        let names: Vec<&str> = standard.map(TypeQualifiers::name).collect();
+        return format!(" ({})", names.join(", "));
+    };
+}
+
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.content {
@@ -346,7 +358,6 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                 ty,
                 variance,
                 qualifiers,
-                alias_ty,
             } => {
                 let variance = match variance {
                     Some(TypeVarVariance::Covariant) => " (covariant)",
@@ -356,33 +367,28 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     None => "",
                 };
 
-                let mut standard = qualifiers
-                    .iter()
-                    .filter(|q| !q.is_non_standard())
-                    .peekable();
-                let qualifier_suffix = if standard.peek().is_none() {
-                    String::new()
-                } else {
-                    let names: Vec<&str> = standard.map(TypeQualifiers::name).collect();
-                    format!(" ({})", names.join(", "))
-                };
-
-                let alias_prefix = match alias_ty {
-                    Some(alias_name) => format!("{} = ", alias_name.display(self.db)),
-                    _ => String::new(),
-                };
-
-                let alias_type = match alias_ty {
-                    Some(Type::TypeAlias(_)) => "type ",
-                    _ => "",
-                };
+                let qualifier_suffix = create_qualifier_suffix(qualifiers);
 
                 let (ty_string, syntax) = self.ty_string_and_syntax(ty);
                 self.kind
+                    .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
+                    .fmt(f)
+            }
+            HoverContent::TypeAlias {
+                alias,
+                value_ty,
+                qualifiers,
+            } => {
+                let alias_type = Type::TypeAlias(*alias);
+                let alias_string = alias_type.display(self.db);
+
+                let qualifier_suffix = create_qualifier_suffix(qualifiers);
+
+                let (ty_string, syntax) = self.ty_string_and_syntax(value_ty);
+
+                self.kind
                     .fenced_code_block(
-                        format!(
-                            "{alias_type}{alias_prefix}{ty_string}{variance}{qualifier_suffix}"
-                        ),
+                        format!("type {alias_string} = {ty_string}{qualifier_suffix}"),
                         syntax,
                     )
                     .fmt(f)
