@@ -60,8 +60,10 @@ class list[T]:
     def __init__(self, required: int) -> None: ...
     @overload
     def __init__(self, required: str) -> None: ...
+    def append(self, value: T) -> None: ...
 
-class set[T](list[T]): ...
+class set[T](list[T]):
+    def add(self, value: T) -> None: ...
 ```
 
 `/typeshed/stdlib/types.pyi`:
@@ -79,6 +81,13 @@ def overload(func, /): ...
 ```py
 list()  # error: [no-matching-overload]
 set()  # error: [no-matching-overload]
+
+def assigned_failed_constructor_calls() -> None:
+    xs = list()  # error: [no-matching-overload]
+    xs.append(1)
+
+    ys = set()  # error: [no-matching-overload]
+    ys.add(1)
 ```
 
 ## Constructor return types with custom `list` and `set`

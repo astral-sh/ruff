@@ -8411,13 +8411,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Ok(()) => bindings,
             Err(_) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
-                let bound_return_ty = bindings.return_type(self.db());
-                return self.infer_collection_constructor_return_type(
-                    collection_initializer_class,
-                    call_expression,
-                    call_expression_tcx,
-                    bound_return_ty,
-                );
+                return bindings.return_type(self.db());
             }
         };
 
