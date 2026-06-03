@@ -1951,9 +1951,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return TypeAndQualifiers::declared(Type::unknown());
         };
 
+        let previous_in_type_alias = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_TYPE_ALIAS, false);
         for metadata_element in &arguments[1..] {
             self.infer_expression(metadata_element, TypeContext::default());
         }
+        self.context
+            .inference_flags
+            .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);
 
         subscript_context.infer(self, first_argument)
     }
