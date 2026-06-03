@@ -818,6 +818,36 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
+    /// Returns an identical type variable with its default type mapped by the provided closure.
+    pub(crate) fn map_default_type(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(Type<'db>) -> Type<'db>,
+    ) -> Self {
+        let Some(default_type) = self.default_type(db) else {
+            return self;
+        };
+        let mapped_default_type = f(default_type);
+        if mapped_default_type == default_type {
+            return self;
+        }
+
+        let typevar = TypeVarInstance::new(
+            db,
+            self.typevar(db).identity(db),
+            self.typevar(db)._bound_or_constraints(db),
+            self.typevar(db).explicit_variance(db),
+            Some(mapped_default_type.into()),
+        );
+
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            self.paramspec_attr(db),
+        )
+    }
+
     pub(crate) fn variance_with_polarity(
         self,
         db: &'db dyn Db,

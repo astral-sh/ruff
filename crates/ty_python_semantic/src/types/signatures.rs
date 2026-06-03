@@ -1062,21 +1062,12 @@ impl<'db> Signature<'db> {
             self_type,
             self.self_binding_context(db),
         ));
-        let parameters = self.parameters.apply_type_mapping_impl(
+        self.apply_type_mapping_impl(
             db,
             &self_mapping,
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
-        );
-        let return_ty =
-            self.return_ty
-                .apply_type_mapping(db, &self_mapping, TypeContext::default());
-        Self {
-            generic_context: self.generic_context,
-            definition: self.definition,
-            parameters,
-            return_ty,
-        }
+        )
     }
 
     /// Returns this signature with the given specialization applied to parameters and return type.
@@ -1229,6 +1220,13 @@ impl<'db> Signature<'db> {
         // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
         // triggers binding when a method is accessed on a concrete receiver.
         self.return_ty.contains_self(db)
+            || self.generic_context.is_some_and(|generic_context| {
+                generic_context.variables(db).any(|typevar| {
+                    typevar
+                        .default_type(db)
+                        .is_some_and(|default| default.contains_self(db))
+                })
+            })
             || self
                 .parameters
                 .iter()

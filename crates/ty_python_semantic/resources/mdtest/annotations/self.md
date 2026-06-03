@@ -408,6 +408,26 @@ T = TypeVar("T", ConstrainedValue, Unrelated)
 def _(value: Intersection[T, Extra]):
     # error: [possibly-missing-attribute]
     value.copy()
+
+class GenericDefaults:
+    def choose[T = Self](self) -> T:
+        raise NotImplementedError
+
+    @classmethod
+    def choose_class[T = Self](cls) -> T:
+        raise NotImplementedError
+
+    @property
+    def choice[T = Self](self) -> T:
+        raise NotImplementedError
+
+def _(
+    value: Intersection[GenericDefaults, Extra],
+    cls: Intersection[type[GenericDefaults], type[Extra]],
+):
+    reveal_type(value.choose())  # revealed: GenericDefaults & Extra
+    reveal_type(cls.choose_class())  # revealed: GenericDefaults & Extra
+    reveal_type(value.choice)  # revealed: GenericDefaults & Extra
 ```
 
 ## Callable-returning decorators preserve `Self` on intersections

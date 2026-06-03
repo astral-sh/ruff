@@ -7319,11 +7319,19 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
-                if binding.binding_context().is_some() {
+                let context = if binding.binding_context().is_some() {
                     context.remove_self(db, binding.binding_context())
                 } else {
                     context
-                }
+                };
+                GenericContext::from_typevar_instances(
+                    db,
+                    context.variables(db).map(|typevar| {
+                        typevar.map_default_type(db, |default| {
+                            default.apply_type_mapping(db, self, TypeContext::default())
+                        })
+                    }),
+                )
             }
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
