@@ -305,6 +305,20 @@ def mixed_constraints[T: (Base, Other)](x: type[T], y: Meta3):
     y = x  # error: [invalid-assignment]
 ```
 
+An intersection can constrain both the instances constructed by a class object and the class
+object's metaclass. Projecting only the instance-type constraints must not discard the metaclass
+constraint during relation checks:
+
+```py
+from ty_extensions import Intersection, is_subtype_of, static_assert
+
+class Meta(type): ...
+class A: ...
+
+def _[T: A]():
+    static_assert(not is_subtype_of(type[T], Intersection[type[A], Meta]))
+```
+
 ```py
 class X[T]:
     value: T
