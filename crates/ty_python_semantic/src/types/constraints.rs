@@ -659,6 +659,7 @@ struct ConstraintSetStorage<'db> {
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
+    unvisited_constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
@@ -898,11 +899,54 @@ impl<'db> ConstraintSetBuilder<'db> {
         result
     }
 
-    fn record_constraint_implication(&self, ante: ConstraintId, post: ConstraintId) {
-        self.storage
-            .borrow_mut()
-            .constraint_implication_cache
-            .insert((ante, post), true);
+    fn cached_unvisited_constraint_implies(
+        &self,
+        db: &'db dyn Db,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) -> bool {
+        let key = (ante, post);
+        if let Some(result) = self
+            .storage
+            .borrow()
+            .unvisited_constraint_implication_cache
+            .get(&key)
+        {
+            return *result;
+        }
+
+        let ante_data = self.constraint_data(ante);
+        let post_data = self.constraint_data(post);
+        let result = ante_data.typevar.is_same_typevar_as(db, post_data.typevar)
+            && !ante_data.lower.is_type_var()
+            && !ante_data.upper.is_type_var()
+            && !post_data.lower.is_type_var()
+            && !post_data.upper.is_type_var()
+            // Lower bounds contribute to the inferred solution, so every materialization of the
+            // postcondition's lower bound must be below every materialization of the antecedent's
+            // lower bound.
+            && post_data
+                .lower
+                .top_materialization(db)
+                .is_constraint_set_assignable_to(db, ante_data.lower.bottom_materialization(db))
+            // Upper bounds restrict the inferred solution. Every materialization allowed by the
+            // antecedent must satisfy the postcondition, but a gradual postcondition remains
+            // permissive.
+            && ante_data
+                .upper
+                .top_materialization(db)
+                .is_constraint_set_assignable_to(db, post_data.upper);
+
+        let mut storage = self.storage.borrow_mut();
+        storage
+            .unvisited_constraint_implication_cache
+            .insert(key, result);
+        if result {
+            // Universal subtyping implies constraint-set assignability, so the later full pair
+            // calculation can reuse this result without repeating the relation checks.
+            storage.constraint_implication_cache.insert(key, true);
+        }
+        result
     }
 
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
@@ -5369,35 +5413,7 @@ impl SequentMap {
         ante: ConstraintId,
         post: ConstraintId,
     ) {
-        let ante_data = builder.constraint_data(ante);
-        let post_data = builder.constraint_data(post);
-        if !ante_data.typevar.is_same_typevar_as(db, post_data.typevar)
-            || ante_data.lower.is_type_var()
-            || ante_data.upper.is_type_var()
-            || post_data.lower.is_type_var()
-            || post_data.upper.is_type_var()
-        {
-            return;
-        }
-
-        // Lower bounds contribute to the inferred solution, so every materialization of the
-        // postcondition's lower bound must be below every materialization of the antecedent's
-        // lower bound.
-        if post_data
-            .lower
-            .top_materialization(db)
-            .is_constraint_set_assignable_to(db, ante_data.lower.bottom_materialization(db))
-            // Upper bounds restrict the inferred solution. Every materialization allowed by the
-            // antecedent must satisfy the postcondition, but a gradual postcondition remains
-            // permissive.
-            && ante_data
-                .upper
-                .top_materialization(db)
-                .is_constraint_set_assignable_to(db, post_data.upper)
-        {
-            // Universal subtyping implies constraint-set assignability, so the later full pair
-            // calculation can reuse this result without repeating the relation checks.
-            builder.record_constraint_implication(ante, post);
+        if builder.cached_unvisited_constraint_implies(db, ante, post) {
             self.add_known_direct_implication(db, builder, ante, post);
         }
     }
@@ -5542,8 +5558,8 @@ pub(crate) struct PathAssignments {
     /// Nested substitutions that we have already applied on the current root→terminal path.
     nested_substitutions: FxIndexSet<NestedSubstitution>,
     /// Constraints that we have discovered, mapped to whether we have processed their single
-    /// sequents and direct implications yet. (This ensures a stable order for all of the derived
-    /// constraints that we create, while still letting us create them lazily.)
+    /// sequents yet. (This ensures a stable order for all of the derived constraints that we
+    /// create, while still letting us create them lazily.)
     discovered: FxIndexMap<ConstraintId, bool>,
 }
 
@@ -5677,9 +5693,9 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         constraint: ConstraintId,
     ) {
-        // If we've already processed this constraint, its single sequents and direct implications
-        // are already in the map. We still need to discover pair sequents for constraints that are
-        // represented in the current path.
+        // If we've already processed this constraint, its single sequents are already in the map.
+        // We still need to discover pair sequents for constraints represented in the current path,
+        // and direct implications to constraints that might have been discovered later.
         let existing = self.discovered.insert(constraint, true);
         let already_processed = existing.is_some_and(|existing| existing);
         if !already_processed {
@@ -5705,10 +5721,12 @@ impl PathAssignments {
                 };
                 let pair_map = SequentMap::for_constraint_pair(db, builder, left, right);
                 self.map.merge(&pair_map);
-            } else if !already_processed {
+            } else {
                 // An unvisited branch alternative can still be universally implied by the current
-                // constraint. Keep that implication, but defer all sequents that require both
-                // constraints until we actually encounter the alternative on the current path.
+                // constraint, including if the alternative was first discovered after the current
+                // constraint on a sibling path. Keep that implication, but defer all sequents that
+                // require both constraints until we actually encounter the alternative on the
+                // current path.
                 self.map
                     .add_direct_implication_from_unvisited(db, builder, constraint, *existing);
             }
@@ -6684,6 +6702,46 @@ mod tests {
 
         assert!(!path.assignment_holds(t_int.when_true()));
         assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 0);
+    }
+
+    #[test]
+    fn path_assignments_rechecks_implications_to_constraints_discovered_on_sibling_paths() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_bool = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Bool.to_instance(&db),
+        );
+        let t_int = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Int.to_instance(&db),
+        );
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str)
+            .node
+            .root_constraint(&builder)
+            .unwrap();
+        let mut path = PathAssignments::new([t_bool, u_str]);
+
+        path.walk_edge(&db, &builder, t_bool.when_true(), 0, |_, _| ())
+            .unwrap();
+        path.walk_edge(&db, &builder, u_str.when_true(), 1, |path, _| {
+            path.add_assignment(&db, &builder, t_int.when_true(), 1, true)
+                .unwrap();
+        })
+        .unwrap();
+
+        path.add_assignment(&db, &builder, t_bool.when_true(), 0, false)
+            .unwrap();
+
+        assert!(path.assignment_holds(t_int.when_true()));
     }
 
     #[test]
