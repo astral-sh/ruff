@@ -452,7 +452,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 self.check_declaration_identifier(&param_var.name);
             }
             AnyNodeRef::ExprStringLiteral(string_expr) => {
-                self.check_typed_dict_string_literal_key(string_expr);
+                self.check_typed_dict_dict_literal_key(string_expr);
 
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
@@ -469,8 +469,9 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     sub_finder.visit_expr(sub_ast.expr());
                 }
             }
-            AnyNodeRef::ExprNumberLiteral(number_expr) => {
-                self.check_named_tuple_subscript_index(number_expr);
+            AnyNodeRef::ExprSubscript(subscript) => {
+                self.check_typed_dict_subscript_key(subscript);
+                self.check_named_tuple_subscript_index(subscript);
             }
             AnyNodeRef::Alias(alias) => {
                 // Handle import alias declarations
@@ -533,43 +534,50 @@ impl<'a> LocalReferencesFinder<'a> {
         self.check_identifier(identifier, OccurrenceKind::Declaration);
     }
 
-    fn check_typed_dict_string_literal_key(&mut self, string_expr: &ast::ExprStringLiteral) {
+    fn check_typed_dict_subscript_key(&mut self, subscript: &ast::ExprSubscript) {
+        let Some(string_expr) = subscript.slice.as_string_literal_expr() else {
+            return;
+        };
+
         let key = string_expr.value.to_str();
         if key != self.target_text {
             return;
         }
 
+        let Some(current_definition) = typed_dict_key_definition(self.model, subscript, key) else {
+            return;
+        };
+
+        self.push_typed_dict_string_key_reference(string_expr, current_definition);
+    }
+
+    fn check_typed_dict_dict_literal_key(&mut self, string_expr: &ast::ExprStringLiteral) {
+        let key = string_expr.value.to_str();
+        if key != self.target_text {
+            return;
+        }
+
+        let Some(dict) = self.enclosing_dict_with_key(string_expr) else {
+            return;
+        };
+
         let Some(current_definition) =
-            self.typed_dict_key_definition_for_string_literal(string_expr, key)
+            typed_dict_dict_literal_key_definition(self.model, dict, key)
         else {
             return;
         };
 
-        if !self.target_definitions.contains(&current_definition) {
-            return;
-        }
-
-        self.references.push(ReferenceTarget::new(
-            self.model.file(),
-            string_expr.range(),
-            ReferenceKind::Read,
-        ));
+        self.push_typed_dict_string_key_reference(string_expr, current_definition);
     }
 
-    fn typed_dict_key_definition_for_string_literal(
+    fn enclosing_dict_with_key(
         &self,
         string_expr: &ast::ExprStringLiteral,
-        key: &str,
-    ) -> Option<ResolvedDefinition<'a>> {
+    ) -> Option<&'a ast::ExprDict> {
         self.ancestors
             .iter()
             .rev()
             .find_map(|ancestor| match ancestor {
-                AnyNodeRef::ExprSubscript(subscript)
-                    if subscript.slice.range() == string_expr.range() =>
-                {
-                    typed_dict_key_definition(self.model, subscript, key)
-                }
                 AnyNodeRef::ExprDict(dict)
                     if dict.items.iter().any(|item| {
                         item.key
@@ -577,22 +585,25 @@ impl<'a> LocalReferencesFinder<'a> {
                             .is_some_and(|item_key| item_key.range() == string_expr.range())
                     }) =>
                 {
-                    typed_dict_dict_literal_key_definition(self.model, dict, key)
+                    Some(*dict)
                 }
+                AnyNodeRef::ExprSubscript(_) => None,
                 _ => None,
             })
     }
 
-    fn check_named_tuple_subscript_index(&mut self, number_expr: &ast::ExprNumberLiteral) {
-        let Some((current_definition, range)) =
-            self.named_tuple_field_definition_for_number_literal(number_expr)
-        else {
-            return;
-        };
-
+    fn push_typed_dict_string_key_reference(
+        &mut self,
+        string_expr: &ast::ExprStringLiteral,
+        current_definition: ResolvedDefinition<'a>,
+    ) {
         if !self.target_definitions.contains(&current_definition) {
             return;
         }
+
+        let Some(range) = self.string_literal_reference_range(string_expr) else {
+            return;
+        };
 
         self.references.push(ReferenceTarget::new(
             self.model.file(),
@@ -601,23 +612,46 @@ impl<'a> LocalReferencesFinder<'a> {
         ));
     }
 
-    fn named_tuple_field_definition_for_number_literal(
+    fn string_literal_reference_range(
         &self,
-        number_expr: &ast::ExprNumberLiteral,
-    ) -> Option<(ResolvedDefinition<'a>, TextRange)> {
-        self.ancestors.iter().rev().find_map(|ancestor| {
-            let AnyNodeRef::ExprSubscript(subscript) = ancestor else {
-                return None;
-            };
-            if !subscript.slice.range().contains_range(number_expr.range()) {
-                return None;
+        string_expr: &ast::ExprStringLiteral,
+    ) -> Option<TextRange> {
+        match self.mode {
+            ReferencesMode::Rename | ReferencesMode::RenameMultiFile => {
+                Some(string_expr.as_single_part_string()?.content_range())
             }
-            let target = named_tuple_field_target(self.model, subscript)?;
-            Some((
-                ResolvedDefinition::Definition(target.definition),
-                subscript.slice.range(),
-            ))
-        })
+            ReferencesMode::References
+            | ReferencesMode::ReferencesSkipDeclaration
+            | ReferencesMode::DocumentHighlights => Some(string_expr.range()),
+        }
+    }
+
+    fn check_named_tuple_subscript_index(&mut self, subscript: &ast::ExprSubscript) {
+        if matches!(
+            self.mode,
+            ReferencesMode::Rename | ReferencesMode::RenameMultiFile
+        ) {
+            return;
+        }
+
+        if !is_number_literal_subscript(subscript) {
+            return;
+        }
+
+        let Some(target) = named_tuple_field_target(self.model, subscript) else {
+            return;
+        };
+
+        let current_definition = ResolvedDefinition::Definition(target.definition);
+        if !self.target_definitions.contains(&current_definition) {
+            return;
+        }
+
+        self.references.push(ReferenceTarget::new(
+            self.model.file(),
+            subscript.slice.range(),
+            ReferenceKind::Read,
+        ));
     }
 
     fn check_identifier(&mut self, identifier: &ast::Identifier, kind: OccurrenceKind) {
@@ -723,6 +757,18 @@ impl<'a> LocalReferencesFinder<'a> {
                     DefinitionState::Deleted | DefinitionState::Undefined
                 )
             })
+    }
+}
+
+fn is_number_literal_subscript(subscript: &ast::ExprSubscript) -> bool {
+    match &*subscript.slice {
+        ast::Expr::NumberLiteral(_) => true,
+        ast::Expr::UnaryOp(unary_op)
+            if matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd) =>
+        {
+            matches!(&*unary_op.operand, ast::Expr::NumberLiteral(_))
+        }
+        _ => false,
     }
 }
 

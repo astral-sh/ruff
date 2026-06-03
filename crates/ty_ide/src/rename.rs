@@ -1,4 +1,4 @@
-use crate::goto::find_goto_target;
+use crate::goto::{GotoTarget, find_goto_target};
 use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
@@ -14,10 +14,10 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
     // Get the definitions for the symbol at the offset
     let goto_target = find_goto_target(&model, &module, offset)?;
 
-    // Don't allow renaming of import module components
+    // Don't allow renaming of import module components or index-based field references.
     if matches!(
         goto_target,
-        crate::goto::GotoTarget::ImportModuleComponent { .. }
+        GotoTarget::ImportModuleComponent { .. } | GotoTarget::SubscriptNamedTupleField { .. }
     ) {
         return None;
     }
@@ -43,7 +43,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
         }
     }
 
-    Some(goto_target.range())
+    Some(rename_range(goto_target)?)
 }
 
 /// Perform a rename operation on the symbol at the given position.
@@ -86,6 +86,22 @@ pub fn rename(
 /// Helper function to check if a file is included in the project.
 fn is_file_in_project(db: &dyn Db, file: File) -> bool {
     file.path(db).is_system_virtual_path() || db.project().files(db).contains(&file)
+}
+
+fn rename_range(goto_target: GotoTarget<'_>) -> Option<ruff_text_size::TextRange> {
+    match goto_target {
+        GotoTarget::SubscriptStringLiteralKey { subscript, .. } => Some(
+            subscript
+                .slice
+                .as_string_literal_expr()?
+                .as_single_part_string()?
+                .content_range(),
+        ),
+        GotoTarget::DictStringLiteralKey { string_expr, .. } => {
+            Some(string_expr.as_single_part_string()?.content_range())
+        }
+        _ => Some(goto_target.range()),
+    }
 }
 
 #[cfg(test)]
@@ -1248,6 +1264,81 @@ TD(f<CURSOR>=1)
     }
 
     #[test]
+    fn rename_typeddict_field_string_keys() {
+        let test = cursor_test(
+            r#"
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title<CURSOR>: str
+
+movie: Movie = {"title": "Alien"}
+print(movie["title"])
+"#,
+        );
+
+        assert_snapshot!(test.rename("name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:5:5
+          |
+        5 |     title: str
+          |     ^^^^^
+        6 |
+        7 | movie: Movie = {"title": "Alien"}
+          |                  -----
+        8 | print(movie["title"])
+          |              -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_typeddict_field_from_string_key() {
+        let test = cursor_test(
+            r#"
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+movie: Movie = {"title": "Alien"}
+print(movie["ti<CURSOR>tle"])
+"#,
+        );
+
+        assert_snapshot!(test.rename("name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:5:5
+          |
+        5 |     title: str
+          |     ^^^^^
+        6 |
+        7 | movie: Movie = {"title": "Alien"}
+          |                  -----
+        8 | print(movie["title"])
+          |              -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn prepare_rename_typeddict_field_from_string_key() {
+        let test = cursor_test(
+            r#"
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+movie: Movie = {"title": "Alien"}
+print(movie["ti<CURSOR>tle"])
+"#,
+        );
+
+        assert_snapshot!(test.prepare_rename(), @"Can rename symbol at range 118..123");
+    }
+
+    #[test]
     fn rename_keyword_argument_namedtuple_field() {
         let test = cursor_test(
             "
@@ -1257,22 +1348,44 @@ class NT(NamedTuple):
     f<CURSOR>: int
     g: str
 
-NT(f=1)
+nt = NT(f=1, g=\"\")
+print(nt.f)
+print(nt[0])
 ",
         );
 
-        assert_snapshot!(test.rename("z"), @"
-        info[rename]: Rename symbol (found 2 locations)
+        assert_snapshot!(test.rename("z"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
          --> main.py:5:5
           |
         5 |     f: int
           |     ^
         6 |     g: str
         7 |
-        8 | NT(f=1)
-          |    -
+        8 | nt = NT(f=1, g="")
+          |         -
+        9 | print(nt.f)
+          |          -
           |
-        ");
+        "#);
+    }
+
+    #[test]
+    fn prepare_rename_namedtuple_index() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class NT(NamedTuple):
+    f: int
+    g: str
+
+nt = NT(f=1, g=\"\")
+print(nt[0<CURSOR>])
+",
+        );
+
+        assert_snapshot!(test.prepare_rename(), @"Cannot rename");
     }
 
     #[test]

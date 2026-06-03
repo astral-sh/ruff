@@ -243,8 +243,8 @@ pub(crate) enum GotoTarget<'a> {
     /// Go to on a string-literal key in a `TypedDict` dict literal (e.g. `{"name": "Alice"}`).
     DictStringLiteralKey {
         dict: &'a ast::ExprDict,
+        string_expr: &'a ast::ExprStringLiteral,
         literal_key: &'a str,
-        key_range: TextRange,
     },
 
     /// Go to on an integer-literal subscript for a `NamedTuple` field (e.g. `point[0]`).
@@ -1317,7 +1317,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::BinOp { operator_range, .. }
             | GotoTarget::UnaryOp { operator_range, .. } => *operator_range,
             GotoTarget::SubscriptStringLiteralKey { subscript, .. } => subscript.slice.range(),
-            GotoTarget::DictStringLiteralKey { key_range, .. } => *key_range,
+            GotoTarget::DictStringLiteralKey { string_expr, .. } => string_expr.range(),
             GotoTarget::SubscriptNamedTupleField { subscript, .. } => subscript.slice.range(),
         }
     }
@@ -1358,8 +1358,8 @@ fn typed_dict_dict_literal_key_target<'a>(
 
     Some(GotoTarget::DictStringLiteralKey {
         dict,
+        string_expr,
         literal_key: key,
-        key_range: string_expr.range(),
     })
 }
 
