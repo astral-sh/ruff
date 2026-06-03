@@ -1114,7 +1114,9 @@ impl<'db> Type<'db> {
                         inner: Protocol::FromClass(class),
                         ..
                     }) if (has_nominal_class_constraint
-                        || owner.is_some_and(|owner| class.class_literal(db) != owner))
+                        || owner.is_some_and(|owner| {
+                            !class_mro_literals(db, class.class_literal(db)).contains(&owner)
+                        }))
                         && !class.is_known(db, KnownClass::NamedTupleLike)
                 );
             if !is_value_refinement {

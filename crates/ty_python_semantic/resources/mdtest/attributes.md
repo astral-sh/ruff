@@ -1963,6 +1963,17 @@ def _(value: VariableTruthProtocol):
     if value:
         reveal_type(value.copy())  # revealed: VariableTruthProtocol
 
+class BaseProtocol(Protocol):
+    def copy(self) -> Self: ...
+
+class ChildProtocol(BaseProtocol, Protocol):
+    def __bool__(self) -> bool: ...
+
+def clone(value: ChildProtocol) -> ChildProtocol:
+    if value:
+        return value.copy()
+    return value
+
 class MyTuple(tuple[int, ...]):
     def fresh(self) -> Self:
         return type(self)((1, 2, 3))
