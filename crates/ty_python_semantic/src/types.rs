@@ -1063,23 +1063,28 @@ impl<'db> Type<'db> {
 
     /// Return the part of a receiver type that describes its runtime class for `Self` binding.
     ///
-    /// Negative constraints and runtime-checkable protocol or truthiness refinements describe the
-    /// current value, but do not necessarily apply to another instance returned as `Self`.
+    /// Negative constraints and flow refinements describe the current value, but do not necessarily
+    /// apply to another instance returned as `Self`.
     pub(crate) fn self_binding_type(self, db: &'db dyn Db) -> Self {
         let Type::Intersection(intersection) = self else {
             return self;
         };
 
+        let has_nominal_class_constraint = intersection.positive(db).iter().any(|positive| {
+            !matches!(positive, Type::ProtocolInstance(_)) && positive.nominal_class(db).is_some()
+        });
         let mut builder = IntersectionBuilder::new(db);
         for positive in intersection.positive(db) {
+            // `NamedTupleLike` is deliberately combined with a tuple type to describe
+            // `typing.NamedTuple`; unlike a user protocol, it is not a flow refinement.
             let is_flow_refinement = matches!(positive, Type::AlwaysTruthy | Type::AlwaysFalsy)
                 || matches!(
                     positive,
-                    Type::ProtocolInstance(protocol)
-                        if matches!(
-                            protocol.inner,
-                            Protocol::FromClass(class) if class.is_runtime_checkable(db)
-                        )
+                    Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::FromClass(class),
+                        ..
+                    }) if has_nominal_class_constraint
+                        && !class.is_known(db, KnownClass::NamedTupleLike)
                 );
             if !is_flow_refinement {
                 builder = builder.add_positive(*positive);

@@ -1867,7 +1867,7 @@ def _(a_and_b: Intersection[type[A], type[B]]):
 
 ```py
 from typing import Protocol, runtime_checkable
-from typing_extensions import Self
+from typing_extensions import Self, TypeIs
 
 class VariableTruth:
     other: Self
@@ -1907,6 +1907,26 @@ def _(value: Value):
         reveal_type(value.copy())  # revealed: Value
         reveal_type(value.other)  # revealed: Value
         reveal_type(value.property)  # revealed: Value
+
+@runtime_checkable
+class VariableTruthProtocol(Protocol):
+    def __bool__(self) -> bool: ...
+    def copy(self) -> Self: ...
+
+def _(value: VariableTruthProtocol):
+    if value:
+        reveal_type(value.copy())  # revealed: VariableTruthProtocol
+
+class TypeIsMarker(Protocol):
+    marker: int
+
+def is_marker(value: object) -> TypeIs[TypeIsMarker]:
+    return hasattr(value, "marker")
+
+def _(value: Value):
+    if is_marker(value):
+        reveal_type(value.copy())  # revealed: Value
+        value.copy().marker  # error: [unresolved-attribute]
 ```
 
 ### Descriptor binding uses the full intersection type
