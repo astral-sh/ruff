@@ -1837,6 +1837,43 @@ class C[T]:
     }
 
     #[test]
+    fn shadowed_collection_constructor_is_not_indexed() {
+        let TestCase { db, file } = test_case(
+            "
+def set(): ...
+result = set()
+result.add(1)
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file).load(&db);
+        let ast = module.syntax();
+
+        let assignment = ast.body[1].as_assign_stmt().unwrap();
+        let constructor = assignment.value.as_call_expr().unwrap();
+        let use_expression = ast.body[2]
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap()
+            .func
+            .as_attribute_expr()
+            .unwrap()
+            .value
+            .as_ref();
+
+        assert!(!index.is_standalone_expression(&assignment.value));
+        assert!(!index.is_standalone_expression(constructor.func.as_ref()));
+        assert!(
+            index
+                .unconstrained_collection_binding(use_expression)
+                .is_none()
+        );
+    }
+
+    #[test]
     fn scope_iterators() {
         fn scope_names<'a, 'db>(
             scopes: impl Iterator<Item = (FileScopeId, &'db Scope)>,

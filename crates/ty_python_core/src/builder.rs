@@ -966,16 +966,38 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.ast_ids[scope_id]
     }
 
+    /// Returns whether `expr` can still be an unconstrained collection initializer based on the
+    /// bindings recorded so far.
+    ///
+    /// Type inference performs the final semantic qualification. This check only avoids indexing
+    /// constructor calls whose names are already known to be shadowed.
+    fn is_potentially_unconstrained_collection_initializer(
+        &self,
+        expr: &ast::Expr,
+        scope: FileScopeId,
+    ) -> bool {
+        let Some(func) = empty_collection_constructor_callable(expr) else {
+            return is_unconstrained_collection_literal(expr);
+        };
+        let ast::Expr::Name(name) = func else {
+            return false;
+        };
+
+        self.visible_ancestor_scopes(scope).all(|(scope, _)| {
+            let place_table = &self.place_tables[scope];
+            place_table
+                .symbol_id(name.id.as_str())
+                .is_none_or(|symbol| !place_table.symbol(symbol).is_local())
+        })
+    }
+
     /// If the given expression is a use of an unconstrained collection literal, returns its
     /// definition.
     fn unconstrained_collection_literal_binding(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
-        self.unconstrained_collection_binding_impl(
-            collection_use,
-            is_unconstrained_collection_literal,
-        )
+        self.unconstrained_collection_binding_impl(collection_use, false)
     }
 
     /// If the given expression is a use of a potentially unconstrained collection initializer,
@@ -984,16 +1006,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
-        self.unconstrained_collection_binding_impl(
-            collection_use,
-            is_potentially_unconstrained_collection_initializer,
-        )
+        self.unconstrained_collection_binding_impl(collection_use, true)
     }
 
     fn unconstrained_collection_binding_impl(
         &self,
         collection_use: &ast::Expr,
-        is_collection_initializer: impl Fn(&ast::Expr) -> bool,
+        include_constructor_calls: bool,
     ) -> Option<Definition<'db>> {
         let use_def = self.current_use_def_map();
         let use_id = self.current_ast_ids().try_use_id(collection_use)?;
@@ -1006,7 +1025,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .kind(self.db)
                     .as_unannotated_assignment()
                     .is_some_and(|assignment| {
-                        is_collection_initializer(assignment.value(self.module))
+                        let initializer = assignment.value(self.module);
+                        if include_constructor_calls {
+                            self.is_potentially_unconstrained_collection_initializer(
+                                initializer,
+                                definition.file_scope(self.db),
+                            )
+                        } else {
+                            is_unconstrained_collection_literal(initializer)
+                        }
                     })
             })
             // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
@@ -2988,7 +3015,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Potentially unconstrained collection initializers must be standalone expressions
                 // to participate in full-scope bidirectional inference.
                 if node.targets.len() == 1
-                    && is_potentially_unconstrained_collection_initializer(&node.value)
+                    && self.is_potentially_unconstrained_collection_initializer(
+                        &node.value,
+                        self.current_scope(),
+                    )
                 {
                     if let Some(func) = empty_collection_constructor_callable(&node.value) {
                         self.add_standalone_expression(func);
@@ -4824,11 +4854,6 @@ pub(crate) fn is_unconstrained_collection_literal(expr: &ast::Expr) -> bool {
         ast::Expr::Dict(dict) => dict.items.is_empty(),
         _ => false,
     }
-}
-
-fn is_potentially_unconstrained_collection_initializer(expr: &ast::Expr) -> bool {
-    is_unconstrained_collection_literal(expr)
-        || empty_collection_constructor_callable(expr).is_some()
 }
 
 fn empty_collection_constructor_callable(expr: &ast::Expr) -> Option<&ast::Expr> {
