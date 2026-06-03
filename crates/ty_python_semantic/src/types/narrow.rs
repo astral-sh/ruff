@@ -1499,6 +1499,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     return;
                 };
 
+                // `False == 0` and `True == 1`, so the protocol must accept both literals.
                 let protocol_length = match length_literal {
                     0 => UnionType::from_two_elements(
                         self.db,

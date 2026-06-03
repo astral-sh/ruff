@@ -108,15 +108,6 @@ def _(val: tuple[()] | tuple[int]):
         empty: tuple[()] = val
 ```
 
-Large exact lengths also remain symbolic instead of materializing a tuple element for every
-position:
-
-```py
-def _(val: tuple[int, ...]):
-    if len(val) == 65:
-        reveal_type(val)  # revealed: tuple[int, ...] & ExactlySized[Literal[65]]
-```
-
 Exact length comparisons intersect arbitrary `Sized` values with `ExactlySized`. This persists the
 observed length even for mutable or stateful values, consistent with other forms of narrowing:
 

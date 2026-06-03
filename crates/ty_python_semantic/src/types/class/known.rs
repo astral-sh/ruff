@@ -132,7 +132,6 @@ pub enum KnownClass {
     // _typeshed._type_checker_internals
     NamedTupleFallback,
     NamedTupleLike,
-    ExactlySized,
     TypedDictFallback,
     // string.templatelib
     Template,
@@ -141,6 +140,7 @@ pub enum KnownClass {
     // functools
     FunctoolsPartial,
     // ty_extensions
+    ExactlySized,
     ConstraintSet,
     GenericContext,
     Specialization,

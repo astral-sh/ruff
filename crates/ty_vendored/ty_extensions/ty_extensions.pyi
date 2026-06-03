@@ -1,7 +1,7 @@
 # ruff: noqa: PYI021
 import sys
 import types
-from collections.abc import Iterable, Sized
+from collections.abc import Iterable
 from enum import Enum
 from typing import Any, ClassVar, Protocol, _SpecialForm
 
@@ -319,7 +319,7 @@ class NamedTupleLike(Protocol):
     if sys.version_info >= (3, 13):
         def __replace__(self, *args, **kwargs) -> Self: ...
 
-class ExactlySized[Length: int](Sized, Protocol):
+class ExactlySized[Length: int](Protocol):
     """A protocol for objects whose length is statically known."""
 
     def __len__(self) -> Length: ...
