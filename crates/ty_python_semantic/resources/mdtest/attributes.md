@@ -2026,6 +2026,11 @@ class CopyableProtocol(Protocol):
     @property
     def property(self) -> Self: ...
 
+class NominalCopyable: ...
+
+def _(value: Intersection[NominalCopyable, CopyableProtocol]):
+    value.copy().copy()
+
 def _(value: CopyableProtocol):
     if is_marker(value):
         reveal_type(value.copy())  # revealed: CopyableProtocol

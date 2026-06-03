@@ -1114,7 +1114,7 @@ impl<'db> Type<'db> {
                     Type::ProtocolInstance(ProtocolInstanceType {
                         inner: Protocol::FromClass(class),
                         ..
-                    }) if (has_nominal_class_constraint
+                    }) if ((owner.is_none() && has_nominal_class_constraint)
                         || owner.is_some_and(|owner| {
                             !class_mro_literals(db, class.class_literal(db)).contains(&owner)
                         }))
