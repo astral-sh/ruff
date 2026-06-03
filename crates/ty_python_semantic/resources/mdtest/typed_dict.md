@@ -3019,6 +3019,10 @@ TotalNone = TypedDict("TotalNone", {"id": int}, total=None)
 def f(total: bool) -> None:
     # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
     TotalDynamic = TypedDict("TotalDynamic", {"id": int}, total=total)
+
+# An expression that evaluates to a bool literal is still not a literal expression:
+# error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+TotalExpression = TypedDict("TotalExpression", {"id": int}, total=1 == 1)
 ```
 
 ## Function syntax with `Required` and `NotRequired`
@@ -3088,6 +3092,10 @@ ClosedNone = TypedDict("ClosedNone", {"id": int}, closed=None)
 def f(closed: bool) -> None:
     # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
     ClosedDynamic = TypedDict("ClosedDynamic", {"id": int}, closed=closed)
+
+# An expression that evaluates to a bool literal is still not a literal expression:
+# error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+ClosedExpression = TypedDict("ClosedExpression", {"id": int}, closed=1 == 1)
 ```
 
 ## Function syntax with `extra_items`
@@ -5089,6 +5097,13 @@ And variadic keywords are also banned:
 ```py
 def f(kwargs: dict):
     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
+```
+
+Literal-valued expressions are not literal arguments:
+
+```py
+class Qux(TypedDict, total=1 == 1): ...  # error: [invalid-argument-type]
+class Quux(TypedDict, closed=1 == 1): ...  # error: [invalid-argument-type]
 ```
 
 ## PEP 728 (`closed` and `extra_items`)

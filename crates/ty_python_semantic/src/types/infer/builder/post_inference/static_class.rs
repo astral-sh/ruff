@@ -655,9 +655,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 match keyword.arg.as_deref() {
                     Some(arg_name @ ("total" | "closed")) => {
                         let passed_type = file_expression_type(&keyword.value);
-                        if passed_type
-                            .as_literal_value()
-                            .is_none_or(|literal| !literal.is_bool())
+                        if !keyword.value.is_boolean_literal_expr()
                             && let Some(builder) =
                                 context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
                         {
