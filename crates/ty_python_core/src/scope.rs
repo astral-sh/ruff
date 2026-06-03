@@ -3,6 +3,7 @@ use std::ops::Range;
 use ruff_db::{files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
     Db, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition, node_key::NodeKey,
@@ -392,6 +393,24 @@ impl NodeWithScopeKind {
             | Self::SetComprehension(_)
             | Self::DictComprehension(_)
             | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
+        }
+    }
+
+    pub fn range(&self, module: &ParsedModuleRef) -> TextRange {
+        match self {
+            Self::Module => module.syntax().range(),
+            Self::Class(class) | Self::ClassTypeParameters(class) => class.node(module).range(),
+            Self::Function(function) | Self::FunctionTypeParameters(function) => {
+                function.node(module).range()
+            }
+            Self::TypeAlias(type_alias) | Self::TypeAliasTypeParameters(type_alias) => {
+                type_alias.node(module).range()
+            }
+            Self::Lambda(lambda) => lambda.node(module).range(),
+            Self::ListComprehension(comprehension) => comprehension.node(module).range(),
+            Self::SetComprehension(comprehension) => comprehension.node(module).range(),
+            Self::DictComprehension(comprehension) => comprehension.node(module).range(),
+            Self::GeneratorExpression(generator) => generator.node(module).range(),
         }
     }
 
