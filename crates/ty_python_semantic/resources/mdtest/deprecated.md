@@ -38,6 +38,73 @@ MyClass.afunc()  # error: [deprecated] "use something else"
 MyClass().amethod()  # error: [deprecated] "don't use this!"
 ```
 
+## Decorator order
+
+`@deprecated` applies to the result of any inner decorators. If an inner decorator replaces a
+function with a different function, the public binding should be deprecated without marking the
+replacement function itself as deprecated.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+from ty_extensions import TypeOf, is_assignable_to, is_equivalent_to, is_subtype_of, static_assert
+from typing_extensions import deprecated
+
+F = TypeVar("F", bound=Callable[..., Any])
+G = TypeVar("G", bound=Callable[..., Any])
+
+def replacement() -> str:
+    return "replacement"
+
+def other() -> str:
+    return "other"
+
+def replace_with(replacement: F) -> Callable[[Callable[..., Any]], F]:
+    def decorator(_: Callable[..., Any]) -> F:
+        return replacement
+    return decorator
+
+def replace_with_one_of(first: F, second: G) -> Callable[[Callable[..., Any]], F | G]:
+    def decorator(_: Callable[..., Any]) -> F | G:
+        return first
+    return decorator
+
+@deprecated("use replacement directly")
+@replace_with(replacement)
+def deprecated_binding() -> None: ...
+@replace_with(replacement)
+@deprecated("only the replaced function is deprecated")
+def replaced_deprecated_function() -> None: ...
+@deprecated("use replacement or other directly")
+@replace_with_one_of(replacement, other)
+def deprecated_union_binding() -> None: ...
+
+deprecated_binding()  # error: [deprecated] "use replacement directly"
+replacement()
+replaced_deprecated_function()
+deprecated_union_binding  # error: [deprecated] "use replacement or other directly"
+
+static_assert(is_equivalent_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
+static_assert(is_subtype_of(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
+static_assert(is_assignable_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
+
+flag = bool(input())
+if flag:
+    @deprecated("use replacement directly")
+    @replace_with(replacement)
+    def conditionally_defined() -> None: ...
+
+else:
+    @deprecated("use other directly")
+    @replace_with(other)
+    def conditionally_defined() -> None: ...
+
+conditionally_defined()  # TODO: error: [deprecated]
+```
+
+Deprecation attached to a decorated binding is currently only reported for direct module-level name
+loads with a single live binding. Merging this metadata across control flow is future work.
+
 ## Syntax
 
 <!-- snapshot-diagnostics -->

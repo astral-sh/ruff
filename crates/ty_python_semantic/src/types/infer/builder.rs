@@ -80,6 +80,7 @@ use crate::types::infer::{
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
+use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -325,6 +326,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
+    /// The `@deprecated` decorator attached to a decorated function's module-level binding.
+    binding_deprecation_decorator: Option<ExpressionNodeKey>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -376,6 +380,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: None,
             deferred: VecSet::default(),
             undecorated_type: None,
+            binding_deprecation_decorator: None,
             cycle_recovery: None,
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
@@ -8744,7 +8749,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
-    /// Check if the given ty is `@deprecated` or not
+    fn report_deprecated_function<T: Ranged>(
+        &self,
+        ranged: T,
+        name: &str,
+        deprecated: DeprecatedInstance,
+    ) {
+        let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
+            return;
+        };
+
+        let mut diag =
+            builder.into_diagnostic(format_args!(r#"The function `{name}` is deprecated"#));
+        if let Some(message) = deprecated.message {
+            diag.set_primary_message(message.value(self.db()));
+        }
+        diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    }
+
+    /// Check if the given type is `@deprecated`.
     fn check_deprecated<T: Ranged>(&self, ranged: T, ty: Type) {
         // First handle classes
         if let Type::ClassLiteral(class_literal) = ty {
@@ -8781,20 +8804,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let Some(builder) = self
-            .context
-            .report_lint(&crate::types::diagnostic::DEPRECATED, ranged)
-        else {
-            return;
-        };
-
-        let func_name = function.name(self.db());
-        let mut diag =
-            builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
-        if let Some(message) = deprecated.message {
-            diag.set_primary_message(message.value(self.db()));
-        }
-        diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+        self.report_deprecated_function(ranged, function.name(self.db()).as_str(), deprecated);
     }
 
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
@@ -9004,12 +9014,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
         let place_table = self.index.place_table(file_scope_id);
+        let use_def = self.index.use_def_map(file_scope_id);
 
         let mut constraint_keys = vec![];
         let (local_scope_place, use_id) = self.infer_local_place_load(place_expr, expr_ref);
         if let Some(use_id) = use_id {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
+
+        let binding_deprecation = if file_scope_id.is_global()
+            && place_expr.as_symbol().is_some()
+            && local_scope_place.is_definitely_bound()
+            && let Some(use_id) = use_id
+        {
+            let mut bindings = use_def.bindings_at_use(use_id);
+            match (
+                bindings.next().map(|binding| binding.binding),
+                bindings.next(),
+            ) {
+                (Some(DefinitionState::Defined(binding)), None)
+                    if binding.kind(db).is_function_def() =>
+                {
+                    infer_definition_types(db, binding).binding_deprecation(db, binding)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
             let mut symbol_resolves_locally = false;
@@ -9278,7 +9310,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if let Some(ty) = place.place.ignore_possibly_undefined() {
-            self.check_deprecated(expr_ref, ty);
+            if let Some(deprecated) = binding_deprecation
+                && let Some(symbol) = place_expr.as_symbol()
+            {
+                self.report_deprecated_function(expr_ref, symbol.name().as_str(), deprecated);
+            } else {
+                self.check_deprecated(expr_ref, ty);
+            }
         }
 
         (place, constraint_keys)
@@ -10187,6 +10225,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            binding_deprecation_decorator: _,
             discards_dict_key_assignments: _,
 
             // builder only state
@@ -10268,6 +10307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            binding_deprecation_decorator: _,
             discards_dict_key_assignments: _,
 
             // builder only state
@@ -10375,6 +10415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: _,
             dataclass_field_specifiers: _,
             undecorated_type: _,
+            binding_deprecation_decorator: _,
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10415,6 +10456,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             undecorated_type,
+            binding_deprecation_decorator,
             discards_dict_key_assignments,
             called_functions,
 
@@ -10436,6 +10478,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !expected_types.is_empty()
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
+            || binding_deprecation_decorator.is_some()
             || !deferred.is_empty()
             || !called_functions.is_empty()
             || !qualifiers.is_empty()
@@ -10457,6 +10500,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     deferred: deferred.into_boxed_slice(),
                     diagnostics,
                     undecorated_type,
+                    binding_deprecation_decorator,
                     discards_dict_key_assignments,
                     qualifiers: FrozenMap::from(qualifiers),
                 })
@@ -10508,6 +10552,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            binding_deprecation_decorator: _,
             discards_dict_key_assignments: _,
 
             // Builder only state
@@ -10581,6 +10626,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             called_functions: _,
             undecorated_type: _,
+            binding_deprecation_decorator: _,
             discards_dict_key_assignments: _,
             qualifiers: _,
             type_expression_flags: _,
@@ -10625,6 +10671,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            binding_deprecation_decorator: _,
             discards_dict_key_assignments: _,
 
             // builder only state

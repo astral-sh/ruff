@@ -32,7 +32,7 @@ use crate::{
     },
 };
 use ty_python_core::{
-    UseDefMap,
+    ExpressionNodeKey, UseDefMap,
     definition::{Definition, DefinitionKind},
     scope::NodeWithScopeRef,
 };
@@ -422,6 +422,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(db, function_literal, None));
+        let function_ty = inferred_ty;
         if !decorator_list.is_empty() {
             self.undecorated_type = Some(inferred_ty);
         }
@@ -450,6 +451,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
         }
+
+        let binding_deprecation_decorator = if !function_decorators
+            .contains(FunctionDecorators::OVERLOAD)
+            && definition.file_scope(db).is_global()
+            && inferred_ty != function_ty
+        {
+            decorator_list.first().and_then(|decorator| {
+                let decorator_ty = decorator_inference
+                    .as_ref()?
+                    .expression_type(&decorator.expression)?;
+                matches!(
+                    decorator_ty,
+                    Type::KnownInstance(KnownInstanceType::Deprecated(_))
+                )
+                .then(|| ExpressionNodeKey::from(&decorator.expression))
+            })
+        } else {
+            None
+        };
+        self.binding_deprecation_decorator = binding_deprecation_decorator;
 
         self.add_declaration_with_binding(
             function.into(),
