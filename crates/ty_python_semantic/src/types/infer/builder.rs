@@ -91,6 +91,7 @@ use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
+use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
@@ -5398,39 +5399,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .unwrap_or(return_ty)
     }
 
-    /// Infer the argument types for a single binding.
-    fn infer_argument_types<'a>(
-        &mut self,
-        ast_arguments: &ast::Arguments,
-        arguments: &mut CallArguments<'a, 'db>,
-        argument_forms: &[Option<ParameterForm>],
-    ) {
-        debug_assert!(
-            ast_arguments.len() == arguments.len() && arguments.len() == argument_forms.len()
-        );
-
-        let iter = itertools::izip!(
-            arguments.iter_mut(),
-            argument_forms.iter().copied(),
-            ast_arguments.iter_source_order()
-        );
-
-        for ((_, argument_types), argument_form, ast_argument) in iter {
-            // Splatted arguments are inferred before parameter matching to
-            // determine their length.
-            if ast_argument.is_variadic() {
-                continue;
-            }
-
-            let ty = self.infer_argument_type(
-                ast_argument.value(),
-                argument_form,
-                TypeContext::default(),
-            );
-            argument_types.insert(TypeContext::default(), ty);
-        }
-    }
-
     #[expect(clippy::too_many_arguments)]
     fn infer_and_try_call_dunder(
         &mut self,
@@ -5833,18 +5801,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.teardown_expression_cache();
                 }
             }
-        }
-    }
-
-    fn infer_argument_type(
-        &mut self,
-        ast_argument: &ast::Expr,
-        form: Option<ParameterForm>,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        match form {
-            None | Some(ParameterForm::Value) => self.infer_expression(ast_argument, tcx),
-            Some(ParameterForm::Type) => self.infer_type_expression(ast_argument),
         }
     }
 
@@ -8233,7 +8189,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let value_type = self.expression_type(value);
 
             if let Type::TypedDict(typed_dict_ty) = value_type
-                && matches!(attr.id.as_str(), "pop" | "setdefault")
+                && matches!(attr.id.as_str(), "get" | "pop" | "setdefault")
                 && !arguments.args.is_empty()
 
                 // Validate the key argument for `TypedDict` methods
@@ -8246,13 +8202,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let key = key_literal.to_str();
                 let items = typed_dict_ty.items(self.db());
 
-                // Check if key exists
-                if let Some((_, field)) = items
-                    .iter()
-                    .find(|(field_name, _)| field_name.as_str() == key)
-                {
+                if let Some(field) = typed_dict_ty.item(self.db(), key) {
                     // Key exists - check if it's a `pop()` on a required field
-                    if attr.id.as_str() == "pop" && field.is_required() {
+                    if items.contains_key(key) && attr.id.as_str() == "pop" && field.is_required() {
                         report_cannot_pop_required_field_on_typed_dict(
                             &self.context,
                             first_arg.into(),
@@ -8261,7 +8213,73 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                         return Type::unknown();
                     }
-                } else {
+
+                    if !items.contains_key(key)
+                        && attr.id.as_str() == "get"
+                        && arguments.keywords.is_empty()
+                        && matches!(arguments.args.len(), 1 | 2)
+                    {
+                        let default_ty = if let Some(default) = arguments.args.get(1) {
+                            self.get_or_infer_expression(default, TypeContext::default())
+                        } else {
+                            Type::none(self.db())
+                        };
+                        return UnionType::from_two_elements(
+                            self.db(),
+                            field.declared_ty,
+                            default_ty,
+                        );
+                    }
+
+                    // Unknown literal keys are concrete extra items, so mutating operations can
+                    // use their extra-items type even when arbitrary `str` keys are unsafe.
+                    if !items.contains_key(key) && !field.is_read_only() {
+                        match attr.id.as_str() {
+                            "pop"
+                                if arguments.keywords.is_empty()
+                                    && matches!(arguments.args.len(), 1 | 2) =>
+                            {
+                                return arguments.args.get(1).map_or(
+                                    field.declared_ty,
+                                    |default| {
+                                        UnionType::from_two_elements(
+                                            self.db(),
+                                            field.declared_ty,
+                                            self.get_or_infer_expression(
+                                                default,
+                                                TypeContext::default(),
+                                            ),
+                                        )
+                                    },
+                                );
+                            }
+                            "setdefault"
+                                if arguments.keywords.is_empty() && arguments.args.len() == 2 =>
+                            {
+                                let default = &arguments.args[1];
+                                let default_ty = self.get_or_infer_expression(
+                                    default,
+                                    TypeContext::new(Some(field.declared_ty)),
+                                );
+                                TypedDictKeyAssignment {
+                                    context: &self.context,
+                                    typed_dict: typed_dict_ty,
+                                    full_object_ty: None,
+                                    key,
+                                    value_ty: default_ty,
+                                    typed_dict_node: value.as_ref().into(),
+                                    key_node: first_arg.into(),
+                                    value_node: default.into(),
+                                    assignment_kind: TypedDictAssignmentKind::Constructor,
+                                    emit_diagnostic: true,
+                                }
+                                .validate();
+                                return field.declared_ty;
+                            }
+                            _ => {}
+                        }
+                    }
+                } else if attr.id.as_str() != "get" {
                     // Key not found, report error with suggestion and return early
                     let key_ty = Type::string_literal(self.db(), key);
                     report_invalid_key_on_typed_dict(
@@ -10606,12 +10624,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions,
             scope,
             cycle_recovery,
+            qualifiers,
 
             // Ignored, never leaked into other scopes
             deferred: _,
             bindings: _,
             declarations: _,
-            qualifiers: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -10636,11 +10654,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !diagnostics.is_empty()
             || cycle_recovery.is_some()
             || !type_expression_flags.is_empty()
-            || !collection_use_constraints.is_empty())
+            || !collection_use_constraints.is_empty()
+            || !qualifiers.is_empty())
         .then(|| {
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
                 string_annotations: FrozenSet::from(string_annotations),
+                qualifiers: FrozenMap::from(qualifiers),
                 expected_types: FrozenMap::from(expected_types),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,

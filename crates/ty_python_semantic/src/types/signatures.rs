@@ -40,6 +40,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
     ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
+    TypedDictType,
     UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -3179,7 +3180,7 @@ pub(crate) enum ParametersKind<'db> {
 /// proper. For example, even if this represents a `Gradual` form, the `value` field should still
 /// contain the `*args: Any` and `**kwargs: Any` parameter. A `**kwargs: Unpack[TypedDict]`
 /// parameter is normalized to the keyword-only parameters exposed to callers plus a possible
-/// trailing `**kwargs` parameter for the extra items accepted by open `TypedDict`s.
+/// trailing `**kwargs` parameter for explicit extra items.
 ///
 /// The `kind` field is used to indicate the specific form of the parameter list which can,
 /// optionally, include additional information such as the bound `ParamSpec` type variable.
@@ -3214,8 +3215,8 @@ impl<'db> Parameters<'db> {
     /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
     /// and the presence of other parameter kinds to determine if they represent a gradual form, a
     /// `ParamSpec`, or a `Concatenate` form. `**kwargs: Unpack[TypedDict]` is normalized here by
-    /// synthesizing keyword-only parameters for the unpacked keys and keeping a trailing
-    /// `**kwargs` parameter for extra items on open `TypedDict`s.
+    /// synthesizing keyword-only parameters for the unpacked keys and a trailing `**kwargs`
+    /// parameter for explicit extra items.
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
@@ -3224,7 +3225,10 @@ impl<'db> Parameters<'db> {
         let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
 
         for parameter in parameters {
-            if let Some(unpacked_keys) = parameter.unpacked_typed_dict_keys(db) {
+            if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db) {
+                let unpacked_keys = parameter
+                    .unpacked_typed_dict_keys(db)
+                    .expect("a TypedDict should expose unpacked keys");
                 let kwargs_name = parameter
                     .name()
                     .expect("keyword variadic parameter always has a name")
@@ -3248,11 +3252,12 @@ impl<'db> Parameters<'db> {
                     );
                 }
 
-                // TODO: Use the unpacked `TypedDict`'s `extra_items` type instead of `object`.
-                // TODO: Omit `**kwargs` here for closed `TypedDict`s.
-                value.push(
-                    Parameter::keyword_variadic(kwargs_name).with_annotated_type(Type::object()),
-                );
+                if let Some(extra_items) = unpacked_typed_dict.explicit_extra_items(db) {
+                    value.push(
+                        Parameter::keyword_variadic(kwargs_name)
+                            .with_annotated_type(extra_items.declared_ty),
+                    );
+                }
             } else {
                 value.push(parameter);
             }
@@ -4181,12 +4186,18 @@ impl<'db> Parameter<'db> {
         &self,
         db: &'db dyn Db,
     ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+        self.unpacked_typed_dict(db).and_then(|typed_dict| {
+            extract_unpacked_typed_dict_keys_from_value_type(db, Type::TypedDict(typed_dict))
+        })
+    }
+
+    fn unpacked_typed_dict(&self, db: &'db dyn Db) -> Option<TypedDictType<'db>> {
         (self.is_keyword_variadic()
             && matches!(
                 self.annotation_kind,
                 ParameterAnnotationKind::UnpackedTypedDictKwargs
             ))
-        .then(|| extract_unpacked_typed_dict_keys_from_value_type(db, self.annotated_type))
+        .then(|| self.annotated_type.resolve_type_alias(db).as_typed_dict())
         .flatten()
     }
 

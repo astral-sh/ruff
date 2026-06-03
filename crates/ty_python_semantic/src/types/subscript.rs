@@ -485,6 +485,11 @@ fn typed_dict_subscript<'db>(
         .as_string_literal()
         .map(|literal| literal.value(db))
     else {
+        if typed_dict.explicit_extra_items(db).is_some()
+            && slice_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+        {
+            return Ok(typed_dict.value_type(db));
+        }
         return Err(SubscriptError::new(
             Type::unknown(),
             SubscriptErrorKind::InvalidTypedDictKey {
@@ -495,7 +500,7 @@ fn typed_dict_subscript<'db>(
         ));
     };
 
-    typed_dict.items(db).get(key).map_or_else(
+    typed_dict.item(db, key).map_or_else(
         || {
             Err(SubscriptError::new(
                 Type::unknown(),

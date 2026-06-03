@@ -46,8 +46,8 @@ use crate::{
         member::{Member, class_member},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
-        tuple::{FixedLengthTuple, Tuple},
-        typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
+        tuple::{FixedLengthTuple, Tuple, TupleSpec, TupleType},
+        typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
@@ -1099,9 +1099,13 @@ impl<'db> StaticClassLiteral<'db> {
 
         match result {
             ClassMemberResult::Done(result) => result.finalize(db),
-            ClassMemberResult::TypedDict => {
-                typed_dict_class_member(db, ClassLiteral::Static(self), policy, name)
-            }
+            ClassMemberResult::TypedDict => typed_dict_class_member(
+                db,
+                TypedDictType::new(self.identity_specialization(db)),
+                ClassLiteral::Static(self),
+                policy,
+                name,
+            ),
         }
     }
 
@@ -1636,11 +1640,14 @@ impl<'db> StaticClassLiteral<'db> {
                         Type::heterogeneous_tuple(db, slots)
                     })
             }
-            (CodeGeneratorKind::TypedDict, name) => {
-                synthesize_typed_dict_method(db, instance_ty, name, || {
-                    TypedDictFields::Static(self.fields(db, specialization, field_policy))
-                })
-            }
+            (CodeGeneratorKind::TypedDict, name) => synthesize_typed_dict_method(
+                db,
+                instance_ty
+                    .as_typed_dict()
+                    .expect("TypedDict code generation should use a TypedDict instance"),
+                name,
+                || TypedDictFields::Static(self.fields(db, specialization, field_policy)),
+            ),
             _ => None,
         }
     }
@@ -1758,22 +1765,13 @@ impl<'db> StaticClassLiteral<'db> {
         if let Some(member) = self.own_synthesized_member(db, specialization, None, name) {
             Place::bound(member).into()
         } else {
-            KnownClass::TypedDictFallback
-                .to_class_literal(db)
-                .find_name_in_mro_with_policy(db, name, policy)
-                .expect("`find_name_in_mro_with_policy` will return `Some()` when called on class literal")
-                .map_type(|ty| {
-                    let new_upper_bound = determine_upper_bound(
-                        db,
-                        ClassLiteral::Static(self),
-                        ClassBase::is_typed_dict
-                    );
-                    ty.apply_type_mapping(
-                        db,
-                        &TypeMapping::ReplaceSelf { new_upper_bound },
-                        TypeContext::default(),
-                    )
-                })
+            let class = match specialization {
+                Some(specialization) => {
+                    ClassType::Generic(GenericAlias::new(db, self, specialization))
+                }
+                None => self.identity_specialization(db),
+            };
+            typed_dict_class_member(db, TypedDictType::new(class), self.into(), policy, name)
         }
     }
 

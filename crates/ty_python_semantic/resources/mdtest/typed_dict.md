@@ -1628,8 +1628,7 @@ alice: Person = alice
 > extra items of type `object`.
 
 That language is at the top of [subtyping section of the `TypedDict` spec][subtyping section]. It
-sounds like an obscure technicality, especially since `extra_items` is still TODO, but it has an
-important interaction with another rule:
+sounds like an obscure technicality, but it has an important interaction with another rule:
 
 > For each item in [the destination type]...If it is non-required...If it is mutable...If \[the
 > source type does not have an item with the same key and also\] has extra items, the extra items
@@ -3409,7 +3408,7 @@ def func(**kwargs: Unpack[TD2]) -> None:
 ### Call-site validation
 
 At the call site, required keys must be provided, known keys must be type-checked, and extra
-keywords are accepted as `object` because ordinary `TypedDict`s are open.
+keywords are rejected unless the `TypedDict` has explicit extra items.
 
 ```py
 from typing_extensions import NotRequired, Required, TypedDict, Unpack
@@ -3428,7 +3427,7 @@ def func(**kwargs: Unpack[TD2]) -> None:
 func()
 func(v1=1, v3="ok")
 func(v1=1, v2="optional", v3="ok")
-func(v1=1, v3="ok", v4=1)
+func(v1=1, v3="ok", v4=1)  # error: [unknown-argument]
 
 # error: [invalid-argument-type]
 func(v1=1, v3=1)
@@ -3450,8 +3449,7 @@ def movie(**kwargs: Unpack[Movie]) -> None:
 
 movie(name="Blade Runner", novel_adaptation=True)
 
-# TODO: Once `extra_items` is supported, this should be an invalid-argument-type error because
-# `year` should be checked against `bool`, not `object`.
+# error: [invalid-argument-type] "Expected `bool`, found `Literal[1982]`"
 movie(name="Blade Runner", year=1982)
 
 class ClosedMovie(TypedDict, closed=True):
@@ -3462,16 +3460,14 @@ def closed_movie(**kwargs: Unpack[ClosedMovie]) -> None:
 
 closed_movie(name="Blade Runner")
 
-# TODO: Once `closed` is supported, this should be an unknown-argument error because closed
-# TypedDicts should not add a trailing `**kwargs` parameter.
+# error: [unknown-argument]
 closed_movie(name="Blade Runner", year=1982)
 ```
 
 ### Assignability with explicit keyword-only signatures
 
 A callable using `**kwargs: Unpack[TD2]` should line up with equivalent explicit keyword-only
-signatures when assigning to the explicit form. The reverse assignment is rejected because an open
-unpacked `TypedDict` also accepts extra keyword arguments.
+signatures.
 
 ```py
 from typing import Protocol
@@ -3497,14 +3493,12 @@ explicit_ok: ExplicitKwargs = func
 typed_dict_ok: TypedDictKwargs = func
 
 def _(explicit: ExplicitKwargs, typed_dict: TypedDictKwargs) -> None:
-    # error: [invalid-assignment]
     typed_dict_2: TypedDictKwargs = explicit
     explicit_2: ExplicitKwargs = typed_dict
 
 def func7(*, v1: int, v3: str, v2: str = "") -> None:
     pass
 
-# error: [invalid-assignment]
 typed_dict_from_explicit: TypedDictKwargs = func7
 ```
 
@@ -3535,7 +3529,7 @@ missing_required: MissingRequiredKwarg = func
 ### Optional-only unpacked kwargs still expose named keys
 
 An unpacked all-optional open `TypedDict` exposes its declared keys as optional named keyword
-arguments while still accepting extra keyword arguments as `object`.
+arguments, but does not accept unknown keyword arguments.
 
 ```py
 from typing import Protocol
@@ -3551,7 +3545,7 @@ class WantsA(Protocol):
     def __call__(self, *, a: int = 1) -> None: ...
 
 wants_a: WantsA = accepts_optional_kwargs
-accepts_optional_kwargs(b="whatever")
+accepts_optional_kwargs(b="whatever")  # error: [unknown-argument]
 
 # error: [invalid-argument-type]
 accepts_optional_kwargs(a="bad")
@@ -5390,14 +5384,11 @@ class Extra(TypedDict, extra_items=int):
     name: str
 
 def _(extra: Extra) -> None:
-    # TODO: should be `dict_keys[str, str | int]`
-    reveal_type(extra.keys())  # revealed: dict_keys[str, object]
+    reveal_type(extra.keys())  # revealed: dict_keys[str, str | int]
 
-    # TODO: should be `dict_values[str, str | int]`
-    reveal_type(extra.values())  # revealed: dict_values[str, object]
+    reveal_type(extra.values())  # revealed: dict_values[str, str | int]
 
-    # TODO: should be `dict_items[str, str | int]`
-    reveal_type(extra.items())  # revealed: dict_items[str, object]
+    reveal_type(extra.items())  # revealed: dict_items[str, str | int]
 
     # iterating over the keys gives `str` types
     for key in extra:
@@ -5407,12 +5398,10 @@ def _(extra: Extra) -> None:
         reveal_type(key)  # revealed: str
 
     for value in extra.values():
-        # TODO: should be `str | int
-        reveal_type(value)  # revealed: object
+        reveal_type(value)  # revealed: str | int
 
     for item in extra.items():
-        # TODO: should be `tuple[str, str | int]`
-        reveal_type(item)  # revealed: tuple[str, object]
+        reveal_type(item)  # revealed: tuple[str, str | int]
 ```
 
 ### A closed `TypedDict` is equivalent to `extra_items=Never`
@@ -5442,8 +5431,7 @@ from typing_extensions import TypedDict
 class Empty(TypedDict, closed=True): ...
 
 def _(empty: Empty) -> None:
-    # TODO: should be `Literal[False]`
-    reveal_type(bool(empty))  # revealed: bool
+    reveal_type(bool(empty))  # revealed: Literal[False]
 ```
 
 ### Closed TypedDict is structurally final but not nominally final
@@ -5464,7 +5452,7 @@ class ClosedChild(Closed): ...
 
 static_assert(is_equivalent_to(ClosedChild, Closed))
 
-# TODO: should be error: [invalid-typed-dict-header] "Cannot add new items to a closed TypedDict"
+# error: [invalid-typed-dict-header] "Cannot add item `age` to closed TypedDict base `Closed`"
 class BadChild(Closed):
     age: int
 ```
@@ -5482,12 +5470,8 @@ class Extra(TypedDict, extra_items=int):
 
 def _(extra: Extra, key: str) -> None:
     reveal_type(extra["name"])  # revealed: str
-    # TODO: should be `int` (the extra_items type) with no error
-    # error: [invalid-key]
-    reveal_type(extra["anything"])  # revealed: Unknown
-    # TODO: should be `str | int` with no error
-    # error: [invalid-key]
-    reveal_type(extra[key])  # revealed: Unknown
+    reveal_type(extra["anything"])  # revealed: int
+    reveal_type(extra[key])  # revealed: str | int
 ```
 
 For closed TypedDicts, indexing into the dictionary with a non-literal `str` is an error, just like
@@ -5520,9 +5504,45 @@ class Child(Base):
 def _(child: Child) -> None:
     reveal_type(child["name"])  # revealed: str
     reveal_type(child["age"])  # revealed: int
-    # TODO: should be `int` (inherited extra_items) with no error
-    # error: [invalid-key]
-    reveal_type(child["other"])  # revealed: Unknown
+    reveal_type(child["other"])  # revealed: int
+```
+
+Generic extra-items types are specialized and inherited:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class GenericExtra(TypedDict, Generic[T], extra_items=T):
+    value: T
+
+class IntExtra(GenericExtra[int]): ...
+
+def _(generic: GenericExtra[int], inherited: IntExtra) -> None:
+    reveal_type(generic["other"])  # revealed: int
+    generic["other"] = 1
+    generic["other"] = "not an int"  # error: [invalid-assignment]
+
+    reveal_type(inherited["other"])  # revealed: int
+```
+
+PEP 695 type parameters are also supported:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+
+class NativeGenericExtra[T](TypedDict, extra_items=T): ...
+class NativeReadOnlyExtra[T](TypedDict, extra_items=ReadOnly[T]): ...
+
+def _(extra: NativeGenericExtra[int], read_only: NativeReadOnlyExtra[int]) -> None:
+    reveal_type(extra["other"])  # revealed: int
+    read_only["other"] = 1  # error: [invalid-assignment]
 ```
 
 ### `closed=False` TypedDict cannot inherit from an `extra_items` TypedDict
@@ -5536,13 +5556,13 @@ from typing_extensions import TypedDict
 class ExtraBase(TypedDict, extra_items=int):
     name: str
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-typed-dict-header]
 class BadChild1(ExtraBase, closed=False): ...
 
 class ClosedBase(TypedDict, closed=True):
     name: str
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-typed-dict-header]
 class BadChild2(ClosedBase, closed=False): ...
 ```
 
@@ -5574,15 +5594,14 @@ from typing_extensions import TypedDict
 class Movie(TypedDict, extra_items=bool):
     name: str
 
-# TODO: should be OK (extra key with correct type), no errors
-a: Movie = {"name": "Blade Runner", "novel_adaptation": True}  # error: [invalid-key]
-Movie(name="Blade Runner", novel_adaptation=True)  # error: [invalid-key]
+a: Movie = {"name": "Blade Runner", "novel_adaptation": True}
+Movie(name="Blade Runner", novel_adaptation=True)
 
-# TODO: should be error: [invalid-argument-type] (wrong type for extra key), not [invalid-key]
-b: Movie = {"name": "Blade Runner", "year": 1982}  # error: [invalid-key]
+# error: [invalid-argument-type]
+b: Movie = {"name": "Blade Runner", "year": 1982}
 
-# TODO: should be error: [invalid-argument-type], not [invalid-key]
-Movie(name="Blade Runner", year=1982)  # error: [invalid-key]
+# error: [invalid-argument-type]
+Movie(name="Blade Runner", year=1982)
 
 # Closed TypedDicts reject extra keys entirely
 class ClosedMovie(TypedDict, closed=True):
@@ -5599,12 +5618,20 @@ The functional syntax also supports `extra_items`:
 
 ```py
 MovieFunctional = TypedDict("MovieFunctional", {"name": str}, extra_items=bool)
+NonIdentifierFunctional = TypedDict(
+    "NonIdentifierFunctional",
+    {"x-y": str},
+    extra_items=int,
+)
 
-# TODO: should be OK (extra key with correct type), no errors
-d: MovieFunctional = {"name": "Blade Runner", "novel_adaptation": True}  # error: [invalid-key]
+d: MovieFunctional = {"name": "Blade Runner", "novel_adaptation": True}
+NonIdentifierFunctional(**{"x-y": "ok", "other": 1})
 
-# TODO: should be error: [invalid-argument-type] (wrong type for extra key), not [invalid-key]
-e: MovieFunctional = {"name": "Blade Runner", "year": 1982}  # error: [invalid-key]
+# error: [invalid-argument-type]
+e: MovieFunctional = {"name": "Blade Runner", "year": 1982}
+
+# error: [invalid-argument-type]
+NonIdentifierFunctional(**{"x-y": 1})
 ```
 
 ### `extra_items` parameter must be a valid annotation expression; the only legal type qualifier is `ReadOnly`
@@ -5648,9 +5675,16 @@ class D(TypedDict, extra_items=InitVar[int]):
 It is an error to specify both `closed` and `extra_items`:
 
 ```py
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-typed-dict-header]
 class E(TypedDict, closed=True, extra_items=int):
     name: str
+```
+
+The same restriction applies to functional TypedDicts:
+
+```py
+# error: [invalid-argument-type]
+FunctionalE = TypedDict("FunctionalE", {"name": str}, closed=True, extra_items=int)
 ```
 
 ### Forward references in `extra_items`
@@ -5718,12 +5752,10 @@ class Extra(TypedDict, extra_items=int):
     name: str
 
 def _(extra: Extra) -> None:
-    # TODO: should be OK (int is assignable to extra_items=int), no error
-    extra["year"] = 1982  # error: [invalid-key]
+    extra["year"] = 1982
     extra["name"] = "Alien"  # OK: str is assignable to str
 
-    # TODO: should be error: [invalid-assignment], not [invalid-key]
-    extra["year"] = "not an int"  # error: [invalid-key]
+    extra["year"] = "not an int"  # error: [invalid-assignment]
 ```
 
 ### If `extra_items` is `ReadOnly`, you can't write to an undeclared literal string key
@@ -5737,8 +5769,8 @@ class ReadOnlyExtra(TypedDict, extra_items=ReadOnly[int]):
 def _(read_only_extra: ReadOnlyExtra) -> None:
     read_only_extra["name"] = "Alien"  # OK: name is a declared mutable field
 
-    # TODO: should be error: [invalid-assignment] "Cannot assign to key "year" on TypedDict `ReadOnlyExtra`: key is marked read-only"
-    read_only_extra["year"] = 1982  # error: [invalid-key]
+    # error: [invalid-assignment] "Cannot assign to key "year" on TypedDict `ReadOnlyExtra`: key is marked read-only"
+    read_only_extra["year"] = 1982
 ```
 
 ### Writing to a `str` key on an `extra_items` TypedDict is only allowed if the type is assignable to all TypedDict items
@@ -5756,19 +5788,16 @@ class Extra2(TypedDict, extra_items=Super):
     field: Sub
 
 def _(extra1: Extra1, extra2: Extra2, key: str) -> None:
-    # TODO: the error message is wrong: `Super` is assignable to the value-type of `field`, but not to `extra_items`
-    #
-    # error: [invalid-key] "TypedDict `Extra1` can only be subscripted with a string literal key, got key of type `str`."
+    # `Super` is assignable to the value type of `field`, but not to `extra_items`.
+    # error: [invalid-assignment] "Expected value assignable to `Sub`"
     extra1[key] = Super()
 
-    # TODO: the error message is wrong: `Super` is assignable to `extra_items`, but not to the value type of `field`
-    #
-    # error: [invalid-key] "TypedDict `Extra2` can only be subscripted with a string literal key, got key of type `str`."
+    # `Super` is assignable to `extra_items`, but not to the value type of `field`.
+    # error: [invalid-assignment] "Expected value assignable to `Sub`"
     extra2[key] = Super()
 
-    # TODO: these should be fine
-    extra1[key] = Sub()  # error: [invalid-key]
-    extra2[key] = Sub()  # error: [invalid-key]
+    extra1[key] = Sub()
+    extra2[key] = Sub()
 ```
 
 ### If `extra_items` is `ReadOnly`, subclasses can override the type covariantly, and/or have mutable `extra_items`
@@ -5792,7 +5821,7 @@ class MutableChild(ReadOnlyBase, extra_items=int): ...
 # OK: close the subclass (only allowed when base extra_items is read-only)
 class ClosedChild(ReadOnlyBase, closed=True): ...
 
-# TODO: should be error: [invalid-typed-dict-header] "'list[str]' is not assignable to 'int | str'"
+# error: [invalid-typed-dict-header] "Extra items type `list[str]` is not assignable to `int | str` from base `ReadOnlyBase`"
 class BadChild(ReadOnlyBase, extra_items=list[str]): ...
 ```
 
@@ -5802,10 +5831,10 @@ When the base has _mutable_ extra items, the child cannot change the extra-items
 class MutableBase(TypedDict, extra_items=int):
     name: str
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-typed-dict-header]
 class BadNarrow(MutableBase, extra_items=bool): ...
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-typed-dict-header]
 class BadClose(MutableBase, closed=True): ...
 ```
 
@@ -5821,11 +5850,11 @@ class Base(TypedDict, extra_items=int | None):
 class GoodChild(Base):
     year: NotRequired[int | None]
 
-# TODO: should be error: [invalid-typed-dict-header] "Required key 'year' is not allowed"
+# error: [invalid-typed-dict-header]
 class ChildWithBadRequiredItem(Base):
     year: int | None
 
-# TODO: should be error: [invalid-typed-dict-header] "Type 'int' is not consistent with 'int | None'"
+# error: [invalid-typed-dict-header]
 class ChildWithBadValueType(Base):
     year: NotRequired[int]
 ```
@@ -5846,7 +5875,7 @@ class WithYear(Base):
 class WithTag(Base):
     tag: NotRequired[str]
 
-# TODO: should be error: [invalid-typed-dict-header] "'list[str]' is not assignable to 'int | str'"
+# error: [invalid-typed-dict-header]
 class BadChild(Base):
     tags: list[str]
 ```
@@ -5863,8 +5892,7 @@ class Extra(TypedDict, extra_items=int):
     name: str
 
 def _(extra: Extra, key: str) -> None:
-    # TODO: should be OK (extra items are non-required)
-    del extra["year"]  # error: [invalid-argument-type]
+    del extra["year"]
 
     # error: [invalid-argument-type] "Cannot delete required key "name" from TypedDict `Extra`"
     del extra["name"]
@@ -5873,6 +5901,104 @@ def _(extra: Extra, key: str) -> None:
     #
     # error: [invalid-argument-type] "Method `__delitem__` of type `(key: Never, /) -> None` cannot be called with key of type `str` on object of type `Extra`"
     del extra[key]
+```
+
+### `pop` and `setdefault` support literal extra-item keys
+
+Extra items behave like non-required items for methods that mutate a specific literal key.
+
+```py
+from typing_extensions import TypedDict
+
+class Extra(TypedDict, extra_items=int):
+    name: str
+
+def _(extra: Extra) -> None:
+    reveal_type(extra.get("year"))  # revealed: int | None
+    reveal_type(extra.get("year", "missing"))  # revealed: int | Literal["missing"]
+    reveal_type(extra.pop("year"))  # revealed: int
+    reveal_type(extra.pop("year", "missing"))  # revealed: int | Literal["missing"]
+    reveal_type(extra.setdefault("year", 1982))  # revealed: int
+
+    # error: [invalid-argument-type]
+    extra.setdefault("year", "not an int")
+```
+
+### `update` accounts for extra items
+
+Mutable extra items can be updated, while read-only extra items cannot:
+
+```py
+from typing_extensions import NotRequired, ReadOnly, TypedDict
+
+class MutableExtra(TypedDict, extra_items=int):
+    name: str
+
+class ReadOnlyExtra(TypedDict, extra_items=ReadOnly[int]):
+    name: str
+
+class IntPatch(TypedDict, extra_items=int):
+    name: NotRequired[str]
+
+class StrPatch(TypedDict, extra_items=str):
+    name: NotRequired[str]
+
+def _(
+    mutable: MutableExtra,
+    read_only: ReadOnlyExtra,
+    ints: IntPatch,
+    strings: StrPatch,
+) -> None:
+    mutable.update(year=1982)
+    mutable.update(ints)
+    mutable.update(year="not an int")  # error: [invalid-argument-type]
+    mutable.update(strings)  # error: [invalid-argument-type]
+
+    read_only.update(year=1982)  # error: [unknown-argument]
+    read_only.update(ints)  # error: [invalid-argument-type]
+```
+
+### Unpacking accounts for extra items
+
+An unpacked extra-items TypedDict can supply arbitrary additional keyword arguments. Its extra-items
+type must therefore be compatible with the target's extra-items policy:
+
+```py
+from typing_extensions import NotRequired, TypedDict
+
+class IntSource(TypedDict, extra_items=int):
+    name: str
+
+class StrSource(TypedDict, extra_items=str):
+    name: str
+
+class IntTarget(TypedDict, extra_items=int):
+    name: str
+
+class ClosedTarget(TypedDict, closed=True):
+    name: str
+
+class OptionalTarget(TypedDict, extra_items=int):
+    label: NotRequired[str]
+
+class ExtraOnly(TypedDict, extra_items=int): ...
+
+def accepts_ints(name: str, **kwargs: int) -> None: ...
+def accepts_name(name: str) -> None: ...
+def accepts_optional_label(*, label: str = "", **kwargs: int) -> None: ...
+def _(ints: IntSource, strings: StrSource, extra_only: ExtraOnly) -> None:
+    accepts_ints(**ints)
+    accepts_ints(**strings)  # error: [invalid-argument-type]
+    accepts_name(**ints)  # error: [unknown-argument]
+    accepts_optional_label(**extra_only)  # error: [invalid-argument-type]
+
+    IntTarget(**ints)
+    IntTarget(**strings)  # error: [invalid-argument-type]
+    ClosedTarget(**ints)  # error: [invalid-key]
+
+    # The extra-items tail may contain the target's optional `label` key with an incompatible type.
+    OptionalTarget(**extra_only)  # error: [invalid-argument-type]
+    optional: OptionalTarget = {**extra_only}  # error: [invalid-argument-type]
 ```
 
 ### Assignability between TypedDicts accounts for the type of extra items
@@ -5889,9 +6015,8 @@ class ExtraStr(TypedDict, extra_items=str):
 
 # Mutable extra items must be equivalent, not just assignable
 #
-# TODO: these should pass
-static_assert(not is_assignable_to(ExtraInt, ExtraStr))  # error: [static-assert-error]
-static_assert(not is_assignable_to(ExtraStr, ExtraInt))  # error: [static-assert-error]
+static_assert(not is_assignable_to(ExtraInt, ExtraStr))
+static_assert(not is_assignable_to(ExtraStr, ExtraInt))
 
 class ReadOnlyExtraInt(TypedDict, extra_items=ReadOnly[int]):
     name: str
@@ -5901,8 +6026,7 @@ class ReadOnlyExtraIntStr(TypedDict, extra_items=ReadOnly[int | str]):
 
 # Read-only extra items: covariant, so narrower is assignable to wider
 static_assert(is_subtype_of(ReadOnlyExtraInt, ReadOnlyExtraIntStr))
-# TODO: should pass
-static_assert(not is_assignable_to(ReadOnlyExtraIntStr, ReadOnlyExtraInt))  # error: [static-assert-error]
+static_assert(not is_assignable_to(ReadOnlyExtraIntStr, ReadOnlyExtraInt))
 
 # A closed TypedDict is assignable to an open one (open implicitly has ReadOnly[object] extras)
 class Closed(TypedDict, closed=True):
@@ -5915,16 +6039,14 @@ static_assert(is_assignable_to(Closed, Open))
 
 # An open TypedDict is not assignable to a closed one (might have extra keys)
 #
-# TODO: should pass
-static_assert(not is_assignable_to(Open, Closed))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Open, Closed))
 
 # An extra-items TypedDict is assignable to an open one
 static_assert(is_assignable_to(ExtraInt, Open))
 
 # But not vice versa
 #
-# TODO: should pass
-static_assert(not is_assignable_to(Open, ExtraInt))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Open, ExtraInt))
 ```
 
 Non-required items in the target that are absent in the source must be accounted for by the source's
@@ -5940,14 +6062,37 @@ class SourceWithIntExtra(TypedDict, extra_items=int):
 
 # SourceExtra can satisfy `Target`'s non-required `ReadOnly` `age` via its `extra_items=int`
 #
-# TODO: should pass
-static_assert(is_assignable_to(SourceWithIntExtra, Target))  # error: [static-assert-error]
+static_assert(is_assignable_to(SourceWithIntExtra, Target))
 
 class SourceWithStrExtra(TypedDict, extra_items=str):
     name: str
 
 # `str` extra items can't satisfy `age: int`
 static_assert(not is_assignable_to(SourceWithStrExtra, Target))
+```
+
+### Disjointness accounts for openness
+
+A required item on one side can conflict with the other side's closed or extra-items policy.
+
+```py
+from typing_extensions import TypedDict, ReadOnly
+from ty_extensions import static_assert, is_disjoint_from
+
+class RequiredInt(TypedDict, closed=True):
+    value: int
+
+class RequiredStr(TypedDict, closed=True):
+    value: str
+
+class ClosedEmpty(TypedDict, closed=True): ...
+class ReadOnlyIntExtras(TypedDict, extra_items=ReadOnly[int]): ...
+class MutableIntExtras(TypedDict, extra_items=int): ...
+
+static_assert(is_disjoint_from(RequiredInt, ClosedEmpty))
+static_assert(not is_disjoint_from(RequiredInt, ReadOnlyIntExtras))
+static_assert(is_disjoint_from(RequiredStr, ReadOnlyIntExtras))
+static_assert(is_disjoint_from(RequiredInt, MutableIntExtras))
 ```
 
 ### A `TypedDict` with `extra_items: T` is a subtype of `Mapping[str, T1]`, where `T1` is the union of `T` and all declared item types
@@ -5961,17 +6106,13 @@ class ExtraStr(TypedDict, extra_items=str):
     name: str
 
 # All value types (str, str) are subtypes of str
-#
-# TODO: should pass
-static_assert(is_assignable_to(ExtraStr, Mapping[str, str]))  # error: [static-assert-error]
+static_assert(is_assignable_to(ExtraStr, Mapping[str, str]))
 
 class ExtraInt(TypedDict, extra_items=int):
     name: str
 
 # Value types are str | int, so it's assignable to Mapping[str, str | int] but not Mapping[str, int]
-#
-# TODO: should pass
-static_assert(is_assignable_to(ExtraInt, Mapping[str, str | int]))  # error: [static-assert-error]
+static_assert(is_assignable_to(ExtraInt, Mapping[str, str | int]))
 static_assert(not is_assignable_to(ExtraInt, Mapping[str, int]))
 
 # Closed TypedDicts also have a known set of value types
@@ -5979,8 +6120,7 @@ class Closed(TypedDict, closed=True):
     name: str
     age: int
 
-# TODO: should pass
-static_assert(is_assignable_to(Closed, Mapping[str, str | int]))  # error: [static-assert-error]
+static_assert(is_assignable_to(Closed, Mapping[str, str | int]))
 static_assert(not is_assignable_to(Closed, Mapping[str, str]))
 ```
 
@@ -6000,25 +6140,21 @@ class IntDictWithNum(IntDict):
     num: NotRequired[int]
 
 # All items non-required + mutable + extra_items=int → assignable to dict[str, int]
-#
-# TODO: these should pass
-static_assert(is_subtype_of(IntDict, dict[str, int]))  # error: [static-assert-error]
-static_assert(is_subtype_of(IntDictWithNum, dict[str, int]))  # error: [static-assert-error]
+static_assert(is_subtype_of(IntDict, dict[str, int]))
+static_assert(is_subtype_of(IntDictWithNum, dict[str, int]))
 
 # But dict[str, int] is not assignable to the TypedDict (could be a dict subclass)
 static_assert(not is_assignable_to(dict[str, int], IntDict))
 static_assert(not is_equivalent_to(dict[str, int], IntDict))
 
 def _(int_dict_with_num: IntDictWithNum, key: str) -> None:
-    # TODO: no errors should be reported here
-    v: dict[str, int] = int_dict_with_num  # error: [invalid-assignment]
-    int_dict_with_num.clear()  # error: [unresolved-attribute]
-    # error: [unresolved-attribute]
-    reveal_type(int_dict_with_num.popitem())  # revealed: Unknown
-    int_dict_with_num[key] = 42  # error: [invalid-key]
-    del int_dict_with_num[key]  # error: [invalid-argument-type]
+    v: dict[str, int] = int_dict_with_num
+    int_dict_with_num.clear()
+    reveal_type(int_dict_with_num.popitem())  # revealed: tuple[str, int]
+    int_dict_with_num[key] = 42
+    del int_dict_with_num[key]
 
-class BoolDictWithNum(IntDict, extra_items=int):
+class BoolDictWithNum(TypedDict, extra_items=int):
     condition: NotRequired[bool]
 
 # All keys must be equivalent to the value-type of the dict in order for
@@ -6026,6 +6162,10 @@ class BoolDictWithNum(IntDict, extra_items=int):
 static_assert(not is_assignable_to(BoolDictWithNum, dict[str, int]))
 static_assert(not is_subtype_of(BoolDictWithNum, dict[str, int]))
 static_assert(not is_equivalent_to(BoolDictWithNum, dict[str, int]))
+
+def _(bool_dict_with_num: BoolDictWithNum) -> None:
+    bool_dict_with_num.clear()
+    reveal_type(bool_dict_with_num.popitem())  # revealed: tuple[str, int]
 ```
 
 A TypedDict with a required key is not assignable to `dict[str, VT]`:
