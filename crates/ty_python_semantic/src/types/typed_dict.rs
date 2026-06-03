@@ -2552,6 +2552,15 @@ fn validate_merged_dict_literal<'db, 'ast>(
                             ));
                         }
                     }
+                } else if !typed_dict.openness(db).is_open() {
+                    valid = false;
+                    if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
+                        builder.into_diagnostic(format_args!(
+                            "TypedDict `{}` requires string keys, got key of type `{}`",
+                            Type::TypedDict(typed_dict).display(db),
+                            key_ty.display(db),
+                        ));
+                    }
                 }
                 continue;
             };

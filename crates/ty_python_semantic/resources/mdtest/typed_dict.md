@@ -5621,6 +5621,27 @@ c: ClosedMovie = {"name": "Blade Runner", "year": 1982}
 ClosedMovie(name="Blade Runner", year=1982)
 ```
 
+Closed and extra-items TypedDicts also reject non-string keys:
+
+```py
+from typing_extensions import TypedDict
+
+class ExtraOnly(TypedDict, extra_items=int): ...
+class ClosedEmpty(TypedDict, closed=True): ...
+
+# error: [invalid-key] "TypedDict `ExtraOnly` requires string keys, got key of type `Literal[1]`"
+extra: ExtraOnly = {1: 1}
+
+# error: [invalid-key] "TypedDict `ClosedEmpty` requires string keys, got key of type `Literal[1]`"
+closed: ClosedEmpty = {1: 1}
+
+# error: [invalid-key] "TypedDict `ExtraOnly` requires string keys, got key of type `Literal[1]`"
+ExtraOnly({1: 1})
+
+# error: [invalid-key] "TypedDict `ClosedEmpty` requires string keys, got key of type `Literal[1]`"
+ClosedEmpty({1: 1})
+```
+
 The functional syntax also supports `extra_items`:
 
 ```py
