@@ -409,6 +409,20 @@ def _(value: Intersection[T, Extra]):
     # error: [possibly-missing-attribute]
     value.copy()
 
+class ConstraintOwner:
+    def copy(self) -> Self:
+        return self
+
+class OwnedConstraint(ConstraintOwner): ...
+
+class AliasedConstraint:
+    copy = ConstraintOwner.copy
+
+OwnedOrAliased = TypeVar("OwnedOrAliased", OwnedConstraint, AliasedConstraint)
+
+def constraint_arm_ownership(value: Intersection[OwnedOrAliased, Extra]):
+    value.copy().extra  # error: [unresolved-attribute]
+
 class HasGet:
     def get(self) -> Self:
         return self

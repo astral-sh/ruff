@@ -7455,6 +7455,28 @@ impl<'db> SelfBinding<'db> {
         }
 
         let owner_class = self_typevar_owner_class_literal(db, bound_typevar);
+        let constraint_uses_bound_definition = |constraint: Type<'db>| {
+            let Some(definition) = bound_typevar.binding_context(db).definition() else {
+                return false;
+            };
+            let Some(name) = definition.name(db) else {
+                return false;
+            };
+            let Some(member) = constraint
+                .class_member_with_policy(db, name.into(), MemberLookupPolicy::default())
+                .place
+                .ignore_possibly_undefined()
+            else {
+                return false;
+            };
+            any_over_type(db, member, false, |ty| {
+                matches!(
+                    ty,
+                    Type::FunctionLiteral(function)
+                        if function.contains_definition(db, definition)
+                )
+            })
+        };
         let intersection_inherits_from_owner = |owner_class| {
             let Type::Intersection(intersection) = self.ty else {
                 return false;
@@ -7467,8 +7489,9 @@ impl<'db> SelfBinding<'db> {
                             .bound_or_constraints(db)
                             .is_some_and(|bound_or_constraints| match bound_or_constraints {
                                 TypeVarBoundOrConstraints::Constraints(constraints) => {
-                                    constraints.elements(db).iter().any(|constraint| {
+                                    constraints.elements(db).iter().all(|constraint| {
                                         type_inherits_from_owner(db, *constraint, owner_class)
+                                            || !constraint_uses_bound_definition(*constraint)
                                     })
                                 }
                                 TypeVarBoundOrConstraints::UpperBound(bound) => {
