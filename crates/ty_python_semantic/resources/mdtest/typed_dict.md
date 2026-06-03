@@ -6102,10 +6102,19 @@ class ClosedTarget(TypedDict, closed=True):
 class ClosedSource(TypedDict, closed=True):
     source_only: str
 
-def _(good: GoodSource, bad: BadSource, closed: ClosedSource) -> None:
+class AllKeywordsTarget(TypedDict, extra_items=int):
+    keyword: int
+
+def _(
+    good: GoodSource,
+    bad: BadSource,
+    closed: ClosedSource,
+    bad_mapping: dict[str, str],
+) -> None:
     Target(good, keyword=1)
     Target(bad, keyword=1)  # error: [invalid-argument-type]
     ClosedTarget(closed, keyword=1)  # error: [invalid-key]
+    AllKeywordsTarget(bad_mapping, keyword=1)  # error: [invalid-argument-type]
 
     # An explicit keyword shadows the source key.
     Target(bad, source_only=1)

@@ -2231,7 +2231,8 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             let positional_inference_target =
                 typed_dict_with_relaxed_keys(db, typed_dict, &keyword_keys);
             let positional_target = typed_dict_without_keys(db, typed_dict, &keyword_keys);
-            let positional_target_is_empty = positional_target.items(db).is_empty();
+            let positional_target_is_unconstrained =
+                positional_target.items(db).is_empty() && positional_target.openness(db).is_open();
             let positional_target_ty = Type::TypedDict(positional_target);
             let positional_inference_target_ty = Type::TypedDict(positional_inference_target);
             let arg_ty =
@@ -2247,7 +2248,8 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             ) {
                 provided_keys
             } else {
-                if !positional_target_is_empty && !arg_ty.is_assignable_to(db, positional_target_ty)
+                if !positional_target_is_unconstrained
+                    && !arg_ty.is_assignable_to(db, positional_target_ty)
                 {
                     if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
                         builder.into_diagnostic(format_args!(
