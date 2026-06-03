@@ -4300,6 +4300,27 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the best-effort return type of calling this type without arguments.
+    ///
+    /// Memoized because reachability can query the same constructor type for every collection use.
+    pub(crate) fn call_return_type_with_no_arguments(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        #[salsa::tracked(
+            cycle_initial=|_, _, _, ()| Type::unknown(),
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn call_return_type_with_no_arguments_impl<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            _: (),
+        ) -> Type<'db> {
+            ty.bindings(db)
+                .match_parameters(db, &CallArguments::none())
+                .return_type(db)
+        }
+
+        call_return_type_with_no_arguments_impl(db, ty, ())
+    }
+
     fn known_class_literal_bindings(
         self,
         db: &'db dyn Db,

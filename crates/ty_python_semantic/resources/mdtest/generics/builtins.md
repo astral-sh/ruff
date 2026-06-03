@@ -94,8 +94,13 @@ typeshed = "/typeshed"
 `/typeshed/stdlib/builtins.pyi`:
 
 ```pyi
+from typing_extensions import Never
+
 class object: ...
-class int: ...
+
+class int:
+    def stop(self) -> Never: ...
+
 class str: ...
 class tuple: ...
 class type: ...
@@ -115,7 +120,25 @@ class set[T](metaclass=SetMeta): ...
 class FunctionType: ...
 ```
 
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+Never: object
+
+def reveal_type(obj, /): ...
+```
+
 ```py
+from typing_extensions import reveal_type
+
 list_result: int = list()
 set_result: str = set()
+
+def constructor_return_reachability() -> None:
+    result = list()
+    reveal_type(result)  # revealed: int
+    reveal_type(result.stop)  # revealed: bound method int.stop() -> Never
+    result.stop()
+
+    after: str = 1
 ```

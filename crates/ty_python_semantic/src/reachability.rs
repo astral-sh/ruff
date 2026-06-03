@@ -1126,10 +1126,18 @@ fn is_builtin_collection_method_call(db: &dyn Db, callable: Expression) -> bool 
         return false;
     };
 
-    infer_expression_type(db, constructor, TypeContext::default())
+    let constructor_ty = infer_expression_type(db, constructor, TypeContext::default());
+    let Some(collection_class) = constructor_ty
         .as_class_literal()
         .and_then(|class| class.known(db))
-        .is_some_and(|class| matches!(class, KnownClass::List | KnownClass::Set | KnownClass::Dict))
+        .filter(|class| matches!(class, KnownClass::List | KnownClass::Set | KnownClass::Dict))
+    else {
+        return false;
+    };
+
+    Type::call_return_type_with_no_arguments(db, constructor_ty)
+        .class_specialization(db)
+        .is_some_and(|(class, _)| class.is_known(db, collection_class))
 }
 
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
