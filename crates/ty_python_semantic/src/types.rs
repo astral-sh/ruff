@@ -2625,6 +2625,27 @@ impl<'db> Type<'db> {
                 ..
             }) => self.instance_member(db, &name),
 
+            Type::LiteralValue(literal)
+                if name == "__len__"
+                    && let Some(length) = match literal.kind() {
+                        LiteralValueTypeKind::Bytes(bytes) => Some(bytes.python_len(db)),
+                        LiteralValueTypeKind::String(string) => Some(string.python_len(db)),
+                        _ => None,
+                    }
+                    && let Ok(length) = i64::try_from(length) =>
+            {
+                let parameters = Parameters::new(
+                    db,
+                    [Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(self)],
+                );
+                Place::bound(Type::function_like_callable(
+                    db,
+                    Signature::new(parameters, Type::int_literal(length)),
+                ))
+                .into()
+            }
+
             // `type[Any]` (or `type[Unknown]`, etc.) has an unknown metaclass, but all
             // metaclasses inherit from `type`. Check `type`'s class-level attributes
             // first so that data descriptors like `__mro__` and `__bases__` resolve to

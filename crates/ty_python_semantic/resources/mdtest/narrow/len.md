@@ -74,6 +74,8 @@ python-version = "3.11"
 ```
 
 ```py
+from typing import Literal
+
 def _(val: tuple[int] | tuple[str, str] | tuple[int, *tuple[str, ...], int]):
     if len(val) == 1:
         # revealed: tuple[int] | (tuple[int, *tuple[str, ...], int] & ExactlySized[Literal[1, True]])
@@ -106,6 +108,17 @@ def _(val: tuple[()] | tuple[int]):
     if False == len(val):
         reveal_type(val)  # revealed: tuple[()]
         empty: tuple[()] = val
+
+def _(x: Literal[b"", b"a"], y: Literal["a", "ab"]):
+    if len(x) == 1:
+        reveal_type(x)  # revealed: Literal[b"a"]
+    else:
+        reveal_type(x)  # revealed: Literal[b""]
+
+    if len(y) == 1:
+        reveal_type(y)  # revealed: Literal["a"]
+    else:
+        reveal_type(y)  # revealed: Literal["ab"]
 ```
 
 Exact length comparisons intersect arbitrary `Sized` values with `ExactlySized`. This persists the
