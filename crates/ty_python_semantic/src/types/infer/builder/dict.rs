@@ -1,9 +1,8 @@
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, HasNodeIndex};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 use super::{ArgExpr, TypeInferenceBuilder};
-use crate::Program;
 use crate::types::typed_dict::{
     extract_unpacked_typed_dict_keys_from_value_type, infer_unpacked_keyword_types,
     validate_typed_dict_constructor,
@@ -11,67 +10,7 @@ use crate::types::typed_dict::{
 use crate::types::{KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) fn infer_dict_call(
-        &mut self,
-        func: &ast::Expr,
-        arguments: &ast::Arguments,
-        call_expression_tcx: TypeContext<'db>,
-    ) -> Option<Type<'db>> {
-        if let Some(ty) = self.infer_single_positional_typed_dict_call(arguments) {
-            return Some(ty);
-        }
-        self.infer_keyword_only_dict_call(func, arguments, call_expression_tcx)
-    }
-
-    /// Fast-path `dict(typed_dict)` and `dict(typed_dict_union)`.
-    ///
-    /// `TypedDict` inhabitants are runtime dictionaries, and ty models a copied `TypedDict` as
-    /// `dict[str, object]`. Avoiding generic protocol inference here is important because matching
-    /// a large union of `TypedDict`s against `SupportsKeysAndGetItem` is very expensive.
-    fn infer_single_positional_typed_dict_call(
-        &mut self,
-        arguments: &ast::Arguments,
-    ) -> Option<Type<'db>> {
-        let argument = self.single_positional_typed_dict_fast_path_argument(arguments)?;
-        let mut speculative_builder = self.speculate();
-        let argument_ty = speculative_builder.infer_expression(argument, TypeContext::default());
-        if !is_typed_dict_or_union_of_typed_dicts(speculative_builder.db(), argument_ty) {
-            // Normal constructor binding will store the root argument type when it retrieves the
-            // cached result. Commit the rest of this inference now so that cache reuse does not
-            // discard diagnostics or child expression results.
-            speculative_builder.expressions.remove(&argument.into());
-            self.extend(speculative_builder);
-            return None;
-        }
-        self.extend(speculative_builder);
-
-        let db = self.db();
-        Some(
-            KnownClass::Dict
-                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::object()]),
-        )
-    }
-
-    pub(super) fn single_positional_typed_dict_fast_path_argument<'a>(
-        &self,
-        arguments: &'a ast::Arguments,
-    ) -> Option<&'a ast::Expr> {
-        // A custom typeshed can redefine `dict.__new__` or `dict.__init__`, so normal constructor
-        // binding must remain authoritative for its calls.
-        if Program::get(self.db())
-            .custom_stdlib_search_path(self.db())
-            .is_some()
-        {
-            return None;
-        }
-
-        let [argument] = &*arguments.args else {
-            return None;
-        };
-        (!argument.is_starred_expr() && arguments.keywords.is_empty()).then_some(argument)
-    }
-
-    fn infer_keyword_only_dict_call(
+    pub(super) fn infer_keyword_only_dict_call(
         &mut self,
         func: &ast::Expr,
         arguments: &ast::Arguments,
@@ -176,42 +115,4 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             call_expression_tcx,
         )
     }
-}
-
-fn is_typed_dict_or_union_of_typed_dicts<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
-    fn is_typed_dict_or_union_of_typed_dicts_impl<'db>(
-        db: &'db dyn crate::Db,
-        ty: Type<'db>,
-        resolving: &mut FxHashSet<Type<'db>>,
-        completed: &mut FxHashMap<Type<'db>, bool>,
-    ) -> bool {
-        let ty = ty.resolve_type_alias(db);
-        match ty {
-            Type::TypedDict(_) => true,
-            Type::Union(union) => {
-                // Recursive aliases are ineligible for this fast path. Cache completed results
-                // separately so shared alias graphs are classified once per union.
-                if let Some(result) = completed.get(&ty) {
-                    return *result;
-                }
-                if !resolving.insert(ty) {
-                    return false;
-                }
-                let result = union.elements(db).iter().all(|element| {
-                    is_typed_dict_or_union_of_typed_dicts_impl(db, *element, resolving, completed)
-                });
-                resolving.remove(&ty);
-                completed.insert(ty, result);
-                result
-            }
-            _ => false,
-        }
-    }
-
-    is_typed_dict_or_union_of_typed_dicts_impl(
-        db,
-        ty,
-        &mut FxHashSet::default(),
-        &mut FxHashMap::default(),
-    )
 }

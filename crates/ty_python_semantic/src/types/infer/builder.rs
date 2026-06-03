@@ -7990,37 +7990,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         callable_type: Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        // The positional `dict()` fast path infers its argument before falling back to normal
-        // constructor binding. Share an expression cache across both paths so the fallback can
-        // reuse that diagnostic-producing default inference while still performing contextual
-        // inference.
-        let teardown_expression_cache = callable_type
-            .as_class_literal()
-            .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
-            && self
-                .single_positional_typed_dict_fast_path_argument(&call_expression.arguments)
-                .is_some()
-            && self.setup_expression_cache();
-
-        let ty = self.infer_call_expression_impl_inner(
-            call_expression,
-            callable_type,
-            call_expression_tcx,
-        );
-
-        if teardown_expression_cache {
-            self.teardown_expression_cache();
-        }
-
-        ty
-    }
-
-    fn infer_call_expression_impl_inner(
-        &mut self,
-        call_expression: &ast::ExprCall,
-        callable_type: Type<'db>,
-        call_expression_tcx: TypeContext<'db>,
-    ) -> Type<'db> {
         fn report_missing_implicit_constructor_call<'db>(
             context: &InferContext<'db, '_>,
             db: &'db dyn Db,
@@ -8061,7 +8030,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if callable_type
             .as_class_literal()
             .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
-            && let Some(ty) = self.infer_dict_call(func, arguments, call_expression_tcx)
+            && let Some(ty) =
+                self.infer_keyword_only_dict_call(func, arguments, call_expression_tcx)
         {
             return ty;
         }

@@ -2357,18 +2357,6 @@ def _(movie: Movie) -> None:
     reveal_type(dict(movie))  # revealed: dict[str, object]
     takes_dict(dict(movie))
 
-def make_movie(value: object) -> Movie:
-    raise NotImplementedError
-
-def preserve_argument_diagnostics() -> None:
-    dict(make_movie(missing))  # error: [unresolved-reference]
-
-def preserve_fallback_argument_diagnostics() -> None:
-    dict(missing)  # error: [unresolved-reference]
-
-def preserve_unpack_argument_diagnostics() -> Movie:
-    return dict(**missing)  # error: [unresolved-reference]
-
 def mixed(movie_or_int: Movie | int) -> None:
     # A union with a non-TypedDict member should still use normal overload resolution.
     dict(movie_or_int)  # error: [no-matching-overload]
@@ -2421,7 +2409,7 @@ type AliasedItem = FirstGroup | SecondGroup | Q | R | S | T | U | V | W | X
 def _(item: AliasedItem) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 
-# Reusing sub-aliases should not make the fast-path check exponential.
+# Reusing sub-aliases should not make the common-constraint check exponential.
 type Left0 = A
 type Right0 = B
 type Left1 = Left0 | Right0
@@ -2474,8 +2462,33 @@ def _(item: Left22) -> None:
 type RecursiveItem = A | RecursiveItem
 
 def _(item: RecursiveItem) -> None:
-    # The fast-path check must terminate when an alias refers back to its containing union.
+    # The common-constraint check must terminate when an alias refers back to its containing union.
     reveal_type(dict(item))  # revealed: dict[str, object]
+```
+
+Generic protocol inference must preserve structural constraints that differ from
+`dict[str, object]`:
+
+```py
+from _collections_abc import dict_items
+from collections.abc import Callable
+from typing import Protocol, TypeVar, TypedDict
+
+ItemsT = TypeVar("ItemsT")
+
+class HasItems(Protocol[ItemsT]):
+    def items(self) -> ItemsT: ...
+
+class ItemsA(TypedDict):
+    x: int
+
+class ItemsB(TypedDict):
+    x: int
+
+def accept(value: HasItems[ItemsT], callback: Callable[[ItemsT], None]) -> None: ...
+def takes_dict_items(value: dict_items[str, object]) -> None: ...
+def _(value: ItemsA | ItemsB) -> None:
+    accept(value, takes_dict_items)
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
