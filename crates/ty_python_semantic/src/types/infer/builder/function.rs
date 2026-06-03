@@ -882,8 +882,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let ty = if annotation.is_starred_expr() {
-                let annotated_type = self.file_expression_type(annotation);
+            let annotated_type = self.file_expression_type(annotation);
+            let has_unpacked_annotation = self
+                .file_type_expression_flags(annotation)
+                .contains(TypeExpressionFlags::UNPACK);
+            let ty = if annotation.is_starred_expr() || has_unpacked_annotation {
                 if let Type::TypeVar(typevar) = annotated_type
                     && typevar.is_typevartuple(db)
                 {
@@ -899,7 +902,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     todo_type!("PEP 646")
                 }
             } else {
-                let annotated_type = self.file_expression_type(annotation);
                 if let Type::TypeVar(typevar) = annotated_type
                     && typevar.is_paramspec(db)
                 {

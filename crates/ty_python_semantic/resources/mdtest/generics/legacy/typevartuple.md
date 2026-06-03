@@ -5,6 +5,10 @@
 python-version = "3.11"
 ```
 
+The tests in this file focus on how `TypeVarTuple`s are defined and specialized using the legacy
+notation. Shared uses of `TypeVarTuple`s are tested with PEP 695 syntax in
+`../pep695/typevartuple.md`; alternate `Unpack` spelling is tested in `unpack.md`.
+
 ## Definition
 
 ### Valid
@@ -90,37 +94,37 @@ class InvariantArray(Generic[*Ts]):
 invariant_out: InvariantArray[object] = InvariantArray[int]()  # error: [invalid-assignment]
 invariant_in: InvariantArray[int] = InvariantArray[object]()  # error: [invalid-assignment]
 
-OutTs = TypeVarTuple("OutTs", covariant=True)
+Ts_Co = TypeVarTuple("Ts_Co", covariant=True)
 
-class CovariantArray(Generic[*OutTs]):
-    def get(self) -> tuple[*OutTs]:
+class CovariantArray(Generic[*Ts_Co]):
+    def get(self) -> tuple[*Ts_Co]:
         raise NotImplementedError
 
 covariant_ok: CovariantArray[object] = CovariantArray[int]()
 covariant_error: CovariantArray[int] = CovariantArray[object]()  # error: [invalid-assignment]
 
-InTs = TypeVarTuple("InTs", contravariant=True)
+Ts_Contra = TypeVarTuple("Ts_Contra", contravariant=True)
 
-class ContravariantArray(Generic[*InTs]):
-    def set(self, value: tuple[*InTs]) -> None:
+class ContravariantArray(Generic[*Ts_Contra]):
+    def set(self, value: tuple[*Ts_Contra]) -> None:
         raise NotImplementedError
 
 contravariant_ok: ContravariantArray[int] = ContravariantArray[object]()
 contravariant_error: ContravariantArray[object] = ContravariantArray[int]()  # error: [invalid-assignment]
 
-InferredOutTs = TypeVarTuple("InferredOutTs", infer_variance=True)
+Ts_Inferred_Co = TypeVarTuple("Ts_Inferred_Co", infer_variance=True)
 
-class InferredCovariantArray(Generic[*InferredOutTs]):
-    def get(self) -> tuple[*InferredOutTs]:
+class InferredCovariantArray(Generic[*Ts_Inferred_Co]):
+    def get(self) -> tuple[*Ts_Inferred_Co]:
         raise NotImplementedError
 
 inferred_covariant_ok: InferredCovariantArray[object] = InferredCovariantArray[int]()
 inferred_covariant_error: InferredCovariantArray[int] = InferredCovariantArray[object]()  # error: [invalid-assignment]
 
-InferredInTs = TypeVarTuple("InferredInTs", infer_variance=True)
+Ts_Inferred_Contra = TypeVarTuple("Ts_Inferred_Contra", infer_variance=True)
 
-class InferredContravariantArray(Generic[*InferredInTs]):
-    def set(self, value: tuple[*InferredInTs]) -> None:
+class InferredContravariantArray(Generic[*Ts_Inferred_Contra]):
+    def set(self, value: tuple[*Ts_Inferred_Contra]) -> None:
         raise NotImplementedError
 
 inferred_contravariant_ok: InferredContravariantArray[int] = InferredContravariantArray[object]()
@@ -147,22 +151,6 @@ AmbiguousContravariant = TypeVarTuple("AmbiguousContravariant", contravariant=co
 AmbiguousInferVariance = TypeVarTuple("AmbiguousInferVariance", infer_variance=cond())
 # error: [invalid-legacy-type-variable]
 CovariantAndInferred = TypeVarTuple("CovariantAndInferred", covariant=True, infer_variance=True)
-```
-
-### Must always be unpacked
-
-```py
-from typing import TypeVarTuple
-
-Ts = TypeVarTuple("Ts")
-
-# error: [invalid-type-form]
-def invalid(x: Ts) -> None: ...
-
-# error: [invalid-type-form]
-def invalid_args(*args: Ts) -> None: ...
-def valid(x: tuple[*Ts]) -> tuple[*Ts]:
-    return x
 ```
 
 ## Generic Classes
@@ -198,193 +186,84 @@ def f(
     reveal_type(sandwich2.parts())  # revealed: tuple[int, str]
 ```
 
-### `typing.Unpack` spelling
+### Inferred specialization from construction
 
-```py
-from typing import Generic, TypeVarTuple, Unpack
-
-Ts = TypeVarTuple("Ts")
-
-class Array(Generic[Unpack[Ts]]): ...
-
-def f(array: Array[int, str], empty: Array[()]) -> None:
-    reveal_type(array)  # revealed: Array[int, str]
-    reveal_type(empty)  # revealed: Array[()]
-```
-
-### Assignment checks
+Calling a generic class without explicit type arguments infers its specialization from the
+constructor arguments.
 
 ```py
 from typing import Generic, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 
-class Array(Generic[*Ts]): ...
+class Array(Generic[*Ts]):
+    def __init__(self, shape: tuple[*Ts]) -> None:
+        self.shape = shape
 
-def takes_int_str(x: Array[int, str]) -> None: ...
-def takes_int_str_tuple(x: tuple[int, str]) -> None: ...
-def f(x: Array[int, str], y: Array[str, int], xs: tuple[int, str], ys: tuple[str, int]) -> None:
-    takes_int_str(x)
-    takes_int_str(y)  # error: [invalid-argument-type]
-    takes_int_str_tuple(xs)
-    takes_int_str_tuple(ys)  # error: [invalid-argument-type]
+def f(i: int, s: str) -> None:
+    reveal_type(Array((i, s)))  # revealed: Array[int, str]
+    reveal_type(Array(()))  # revealed: Array[()]
 ```
 
-### Multiple Type Variable Tuples not allowed
+### Default type arguments
 
-Only one type variable tuple can appear in a type parameter list.
+A defaulted type variable tuple supplies its unpacked tuple when the generic class is not explicitly
+specialized. Explicit type arguments override the default.
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 ```
 
 ```py
-# error: [invalid-type-form]
-class Array[*Ts1, *Ts2]: ...
+from typing import Generic, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+
+class Array(Generic[*Ts]):
+    def shape(self) -> tuple[*Ts]:
+        raise NotImplementedError
+
+def f(default: Array, explicit: Array[bool]) -> None:
+    reveal_type(default)  # revealed: Array[int, str]
+    reveal_type(default.shape())  # revealed: tuple[int, str]
+    reveal_type(explicit)  # revealed: Array[bool]
+    reveal_type(explicit.shape())  # revealed: tuple[bool]
+    reveal_type(Array())  # revealed: Array[int, str]
+    reveal_type(Array[bytes, bool]())  # revealed: Array[bytes, bool]
 ```
 
-## Functions
+### Unspecified type arguments
 
-### Tuple arguments and returns
-
-```py
-from typing import TypeVar, TypeVarTuple
-
-T = TypeVar("T")
-Ts = TypeVarTuple("Ts")
-U = TypeVar("U")
-
-def echo(x: tuple[*Ts]) -> tuple[*Ts]:
-    return x
-
-def with_prefix(x: T, y: tuple[*Ts]) -> tuple[T, *Ts]:
-    raise NotImplementedError
-
-def with_suffix(x: tuple[*Ts], y: U) -> tuple[*Ts, U]:
-    raise NotImplementedError
-
-def with_both(x: tuple[T, *Ts, U]) -> tuple[*Ts]:
-    raise NotImplementedError
-
-def f(i: int, s: str, b: bool) -> None:
-    reveal_type(echo((i, s)))  # revealed: tuple[int, str]
-    reveal_type(echo(()))  # revealed: tuple[()]
-    reveal_type(with_prefix(i, (s, b)))  # revealed: tuple[int, str, bool]
-    reveal_type(with_suffix((i, s), b))  # revealed: tuple[int, str, bool]
-    reveal_type(with_both((i, s, b)))  # revealed: tuple[str]
-```
-
-### Starred variadic parameters
-
-When a `TypeVarTuple` appears in `*args`, the argument tuple keeps the exact element types from the
-call site.
+An unsubscripted variadic generic uses an unknown-length tuple of `Any` arguments, allowing typed
+and dynamic uses of the class to interoperate.
 
 ```py
-from typing import TypeVar, TypeVarTuple
-
-T = TypeVar("T")
-Ts = TypeVarTuple("Ts")
-
-def args_to_tuple(*args: *Ts) -> tuple[*Ts]:
-    reveal_type(args)  # revealed: tuple[*Ts@args_to_tuple]
-    raise NotImplementedError
-
-def first_and_rest(first: T, *rest: *Ts) -> tuple[T, *Ts]:
-    raise NotImplementedError
-
-def f(i: int, s: str, b: bool) -> None:
-    reveal_type(args_to_tuple(i, s))  # revealed: tuple[int, str]
-    reveal_type(args_to_tuple())  # revealed: tuple[()]
-    reveal_type(first_and_rest(i, s, b))  # revealed: tuple[int, str, bool]
-```
-
-### `Unpack` spelling for variadic parameters
-
-The legacy `Unpack` spelling is equivalent to `*Ts` in a variadic parameter annotation.
-
-```py
-from typing import Callable, TypeVar, TypeVarTuple, Unpack
-
-T = TypeVar("T")
-Ts = TypeVarTuple("Ts")
-
-def call_with_args(func: Callable[[Unpack[Ts]], T], *args: Unpack[Ts]) -> T:
-    raise NotImplementedError
-
-def takes_int_str(i: int, s: str) -> bool:
-    return True
-
-def f(i: int, s: str) -> None:
-    reveal_type(call_with_args(takes_int_str, i, s))  # revealed: bool
-```
-
-### Callable parameters
-
-`Callable` accepts unpacked `TypeVarTuple`s in its positional parameter list.
-
-```py
-from typing import Callable, TypeVarTuple
+from typing import Any, Generic, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 
-def f(callback: Callable[[int, *Ts], tuple[*Ts]]) -> None:
-    reveal_type(callback)  # revealed: (int, /, *Ts@f) -> tuple[*Ts@f]
-```
+class Shelf(Generic[*Ts]):
+    def contents(self) -> tuple[*Ts]:
+        raise NotImplementedError
 
-### Length-sensitive inference
-
-```py
-from typing import TypeVarTuple
-
-Ts = TypeVarTuple("Ts")
-
-def same_shape(x: tuple[*Ts], y: tuple[*Ts]) -> tuple[*Ts]:
+def needs_two_items(x: Shelf[int, str]) -> None:
     raise NotImplementedError
 
-def f(i: int, s: str, b: bool) -> None:
-    reveal_type(same_shape((i, s), (b, i)))  # revealed: tuple[int, str | int]
-    same_shape((i,), (s, b))  # error: [invalid-argument-type]
-```
-
-## Type concatenation
-
-A type variable tuple can be combined with fixed leading or trailing types.
-
-```py
-from typing import Generic, TypeVar, TypeVarTuple
-
-T = TypeVar("T")
-Shape = TypeVarTuple("Shape")
-
-class Array(Generic[*Shape]): ...
-class Batch: ...
-class Channels: ...
-class Height: ...
-class Width: ...
-
-def add_batch_axis(x: Array[*Shape]) -> Array[Batch, *Shape]:
+def needs_dynamic_items(x: Shelf) -> None:
     raise NotImplementedError
 
-def del_batch_axis(x: Array[Batch, *Shape]) -> Array[*Shape]:
-    raise NotImplementedError
-
-def add_batch_channels(x: Array[*Shape]) -> Array[Batch, *Shape, Channels]:
-    raise NotImplementedError
-
-def del_channels_axis(x: Array[*Shape, Channels]) -> Array[*Shape]:
-    raise NotImplementedError
-
-def prefix_tuple(x: T, y: tuple[*Shape]) -> tuple[T, *Shape]:
-    raise NotImplementedError
-
-def f(a: Array[Height, Width], c: Array[Height, Width, Channels]) -> None:
-    b = add_batch_axis(a)
-    reveal_type(b)  # revealed: Array[Batch, Height, Width]
-    reveal_type(del_batch_axis(b))  # revealed: Array[Height, Width]
-    reveal_type(add_batch_channels(a))  # revealed: Array[Batch, Height, Width, Channels]
-    reveal_type(del_channels_axis(c))  # revealed: Array[Height, Width]
-    reveal_type(prefix_tuple(1, (True, "a")))  # revealed: tuple[Literal[1], Literal[True], Literal["a"]]
+def f(
+    dynamic: Shelf,
+    explicitly_dynamic: Shelf[*tuple[Any, ...]],
+    fixed: Shelf[int, str],
+) -> None:
+    reveal_type(dynamic)  # revealed: Shelf[*tuple[Any, ...]]
+    reveal_type(dynamic.contents())  # revealed: tuple[Any, ...]
+    reveal_type(explicitly_dynamic)  # revealed: Shelf[*tuple[Any, ...]]
+    reveal_type(explicitly_dynamic.contents())  # revealed: tuple[Any, ...]
+    needs_two_items(dynamic)
+    needs_dynamic_items(fixed)
 ```
 
 ## Type Aliases
@@ -404,11 +283,13 @@ Suffix = tuple[*Ts, str]
 
 def f(
     alias: Alias[int, bool, str],
+    long_alias: Alias[int, bool, bytes, str],
     short_alias: Alias[int, str],
     prefix: Prefix[bool, str],
     suffix: Suffix[int, bool],
 ) -> None:
     reveal_type(alias)  # revealed: tuple[int, bool, str]
+    reveal_type(long_alias)  # revealed: tuple[int, bool, bytes, str]
     reveal_type(short_alias)  # revealed: tuple[int, str]
     reveal_type(prefix)  # revealed: tuple[int, bool, str]
     reveal_type(suffix)  # revealed: tuple[int, bool, str]
@@ -428,19 +309,49 @@ def f(x: Alias[*tuple[str, bool]], y: Alias[*tuple[str, ...]]) -> None:
     reveal_type(y)  # revealed: tuple[int, *tuple[str, ...]]
 ```
 
-## Invalid Tuple Forms
+### Unspecified alias type arguments
 
-### Only one variadic unpack
+A bare variadic alias substitutes an unknown-length tuple of `Any`.
 
 ```py
-from typing import TypeVarTuple
+from typing import Any, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 
+Headered = tuple[bytes, *Ts]
+
+def f(raw: Headered, explicit: Headered[*tuple[Any, ...]]) -> None:
+    reveal_type(raw)  # revealed: tuple[bytes, *tuple[Any, ...]]
+    reveal_type(explicit)  # revealed: tuple[bytes, *tuple[Any, ...]]
+```
+
+### Variadic substitutions
+
+Legacy aliases can forward a type variable tuple and split an unbounded tuple to satisfy a fixed
+trailing type argument.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+Start = TypeVar("Start")
+End = TypeVar("End")
+Ts = TypeVarTuple("Ts")
+
+Payload = tuple[bytes, *Ts]
+CountedPayload = Payload[int, *Ts]
+Started = tuple[Start, *Ts]
+Terminated = tuple[*Ts, End]
+
 def f(
-    ok1: tuple[int, *Ts],
-    ok2: tuple[int, *Ts, str],
-    bad1: tuple[*Ts, *tuple[str, ...]],  # error: [invalid-type-form]
-    bad2: tuple[*tuple[str, ...], *Ts],  # error: [invalid-type-form]
-) -> None: ...
+    forwarded: CountedPayload[str, bool],
+    leading_split: Started[*tuple[str, ...]],
+    split: Terminated[*tuple[str, ...]],
+    retained: Terminated[*tuple[str, ...], bytes],
+    combined: Terminated[int, *tuple[str, ...]],
+) -> None:
+    reveal_type(forwarded)  # revealed: tuple[bytes, int, str, bool]
+    reveal_type(leading_split)  # revealed: tuple[str, *tuple[str, ...]]
+    reveal_type(split)  # revealed: tuple[*tuple[str, ...], str]
+    reveal_type(retained)  # revealed: tuple[*tuple[str, ...], bytes]
+    reveal_type(combined)  # revealed: tuple[int, *tuple[str, ...], str]
 ```

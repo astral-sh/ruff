@@ -708,18 +708,19 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 ```py
 # snapshot: invalid-type-variable-default
 # error: [invalid-type-form]
+# error: [invalid-type-form]
 type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
 ```
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:9:13
-  |
-9 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
-  |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
-  |             |
-  |             `Us` is a TypeVarTuple
-  |
+  --> src/mdtest_snippet.py:10:13
+   |
+10 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+   |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
+   |             |
+   |             `Us` is a TypeVarTuple
+   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 

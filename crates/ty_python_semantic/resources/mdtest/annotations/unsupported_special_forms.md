@@ -45,8 +45,8 @@ def ex3(msg: str):
 def first_arg_int(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...
 
 first_arg_int(42, "42", "42")  # fine
-first_arg_int("not an int", "42", "42")  # TODO: should error
-first_arg_int(56, "42", 56)  # TODO: should error
+first_arg_int("not an int", "42", "42")  # error: [invalid-argument-type]
+first_arg_int(56, "42", 56)  # error: [invalid-argument-type]
 ```
 
 ## Allowed `Unpack` contexts
@@ -77,7 +77,7 @@ def variadic_typevartuple(*args: Unpack[Ts]) -> None:
     reveal_type(args)  # revealed: tuple[*Ts@variadic_typevartuple]
 
 def variadic_tuple(*args: Unpack[tuple[int, str]]) -> None:
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[int, str]
 
 def allowed(
     tuple_fixed: tuple[int, Unpack[tuple[str, bytes]]],

@@ -1021,7 +1021,7 @@ impl<'db> GenericContext<'db> {
             if typevar.is_paramspec(db) {
                 expanded.push(Type::paramspec_value_callable(db, Parameters::unknown()));
             } else if typevar.is_typevartuple(db) {
-                expanded.push(Type::homogeneous_tuple(db, Type::unknown()));
+                expanded.push(Type::homogeneous_tuple(db, Type::any()));
             } else {
                 expanded.push(Type::unknown());
             }

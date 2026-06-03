@@ -2392,25 +2392,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return inner_ty;
                 }
 
-                // When the argument is a tuple type, return it directly so that
-                // `Unpack[tuple[int, ...]]` behaves identically to `*tuple[int, ...]`.
-                //
-                // However, we still need a Todo type for things like
-                // `def f(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...`,
-                // which we don't yet support.
-                if matches!(
-                    inner_ty,
-                    Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
-                ) {
-                    inner_ty
-                } else if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_VARARG_ANNOTATION)
-                    || inner_ty.exact_tuple_instance_spec(self.db()).is_none()
+                // Preserve valid unpack targets so that `Unpack[...]` follows the same
+                // argument-binding path as an equivalent starred annotation.
+                if inner_ty.exact_tuple_instance_spec(self.db()).is_some()
+                    || matches!(
+                        inner_ty,
+                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
+                    )
                 {
-                    todo_type!("`Unpack[]` special form")
-                } else {
                     inner_ty
+                } else {
+                    todo_type!("`Unpack[]` special form")
                 }
             }
             SpecialFormType::NoReturn

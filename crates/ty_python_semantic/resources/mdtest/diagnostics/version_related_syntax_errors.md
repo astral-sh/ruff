@@ -38,8 +38,10 @@ match 2:
 
 ## PEP 695 type parameter lists
 
-PEP 695 type parameter lists were introduced in Python 3.12. Even though the syntax is invalid on
-older Python versions, we should still handle later semantic analysis gracefully.
+This is a regression test for semantic analysis of `TypeVarTuple` and `ParamSpec` parameters after
+the parser reports a version-related syntax error. PEP 695 type parameter lists are invalid on
+Python versions before 3.12, but later semantic analysis should still handle their generic contexts
+without panicking.
 
 ```toml
 [environment]

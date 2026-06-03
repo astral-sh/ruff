@@ -681,13 +681,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .max(typevartuple_index);
             let mut packed = Vec::with_capacity(typevars_len);
 
-            packed.extend_from_slice(
-                &expanded_type_arguments[..expanded_type_arguments.len().min(typevartuple_index)],
-            );
-
             let mut tuple_builder = TupleSpecBuilder::with_capacity(
                 typevartuple_end.saturating_sub(typevartuple_index),
             );
+            for type_argument in
+                &expanded_type_arguments[..expanded_type_arguments.len().min(typevartuple_index)]
+            {
+                let provided_type = type_argument.ty.unwrap_or_else(Type::unknown);
+                let is_unpack = self
+                    .type_expression_flags(type_argument.node)
+                    .contains(TypeExpressionFlags::UNPACK);
+                if is_unpack
+                    && let Some(tuple) = provided_type.exact_tuple_instance_spec(db)
+                    && let Tuple::Variable(variable) = tuple.as_ref()
+                    && variable.prefix_elements().is_empty()
+                    && variable.suffix_elements().is_empty()
+                    && !matches!(
+                        variable.variable(),
+                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                    )
+                {
+                    tuple_builder = tuple_builder.concat(db, &tuple);
+                    packed.push(TypeArgument {
+                        ty: Some(variable.variable()),
+                        ..*type_argument
+                    });
+                } else if is_unpack
+                    && (matches!(
+                        provided_type,
+                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                    ) || matches!(
+                        provided_type.exact_tuple_instance_spec(db).as_deref(),
+                        Some(Tuple::Variable(variable))
+                            if matches!(
+                                variable.variable(),
+                                Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                            )
+                    ))
+                {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_FORM, type_argument.node)
+                    {
+                        builder.into_diagnostic(
+                            "A TypeVarTuple cannot be split to provide a fixed type argument",
+                        );
+                    }
+                    packed.push(TypeArgument {
+                        ty: Some(Type::unknown()),
+                        ..*type_argument
+                    });
+                } else {
+                    packed.push(*type_argument);
+                }
+            }
+
             let typevartuple_start = expanded_type_arguments.len().min(typevartuple_index);
             for type_argument in &expanded_type_arguments
                 [typevartuple_start..expanded_type_arguments.len().min(typevartuple_end)]
@@ -720,6 +768,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            let mut packed_suffix = Vec::with_capacity(suffix_len);
+            if suffix_len > 0 && expanded_type_arguments.len() >= typevartuple_index + suffix_len {
+                for type_argument in
+                    &expanded_type_arguments[expanded_type_arguments.len() - suffix_len..]
+                {
+                    let provided_type = type_argument.ty.unwrap_or_else(Type::unknown);
+                    let is_unpack = self
+                        .type_expression_flags(type_argument.node)
+                        .contains(TypeExpressionFlags::UNPACK);
+                    if is_unpack
+                        && let Some(tuple) = provided_type.exact_tuple_instance_spec(db)
+                        && let Tuple::Variable(variable) = tuple.as_ref()
+                        && variable.prefix_elements().is_empty()
+                        && variable.suffix_elements().is_empty()
+                        && !matches!(
+                            variable.variable(),
+                            Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                        )
+                    {
+                        tuple_builder = tuple_builder.concat(db, &tuple);
+                        packed_suffix.push(TypeArgument {
+                            ty: Some(variable.variable()),
+                            ..*type_argument
+                        });
+                    } else if is_unpack
+                        && (matches!(
+                            provided_type,
+                            Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                        ) || matches!(
+                            provided_type.exact_tuple_instance_spec(db).as_deref(),
+                            Some(Tuple::Variable(variable))
+                                if matches!(
+                                    variable.variable(),
+                                    Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                                )
+                        ))
+                    {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_FORM, type_argument.node)
+                        {
+                            builder.into_diagnostic(
+                                "A TypeVarTuple cannot be split to provide a fixed type argument",
+                            );
+                        }
+                        packed_suffix.push(TypeArgument {
+                            ty: Some(Type::unknown()),
+                            ..*type_argument
+                        });
+                    } else {
+                        packed_suffix.push(*type_argument);
+                    }
+                }
+            }
+
             if expanded_type_arguments.len() >= typevartuple_index {
                 packed.push(TypeArgument {
                     node: expanded_type_arguments
@@ -731,12 +834,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map_or(0, |argument| argument.source_index),
                 });
             }
-
-            if suffix_len > 0 && expanded_type_arguments.len() >= typevartuple_index + suffix_len {
-                packed.extend_from_slice(
-                    &expanded_type_arguments[expanded_type_arguments.len() - suffix_len..],
-                );
-            }
+            packed.extend(packed_suffix);
 
             packed
         } else {
