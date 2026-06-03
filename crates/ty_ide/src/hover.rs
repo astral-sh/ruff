@@ -290,8 +290,11 @@ pub enum HoverContent<'db> {
         qualifiers: TypeQualifiers,
     },
     TypeAlias {
+        // The type alias being hovered
         alias: TypeAliasType<'db>,
+        // The value type this TypeAlias is aliasing
         value_ty: Type<'db>,
+        // The type's qualifiers
         qualifiers: TypeQualifiers,
     },
     TypedDictKey {
