@@ -519,6 +519,10 @@ class Value:
     def choice[T = Self](self) -> T:
         raise NotImplementedError
 
+    @identity
+    def factory(self) -> Callable[[], Self]:
+        return lambda: self
+
 class Extra:
     extra: int
 
@@ -534,6 +538,8 @@ def _(
     reveal_type(cls.choose_class().extra)  # revealed: int
     reveal_type(value.choice)  # revealed: Value & Extra
     reveal_type(value.choice.extra)  # revealed: int
+    reveal_type(value.factory()())  # revealed: Value & Extra
+    reveal_type(value.factory()().extra)  # revealed: int
 ```
 
 ## typing_extensions

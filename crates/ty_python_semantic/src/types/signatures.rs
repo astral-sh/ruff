@@ -924,19 +924,26 @@ impl<'db> Signature<'db> {
     }
 
     fn self_typevar(&self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
-        self.generic_context.and_then(|generic_context| {
-            generic_context
-                .variables(db)
-                .find(|typevar| typevar.typevar(db).is_self(db))
-                .or_else(|| {
-                    generic_context.variables(db).find_map(|typevar| {
-                        find_over_type(db, typevar.default_type(db)?, false, |ty| {
-                            ty.as_typevar()
-                                .filter(|typevar| typevar.typevar(db).is_self(db))
+        self.generic_context
+            .and_then(|generic_context| {
+                generic_context
+                    .variables(db)
+                    .find(|typevar| typevar.typevar(db).is_self(db))
+                    .or_else(|| {
+                        generic_context.variables(db).find_map(|typevar| {
+                            find_over_type(db, typevar.default_type(db)?, false, |ty| {
+                                ty.as_typevar()
+                                    .filter(|typevar| typevar.typevar(db).is_self(db))
+                            })
                         })
                     })
+            })
+            .or_else(|| {
+                find_over_type(db, self.return_ty, false, |ty| {
+                    ty.as_typevar()
+                        .filter(|typevar| typevar.typevar(db).is_self(db))
                 })
-        })
+            })
     }
 
     fn self_binding_context(&self, db: &'db dyn Db) -> Option<BindingContext<'db>> {
