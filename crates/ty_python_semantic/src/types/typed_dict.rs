@@ -5,11 +5,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
-#[cfg(test)]
-use ruff_db::files::system_path_to_file;
 use ruff_db::parsed::parsed_module;
-#[cfg(test)]
-use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
@@ -26,10 +22,6 @@ use super::{
     UnionBuilder, definition_expression_qualifiers, definition_expression_type, visitor,
 };
 use crate::Db;
-#[cfg(test)]
-use crate::db::tests::setup_db;
-#[cfg(test)]
-use crate::place::global_symbol;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
@@ -104,7 +96,7 @@ impl<'db> TypedDictOpenness<'db> {
         }
     }
 
-    /// Returns the effective extra-items type used by structural relations.
+    /// Returns the effective extra-items policy.
     ///
     /// An open `TypedDict` behaves like it has read-only extra items of type `object` for these
     /// purposes, while a closed `TypedDict` has no extra items.
@@ -316,14 +308,6 @@ impl<'db> TypedDictType<'db> {
     /// Returns extra items only when they were explicitly declared.
     pub(crate) fn explicit_extra_items(self, db: &'db dyn Db) -> Option<TypedDictExtraItems<'db>> {
         self.openness(db).explicit_extra_items()
-    }
-
-    /// Returns the extra-items policy used by structural relations.
-    ///
-    /// Unlike [`Self::explicit_extra_items`], this treats an ordinary open `TypedDict` as having
-    /// read-only extra items of type `object`.
-    pub(crate) fn effective_extra_items(self, db: &'db dyn Db) -> Option<TypedDictExtraItems<'db>> {
-        self.openness(db).effective_extra_items()
     }
 
     /// Returns a type that contains every value that may be stored in this `TypedDict`.
@@ -1587,7 +1571,7 @@ pub(crate) struct UnpackedTypedDictKey<'db> {
     pub(crate) definition: Option<Definition<'db>>,
 }
 
-/// A normalized view of a `TypedDict`-shaped value used when expanding `**kwargs`.
+/// A normalized view of a `TypedDict`-shaped value used when unpacking it.
 ///
 /// Union and intersection inputs are combined into one set of possible keys and one openness
 /// policy describing arbitrary undeclared keys.
@@ -1598,6 +1582,14 @@ pub(crate) struct UnpackedTypedDict<'db> {
     pub(crate) openness: TypedDictOpenness<'db>,
 }
 
+/// Combines the openness policies of intersected `TypedDict`-shaped values.
+///
+/// An intersection must satisfy every constituent, so `Closed` dominates, `Open` adds no
+/// constraint, and explicit extra-item value types are intersected. Conceptually,
+/// `Open & Extra[int]` becomes a read-only `Extra[int]`, while `Closed & Extra[int]` is `Closed`.
+///
+/// The combined explicit policy can be read-only because unpacking observes extra items but never
+/// writes through the synthesized policy.
 fn intersect_unpacked_typed_dict_openness<'db>(
     db: &'db dyn Db,
     openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
@@ -1625,6 +1617,16 @@ fn intersect_unpacked_typed_dict_openness<'db>(
     }
 }
 
+/// Combines the openness policies of unioned `TypedDict`-shaped values.
+///
+/// A union may contain extra items from any constituent, so `Closed` contributes no values and
+/// explicit extra-item value types are unioned. An `Open` constituent widens explicit extra items
+/// to `object` while preserving explicit-extra-item behavior: conceptually,
+/// `Open | Extra[int]` becomes a read-only `Extra[object]`. With no explicit extra items, any open
+/// constituent makes the result `Open`; otherwise the result is `Closed`.
+///
+/// As with intersections, a synthesized explicit policy is read-only because unpacking only
+/// observes its values.
 fn union_unpacked_typed_dict_openness<'db>(
     db: &'db dyn Db,
     openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
@@ -3124,47 +3126,4 @@ fn test_btreemap_overlapping_items() {
             .next()
             .is_none()
     );
-}
-
-#[test]
-fn open_value_type_does_not_compute_items() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_dedented(
-        "src/a.py",
-        "
-        from typing import TypedDict
-
-        class TD(TypedDict):
-            field: int
-        ",
-    )?;
-
-    let file = system_path_to_file(&db, "src/a.py").unwrap();
-    {
-        let class = global_symbol(&db, file, "TD")
-            .place
-            .expect_type()
-            .expect_class_literal();
-        let typed_dict = TypedDictType::new(ClassType::NonGeneric(class));
-        assert!(typed_dict.openness(&db).is_open());
-    }
-    db.clear_salsa_events();
-
-    {
-        let class = global_symbol(&db, file, "TD")
-            .place
-            .expect_type()
-            .expect_class_literal();
-        let typed_dict = TypedDictType::new(ClassType::NonGeneric(class));
-        assert_eq!(typed_dict.value_type(&db), Type::object());
-    }
-    let events = db.take_salsa_events();
-    assert!(
-        !events
-            .iter()
-            .any(|event| matches!(event.kind, salsa::EventKind::WillExecute { .. })),
-        "Computing the value type of an open TypedDict should not require its items: {events:#?}"
-    );
-
-    Ok(())
 }

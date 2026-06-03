@@ -38,6 +38,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let in_stub = self.in_stub();
             let previous_deferred_state =
                 std::mem::replace(&mut self.deferred_state, in_stub.into());
+
+            // PEP 695 class headers are inferred in the type-parameter scope, before the completed
+            // class type is available. Infer the bases first because `extra_items=T` is an
+            // annotation in `class C[T](TypedDict, extra_items=T)`, but an ordinary value argument
+            // in `class C[T](Base, extra_items=T)`.
             let mut is_typed_dict = false;
 
             for base in class.bases() {

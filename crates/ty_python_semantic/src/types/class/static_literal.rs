@@ -46,7 +46,7 @@ use crate::{
         member::{Member, class_member},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
-        tuple::{FixedLengthTuple, Tuple, TupleSpec, TupleType},
+        tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},

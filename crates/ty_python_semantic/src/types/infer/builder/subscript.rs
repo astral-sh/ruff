@@ -1806,6 +1806,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             _ => {
                 if let Type::TypedDict(typed_dict) = object_ty {
+                    // A known undeclared key can only refer to an explicit extra item, so it can
+                    // be deleted whenever those items are mutable. An arbitrary string key could
+                    // instead refer to any declared field, so deletion is only safe when all
+                    // possible fields are optional and mutable.
                     let can_delete_extra_literal =
                         slice_ty.as_string_literal().is_some_and(|literal| {
                             !typed_dict.items(db).contains_key(literal.value(db))
