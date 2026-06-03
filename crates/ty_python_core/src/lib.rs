@@ -328,6 +328,9 @@ pub struct SemanticIndex<'db> {
     // Map from a collection initializer definition to statements containing a constraining use.
     uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
 
+    // Collection initializers that are later expanded as keyword arguments.
+    keyword_splatted_collections: FrozenSet<Definition<'db>>,
+
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
@@ -558,6 +561,11 @@ impl<'db> SemanticIndex<'db> {
             .get(&collection_def)
             .into_iter()
             .flat_map(|uses| uses.iter().copied())
+    }
+
+    /// Returns whether the collection is later expanded as keyword arguments.
+    pub fn is_keyword_splatted_collection(&self, collection_def: Definition<'db>) -> bool {
+        self.keyword_splatted_collections.contains(&collection_def)
     }
 
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {

@@ -805,6 +805,46 @@ x1_dict["a"] = 1
 reveal_type(x1_dict)  # revealed: dict[str, int]
 ```
 
+Bare constructor inference remains gradual when later uses combine `Unknown` with multiple concrete
+alternatives, or when a dictionary is expanded as keyword arguments and its homogeneous type cannot
+preserve key/value correlation.
+
+```py
+def accepts_float_keywords(*, p: float = 1.0, out: str | None = None) -> None: ...
+def accepts_int_list(values: list[int]) -> None: ...
+def constructor_inference_remains_gradual(flag: bool, name: str, value):
+    kwargs = dict()
+    if flag:
+        kwargs["p"] = 1.23
+    accepts_float_keywords(**kwargs)
+    reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
+
+    nested_kwargs = dict()
+    nested_kwargs["a"] = dict(p=1.23)
+    accepts_float_keywords(**nested_kwargs[name])
+    reveal_type(nested_kwargs)  # revealed: dict[Unknown, Unknown]
+
+    values = list()
+    values.append(value)
+    values.append("value")
+    values.append(1)
+    accepts_int_list(values)
+    reveal_type(values)  # revealed: list[Unknown]
+
+def constructor_inference_keeps_one_concrete_alternative(value):
+    values = set()
+    values.add(value)
+    values.add(("host", None))
+    reveal_type(values)  # revealed: set[Unknown | tuple[str, None]]
+
+def concrete_heterogeneous_constructor() -> set[str]:
+    values = set()
+    values.add(1)
+    values.add(2.0)
+    reveal_type(values)  # revealed: set[int | float | str]
+    return values  # error: [invalid-return-type]
+```
+
 ```py
 from builtins import list
 

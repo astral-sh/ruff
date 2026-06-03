@@ -240,6 +240,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
     // A map from a collection initializer definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
+    // Collection initializers that are later expanded as keyword arguments.
+    keyword_splatted_collections: FxHashSet<Definition<'db>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -289,6 +291,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FxHashMap::default(),
             collections_by_use: FxHashMap::default(),
             uses_by_collection: FxHashMap::default(),
+            keyword_splatted_collections: FxHashSet::default(),
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
@@ -2504,6 +2507,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
+            keyword_splatted_collections: FrozenSet::from(self.keyword_splatted_collections),
             imported_modules: Arc::new(FrozenSet::from(self.imported_modules)),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
@@ -3980,10 +3984,24 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_keyword(&mut self, keyword: &'ast ast::Keyword) {
+        let collection_use_start = self
+            .current_statement_mut()
+            .map(|statement| statement.collection_uses.len());
         walk_keyword(self, keyword);
 
         if keyword.arg.is_some() {
             return;
+        }
+
+        if let Some(collection_use_start) = collection_use_start {
+            let keyword_splatted_collections = self
+                .current_statement_mut()
+                .into_iter()
+                .flat_map(|statement| &statement.collection_uses[collection_use_start..])
+                .map(|(definition, _)| *definition)
+                .collect_vec();
+            self.keyword_splatted_collections
+                .extend(keyword_splatted_collections);
         }
 
         // Record a use of all members of `x` for a splatted keyword argument `**x`.

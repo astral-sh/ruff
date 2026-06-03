@@ -10,12 +10,11 @@ use crate::types::typed_dict::{
 use crate::types::{KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) fn infer_keyword_only_dict_call(
+    pub(super) fn infer_dict_call_in_typed_dict_context(
         &mut self,
         func: &ast::Expr,
         arguments: &ast::Arguments,
-        call_expression_tcx: TypeContext<'db>,
-        typed_dict_only: bool,
+        expected_type: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
         if !arguments.args.is_empty() {
             return None;
@@ -24,54 +23,59 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
         // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
         // is `TypedDict`-shaped.
-        if let Some(tcx) = call_expression_tcx.annotation
-            && let Some(typed_dict) = tcx
-                .filter_union(self.db(), Type::is_typed_dict)
-                .as_typed_dict()
-        {
-            // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
-            // are already valid for the target, including gradual and bottom types. The additional
-            // TypedDict-shape check keeps invalid-but-analyzable unpacks on this path so validation
-            // can emit key-level diagnostics instead of falling back to a broad `dict[...]`
-            // assignment error. Unsupported unpacks still fall back to ordinary `dict(...)`
-            // inference.
-            //
-            // Named keyword values are inferred on the real builder so their diagnostics are either
-            // committed with the fast path or left for ordinary `dict(...)` inference when we fall
-            // back.
-            let supports_typed_dict_context = {
-                let mut speculative_builder = self.speculate();
-                infer_unpacked_keyword_types(arguments, |expr, tcx| {
-                    speculative_builder.infer_expression(expr, tcx)
-                })
-                .into_iter()
-                .flatten()
-                .all(|keyword_ty| {
-                    keyword_ty
-                        .is_assignable_to(speculative_builder.db(), Type::TypedDict(typed_dict))
-                        || extract_unpacked_typed_dict_keys_from_value_type(
-                            speculative_builder.db(),
-                            keyword_ty,
-                        )
-                        .is_some()
-                })
-            };
+        let typed_dict = expected_type?
+            .filter_union(self.db(), Type::is_typed_dict)
+            .as_typed_dict()?;
 
-            if supports_typed_dict_context {
-                self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
-                validate_typed_dict_constructor(
-                    &self.context,
-                    typed_dict,
-                    arguments,
-                    func.into(),
-                    |expr, _| self.expression_type(expr),
-                );
+        // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
+        // are already valid for the target, including gradual and bottom types. The additional
+        // TypedDict-shape check keeps invalid-but-analyzable unpacks on this path so validation
+        // can emit key-level diagnostics instead of falling back to a broad `dict[...]`
+        // assignment error. Unsupported unpacks still fall back to ordinary `dict(...)`
+        // inference.
+        //
+        // Named keyword values are inferred on the real builder so their diagnostics are either
+        // committed with the fast path or left for ordinary `dict(...)` inference when we fall
+        // back.
+        let supports_typed_dict_context = {
+            let mut speculative_builder = self.speculate();
+            infer_unpacked_keyword_types(arguments, |expr, tcx| {
+                speculative_builder.infer_expression(expr, tcx)
+            })
+            .into_iter()
+            .flatten()
+            .all(|keyword_ty| {
+                keyword_ty.is_assignable_to(speculative_builder.db(), Type::TypedDict(typed_dict))
+                    || extract_unpacked_typed_dict_keys_from_value_type(
+                        speculative_builder.db(),
+                        keyword_ty,
+                    )
+                    .is_some()
+            })
+        };
 
-                return Some(Type::TypedDict(typed_dict));
-            }
+        if !supports_typed_dict_context {
+            return None;
         }
 
-        if typed_dict_only {
+        self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
+        validate_typed_dict_constructor(
+            &self.context,
+            typed_dict,
+            arguments,
+            func.into(),
+            |expr, _| self.expression_type(expr),
+        );
+
+        Some(Type::TypedDict(typed_dict))
+    }
+
+    pub(super) fn infer_keyword_only_dict_call(
+        &mut self,
+        arguments: &ast::Arguments,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        if !arguments.args.is_empty() {
             return None;
         }
 

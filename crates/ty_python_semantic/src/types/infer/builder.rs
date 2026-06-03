@@ -7992,13 +7992,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let elements: [[Option<&ast::Expr>; N]; 0] = [];
         let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
 
-        self.infer_collection_literal(
+        let inferred_ty = self.infer_collection_literal(
             collection_class,
             Some(call_expression.into()),
             &elements,
             &mut infer_element_ty,
             tcx,
-        )
+        )?;
+
+        // Bare constructor inference only refines an otherwise gradual return type. Keep the
+        // normal gradual return type when inference combines `Unknown` with multiple concrete
+        // alternatives, or when a dictionary is expanded as keyword arguments and its homogeneous
+        // type cannot preserve key/value correlation. Explicit type context still determines the
+        // specialization.
+        let (_, specialization) = inferred_ty.class_specialization(self.db())?;
+        let mixes_unknown_with_alternatives = specialization.types(self.db()).iter().any(|ty| {
+            let Some(union) = ty.as_union() else {
+                return false;
+            };
+            // Only inspect the direct alternatives. `Unknown` nested inside a concrete
+            // alternative still contributes useful shape information.
+            union.elements(self.db()).iter().any(Type::is_dynamic)
+                && union
+                    .elements(self.db())
+                    .iter()
+                    .filter(|element| !element.is_dynamic())
+                    .take(2)
+                    .count()
+                    > 1
+        });
+        let is_keyword_splatted_dict = collection_class == KnownClass::Dict
+            && self
+                .index
+                .try_expression(call_expression)
+                .and_then(|expression| expression.assigned_to(self.db()))
+                .and_then(|assignment| {
+                    DefinitionNodeKey::from_assignment(assignment.node(self.module()))
+                        .exactly_one()
+                        .ok()
+                })
+                .and_then(|definition| self.index.try_definition(definition))
+                .is_some_and(|definition| self.index.is_keyword_splatted_collection(definition));
+
+        if tcx.annotation.is_none() && (mixes_unknown_with_alternatives || is_keyword_splatted_dict)
+        {
+            return None;
+        }
+
+        Some(inferred_ty)
     }
 
     fn infer_call_expression_impl(
@@ -8073,15 +8114,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None
         };
 
-        if known_class == Some(KnownClass::Dict)
-            && let Some(ty) = self.infer_keyword_only_dict_call(
+        if known_class == Some(KnownClass::Dict) {
+            if let Some(ty) = self.infer_dict_call_in_typed_dict_context(
                 func,
                 arguments,
-                call_expression_tcx,
-                collection_initializer_class == Some(KnownClass::Dict),
-            )
-        {
-            return ty;
+                call_expression_tcx.annotation,
+            ) {
+                return ty;
+            }
+            // Empty constructor initializers are inferred below from their constraining uses.
+            if collection_initializer_class != Some(KnownClass::Dict)
+                && let Some(ty) = self.infer_keyword_only_dict_call(arguments, call_expression_tcx)
+            {
+                return ty;
+            }
         }
 
         // Handle 3-argument `type(name, bases, dict)`.
