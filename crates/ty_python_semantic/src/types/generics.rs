@@ -2335,28 +2335,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return None;
         }
 
-        // Use the shared read-only fallback rather than `dict[str, object]`. The current constraint
-        // solver can consider mutable protocol constraints equivalent even when a `TypedDict`
-        // preserves more precise correlations between its keys and values.
-        //
-        // TODO: Reconsider mutable common constraints once equivalence preserves those correlations.
+        // Use the read-only `Mapping[str, object]` as the fallback rather than `dict[str, object]`.
+        // The current constraint solver can consider mutable protocol constraints equivalent even
+        // when a `TypedDict` preserves more precise correlations between its keys and values.
         let spec = &[KnownClass::Str.to_instance(self.db), Type::object()];
         let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
-        let probe_constraints = ConstraintSetBuilder::new();
-        let probe_mapping_when = probe_constraints.load(self.db, mapping_when);
+        let mapping_when = self.constraints.load(self.db, mapping_when);
         typed_dicts
             .into_iter()
             .all(|element| {
-                let element_when = probe_constraints.load(
+                let element_when = self.constraints.load(
                     self.db,
                     element.when_constraint_set_assignable_to_owned(self.db, formal),
                 );
                 element_when
-                    .iff(self.db, &probe_constraints, probe_mapping_when)
+                    .iff(self.db, self.constraints, mapping_when)
                     .is_always_satisfied(self.db)
             })
-            .then(|| self.constraints.load(self.db, mapping_when))
+            .then(|| mapping_when)
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
