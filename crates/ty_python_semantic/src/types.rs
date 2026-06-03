@@ -1140,15 +1140,9 @@ impl<'db> Type<'db> {
     pub(crate) fn apply_self_binding(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         match self {
             Type::FunctionLiteral(function) => {
-                let self_type = function.signature(db).self_binding_type(db, self_type);
-                self.apply_type_mapping(
-                    db,
-                    &TypeMapping::BindSelf(SelfBinding::new(db, self_type, None)),
-                    TypeContext::default(),
-                )
+                Type::FunctionLiteral(function.apply_self(db, self_type))
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
-                let self_type = callable.signatures(db).self_binding_type(db, self_type);
                 Type::Callable(callable.apply_self(db, self_type))
             }
             _ => self,
@@ -3017,7 +3011,12 @@ impl<'db> Type<'db> {
                 } else {
                     let self_type = instance.unwrap_or_else(|| {
                         // For classmethod-like callables, bind to the owner class.
-                        owner.to_instance(db).unwrap_or(owner)
+                        match owner {
+                            Type::Intersection(intersection) => intersection
+                                .to_instance_for_classmethod_receiver(db)
+                                .unwrap_or(owner),
+                            _ => owner.to_instance(db).unwrap_or(owner),
+                        }
                     });
 
                     Some((

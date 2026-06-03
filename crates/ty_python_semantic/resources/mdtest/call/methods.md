@@ -505,8 +505,9 @@ on a derived class.
 
 ```py
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Callable, Iterator, ParamSpec, TypeVar
 from typing_extensions import Self
+from ty_extensions import Intersection
 
 class Base:
     @classmethod
@@ -531,6 +532,29 @@ with Child.create() as child:
 reveal_type(Child().create())  # revealed: _GeneratorContextManager[Child, None, None]
 with Child().create() as child:
     reveal_type(child)  # revealed: Child
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def identity(function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Decorated:
+    @classmethod
+    @identity
+    def outer_classmethod(cls) -> Self:
+        return cls()
+
+    @identity
+    @classmethod
+    def outer_identity(cls) -> Self:
+        return cls()
+
+class Extra: ...
+
+def _(cls: Intersection[type[Decorated], type[Extra]]):
+    reveal_type(cls.outer_classmethod())  # revealed: Decorated & Extra
+    reveal_type(cls.outer_identity())  # revealed: Decorated & Extra
 ```
 
 ### `__init_subclass__`

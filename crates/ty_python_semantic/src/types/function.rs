@@ -1013,6 +1013,15 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        Self::new(
+            db,
+            self.literal(db),
+            Some(self.signature(db).apply_self(db, self_type)),
+            Some(self.last_definition_signature(db).apply_self(db, self_type)),
+        )
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,

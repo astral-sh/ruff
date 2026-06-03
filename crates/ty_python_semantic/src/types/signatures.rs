@@ -922,13 +922,25 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
-    pub(crate) fn self_binding_type(&self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
-        let self_typevar = self.generic_context.and_then(|generic_context| {
+    fn self_typevar(&self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
+        self.generic_context.and_then(|generic_context| {
             generic_context
                 .variables(db)
                 .find(|typevar| typevar.typevar(db).is_self(db))
-        });
-        self_type.self_binding_type_for(db, self_typevar)
+        })
+    }
+
+    fn self_binding_context(&self, db: &'db dyn Db) -> Option<BindingContext<'db>> {
+        // Callable-returning decorators can erase the source definition while retaining the
+        // method's `Self` in the callable's generic context.
+        self.definition.map(BindingContext::Definition).or_else(|| {
+            self.self_typevar(db)
+                .map(|typevar| typevar.binding_context(db))
+        })
+    }
+
+    pub(crate) fn self_binding_type(&self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
+        self_type.self_binding_type_for(db, self.self_typevar(db))
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
@@ -943,7 +955,7 @@ impl<'db> Signature<'db> {
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
-        let binding_context = self.definition.map(BindingContext::Definition);
+        let binding_context = self.self_binding_context(db);
         if let Some(self_type) = self_type
             && self.needs_self_mapping(db, removed_receiver)
         {
@@ -1048,7 +1060,7 @@ impl<'db> Signature<'db> {
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
             db,
             self_type,
-            self.definition.map(BindingContext::Definition),
+            self.self_binding_context(db),
         ));
         let parameters = self.parameters.apply_type_mapping_impl(
             db,

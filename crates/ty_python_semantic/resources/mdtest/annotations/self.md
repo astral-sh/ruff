@@ -398,6 +398,27 @@ def _(value: Intersection[Value, Extra], plain: Value):
     reveal_type(value.copy_from(plain))  # revealed: Value & Extra
 ```
 
+## Callable-returning decorators preserve `Self` on intersections
+
+```py
+from typing import Callable, Self
+from ty_extensions import Intersection
+
+def identity[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Value:
+    @identity
+    def copy(self) -> Self:
+        return self
+
+class Extra: ...
+
+def _(value: Intersection[Value, Extra]):
+    reveal_type(value.copy())  # revealed: Value & Extra
+    value.copy().missing  # error: [unresolved-attribute]
+```
+
 ## typing_extensions
 
 ```toml

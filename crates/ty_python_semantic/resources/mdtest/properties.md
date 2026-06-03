@@ -438,6 +438,7 @@ the return type is bound to the receiver's runtime class:
 ```py
 from typing import Protocol, runtime_checkable
 from typing_extensions import Self
+from ty_extensions import Intersection
 
 @runtime_checkable
 class Marker(Protocol):
@@ -448,11 +449,18 @@ class Value:
     def property(self: Marker) -> Self:
         raise NotImplementedError
 
+class Extra:
+    marker: int
+
 def _(value: Value):
     if isinstance(value, Marker):
         reveal_type(value.property)  # revealed: Value
         reveal_type(Value.property.__get__(value, Value))  # revealed: Value
         reveal_type(type(Value.property).__get__(Value.property, value, Value))  # revealed: Value
+
+def _(value: Intersection[Value, Extra]):
+    reveal_type(value.property)  # revealed: Value & Extra
+    value.property.missing  # error: [unresolved-attribute]
 ```
 
 When we access `attr` on the class itself, the descriptor protocol is also invoked, but the instance
