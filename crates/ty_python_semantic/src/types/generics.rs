@@ -2280,6 +2280,82 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
+    /// Returns common protocol constraints for a union containing only `TypedDict`s when every
+    /// member has the same constraints as their shared `Mapping[str, object]` fallback.
+    fn common_typed_dict_protocol_constraints(
+        &self,
+        formal: Type<'db>,
+        actual: UnionType<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        fn collect_typed_dicts<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            resolving: &mut FxHashSet<Type<'db>>,
+            completed: &mut FxHashMap<Type<'db>, bool>,
+            typed_dicts: &mut FxHashSet<Type<'db>>,
+        ) -> bool {
+            let ty = ty.resolve_type_alias(db);
+            if let Some(result) = completed.get(&ty) {
+                return *result;
+            }
+
+            let result = match ty {
+                Type::TypedDict(_) => {
+                    typed_dicts.insert(ty);
+                    true
+                }
+                Type::Union(union) => {
+                    if !resolving.insert(ty) {
+                        return false;
+                    }
+                    let result = union.elements(db).iter().all(|element| {
+                        collect_typed_dicts(db, *element, resolving, completed, typed_dicts)
+                    });
+                    resolving.remove(&ty);
+                    result
+                }
+                _ => false,
+            };
+            completed.insert(ty, result);
+            result
+        }
+
+        let mut resolving = FxHashSet::default();
+        let mut completed = FxHashMap::default();
+        let mut typed_dicts = FxHashSet::default();
+        if !actual.elements(self.db).iter().all(|element| {
+            collect_typed_dicts(
+                self.db,
+                *element,
+                &mut resolving,
+                &mut completed,
+                &mut typed_dicts,
+            )
+        }) {
+            return None;
+        }
+
+        // Use the read-only `Mapping[str, object]` as the fallback rather than `dict[str, object]`.
+        // The current constraint solver can consider mutable protocol constraints equivalent even
+        // when a `TypedDict` preserves more precise correlations between its keys and values.
+        let spec = &[KnownClass::Str.to_instance(self.db), Type::object()];
+        let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
+        let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
+        let mapping_when = self.constraints.load(self.db, mapping_when);
+        typed_dicts
+            .into_iter()
+            .all(|element| {
+                let element_when = self.constraints.load(
+                    self.db,
+                    element.when_constraint_set_assignable_to_owned(self.db, formal),
+                );
+                element_when
+                    .iff(self.db, self.constraints, mapping_when)
+                    .is_always_satisfied(self.db)
+            })
+            .then_some(mapping_when)
+    }
+
     /// Infer type mappings by comparing formal callable signatures against actual callables.
     fn infer_from_callable_signature(
         &mut self,
@@ -2840,9 +2916,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // TODO: in principle this could be a generalized Union-actual arm that maps over the
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
-            (formal @ Type::ProtocolInstance(_), actual @ Type::Union(_)) => {
-                let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
-                let when = self.constraints.load(self.db, when);
+            (formal @ Type::ProtocolInstance(_), actual @ Type::Union(actual_union)) => {
+                let when = self
+                    .common_typed_dict_protocol_constraints(formal, actual_union)
+                    .unwrap_or_else(|| {
+                        actual.when_constraint_set_assignable_to(self.db, formal, self.constraints)
+                    });
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
