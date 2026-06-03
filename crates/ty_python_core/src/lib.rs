@@ -1942,6 +1942,55 @@ def f():
     }
 
     #[test]
+    fn wildcard_import_prevents_collection_constructor_indexing() {
+        let TestCase { db, file } = test_case(
+            "
+def f():
+    result = list()
+    result.append(1)
+
+from dep import *
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file).load(&db);
+        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+        let assignment = function.body[0].as_assign_stmt().unwrap();
+        let use_statement = &function.body[1];
+        let use_expression = use_statement
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap()
+            .func
+            .as_attribute_expr()
+            .unwrap()
+            .value
+            .as_ref();
+        let function_scope = index.node_scope(NodeWithScopeRef::Function(function));
+
+        assert!(!index.is_standalone_expression(&assignment.value));
+        assert!(index.try_statement(use_statement).is_none());
+        assert!(
+            index
+                .unconstrained_collection_binding(use_expression)
+                .is_none()
+        );
+        assert!(
+            index
+                .use_def_map(function_scope)
+                .predicates()
+                .iter()
+                .any(|predicate| matches!(
+                    predicate.node,
+                    predicate::PredicateNode::IsNonTerminalCall(_)
+                ))
+        );
+    }
+
+    #[test]
     fn collection_constructor_method_call_has_no_reachability_predicate() {
         let TestCase { db, file } = test_case(
             "

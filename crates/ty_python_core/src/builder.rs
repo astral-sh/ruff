@@ -173,6 +173,7 @@ impl CollectionConstructorBindings {
             "list" => Self::LIST,
             "set" => Self::SET,
             "dict" => Self::DICT,
+            "*" => Self::LIST | Self::SET | Self::DICT,
             _ => 0,
         };
     }
