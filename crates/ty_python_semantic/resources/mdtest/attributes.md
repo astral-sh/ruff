@@ -1889,7 +1889,7 @@ def _(a_and_b: Intersection[A, B]):
 ### `Self` binding excludes flow-only refinements
 
 ```py
-from typing import Protocol, runtime_checkable
+from typing import Callable, ParamSpec, Protocol, TypeVar, runtime_checkable
 from typing_extensions import Self, TypeIs
 
 class VariableTruth:
@@ -1915,10 +1915,21 @@ def _(value: VariableTruth):
 class InstanceMarker(Protocol):
     marker: int
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def identity(function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
 class Value:
     other: Self
 
     def copy(self) -> Self:
+        return self
+
+    @property
+    @identity
+    def decorated_property(self) -> Self:
         return self
 
     @property
@@ -1930,6 +1941,8 @@ def _(value: Value):
         reveal_type(value.copy())  # revealed: Value
         reveal_type(value.other)  # revealed: Value
         reveal_type(value.property)  # revealed: Value
+        reveal_type(value.decorated_property)  # revealed: Value
+        value.decorated_property.marker  # error: [unresolved-attribute]
 
 @runtime_checkable
 class VariableTruthProtocol(Protocol):

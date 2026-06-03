@@ -1117,6 +1117,18 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) fn self_binding_type(self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
+        match self {
+            Type::FunctionLiteral(function) => {
+                function.signature(db).self_binding_type(db, self_type)
+            }
+            Type::Callable(callable) if callable.is_function_like(db) => {
+                callable.signatures(db).self_binding_type(db, self_type)
+            }
+            _ => self_type,
+        }
+    }
+
     /// Returns `true` if `self` is [`Type::Callable`].
     pub(crate) const fn is_callable_type(&self) -> bool {
         matches!(self, Type::Callable(..))

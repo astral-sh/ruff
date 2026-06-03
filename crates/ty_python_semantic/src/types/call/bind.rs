@@ -1342,13 +1342,7 @@ impl<'db> Bindings<'db> {
                             }
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    let instance = if getter.needs_self_binding(db) {
-                                        getter.as_function_literal().map_or(*instance, |getter| {
-                                            getter.signature(db).self_binding_type(db, *instance)
-                                        })
-                                    } else {
-                                        *instance
-                                    };
+                                    let instance = getter.self_binding_type(db, *instance);
                                     if let Ok(return_ty) = getter
                                         .try_call(db, &CallArguments::positional([instance]))
                                         .map(|binding| binding.return_type(db))
@@ -1378,13 +1372,7 @@ impl<'db> Bindings<'db> {
                             }
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    let instance = if getter.needs_self_binding(db) {
-                                        getter.as_function_literal().map_or(*instance, |getter| {
-                                            getter.signature(db).self_binding_type(db, *instance)
-                                        })
-                                    } else {
-                                        *instance
-                                    };
+                                    let instance = getter.self_binding_type(db, *instance);
                                     if let Ok(return_ty) = getter
                                         .try_call(db, &CallArguments::positional([instance]))
                                         .map(|binding| binding.return_type(db))
