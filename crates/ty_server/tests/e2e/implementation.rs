@@ -1,11 +1,8 @@
 use anyhow::Result;
 use lsp_types::request::{GotoImplementation, GotoImplementationParams};
 use lsp_types::{
-    ClientCapabilities, DiagnosticClientCapabilities, GotoCapability, GotoDefinitionResponse,
-    ImplementationProviderCapability, PartialResultParams, Position,
-    PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
+    GotoDefinitionResponse, ImplementationProviderCapability, PartialResultParams, Position, Range,
     TextDocumentIdentifier, TextDocumentPositionParams, WorkDoneProgressParams,
-    WorkspaceClientCapabilities,
 };
 
 use crate::TestServerBuilder;
@@ -42,6 +39,7 @@ fn implementation_provider_is_advertised() -> Result<()> {
 fn implementation_locations_without_link_support() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_file("foo.py", CONTENT)?
+        .enable_implementations_link_support(false)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -67,10 +65,9 @@ fn implementation_locations_without_link_support() -> Result<()> {
 
 #[test]
 fn implementation_location_links_with_link_support() -> Result<()> {
-    let capabilities = capabilities_with_implementation_link_support();
     let mut server = TestServerBuilder::new()?
         .with_file("foo.py", CONTENT)?
-        .with_client_capabilities(capabilities)
+        .enable_implementations_link_support(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -116,23 +113,4 @@ fn implementation(
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),
     })
-}
-
-fn capabilities_with_implementation_link_support() -> ClientCapabilities {
-    ClientCapabilities {
-        text_document: Some(TextDocumentClientCapabilities {
-            implementation: Some(GotoCapability {
-                link_support: Some(true),
-                ..GotoCapability::default()
-            }),
-            diagnostic: Some(DiagnosticClientCapabilities::default()),
-            publish_diagnostics: Some(PublishDiagnosticsClientCapabilities::default()),
-            ..TextDocumentClientCapabilities::default()
-        }),
-        workspace: Some(WorkspaceClientCapabilities {
-            configuration: Some(true),
-            ..WorkspaceClientCapabilities::default()
-        }),
-        ..ClientCapabilities::default()
-    }
 }
