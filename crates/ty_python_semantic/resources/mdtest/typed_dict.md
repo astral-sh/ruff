@@ -5434,9 +5434,10 @@ static_assert(is_subtype_of(Closed, Extra))
 static_assert(is_equivalent_to(AliasedExtra, Closed))
 ```
 
-### Empty closed TypedDict is known to be falsy
+### Empty closed TypedDict truthiness
 
-An empty `closed=True` TypedDict cannot contain any keys, so it is always empty and always falsy.
+An empty `closed=True` TypedDict cannot contain any keys, so it is always empty and always falsy,
+but inferring that precisely is outside the scope of `extra_items` support.
 
 ```py
 from typing_extensions import TypedDict
@@ -5444,7 +5445,8 @@ from typing_extensions import TypedDict
 class Empty(TypedDict, closed=True): ...
 
 def _(empty: Empty) -> None:
-    reveal_type(bool(empty))  # revealed: Literal[False]
+    # TODO: This can be revealed as `Literal[False]`.
+    reveal_type(bool(empty))  # revealed: bool
 ```
 
 ### Closed TypedDict is structurally final but not nominally final
