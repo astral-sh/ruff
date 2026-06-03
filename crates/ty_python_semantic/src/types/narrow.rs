@@ -4,7 +4,6 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -34,12 +33,6 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
-
-/// Maximum length to materialize when narrowing a variable-length tuple using `len`.
-///
-/// Larger lengths remain represented by an `ExactlySized` intersection to avoid allocating a
-/// tuple element for every position from a source-controlled integer literal.
-const MAX_TUPLE_LENGTH_FOR_LEN_NARROWING: usize = 64;
 
 /// Return the distinct non-negative integer values represented by an int-like literal union.
 ///
@@ -1083,8 +1076,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     /// Narrow a type using an equality or inequality comparison against an exact length.
     ///
-    /// Exact tuples can be resized because their shape is immutable. Other types receive an
-    /// `ExactlySized` constraint representing the observed length.
+    /// The observed length is represented by an `ExactlySized` constraint.
     fn narrow_type_by_exact_len(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -1148,24 +1140,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
                 None => resolved,
             },
-            Type::NominalInstance(instance) => {
-                if let Some(tuple) = instance.own_tuple_spec(db) {
-                    if constrain_with_equality
-                        && (!tuple.len().is_variable()
-                            || length <= MAX_TUPLE_LENGTH_FOR_LEN_NARROWING)
-                    {
-                        tuple
-                            .resize(db, TupleLength::Fixed(length))
-                            .ok()
-                            .map(|tuple| Type::tuple(TupleType::new(db, &tuple)))
-                            .unwrap_or(Type::Never)
-                    } else {
-                        constrain(db, resolved, exactly_sized, constrain_with_equality)
-                    }
-                } else {
-                    constrain(db, resolved, exactly_sized, constrain_with_equality)
-                }
-            }
             ty => constrain(db, ty, exactly_sized, constrain_with_equality),
         };
         if narrowed == resolved { ty } else { narrowed }

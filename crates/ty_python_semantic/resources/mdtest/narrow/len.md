@@ -65,8 +65,8 @@ def _(x: tuple[int, ...]):
 
 ## Exact length comparisons
 
-Tuple length narrowing follows the typing specification for both fixed-length and partially unpacked
-tuple types:
+Exact length constraints eliminate incompatible fixed-length tuples. Variable-length tuples remain
+intersected with `ExactlySized` until tuple/protocol intersections can be simplified generally:
 
 ```toml
 [environment]
@@ -76,13 +76,16 @@ python-version = "3.11"
 ```py
 def _(val: tuple[int] | tuple[str, str] | tuple[int, *tuple[str, ...], int]):
     if len(val) == 1:
-        reveal_type(val)  # revealed: tuple[int]
+        # revealed: tuple[int] | (tuple[int, *tuple[str, ...], int] & ExactlySized[Literal[1, True]])
+        reveal_type(val)
 
     if len(val) == 2:
-        reveal_type(val)  # revealed: tuple[str, str] | tuple[int, int]
+        # revealed: tuple[str, str] | (tuple[int, *tuple[str, ...], int] & ExactlySized[Literal[2]])
+        reveal_type(val)
 
     if len(val) == 3:
-        reveal_type(val)  # revealed: tuple[int, str, int]
+        # revealed: tuple[int, *tuple[str, ...], int] & ExactlySized[Literal[3]]
+        reveal_type(val)
 
 def _(val: tuple[int] | tuple[str, str]):
     if 1 != len(val):
@@ -92,9 +95,7 @@ def _(val: tuple[int] | tuple[str, str]):
 
 def _(val: tuple[int, ...]):
     if val and len(val) == 2:
-        reveal_type(val)  # revealed: tuple[int, int]
-        fixed: tuple[int, int] = val
-        _ = val[2]  # error: [index-out-of-bounds]
+        reveal_type(val)  # revealed: tuple[int, ...] & ExactlySized[Literal[2]] & ~AlwaysFalsy
 
 def _(val: tuple[int] | tuple[str, str]):
     if len(val) == True:
@@ -107,7 +108,8 @@ def _(val: tuple[()] | tuple[int]):
         empty: tuple[()] = val
 ```
 
-Large exact lengths remain symbolic instead of materializing a tuple element for every position:
+Large exact lengths also remain symbolic instead of materializing a tuple element for every
+position:
 
 ```py
 def _(val: tuple[int, ...]):
@@ -229,7 +231,7 @@ type Two = Literal[2]
 
 def _(val: tuple[int, ...], n: Two):
     if len(val) == n:
-        reveal_type(val)  # revealed: tuple[int, int]
+        reveal_type(val)  # revealed: tuple[int, ...] & ExactlySized[Literal[2]]
 ```
 
 ## Unions of narrowable types
