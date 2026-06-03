@@ -5488,7 +5488,7 @@ from typing_extensions import TypedDict
 class Empty(TypedDict, closed=True): ...
 
 def _(empty: Empty) -> None:
-    # TODO: This can be revealed as `Literal[False]`.
+    # TODO: should be `Literal[False]`
     reveal_type(bool(empty))  # revealed: bool
 ```
 
