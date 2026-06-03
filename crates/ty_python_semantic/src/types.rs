@@ -3844,16 +3844,6 @@ impl<'db> Type<'db> {
             }
         }
 
-        let usize_len = match self.as_literal_value_kind() {
-            Some(LiteralValueTypeKind::Bytes(bytes)) => Some(bytes.python_len(db)),
-            Some(LiteralValueTypeKind::String(string)) => Some(string.python_len(db)),
-            _ => None,
-        };
-
-        if let Some(usize_len) = usize_len {
-            return usize_len.try_into().ok().map(Type::int_literal);
-        }
-
         let return_ty = match self.try_call_dunder(
             db,
             "__len__",
