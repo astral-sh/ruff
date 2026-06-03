@@ -67,6 +67,26 @@ match x:
         pass
 
 reveal_type(x)  # revealed: object
+
+def mixed_guarded_and_unguarded_patterns(x: A | B, first_flag: bool, second_flag: bool) -> None:
+    match x:
+        case A():
+            pass
+        case B() if first_flag:
+            pass
+        case B() if second_flag:
+            pass
+        case B():
+            # The guarded `B` patterns are not exclusions, but the earlier
+            # unguarded `A` pattern is still excluded.
+            reveal_type(x)  # revealed: B & ~A
+
+def exhaustive_pattern_with_guard(x: A, flag: bool) -> None:
+    match x:
+        case A() if flag:
+            pass
+        case _:
+            reveal_type(x)  # revealed: A
 ```
 
 ## Class patterns with generic classes

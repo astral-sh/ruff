@@ -79,6 +79,18 @@ def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int
     match value:
         case [int(real=0)]:
             return 1
+
+def guarded_exact_sequence_pattern_is_not_exhaustive(value: tuple[int, str], flag: bool) -> int:  # error: [invalid-return-type]
+    match value:
+        case [int(), str()] if flag:
+            return 1
+
+def guarded_then_unguarded_exact_sequence_patterns_are_exhaustive(value: tuple[int, str], flag: bool) -> int:
+    match value:
+        case [int(), str()] if flag:
+            return 1
+        case [int(), str()]:
+            return 2
 ```
 
 ## Basic match
