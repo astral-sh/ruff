@@ -380,6 +380,24 @@ class Both(Factory[ConcreteOwner], Owner): ...
 ConcreteOwner().inspect(Both)
 ```
 
+## Intersection receivers bind `Self` before inferring arguments
+
+```py
+from typing import Self
+from ty_extensions import Intersection
+
+class Value:
+    def copy_from(self, other: Self) -> Self:
+        raise NotImplementedError
+
+class Extra: ...
+
+def _(value: Intersection[Value, Extra], plain: Value):
+    reveal_type(value.copy_from(value))  # revealed: Value & Extra
+    # error: [invalid-argument-type]
+    reveal_type(value.copy_from(plain))  # revealed: Value & Extra
+```
+
 ## typing_extensions
 
 ```toml

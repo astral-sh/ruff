@@ -4105,21 +4105,14 @@ impl<'db> Type<'db> {
                 let signatures = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
                 let needs_self_binding = Type::FunctionLiteral(function).needs_self_binding(db);
-                let classmethod_intersection_self = needs_self_binding
-                    && function.is_classmethod(db)
-                    && matches!(self_instance, Type::Intersection(_));
-                let separate_self_binding = needs_self_binding
-                    && (classmethod_intersection_self
-                        || (!function.is_classmethod(db)
-                            && signatures.overloads.iter().any(|signature| {
-                                signature.self_binding_type(db, self_instance) != self_instance
-                            })));
-                let typing_self_type =
-                    classmethod_intersection_self.then(|| bound_method.typing_self_type(db));
+                let intersection_self =
+                    needs_self_binding && matches!(self_instance, Type::Intersection(_));
+                let typing_self_type = (intersection_self && function.is_classmethod(db))
+                    .then(|| bound_method.typing_self_type(db));
                 CallableBinding::from_overloads(
                     self,
                     signatures.overloads.iter().map(|signature| {
-                        if separate_self_binding && signature.needs_self_mapping(db, true) {
+                        if intersection_self && signature.needs_self_mapping(db, true) {
                             signature.apply_self(
                                 db,
                                 typing_self_type.unwrap_or_else(|| {
@@ -4131,7 +4124,7 @@ impl<'db> Type<'db> {
                         }
                     }),
                 )
-                .with_bound_type(if separate_self_binding || !needs_self_binding {
+                .with_bound_type(if intersection_self || !needs_self_binding {
                     self_instance
                 } else {
                     signatures.self_binding_type(db, self_instance)
