@@ -73,15 +73,25 @@ Dynamic elements in a class-object intersection cannot be projected into the typ
 constructed by the class object:
 
 ```py
-from typing import Any
+from typing import Any, TypeVar
 from ty_extensions import Intersection, Unknown
 
 class A: ...
+class DynamicB: ...
+class DynamicC: ...
+
+TAny = TypeVar("TAny", bound=type[Any])
+TUnknown = TypeVar("TUnknown", bound=type[Unknown])
 
 def make[T](cls: type[T]) -> T:
     raise NotImplementedError
 
+def identity_dynamic[T](cls: type[T]) -> type[T]:
+    return cls
+
 def takes_str(x: str): ...
+def takes_dynamic_c(x: DynamicC): ...
+def takes_type_dynamic_c(x: type[DynamicC]): ...
 def _(cls: Intersection[type[A], Any]):
     reveal_type(make(cls))  # revealed: A | Any
     takes_str(make(cls))  # error: [invalid-argument-type]
@@ -93,6 +103,16 @@ def _(cls: Intersection[type[A], type[Any]]):
 def _(cls: Intersection[type[A], type[Unknown]]):
     reveal_type(make(cls))  # revealed: A | Unknown
     takes_str(make(cls))  # error: [invalid-argument-type]
+
+def _(cls: Intersection[type[DynamicB], TAny]):
+    takes_dynamic_c(make(cls))  # error: [invalid-argument-type]
+    # error: 26 [invalid-argument-type]
+    takes_type_dynamic_c(identity_dynamic(cls))
+
+def _(cls: Intersection[type[DynamicB], TUnknown]):
+    takes_dynamic_c(make(cls))  # error: [invalid-argument-type]
+    # error: 26 [invalid-argument-type]
+    takes_type_dynamic_c(identity_dynamic(cls))
 ```
 
 ## Methods can mention class typevars

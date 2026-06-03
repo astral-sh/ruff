@@ -809,7 +809,16 @@ impl<'db> IntersectionType<'db> {
                 return None;
             }
             if let Some(instance) = element.to_instance(db) {
-                if instance.is_dynamic() {
+                // `has_dynamic` does not walk into a type variable's bound or constraints.
+                let has_dynamic_typevar_bound = matches!(
+                    instance,
+                    Type::TypeVar(typevar)
+                        if typevar
+                            .typevar(db)
+                            .bound_or_constraints(db)
+                            .is_none_or(|bound| bound.as_type(db).has_dynamic(db))
+                );
+                if instance.has_dynamic(db) || has_dynamic_typevar_bound {
                     return None;
                 }
                 builder = builder.add_positive(instance);
