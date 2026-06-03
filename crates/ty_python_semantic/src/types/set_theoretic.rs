@@ -100,7 +100,9 @@ impl<'db> UnionType<'db> {
             .any(|element| matches!(element, Type::TypeAlias(_)))
     }
 
-    /// Expands direct type alias elements of this union.
+    /// Recursively expands aliases that expose top-level union elements.
+    ///
+    /// Aliases nested inside non-union elements remain part of those elements.
     pub(crate) fn expand_aliases(self, db: &'db dyn Db) -> Type<'db> {
         // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
         Self::from_elements(db, self.elements(db).iter().copied())
