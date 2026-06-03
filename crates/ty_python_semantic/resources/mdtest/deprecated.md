@@ -76,6 +76,33 @@ static_assert(is_subtype_of(TypeOf[deprecated_binding], TypeOf[replacement]))  #
 static_assert(is_assignable_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
 ```
 
+An outer decorator that returns the same non-singleton callable type can still replace the
+deprecated callable:
+
+```py
+from collections.abc import Callable
+from typing_extensions import deprecated
+
+C = Callable[[int], int]
+
+def same_type_replacement(value: int) -> int:
+    return value
+
+def erase(function: C) -> C:
+    return function
+
+def replace(_: C) -> C:
+    return same_type_replacement
+
+@replace
+@deprecated("discarded")
+@erase
+def replaced_binding(value: int) -> int:
+    return value
+
+replaced_binding(1)
+```
+
 ## Union-valued decorator results
 
 Deprecation applies to a public binding even if an inner decorator gives it a callable union type.

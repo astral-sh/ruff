@@ -454,7 +454,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
             if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty {
                 binding_deprecated = Some(*deprecated);
-            } else if inferred_ty != undecorated_ty {
+            } else if inferred_ty != undecorated_ty || !inferred_ty.is_singleton(db) {
                 binding_deprecated = None;
             }
         }
