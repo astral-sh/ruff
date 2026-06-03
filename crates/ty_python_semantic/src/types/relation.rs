@@ -1782,7 +1782,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(source, target, || {
-                let fallback = if let Some(value_ty) = typed_dict.dict_value_type(db) {
+                let dict_value_type = if matches!(
+                    self.relation,
+                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability
+                ) {
+                    typed_dict.assignable_dict_value_type(db)
+                } else {
+                    typed_dict.dict_value_type(db)
+                };
+                let fallback = if let Some(value_ty) = dict_value_type {
                     KnownClass::Dict
                         .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), value_ty])
                 } else {

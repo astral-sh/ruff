@@ -356,6 +356,26 @@ impl<'db> TypedDictType<'db> {
         Some(extra_items.declared_ty)
     }
 
+    /// Returns the value type if this `TypedDict` is assignable to `dict[str, VT]`.
+    pub(crate) fn assignable_dict_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let extra_items = self.explicit_extra_items(db)?;
+        if extra_items.is_read_only()
+            || self.items(db).values().any(|field| {
+                field.is_required()
+                    || field.is_read_only()
+                    || !field
+                        .declared_ty
+                        .is_assignable_to(db, extra_items.declared_ty)
+                    || !extra_items
+                        .declared_ty
+                        .is_assignable_to(db, field.declared_ty)
+            })
+        {
+            return None;
+        }
+        Some(extra_items.declared_ty)
+    }
+
     pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
         // Field annotations can recursively inspect this schema while the class fields are still
         // being collected, e.g. through `typing.Self` in a `TypedDict` field.

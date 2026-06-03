@@ -6259,6 +6259,7 @@ keys. The reverse is not true, however. `dict[str, VT]` is not assignable to suc
 type, as an inhabitant of this type might be an instance of a subclass of `dict`.
 
 ```py
+from typing import Any
 from typing_extensions import TypedDict, NotRequired
 from ty_extensions import static_assert, is_subtype_of, is_assignable_to, is_equivalent_to
 
@@ -6294,6 +6295,13 @@ static_assert(not is_equivalent_to(BoolDictWithNum, dict[str, int]))
 def _(bool_dict_with_num: BoolDictWithNum) -> None:
     bool_dict_with_num.clear()
     reveal_type(bool_dict_with_num.popitem())  # revealed: tuple[str, int]
+
+class GradualIntDict(TypedDict, extra_items=int):
+    value: NotRequired[Any]
+
+# Assignability uses consistency for gradual item types, while subtyping remains strict.
+static_assert(is_assignable_to(GradualIntDict, dict[str, int]))
+static_assert(not is_subtype_of(GradualIntDict, dict[str, int]))
 ```
 
 A TypedDict with a required key is not assignable to `dict[str, VT]`:
