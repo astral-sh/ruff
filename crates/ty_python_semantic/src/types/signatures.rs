@@ -2790,6 +2790,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut target_keywords = Vec::new();
         let mut target_index = 0usize;
 
+        if target.parameters.has_hidden_open_typed_dict_tail()
+            && !source.parameters.has_hidden_open_typed_dict_tail()
+            && !source.parameters.iter().any(Parameter::is_keyword_variadic)
+        {
+            return self.never();
+        }
+
         loop {
             let Some(next_parameter) = parameters.next() else {
                 if target_keywords.is_empty() {
@@ -3118,13 +3125,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return self.never();
                 }
             }
-        }
-
-        if target.parameters.has_hidden_open_typed_dict_tail()
-            && source_keyword_variadic.is_none()
-            && !source.parameters.has_hidden_open_typed_dict_tail()
-        {
-            return self.never();
         }
 
         // If there are still unmatched keyword parameters from `source`, then they should be

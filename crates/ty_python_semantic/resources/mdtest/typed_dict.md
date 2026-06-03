@@ -3502,6 +3502,17 @@ def func7(*, v1: int, v3: str, v2: str = "") -> None:
 
 typed_dict_from_explicit: TypedDictKwargs = func7  # error: [invalid-assignment]
 
+class EmptyOpenTD(TypedDict):
+    pass
+
+class EmptyOpenTypedDictKwargs(Protocol):
+    def __call__(self, **kwargs: Unpack[EmptyOpenTD]) -> None: ...
+
+def no_kwargs() -> None:
+    pass
+
+empty_open_typed_dict_from_explicit: EmptyOpenTypedDictKwargs = no_kwargs  # error: [invalid-assignment]
+
 class ClosedTD(TypedDict, closed=True):
     v1: Required[int]
     v2: NotRequired[str]
