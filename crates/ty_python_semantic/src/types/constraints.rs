@@ -905,6 +905,17 @@ impl<'db> ConstraintSetBuilder<'db> {
         ante: ConstraintId,
         post: ConstraintId,
     ) -> bool {
+        let ante_data = self.constraint_data(ante);
+        let post_data = self.constraint_data(post);
+        if !ante_data.typevar.is_same_typevar_as(db, post_data.typevar)
+            || ante_data.lower.is_type_var()
+            || ante_data.upper.is_type_var()
+            || post_data.lower.is_type_var()
+            || post_data.upper.is_type_var()
+        {
+            return false;
+        }
+
         let key = (ante, post);
         if let Some(result) = self
             .storage
@@ -915,20 +926,13 @@ impl<'db> ConstraintSetBuilder<'db> {
             return *result;
         }
 
-        let ante_data = self.constraint_data(ante);
-        let post_data = self.constraint_data(post);
-        let result = ante_data.typevar.is_same_typevar_as(db, post_data.typevar)
-            && !ante_data.lower.is_type_var()
-            && !ante_data.upper.is_type_var()
-            && !post_data.lower.is_type_var()
-            && !post_data.upper.is_type_var()
-            // Lower bounds contribute to the inferred solution, so every materialization of the
-            // postcondition's lower bound must be below every materialization of the antecedent's
-            // lower bound.
-            && post_data
-                .lower
-                .top_materialization(db)
-                .is_constraint_set_assignable_to(db, ante_data.lower.bottom_materialization(db))
+        // Lower bounds contribute to the inferred solution, so every materialization of the
+        // postcondition's lower bound must be below every materialization of the antecedent's
+        // lower bound.
+        let result = post_data
+            .lower
+            .top_materialization(db)
+            .is_constraint_set_assignable_to(db, ante_data.lower.bottom_materialization(db))
             // Upper bounds restrict the inferred solution. Every materialization allowed by the
             // antecedent must satisfy the postcondition, but a gradual postcondition remains
             // permissive.
@@ -6595,6 +6599,41 @@ mod tests {
         );
         assert_eq!(storage.constraint_implication_cache.len(), 2);
         assert_eq!(storage.pair_sequent_cache.len(), 1);
+    }
+
+    #[test]
+    fn path_assignments_does_not_cache_structurally_impossible_unvisited_implications() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Int.to_instance(&db),
+        );
+        let u_str = ConstraintId::new(
+            &db,
+            &builder,
+            u,
+            Type::Never,
+            KnownClass::Str.to_instance(&db),
+        );
+        let t_u = ConstraintId::new(&db, &builder, t, Type::Never, Type::TypeVar(u));
+        let mut path = PathAssignments::new([t_int, u_str, t_u]);
+
+        path.add_assignment(&db, &builder, t_int.when_true(), 0, false)
+            .unwrap();
+
+        assert!(
+            builder
+                .storage
+                .borrow()
+                .unvisited_constraint_implication_cache
+                .is_empty()
+        );
     }
 
     #[test]
