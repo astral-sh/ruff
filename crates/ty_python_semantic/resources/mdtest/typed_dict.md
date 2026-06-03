@@ -6000,6 +6000,8 @@ class IntTarget(TypedDict, extra_items=int):
 class ClosedTarget(TypedDict, closed=True):
     name: str
 
+class ClosedOnly(TypedDict, closed=True): ...
+
 class OptionalTarget(TypedDict, extra_items=int):
     label: NotRequired[str]
 
@@ -6030,6 +6032,9 @@ def _(
 
     ExtraOnly(**str_mapping)  # error: [invalid-argument-type]
     copied_from_mapping: ExtraOnly = {**str_mapping}  # error: [invalid-argument-type]
+
+    ClosedOnly(**int_mapping)  # error: [invalid-key]
+    copied_into_closed: ClosedOnly = {**int_mapping}  # error: [invalid-key]
 
     # An arbitrary mapping key may collide with the target's declared `label` item.
     OptionalTarget(**int_mapping)  # error: [invalid-argument-type]

@@ -2609,7 +2609,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         }
 
         return unpacked_valid;
-    } else if typed_dict.explicit_extra_items(db).is_some()
+    } else if !typed_dict.openness(db).is_open()
         && let Some((_, value_ty)) = unpacked_type.unpack_keys_and_items(db)
     {
         return validate_extracted_typed_dict_extra_items(
