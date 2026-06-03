@@ -2353,7 +2353,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .iff(self.db, self.constraints, mapping_when)
                     .is_always_satisfied(self.db)
             })
-            .then(|| mapping_when)
+            .then_some(mapping_when)
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
