@@ -594,7 +594,7 @@ impl<'db> TypeContext<'db> {
 
     /// If the type annotation is a union, returns the target elements that it can be narrowed to.
     pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<Cow<'db, [Type<'db>]>> {
-        let union = self.annotation.and_then(|ty| ty.as_union_like(db))?;
+        let union = self.annotation?.as_union_like(db)?;
 
         let targets = if union.has_aliases(db) {
             let expanded = union.expand_aliases(db);
