@@ -1914,6 +1914,34 @@ def f():
     }
 
     #[test]
+    fn later_shadowed_collection_constructor_keeps_reachability_predicate() {
+        let TestCase { db, file } = test_case(
+            "
+def f():
+    result = set()
+    result.stop()
+    set = factory
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file).load(&db);
+        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+        let function_scope = index.node_scope(NodeWithScopeRef::Function(function));
+
+        assert!(
+            index
+                .use_def_map(function_scope)
+                .predicates()
+                .iter()
+                .any(|predicate| matches!(
+                    predicate.node,
+                    predicate::PredicateNode::IsNonTerminalCall(_)
+                ))
+        );
+    }
+
+    #[test]
     fn collection_constructor_method_call_has_no_reachability_predicate() {
         let TestCase { db, file } = test_case(
             "

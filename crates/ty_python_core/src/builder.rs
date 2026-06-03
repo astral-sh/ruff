@@ -154,18 +154,138 @@ pub enum GlobalOrNonlocal {
     Nonlocal,
 }
 
-struct CollectionConstructorCandidate<'ast> {
-    scope: FileScopeId,
-    initializer: &'ast ast::Expr,
-    callable: &'ast ast::Expr,
-    assigned_to: Option<&'ast ast::StmtAssign>,
+#[derive(Copy, Clone, Default)]
+struct CollectionConstructorBindings(u8);
+
+impl CollectionConstructorBindings {
+    const LIST: u8 = 1;
+    const SET: u8 = 1 << 1;
+    const DICT: u8 = 1 << 2;
+
+    fn from_body(body: &[ast::Stmt]) -> Self {
+        let mut visitor = CollectionConstructorBindingVisitor::default();
+        visitor.visit_body(body);
+        visitor.bindings
+    }
+
+    fn insert(&mut self, name: &str) {
+        self.0 |= match name {
+            "list" => Self::LIST,
+            "set" => Self::SET,
+            "dict" => Self::DICT,
+            _ => 0,
+        };
+    }
+
+    fn contains(self, name: &str) -> bool {
+        let binding = match name {
+            "list" => Self::LIST,
+            "set" => Self::SET,
+            "dict" => Self::DICT,
+            _ => return false,
+        };
+        self.0 & binding != 0
+    }
 }
 
-struct PendingCollectionConstructorUse<'ast, 'db> {
-    scope: FileScopeId,
-    statement: &'ast ast::Stmt,
-    definition: Definition<'db>,
-    use_expression: ExpressionNodeKey,
+#[derive(Default)]
+struct CollectionConstructorBindingVisitor {
+    bindings: CollectionConstructorBindings,
+}
+
+impl<'ast> Visitor<'ast> for CollectionConstructorBindingVisitor {
+    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+        match stmt {
+            ast::Stmt::FunctionDef(function) => {
+                self.bindings.insert(function.name.id.as_str());
+                for decorator in &function.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = &function.type_params {
+                    self.visit_type_params(type_params);
+                }
+                self.visit_parameters(&function.parameters);
+                if let Some(returns) = &function.returns {
+                    self.visit_annotation(returns);
+                }
+            }
+            ast::Stmt::ClassDef(class) => {
+                self.bindings.insert(class.name.id.as_str());
+                for decorator in &class.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = &class.type_params {
+                    self.visit_type_params(type_params);
+                }
+                if let Some(arguments) = &class.arguments {
+                    self.visit_arguments(arguments);
+                }
+            }
+            ast::Stmt::Global(ast::StmtGlobal { names, .. })
+            | ast::Stmt::Nonlocal(ast::StmtNonlocal { names, .. }) => {
+                for name in names {
+                    self.bindings.insert(name.id.as_str());
+                }
+            }
+            _ => walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        match expr {
+            ast::Expr::Name(name)
+                if matches!(name.ctx, ast::ExprContext::Store | ast::ExprContext::Del) =>
+            {
+                self.bindings.insert(name.id.as_str());
+            }
+            ast::Expr::Lambda(lambda) => {
+                if let Some(parameters) = &lambda.parameters {
+                    self.visit_parameters(parameters);
+                }
+                return;
+            }
+            _ => {}
+        }
+        walk_expr(self, expr);
+    }
+
+    fn visit_alias(&mut self, alias: &'ast ast::Alias) {
+        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+        self.bindings
+            .insert(name.id.as_str().split('.').next().unwrap_or_default());
+    }
+
+    fn visit_except_handler(&mut self, handler: &'ast ast::ExceptHandler) {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            type_,
+            name,
+            body,
+            ..
+        }) = handler;
+        if let Some(name) = name {
+            self.bindings.insert(name.id.as_str());
+        }
+        if let Some(type_) = type_ {
+            self.visit_expr(type_);
+        }
+        self.visit_body(body);
+    }
+
+    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        match pattern {
+            ast::Pattern::MatchAs(ast::PatternMatchAs {
+                name: Some(name), ..
+            })
+            | ast::Pattern::MatchStar(ast::PatternMatchStar {
+                name: Some(name), ..
+            })
+            | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
+                rest: Some(name), ..
+            }) => self.bindings.insert(name.id.as_str()),
+            _ => {}
+        }
+        walk_pattern(self, pattern);
+    }
 }
 
 #[derive(Clone)]
@@ -238,6 +358,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
+    collection_constructor_bindings: IndexVec<FileScopeId, Option<CollectionConstructorBindings>>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
@@ -254,8 +375,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
     // A map from a collection literal definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
-    collection_constructor_candidates: Vec<CollectionConstructorCandidate<'ast>>,
-    pending_collection_constructor_uses: Vec<PendingCollectionConstructorUse<'ast, 'db>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -292,6 +411,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
+            collection_constructor_bindings: IndexVec::new(),
             ast_ids: IndexVec::new(),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
@@ -305,8 +425,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FxHashMap::default(),
             collections_by_use: FxHashMap::default(),
             uses_by_collection: FxHashMap::default(),
-            collection_constructor_candidates: Vec::new(),
-            pending_collection_constructor_uses: Vec::new(),
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
@@ -470,6 +588,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let file_scope_id = self.scopes.push(scope);
         self.place_tables.push(PlaceTableBuilder::default());
+        self.collection_constructor_bindings.push(None);
         self.use_def_maps
             .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
@@ -997,22 +1116,54 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let Some(func) = empty_collection_constructor_callable(expr) else {
             return is_unconstrained_collection_literal(expr);
         };
-        if Program::get(self.db)
-            .custom_stdlib_search_path(self.db)
-            .is_some()
-        {
-            return false;
-        }
         let ast::Expr::Name(name) = func else {
             return false;
         };
 
         self.visible_ancestor_scopes(scope).all(|(scope, _)| {
             let place_table = &self.place_tables[scope];
-            place_table
-                .symbol_id(name.id.as_str())
-                .is_none_or(|symbol| !place_table.symbol(symbol).is_local())
+            self.collection_constructor_bindings[scope]
+                .is_some_and(|bindings| !bindings.contains(name.id.as_str()))
+                && place_table
+                    .symbol_id(name.id.as_str())
+                    .is_none_or(|symbol| !place_table.symbol(symbol).is_local())
         })
+    }
+
+    fn prepare_potentially_unconstrained_collection_initializer(
+        &mut self,
+        expr: &ast::Expr,
+        scope: FileScopeId,
+    ) -> bool {
+        if empty_collection_constructor_callable(expr).is_none() {
+            return is_unconstrained_collection_literal(expr);
+        }
+        if Program::get(self.db)
+            .custom_stdlib_search_path(self.db)
+            .is_some()
+        {
+            return false;
+        }
+
+        let visible_scopes: SmallVec<[_; 4]> = self
+            .visible_ancestor_scopes(scope)
+            .map(|(scope, _)| scope)
+            .collect();
+        for scope in visible_scopes {
+            if self.collection_constructor_bindings[scope].is_some() {
+                continue;
+            }
+            let body: &[ast::Stmt] = match self.scopes[scope].node() {
+                NodeWithScopeKind::Module => self.module.suite(),
+                NodeWithScopeKind::Class(class) => &class.node(self.module).body,
+                NodeWithScopeKind::Function(function) => &function.node(self.module).body,
+                _ => &[],
+            };
+            self.collection_constructor_bindings[scope] =
+                Some(CollectionConstructorBindings::from_body(body));
+        }
+
+        self.is_potentially_unconstrained_collection_initializer(expr, scope)
     }
 
     /// If the given expression is a use of a potentially unconstrained collection initializer,
@@ -1042,61 +1193,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // cycle-related panics.
             .exactly_one()
             .ok()
-    }
-
-    fn is_potentially_unconstrained_collection_definition(
-        &self,
-        definition: Definition<'db>,
-    ) -> bool {
-        definition
-            .kind(self.db)
-            .as_unannotated_assignment()
-            .is_some_and(|assignment| {
-                self.is_potentially_unconstrained_collection_initializer(
-                    assignment.value(self.module),
-                    definition.file_scope(self.db),
-                )
-            })
-    }
-
-    fn materialize_collection_constructor_candidates(&mut self) {
-        for candidate in std::mem::take(&mut self.collection_constructor_candidates) {
-            if !self.is_potentially_unconstrained_collection_initializer(
-                candidate.initializer,
-                candidate.scope,
-            ) {
-                continue;
-            }
-
-            self.add_standalone_expression_in_scope(candidate.callable, candidate.scope);
-            if let Some(assigned_to) = candidate.assigned_to {
-                self.add_standalone_assigned_expression_in_scope(
-                    candidate.initializer,
-                    assigned_to,
-                    candidate.scope,
-                );
-            }
-        }
-
-        for pending in std::mem::take(&mut self.pending_collection_constructor_uses) {
-            if !self.is_potentially_unconstrained_collection_definition(pending.definition) {
-                continue;
-            }
-
-            let standalone_statement = self
-                .statements_by_node
-                .get(&pending.statement.into())
-                .copied()
-                .unwrap_or_else(|| {
-                    self.add_standalone_statement_in_scope(pending.statement, pending.scope)
-                });
-            self.uses_by_collection
-                .entry(pending.definition)
-                .or_default()
-                .push((standalone_statement, pending.use_expression));
-            self.collections_by_use
-                .insert(pending.use_expression, pending.definition);
-        }
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
@@ -2141,15 +2237,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_in_scope(expression_node, self.current_scope())
-    }
-
-    fn add_standalone_expression_in_scope(
-        &mut self,
-        expression_node: &ast::Expr,
-        scope: FileScopeId,
-    ) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, scope, ExpressionKind::Normal, None)
+        self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa
@@ -2160,22 +2248,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         expression_node: &ast::Expr,
         assigned_to: &ast::StmtAssign,
     ) -> Expression<'db> {
-        self.add_standalone_assigned_expression_in_scope(
-            expression_node,
-            assigned_to,
-            self.current_scope(),
-        )
-    }
-
-    fn add_standalone_assigned_expression_in_scope(
-        &mut self,
-        expression_node: &ast::Expr,
-        assigned_to: &ast::StmtAssign,
-        scope: FileScopeId,
-    ) -> Expression<'db> {
         self.add_standalone_expression_impl(
             expression_node,
-            scope,
             ExpressionKind::Normal,
             Some(assigned_to),
         )
@@ -2184,25 +2258,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Same as [`SemanticIndexBuilder::add_standalone_expression`], but marks the expression as a
     /// *type* expression, which makes sure that it will later be inferred as such.
     fn add_standalone_type_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(
-            expression_node,
-            self.current_scope(),
-            ExpressionKind::TypeExpression,
-            None,
-        )
+        self.add_standalone_expression_impl(expression_node, ExpressionKind::TypeExpression, None)
     }
 
     fn add_standalone_expression_impl(
         &mut self,
         expression_node: &ast::Expr,
-        scope: FileScopeId,
         expression_kind: ExpressionKind,
         assigned_to: Option<&ast::StmtAssign>,
     ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
             self.file,
-            scope,
+            self.current_scope(),
             AstNodeRef::new(self.module, expression_node),
             assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
@@ -2213,14 +2281,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn add_standalone_statement(&mut self, statement_node: &ast::Stmt) -> Statement<'db> {
-        self.add_standalone_statement_in_scope(statement_node, self.current_scope())
-    }
-
-    fn add_standalone_statement_in_scope(
-        &mut self,
-        statement_node: &ast::Stmt,
-        scope: FileScopeId,
-    ) -> Statement<'db> {
         // Avoid allocating a salsa ingredient if the statement represents an existing
         // definition or standalone expression.
         let statement = match statement_node {
@@ -2230,9 +2290,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::ClassDef(class) => {
                 Some(Statement::Definition(self.expect_single_definition(class)))
             }
-            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => Some(Statement::Expression(
-                self.add_standalone_expression_in_scope(value, scope),
-            )),
+            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                Some(Statement::Expression(self.add_standalone_expression(value)))
+            }
             ast::Stmt::Assign(assign) => {
                 if let [ast::Expr::Name(name)] = &assign.targets[..] {
                     Some(Statement::Definition(self.expect_single_definition(name)))
@@ -2258,7 +2318,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             Statement::Other(StatementInner::new(
                 self.db,
                 self.file,
-                scope,
+                self.current_scope(),
                 AstNodeRef::new(self.module, statement_node),
             ))
         };
@@ -2589,7 +2649,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
-        self.materialize_collection_constructor_candidates();
 
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
@@ -3109,27 +3168,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Potentially unconstrained collection initializers must be standalone expressions
                 // to participate in full-scope bidirectional inference.
                 if node.targets.len() == 1
-                    && self.is_potentially_unconstrained_collection_initializer(
+                    && self.prepare_potentially_unconstrained_collection_initializer(
                         &node.value,
                         self.current_scope(),
                     )
                 {
                     if let Some(func) = empty_collection_constructor_callable(&node.value) {
-                        self.collection_constructor_candidates.push(
-                            CollectionConstructorCandidate {
-                                scope: self.current_scope(),
-                                initializer: &node.value,
-                                callable: func,
-                                assigned_to: matches!(
-                                    node.targets.as_slice(),
-                                    [ast::Expr::Name(_)]
-                                )
-                                .then_some(node),
-                            },
-                        );
-                    } else {
-                        self.add_standalone_assigned_expression(&node.value, node);
+                        self.add_standalone_expression(func);
                     }
+                    self.add_standalone_assigned_expression(&node.value, node);
                 }
 
                 // Optimization for the common case: if there's just one target, and it's not an
@@ -4111,23 +4158,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             // we only consider the first occurrence, as collection use constraints are
             // tracked at the statement level.
             if !collection_defs.insert(collection_def) {
-                continue;
-            }
-
-            if collection_def
-                .kind(self.db)
-                .as_unannotated_assignment()
-                .is_some_and(|assignment| {
-                    empty_collection_constructor_callable(assignment.value(self.module)).is_some()
-                })
-            {
-                self.pending_collection_constructor_uses
-                    .push(PendingCollectionConstructorUse {
-                        scope: self.current_scope(),
-                        statement: stmt,
-                        definition: collection_def,
-                        use_expression,
-                    });
                 continue;
             }
 
