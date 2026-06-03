@@ -1936,11 +1936,13 @@ fn add_unimported_completions<'db>(
                 let name = module_name.as_str();
                 (name, ImportRequest::module(name))
             });
-        let import_action = importer.import(request, &members);
 
-        if import_action.import().is_none() && import_action.symbol_text() == name {
+        // Don't suggest symbols that are already imported.
+        if members.satisfies(db, file, &request) {
             continue;
         }
+
+        let import_action = importer.import(request, &members);
 
         // N.B. We use `add_skip_query` here because `all_symbols`
         // already takes our query into account.
@@ -9785,6 +9787,217 @@ TypedDi<CURSOR>
 
         _FormatterConfigurationTypedDict :: from logging.config import _FormatterConfigurationTypedDict
         ",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_directly_imported_symbol() {
+        let builder = CursorTest::builder()
+            .source("main.py", "from package import Thing\nThi<CURSOR>\n")
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_wildcard_imported_symbol() {
+        let builder = CursorTest::builder()
+            .source("main.py", "from package import *\nThi<CURSOR>\n")
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_directly_imported_symbol_in_nested_scope() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+def f():
+    from package import Thing
+    Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_imported_symbol_from_parent_scope() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+from package import Thing
+
+def f():
+    Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_conditionally_imported_symbol_available_in_all_branches() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+if condition:
+    from package import Thing
+else:
+    from package import Thing
+
+Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_conditionally_imported_symbol_available_in_some_branches() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+if condition:
+    from package import Thing
+
+Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_preserves_suggestion_for_import_after_cursor() {
+        let builder = CursorTest::builder()
+            .source("main.py", "Thi<CURSOR>\nfrom package import Thing\n")
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"
+        Thing :: <no import required> :: <no import edit>
+        Thing :: package :: from package import Thing
+        ",
+        );
+    }
+
+    #[test]
+    fn auto_import_preserves_qualified_suggestion_for_same_named_import() {
+        let builder = CursorTest::builder()
+            .source("main.py", "from other import Thing\nThi<CURSOR>\n")
+            .source("other/__init__.py", "class Thing: ...\n")
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"
+        Thing :: <no import required> :: <no import edit>
+        package.Thing :: package :: import package
+        ",
+        );
+    }
+
+    #[test]
+    fn auto_import_preserves_qualified_suggestion_for_shadowed_import() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+from package import Thing
+
+def f():
+    Thing = 1
+    Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"
+        Thing :: <no import required> :: <no import edit>
+        package.Thing :: package :: import package
+        ",
+        );
+    }
+
+    #[test]
+    fn auto_import_does_not_use_enclosing_class_scope() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+class C:
+    from package import Thing
+
+    def f(self):
+        Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing" && c.import.is_some());
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: package :: from package import Thing",
         );
     }
 
