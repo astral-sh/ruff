@@ -1212,6 +1212,52 @@ def _(x: Intersection[A, B]) -> None:
     reveal_type(x())  # revealed: Unknown
 ```
 
+### Implicit operations do not yet preserve intersection receivers
+
+Several implicit operation paths still bind methods to each positive intersection element instead of
+the full intersection receiver. These are existing limitations outside the scope of the
+receiver-aware attribute and dunder lookup changes.
+
+```py
+from typing import Iterator
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class Extra:
+    extra: int
+
+class Value:
+    def __call__(self, other: Self) -> Self:
+        return self
+
+    def __iter__(self) -> Iterator[Self]:
+        yield self
+
+    def __getitem__(self, key: Self) -> Self:
+        return self
+
+    def __setitem__(self, key: int, value: Self) -> None: ...
+
+def _(value: Intersection[Value, Extra], plain: Value):
+    # TODO: revealed: Value & Extra
+    reveal_type(value(value))  # revealed: Value
+    # TODO: error: [invalid-argument-type]
+    value(plain)
+
+    # TODO: revealed: Value & Extra
+    for item in value:
+        reveal_type(item)  # revealed: Value
+
+    # TODO: revealed: Value & Extra
+    reveal_type(value[value])  # revealed: Value
+    # TODO: error: [invalid-argument-type]
+    value[plain]
+
+    value[0] = value
+    # TODO: error: [invalid-argument-type]
+    value[0] = plain
+```
+
 ## Unions containing intersections
 
 ### Intersection element fails, union element succeeds
