@@ -33,8 +33,11 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
+pub(crate) use self::match_pattern::{
+    definite_match_pattern_type, definite_sequence_pattern_type, exact_sequence_pattern_type,
+    mapping_pattern_type, sequence_pattern_type, singleton_pattern_type,
+};
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
-pub(crate) use self::sequence_pattern::{exact_sequence_pattern_type, sequence_pattern_type};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
@@ -126,6 +129,7 @@ mod iteration;
 mod known_instance;
 pub mod list_members;
 mod literal;
+mod match_pattern;
 mod member;
 mod method;
 mod mro;
@@ -135,7 +139,6 @@ mod overrides;
 mod protocol_class;
 pub(crate) mod relation;
 mod relation_error;
-mod sequence_pattern;
 mod set_theoretic;
 mod signatures;
 mod special_form;

@@ -198,13 +198,13 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
-        TypeContext, UnionBuilder, UnionType, enum_metadata, exact_sequence_pattern_type,
-        infer_expression_type, infer_narrowing_constraint, sequence_pattern_type,
+        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, Type, TypeContext,
+        UnionBuilder, UnionType, definite_match_pattern_type, enum_metadata, infer_expression_type,
+        infer_narrowing_constraint, mapping_pattern_type, sequence_pattern_type,
+        singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -216,102 +216,10 @@ use ty_python_core::{
     place_table,
     predicate::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        ScopedPredicateId, SequencePatternPredicateKind,
+        ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
-
-fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
-    let ty = match singleton {
-        ast::Singleton::None => Type::none(db),
-        ast::Singleton::True => Type::bool_literal(true),
-        ast::Singleton::False => Type::bool_literal(false),
-    };
-    debug_assert!(ty.is_singleton(db));
-    ty
-}
-
-fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
-    KnownClass::Mapping.to_instance(db).top_materialization(db)
-}
-
-/// Return the values that are guaranteed to match `kind`.
-///
-/// Reachability and negative narrowing can only subtract this under-approximation.
-fn definite_match_pattern_type<'db>(
-    db: &'db dyn Db,
-    kind: &PatternPredicateKind<'db>,
-) -> Type<'db> {
-    match kind {
-        PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
-        PatternPredicateKind::Value(value) => {
-            let ty = infer_expression_type(db, *value, TypeContext::default());
-            // Only return the type if it's single-valued. For non-single-valued types
-            // (like `str`), we can't definitively exclude any specific type from
-            // subsequent patterns because the pattern could match any value of that type.
-            if ty.is_single_valued(db) {
-                ty
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Class(class_expr, kind) => {
-            if kind.is_irrefutable() {
-                infer_expression_type(db, *class_expr, TypeContext::default())
-                    .to_instance(db)
-                    .unwrap_or(Type::Never)
-                    .top_materialization(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Mapping(kind) => {
-            if kind.is_irrefutable() {
-                mapping_pattern_type(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Sequence(kind) => definite_sequence_pattern_type(db, kind),
-        PatternPredicateKind::Or(predicates) => UnionType::from_elements(
-            db,
-            predicates
-                .iter()
-                .map(|p| definite_match_pattern_type(db, p)),
-        ),
-        PatternPredicateKind::As(pattern, _) => pattern
-            .as_deref()
-            .map(|p| definite_match_pattern_type(db, p))
-            .unwrap_or_else(Type::object),
-        PatternPredicateKind::Unsupported => Type::Never,
-    }
-}
-
-/// Return the values that are guaranteed to match a sequence pattern.
-pub(crate) fn definite_sequence_pattern_type<'db>(
-    db: &'db dyn Db,
-    kind: &SequencePatternPredicateKind<'db>,
-) -> Type<'db> {
-    if kind.is_irrefutable() {
-        return sequence_pattern_type(db);
-    }
-
-    if kind.is_exact_length() {
-        let element_types: Vec<_> = kind
-            .patterns
-            .iter()
-            .map(|pattern| definite_match_pattern_type(db, pattern))
-            .collect();
-
-        if element_types.iter().any(Type::is_never) {
-            Type::Never
-        } else {
-            exact_sequence_pattern_type(db, &element_types)
-        }
-    } else {
-        Type::Never
-    }
-}
 
 /// Go through the list of previous match cases, and accumulate a union of all types that were already
 /// matched by these patterns.
@@ -1020,7 +928,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
         }
         PatternPredicateKind::Singleton(singleton) => {
-            let singleton_ty = singleton_to_type(db, *singleton);
+            let singleton_ty = singleton_pattern_type(db, *singleton);
 
             if subject_ty.is_equivalent_to(db, singleton_ty) {
                 Truthiness::AlwaysTrue

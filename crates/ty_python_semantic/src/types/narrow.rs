@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::reachability::{ReachabilityConstraintsExtension, definite_sequence_pattern_type};
+use crate::reachability::ReachabilityConstraintsExtension;
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
@@ -11,7 +11,8 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, SpecialFormType, SubclassOfInner, SubclassOfType,
     Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
-    exact_sequence_pattern_type, infer_expression_types, sequence_pattern_type,
+    definite_sequence_pattern_type, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, sequence_pattern_type, singleton_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -1932,20 +1933,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = self.match_pattern_singleton_type(singleton);
+        let ty = singleton_pattern_type(self.db, singleton);
         let ty = ty.negate_if(self.db, !is_positive);
         Some(NarrowingConstraints::from_iter([(
             place,
             NarrowingConstraint::intersection(ty),
         )]))
-    }
-
-    fn match_pattern_singleton_type(&self, singleton: ast::Singleton) -> Type<'db> {
-        match singleton {
-            ast::Singleton::None => Type::none(self.db),
-            ast::Singleton::True => Type::bool_literal(true),
-            ast::Singleton::False => Type::bool_literal(false),
-        }
     }
 
     fn evaluate_match_pattern_class(
@@ -2017,7 +2010,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn necessary_match_pattern_type(&self, pattern: &PatternPredicateKind<'db>) -> Type<'db> {
         match pattern {
             PatternPredicateKind::Singleton(singleton) => {
-                self.match_pattern_singleton_type(*singleton)
+                singleton_pattern_type(self.db, *singleton)
             }
             PatternPredicateKind::Class(cls, _) => {
                 match infer_same_file_expression_type(self.db, *cls, TypeContext::default()) {
@@ -2027,9 +2020,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     _ => Type::object(),
                 }
             }
-            PatternPredicateKind::Mapping(_) => KnownClass::Mapping
-                .to_instance(self.db)
-                .top_materialization(self.db),
+            PatternPredicateKind::Mapping(_) => mapping_pattern_type(self.db),
             PatternPredicateKind::Sequence(kind) => self.necessary_sequence_pattern_type(kind),
             PatternPredicateKind::Or(predicates) => UnionType::from_elements(
                 self.db,
