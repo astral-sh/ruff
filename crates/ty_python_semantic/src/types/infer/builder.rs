@@ -8748,21 +8748,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn deprecated_function_binding(
         &self,
         definition: Definition<'db>,
-        ty: Type<'db>,
     ) -> Option<DeprecatedInstance<'db>> {
-        fn is_function_type(db: &dyn Db, ty: Type) -> bool {
+        fn is_replaced_function_type(
+            db: &dyn Db,
+            definition: Definition,
+            ty: Type,
+        ) -> Option<bool> {
             match ty {
-                Type::FunctionLiteral(_) | Type::BoundMethod(_) => true,
-                Type::Union(union) => union
-                    .elements(db)
-                    .iter()
-                    .all(|element| is_function_type(db, *element)),
-                _ => false,
+                Type::FunctionLiteral(function) => {
+                    Some(!function.contains_definition(db, definition))
+                }
+                Type::BoundMethod(bound) => {
+                    Some(!bound.function(db).contains_definition(db, definition))
+                }
+                Type::Union(union) => {
+                    union
+                        .elements(db)
+                        .iter()
+                        .try_fold(false, |replaced, element| {
+                            Some(replaced || is_replaced_function_type(db, definition, *element)?)
+                        })
+                }
+                _ => None,
             }
-        }
-
-        if !is_function_type(self.db(), ty) {
-            return None;
         }
 
         let DefinitionKind::Function(function) = definition.kind(self.db()) else {
@@ -8776,8 +8784,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        let function_ty = infer_definition_types(self.db(), definition).function_type(definition)?;
-        if ty == Type::FunctionLiteral(function_ty) {
+        let definition_inference = infer_definition_types(self.db(), definition);
+        let binding_ty = definition_inference.binding_type(definition);
+        if is_replaced_function_type(self.db(), definition, binding_ty) != Some(true) {
             return None;
         }
 
@@ -9067,6 +9076,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && place_expr.as_symbol().is_some()
             && local_scope_place.is_definitely_bound()
             && let Some(ty) = local_scope_place.ignore_possibly_undefined()
+            && !ty.is_never()
             && let Some(use_id) = use_id
         {
             let mut bindings = use_def.bindings_at_use(use_id);
@@ -9075,7 +9085,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 bindings.next(),
             ) {
                 (Some(DefinitionState::Defined(binding)), None) => {
-                    self.deprecated_function_binding(binding, ty)
+                    self.deprecated_function_binding(binding)
                 }
                 _ => None,
             }

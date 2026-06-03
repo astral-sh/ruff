@@ -48,7 +48,7 @@ replacement function itself as deprecated.
 from collections.abc import Callable
 from typing import Any, TypeVar, overload
 from ty_extensions import TypeOf, is_equivalent_to, static_assert
-from typing_extensions import deprecated
+from typing_extensions import TypeGuard, deprecated
 
 F = TypeVar("F", bound=Callable[..., Any])
 G = TypeVar("G", bound=Callable[..., Any])
@@ -76,8 +76,16 @@ def replace_with_one_of(first: F, second: G) -> Callable[[Callable[..., Any]], F
 def replace_with_object(_: Callable[..., Any]) -> object:
     return object()
 
+def is_replacement(value: object) -> TypeGuard[TypeOf[replacement]]:
+    return True
+
+def is_callable(value: object) -> TypeGuard[Callable[..., Any]]:
+    return True
+
 class ReplacementClass: ...
 
+@deprecated("ordinary deprecated function")
+def ordinary_deprecated_function() -> None: ...
 @deprecated("use replacement directly")
 @replace_with(replacement)
 def deprecated_binding() -> None: ...
@@ -115,6 +123,12 @@ static_assert(is_equivalent_to(TypeOf[deprecated_binding], TypeOf[replacement]))
 
 if deprecated_binding is not replacement:  # error: [deprecated] "use replacement directly"
     deprecated_binding()
+
+if is_replacement(ordinary_deprecated_function):  # error: [deprecated] "ordinary deprecated function"
+    ordinary_deprecated_function()
+
+if is_callable(deprecated_binding):  # error: [deprecated] "use replacement directly"
+    deprecated_binding()  # error: [deprecated] "use replacement directly"
 
 flag = bool(input())
 if flag:
