@@ -3544,31 +3544,37 @@ impl<'db> Type<'db> {
                         .count();
                     let shared_class_member = (always_defined_member_count > 1)
                         .then(|| {
-                            let mut class_members = intersection
-                                .positive_elements_or_object(db)
-                                .filter(|element| {
-                                    matches!(
-                                        element
-                                            .member_lookup_with_policy(
-                                                db,
-                                                name_str.into(),
-                                                member_policy,
-                                            )
-                                            .place,
-                                        Place::Defined(DefinedPlace {
-                                            definedness: Definedness::AlwaysDefined,
-                                            ..
-                                        })
-                                    )
-                                })
-                                .map(|element| {
-                                    element.class_member_with_policy(
-                                        db,
-                                        name_str.into(),
-                                        member_policy,
-                                    )
-                                });
-                            let first = class_members.next()?;
+                            let mut elements =
+                                intersection
+                                    .positive_elements_or_object(db)
+                                    .filter(|element| {
+                                        matches!(
+                                            element
+                                                .member_lookup_with_policy(
+                                                    db,
+                                                    name_str.into(),
+                                                    member_policy,
+                                                )
+                                                .place,
+                                            Place::Defined(DefinedPlace {
+                                                definedness: Definedness::AlwaysDefined,
+                                                ..
+                                            })
+                                        )
+                                    });
+                            let first_element = elements.next()?;
+                            if !first_element
+                                .instance_member(db, name_str)
+                                .place
+                                .is_undefined()
+                            {
+                                return None;
+                            }
+                            let first = first_element.class_member_with_policy(
+                                db,
+                                name_str.into(),
+                                member_policy,
+                            );
                             matches!(
                                 first.place,
                                 Place::Defined(DefinedPlace {
@@ -3576,7 +3582,16 @@ impl<'db> Type<'db> {
                                     ..
                                 })
                             )
-                            .then(|| class_members.all(|member| member == first))
+                            .then(|| {
+                                elements.all(|element| {
+                                    element.instance_member(db, name_str).place.is_undefined()
+                                        && element.class_member_with_policy(
+                                            db,
+                                            name_str.into(),
+                                            member_policy,
+                                        ) == first
+                                })
+                            })
                         })
                         .flatten()
                         .unwrap_or(false);

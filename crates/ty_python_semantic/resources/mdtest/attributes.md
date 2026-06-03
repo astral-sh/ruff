@@ -2058,6 +2058,20 @@ def _(value: Intersection[PropertyOwner, PropertyFallback]):
     reveal_type(value.value)  # revealed: PropertyOwner
     takes_property_fallback(value.value)  # error: [invalid-argument-type]
 
+class SharedMethodBase:
+    def method(self) -> Self:
+        return self
+
+class InstanceMethodShadow(SharedMethodBase):
+    def __init__(self) -> None:
+        self.method: Callable[[], object] = lambda: object()
+
+class SharedMethodOther(SharedMethodBase): ...
+
+def takes_shared_method_intersection(value: Intersection[InstanceMethodShadow, SharedMethodOther]): ...
+def _(value: Intersection[InstanceMethodShadow, SharedMethodOther]):
+    takes_shared_method_intersection(value.method())  # error: [invalid-argument-type]
+
 class ConstraintA:
     other: Self
 
