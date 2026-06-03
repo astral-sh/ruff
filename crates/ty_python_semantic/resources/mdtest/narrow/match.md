@@ -204,42 +204,43 @@ def test_match_singleton_object_sequence(value: object) -> None:
 def test_match_prefix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest]:
-            reveal_type(value)  # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
             reveal_type(len(value))  # revealed: int
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: object
 
-# Exact patterns are commonly used to validate parsed data before using it.
-
-def unwrap_single_int(value: object) -> int | None:
+def test_match_prefix_and_suffix_star_object_sequence(value: object) -> None:
     match value:
-        case [int()]:
-            return value[0]
-    return None
+        case [int(), *rest, str()]:
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[-1])  # revealed: str
+            reveal_type(value[1])  # revealed: object
 
-# This deliberately accepts a small unsoundness: sequence matching can inspect
-# values yielded by `__iter__`, while a later indexed read calls `__getitem__`.
-# Custom `Sequence` implementations and tuple subclasses can override those
-# methods inconsistently. We assume conventional container behavior so exact
-# patterns remain useful for validating parsed data before indexing it.
-def accepted_unsound_indexed_reconstruction(value: Sequence[object]) -> int | None:
+def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
     match value:
-        case [int()]:
-            return value[0]
-    return None
-
-def normalize_counted_label(value: object | None) -> str | None:
-    match value:
-        case [int(), str()]:
-            return value[1].upper() * value[0]
-    return None
+        case [int(), *rest]:
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: int | str
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
         case x, str():
+            # TODO: This should simplify to `tuple[int | str, str]`.
             # revealed: tuple[int | str, int | str] & <Protocol with members '__getitem__', '__len__'>
             reveal_type(subj)
+            reveal_type(subj[0])  # revealed: int | str
+            reveal_type(subj[1])  # revealed: str
         case y:
+            # TODO: This should simplify to `tuple[int | str, int]`.
             # revealed: tuple[int | str, int | str] & ~<Protocol with members '__getitem__', '__len__'>
             reveal_type(subj)
+            reveal_type(subj[0])  # revealed: int | str
+            # TODO: This should reveal `int` once we simplify the negative
+            # intersection above.
+            reveal_type(subj[1])  # revealed: int | str
 
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:

@@ -147,16 +147,16 @@ impl ClassPatternKind {
 
 /// Structural details for sequence patterns that affect narrowing and reachability.
 ///
-/// `patterns` stores one predicate per syntactic element, including the starred
-/// element. `has_star` records whether the pattern accepts additional sequence
-/// elements.
+/// `patterns` stores one predicate per syntactic element, with a starred element
+/// represented by [`PatternPredicateKind::Unsupported`]. `has_star` records
+/// whether the pattern accepts additional sequence elements.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct SequencePatternPredicateKind<'db> {
     pub patterns: Vec<PatternPredicateKind<'db>>,
     pub has_star: bool,
 }
 
-impl SequencePatternPredicateKind<'_> {
+impl<'db> SequencePatternPredicateKind<'db> {
     /// Return `true` for `case [*rest]`, the only sequence pattern with no
     /// length or element constraints.
     pub fn is_irrefutable(&self) -> bool {
@@ -165,6 +165,22 @@ impl SequencePatternPredicateKind<'_> {
 
     pub fn is_exact_length(&self) -> bool {
         !self.has_star
+    }
+
+    /// Return the patterns before and after the starred element.
+    pub fn split_around_star(
+        &self,
+    ) -> Option<(&[PatternPredicateKind<'db>], &[PatternPredicateKind<'db>])> {
+        if !self.has_star {
+            return None;
+        }
+
+        let star_index = self
+            .patterns
+            .iter()
+            .position(|pattern| matches!(pattern, PatternPredicateKind::Unsupported))?;
+        let (prefix, star_and_suffix) = self.patterns.split_at(star_index);
+        Some((prefix, &star_and_suffix[1..]))
     }
 }
 

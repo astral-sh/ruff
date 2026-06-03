@@ -35,6 +35,52 @@ pub(crate) fn sequence_pattern_type(db: &dyn Db) -> Type<'_> {
         .build()
 }
 
+fn sequence_pattern_getitem_method<'db>(
+    db: &'db dyn Db,
+    indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
+    fallback_return_type: Option<Type<'db>>,
+) -> CallableType<'db> {
+    let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
+
+    let mut overloads: Vec<_> = indexed_element_types
+        .into_iter()
+        .map(|(index, element_type)| {
+            Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        self_parameter(),
+                        Parameter::positional_only(Some(Name::new_static("index")))
+                            .with_annotated_type(Type::int_literal(index)),
+                    ],
+                ),
+                element_type,
+            )
+        })
+        .collect();
+
+    if let Some(fallback_return_type) = fallback_return_type {
+        overloads.push(Signature::new(
+            Parameters::new(
+                db,
+                [
+                    self_parameter(),
+                    Parameter::positional_only(Some(Name::new_static("index")))
+                        .with_annotated_type(KnownClass::Int.to_instance(db)),
+                ],
+            ),
+            fallback_return_type,
+        ));
+    }
+
+    CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
+    )
+}
+
 /// Build the structural type used for a fixed-length sequence pattern.
 ///
 /// For a pattern like:
@@ -71,32 +117,47 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
     let mut methods = vec![("__len__", len_method)];
 
     if !element_types.is_empty() {
-        let getitem_overloads = (0..length).zip(element_types).map(|(index, element_type)| {
-            Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        self_parameter(),
-                        Parameter::positional_only(Some(Name::new_static("index")))
-                            .with_annotated_type(Type::int_literal(index)),
-                    ],
-                ),
-                *element_type,
-            )
-        });
-
         methods.push((
             "__getitem__",
-            CallableType::new(
+            sequence_pattern_getitem_method(
                 db,
-                CallableSignature::from_overloads(getitem_overloads),
-                CallableTypeKind::FunctionLike,
-                CallableFunctionProvenance::None,
+                (0..length).zip(element_types.iter().copied()),
+                None,
             ),
         ));
     }
 
     let protocol = Type::protocol_with_methods(db, methods);
+
+    IntersectionBuilder::new(db)
+        .add_positive(sequence_pattern_type(db))
+        .add_positive(protocol)
+        .build()
+}
+
+/// Build the structural type used for a sequence pattern containing `*rest`.
+///
+/// Fixed prefix elements use non-negative indices and fixed suffix elements use
+/// negative indices. Other integer indices retain the sequence's element type.
+pub(crate) fn starred_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    prefix_element_types: &[Type<'db>],
+    suffix_element_types: &[Type<'db>],
+) -> Type<'db> {
+    if prefix_element_types.is_empty() && suffix_element_types.is_empty() {
+        return sequence_pattern_type(db);
+    }
+
+    let Ok(suffix_length) = i64::try_from(suffix_element_types.len()) else {
+        return sequence_pattern_type(db);
+    };
+
+    let indexed_element_types = (0_i64..)
+        .zip(prefix_element_types.iter().copied())
+        .chain((-suffix_length..0).zip(suffix_element_types.iter().copied()));
+    let getitem_method =
+        sequence_pattern_getitem_method(db, indexed_element_types, Some(Type::object()));
+    let protocol = Type::protocol_with_methods(db, [("__getitem__", getitem_method)]);
 
     IntersectionBuilder::new(db)
         .add_positive(sequence_pattern_type(db))
