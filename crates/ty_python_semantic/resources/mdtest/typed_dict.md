@@ -2511,10 +2511,38 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
     raise NotImplementedError
 
 def takes_str(value: str) -> None: ...
-
 def _(value: ValueA | ValueB) -> None:
     reveal_type(get_value(value))  # revealed: object
     takes_str(get_value(value))  # error: [invalid-argument-type]
+```
+
+Common constraints must preserve correlations in mutable protocols:
+
+```py
+from typing import Any, Protocol, TypeVar, TypedDict
+
+Key = TypeVar("Key")
+Value = TypeVar("Value")
+
+class SetAndGet(Protocol[Key, Value]):
+    def __getitem__(self, key: Key, /) -> Value: ...
+    def __setitem__(self, key: Key, value: Value, /) -> None: ...
+
+class CorrelatedA(TypedDict):
+    a: Any
+    b: str
+
+class CorrelatedB(TypedDict):
+    a: Any
+    b: str
+
+def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
+    value[key] = item
+    return value[key]
+
+def takes_int(value: int) -> None: ...
+def _(value: CorrelatedA | CorrelatedB) -> None:
+    takes_int(set_and_get(value, "a", 1))
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a

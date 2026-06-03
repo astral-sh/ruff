@@ -2281,7 +2281,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     /// Returns common protocol constraints for a union containing only `TypedDict`s when every
-    /// member has the same constraints as `dict[str, object]`.
+    /// member has the same constraints as their shared `Mapping[str, object]` fallback.
     fn common_typed_dict_protocol_constraints(
         &self,
         formal: Type<'db>,
@@ -2335,14 +2335,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return None;
         }
 
-        // `TypedDict` instances are dictionaries at runtime, but their supported method surface
-        // can be narrower. Only reuse the common dictionary constraints after proving that they
-        // are equivalent to the actual constraints for every union member.
+        // Use the shared read-only fallback rather than `dict[str, object]`. The current constraint
+        // solver can consider mutable protocol constraints equivalent even when a `TypedDict`
+        // preserves more precise correlations between its keys and values.
+        //
+        // TODO: Reconsider mutable common constraints once equivalence preserves those correlations.
         let spec = &[KnownClass::Str.to_instance(self.db), Type::object()];
-        let dict = KnownClass::Dict.to_specialized_instance(self.db, spec);
-        let dict_when = dict.when_constraint_set_assignable_to_owned(self.db, formal);
+        let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
+        let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
         let probe_constraints = ConstraintSetBuilder::new();
-        let probe_dict_when = probe_constraints.load(self.db, dict_when);
+        let probe_mapping_when = probe_constraints.load(self.db, mapping_when);
         typed_dicts
             .into_iter()
             .all(|element| {
@@ -2351,10 +2353,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     element.when_constraint_set_assignable_to_owned(self.db, formal),
                 );
                 element_when
-                    .iff(self.db, &probe_constraints, probe_dict_when)
+                    .iff(self.db, &probe_constraints, probe_mapping_when)
                     .is_always_satisfied(self.db)
             })
-            .then(|| self.constraints.load(self.db, dict_when))
+            .then(|| self.constraints.load(self.db, mapping_when))
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
