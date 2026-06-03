@@ -5704,6 +5704,7 @@ impl PathAssignments {
             drop(single_map);
         }
 
+        let constraint_is_positive = self.assignment_holds(constraint.when_true());
         let mut constraint_is_before_existing = false;
         for existing in self.discovered.keys() {
             if *existing == constraint {
@@ -5711,7 +5712,9 @@ impl PathAssignments {
                 continue;
             }
 
-            if self.contains_constraint(*existing) {
+            if constraint_is_positive && self.assignment_holds(existing.when_true()) {
+                // Pair sequents have two positive antecedents, so they can only affect the current
+                // path when both constraints are positive.
                 // Pair sequent maps are not commutative. Preserve the source order recorded in
                 // `discovered`, even if BDD traversal encounters the constraints in another order.
                 let (left, right) = if constraint_is_before_existing {
@@ -5721,12 +5724,12 @@ impl PathAssignments {
                 };
                 let pair_map = SequentMap::for_constraint_pair(db, builder, left, right);
                 self.map.merge(&pair_map);
-            } else {
+            } else if constraint_is_positive {
                 // An unvisited branch alternative can still be universally implied by the current
                 // constraint, including if the alternative was first discovered after the current
-                // constraint on a sibling path. Keep that implication, but defer all sequents that
-                // require both constraints until we actually encounter the alternative on the
-                // current path.
+                // constraint on a sibling path or is represented by a non-positive assignment.
+                // Keep that implication, but defer all sequents that require both constraints
+                // until both are positive on the current path.
                 self.map
                     .add_direct_implication_from_unvisited(db, builder, constraint, *existing);
             }
@@ -6541,7 +6544,7 @@ mod tests {
     }
 
     #[test]
-    fn path_assignments_caches_direct_implications_for_later_pairs() {
+    fn path_assignments_caches_unvisited_implications_for_later_pairs() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
         let builder = ConstraintSetBuilder::new();
@@ -6561,30 +6564,34 @@ mod tests {
         );
         let mut path = PathAssignments::new([t_int, t_bool]);
 
-        path.add_assignment(&db, &builder, t_bool.when_false(), 0, false)
+        path.add_assignment(&db, &builder, t_int.when_true(), 0, false)
             .unwrap();
 
         {
             let storage = builder.storage.borrow();
             assert_eq!(
-                storage.constraint_implication_cache.get(&(t_bool, t_int)),
-                Some(&true)
+                storage
+                    .unvisited_constraint_implication_cache
+                    .get(&(t_int, t_bool)),
+                Some(&false)
             );
-            assert_eq!(storage.constraint_implication_cache.len(), 1);
+            assert_eq!(storage.constraint_implication_cache.len(), 0);
             assert_eq!(storage.pair_sequent_cache.len(), 0);
         }
 
-        path.add_assignment(&db, &builder, t_int.when_true(), 1, false)
+        path.add_assignment(&db, &builder, t_bool.when_true(), 1, false)
             .unwrap();
 
         let storage = builder.storage.borrow();
         assert_eq!(
-            storage.constraint_implication_cache.get(&(t_bool, t_int)),
-            Some(&true)
+            storage
+                .unvisited_constraint_implication_cache
+                .get(&(t_int, t_bool)),
+            Some(&false)
         );
         assert_eq!(
-            storage.constraint_implication_cache.get(&(t_int, t_bool)),
-            Some(&false)
+            storage.constraint_implication_cache.get(&(t_bool, t_int)),
+            Some(&true)
         );
         assert_eq!(storage.constraint_implication_cache.len(), 2);
         assert_eq!(storage.pair_sequent_cache.len(), 1);
@@ -6702,6 +6709,34 @@ mod tests {
 
         assert!(!path.assignment_holds(t_int.when_true()));
         assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 0);
+    }
+
+    #[test]
+    fn path_assignments_does_not_discover_pairs_from_non_positive_constraints() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_any = ConstraintId::new(&db, &builder, t, Type::any(), Type::object());
+        let t_int = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+            Type::object(),
+        );
+
+        for t_int_assignment in [t_int.when_false(), t_int.when_unconstrained()] {
+            let mut path = PathAssignments::new([t_any, t_int]);
+
+            path.add_assignment(&db, &builder, t_int_assignment, 1, false)
+                .unwrap();
+
+            assert!(
+                path.add_assignment(&db, &builder, t_any.when_true(), 0, false)
+                    .is_ok()
+            );
+            assert!(!path.assignment_holds(t_int.when_true()));
+        }
     }
 
     #[test]
