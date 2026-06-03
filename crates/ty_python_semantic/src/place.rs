@@ -1527,7 +1527,10 @@ fn place_from_bindings_impl<'db>(
             }
 
             first_definition.get_or_insert(binding);
-            let binding_deprecated = if matches!(binding.kind(db), DefinitionKind::Function(_)) {
+            let binding_deprecated = if matches!(
+                binding.kind(db),
+                DefinitionKind::Function(_) | DefinitionKind::StarImport(_)
+            ) {
                 inferred_declaration(db, binding)
                     .declared()
                     .and_then(|declared| declared.deprecated())

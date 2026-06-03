@@ -342,13 +342,26 @@ If the items are instead star-imported, then the actual uses should warn.
 `module.py`:
 
 ```py
+from collections.abc import Callable
+from typing import Any, TypeVar
 from typing_extensions import deprecated
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+def replacement() -> None: ...
+def replace_with(replacement: F) -> Callable[[Callable[..., Any]], F]:
+    def decorator(_: Callable[..., Any]) -> F:
+        return replacement
+    return decorator
 
 @deprecated("Use OtherType instead")
 class DeprType: ...
 
 @deprecated("Use other_func instead")
 def depr_func(): ...
+@deprecated("Use replacement instead")
+@replace_with(replacement)
+def decorated_depr_func(): ...
 ```
 
 `main.py`:
@@ -358,6 +371,7 @@ from module import *
 
 DeprType()  # error: [deprecated] "Use OtherType instead"
 depr_func()  # error: [deprecated] "Use other_func instead"
+decorated_depr_func()  # error: [deprecated] "Use replacement instead"
 
 def higher_order(x): ...
 
