@@ -1053,7 +1053,6 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        let self_type = self_type.self_binding_type(db);
         self.apply_type_mapping(
             db,
             &TypeMapping::BindSelf(SelfBinding::new(db, self_type, None)),
@@ -1064,12 +1063,19 @@ impl<'db> Type<'db> {
     /// Return the part of a receiver type that describes its runtime class for `Self` binding.
     ///
     /// Negative constraints and flow refinements describe the current value, but do not necessarily
-    /// apply to another instance returned as `Self`.
-    pub(crate) fn self_binding_type(self, db: &'db dyn Db) -> Self {
+    /// apply to another instance returned as `Self`. When known, `self_typevar` identifies the
+    /// protocol that owns `Self`, so other structural constraints can be treated as refinements.
+    pub(crate) fn self_binding_type_for(
+        self,
+        db: &'db dyn Db,
+        self_typevar: Option<BoundTypeVarInstance<'db>>,
+    ) -> Self {
         let Type::Intersection(intersection) = self else {
             return self;
         };
 
+        let owner = self_typevar
+            .and_then(|self_typevar| self_typevar_owner_class_literal(db, self_typevar));
         let has_nominal_class_constraint = intersection.positive(db).iter().any(|positive| {
             !matches!(positive, Type::ProtocolInstance(_)) && positive.nominal_class(db).is_some()
         });
@@ -1081,9 +1087,17 @@ impl<'db> Type<'db> {
                 || matches!(
                     positive,
                     Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::Synthesized(_),
+                        ..
+                    })
+                )
+                || matches!(
+                    positive,
+                    Type::ProtocolInstance(ProtocolInstanceType {
                         inner: Protocol::FromClass(class),
                         ..
-                    }) if has_nominal_class_constraint
+                    }) if (has_nominal_class_constraint
+                        || owner.is_some_and(|owner| class.class_literal(db) != owner))
                         && !class.is_known(db, KnownClass::NamedTupleLike)
                 );
             if !is_flow_refinement {
@@ -4052,16 +4066,17 @@ impl<'db> Type<'db> {
                 let function = bound_method.function(db);
                 let signatures = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
-                let self_binding_type = self_instance.self_binding_type(db);
                 let needs_self_binding = Type::FunctionLiteral(function).needs_self_binding(db);
                 let separate_self_binding = needs_self_binding
                     && !function.is_classmethod(db)
-                    && self_binding_type != self_instance;
+                    && signatures.overloads.iter().any(|signature| {
+                        signature.self_binding_type(db, self_instance) != self_instance
+                    });
                 CallableBinding::from_overloads(
                     self,
                     signatures.overloads.iter().map(|signature| {
                         if separate_self_binding && signature.needs_self_mapping(db, true) {
-                            signature.apply_self(db, self_binding_type)
+                            signature.apply_self(db, signature.self_binding_type(db, self_instance))
                         } else {
                             signature.clone()
                         }
@@ -4070,7 +4085,7 @@ impl<'db> Type<'db> {
                 .with_bound_type(if separate_self_binding || !needs_self_binding {
                     self_instance
                 } else {
-                    self_binding_type
+                    signatures.self_binding_type(db, self_instance)
                 })
                 .into()
             }
@@ -7058,6 +7073,14 @@ impl<'db> SelfBinding<'db> {
         self.ty
     }
 
+    fn self_type_for(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Type<'db> {
+        self.ty.self_binding_type_for(db, Some(bound_typevar))
+    }
+
     pub(crate) fn binding_context(&self) -> Option<BindingContext<'db>> {
         self.binding_context
     }
@@ -7074,6 +7097,7 @@ impl<'db> SelfBinding<'db> {
                 self_typevar_owner_class_literal(db, typevar)
             }
             _ => self_type
+                .self_binding_type_for(db, None)
                 .nominal_class(db)
                 .map(|class| class.class_literal(db)),
         };
@@ -7097,12 +7121,28 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
+        let owner_class = self_typevar_owner_class_literal(db, bound_typevar);
+
         // Check that the Self typevar's owner class is in the MRO of the self type's class.
-        // If we can't determine either class, conservatively don't bind.
-        self.class_literal.is_some_and(|class_literal| {
+        if self.class_literal.is_some_and(|class_literal| {
             let class_mro = class_mro_literals(db, class_literal);
-            self_typevar_owner_class_literal(db, bound_typevar)
-                .is_none_or(|owner_class| class_mro.contains(&owner_class))
+            owner_class.is_none_or(|owner_class| class_mro.contains(&owner_class))
+        }) {
+            return true;
+        }
+
+        // An intersection of structural types has no single nominal class, but it can still
+        // contain the protocol class that owns this `Self`.
+        let Some(owner_class) = owner_class else {
+            return false;
+        };
+        let Type::Intersection(intersection) = self.ty else {
+            return false;
+        };
+        intersection.positive(db).iter().any(|positive| {
+            positive
+                .nominal_class(db)
+                .is_some_and(|class| class.class_literal(db) == owner_class)
         })
     }
 }

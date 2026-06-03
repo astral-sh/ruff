@@ -179,6 +179,14 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn self_binding_type(&self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
+        self.overloads
+            .iter()
+            .map(|signature| signature.self_binding_type(db, self_type))
+            .find(|binding_type| *binding_type != self_type)
+            .unwrap_or(self_type)
+    }
+
     /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
     pub(crate) fn overload_return_type_or_unknown(&self, db: &'db dyn Db) -> Type<'db> {
         match self.overloads.as_slice() {
@@ -912,6 +920,15 @@ impl<'db> Signature<'db> {
     /// Return the definition associated with this signature, if any.
     pub(crate) fn definition(&self) -> Option<Definition<'db>> {
         self.definition
+    }
+
+    pub(crate) fn self_binding_type(&self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
+        let self_typevar = self.generic_context.and_then(|generic_context| {
+            generic_context
+                .variables(db)
+                .find(|typevar| typevar.typevar(db).is_self(db))
+        });
+        self_type.self_binding_type_for(db, self_typevar)
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {

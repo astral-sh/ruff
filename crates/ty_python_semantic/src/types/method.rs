@@ -56,7 +56,9 @@ impl<'db> BoundMethodType<'db> {
             }
             .unwrap_or_else(Type::unknown);
         }
-        self_instance.self_binding_type(db)
+        self.function(db)
+            .signature(db)
+            .self_binding_type(db, self_instance)
     }
 
     pub(crate) fn map_self_type(

@@ -887,7 +887,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 .unwrap_or(Type::TypeVar(self)),
             TypeMapping::BindSelf(binding) => {
                 if binding.should_bind(db, self) {
-                    binding.self_type()
+                    binding.self_type_for(db, self)
                 } else {
                     Type::TypeVar(self)
                 }

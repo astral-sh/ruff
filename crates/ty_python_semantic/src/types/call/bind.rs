@@ -1343,7 +1343,9 @@ impl<'db> Bindings<'db> {
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
                                     let instance = if getter.needs_self_binding(db) {
-                                        instance.self_binding_type(db)
+                                        getter.as_function_literal().map_or(*instance, |getter| {
+                                            getter.signature(db).self_binding_type(db, *instance)
+                                        })
                                     } else {
                                         *instance
                                     };
@@ -1377,7 +1379,9 @@ impl<'db> Bindings<'db> {
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
                                     let instance = if getter.needs_self_binding(db) {
-                                        instance.self_binding_type(db)
+                                        getter.as_function_literal().map_or(*instance, |getter| {
+                                            getter.signature(db).self_binding_type(db, *instance)
+                                        })
                                     } else {
                                         *instance
                                     };

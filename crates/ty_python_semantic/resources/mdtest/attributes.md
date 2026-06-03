@@ -1950,6 +1950,26 @@ def _(value: Value):
     if is_marker(value):
         reveal_type(value.copy())  # revealed: Value
         value.copy().marker  # error: [unresolved-attribute]
+
+    if hasattr(value, "synthesized_marker"):
+        reveal_type(value.copy())  # revealed: Value
+        value.copy().synthesized_marker  # error: [unresolved-attribute]
+
+class CopyableProtocol(Protocol):
+    other: Self
+
+    def copy(self) -> Self: ...
+    @property
+    def property(self) -> Self: ...
+
+def _(value: CopyableProtocol):
+    if is_marker(value):
+        reveal_type(value.copy())  # revealed: CopyableProtocol
+        reveal_type(value.other)  # revealed: CopyableProtocol
+        reveal_type(value.property)  # revealed: CopyableProtocol
+        value.copy().marker  # error: [unresolved-attribute]
+        value.other.marker  # error: [unresolved-attribute]
+        value.property.marker  # error: [unresolved-attribute]
 ```
 
 ### Descriptor binding uses the full intersection type
