@@ -32,6 +32,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         arguments: &ast::Arguments,
     ) -> Option<Type<'db>> {
+        let argument = self.single_positional_typed_dict_fast_path_argument(arguments)?;
+        let mut speculative_builder = self.speculate();
+        let argument_ty = speculative_builder.infer_expression(argument, TypeContext::default());
+        if !is_typed_dict_or_union_of_typed_dicts(speculative_builder.db(), argument_ty) {
+            // Normal constructor binding will store the root argument type when it retrieves the
+            // cached result. Commit the rest of this inference now so that cache reuse does not
+            // discard diagnostics or child expression results.
+            speculative_builder.expressions.remove(&argument.into());
+            self.extend(speculative_builder);
+            return None;
+        }
+        self.extend(speculative_builder);
+
+        let db = self.db();
+        Some(
+            KnownClass::Dict
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::object()]),
+        )
+    }
+
+    pub(super) fn single_positional_typed_dict_fast_path_argument<'a>(
+        &self,
+        arguments: &'a ast::Arguments,
+    ) -> Option<&'a ast::Expr> {
         // A custom typeshed can redefine `dict.__new__` or `dict.__init__`, so normal constructor
         // binding must remain authoritative for its calls.
         if Program::get(self.db())
@@ -44,22 +68,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let [argument] = &*arguments.args else {
             return None;
         };
-        if argument.is_starred_expr() || !arguments.keywords.is_empty() {
-            return None;
-        }
-
-        let mut speculative_builder = self.speculate();
-        let argument_ty = speculative_builder.infer_expression(argument, TypeContext::default());
-        if !is_typed_dict_or_union_of_typed_dicts(speculative_builder.db(), argument_ty) {
-            return None;
-        }
-        self.extend(speculative_builder);
-
-        let db = self.db();
-        Some(
-            KnownClass::Dict
-                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::object()]),
-        )
+        (!argument.is_starred_expr() && arguments.keywords.is_empty()).then_some(argument)
     }
 
     fn infer_keyword_only_dict_call(

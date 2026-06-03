@@ -2363,6 +2363,12 @@ def make_movie(value: object) -> Movie:
 def preserve_argument_diagnostics() -> None:
     dict(make_movie(missing))  # error: [unresolved-reference]
 
+def preserve_fallback_argument_diagnostics() -> None:
+    dict(missing)  # error: [unresolved-reference]
+
+def preserve_unpack_argument_diagnostics() -> Movie:
+    return dict(**missing)  # error: [unresolved-reference]
+
 def mixed(movie_or_int: Movie | int) -> None:
     # A union with a non-TypedDict member should still use normal overload resolution.
     dict(movie_or_int)  # error: [no-matching-overload]
