@@ -898,6 +898,13 @@ impl<'db> ConstraintSetBuilder<'db> {
         result
     }
 
+    fn record_constraint_implication(&self, ante: ConstraintId, post: ConstraintId) {
+        self.storage
+            .borrow_mut()
+            .constraint_implication_cache
+            .insert((ante, post), true);
+    }
+
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
         self.storage.borrow().nodes[node]
     }
@@ -5333,18 +5340,28 @@ impl SequentMap {
         post: ConstraintId,
     ) {
         if builder.cached_constraint_implies(db, ante, post) {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                ante = %ante.display(db, builder),
-                post = %post.display(db, builder),
-                "antecedent implies postcondition",
-            );
-            self.add_single_implication(db, builder, ante, post);
+            self.add_known_direct_implication(db, builder, ante, post);
         }
     }
 
-    /// Adds a direct implication from an unvisited constraint only when the antecedent is fully
-    /// static.
+    fn add_known_direct_implication<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) {
+        tracing::trace!(
+            target: "ty_python_semantic::types::constraints::SequentMap",
+            ante = %ante.display(db, builder),
+            post = %post.display(db, builder),
+            "antecedent implies postcondition",
+        );
+        self.add_single_implication(db, builder, ante, post);
+    }
+
+    /// Adds a direct implication from an unvisited constraint only when it holds for every
+    /// materialization of both constraints.
     fn add_direct_implication_from_unvisited<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -5363,13 +5380,25 @@ impl SequentMap {
             return;
         }
 
-        // `ConstraintId::implies` uses constraint-set assignability, which is existential for
-        // gradual types. It is not a logical implication across every materialization, so it
-        // cannot be used to collapse an unvisited gradual branch.
-        let is_fully_static =
-            |ty: Type<'db>| ty.top_materialization(db) == ty.bottom_materialization(db);
-        if is_fully_static(ante_data.lower) && is_fully_static(ante_data.upper) {
-            self.add_direct_implication(db, builder, ante, post);
+        // Lower bounds contribute to the inferred solution, so every materialization of the
+        // postcondition's lower bound must be below every materialization of the antecedent's
+        // lower bound.
+        if post_data
+            .lower
+            .top_materialization(db)
+            .is_constraint_set_assignable_to(db, ante_data.lower.bottom_materialization(db))
+            // Upper bounds restrict the inferred solution. Every materialization allowed by the
+            // antecedent must satisfy the postcondition, but a gradual postcondition remains
+            // permissive.
+            && ante_data
+                .upper
+                .top_materialization(db)
+                .is_constraint_set_assignable_to(db, post_data.upper)
+        {
+            // Universal subtyping implies constraint-set assignability, so the later full pair
+            // calculation can reuse this result without repeating the relation checks.
+            builder.record_constraint_implication(ante, post);
+            self.add_known_direct_implication(db, builder, ante, post);
         }
     }
 
@@ -5639,8 +5668,8 @@ impl PathAssignments {
     /// [`for_constraint_pair`][SequentMap::for_constraint_pair] for constraints represented in the
     /// current path, so that if we walk another constraint set containing them, we reuse the work
     /// to calculate their sequents. `discovered` also contains constraints from unvisited branch
-    /// alternatives and previously traversed sibling paths. If the current constraint is fully
-    /// static, only a direct implication from it can affect the current path, so we add it without
+    /// alternatives and previously traversed sibling paths. Only a direct implication from the
+    /// current constraint can affect the current path, so we add any universal implication without
     /// calculating or caching the full pair map.
     fn discover_constraint<'db>(
         &mut self,
@@ -5677,10 +5706,9 @@ impl PathAssignments {
                 let pair_map = SequentMap::for_constraint_pair(db, builder, left, right);
                 self.map.merge(&pair_map);
             } else if !already_processed {
-                // An unvisited branch alternative can still be implied by a fully static current
-                // constraint. Keep that implication, but defer implications from gradual
-                // constraints and all sequents that require both constraints until we actually
-                // encounter the alternative on the current path.
+                // An unvisited branch alternative can still be universally implied by the current
+                // constraint. Keep that implication, but defer all sequents that require both
+                // constraints until we actually encounter the alternative on the current path.
                 self.map
                     .add_direct_implication_from_unvisited(db, builder, constraint, *existing);
             }
@@ -6568,6 +6596,69 @@ mod tests {
 
         assert!(!path.assignment_holds(t_int.when_true()));
         assert_eq!(builder.storage.borrow().pair_sequent_cache.len(), 0);
+    }
+
+    #[test]
+    fn path_assignments_uses_universal_implications_for_unvisited_constraints() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int_lower = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+            Type::object(),
+        );
+        let t_any_lower = ConstraintId::new(&db, &builder, t, Type::any(), Type::object());
+        let mut lower_path = PathAssignments::new([t_int_lower, t_any_lower]);
+
+        lower_path
+            .add_assignment(&db, &builder, t_int_lower.when_true(), 0, false)
+            .unwrap();
+
+        // A `str` materialization of `Any` does not satisfy `int ≤ T`.
+        assert!(!lower_path.assignment_holds(t_any_lower.when_true()));
+
+        let t_any_bool = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::any(),
+            KnownClass::Bool.to_instance(&db),
+        );
+        let t_int_upper = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Int.to_instance(&db),
+        );
+        let mut upper_path = PathAssignments::new([t_any_bool, t_int_upper]);
+
+        upper_path
+            .add_assignment(&db, &builder, t_any_bool.when_true(), 0, false)
+            .unwrap();
+
+        // The static upper bound proves this implication for every materialization of `Any`.
+        assert!(upper_path.assignment_holds(t_int_upper.when_true()));
+
+        let t_str_upper = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Str.to_instance(&db),
+        );
+        let t_any_upper = ConstraintId::new(&db, &builder, t, Type::Never, Type::any());
+        let mut gradual_upper_path = PathAssignments::new([t_str_upper, t_any_upper]);
+
+        gradual_upper_path
+            .add_assignment(&db, &builder, t_str_upper.when_true(), 0, false)
+            .unwrap();
+
+        // A gradual upper bound remains permissive for every materialization of `str`.
+        assert!(gradual_upper_path.assignment_holds(t_any_upper.when_true()));
     }
 
     #[test]
