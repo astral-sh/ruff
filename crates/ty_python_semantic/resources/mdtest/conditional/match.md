@@ -66,7 +66,9 @@ def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
         case [_first, _second, *_paths]:
             raise ValueError
 
-    reveal_type(paths)  # revealed: Sequence[str]
+    # Exact sequence alternatives remain as negative protocol constraints.
+    # revealed: (Sequence[str] & ~<Protocol with members '__len__'> & ~<Protocol with members '__getitem__', '__len__'>) | str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
+    reveal_type(paths)
 ```
 
 ## Basic match

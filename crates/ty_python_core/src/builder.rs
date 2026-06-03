@@ -41,7 +41,8 @@ use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
+    StarImportPlaceholderPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1947,15 +1948,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
-                // `case [*rest]` matches every sequence, while all other sequence patterns
-                // are refutable because they impose a minimum and/or exact length.
-                PatternPredicateKind::Sequence(
-                    if matches!(pattern.patterns.as_slice(), [ast::Pattern::MatchStar(_)]) {
-                        ClassPatternKind::Irrefutable
-                    } else {
-                        ClassPatternKind::Refutable
-                    },
-                )
+                PatternPredicateKind::Sequence(SequencePatternPredicateKind {
+                    patterns: pattern
+                        .patterns
+                        .iter()
+                        .map(|pattern| self.predicate_kind(pattern))
+                        .collect(),
+                    has_star: pattern
+                        .patterns
+                        .iter()
+                        .any(|pattern| matches!(pattern, ast::Pattern::MatchStar(_))),
+                })
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern

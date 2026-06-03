@@ -200,7 +200,7 @@ use crate::{
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
         TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
-        infer_narrowing_constraint,
+        infer_narrowing_constraint, sequence_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -233,17 +233,6 @@ fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
 
 fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
     KnownClass::Mapping.to_instance(db).top_materialization(db)
-}
-
-pub(crate) fn sequence_pattern_type(db: &dyn Db) -> Type<'_> {
-    IntersectionBuilder::new(db)
-        .add_positive(KnownClass::Sequence.to_instance(db).top_materialization(db))
-        // `str`, `bytes`, and `bytearray` are sequences, but Python sequence
-        // patterns explicitly do not match them or their subclasses.
-        .add_negative(KnownClass::Str.to_instance(db))
-        .add_negative(KnownClass::Bytes.to_instance(db))
-        .add_negative(KnownClass::Bytearray.to_instance(db))
-        .build()
 }
 
 /// Turn a `match` pattern kind into a type that represents the set of all values that would definitely

@@ -145,6 +145,29 @@ impl ClassPatternKind {
     }
 }
 
+/// Structural details for sequence patterns that affect narrowing and reachability.
+///
+/// `patterns` stores one predicate per syntactic element, including the starred
+/// element. `has_star` records whether the pattern accepts additional sequence
+/// elements.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct SequencePatternPredicateKind<'db> {
+    pub patterns: Vec<PatternPredicateKind<'db>>,
+    pub has_star: bool,
+}
+
+impl SequencePatternPredicateKind<'_> {
+    /// Return `true` for `case [*rest]`, the only sequence pattern with no
+    /// length or element constraints.
+    pub fn is_irrefutable(&self) -> bool {
+        self.patterns.len() == 1 && self.has_star
+    }
+
+    pub fn is_exact_length(&self) -> bool {
+        !self.has_star
+    }
+}
+
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum PatternPredicateKind<'db> {
@@ -153,7 +176,7 @@ pub enum PatternPredicateKind<'db> {
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
     Mapping(ClassPatternKind),
-    Sequence(ClassPatternKind),
+    Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Unsupported,
 }
