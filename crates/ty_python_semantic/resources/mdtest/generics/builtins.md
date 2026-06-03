@@ -197,6 +197,48 @@ def explicit_unspecialized_return() -> None:
     value: str = xs.get()
 ```
 
+## Collection constructors with nonstandard variance
+
+Collection-constructor inference is specific to the standard invariant builtin collections.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+python-version = "3.12"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class int: ...
+class tuple: ...
+
+class list[T]:
+    def __init__(self) -> None: ...
+    def append(self, value: T) -> None: ...
+```
+
+`/typeshed/stdlib/types.pyi`:
+
+```pyi
+class FunctionType: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+```py
+from typing_extensions import reveal_type
+
+xs = list()
+xs.append(1)
+reveal_type(xs)  # revealed: list[Unknown]
+```
+
 ## Reachability for specialized custom collection constructor returns
 
 Collection method calls still need normal reachability analysis when a custom typeshed preserves a

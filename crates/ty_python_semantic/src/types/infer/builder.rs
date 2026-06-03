@@ -8018,6 +8018,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_return_ty != identity_instance && bound_return_ty != unknown_instance {
             return bound_return_ty;
         }
+        if collection_literal
+            .generic_context(self.db())
+            .is_some_and(|generic_context| {
+                generic_context
+                    .variables(self.db())
+                    .any(|typevar| typevar.variance(self.db()) != TypeVarVariance::Invariant)
+            })
+        {
+            return unknown_instance;
+        }
 
         let elements: [[Option<&ast::Expr>; 1]; 0] = [];
         let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
