@@ -1231,7 +1231,6 @@ impl KnownClass {
         match self {
             Self::NoneType
             | Self::NoDefaultType
-            | Self::VersionInfo
             | Self::EllipsisType
             | Self::NotImplementedType => Some(true),
 
@@ -1276,6 +1275,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
+            | Self::VersionInfo
             | Self::SupportsIndex
             | Self::StdlibAlias
             | Self::TypeAliasType
@@ -1332,7 +1332,6 @@ impl KnownClass {
             Self::NoneType
             | Self::EllipsisType
             | Self::NoDefaultType
-            | Self::VersionInfo
             | Self::NotImplementedType => true,
 
             Self::Bool
@@ -1348,6 +1347,7 @@ impl KnownClass {
             | Self::FrozenSet
             | Self::Dict
             | Self::List
+            | Self::VersionInfo
             | Self::Type
             | Self::Slice
             | Self::Property

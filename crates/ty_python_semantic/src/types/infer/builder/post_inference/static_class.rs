@@ -236,8 +236,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 Type::SpecialForm(SpecialFormType::NamedTuple)
                     | Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
             )
-            && let Some(node) = source_node
-            && let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, node)
+            && let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, source_node)
         {
             builder.into_diagnostic(format_args!(
                 "NamedTuple class `{}` cannot use multiple inheritance except with `Generic[]`",
@@ -247,9 +246,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         let base_class = match base_class {
             Type::SpecialForm(SpecialFormType::Generic) => {
-                if let Some(node) = source_node
-                    && let Some(builder) = context.report_lint(&INVALID_BASE, node)
-                {
+                if let Some(builder) = context.report_lint(&INVALID_BASE, source_node) {
                     // Unsubscripted `Generic` can appear in the MRO of many classes,
                     // but it is never valid as an explicit base class in user code.
                     builder.into_diagnostic("Cannot inherit from plain `Generic`");
@@ -285,9 +282,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             // but it is semantically invalid.
             Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context)) => {
                 if let Some(type_params) = class_node.type_params.as_deref() {
-                    let Some(node) = source_node else {
-                        continue;
-                    };
+                    let node = source_node;
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node) else {
                         continue;
                     };
@@ -308,17 +303,14 @@ pub(crate) fn check_static_class_definitions<'db>(
                             )));
                         }
                     }
-                } else if let Some(node) = source_node
-                    && protocol_base_with_generic_context.is_none()
-                {
-                    protocol_base_with_generic_context = Some((node, generic_context));
+                } else if protocol_base_with_generic_context.is_none() {
+                    protocol_base_with_generic_context = Some((source_node, generic_context));
                 }
                 continue;
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
             Type::GenericAlias(base_alias) => {
                 if check_explicit_base_variance
-                    && let Some(node) = source_node
                     && let Some(generic_context) = class.generic_context(db)
                     && let Some((typevar, declared_variance, required_variance)) =
                         generic_context.variables(db).find_map(|typevar| {
@@ -333,7 +325,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 None
                             }
                         })
-                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node)
+                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, source_node)
                 {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Variance of type variable `{}` is incompatible with base class `{}`",
@@ -361,8 +353,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         if is_protocol {
             if !base_class.is_protocol(db)
                 && !base_class.is_object(db)
-                && let Some(node) = source_node
-                && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, node)
+                && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node)
             {
                 builder.into_diagnostic(format_args!(
                     "Protocol class `{}` cannot inherit from non-protocol class `{}`",
@@ -372,8 +363,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
             if !base_class.class_literal(db).is_typed_dict(db)
-                && let Some(node) = source_node
-                && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, node)
+                && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, source_node)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "TypedDict class `{}` can only inherit from TypedDict classes",
@@ -394,8 +384,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
 
         if base_class.is_final(db)
-            && let Some(node) = source_node
-            && let Some(builder) = context.report_lint(&SUBCLASS_OF_FINAL_CLASS, node)
+            && let Some(builder) = context.report_lint(&SUBCLASS_OF_FINAL_CLASS, source_node)
         {
             builder.into_diagnostic(format_args!(
                 "Class `{}` cannot inherit from final class `{}`",
@@ -410,25 +399,23 @@ pub(crate) fn check_static_class_definitions<'db>(
                 class.is_frozen_dataclass(db),
             )
             && base_is_frozen != class_is_frozen
-            && let Some(node) = source_node
         {
             report_bad_frozen_dataclass_inheritance(
                 context,
                 class,
                 class_node,
                 base_class_literal,
-                node,
+                source_node,
                 base_is_frozen,
             );
         }
 
-        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class)
-            && let Some(node) = source_node
-        {
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class) {
             // Suppress the diagnostic if the child class manually overrides all comparison
             // methods, since the user has explicitly fixed the LSP violation.
             if !class.has_own_comparison_methods(db)
-                && let Some(builder) = context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, node)
+                && let Some(builder) =
+                    context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, source_node)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Class `{}` inherits from dataclass `{}` which has `order=True`",
@@ -464,9 +451,8 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
             StaticMroErrorKind::InvalidBases(bases) => {
                 for (index, base_ty) in bases {
-                    if let Some(base_node) = expanded_base_entries[*index].source_node() {
-                        report_invalid_or_unsupported_base(context, base_node, *base_ty, class);
-                    }
+                    let base_node = expanded_base_entries[*index].source_node();
+                    report_invalid_or_unsupported_base(context, base_node, *base_ty, class);
                 }
             }
             StaticMroErrorKind::UnresolvableMro {

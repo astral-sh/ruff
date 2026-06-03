@@ -1145,14 +1145,20 @@ fn symbol_impl<'db>(
         file_to_module(db, scope.file(db)).is_some_and(|module| module.is_known(db, known_module))
     };
 
-    if name == "platform" && is_known_module(KnownModule::Sys) {
-        match Program::get(db).python_platform(db) {
-            crate::PythonPlatform::Identifier(platform) => {
-                return Place::bound(Type::string_literal(db, platform.as_str())).into();
+    if is_known_module(KnownModule::Sys) {
+        match name {
+            "version_info" => {
+                return Place::bound(Type::sys_version_info(db)).into();
             }
-            crate::PythonPlatform::All => {
-                // Fall through to the looked up type
-            }
+            "platform" => match Program::get(db).python_platform(db) {
+                crate::PythonPlatform::Identifier(platform) => {
+                    return Place::bound(Type::string_literal(db, platform.as_str())).into();
+                }
+                crate::PythonPlatform::All => {
+                    // Fall through to the looked up type
+                }
+            },
+            _ => {}
         }
     }
 
