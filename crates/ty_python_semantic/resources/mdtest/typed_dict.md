@@ -6002,7 +6002,14 @@ class ExtraOnly(TypedDict, extra_items=int): ...
 def accepts_ints(name: str, **kwargs: int) -> None: ...
 def accepts_name(name: str) -> None: ...
 def accepts_optional_label(*, label: str = "", **kwargs: int) -> None: ...
-def _(ints: IntSource, strings: StrSource, open_source: OpenSource, extra_only: ExtraOnly) -> None:
+def _(
+    ints: IntSource,
+    strings: StrSource,
+    open_source: OpenSource,
+    extra_only: ExtraOnly,
+    int_mapping: dict[str, int],
+    str_mapping: dict[str, str],
+) -> None:
     accepts_ints(**ints)
     accepts_ints(**strings)  # error: [invalid-argument-type]
     accepts_name(**ints)  # error: [unknown-argument]
@@ -6014,6 +6021,12 @@ def _(ints: IntSource, strings: StrSource, open_source: OpenSource, extra_only: 
     ClosedTarget(**ints)  # error: [invalid-key]
 
     copied: IntTarget = {**open_source}  # error: [invalid-argument-type]
+
+    ExtraOnly(**str_mapping)  # error: [invalid-argument-type]
+    copied_from_mapping: ExtraOnly = {**str_mapping}  # error: [invalid-argument-type]
+
+    # An arbitrary mapping key may collide with the target's declared `label` item.
+    OptionalTarget(**int_mapping)  # error: [invalid-argument-type]
 
     # The extra-items tail may contain the target's optional `label` key with an incompatible type.
     OptionalTarget(**extra_only)  # error: [invalid-argument-type]
