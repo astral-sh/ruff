@@ -29,6 +29,7 @@ pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_RE
 pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
     infer_expression_type, infer_expression_types, infer_scope_types,
+    is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -782,6 +783,24 @@ impl<'db> DataclassParams<'db> {
             DataclassFlags::from(params.flags(db)),
             params.field_specifiers(db),
         )
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let field_specifiers = self
+            .field_specifiers(db)
+            .iter()
+            .map(|ty| {
+                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                if nested { ty } else { Some(ty.unwrap_or(div)) }
+            })
+            .collect::<Option<Box<_>>>()?;
+
+        Some(Self::new(db, self.flags(db), field_specifiers))
     }
 }
 
@@ -2072,6 +2091,9 @@ impl<'db> Type<'db> {
             Type::GenericAlias(generic) => generic
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::GenericAlias),
+            Type::ClassLiteral(class) => class
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::ClassLiteral),
             Type::SubclassOf(subclass_of) => subclass_of
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::SubclassOf),
@@ -2106,7 +2128,6 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
             | Type::LiteralValue(_) => Some(self),
         }
@@ -3392,6 +3413,14 @@ impl<'db> Type<'db> {
             {
                 Place::bound(Type::KnownBoundMethod(
                     KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "with_detailed_display" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
                 ))
                 .into()
             }
@@ -6036,6 +6065,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6283,7 +6313,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -6821,6 +6852,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, typevar),
             Type::TypeForm(typeform_type) => typeform_type.variance_of(db, typevar),
             Type::KnownInstance(known_instance) => known_instance.variance_of(db, typevar),
+            Type::TypeAlias(alias) => alias.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -6836,7 +6868,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
             | Type::TypedDict(_)
-            | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
         };
 
@@ -7389,6 +7420,8 @@ enum InvalidTypeExpression<'db> {
     TypeQualifier(TypeQualifier),
     /// `typing.Self` cannot be used in `@staticmethod` definitions.
     TypingSelfInStaticMethod,
+    /// `typing.Self` cannot be used in type aliases.
+    TypingSelfInTypeAlias,
     /// `typing.Self` cannot be used in metaclass definitions.
     TypingSelfInMetaclass,
     /// Some types are always invalid in type expressions
@@ -7486,6 +7519,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::TypingSelfInStaticMethod => {
                         f.write_str("`Self` cannot be used in a static method")
+                    }
+                    InvalidTypeExpression::TypingSelfInTypeAlias => {
+                        f.write_str("`Self` cannot be used in a type alias")
                     }
                     InvalidTypeExpression::TypingSelfInMetaclass => {
                         f.write_str("`Self` cannot be used in a metaclass")
@@ -7592,7 +7628,7 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
         } else if matches!(self, InvalidTypeExpression::Concatenate) {
             diagnostic.info("`typing.Concatenate` is only valid:");
-            diagnostic.info(" - as the first argument to `typing.Callable`");
+            diagnostic.info(" - as the first argument to `Callable`");
             diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
     }
@@ -7867,6 +7903,26 @@ impl<'db> ModuleLiteralType<'db> {
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {
             return self.try_module_getattr(db, name);
+        }
+
+        // typeshed re-exports some special forms across modules (e.g. `collections.abc.Callable`
+        // is `from typing import Callable as Callable`). The resolved type still carries the
+        // definition-site variant (`SpecialFormType::TypingCallable`), so we recover the
+        // import-path identity here while it's still observable.
+        if let Place::Defined(defined) = place_and_qualifiers.place
+            && let Type::SpecialForm(special) = defined.ty
+            && let Some(import_module) = self.module(db).known(db)
+        {
+            let rewrapped = special.rewrap_for_import_module(name, import_module);
+            if rewrapped != special {
+                return PlaceAndQualifiers {
+                    place: Place::Defined(DefinedPlace {
+                        ty: Type::SpecialForm(rewrapped),
+                        ..defined
+                    }),
+                    qualifiers: place_and_qualifiers.qualifiers,
+                };
+            }
         }
 
         place_and_qualifiers

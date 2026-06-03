@@ -258,7 +258,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -2758,10 +2759,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
+                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
                             db,
                             ClassType::NonGeneric(class_b),
-                            self.constraints,
+                            self,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
@@ -2774,10 +2775,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
+                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
                             db,
                             ClassType::Generic(alias_b),
-                            self.constraints,
+                            self,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),

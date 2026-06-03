@@ -11,12 +11,12 @@ use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachabilit
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, declaration_type,
+    UnionBuilder, UnionType, binding_type, declaration_type, is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
-use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
+use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
 use ty_python_core::reachability_constraints::{
     ReachabilityConstraints, ScopedReachabilityConstraintId,
@@ -369,23 +369,6 @@ pub(crate) fn symbol<'db>(
         db,
         scope,
         name,
-        RequiresExplicitReExport::No,
-        considered_definitions,
-    )
-}
-
-/// Infer the public type of a place (its type as seen from outside its scope) in the given
-/// `scope`.
-pub(crate) fn place<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    member: PlaceExprRef,
-    considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    place_impl(
-        db,
-        scope,
-        member,
         RequiresExplicitReExport::No,
         considered_definitions,
     )
@@ -1200,29 +1183,6 @@ fn symbol_impl<'db>(
         .unwrap_or_default()
 }
 
-fn place_impl<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    place: PlaceExprRef,
-    requires_explicit_reexport: RequiresExplicitReExport,
-    considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    let _span = tracing::trace_span!("place_impl", ?place).entered();
-
-    place_table(db, scope)
-        .place_id(place)
-        .map(|place| {
-            place_by_id(
-                db,
-                scope,
-                place,
-                requires_explicit_reexport,
-                considered_definitions,
-            )
-        })
-        .unwrap_or_default()
-}
-
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
     cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
@@ -1392,7 +1352,8 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
-    let mut only_loop_header_bindings = true;
+    // special handling for synthetic loop header definitions and nested bindings definitions
+    let mut only_non_shadowing_bindings = true;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1401,6 +1362,14 @@ fn place_from_bindings_impl<'db>(
              reachability_constraint,
          }| {
             let binding = match binding {
+                DefinitionState::Defined(binding)
+                    if is_discarded_dict_key_assignment(db, binding) =>
+                {
+                    // This synthesized `d[key] = value` binding was derived from an assignment such
+                    // as `d = {key: value}`. If the RHS is not known to be stored unchanged, discard
+                    // the binding so that lookup of `d[key]` can fall back to `d`.
+                    return None;
+                }
                 DefinitionState::Defined(binding) => binding,
                 DefinitionState::Undefined => {
                     return None;
@@ -1487,8 +1456,11 @@ fn place_from_bindings_impl<'db>(
                 if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
+            } else if matches!(binding.kind(db), DefinitionKind::NestedBindings(_)) {
+                // Nested bindings definitions similar to loop header definitions, synthetic
+                // bindings with special shadowing behavior. They can also coexist with `UNBOUND`.
             } else {
-                only_loop_header_bindings = false;
+                only_non_shadowing_bindings = false;
             }
 
             first_definition.get_or_insert(binding);
@@ -1518,9 +1490,9 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
-                Some(Truthiness::AlwaysTrue) if only_loop_header_bindings => {
-                    // Loop header definitions don't shadow prior bindings, so UNBOUND can still be
-                    // definitely-visible alongside a loop header binding. See "Use with loop
+                Some(Truthiness::AlwaysTrue) if only_non_shadowing_bindings => {
+                    // Loop header and nested binding definitions don't shadow prior bindings, so
+                    // UNBOUND can still be definitely-visible alongside them. See "Use with loop
                     // header and also `UNBOUND` definitely visible" in `while_loop.md`.
                     Definedness::PossiblyUndefined
                 }

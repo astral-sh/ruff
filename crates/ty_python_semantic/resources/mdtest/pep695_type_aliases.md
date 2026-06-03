@@ -82,6 +82,29 @@ def f() -> None:
     reveal_type(x)  # revealed: int | str | bytes
 ```
 
+## `Self`
+
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` in alias type-parameter bounds and defaults.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
+
+```py
+from typing import Annotated, Self, cast
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Alias = tuple[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Simplified = object | Self
+
+    type Metadata = Annotated[int, cast(Self, object())]
+```
+
 ## Aliased type aliases
 
 ```py

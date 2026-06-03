@@ -1392,6 +1392,76 @@ class FinalFoo:
 static_assert(is_disjoint_from(Proto, FinalFoo))
 ```
 
+Method members establish disjointness when their non-`Never` return types are disjoint. This is a
+pragmatic approximation: strictly speaking, an implementation returning `Never` could satisfy method
+signatures with otherwise disjoint return types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, Protocol
+from typing_extensions import Never
+from ty_extensions import is_assignable_to, is_disjoint_from, is_subtype_of, static_assert
+
+class HasLengthTwo(Protocol):
+    def __len__(self) -> Literal[2]: ...
+
+class LengthThree:
+    def __len__(self) -> Literal[3]:
+        return 3
+
+class NeverLengthSubclass(LengthThree):
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(is_subtype_of(NeverLengthSubclass, LengthThree))
+static_assert(is_subtype_of(NeverLengthSubclass, HasLengthTwo))
+
+# Intentionally unsound: `NeverLengthSubclass` inhabits both operands,
+# but pragmatically, nobody is ever likely to write such a class
+static_assert(is_disjoint_from(LengthThree, HasLengthTwo))
+```
+
+The same pragmatic approximation applies to fixed-length tuple types. A tuple subclass with a
+`Never`-returning override demonstrates that the disjointness assertion here is also intentionally
+unsound:
+
+```py
+class NeverLengthTupleSubclass(tuple[int, int, int]):
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(is_subtype_of(NeverLengthTupleSubclass, tuple[int, int, int]))
+static_assert(is_subtype_of(NeverLengthTupleSubclass, HasLengthTwo))
+
+# Intentionally unsound: `NeverLengthTupleSubclass` inhabits both operands.
+static_assert(is_disjoint_from(tuple[int, int, int], HasLengthTwo))
+static_assert(not is_disjoint_from(tuple[int, int], HasLengthTwo))
+```
+
+Methods returning `Never` directly cannot establish this pragmatic disjointness. The same applies
+when the return type is a type alias that resolves to `Never`:
+
+```py
+class NeverLength:
+    def __len__(self) -> Never:
+        raise RuntimeError
+
+static_assert(not is_disjoint_from(NeverLength, HasLengthTwo))
+
+type Bottom = Never
+
+class AliasedNeverLength:
+    def __len__(self) -> Bottom:
+        raise RuntimeError
+
+static_assert(is_assignable_to(AliasedNeverLength, HasLengthTwo))
+static_assert(not is_disjoint_from(AliasedNeverLength, HasLengthTwo))
+```
+
 ## Intersections of protocols with types that have possibly unbound attributes
 
 Note that if a `@final` class has a possibly unbound attribute corresponding to the protocol member,
@@ -3556,7 +3626,7 @@ def g(x: B2[int]):
     pass
 ```
 
-## The `Generator` protocol's `_ReturnT_co` needs special casing prior to Python 3.13
+## The `Generator` protocol's `_ReturnT_co` needs special casing
 
 The `_ReturnT_co` type parameter in the `Generator` protocol is the value of a `yield from` over
 that generator, and it's also in the pathway for the return values from `async` functions. (In the
@@ -3574,7 +3644,7 @@ returning `_ReturnT_co | None`. This was motivated by an edge case (you tried to
 but it caught the related exception and returned something anyway), but coincidentally it tells ty
 what it needs to know: `_ReturnT_co` is something that some method in this protocol returns.
 Something with a method that returns `float` isn't assignable to something where the same method
-returns `str`. Problem solved.
+returns `str`.
 
 However, prior to 3.13, the `_ReturnT_co` type only appeared in the `__iter__` method.
 Unfortunately, the `__iter__` method on a `Generator` just returns `self`; its return type is the
@@ -3586,8 +3656,11 @@ be. But how we break the cycle isn't really the problem; the problem is that the
 protocol (prior to 3.13) genuinely tells us nothing about how `_ReturnT_co` interacts with
 assignability.
 
-As a special case workaround for this, we compare `Generator` implementations *nominally* when the
-target Python version is 3.12 or earlier in `has_relation_to`.
+As a special case workaround for this, we compare `Generator` implementations *nominally* in
+`has_relation_to`. Prior to Python 3.13, this is necessary because `_ReturnT_co` is not structurally
+visible. As of Python 3.13, it is necessary because structurally inferring through
+`close() -> _ReturnT_co | None` can spuriously infer `None`. The latter workaround can be removed
+once [ty#3596](https://github.com/astral-sh/ty/issues/3596) is fixed.
 
 ```toml
 [environment]
@@ -3627,10 +3700,10 @@ static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProto
 static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 ```
 
-## The `Generator` protocol's `_ReturnT_co` does not need special casing as of Python 3.13
+## The `Generator` protocol's `_ReturnT_co` appears in `close` as of Python 3.13
 
 The same test cases as above, but for Python 3.13 instead of 3.12. In this version `_ReturnT_co`
-appears in `Generator`'s `close` method, and no special case is needed.
+appears in `Generator`'s `close` method.
 
 ```toml
 [environment]
@@ -3666,6 +3739,39 @@ static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantPr
 static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
 static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+```
+
+## Inferring async return contexts on Python 3.13 or newer
+
+Regression test for [ty#3583](https://github.com/astral-sh/ty/issues/3583). When inferring the
+generic async call in a return statement, the `Awaitable[int]` context should not infer `None`
+through `Generator.close()`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T", bound=tuple[Any, ...])
+
+class Select(Generic[T]):
+    pass
+
+def first[T](v: T) -> Select[tuple[T]]:
+    raise NotImplementedError
+
+async def second[T](query: Select[tuple[T]]) -> T:
+    raise NotImplementedError
+
+async def variant_one() -> int:
+    result = await second(first(123))
+    return result
+
+async def variant_two() -> int:
+    return await second(first(123))
 ```
 
 ## TODO

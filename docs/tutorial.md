@@ -58,7 +58,7 @@ Found 1 error.
 !!! note
 
     As an alternative to `uv run`, you can also run Ruff by activating the project's virtual
-    environment (`source .venv/bin/active` on Linux and macOS, or `.venv\Scripts\activate` on
+    environment (`source .venv/bin/activate` on Linux and macOS, or `.venv\Scripts\activate` on
     Windows) and running `ruff check` directly.
 
 Ruff identified an unused import, which is a common error in Python code. Ruff considers this a

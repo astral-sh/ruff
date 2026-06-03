@@ -638,6 +638,28 @@ pub enum DynamicTypedDictAnchor<'db> {
     },
 }
 
+impl<'db> DynamicTypedDictAnchor<'db> {
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Definition(definition) => Some(Self::Definition(*definition)),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                schema,
+            } => Some(Self::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                schema: schema.recursive_type_normalized_impl(db, div, nested)?,
+            }),
+        }
+    }
+}
+
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 pub struct DynamicTypedDictLiteral<'db> {
     /// The name of the TypedDict (from the first argument).
@@ -656,6 +678,22 @@ pub struct DynamicTypedDictLiteral<'db> {
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
+
+impl<'db> DynamicTypedDictLiteral<'db> {
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self::new(
+            db,
+            self.name(db).clone(),
+            self.anchor(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+        ))
+    }
+}
 
 #[salsa::tracked]
 impl<'db> DynamicTypedDictLiteral<'db> {

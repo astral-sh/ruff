@@ -42,7 +42,7 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-  ECOSYSTEM_ANALYZER_COMMIT: 296347b07a34b0b1fffc1cb3e03abacf0fd5df70
+  ECOSYSTEM_ANALYZER_COMMIT: 745435446f068540fe5f73e34aa5dd15418d0f3c
 
 jobs:
   build-ty:
@@ -88,13 +88,11 @@ jobs:
           cargo build --package ty --profile profiling
           cp target/profiling/ty ty-pr
 
-          # Extract project lists and config for the shard jobs
-          git show "${MERGE_BASE}:crates/ty_python_semantic/resources/primer/good.txt" > projects_old.txt
-          cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
+          # Extract the flaky project list and config for the shard jobs
           cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
           cp .github/ty-ecosystem.toml ty-ecosystem.toml
 
-      - name: Upload ty binaries, project lists, and config
+      - name: Upload ty binaries, flaky project list, and config
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ty-builds
@@ -102,8 +100,6 @@ jobs:
           path: |
             ty-base
             ty-pr
-            projects_old.txt
-            projects_new.txt
             projects_flaky.txt
             ty-ecosystem.toml
 
@@ -119,9 +115,9 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-          version: "0.11.16"
+          version: "0.11.18"
 
-      - name: Download ty binaries, project lists, and config
+      - name: Download ty binaries, flaky project list, and config
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ty-builds
@@ -142,8 +138,6 @@ jobs:
             ecosystem-analyzer \
             --flaky-runs 10 \
             diff \
-            --projects-old projects_old.txt \
-            --projects-new projects_new.txt \
             --projects-flaky projects_flaky.txt \
             --ty-binary-old ty-base \
             --ty-binary-new ty-pr \
@@ -173,7 +167,7 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-          version: "0.11.16"
+          version: "0.11.18"
 
       - name: Download shard diagnostics
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

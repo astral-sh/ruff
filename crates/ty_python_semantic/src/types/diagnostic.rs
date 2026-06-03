@@ -4733,7 +4733,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
+        "Special form `Callable` expected exactly two arguments (parameter types and return type)",
     ));
 }
 
