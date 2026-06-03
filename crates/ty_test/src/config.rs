@@ -5,6 +5,9 @@
 //! ```toml
 //! log = true # or log = "ty=WARN"
 //!
+//! [rules]
+//! possibly-unresolved-reference = "warn"
+//!
 //! [environment]
 //! python-version = "3.10"
 //!
@@ -12,10 +15,13 @@
 //! dependencies = ["pydantic==2.12.2"]
 //! ```
 
+use std::collections::BTreeMap;
+
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
 use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::lint::Level;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -23,6 +29,8 @@ pub(crate) struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
 
     pub(crate) log: Option<Log>,
+
+    pub(crate) rules: Option<Rules>,
 
     pub(crate) analysis: Option<Analysis>,
 
@@ -68,6 +76,8 @@ impl MarkdownTestConfig {
         self.verbose.unwrap_or_default()
     }
 }
+
+pub(crate) type Rules = BTreeMap<String, Level>;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]

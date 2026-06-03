@@ -11,8 +11,8 @@ from collections.abc import Callable, Iterable, Iterator
 from io import TextIOWrapper
 from os import PathLike
 from types import TracebackType
-from typing import IO, Final, Literal, Protocol, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import IO, Final, Literal, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self
 
 __all__ = [
     "BadZipFile",
@@ -81,6 +81,7 @@ class ZipExtFile(io.BufferedIOBase):
     newlines: list[bytes] | None
     mode: _ReadWriteMode
     name: str
+
     @overload
     def __init__(
         self, fileobj: _ClosableZipStream, mode: _ReadWriteMode, zipinfo: ZipInfo, pwd: bytes | None, close_fileobj: Literal[True]
@@ -104,6 +105,7 @@ class ZipExtFile(io.BufferedIOBase):
         pwd: bytes | None = None,
         close_fileobj: Literal[False] = False,
     ) -> None: ...
+
     def read(self, n: int | None = -1) -> bytes:
         """Read and return up to n bytes.
         If the argument is omitted, None, or negative, data is read and returned until EOF is reached.
@@ -254,7 +256,6 @@ class ZipFile:
             """Open the ZIP file with mode read 'r', write 'w', exclusive create 'x',
             or append 'a'.
             """
-
         @overload
         def __init__(
             self,
@@ -518,7 +519,6 @@ else:
             Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
-
         @overload
         @classmethod
         def make(cls, source: StrPath | IO[bytes]) -> Self: ...
@@ -618,9 +618,8 @@ else:
         def name(self) -> str: ...
         @property
         def parent(self) -> PathLike[str]: ...  # undocumented
-        if sys.version_info >= (3, 10):
-            @property
-            def filename(self) -> PathLike[str]: ...  # undocumented
+        @property
+        def filename(self) -> PathLike[str]: ...  # undocumented
         if sys.version_info >= (3, 11):
             @property
             def suffix(self) -> str: ...
@@ -646,15 +645,10 @@ else:
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """
-
         @overload
         def open(self, mode: Literal["rb", "wb"], *, pwd: bytes | None = None) -> IO[bytes]: ...
 
-        if sys.version_info >= (3, 10):
-            def iterdir(self) -> Iterator[Self]: ...
-        else:
-            def iterdir(self) -> Iterator[Path]: ...
-
+        def iterdir(self) -> Iterator[Self]: ...
         def is_dir(self) -> bool: ...
         def is_file(self) -> bool: ...
         def exists(self) -> bool: ...
@@ -667,11 +661,7 @@ else:
             write_through: bool = False,
         ) -> str: ...
         def read_bytes(self) -> bytes: ...
-        if sys.version_info >= (3, 10):
-            def joinpath(self, *other: StrPath) -> Path: ...
-        else:
-            def joinpath(self, add: StrPath) -> Path: ...  # undocumented
-
+        def joinpath(self, *other: StrPath) -> Path: ...
         def __truediv__(self, add: StrPath) -> Path: ...
 
 def is_zipfile(filename: StrOrBytesPath | _SupportsReadSeekTell) -> bool:

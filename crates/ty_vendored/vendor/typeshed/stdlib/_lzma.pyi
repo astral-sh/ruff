@@ -1,8 +1,8 @@
 import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Mapping, Sequence
-from typing import Any, Final, final
-from typing_extensions import Self, TypeAlias
+from typing import Any, Final, TypeAlias, final
+from typing_extensions import Self
 
 _FilterChain: TypeAlias = Sequence[Mapping[str, Any]]
 

@@ -198,30 +198,34 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Type, TypeContext,
-        UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
+        TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
+        infer_narrowing_constraint,
     },
 };
+use ruff_index::IndexSlice;
+use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    SemanticIndex, Truthiness, UseDefMap,
+    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     place::ScopedPlaceId,
     place_table,
     predicate::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        Predicates, ScopedPredicateId,
+        ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
 
-fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
+fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
     let ty = match singleton {
-        ruff_python_ast::Singleton::None => Type::none(db),
-        ruff_python_ast::Singleton::True => Type::bool_literal(true),
-        ruff_python_ast::Singleton::False => Type::bool_literal(false),
+        ast::Singleton::None => Type::none(db),
+        ast::Singleton::True => Type::bool_literal(true),
+        ast::Singleton::False => Type::bool_literal(false),
     };
     debug_assert!(ty.is_singleton(db));
     ty
@@ -310,6 +314,179 @@ fn type_excluded_by_previous_patterns<'db>(
     builder.build()
 }
 
+/// Return the enum class and canonical member names represented by an enum-literal subject type.
+///
+/// This succeeds only when the subject is a single enum literal, a union of enum literals from the
+/// same enum class, or an alias to either form. Enum aliases are normalized to the canonical member
+/// name so previous `match` cases can be compared by member identity.
+fn enum_literal_subject_names<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+) -> Option<(ClassLiteral<'db>, FxHashSet<Name>)> {
+    fn add_enum_literal<'db>(
+        db: &'db dyn Db,
+        enum_class: &mut Option<ClassLiteral<'db>>,
+        names: &mut FxHashSet<Name>,
+        ty: Type<'db>,
+    ) -> Option<()> {
+        let enum_literal = ty.as_enum_literal()?;
+        let class = enum_literal.enum_class(db);
+
+        if let Some(existing_class) = *enum_class {
+            if existing_class != class {
+                return None;
+            }
+        } else {
+            *enum_class = Some(class);
+        }
+
+        let metadata = enum_metadata(db, class)?;
+        let name = enum_literal.name(db);
+        let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+        names.insert(canonical_name.clone());
+        Some(())
+    }
+
+    let mut enum_class = None;
+    let mut names = FxHashSet::default();
+
+    match subject_ty {
+        Type::LiteralValue(_) => {
+            add_enum_literal(db, &mut enum_class, &mut names, subject_ty)?;
+        }
+        Type::Union(union) => {
+            for element in union.elements(db) {
+                add_enum_literal(db, &mut enum_class, &mut names, *element)?;
+            }
+        }
+        Type::TypeAlias(alias) => return enum_literal_subject_names(db, alias.value_type(db)),
+        _ => return None,
+    }
+
+    Some((enum_class?, names))
+}
+
+/// Return the canonical enum-member name matched by a single value pattern.
+///
+/// This recognizes patterns like `case Color.RED:` only when the pattern expression is
+/// single-valued and belongs to the expected enum class. Enum aliases are resolved to their
+/// canonical member names before returning.
+fn enum_member_pattern_name<'db>(
+    db: &'db dyn Db,
+    enum_class: ClassLiteral<'db>,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<Name> {
+    let value_ty = pattern_kind_to_type(db, kind);
+    let enum_literal = value_ty.as_enum_literal()?;
+    if enum_literal.enum_class(db) != enum_class {
+        return None;
+    }
+
+    let metadata = enum_metadata(db, enum_class)?;
+    let name = enum_literal.name(db);
+    let canonical_name = metadata.resolve_member(name).unwrap_or(name);
+    Some(canonical_name.clone())
+}
+
+struct EnumMemberPatternCoverage {
+    /// Enum members that this pattern definitely matches.
+    definitely_matched: FxHashSet<Name>,
+    /// Whether the collected coverage is known to represent every possible matching enum member.
+    is_exact: bool,
+}
+
+/// Returns enum-member coverage evidence for a pattern.
+///
+/// This recognizes patterns like `case Color.RED | Color.GREEN` when the pattern
+/// belongs to the expected enum class. Enum aliases are resolved to their canonical member names
+/// before returning. A pattern with additional alternatives such as `Color.GREEN | Color()`
+/// produces only a lower bound: it definitely matches `Color.GREEN`, but can match other members.
+fn enum_member_pattern_coverage<'db>(
+    db: &'db dyn Db,
+    enum_class: ClassLiteral<'db>,
+    kind: &PatternPredicateKind<'db>,
+) -> EnumMemberPatternCoverage {
+    let mut coverage = EnumMemberPatternCoverage {
+        definitely_matched: FxHashSet::default(),
+        is_exact: true,
+    };
+    match kind {
+        PatternPredicateKind::Or(alts) => {
+            for alt in alts {
+                let alt_coverage = enum_member_pattern_coverage(db, enum_class, alt);
+                coverage
+                    .definitely_matched
+                    .extend(alt_coverage.definitely_matched);
+                coverage.is_exact &= alt_coverage.is_exact;
+            }
+        }
+        PatternPredicateKind::As(Some(inner), _) => {
+            return enum_member_pattern_coverage(db, enum_class, inner);
+        }
+        _ => {
+            if let Some(name) = enum_member_pattern_name(db, enum_class, kind) {
+                coverage.definitely_matched.insert(name);
+            } else {
+                coverage.is_exact = false;
+            }
+        }
+    }
+    coverage
+}
+
+/// Determine the static truthiness of a `match` case over a union of enum literals.
+///
+/// The analysis removes enum members already matched by earlier unguarded cases, then decides
+/// whether the current case is impossible, exhaustive, or still ambiguous. Guarded cases remain
+/// ambiguous because the guard can reject an otherwise matching enum member.
+fn analyze_enum_literal_union_pattern_predicate<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
+) -> Option<Truthiness> {
+    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
+    let current_coverage = enum_member_pattern_coverage(db, enum_class, predicate.kind(db));
+    let current_names = &current_coverage.definitely_matched;
+    if current_names.is_empty() {
+        return None;
+    }
+
+    let mut previous_predicate = predicate;
+    while let Some(previous) = previous_predicate.previous_predicate(db) {
+        previous_predicate = *previous;
+
+        if previous_predicate.guard(db).is_some() {
+            continue;
+        }
+
+        let previous_coverage =
+            enum_member_pattern_coverage(db, enum_class, previous_predicate.kind(db));
+        for previous_name in previous_coverage.definitely_matched {
+            remaining_names.remove(&previous_name);
+        }
+    }
+
+    if remaining_names.is_empty() {
+        return Some(Truthiness::AlwaysFalse);
+    }
+
+    if remaining_names.is_subset(current_names) {
+        if predicate.guard(db).is_some() {
+            Some(Truthiness::Ambiguous)
+        } else {
+            Some(Truthiness::AlwaysTrue)
+        }
+    } else if current_coverage.is_exact {
+        if remaining_names.is_disjoint(current_names) {
+            Some(Truthiness::AlwaysFalse)
+        } else {
+            Some(Truthiness::Ambiguous)
+        }
+    } else {
+        None
+    }
+}
+
 /// Analyze a pattern predicate to determine its static truthiness.
 ///
 /// This is a Salsa tracked function to enable memoization. Without memoization, for a match
@@ -322,6 +499,12 @@ fn type_excluded_by_previous_patterns<'db>(
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
     let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+
+    if let Some(truthiness) =
+        analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
+    {
+        return truthiness;
+    }
 
     let narrowed_subject = IntersectionBuilder::new(db)
         .add_positive(subject_ty)
@@ -375,7 +558,7 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
     fn narrow_by_constraint(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
@@ -385,7 +568,7 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness;
 }
@@ -415,26 +598,28 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     fn narrow_by_constraint(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
-        ProjectedNarrowingContext {
+        let mut context = ProjectedNarrowingContext {
             db,
             base_ty,
             graph: &projector.graph,
-        }
-        .narrow(projected_root, None)
+            joins: projector.graph.joins(projected_root),
+            join_cache: FxHashMap::default(),
+        };
+        context.narrow(projected_root, None)
     }
 
     /// Analyze the statically known reachability for a given constraint.
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        predicates: &Predicates<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         mut id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
         type Id = ScopedReachabilityConstraintId;
@@ -444,21 +629,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
                 Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
                 Id::AMBIGUOUS => return Truthiness::Ambiguous,
                 Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => {
-                    // `id` gives us the index of this node in the IndexVec that we used when
-                    // constructing this BDD. When finalizing the builder, we threw away any
-                    // interior nodes that weren't marked as used. The `used_indices` bit vector
-                    // lets us verify that this node was marked as used, and the rank of that bit
-                    // in the bit vector tells us where this node lives in the "condensed"
-                    // `used_interiors` vector.
-                    let raw_index = id.as_u32() as usize;
-                    debug_assert!(
-                        self.used_indices().get_bit(raw_index).unwrap_or(false),
-                        "all used reachability constraints should have been marked as used",
-                    );
-                    let index = self.used_indices().rank(raw_index) as usize;
-                    self.used_interiors()[index]
-                }
+                _ => self.get_interior_node(id),
             };
             let predicate = &predicates[node.atom()];
             match analyze_single(db, predicate) {
@@ -492,6 +663,10 @@ impl ProjectedNarrowingNodeId {
     const ALWAYS_TRUE: Self = Self(usize::MAX);
     /// Terminal node for paths that are statically unreachable.
     const ALWAYS_FALSE: Self = Self(usize::MAX - 1);
+
+    fn is_terminal(self) -> bool {
+        self == Self::ALWAYS_TRUE || self == Self::ALWAYS_FALSE
+    }
 }
 
 /// Interior node in a projected narrowing graph.
@@ -538,6 +713,35 @@ impl ProjectedNarrowingGraph<'_> {
         self.nodes.push(node);
         self.node_cache.insert(node, id);
         id
+    }
+
+    /// Returns the projected nodes that join multiple incoming paths.
+    ///
+    /// Projection interns equivalent subgraphs into a DAG. Caching each join lets narrowing
+    /// evaluate a shared suffix once and apply each incoming prefix constraint afterward.
+    fn joins(&self, root: ProjectedNarrowingNodeId) -> Vec<bool> {
+        let mut referenced = vec![false; self.nodes.len()];
+        let mut joins = vec![false; self.nodes.len()];
+        let mut visited = vec![false; self.nodes.len()];
+        let mut pending = vec![root];
+
+        while let Some(id) = pending.pop() {
+            if id.is_terminal() || std::mem::replace(&mut visited[id.0], true) {
+                continue;
+            }
+
+            let node = self.node(id);
+            for next in [node.if_true, node.if_false] {
+                if !next.is_terminal() {
+                    if std::mem::replace(&mut referenced[next.0], true) {
+                        joins[next.0] = true;
+                    }
+                    pending.push(next);
+                }
+            }
+        }
+
+        joins
     }
 
     /// Constructs the canonical disjunction of two projected subgraphs.
@@ -609,7 +813,7 @@ impl ProjectedNarrowingGraph<'_> {
 struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
     constraints: &'a ReachabilityConstraints,
-    predicates: &'a Predicates<'db>,
+    predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
     project_cache: FxHashMap<ScopedReachabilityConstraintId, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
@@ -620,7 +824,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         constraints: &'a ReachabilityConstraints,
-        predicates: &'a Predicates<'db>,
+        predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
     ) -> Self {
         Self {
@@ -710,11 +914,46 @@ struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
+    /// Marks join boundaries in the projected DAG.
+    joins: Vec<bool>,
+    /// Caches each join's narrowed suffix type from its boundary.
+    join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
+    fn is_join(&self, id: ProjectedNarrowingNodeId) -> bool {
+        !id.is_terminal() && self.joins[id.0]
+    }
+
+    /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
+    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
+        if let Some(cached) = self.join_cache.get(&id) {
+            return *cached;
+        }
+
+        let result = self.narrow_uncached(id, None);
+        self.join_cache.insert(id, result);
+        result
+    }
+
     /// Recursively evaluates a projected path while accumulating narrowing constraints.
     fn narrow(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+        accumulated: Option<NarrowingConstraint<'db>>,
+    ) -> Type<'db> {
+        if self.is_join(id) {
+            // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
+            // then apply the incoming prefix constraint to its narrowed type.
+            let suffix_ty = self.narrow_join(id);
+            return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
+        }
+
+        self.narrow_uncached(id, accumulated)
+    }
+
+    /// Recursively evaluates an unshared projected path while accumulating narrowing constraints.
+    fn narrow_uncached(
         &mut self,
         id: ProjectedNarrowingNodeId,
         accumulated: Option<NarrowingConstraint<'db>>,
@@ -1030,6 +1269,13 @@ pub(crate) trait DeclarationsIteratorExtension<'db> {
         db: &'db dyn Db,
         predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool;
+
+    /// Return the first reachable declaration that matches the passed in predicate function.
+    fn first_reachable_declaration_order(
+        self,
+        db: &'db dyn Db,
+        predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> Option<ScopedDefinitionId>;
 }
 
 impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
@@ -1045,11 +1291,35 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
             |DeclarationWithConstraint {
                  declaration,
                  reachability_constraint,
+                 ..
              }| {
                 predicate(declaration)
                     && !reachability_constraints
                         .evaluate(db, predicates, reachability_constraint)
                         .is_always_false()
+            },
+        )
+    }
+
+    fn first_reachable_declaration_order(
+        mut self,
+        db: &'db dyn Db,
+        mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> Option<ScopedDefinitionId> {
+        let reachability_predicates = self.predicates();
+        let reachability_constraints = self.reachability_constraints();
+
+        self.find_map(
+            |DeclarationWithConstraint {
+                 declaration,
+                 declaration_order,
+                 reachability_constraint,
+             }| {
+                (predicate(declaration)
+                    && !reachability_constraints
+                        .evaluate(db, reachability_predicates, reachability_constraint)
+                        .is_always_false())
+                .then_some(declaration_order)
             },
         )
     }

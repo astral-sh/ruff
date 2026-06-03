@@ -48,8 +48,7 @@ class Awaitable:
 
 class NotAwaitable: ...
 
-async def _(flag: bool) -> None:
-    x = Awaitable() if flag else NotAwaitable()
+async def _(x: Awaitable | NotAwaitable) -> None:
     await x  # error: [invalid-await]
 ```
 

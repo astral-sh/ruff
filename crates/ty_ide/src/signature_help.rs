@@ -354,6 +354,27 @@ mod tests {
     }
 
     #[test]
+    fn signature_help_bound_method_overload_self_type() {
+        let test = cursor_test(
+            r#"
+        def f(string: str):
+            string.removesuffix("suffix"<CURSOR>)
+        "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (suffix: str, /) -> str
+        ---------------------------------------------
+
+        -------------- active parameter -------------
+        suffix: str
+        ---------------------------------------------
+        ");
+    }
+
+    #[test]
     fn signature_help_nested_function_calls() {
         let test = cursor_test(
             r#"

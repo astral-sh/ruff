@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -19,18 +19,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 4 | 
 5 | class NotAwaitable: ...
 6 | 
-7 | async def _(flag: bool) -> None:
-8 |     x = Awaitable() if flag else NotAwaitable()
-9 |     await x  # error: [invalid-await]
+7 | async def _(x: Awaitable | NotAwaitable) -> None:
+8 |     await x  # error: [invalid-await]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-await]: `Awaitable | NotAwaitable` is not awaitable
- --> src/mdtest_snippet.py:9:11
+ --> src/mdtest_snippet.py:8:11
   |
-9 |     await x  # error: [invalid-await]
+8 |     await x  # error: [invalid-await]
   |           ^
   |
  ::: src/mdtest_snippet.py:2:9

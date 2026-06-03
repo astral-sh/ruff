@@ -175,6 +175,25 @@ impl<'db> NewType<'db> {
         self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
             .unwrap()
     }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let eager_base = match self.eager_base(db) {
+            Some(base) => Some(base.recursive_type_normalized_impl(db, div, nested)?),
+            None => None,
+        };
+
+        Some(NewType::new(
+            db,
+            self.name(db).clone(),
+            self.definition(db),
+            eager_base,
+        ))
+    }
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
@@ -249,6 +268,23 @@ impl<'db> NewTypeBase<'db> {
             NewTypeBase::NewType(newtype) => Type::NewTypeInstance(newtype),
             NewTypeBase::Float => KnownUnion::Float.to_type(db),
             NewTypeBase::Complex => KnownUnion::Complex.to_type(db),
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            NewTypeBase::ClassType(class_type) => class_type
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(NewTypeBase::ClassType),
+            NewTypeBase::NewType(newtype) => newtype
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(NewTypeBase::NewType),
+            NewTypeBase::Float | NewTypeBase::Complex => Some(self),
         }
     }
 }

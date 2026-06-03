@@ -107,6 +107,9 @@ pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
 
+    /// An error specific to stringified annotations occurred.
+    StringAnnotationError(&'static str),
+
     /// An empty slice was found during parsing, e.g `data[]`.
     EmptySlice,
     /// An empty global names list was found during parsing.
@@ -200,6 +203,9 @@ pub enum ParseErrorType {
     TStringError(InterpolatedStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
+
+    /// Parser aborted because [`crate::ParseOptions::max_recursion_depth`] was exceeded.
+    RecursionLimitExceeded,
 }
 
 impl ParseErrorType {
@@ -219,7 +225,8 @@ impl std::error::Error for ParseErrorType {}
 impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::OtherError(msg) => write!(f, "{msg}"),
+            ParseErrorType::OtherError(msg) => f.write_str(msg),
+            ParseErrorType::StringAnnotationError(msg) => f.write_str(msg),
             ParseErrorType::ExpectedToken { found, expected } => {
                 write!(f, "Expected {expected}, found {found}")
             }
@@ -329,6 +336,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
             }
+            ParseErrorType::RecursionLimitExceeded => f.write_str("Source is too deeply nested"),
         }
     }
 }

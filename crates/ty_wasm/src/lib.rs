@@ -17,9 +17,9 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    Hint as IdeHint, InlayHintSettings, MarkupKind, RangedValue, can_rename, document_highlights,
-    find_references, goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
-    rename,
+    CompletionCapabilities, Hint as IdeHint, InlayHintSettings, MarkupKind, RangedValue,
+    can_rename, document_highlights, find_references, goto_declaration, goto_definition,
+    goto_type_definition, hover, inlay_hints, rename,
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
@@ -526,13 +526,19 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let settings = ty_ide::CompletionSettings { auto_import: true };
-        let completions = ty_ide::completion(&self.db, &settings, file_id.file, offset);
+        let settings = ty_ide::CompletionSettings::default();
+        let completions = ty_ide::completion(
+            &self.db,
+            &settings,
+            CompletionCapabilities::default(),
+            file_id.file,
+            offset,
+        );
 
         Ok(completions
             .into_iter()
             .map(|comp| {
-                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let name = comp.label.to_string();
                 let kind = comp.kind.map(CompletionKind::from);
                 let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {

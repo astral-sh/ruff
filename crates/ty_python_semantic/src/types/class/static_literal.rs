@@ -24,7 +24,7 @@ use crate::{
         Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
         TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
-        callable::CallableTypeKind,
+        callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
             FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
@@ -32,7 +32,7 @@ use crate::{
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
-        declaration_type, definition_expression_type, determine_upper_bound,
+        definition_expression_type, determine_upper_bound,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{
@@ -41,7 +41,7 @@ use crate::{
         },
         generics::Specialization,
         infer::infer_unpack_types,
-        infer_expression_type,
+        infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
@@ -129,6 +129,14 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
+    /// Returns `true` if this class is decorated with `@dataclass(order=True)`.
+    pub(crate) fn is_ordered_dataclass(self, db: &'db dyn Db) -> bool {
+        self.find_dataclass_decorator_position(db).is_some()
+            && self
+                .dataclass_params(db)
+                .is_some_and(|params| params.flags(db).contains(DataclassFlags::ORDER))
+    }
+
     /// Returns a new [`StaticClassLiteral`] with the given dataclass params, preserving all other fields.
     pub(crate) fn with_dataclass_params(
         self,
@@ -157,6 +165,14 @@ impl<'db> StaticClassLiteral<'db> {
         ["__lt__", "__le__", "__gt__", "__ge__"]
             .iter()
             .any(|method| !class_member(db, body_scope, method).is_undefined())
+    }
+
+    #[salsa::tracked]
+    pub(crate) fn has_own_comparison_methods(self, db: &'db dyn Db) -> bool {
+        let body_scope = self.body_scope(db);
+        ["__lt__", "__le__", "__gt__", "__ge__"]
+            .iter()
+            .all(|method| !class_member(db, body_scope, method).is_undefined())
     }
 
     /// Returns `true` if any class in this class's MRO (excluding `object`) defines an ordering
@@ -535,25 +551,23 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(|decorator| decorator.known(db))
     }
 
-    /// Iterate through the decorators on this class, returning the position of the first one
-    /// that matches the given predicate.
-    pub(super) fn find_decorator_position(
-        self,
-        db: &'db dyn Db,
-        predicate: impl Fn(Type<'db>) -> bool,
-    ) -> Option<usize> {
-        self.decorators(db)
-            .iter()
-            .position(|decorator| predicate(*decorator))
-    }
-
     /// Iterate through the decorators on this class, returning the index of the first one
     /// that is either `@dataclass` or `@dataclass(...)`.
     pub(crate) fn find_dataclass_decorator_position(self, db: &'db dyn Db) -> Option<usize> {
-        self.find_decorator_position(db, |ty| match ty {
-            Type::FunctionLiteral(function) => function.is_known(db, KnownFunction::Dataclass),
-            Type::DataclassDecorator(_) => true,
-            _ => false,
+        let module = parsed_module(db, self.file(db)).load(db);
+        let class_stmt = self.node(db, &module);
+        let class_definition =
+            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+
+        class_stmt.decorator_list.iter().position(|decorator| {
+            let decorator_callable = decorator
+                .expression
+                .as_call_expr()
+                .map_or(&decorator.expression, |call| &call.func);
+
+            definition_expression_type(db, class_definition, decorator_callable)
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
         })
     }
 
@@ -744,7 +758,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
-    fn has_dataclass_param(
+    pub(crate) fn has_dataclass_param(
         self,
         db: &'db dyn Db,
         field_policy: CodeGeneratorKind<'db>,
@@ -966,6 +980,7 @@ impl<'db> StaticClassLiteral<'db> {
                     db,
                     callable_ty.signatures(db),
                     CallableTypeKind::FunctionLike,
+                    callable_ty.provenance(db),
                 )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
@@ -1191,10 +1206,26 @@ impl<'db> StaticClassLiteral<'db> {
                         )
                     }),
                 );
-                CallableType::new(db, signatures, CallableTypeKind::FunctionLike)
+                CallableType::new(
+                    db,
+                    signatures,
+                    CallableTypeKind::FunctionLike,
+                    CallableFunctionProvenance::None,
+                )
             });
 
             return Some(synthesized_callables.into_type(db));
+        }
+
+        // An ordinary subclass of a frozen dataclass is not itself dataclass-like, so the
+        // `CodeGeneratorKind::from_class` check below would return `None` before dataclass-like
+        // synthesis runs. Still, an instance of such a subclass inherits the frozen dataclass's
+        // generated `__setattr__`, which rejects writes to frozen base fields.
+        if name == "__setattr__"
+            && let Some(synthesized_setattr) =
+                self.own_frozen_dataclass_subclass_setattr(db, specialization)
+        {
+            return Some(synthesized_setattr);
         }
 
         let field_policy = CodeGeneratorKind::from_class(db, self.into(), specialization)?;
@@ -1543,6 +1574,104 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// Synthesize a `__setattr__` view for an ordinary subclass of a frozen dataclass.
+    ///
+    /// CPython's generated frozen-dataclass `__setattr__` rejects all writes on exact instances of
+    /// the frozen dataclass, but on subclass instances it only rejects writes to that dataclass's
+    /// fields before delegating to the next `__setattr__` in the MRO.
+    fn own_frozen_dataclass_subclass_setattr(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<Type<'db>> {
+        if CodeGeneratorKind::from_static_class(db, self, specialization).is_some() {
+            return None;
+        }
+
+        let frozen_base_fields =
+            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization)?;
+
+        let instance_ty =
+            Type::instance(db, self.apply_optional_specialization(db, specialization));
+        let setattr_signature = |name_ty, return_ty| {
+            Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("name"))
+                            .with_annotated_type(name_ty),
+                        Parameter::positional_or_keyword(Name::new_static("value")),
+                    ],
+                ),
+                return_ty,
+            )
+        };
+
+        let overloads = frozen_base_fields
+            .keys()
+            .map(|field| setattr_signature(Type::string_literal(db, field), Type::Never))
+            .chain([setattr_signature(
+                KnownClass::Str.to_instance(db),
+                Type::none(db),
+            )]);
+
+        Some(Type::Callable(CallableType::new(
+            db,
+            CallableSignature::from_overloads(overloads),
+            CallableTypeKind::FunctionLike,
+            CallableFunctionProvenance::None,
+        )))
+    }
+
+    /// Return the inherited frozen dataclass fields whose generated `__setattr__` still controls
+    /// assignments on this class.
+    fn inherited_non_slotted_frozen_dataclass_fields(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<&'db FxIndexMap<Name, Field<'db>>> {
+        for base in self.iter_mro(db, specialization).skip(1) {
+            let (base_class, base_specialization) = base.into_class()?.static_class_literal(db)?;
+
+            // Stop if another class in the MRO replaces the generated frozen setter:
+            //
+            //   @dataclass(frozen=True)
+            //   class Frozen: x: int
+            //
+            //   class Mutable(Frozen):
+            //       def __setattr__(self, name: str, value: object) -> None: ...
+            //
+            //   class Child(Mutable): ...
+            //
+            // Writes to `Child().x` dispatch to `Mutable.__setattr__`, not to the synthesized
+            // `Frozen.__setattr__`.
+            if class_member(db, base_class.body_scope(db), "__setattr__")
+                .ignore_possibly_undefined()
+                .is_some()
+            {
+                return None;
+            }
+
+            if base_class.is_frozen_dataclass(db) == Some(true) {
+                let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+                    CodeGeneratorKind::from_static_class(db, base_class, base_specialization)?
+                else {
+                    return None;
+                };
+
+                if base_class.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS) {
+                    return None;
+                }
+
+                return Some(base_class.fields(db, base_specialization, field_policy));
+            }
+        }
+
+        None
+    }
+
     /// Member lookup for classes that inherit from `typing.TypedDict`.
     ///
     /// This is implemented as a separate method because the item definitions on a `TypedDict`-based
@@ -1617,7 +1746,8 @@ impl<'db> StaticClassLiteral<'db> {
             "Collecting `fields` for NamedTuples should short-circuit in `fields()`"
         );
 
-        self.iter_mro(db, specialization)
+        let mut map: FxIndexMap<_, _> = self
+            .iter_mro(db, specialization)
             .rev()
             .filter_map(|superclass| {
                 let class = superclass.into_class()?;
@@ -1663,7 +1793,10 @@ impl<'db> StaticClassLiteral<'db> {
             // they cannot shadow an inherited field with the same name.
             .filter(|(_, field)| !field.is_kw_only_sentinel(db))
             // We collect into a FxOrderMap here to deduplicate attributes
-            .collect()
+            .collect();
+
+        map.shrink_to_fit();
+        map
     }
 
     pub(crate) fn validate_members(self, context: &InferContext<'db, '_>) {
@@ -1737,8 +1870,9 @@ impl<'db> StaticClassLiteral<'db> {
     ///     y: str = "hello"
     ///     z: float = field(kw_only=False, default=1.0)
     /// ```
-    /// we return a map `{"x": Field, "y": Field, "z": Field}` where each `Field` contains
-    /// the annotated type, default value (if any), and field properties.
+    /// we return a map `{"x": Field, "y": Field, "z": Field}` in class-body declaration order,
+    /// where each `Field` contains the annotated type, default value (if any), and field
+    /// properties.
     ///
     /// **Important**: The returned `Field` objects represent our full understanding of the fields,
     /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
@@ -1755,8 +1889,6 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
-        let mut attributes = FxIndexMap::default();
-
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
 
@@ -1766,6 +1898,7 @@ impl<'db> StaticClassLiteral<'db> {
         let dataclass_kw_only_default = matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
             .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
         let mut kw_only_sentinel_field_seen = false;
+        let mut field_declarations = Vec::new();
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
@@ -1786,9 +1919,32 @@ impl<'db> StaticClassLiteral<'db> {
                 continue;
             }
 
-            let symbol = table.symbol(symbol_id);
+            // Field contents come from the declarations live at end of scope, but field order is
+            // anchored to the first reachable annotated declaration in the class body.
+            let Some(first_declaration_order) = use_def
+                .reachable_symbol_declarations(symbol_id)
+                .first_reachable_declaration_order(db, |declaration| {
+                    declaration.is_defined_and(|declaration| {
+                        matches!(
+                            declaration.kind(db),
+                            DefinitionKind::AnnotatedAssignment(..)
+                        )
+                    })
+                })
+            else {
+                continue;
+            };
 
             let result = place_from_declarations(db, declarations.clone());
+            field_declarations.push((first_declaration_order, symbol_id, result));
+        }
+
+        field_declarations
+            .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
+
+        let mut attributes = FxIndexMap::default();
+        for (_, symbol_id, result) in field_declarations {
+            let symbol = table.symbol(symbol_id);
             let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
@@ -1882,6 +2038,8 @@ impl<'db> StaticClassLiteral<'db> {
                 attributes.insert(symbol.name().clone(), field);
             }
         }
+
+        attributes.shrink_to_fit();
 
         attributes
     }
@@ -2027,7 +2185,9 @@ impl<'db> StaticClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                let annotation = declaration_type(db, declaration);
+                let Some(annotation) = inferred_declaration(db, declaration).declared() else {
+                    continue;
+                };
                 let annotation = Place::declared(annotation.inner).with_qualifiers(
                     annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
                 );

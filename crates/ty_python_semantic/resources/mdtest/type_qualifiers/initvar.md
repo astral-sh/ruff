@@ -77,6 +77,44 @@ reveal_type(bob.metadata)  # revealed: str
 reveal_type(Person.metadata)  # revealed: str
 ```
 
+Field synthesis still follows declaration order even when an `InitVar` field name shadows a type
+name referenced by an earlier annotation:
+
+```py
+from dataclasses import InitVar, dataclass
+from ty_extensions import Top
+
+@dataclass
+class C:
+    a: Top[int]
+    int: InitVar[int] = 0
+
+reveal_type(C.__init__)  # revealed: (self: C, a: int, int: int = 0) -> None
+C()  # error: [missing-argument] "No argument provided for required parameter `a`"
+```
+
+## Deferred annotations
+
+The same case must not fail when annotations are deferred, as they are by default on Python 3.14:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import InitVar, dataclass
+from ty_extensions import Top
+
+@dataclass
+class C:
+    a: Top[int]
+    int: InitVar[int] = 0
+
+def fn():
+    C()  # error: [missing-argument] "No argument provided for required parameter `a`"
+```
+
 ## Overwritten `InitVar`
 
 We do not emit an error if an `InitVar` attribute is later overwritten on the instance. In that

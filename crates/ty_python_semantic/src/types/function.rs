@@ -55,14 +55,17 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast::{self as ast, ParameterWithDefault};
+use ruff_db::source::source_text;
+use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
@@ -76,7 +79,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
-use crate::types::infer::nearest_enclosing_class;
+use crate::types::infer::{nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
@@ -89,7 +92,7 @@ use crate::types::{
     ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
     KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
     Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
-    binding_type, definition_expression_type, infer_definition_types, walk_signature,
+    definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -273,6 +276,9 @@ pub struct OverloadLiteral<'db> {
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
+
+    /// Whether this overload or implementation has an explicit return annotation.
+    pub(crate) has_explicit_return_annotation: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -293,6 +299,7 @@ impl<'db> OverloadLiteral<'db> {
             self.decorators(db),
             self.deprecated(db),
             Some(params),
+            self.has_explicit_return_annotation(db),
         )
     }
 
@@ -421,7 +428,7 @@ impl<'db> OverloadLiteral<'db> {
             .expect_function()
             .node(&module)
             .name
-            .scoped_use_id(db, scope);
+            .scoped_use_id(db, self.file(db));
 
         let Place::Defined(DefinedPlace {
             ty: Type::FunctionLiteral(previous_type),
@@ -544,9 +551,8 @@ impl<'db> OverloadLiteral<'db> {
             // or there is but it isn't using the PEP-484 convention,
             // then `self`/`cls` are only implicitly positional-only if
             // it is a protocol class.
-            let class_type = binding_type(db, class_definition);
-            class_type
-                .to_class_type(db)
+            original_class_type(db, class_definition)
+                .map(|class_literal| class_literal.default_specialization(db))
                 .is_some_and(|class| class.is_protocol(db))
         }
 
@@ -593,12 +599,7 @@ impl<'db> OverloadLiteral<'db> {
             let class_scope = index.scope(class_scope_id.file_scope_id(db));
             let class_node = class_scope.node().as_class()?;
             let class_def = index.expect_single_definition(class_node);
-            let Type::ClassLiteral(class_literal) = infer_definition_types(db, class_def)
-                .declaration_type(class_def)
-                .inner_type()
-            else {
-                return None;
-            };
+            let class_literal = original_class_type(db, class_def)?;
             let class_is_generic = class_literal.generic_context(db).is_some();
             let class_is_fallback = class_literal
                 .known(db)
@@ -785,6 +786,11 @@ impl<'db> FunctionLiteral<'db> {
         (overloads.as_ref(), *implementation)
     }
 
+    fn has_separate_implementation(self, db: &'db dyn Db) -> bool {
+        !self.last_definition.is_overload(db)
+            && self.last_definition.previous_overload(db).is_some()
+    }
+
     fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -957,12 +963,12 @@ pub struct FunctionType<'db> {
     #[returns(as_ref)]
     updated_signature: Option<CallableSignature<'db>>,
 
-    /// Contains a potentially modified signature for the last overload or the implementation of this
-    /// function literal, in case certain operations (like type mappings) have been applied to it.
+    /// Contains a potentially modified signature for the implementation of an overloaded function,
+    /// in case certain operations (like type mappings) have been applied to it.
     ///
     /// See also: [`FunctionLiteral::last_definition_signature`].
     #[returns(as_ref)]
-    updated_last_definition_signature: Option<Signature<'db>>,
+    updated_implementation_signature: Option<Signature<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -978,7 +984,7 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
             walk_signature(db, signature, visitor);
         }
     }
-    if let Some(signature) = function.updated_last_definition_signature(db) {
+    if let Some(signature) = function.updated_implementation_signature(db) {
         walk_signature(db, signature, visitor);
     }
 }
@@ -993,15 +999,17 @@ impl<'db> FunctionType<'db> {
         let updated_signature = self
             .signature(db)
             .with_inherited_generic_context(db, inherited_generic_context);
-        let updated_last_definition_signature = self
-            .last_definition_signature(db)
-            .clone()
-            .with_inherited_generic_context(db, inherited_generic_context);
+        let literal = self.literal(db);
+        let updated_implementation_signature = literal.has_separate_implementation(db).then(|| {
+            self.last_definition_signature(db)
+                .clone()
+                .with_inherited_generic_context(db, inherited_generic_context)
+        });
         Self::new(
             db,
-            self.literal(db),
+            literal,
             Some(updated_signature),
-            Some(updated_last_definition_signature),
+            updated_implementation_signature,
         )
     }
 
@@ -1014,7 +1022,8 @@ impl<'db> FunctionType<'db> {
     ) -> Self {
         // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
         // function literal; doing so can re-enter recursive `TypeOf` evaluation.
-        let (updated_signature, updated_last_definition_signature) = if matches!(
+        let literal = self.literal(db);
+        let (updated_signature, updated_implementation_signature) = if matches!(
             type_mapping,
             TypeMapping::ApplySpecialization(
                 ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
@@ -1028,7 +1037,7 @@ impl<'db> FunctionType<'db> {
                 self.updated_signature(db).map(|signature| {
                     signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }),
-                self.updated_last_definition_signature(db).map(|signature| {
+                self.updated_implementation_signature(db).map(|signature| {
                     signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }),
             )
@@ -1038,23 +1047,25 @@ impl<'db> FunctionType<'db> {
                     self.signature(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ),
-                Some(self.last_definition_signature(db).apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                )),
+                literal.has_separate_implementation(db).then(|| {
+                    self.last_definition_signature(db).apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )
+                }),
             )
         };
 
-        if updated_signature.is_none() && updated_last_definition_signature.is_none() {
+        if updated_signature.is_none() && updated_implementation_signature.is_none() {
             self
         } else {
             Self::new(
                 db,
-                self.literal(db),
+                literal,
                 updated_signature,
-                updated_last_definition_signature,
+                updated_implementation_signature,
             )
         }
     }
@@ -1221,6 +1232,22 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_trivial_body(db)
     }
 
+    /// Returns `true` if any overload or implementation has an explicit return annotation.
+    ///
+    /// This distinguishes untyped decorators that infer an unknown return from decorators that
+    /// explicitly promise a replacement type:
+    /// ```python
+    /// def identity(cls):
+    ///     return cls
+    ///
+    /// def replace(cls) -> object:
+    ///     return object()
+    /// ```
+    pub(crate) fn has_explicit_return_annotation(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
+            .any(|overload| overload.has_explicit_return_annotation(db))
+    }
+
     /// Returns all of the overload signatures and the implementation definition, if any, of this
     /// function. The overload signatures will be in source order.
     pub(crate) fn overloads_and_implementation(
@@ -1300,9 +1327,16 @@ impl<'db> FunctionType<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
-        self.updated_last_definition_signature(db)
-            .cloned()
-            .unwrap_or_else(|| self.literal(db).last_definition_signature(db))
+        let literal = self.literal(db);
+        if literal.has_separate_implementation(db) {
+            self.updated_implementation_signature(db)
+                .cloned()
+                .unwrap_or_else(|| literal.last_definition_signature(db))
+        } else {
+            self.updated_signature(db)
+                .and_then(|signature| signature.overloads.last().cloned())
+                .unwrap_or_else(|| literal.last_definition_signature(db))
+        }
     }
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
@@ -1322,16 +1356,27 @@ impl<'db> FunctionType<'db> {
             .last_definition_raw_signature(db, return_callable_typevar_scope)
     }
 
-    /// Convert the `FunctionType` into a [`CallableType`].
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        let kind = if self.is_classmethod(db) {
+    /// Return the kind for this function when it is converted into a [`CallableType`].
+    pub(crate) fn callable_type_kind(self, db: &'db dyn Db) -> CallableTypeKind {
+        if self.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
         } else if self.is_staticmethod(db) {
             CallableTypeKind::StaticMethodLike
         } else {
             CallableTypeKind::FunctionLike
-        };
-        CallableType::new(db, self.signature(db), kind)
+        }
+    }
+
+    /// Convert the `FunctionType` into a [`CallableType`].
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signature(db),
+            self.callable_type_kind(db),
+            CallableFunctionProvenance::from_function_return_annotation(
+                self.has_explicit_return_annotation(db),
+            ),
+        )
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].
@@ -1374,8 +1419,8 @@ impl<'db> FunctionType<'db> {
                     }
                     None => None,
                 };
-                let updated_last_definition_signature =
-                    match self.updated_last_definition_signature(db) {
+                let updated_implementation_signature =
+                    match self.updated_implementation_signature(db) {
                         Some(signature) => {
                             Some(signature.recursive_type_normalized_impl(db, div, nested)?)
                         }
@@ -1385,7 +1430,7 @@ impl<'db> FunctionType<'db> {
                     db,
                     literal,
                     updated_signature,
-                    updated_last_definition_signature,
+                    updated_implementation_signature,
                 ))
             },
         )
@@ -1675,6 +1720,10 @@ fn is_instance_truthiness<'db>(
             }
         }
 
+        Type::EnumComplement(complement) => {
+            is_instance_truthiness(db, complement.to_intersection(db), class)
+        }
+
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
         Type::NewTypeInstance(newtype) => {
@@ -1722,6 +1771,7 @@ fn is_instance_truthiness<'db>(
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
         | Type::TypeGuard(..)
+        | Type::TypeForm(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
         | Type::Divergent(_)
@@ -1894,6 +1944,8 @@ pub enum KnownFunction {
     IsSubtypeOf,
     /// `ty_extensions.is_assignable_to`
     IsAssignableTo,
+    /// `ty_extensions.is_constraint_set_assignable_to`
+    IsConstraintSetAssignableTo,
     /// `ty_extensions.is_disjoint_from`
     IsDisjointFrom,
     /// `ty_extensions.is_singleton`
@@ -2002,6 +2054,7 @@ impl KnownFunction {
             Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
+            | Self::IsConstraintSetAssignableTo
             | Self::IsDisjointFrom
             | Self::IsEquivalentTo
             | Self::IsSingleValued
@@ -2231,6 +2284,31 @@ impl KnownFunction {
                             diagnostic.info(format_args!(
                                 "`{casted_display}` is equivalent to `{source_display}`",
                             ));
+                        }
+                        if let Some(value) = call_expression.arguments.find_argument_value("val", 1)
+                        {
+                            let covering = covering_node(
+                                context.module().syntax().into(),
+                                call_expression.range(),
+                            );
+                            let needs_parens = covering
+                                .parent()
+                                .and_then(ast::AnyNodeRef::as_expr_ref)
+                                .is_some_and(|parent| {
+                                    let value_precedence = OperatorPrecedence::from_expr(value);
+                                    OperatorPrecedence::from_expr_ref(parent) >= value_precedence
+                                });
+                            let value_text = &source_text(db, file)[value.range()];
+                            let replacement = if needs_parens {
+                                format!("({value_text})")
+                            } else {
+                                value_text.to_string()
+                            };
+                            diagnostic.help("Remove the redundant `cast`");
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                replacement,
+                                call_expression.range(),
+                            )));
                         }
                     }
                 }
@@ -2532,6 +2610,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsDisjointFrom
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
+                | KnownFunction::IsConstraintSetAssignableTo
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface

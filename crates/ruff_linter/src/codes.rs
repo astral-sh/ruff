@@ -1074,6 +1074,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "071") => rules::ruff::rules::OsPathCommonprefix,
         (Ruff, "072") => rules::ruff::rules::UselessFinally,
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
+        (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
+        (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1138,6 +1140,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "003") => rules::airflow::rules::AirflowVariableGetOutsideTask,
         (Airflow, "004") => rules::airflow::rules::AirflowTaskBranchAsShortCircuit,
         (Airflow, "201") => rules::airflow::rules::AirflowXcomPullInTemplateString,
+        (Airflow, "202") => rules::airflow::rules::AirflowTaskImplicitMultipleOutputs,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,

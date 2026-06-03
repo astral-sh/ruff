@@ -18,8 +18,8 @@ from sqlite3 import (
     Warning as Warning,
     _IsolationLevel,
 )
-from typing import Any, Final, Literal, TypeVar, overload
-from typing_extensions import TypeAlias, deprecated
+from typing import Any, Final, Literal, TypeAlias, TypeVar, overload
+from typing_extensions import deprecated
 
 if sys.version_info >= (3, 11):
     from sqlite3 import Blob as Blob
@@ -69,6 +69,8 @@ SQLITE_SAVEPOINT: Final = 32
 SQLITE_SELECT: Final = 21
 SQLITE_TRANSACTION: Final = 22
 SQLITE_UPDATE: Final = 23
+if sys.version_info >= (3, 15):
+    SQLITE_KEYWORDS: tuple[str, ...]
 adapters: dict[tuple[type[Any], type[Any]], _Adapter[Any]]
 converters: dict[str, _Converter]
 sqlite_version: str
@@ -217,9 +219,9 @@ if sys.version_info >= (3, 11):
 @overload
 def adapt(obj: Any, proto: Any, /) -> Any:
     """Adapt given object to given protocol."""
-
 @overload
 def adapt(obj: Any, proto: Any, alt: _T, /) -> Any | _T: ...
+
 def complete_statement(statement: str) -> bool:
     """Checks if a string contains a complete SQL statement."""
 
@@ -246,7 +248,6 @@ if sys.version_info >= (3, 12):
         'check_same_thread', 'factory', 'cached_statements' and 'uri' will
         become keyword-only parameters in Python 3.15.
         """
-
     @overload
     def connect(
         database: StrOrBytesPath,
@@ -273,7 +274,6 @@ if sys.version_info >= (3, 12):
         uri: bool = False,
         autocommit: bool = ...,
     ) -> _ConnectionT: ...
-
 else:
     @overload
     def connect(
@@ -290,7 +290,6 @@ else:
         You can use ":memory:" to open a database connection to a database that resides
         in RAM instead of on disk.
         """
-
     @overload
     def connect(
         database: StrOrBytesPath,
@@ -333,25 +332,8 @@ if sys.version_info < (3, 12):
         the cache=shared query parameter.
         """
 
-if sys.version_info >= (3, 10):
-    def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None:
-        """Register a function to adapt Python objects to SQLite values."""
+def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None:
+    """Register a function to adapt Python objects to SQLite values."""
 
-    def register_converter(typename: str, converter: _Converter, /) -> None:
-        """Register a function to convert SQLite values to Python objects."""
-
-else:
-    def register_adapter(type: type[_T], caster: _Adapter[_T], /) -> None:
-        """register_adapter(type, callable)
-
-        Registers an adapter with sqlite3's adapter registry.
-        """
-
-    def register_converter(name: str, converter: _Converter, /) -> None:
-        """register_converter(typename, callable)
-
-        Registers a converter with sqlite3.
-        """
-
-if sys.version_info < (3, 10):
-    OptimizedUnicode = str  # undocumented
+def register_converter(typename: str, converter: _Converter, /) -> None:
+    """Register a function to convert SQLite values to Python objects."""

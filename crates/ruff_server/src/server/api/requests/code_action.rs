@@ -23,11 +23,20 @@ impl super::RequestHandler for CodeActions {
 
 impl super::BackgroundDocumentRequestHandler for CodeActions {
     super::define_document_url!(params: &types::CodeActionParams);
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(url) => {
+                tracing::warn!("Returning no code actions because document `{url}` isn't open.");
+                return Ok(None);
+            }
+        };
+
         let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
 
         let query = snapshot.query();

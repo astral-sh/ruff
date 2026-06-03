@@ -370,7 +370,7 @@ pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathI
 ///
 /// We exclude `__init__.py(i)` dirs to avoid truncating packages.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<SearchPath>> {
+fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Box<[SearchPath]>> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
@@ -425,7 +425,7 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
     if search_paths.is_empty() {
         None
     } else {
-        Some(search_paths)
+        Some(search_paths.into_boxed_slice())
     }
 }
 
@@ -692,7 +692,7 @@ impl SearchPaths {
         }
     }
 
-    /// Registers the file roots for all non-dynamically discovered search paths that aren't first-party.
+    /// Registers file roots for all non-dynamically discovered search paths.
     pub fn try_register_static_roots(&self, db: &dyn Db) {
         let files = db.files();
         for path in self
@@ -702,8 +702,10 @@ impl SearchPaths {
             .chain(&self.stdlib_path)
         {
             if let Some(system_path) = path.as_system_path() {
-                if !path.is_first_party() {
-                    files.try_add_root(db, system_path, FileRootKind::LibrarySearchPath);
+                // Nested first-party paths reuse the project root. Other nested paths, such as
+                // site-packages inside `.venv`, need their own search-path root.
+                if !path.is_first_party() || files.root(db, system_path).is_none() {
+                    files.try_add_root(db, system_path, FileRootKind::SearchPath);
                 }
             }
         }
@@ -892,11 +894,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                         // than they would otherwise.
                         if let Some(dynamic_path) = search_path.as_system_path() {
                             if files.root(db, dynamic_path).is_none() {
-                                files.try_add_root(
-                                    db,
-                                    dynamic_path,
-                                    FileRootKind::LibrarySearchPath,
-                                );
+                                files.try_add_root(db, dynamic_path, FileRootKind::SearchPath);
                             }
                         }
 
