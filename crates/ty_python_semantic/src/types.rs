@@ -3526,11 +3526,43 @@ impl<'db> Type<'db> {
                     enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 } else {
                     let receiver = receiver.unwrap_or(self);
+                    let member_policy = policy | MemberLookupPolicy::NO_GETATTR_LOOKUP;
+                    let always_defined_member_count = intersection
+                        .positive_elements_or_object(db)
+                        .filter(|element| {
+                            matches!(
+                                element
+                                    .member_lookup_with_policy(db, name_str.into(), member_policy)
+                                    .place,
+                                Place::Defined(DefinedPlace {
+                                    definedness: Definedness::AlwaysDefined,
+                                    ..
+                                })
+                            )
+                        })
+                        .take(2)
+                        .count();
                     let result = intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                        // If multiple elements define the member, either one can shadow the other
+                        // at runtime. Keep each member bound to its local receiver.
+                        let local_member =
+                            elem.member_lookup_with_policy(db, name_str.into(), member_policy);
+                        let can_be_shadowed = always_defined_member_count > 1
+                            && matches!(
+                                local_member.place,
+                                Place::Defined(DefinedPlace {
+                                    definedness: Definedness::AlwaysDefined,
+                                    ..
+                                })
+                            );
+                        if can_be_shadowed {
+                            return local_member;
+                        }
+
                         elem.member_lookup_with_policy_and_receiver(
                             db,
                             name_str.into(),
-                            policy | MemberLookupPolicy::NO_GETATTR_LOOKUP,
+                            member_policy,
                             Some(receiver),
                         )
                     });

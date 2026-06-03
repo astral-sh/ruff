@@ -2043,6 +2043,21 @@ def _(value: Intersection[Child, Extra]):
 def _(cls: Intersection[type[Child], type[Extra]]):
     reveal_type(cls.other)  # revealed: Child & Extra
 
+class PropertyOwner:
+    @property
+    def value(self) -> Self:
+        return self
+
+class PropertyFallback:
+    @property
+    def value(self) -> object:
+        return object()
+
+def takes_property_fallback(value: PropertyFallback): ...
+def _(value: Intersection[PropertyOwner, PropertyFallback]):
+    reveal_type(value.value)  # revealed: PropertyOwner
+    takes_property_fallback(value.value)  # error: [invalid-argument-type]
+
 class ConstraintA:
     other: Self
 
