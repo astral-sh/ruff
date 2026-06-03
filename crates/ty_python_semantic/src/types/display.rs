@@ -877,7 +877,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 if dynamic.is_todo() {
                     f.set_invalid_type_annotation();
                 }
-
                 write!(f.with_type(self.ty), "{dynamic}")
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
