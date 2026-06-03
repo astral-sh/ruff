@@ -44,60 +44,15 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 ///     ...
 /// ```
 ///
-/// Or, for complex test environments with multiple dependency fixtures:
-/// ```python
-/// import pytest
+/// ## Note
+/// This is a pedantic rule that restricts a valid pytest pattern. If you choose to
+/// enable it, you may want to restrict it to only apply outside of `conftest.py` files,
+/// as autouse fixtures are most problematic when defined globally.
 ///
-///
-/// @pytest.fixture(autouse=True)
-/// def db():
-///     return Database()
-///
-///
-/// @pytest.fixture(autouse=True)
-/// def cache():
-///     return Cache()
-///
-///
-/// @pytest.fixture(autouse=True)
-/// def mock_email_client():
-///     return MockEmailClient()
-///
-/// # relying on the autouse fixture which might be defined elsewhere makes the test
-/// # harder to reason about and debug
-/// def test_user_creation():
-///     ...
-/// ```
-///
-/// Use instead:
-/// ```python
-/// import pytest
-///
-///
-/// @pytest.fixture
-/// def db():
-///     return Database()
-///
-///
-/// @pytest.fixture
-/// def cache():
-///     return Cache()
-///
-///
-/// @pytest.fixture
-/// def mock_email_client():
-///     return MockEmailClient()
-///
-///
-/// # Combine related dependencies into a single high-level fixture
-/// @pytest.fixture
-/// def app_context(db, cache, mock_email_client):
-///     return AppContext(db=db, cache=cache, email=mock_email_client)
-///
-///
-/// # Declare only the combining fixture in the test
-/// def test_user_creation(app_context):
-///     ...
+/// You can do this by configuring [`per-file-ignores`](https://docs.astral.sh/ruff/settings/#lint_per-file-ignores):
+/// ```toml
+/// [tool.ruff.lint.per-file-ignores]
+/// "!**/conftest.py" = ["RUF076"]
 /// ```
 ///
 /// ## References
