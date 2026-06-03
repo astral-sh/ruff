@@ -5920,12 +5920,16 @@ from typing_extensions import TypedDict
 class Extra(TypedDict, extra_items=int):
     name: str
 
-def _(extra: Extra) -> None:
+class ArbitraryPop(TypedDict, total=False, extra_items=int):
+    label: str
+
+def _(extra: Extra, arbitrary: ArbitraryPop, key: str) -> None:
     reveal_type(extra.get("year"))  # revealed: int | None
     reveal_type(extra.get("year", "missing"))  # revealed: int | Literal["missing"]
     reveal_type(extra.pop("year"))  # revealed: int
     reveal_type(extra.pop("year", "missing"))  # revealed: int | Literal["missing"]
     reveal_type(extra.setdefault("year", 1982))  # revealed: int
+    reveal_type(arbitrary.pop(key))  # revealed: str | int
 
     # error: [invalid-argument-type]
     extra.setdefault("year", "not an int")

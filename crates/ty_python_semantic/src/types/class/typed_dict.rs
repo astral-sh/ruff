@@ -572,17 +572,16 @@ fn synthesize_typed_dict_pop<'db>(
             [pop_sig, pop_with_typed_default_sig, pop_with_default_sig]
         })
         .chain(typed_dict.supports_arbitrary_key_deletion(db).then(|| {
-            let value_ty = typed_dict
-                .explicit_extra_items(db)
-                .expect("arbitrary deletion requires explicit extra items")
-                .declared_ty;
             let pop_parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(KnownClass::Str.to_instance(db)),
             ];
-            Signature::new(Parameters::new(db, pop_parameters), value_ty)
+            Signature::new(
+                Parameters::new(db, pop_parameters),
+                typed_dict.value_type(db),
+            )
         }));
 
     Type::Callable(CallableType::new(
