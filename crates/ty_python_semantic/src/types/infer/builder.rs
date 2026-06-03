@@ -4571,14 +4571,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
-            // Preserve a bare `Self` as a type so that alias validation can reject it.
-            let inferred_ty = if is_pep_613_type_alias
-                && target.is_name_expr()
-                && matches!(inferred_ty, Type::SpecialForm(SpecialFormType::TypingSelf))
-            {
-                let inferred_ty = self.infer_name_or_attribute_type_expression(inferred_ty, value);
-                self.expressions.insert(value.into(), inferred_ty);
-                inferred_ty
+            let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
+                match inferred_ty {
+                    // Preserve a bare `Self` as a type so that alias validation can reject it.
+                    Type::SpecialForm(SpecialFormType::TypingSelf) => {
+                        let inferred_ty =
+                            self.infer_name_or_attribute_type_expression(inferred_ty, value);
+                        self.expressions.insert(value.into(), inferred_ty);
+                        inferred_ty
+                    }
+                    // The post-inference pass emits the diagnostic, but this first-pass value is
+                    // retained as the alias binding.
+                    Type::KnownInstance(KnownInstanceType::LiteralStringAlias(ty))
+                        if ty.inner(self.db()).contains_self(self.db()) =>
+                    {
+                        Type::KnownInstance(KnownInstanceType::LiteralStringAlias(
+                            InternedType::new(
+                                self.db(),
+                                ty.inner(self.db()).replace_self_with_unknown(self.db()),
+                            ),
+                        ))
+                    }
+                    _ => inferred_ty,
+                }
             } else {
                 inferred_ty
             };

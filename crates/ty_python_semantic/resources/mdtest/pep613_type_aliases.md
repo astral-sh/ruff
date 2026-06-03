@@ -568,9 +568,13 @@ from typing_extensions import Self, TypeAlias
 
 class C:
     Inner: TypeAlias = Self
+    Stringified: TypeAlias = "tuple[Self, int]"
 
     def takes(self, value: Inner) -> None:
         reveal_type(value)  # revealed: Unknown
+
+    def takes_stringified(self, value: Stringified) -> None:
+        reveal_type(value)  # revealed: tuple[Unknown, int]
 
     def invalid_attribute(self) -> Self:
         self.attribute: TypeAlias = Self
