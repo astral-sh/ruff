@@ -600,6 +600,7 @@ mod format {
 }
 
 #[cfg(any(test, feature = "testing"))]
+#[cfg_attr(not(feature = "testing"), expect(unreachable_pub))]
 pub(crate) mod testing {
     use std::sync::{Arc, Mutex};
 
