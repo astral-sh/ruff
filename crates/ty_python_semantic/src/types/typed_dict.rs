@@ -297,7 +297,8 @@ impl<'db> TypedDictType<'db> {
     }
 
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        if self.openness(db).is_open() {
+        let openness = self.openness(db);
+        if openness.is_open() {
             return Type::object();
         }
 
@@ -305,7 +306,7 @@ impl<'db> TypedDictType<'db> {
         for field in self.items(db).values() {
             builder = builder.add(field.declared_ty);
         }
-        if let Some(extra_items) = self.effective_extra_items(db) {
+        if let Some(extra_items) = openness.effective_extra_items() {
             builder = builder.add(extra_items.declared_ty);
         }
         builder.build()
@@ -818,63 +819,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return self.never();
                 }
             }
-            TypedDictOpenness::Open => {
-                // An open target behaves like it has read-only extra items of type `object`.
-                let target_extra_items = target_openness
-                    .effective_extra_items()
-                    .expect("open TypedDict should have effective extra items");
-                if let Some(source_extra_items) = source_openness.effective_extra_items() {
-                    result.intersect(
-                        db,
-                        self.constraints,
-                        self.check_type_pair(
-                            db,
-                            source_extra_items.declared_ty,
-                            target_extra_items.declared_ty,
-                        ),
-                    );
-                }
-                for (source_item_name, source_item_field) in source_items {
-                    if !target_items.contains_key(source_item_name) {
-                        result.intersect(
-                            db,
-                            self.constraints,
-                            self.check_type_pair(
-                                db,
-                                source_item_field.declared_ty,
-                                target_extra_items.declared_ty,
-                            ),
-                        );
-                    }
-                }
-            }
-            TypedDictOpenness::Extra(target_extra_items) if target_extra_items.is_read_only() => {
-                if let Some(source_extra_items) = source_openness.effective_extra_items() {
-                    result.intersect(
-                        db,
-                        self.constraints,
-                        self.check_type_pair(
-                            db,
-                            source_extra_items.declared_ty,
-                            target_extra_items.declared_ty,
-                        ),
-                    );
-                }
-                for (source_item_name, source_item_field) in source_items {
-                    if !target_items.contains_key(source_item_name) {
-                        result.intersect(
-                            db,
-                            self.constraints,
-                            self.check_type_pair(
-                                db,
-                                source_item_field.declared_ty,
-                                target_extra_items.declared_ty,
-                            ),
-                        );
-                    }
-                }
-            }
-            TypedDictOpenness::Extra(target_extra_items) => {
+            TypedDictOpenness::Extra(target_extra_items) if !target_extra_items.is_read_only() => {
                 let Some(source_extra_items) = source_openness.explicit_extra_items() else {
                     return self.never();
                 };
@@ -917,6 +862,37 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     source_item_field.declared_ty,
                                 )
                             }),
+                        );
+                    }
+                }
+            }
+            TypedDictOpenness::Open | TypedDictOpenness::Extra(_) => {
+                // An open target shares the read-only extra-items path, using `object` as its
+                // effective extra-items type.
+                let target_extra_items = target_openness.effective_extra_items().expect(
+                    "open or read-only extra-items TypedDict should have effective extra items",
+                );
+                if let Some(source_extra_items) = source_openness.effective_extra_items() {
+                    result.intersect(
+                        db,
+                        self.constraints,
+                        self.check_type_pair(
+                            db,
+                            source_extra_items.declared_ty,
+                            target_extra_items.declared_ty,
+                        ),
+                    );
+                }
+                for (source_item_name, source_item_field) in source_items {
+                    if !target_items.contains_key(source_item_name) {
+                        result.intersect(
+                            db,
+                            self.constraints,
+                            self.check_type_pair(
+                                db,
+                                source_item_field.declared_ty,
+                                target_extra_items.declared_ty,
+                            ),
                         );
                     }
                 }
@@ -1051,36 +1027,24 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         .map(|(_, field)| (field, left.openness(db))),
                 )
                 .when_any(db, self.constraints, |(required_field, other_openness)| {
+                    let check_read_only_extra_items = |extra_items_ty| {
+                        if required_field.is_read_only() {
+                            self.check_type_pair(db, required_field.declared_ty, extra_items_ty)
+                        } else {
+                            self.as_relation_checker(TypeRelation::Assignability)
+                                .check_type_pair(db, required_field.declared_ty, extra_items_ty)
+                                .negate(db, self.constraints)
+                        }
+                    };
+
                     match other_openness {
                         TypedDictOpenness::Closed => self.always(),
                         TypedDictOpenness::Extra(extra_items) if !extra_items.is_read_only() => {
                             self.always()
                         }
-                        TypedDictOpenness::Open => {
-                            if required_field.is_read_only() {
-                                self.check_type_pair(db, required_field.declared_ty, Type::object())
-                            } else {
-                                self.as_relation_checker(TypeRelation::Assignability)
-                                    .check_type_pair(db, required_field.declared_ty, Type::object())
-                                    .negate(db, self.constraints)
-                            }
-                        }
+                        TypedDictOpenness::Open => check_read_only_extra_items(Type::object()),
                         TypedDictOpenness::Extra(extra_items) => {
-                            if required_field.is_read_only() {
-                                self.check_type_pair(
-                                    db,
-                                    required_field.declared_ty,
-                                    extra_items.declared_ty,
-                                )
-                            } else {
-                                self.as_relation_checker(TypeRelation::Assignability)
-                                    .check_type_pair(
-                                        db,
-                                        required_field.declared_ty,
-                                        extra_items.declared_ty,
-                                    )
-                                    .negate(db, self.constraints)
-                            }
+                            check_read_only_extra_items(extra_items.declared_ty)
                         }
                     }
                 })
