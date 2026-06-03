@@ -180,6 +180,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if definition.is_none() {
                         let annotation = self.infer_extra_items_kwarg(&kw.value);
                         extra_items = Some(TypedDictOpenness::extra(
+                            db,
                             annotation.inner_type(),
                             annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
                         ));

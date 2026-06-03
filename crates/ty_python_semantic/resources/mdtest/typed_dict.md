@@ -5407,6 +5407,11 @@ def _(extra: Extra) -> None:
 
 ### A closed `TypedDict` is equivalent to `extra_items=Never`
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing_extensions import TypedDict, Never
 from ty_extensions import static_assert, is_equivalent_to, is_subtype_of
@@ -5417,9 +5422,15 @@ class Extra(TypedDict, extra_items=Never):
 class Closed(TypedDict, closed=True):
     x: int
 
+type Bottom = Never
+
+class AliasedExtra(TypedDict, extra_items=Bottom):
+    x: int
+
 static_assert(is_equivalent_to(Extra, Closed))
 static_assert(is_subtype_of(Extra, Closed))
 static_assert(is_subtype_of(Closed, Extra))
+static_assert(is_equivalent_to(AliasedExtra, Closed))
 ```
 
 ### Empty closed TypedDict is known to be falsy

@@ -61,8 +61,8 @@ pub enum TypedDictOpenness<'db> {
 }
 
 impl<'db> TypedDictOpenness<'db> {
-    pub(crate) fn extra(declared_ty: Type<'db>, is_read_only: bool) -> Self {
-        if declared_ty.is_never() {
+    pub(crate) fn extra(db: &'db dyn Db, declared_ty: Type<'db>, is_read_only: bool) -> Self {
+        if declared_ty.resolve_type_alias(db).is_never() {
             Self::Closed
         } else {
             Self::Extra(TypedDictExtraItems {
@@ -112,6 +112,7 @@ impl<'db> TypedDictOpenness<'db> {
         match self {
             Self::Open | Self::Closed => self,
             Self::Extra(extra_items) => Self::extra(
+                db,
                 extra_items
                     .declared_ty
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -137,7 +138,7 @@ impl<'db> TypedDictOpenness<'db> {
                 } else {
                     declared_ty.unwrap_or(div)
                 };
-                Some(Self::extra(declared_ty, extra_items.is_read_only))
+                Some(Self::extra(db, declared_ty, extra_items.is_read_only))
             }
         }
     }
@@ -238,6 +239,7 @@ impl<'db> TypedDictType<'db> {
                     let qualifiers =
                         definition_expression_qualifiers(db, class_definition, &extra_items.value);
                     return TypedDictOpenness::extra(
+                        db,
                         declared_ty,
                         qualifiers.contains(TypeQualifiers::READ_ONLY),
                     );
@@ -1273,6 +1275,7 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
     if let Some(extra_items) = node.arguments.find_keyword("extra_items") {
         let deferred_inference = infer_deferred_types(db, definition);
         return TypedDictOpenness::extra(
+            db,
             deferred_inference.expression_type(&extra_items.value),
             deferred_inference
                 .qualifiers(&extra_items.value)
