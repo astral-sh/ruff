@@ -33,6 +33,8 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         _ => None,
     };
 
+    let mut alias_docstring: Option<Docstring> = None;
+
     let docs = if keyword_argument.is_some() || typed_dict_key.is_some() {
         None
     } else if let GotoTarget::Call { call, .. } = goto_target {
@@ -78,7 +80,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
-        let mut docstring: Option<Docstring> = None;
         let inferred_type_hover_content = match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
                 typevar.bind_pep695(db).map_or(
@@ -98,7 +99,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             | Type::TypeAlias(alias) => {
                 let value_ty = alias.value_type(db);
 
-                docstring = Definitions::from_ty(db, ty)
+                alias_docstring = Definitions::from_ty(db, ty)
                     .and_then(|def| def.docstring(db))
                     .or_else(|| {
                         Definitions::from_ty(db, value_ty).and_then(|def| def.docstring(db))
@@ -122,13 +123,14 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             },
         };
         contents.push(inferred_type_hover_content);
-        if let Some(docstring) = docstring
-            && docs.is_none()
-        {
-            contents.push(HoverContent::Docstring(docstring));
-        }
     }
+
     contents.extend(docs);
+
+    // Aliased docs should come after the docs of the target, if they exist
+    if let Some(alias_docstring) = alias_docstring {
+        contents.push(HoverContent::Docstring(alias_docstring));
+    }
 
     if contents.is_empty() {
         return None;
@@ -6733,6 +6735,53 @@ type U<CURSOR> = MyType
           |                     |
           |                     source
           |
+        ");
+    }
+
+    #[test]
+    fn hover_type_dosctring_correct_order() {
+        let test = CursorTest::builder()
+            .source(
+                "library.py",
+                r#"
+                class Target:
+                    """Target Docs"""
+
+                type Alias = Target
+
+                Copy = Alias
+                """Copy Docs"""
+
+                x: Copy<CURSOR>
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.hover(), @"
+        type Alias = Target
+        ---------------------------------------------
+        Copy Docs
+
+        ---------------------------------------------
+        Target Docs
+
+        ---------------------------------------------
+        ```python
+        type Alias = Target
+        ```
+        ---
+        Copy Docs
+        ---
+        Target Docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> library.py:10:4
+           |
+        10 | x: Copy
+           |    ^^^^- Cursor offset
+           |    |
+           |    source
+           |
         ");
     }
 
