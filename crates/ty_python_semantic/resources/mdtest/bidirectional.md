@@ -828,6 +828,15 @@ def constructor_inference_remains_gradual(flag: bool, name: str, value):
     accepts_float_keywords(**kwargs)
     reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
 
+    if flag:
+        merged_kwargs = dict()
+        merged_kwargs["p"] = 1.23
+    else:
+        merged_kwargs = dict()
+        merged_kwargs["p"] = 1.23
+    accepts_float_keywords(**merged_kwargs)
+    reveal_type(merged_kwargs)  # revealed: dict[Unknown, Unknown]
+
     nested_kwargs = dict()
     nested_kwargs["a"] = dict(p=1.23)
     accepts_float_keywords(**nested_kwargs[name])

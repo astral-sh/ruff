@@ -996,59 +996,63 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn unconstrained_collection_binding_following_aliases(
         &self,
         collection_use: &ast::Expr,
-    ) -> Option<Definition<'db>> {
-        let mut use_expression = collection_use;
-        let mut use_scope = self.current_scope();
+    ) -> FxHashSet<Definition<'db>> {
+        let mut uses = vec![(collection_use, self.current_scope())];
         let mut seen = FxHashSet::default();
+        let mut collections = FxHashSet::default();
 
-        loop {
-            let definition = self.binding_at_use(use_expression, use_scope)?;
-            if !seen.insert(definition) {
-                return None;
-            }
+        while let Some((use_expression, use_scope)) = uses.pop() {
+            for definition in self.bindings_at_use(use_expression, use_scope) {
+                if !seen.insert(definition) {
+                    continue;
+                }
 
-            let assignment = definition.kind(self.db).as_unannotated_assignment()?;
-            let value = assignment.value(self.module);
-            if is_potentially_unconstrained_collection_initializer(value) {
-                return Some(definition);
+                let Some(assignment) = definition.kind(self.db).as_unannotated_assignment() else {
+                    continue;
+                };
+                let value = assignment.value(self.module);
+                if is_potentially_unconstrained_collection_initializer(value) {
+                    collections.insert(definition);
+                } else if value.is_name_expr() {
+                    uses.push((value, definition.file_scope(self.db)));
+                }
             }
-            if !value.is_name_expr() {
-                return None;
-            }
-
-            use_expression = value;
-            use_scope = definition.file_scope(self.db);
         }
+
+        collections
     }
 
-    fn binding_at_use(
+    fn bindings_at_use(
         &self,
         use_expression: &ast::Expr,
         use_scope: FileScopeId,
-    ) -> Option<Definition<'db>> {
+    ) -> Vec<Definition<'db>> {
         let use_def = &self.use_def_maps[use_scope];
-        let use_id = self.ast_ids[use_scope].try_use_id(use_expression)?;
+        let Some(use_id) = self.ast_ids[use_scope].try_use_id(use_expression) else {
+            return vec![];
+        };
 
-        if let Ok(definition) = use_def
+        let definitions = use_def
             .bindings_at_use(use_id)
             .filter_map(|binding| use_def.definition(binding.binding()).definition())
-            // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
-            // cycle-related panics.
-            .exactly_one()
-        {
-            return Some(definition);
+            .collect_vec();
+        if !definitions.is_empty() {
+            return definitions;
         }
 
-        let place_expr = PlaceExpr::try_from_expr(use_expression)?;
+        let Some(place_expr) = PlaceExpr::try_from_expr(use_expression) else {
+            return vec![];
+        };
         self.visible_ancestor_scopes(use_scope)
             .skip(1)
             .find_map(|(scope, _)| {
                 let place = self.place_tables[scope].place_id((&place_expr).into())?;
-                self.use_def_maps[scope]
+                let definitions = self.use_def_maps[scope]
                     .definitions_for_place(place)
-                    .exactly_one()
-                    .ok()
+                    .collect_vec();
+                (!definitions.is_empty()).then_some(definitions)
             })
+            .unwrap_or_default()
     }
 
     fn unconstrained_collection_literal_binding(
@@ -4047,11 +4051,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             return;
         }
 
-        if let Some(definition) =
-            self.unconstrained_collection_binding_following_aliases(&keyword.value)
-        {
-            self.keyword_splatted_collections.insert(definition);
-        }
+        self.keyword_splatted_collections
+            .extend(self.unconstrained_collection_binding_following_aliases(&keyword.value));
 
         if let Some(collection_use_start) = collection_use_start {
             let keyword_splatted_collections = self
