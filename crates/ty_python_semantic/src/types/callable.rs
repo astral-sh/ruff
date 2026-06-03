@@ -267,9 +267,10 @@ impl<'db> Type<'db> {
             | Type::TypeForm(_)
             | Type::TypedDict(_) => None,
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
-                Some(CallableTypes::one(partial.partial(db)))
-            }
+            Type::KnownInstance(
+                KnownInstanceType::FunctoolsPartial(partial)
+                | KnownInstanceType::FunctoolsPartialCall(partial),
+            ) => Some(CallableTypes::one(partial.partial(db))),
 
             Type::Intersection(intersection) => {
                 intersection

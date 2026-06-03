@@ -3193,6 +3193,11 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
+            KnownInstanceType::FunctoolsPartialCall(partial) => {
+                Type::Callable(partial.partial(self.db))
+                    .display_with(self.db, DisplaySettings::default().singleline())
+                    .fmt_detailed(f)
+            }
         }
     }
 }
