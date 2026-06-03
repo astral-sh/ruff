@@ -837,6 +837,17 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
     }
+
+    /// Return finite indexed constraints carried by a synthesized protocol.
+    ///
+    /// Class-based protocols remain symbolic because tuple types include subclasses that can
+    /// override the indexed methods described by the protocol.
+    pub(super) fn finite_indexed_constraint(self, db: &'db dyn Db) -> Option<Box<[Type<'db>]>> {
+        let Protocol::Synthesized(protocol) = self.inner else {
+            return None;
+        };
+        protocol.interface().finite_indexed_constraint(db)
+    }
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {

@@ -36,6 +36,8 @@
 //! shares exactly the same possible super-types, and none of them are subtypes of each other
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
+mod indexed_protocol;
+
 use super::RecursivelyDefined;
 use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
@@ -1239,6 +1241,16 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn build(self) -> Type<'db> {
+        self.simplify_indexed_protocol_negatives()
+            .build_without_indexed_protocol_simplification()
+    }
+
+    /// Build the accumulated type without re-entering indexed-protocol simplification.
+    ///
+    /// The indexed-protocol pass uses ordinary intersection simplification to compute residual
+    /// tuple elements. Those nested builds must bypass the pass to keep the outer fixed-point
+    /// iteration in control.
+    fn build_without_indexed_protocol_simplification(self) -> Type<'db> {
         UnionType::from_elements(
             self.db,
             self.intersections
@@ -1422,6 +1434,24 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let addition_is_bool_instance = positive_as_instance
                     .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool));
+
+                if let Some((index, refined)) =
+                    self.positive
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, existing_positive)| {
+                            indexed_protocol::refine_tuple_protocol_intersection(
+                                db,
+                                *existing_positive,
+                                new_positive,
+                            )
+                            .map(|refined| (index, refined))
+                        })
+                {
+                    self.positive.swap_remove_index(index);
+                    self.add_positive(db, refined);
+                    return;
+                }
 
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     match existing_positive {
