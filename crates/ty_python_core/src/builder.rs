@@ -997,6 +997,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let Some(func) = empty_collection_constructor_callable(expr) else {
             return is_unconstrained_collection_literal(expr);
         };
+        if Program::get(self.db)
+            .custom_stdlib_search_path(self.db)
+            .is_some()
+        {
+            return false;
+        }
         let ast::Expr::Name(name) = func else {
             return false;
         };
@@ -1009,28 +1015,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         })
     }
 
-    /// If the given expression is a use of an unconstrained collection literal, returns its
-    /// definition.
-    fn unconstrained_collection_literal_binding(
-        &self,
-        collection_use: &ast::Expr,
-    ) -> Option<Definition<'db>> {
-        self.unconstrained_collection_binding_impl(collection_use, false)
-    }
-
     /// If the given expression is a use of a potentially unconstrained collection initializer,
     /// returns its definition.
     fn unconstrained_collection_binding(
         &self,
         collection_use: &ast::Expr,
-    ) -> Option<Definition<'db>> {
-        self.unconstrained_collection_binding_impl(collection_use, true)
-    }
-
-    fn unconstrained_collection_binding_impl(
-        &self,
-        collection_use: &ast::Expr,
-        include_constructor_calls: bool,
     ) -> Option<Definition<'db>> {
         let use_def = self.current_use_def_map();
         let use_id = self.current_ast_ids().try_use_id(collection_use)?;
@@ -1043,15 +1032,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .kind(self.db)
                     .as_unannotated_assignment()
                     .is_some_and(|assignment| {
-                        let initializer = assignment.value(self.module);
-                        if include_constructor_calls {
-                            self.is_potentially_unconstrained_collection_initializer(
-                                initializer,
-                                definition.file_scope(self.db),
-                            )
-                        } else {
-                            is_unconstrained_collection_literal(initializer)
-                        }
+                        self.is_potentially_unconstrained_collection_initializer(
+                            assignment.value(self.module),
+                            definition.file_scope(self.db),
+                        )
                     })
             })
             // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
@@ -3986,7 +3970,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 if let Some((func, expr, is_await)) = call_info {
                     // Avoid creating reachability nodes for calls on unconstrained collection
-                    // literals. Without this short-circuit, performing reachability analysis
+                    // initializers. Without this short-circuit, performing reachability analysis
                     // can lead to quadratic blowup of cycle dependencies during full-scope
                     // collection inference, as Salsa flattens the dependencies of all cycle
                     // participants, and the reachability analysis of a given use of the
@@ -3996,12 +3980,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Note that built-in collection types do not have methods that explicitly
                     // return `Never`, so does not have a meaningful semantic impact, except in
                     // the rare case where a collection is explicitly marked as having elements
-                    // of type `Never`.
+                    // of type `Never`. Constructor calls with custom stdlib stubs are not indexed
+                    // as collection initializers, so they continue through normal reachability
+                    // analysis.
                     if !self.source_type.is_stub()
                         && func
                             .as_attribute_expr()
                             .and_then(|attribute| {
-                                self.unconstrained_collection_literal_binding(&attribute.value)
+                                self.unconstrained_collection_binding(&attribute.value)
                             })
                             .is_none()
                     {
