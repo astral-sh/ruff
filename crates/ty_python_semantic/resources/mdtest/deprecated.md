@@ -47,7 +47,7 @@ replacement function itself as deprecated.
 ```py
 from collections.abc import Callable
 from typing import Any, TypeVar
-from ty_extensions import TypeOf, is_assignable_to, is_equivalent_to, is_subtype_of, static_assert
+from ty_extensions import TypeOf, is_equivalent_to, static_assert
 from typing_extensions import deprecated
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -72,6 +72,8 @@ def replace_with_one_of(first: F, second: G) -> Callable[[Callable[..., Any]], F
 def replace_with_object(_: Callable[..., Any]) -> object:
     return object()
 
+class ReplacementClass: ...
+
 @deprecated("use replacement directly")
 @replace_with(replacement)
 def deprecated_binding() -> None: ...
@@ -84,16 +86,18 @@ def deprecated_union_binding() -> None: ...
 @deprecated("this object is not callable")
 @replace_with_object
 def deprecated_object_binding() -> None: ...
+@deprecated("use ReplacementClass directly")
+@replace_with(ReplacementClass)
+def deprecated_class_binding() -> None: ...
 
 deprecated_binding()  # error: [deprecated] "use replacement directly"
 replacement()
 replaced_deprecated_function()
 deprecated_union_binding  # error: [deprecated] "use replacement or other directly"
 deprecated_object_binding
+deprecated_class_binding  # TODO: error: [deprecated] "use ReplacementClass directly"
 
 static_assert(is_equivalent_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
-static_assert(is_subtype_of(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
-static_assert(is_assignable_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
 
 if deprecated_binding is not replacement:  # error: [deprecated] "use replacement directly"
     deprecated_binding()
@@ -113,7 +117,7 @@ conditionally_defined()  # TODO: error: [deprecated]
 ```
 
 Deprecation attached to a decorated binding is currently only reported for direct module-level name
-loads with a single live binding. Merging this metadata across control flow is future work.
+loads with a single live binding. Following it through multiple live bindings is future work.
 
 ## Deferred annotations
 

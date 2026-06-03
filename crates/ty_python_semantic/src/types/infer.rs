@@ -56,11 +56,9 @@ pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
-use crate::types::known_instance::DeprecatedInstance;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral, Type, TypeAndQualifiers,
-    TypeQualifiers,
+    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -1092,9 +1090,6 @@ struct DefinitionInferenceExtra<'db> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
-    /// The `@deprecated` decorator attached to a decorated function's module-level binding.
-    binding_deprecation_decorator: Option<ExpressionNodeKey>,
-
     /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
     /// discarded.
     discards_dict_key_assignments: bool,
@@ -1269,22 +1264,6 @@ impl<'db> DefinitionInference<'db> {
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
-    }
-
-    pub(crate) fn binding_deprecation(
-        &self,
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-    ) -> Option<DeprecatedInstance<'db>> {
-        let decorator = self
-            .extra
-            .as_ref()
-            .and_then(|extra| extra.binding_deprecation_decorator)?;
-        let decorator_ty = function_known_decorators(db, definition).expression_type(decorator)?;
-        let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty else {
-            return None;
-        };
-        Some(deprecated)
     }
 
     pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {
