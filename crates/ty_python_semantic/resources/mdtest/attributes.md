@@ -1863,6 +1863,29 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     reveal_type(a_and_b.classmethod())  # revealed: A & B
 ```
 
+### Descriptor owner for an intersection
+
+```py
+from typing import TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[T]) -> type[T]:
+        return owner
+
+class A:
+    descriptor = Descriptor()
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    # TODO: This should reveal `type[A] & type[B]` once intersection meta-types are supported:
+    # https://github.com/astral-sh/ruff/pull/24761
+    reveal_type(a_and_b.descriptor)  # revealed: type[A]
+```
+
 ### `Self` binding excludes flow-only refinements
 
 ```py
