@@ -2,7 +2,6 @@ use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::path;
-use std::sync::Arc;
 
 use camino::{Utf8Components, Utf8Path, Utf8PathBuf};
 
@@ -119,19 +118,31 @@ impl VendoredPathBuf {
     }
 }
 
-impl From<&VendoredPath> for Arc<VendoredPath> {
+impl From<&VendoredPath> for Box<VendoredPath> {
     fn from(path: &VendoredPath) -> Self {
-        let path: Arc<Utf8Path> = Arc::from(&path.0);
-        let path = Arc::into_raw(path) as *const VendoredPath;
+        let path: Box<Utf8Path> = Box::from(&path.0);
+        let path = Box::into_raw(path) as *mut VendoredPath;
         // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
-        // *const Utf8Path to a *const VendoredPath is valid.
-        unsafe { Arc::from_raw(path) }
+        // *mut Utf8Path to a *mut VendoredPath is valid.
+        unsafe { Box::from_raw(path) }
     }
 }
 
-impl From<VendoredPathBuf> for Arc<VendoredPath> {
+impl From<VendoredPathBuf> for Box<VendoredPath> {
     fn from(path: VendoredPathBuf) -> Self {
-        Arc::from(path.as_path())
+        Box::from(path.as_path())
+    }
+}
+
+impl Clone for Box<VendoredPath> {
+    fn clone(&self) -> Self {
+        Box::from(&**self)
+    }
+}
+
+impl get_size2::GetSize for Box<VendoredPath> {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (std::mem::size_of_val(&**self), tracker)
     }
 }
 

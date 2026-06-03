@@ -3,7 +3,6 @@ use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::path::{Path, PathBuf, StripPrefixError};
-use std::sync::Arc;
 
 /// A slice of a path on [`System`](super::System) (akin to [`str`]).
 ///
@@ -579,19 +578,31 @@ impl SystemPathBuf {
     }
 }
 
-impl From<&SystemPath> for Arc<SystemPath> {
+impl From<&SystemPath> for Box<SystemPath> {
     fn from(path: &SystemPath) -> Self {
-        let path: Arc<Utf8Path> = Arc::from(&path.0);
-        let path = Arc::into_raw(path) as *const SystemPath;
+        let path: Box<Utf8Path> = Box::from(&path.0);
+        let path = Box::into_raw(path) as *mut SystemPath;
         // SAFETY: SystemPath is marked as #[repr(transparent)] so the conversion from a
-        // *const Utf8Path to a *const SystemPath is valid.
-        unsafe { Arc::from_raw(path) }
+        // *mut Utf8Path to a *mut SystemPath is valid.
+        unsafe { Box::from_raw(path) }
     }
 }
 
-impl From<SystemPathBuf> for Arc<SystemPath> {
+impl From<SystemPathBuf> for Box<SystemPath> {
     fn from(path: SystemPathBuf) -> Self {
-        Arc::from(path.as_path())
+        Box::from(path.as_path())
+    }
+}
+
+impl Clone for Box<SystemPath> {
+    fn clone(&self) -> Self {
+        Box::from(&**self)
+    }
+}
+
+impl get_size2::GetSize for Box<SystemPath> {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (std::mem::size_of_val(&**self), tracker)
     }
 }
 
@@ -797,19 +808,31 @@ impl SystemVirtualPathBuf {
     }
 }
 
-impl From<&SystemVirtualPath> for Arc<SystemVirtualPath> {
+impl From<&SystemVirtualPath> for Box<SystemVirtualPath> {
     fn from(path: &SystemVirtualPath) -> Self {
-        let path: Arc<str> = Arc::from(path.as_str());
-        let path = Arc::into_raw(path) as *const SystemVirtualPath;
+        let path: Box<str> = Box::from(path.as_str());
+        let path = Box::into_raw(path) as *mut SystemVirtualPath;
         // SAFETY: SystemVirtualPath is marked as #[repr(transparent)] so the conversion from a
-        // *const str to a *const SystemVirtualPath is valid.
-        unsafe { Arc::from_raw(path) }
+        // *mut str to a *mut SystemVirtualPath is valid.
+        unsafe { Box::from_raw(path) }
     }
 }
 
-impl From<SystemVirtualPathBuf> for Arc<SystemVirtualPath> {
+impl From<SystemVirtualPathBuf> for Box<SystemVirtualPath> {
     fn from(path: SystemVirtualPathBuf) -> Self {
-        Arc::from(path.as_path())
+        Box::from(path.as_path())
+    }
+}
+
+impl Clone for Box<SystemVirtualPath> {
+    fn clone(&self) -> Self {
+        Box::from(&**self)
+    }
+}
+
+impl get_size2::GetSize for Box<SystemVirtualPath> {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (std::mem::size_of_val(&**self), tracker)
     }
 }
 

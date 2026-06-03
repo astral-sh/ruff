@@ -16,8 +16,8 @@ use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
 use crate::source::SourceText;
-use crate::system::{SystemPath, SystemVirtualPath};
-use crate::vendored::VendoredPath;
+use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap, vendored};
 
 mod file_root;
@@ -58,17 +58,17 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
-    /// Lookup table that maps [`SystemPath`]s to salsa interned [`File`] instances.
+    /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
     ///
     /// The map also stores entries for files that don't exist on the file system. This is necessary
     /// so that queries that depend on the existence of a file are re-executed when the file is created.
-    system_by_path: FxDashMap<Arc<SystemPath>, File>,
+    system_by_path: FxDashMap<SystemPathBuf, File>,
 
-    /// Lookup table that maps [`SystemVirtualPath`]s to [`VirtualFile`] instances.
-    system_virtual_by_path: FxDashMap<Arc<SystemVirtualPath>, VirtualFile>,
+    /// Lookup table that maps [`SystemVirtualPathBuf`]s to [`VirtualFile`] instances.
+    system_virtual_by_path: FxDashMap<SystemVirtualPathBuf, VirtualFile>,
 
     /// Lookup table that maps vendored files to the salsa [`File`] ingredients.
-    vendored_by_path: FxDashMap<Arc<VendoredPath>, File>,
+    vendored_by_path: FxDashMap<VendoredPathBuf, File>,
 
     /// Lookup table that maps file paths to their [`FileRoot`].
     roots: std::sync::RwLock<FileRoots>,
@@ -82,19 +82,12 @@ impl Files {
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::NotFound`] is returned.
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
-        if path.is_absolute()
-            && let Some(file) = self.inner.system_by_path.get(path)
-        {
-            return *file;
-        }
-
-        let absolute =
-            Arc::<SystemPath>::from(SystemPath::absolute(path, db.system().current_directory()));
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
 
         *self
             .inner
             .system_by_path
-            .entry(Arc::clone(&absolute))
+            .entry(absolute.clone())
             .or_insert_with(|| {
                 let metadata = db.system().path_metadata(path);
 
@@ -126,31 +119,20 @@ impl Files {
 
     /// Tries to look up the file for the given system path, returns `None` if no such file exists yet
     pub fn try_system(&self, db: &dyn Db, path: &SystemPath) -> Option<File> {
-        if path.is_absolute()
-            && let Some(file) = self.inner.system_by_path.get(path)
-        {
-            return Some(*file);
-        }
-
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         self.inner
             .system_by_path
-            .get(absolute.as_path())
+            .get(&absolute)
             .map(|entry| *entry.value())
     }
 
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Result<File, FileError> {
-        if let Some(file) = self.inner.vendored_by_path.get(path) {
-            return Ok(*file);
-        }
-
-        let path = Arc::<VendoredPath>::from(path);
-        let file = match self.inner.vendored_by_path.entry(Arc::clone(&path)) {
+        let file = match self.inner.vendored_by_path.entry(path.to_path_buf()) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
-                let metadata = match db.vendored().metadata(&path) {
+                let metadata = match db.vendored().metadata(path) {
                     Ok(metadata) => match metadata.kind() {
                         vendored::FileType::File => metadata,
                         vendored::FileType::Directory => return Err(FileError::IsADirectory),
@@ -179,10 +161,9 @@ impl Files {
     /// This will always create a new file, overwriting any existing file at `path` in the internal
     /// storage.
     pub fn virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> VirtualFile {
-        let path = Arc::<SystemVirtualPath>::from(path);
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
-            File::builder(FilePath::from(Arc::clone(&path)))
+            File::builder(FilePath::from(path))
                 .path_durability(Durability::HIGH)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
@@ -190,7 +171,9 @@ impl Files {
                 .permissions_durability(Durability::HIGH)
                 .new(db),
         );
-        self.inner.system_virtual_by_path.insert(path, virtual_file);
+        self.inner
+            .system_virtual_by_path
+            .insert(path.to_path_buf(), virtual_file);
         virtual_file
     }
 
@@ -198,7 +181,7 @@ impl Files {
     pub fn try_virtual_file(&self, path: &SystemVirtualPath) -> Option<VirtualFile> {
         self.inner
             .system_virtual_by_path
-            .get(path)
+            .get(&path.to_path_buf())
             .map(|entry| *entry.value())
     }
 
@@ -724,8 +707,8 @@ mod tests {
         );
 
         assert_eq!(
-            system_path_to_file(&db, "root/.././test.py"),
-            system_path_to_file(&db, "/test.py")
+            system_path_to_file(&db, "/root/.././test.py"),
+            system_path_to_file(&db, "/root/test.py")
         );
     }
 
