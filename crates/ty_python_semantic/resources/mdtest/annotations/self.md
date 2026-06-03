@@ -383,7 +383,7 @@ ConcreteOwner().inspect(Both)
 ## Intersection receivers bind `Self` before inferring arguments
 
 ```py
-from typing import Self
+from typing import Self, TypeVar
 from ty_extensions import Intersection
 
 class Value:
@@ -396,6 +396,18 @@ def _(value: Intersection[Value, Extra], plain: Value):
     reveal_type(value.copy_from(value))  # revealed: Value & Extra
     # error: [invalid-argument-type]
     reveal_type(value.copy_from(plain))  # revealed: Value & Extra
+
+class ConstrainedValue:
+    def copy(self) -> Self:
+        return self
+
+class Unrelated: ...
+
+T = TypeVar("T", ConstrainedValue, Unrelated)
+
+def _(value: Intersection[T, Extra]):
+    # error: [possibly-missing-attribute]
+    value.copy()
 ```
 
 ## Callable-returning decorators preserve `Self` on intersections
