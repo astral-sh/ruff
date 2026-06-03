@@ -7337,7 +7337,7 @@ fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| type_is_tuple_refinement(db, *element)),
+            .any(|element| type_is_tuple_refinement(db, *element)),
         Type::TypeVar(typevar) => {
             typevar
                 .typevar(db)
@@ -7346,7 +7346,7 @@ fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                     TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                         .elements(db)
                         .iter()
-                        .all(|constraint| type_is_tuple_refinement(db, *constraint)),
+                        .any(|constraint| type_is_tuple_refinement(db, *constraint)),
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         type_is_tuple_refinement(db, bound)
                     }

@@ -1992,6 +1992,12 @@ def _(value: Intersection[MyTuple, T]):
     reveal_type(value.fresh())  # revealed: MyTuple
     takes_object_pair(value.fresh())  # error: [invalid-argument-type]
 
+MixedTupleBound = TypeVar("MixedTupleBound", bound=tuple[int, int] | list[str])
+
+def _(value: Intersection[MyTuple, MixedTupleBound]):
+    reveal_type(value.fresh())  # revealed: MyTuple
+    takes_pair(value.fresh())  # error: [invalid-argument-type]
+
 class TypeIsMarker(Protocol):
     marker: int
 
