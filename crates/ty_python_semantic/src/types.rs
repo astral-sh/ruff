@@ -3525,15 +3525,16 @@ impl<'db> Type<'db> {
                 if let Some(complement) = intersection.enum_complement(db) {
                     enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 } else {
-                    let receiver = Some(receiver.unwrap_or(self));
-                    intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                    let receiver = receiver.unwrap_or(self);
+                    let result = intersection.map_with_boundness_and_qualifiers(db, |elem| {
                         elem.member_lookup_with_policy_and_receiver(
                             db,
                             name_str.into(),
-                            policy,
-                            receiver,
+                            policy | MemberLookupPolicy::NO_GETATTR_LOOKUP,
+                            Some(receiver),
                         )
-                    })
+                    });
+                    self.fallback_to_getattr_only(db, receiver, &name, result, policy)
                 }
             }
 
@@ -5359,6 +5360,35 @@ impl<'db> Type<'db> {
                 qualifiers: _,
             } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
         }
+    }
+
+    /// Apply only `__getattr__` fallback to an attribute-lookup result.
+    fn fallback_to_getattr_only(
+        self,
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        name: &Name,
+        result: PlaceAndQualifiers<'db>,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        result.or_fall_back_to(db, || {
+            if policy.no_getattr_lookup() {
+                return Place::Undefined.into();
+            }
+
+            self.try_call_dunder_with_policy_and_receiver(
+                db,
+                Some(receiver),
+                "__getattr__",
+                &mut CallArguments::positional([Type::string_literal(db, name)]),
+                TypeContext::default(),
+                MemberLookupPolicy::NO_GETATTR_LOOKUP,
+            )
+            .map(|outcome| Place::bound(outcome.return_type(db)))
+            // TODO: Handle call errors here.
+            .unwrap_or_default()
+            .into()
+        })
     }
 
     /// Flatten typevars in a union or intersection by resolving them to their upper bounds

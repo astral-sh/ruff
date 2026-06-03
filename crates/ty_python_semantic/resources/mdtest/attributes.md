@@ -2142,6 +2142,7 @@ def _(a: A):
 
 ```py
 from typing import Literal, overload
+from typing_extensions import Self
 from ty_extensions import Intersection
 
 class B: ...
@@ -2170,6 +2171,18 @@ def _(value: Intersection[GetAttr, B]):
 def _(value: Intersection[GetAttribute, B]):
     reveal_type(value.x)  # revealed: int
     takes_str(value.x)  # error: [invalid-argument-type]
+
+class SelfGetAttr:
+    def __getattr__(self, name: str) -> Self:
+        return self
+
+class AttrFallback:
+    x: object = object()
+
+def takes_attr_fallback(value: AttrFallback): ...
+def _(value: Intersection[SelfGetAttr, AttrFallback]):
+    reveal_type(value.x)  # revealed: object
+    takes_attr_fallback(value.x)  # error: [invalid-argument-type]
 ```
 
 ### Negation types
