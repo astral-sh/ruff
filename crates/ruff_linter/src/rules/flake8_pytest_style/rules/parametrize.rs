@@ -212,12 +212,20 @@ impl Violation for PytestParametrizeValuesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestParametrizeValuesWrongType { values, row } = self;
-        format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
+        if values.to_string() == row.to_string() {
+            format!("Wrong values type in `pytest.mark.parametrize` expected `{values}`")
+        } else {
+            format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
         let PytestParametrizeValuesWrongType { values, row } = self;
-        Some(format!("Use `{values}` of `{row}` for parameter values"))
+        if values.to_string() == row.to_string() {
+            Some(format!("Use `{values}` for parameter values"))
+        } else {
+            Some(format!("Use `{values}` of `{row}` for parameter values"))
+        }
     }
 }
 
