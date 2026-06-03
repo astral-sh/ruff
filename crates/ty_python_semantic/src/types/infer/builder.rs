@@ -270,7 +270,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The list should only contain one entry per binding at most.
     bindings: VecMap<Definition<'db>, Type<'db>>,
 
-    /// The inferred outcome of every syntactically indexed declaration in this region.
+    /// The inferred outcome of every declaration recorded by the semantic index in this region.
     ///
     /// The list should only contain one entry per declaration at most.
     declarations: VecMap<Definition<'db>, InferredDeclaration<'db>>,
@@ -4399,8 +4399,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 is_local: true,
             };
             let target_ty = if let Some(value) = value {
-                // The value remains an ordinary assignment, but normal binding resolution
-                // would consult this rejected annotation as a declaration.
+                // Infer the value as an ordinary assignment without using the rejected annotation
+                // as its declared type.
                 let value_ty = self.infer_maybe_standalone_expression(value, add.type_context());
                 self.stub_placeholder_binding_type(value)
                     .unwrap_or(value_ty)
@@ -10478,7 +10478,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
-            declarations: declarations.into_boxed_slice(),
+            declarations: declarations
+                .into_iter()
+                .filter_map(|(definition, declaration)| {
+                    declaration
+                        .declared()
+                        .map(|declared| (definition, declared))
+                })
+                .collect(),
             extra,
         }
     }

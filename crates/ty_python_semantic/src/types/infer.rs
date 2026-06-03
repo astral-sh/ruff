@@ -843,12 +843,15 @@ impl<'db> ScopeInference<'db> {
     }
 }
 
-/// The inferred declaration produced by a syntactically indexed declaration.
+/// The result of inferring a declaration recorded by the semantic index.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum InferredDeclaration<'db> {
-    /// A semantic declaration with an inferred declared type.
+    /// A valid declaration with an inferred declared type.
     Declared(TypeAndQualifiers<'db>),
-    /// A syntactic declaration candidate that is not a valid semantic declaration.
+    /// An invalid declaration that should not participate in declaration resolution.
+    ///
+    /// For example, `obj.attr: int` when `obj` is not a valid implicit receiver, or
+    /// `items[0]: int`, which is never a valid annotation target.
     Rejected,
 }
 
@@ -877,12 +880,12 @@ pub(crate) struct DefinitionInference<'db> {
     /// Because of that, use a slice with linear search over a hash map.
     pub(crate) bindings: Box<[(Definition<'db>, Type<'db>)]>,
 
-    /// The inferred outcome of every syntactically indexed declaration in this region.
+    /// The types and type qualifiers of every valid declaration in this region.
     ///
     /// About 50% of the definition inference regions have no declarations.
     /// The other 50% have less than 10 declarations. Because of that, use a
     /// slice with linear search over a hash map.
-    declarations: Box<[(Definition<'db>, InferredDeclaration<'db>)]>,
+    declarations: Box<[(Definition<'db>, TypeAndQualifiers<'db>)]>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<DefinitionInferenceExtra<'db>>>,
@@ -991,16 +994,11 @@ impl<'db> DefinitionInference<'db> {
                 *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
             }
         }
-        for (declaration, inferred_declaration) in &mut self.declarations {
-            let InferredDeclaration::Declared(declaration_ty) = inferred_declaration else {
-                continue;
-            };
-
-            if let Some((_, InferredDeclaration::Declared(previous_declaration))) =
-                previous_inference
-                    .declarations
-                    .iter()
-                    .find(|(previous_declaration, _)| previous_declaration == declaration)
+        for (declaration, declaration_ty) in &mut self.declarations {
+            if let Some((_, previous_declaration)) = previous_inference
+                .declarations
+                .iter()
+                .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
                 *declaration_ty = declaration_ty.map_type(|decl_ty| {
                     decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
@@ -1078,7 +1076,6 @@ impl<'db> DefinitionInference<'db> {
         self.bindings.iter().copied()
     }
 
-    #[track_caller]
     pub(crate) fn inferred_declaration(
         &self,
         definition: Definition<'db>,
@@ -1087,7 +1084,7 @@ impl<'db> DefinitionInference<'db> {
             .iter()
             .find_map(|(def, declaration)| {
                 if def == &definition {
-                    Some(*declaration)
+                    Some(InferredDeclaration::Declared(*declaration))
                 } else {
                     None
                 }
@@ -1097,22 +1094,17 @@ impl<'db> DefinitionInference<'db> {
                     .map(TypeAndQualifiers::declared)
                     .map(InferredDeclaration::Declared)
             })
-            .expect(
-                "definition should belong to this TypeInference region and \
-                    TypeInferenceBuilder should have inferred an outcome for it",
-            )
+            .unwrap_or(InferredDeclaration::Rejected)
     }
 
-    fn declarations(&self) -> impl Iterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> + '_ {
-        self.declarations
-            .iter()
-            .filter_map(|(definition, declaration)| Some((*definition, declaration.declared()?)))
+    fn declarations(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
+        self.declarations.iter().copied()
     }
 
-    fn declaration_types(&self) -> impl Iterator<Item = TypeAndQualifiers<'db>> + '_ {
-        self.declarations
-            .iter()
-            .filter_map(|(_, declaration)| declaration.declared())
+    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
+        self.declarations.iter().map(|(_, qualifiers)| *qualifiers)
     }
 
     pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {

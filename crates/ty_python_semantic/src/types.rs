@@ -203,7 +203,7 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
     inference.binding_type(definition)
 }
 
-/// Infer whether a syntactically indexed declaration is a semantic declaration.
+/// Infer the type of a declaration, returning `Rejected` if it is not valid.
 pub(crate) fn inferred_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
