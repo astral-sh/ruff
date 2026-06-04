@@ -8,7 +8,6 @@ use rustc_hash::FxHashMap;
 use crate::Db;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::Tuple;
-use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{KnownClass, Type, TypeContext};
 
 /// Maximum number of expanded types that can be generated from a single tuple's
@@ -297,13 +296,9 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         .and_then(|nominal| nominal.tuple_spec(db)),
                     Some(spec) if spec.as_fixed_length().is_some()
                 ),
-                // Optional TypedDict keys may be absent at runtime, so we can only refine
-                // `partial(...)` when every expanded key is guaranteed to be present.
-                Argument::Keywords => {
-                    extract_unpacked_typed_dict_keys_from_value_type(db, argument_ty).is_none_or(
-                        |unpacked_keys| unpacked_keys.values().any(|key| !key.is_required),
-                    )
-                }
+                // Keyword splats cannot be normalized to concrete partial arguments. Mappings
+                // may have arbitrary keys, and ordinary `TypedDict`s are implicitly open.
+                Argument::Keywords => true,
                 Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => false,
             }
         }) {

@@ -4482,6 +4482,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     name.as_str(),
                 );
             }
+            self.match_open_typed_dict_extra_items(argument_index);
         } else {
             for (parameter_index, parameter) in self.parameters.iter().enumerate() {
                 if self.parameter_info[parameter_index].matched && !parameter.is_keyword_variadic()
@@ -4520,6 +4521,26 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 );
             }
         }
+    }
+
+    /// Match the possible hidden keyword arguments in an implicitly-open `TypedDict`.
+    ///
+    /// Hidden extra items can constrain an existing keyword-variadic parameter, but they should
+    /// not cause unknown-key errors when the destination has no `**kwargs`.
+    fn match_open_typed_dict_extra_items(&mut self, argument_index: usize) {
+        let Some((parameter_index, parameter)) = self.parameters.keyword_variadic() else {
+            return;
+        };
+
+        self.assign_argument(
+            argument_index,
+            Argument::Keywords,
+            Some(Type::object()),
+            parameter_index,
+            parameter,
+            false,
+            true,
+        );
     }
 
     fn finish(self) -> Box<[MatchedArgument<'db>]> {
@@ -4998,6 +5019,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             })
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn check_argument_type(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
@@ -5006,6 +5028,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument: Argument<'a>,
         mut argument_type: Type<'db>,
         parameter_index: usize,
+        provenance: InvalidArgumentTypeProvenance,
     ) {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
@@ -5045,6 +5068,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 argument_index: adjusted_argument_index,
                 expected_ty,
                 provided_ty: argument_type,
+                provenance,
             });
         }
         // We still update the actual type of the parameter in this binding to match the argument,
@@ -5183,6 +5207,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             argument,
                             argument_type,
                             *parameter_index,
+                            InvalidArgumentTypeProvenance::Argument,
                         );
                     }
                 }
@@ -5329,6 +5354,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 argument,
                 variadic_argument_type.unwrap_or_else(Type::unknown),
                 parameter_index,
+                InvalidArgumentTypeProvenance::Argument,
             );
         }
     }
@@ -5342,15 +5368,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_type: Type<'db>,
         paramspec_component_start: Option<usize>,
     ) {
-        if let Some(unpacked_keys) =
-            extract_unpacked_typed_dict_keys_from_value_type(self.db, argument_type)
-        {
-            for (argument_type, parameter_index) in unpacked_keys
-                .values()
-                .map(|unpacked_key| unpacked_key.value_ty)
-                .zip(&self.argument_matches[argument_index].parameters)
+        if extract_unpacked_typed_dict_keys_from_value_type(self.db, argument_type).is_some() {
+            let open_extra_items_match_index = self.argument_matches[argument_index]
+                .parameters
+                .len()
+                .checked_sub(1)
+                .filter(|match_index| {
+                    let parameter_index =
+                        self.argument_matches[argument_index].parameters[*match_index];
+                    self.signature.parameters()[parameter_index].is_keyword_variadic()
+                });
+
+            for (match_index, (parameter_index, argument_type)) in
+                self.argument_matches[argument_index].iter().enumerate()
             {
-                if paramspec_component_start.is_some_and(|start| *parameter_index >= start) {
+                if paramspec_component_start.is_some_and(|start| parameter_index >= start) {
                     continue;
                 }
 
@@ -5359,8 +5391,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_index,
                     adjusted_argument_index,
                     argument,
-                    argument_type,
-                    *parameter_index,
+                    argument_type.unwrap_or_else(Type::unknown),
+                    parameter_index,
+                    if open_extra_items_match_index == Some(match_index) {
+                        InvalidArgumentTypeProvenance::OpenTypedDictExtraItems
+                    } else {
+                        InvalidArgumentTypeProvenance::Argument
+                    },
                 );
             }
 
@@ -5414,6 +5451,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 Argument::Keywords,
                 value_type,
                 *parameter_index,
+                InvalidArgumentTypeProvenance::Argument,
             );
         }
     }
@@ -6696,6 +6734,12 @@ impl std::fmt::Display for ParameterContexts {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InvalidArgumentTypeProvenance {
+    Argument,
+    OpenTypedDictExtraItems,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum BindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
@@ -6705,6 +6749,7 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
+        provenance: InvalidArgumentTypeProvenance,
     },
     /// The type of the keyword-variadic argument's key is not `str`.
     InvalidKeyType {
@@ -6940,6 +6985,7 @@ impl<'db> BindingError<'db> {
                 argument_index,
                 expected_ty,
                 provided_ty,
+                provenance,
             } => {
                 // Certain special forms in the typing module are aliases for classes
                 // elsewhere in the standard library. These special forms are not instances of `type`,
@@ -7052,6 +7098,15 @@ impl<'db> BindingError<'db> {
 
                 if let Some(compound_diag) = compound_diag {
                     compound_diag.add_context(context.db(), &mut diag);
+                }
+
+                if matches!(
+                    provenance,
+                    InvalidArgumentTypeProvenance::OpenTypedDictExtraItems
+                ) {
+                    diag.info(
+                        "Possible extra items in the unpacked open `TypedDict` have type `object`",
+                    );
                 }
 
                 // If the type comes from first-party code, the user may have some control over

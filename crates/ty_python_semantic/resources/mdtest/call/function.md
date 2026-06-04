@@ -1350,6 +1350,7 @@ def _(kwargs: dict[str, int]) -> None:
 
 f(**{"foo": 1})
 f(**dict(foo=1))
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `object`"
 f(**Foo(a=1, b=2))
 ```
 
@@ -1456,10 +1457,42 @@ class Foo2(TypedDict):
 
 def f(**kwargs: int) -> None: ...
 
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+# snapshot: invalid-argument-type
+# snapshot: invalid-argument-type
 f(**Foo1(a=1, b="b"))
 # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `object`"
 f(**Foo2(a=1))
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:15:3
+   |
+15 | f(**Foo1(a=1, b="b"))
+   |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:11:5
+   |
+11 | def f(**kwargs: int) -> None: ...
+   |     ^ ------------- Parameter declared here
+   |
+info: Possible extra items in the unpacked open `TypedDict` have type `object`
+
+
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:15:3
+   |
+15 | f(**Foo1(a=1, b="b"))
+   |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `str`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:11:5
+   |
+11 | def f(**kwargs: int) -> None: ...
+   |     ^ ------------- Parameter declared here
+   |
 ```
 
 ### TypedDict union
@@ -1490,6 +1523,7 @@ def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
     needs_known_keys(**good)
 
     # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `str`"
+    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `object`"
     takes_int_kwargs(**bad)
 ```
 
@@ -1659,7 +1693,7 @@ def _(kwargs: dict[str, int]) -> None:
     reveal_type(f(**kwargs))  # revealed: int
 ```
 
-For a `TypedDict`, the type variable should be specialized to the union of all value types.
+For an open `TypedDict`, the type variable must also account for hidden values of type `object`.
 
 ```py
 from typing import TypeVar
@@ -1674,7 +1708,7 @@ class Foo(TypedDict):
 def f(**kwargs: _T) -> _T:
     return kwargs["a"]
 
-reveal_type(f(**Foo(a=1, b="b")))  # revealed: int | str
+reveal_type(f(**Foo(a=1, b="b")))  # revealed: object
 ```
 
 ## Non-iterable variadic argument
