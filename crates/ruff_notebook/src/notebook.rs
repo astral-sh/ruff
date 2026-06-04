@@ -30,7 +30,8 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
         )
     })?;
     let code = notebook.source_code().to_string();
-    notebook.update_cell_content(&code);
+    let needs_rebuild = notebook.update_cell_content(&code);
+    debug_assert!(!needs_rebuild);
     let mut writer = Vec::new();
     notebook.write(&mut writer)?;
     Ok(String::from_utf8(writer)?)
@@ -136,21 +137,6 @@ impl Notebook {
             .map(|(cell_index, _)| u32::try_from(cell_index).unwrap())
             .collect::<Vec<_>>();
 
-        let mut contents = Vec::with_capacity(valid_code_cells.len());
-        let mut current_offset = TextSize::from(0);
-        let mut cell_offsets = CellOffsets::with_capacity(valid_code_cells.len());
-        cell_offsets.push(TextSize::from(0));
-
-        for &idx in &valid_code_cells {
-            let cell_contents = match &raw_notebook.cells[idx as usize].source() {
-                SourceValue::String(string) => string.clone(),
-                SourceValue::StringArray(string_array) => string_array.join(""),
-            };
-            current_offset += TextSize::of(&cell_contents) + TextSize::of(SYNTHETIC_CELL_SEPARATOR);
-            contents.push(cell_contents);
-            cell_offsets.push(current_offset);
-        }
-
         // Add cell ids to 4.5+ notebooks if they are missing
         // https://github.com/astral-sh/ruff/issues/6834
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
@@ -193,17 +179,13 @@ impl Notebook {
             }
         }
 
+        let (source_code, cell_offsets) =
+            Self::source_code_and_cell_offsets(&raw_notebook, &valid_code_cells);
+
         Ok(Self {
             raw: raw_notebook,
             index: OnceLock::new(),
-            // The additional newline at the end is to maintain consistency for
-            // all cells. These newlines will be removed before updating the
-            // source code with the transformed content. Refer `update_cell_content`.
-            source_code: {
-                let mut source_code = contents.join("\n");
-                source_code.push(SYNTHETIC_CELL_SEPARATOR);
-                source_code
-            },
+            source_code,
             cell_offsets,
             valid_code_cells,
             trailing_newline,
@@ -228,6 +210,39 @@ impl Notebook {
             false,
         )
         .unwrap()
+    }
+
+    /// Build the concatenated source code and cell offsets from the raw notebook.
+    fn source_code_and_cell_offsets(
+        raw_notebook: &RawNotebook,
+        valid_code_cells: &[u32],
+    ) -> (String, CellOffsets) {
+        let mut source_code = String::new();
+        let mut cell_offsets = CellOffsets::with_capacity(valid_code_cells.len() + 1);
+        cell_offsets.push(TextSize::from(0));
+
+        for &idx in valid_code_cells {
+            match raw_notebook.cells[idx as usize].source() {
+                SourceValue::String(string) => source_code.push_str(string),
+                SourceValue::StringArray(string_array) => {
+                    for string in string_array {
+                        source_code.push_str(string);
+                    }
+                }
+            }
+            source_code.push(SYNTHETIC_CELL_SEPARATOR);
+            cell_offsets.push(TextSize::of(&source_code));
+        }
+
+        // The additional newline maintains a consistent source representation
+        // for notebooks without any valid Python code cells. Synthetic newlines
+        // are removed before updating the raw cell content. Refer
+        // `update_cell_content`.
+        if valid_code_cells.is_empty() {
+            source_code.push(SYNTHETIC_CELL_SEPARATOR);
+        }
+
+        (source_code, cell_offsets)
     }
 
     /// Update the cell offsets as per the given [`SourceMap`].
@@ -268,12 +283,17 @@ impl Notebook {
 
     /// Update the cell contents with the transformed content.
     ///
+    /// Returns `true` if a cell separator was removed and the source code and
+    /// cell offsets need to be rebuilt.
+    ///
     /// ## Panics
     ///
     /// Panics if the transformed content is out of bounds for any cell. This
     /// can happen only if the cell offsets were not updated before calling
     /// this method or the offsets were updated incorrectly.
-    fn update_cell_content(&mut self, transformed: &str) {
+    fn update_cell_content(&mut self, transformed: &str) -> bool {
+        let mut missing_separator = false;
+
         for (&idx, (start, end)) in self
             .valid_code_cells
             .iter()
@@ -286,6 +306,7 @@ impl Notebook {
                         "Transformed content out of bounds ({start:?}..{end:?}) for cell at {idx:?}"
                     );
                 });
+            missing_separator |= !cell_content.ends_with(SYNTHETIC_CELL_SEPARATOR);
             self.raw.cells[idx as usize].set_source(SourceValue::StringArray(
                 UniversalNewlineIterator::from(
                     // We only need to strip the trailing newline which we added
@@ -296,6 +317,8 @@ impl Notebook {
                 .collect::<Vec<_>>(),
             ));
         }
+
+        missing_separator
     }
 
     /// Build and return the [`NotebookIndex`].
@@ -392,8 +415,19 @@ impl Notebook {
         // it depends on the offsets to extract the cell content.
         self.index.take();
         self.update_cell_offsets(source_map);
-        self.update_cell_content(&transformed);
-        self.source_code = transformed;
+
+        let needs_rebuild = self.update_cell_content(&transformed);
+
+        if needs_rebuild {
+            // A fix that empties a cell can also remove its synthetic newline
+            // separator. For example, deleting `"import os\n"` from the first
+            // cell changes offsets `[0, 10, 16]` to `[0, 0, 6]`. Rebuild the
+            // source and offsets to restore the separator as `[0, 1, 7]`.
+            (self.source_code, self.cell_offsets) =
+                Self::source_code_and_cell_offsets(&self.raw, &self.valid_code_cells);
+        } else {
+            self.source_code = transformed;
+        }
     }
 
     /// Return a slice of [`Cell`] in the Jupyter notebook.
@@ -449,6 +483,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use ruff_diagnostics::SourceMap;
     use ruff_source_file::OneIndexed;
 
     use crate::{Cell, CellStart, Notebook, NotebookError, NotebookIndex};
@@ -619,6 +654,73 @@ print("after empty cells")
                     CellStart {
                         start_row: OneIndexed::from_zero_indexed(1),
                         raw_cell_index: OneIndexed::from_zero_indexed(1),
+                    },
+                ],
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn update_restores_separators_for_empty_cells() -> Result<(), NotebookError> {
+        let mut notebook = Notebook::from_source_code(
+            r##"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["import os"]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["import sys"]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["x = 1"]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 4
+}"##,
+        )?;
+
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(0.into(), 0.into());
+        source_map.push_marker(10.into(), 0.into());
+        source_map.push_marker(21.into(), 0.into());
+        notebook.update(&source_map, "x = 1\n".to_string());
+
+        assert_eq!(notebook.source_code(), "\n\nx = 1\n");
+        assert_eq!(
+            notebook.cell_offsets().as_ref(),
+            &[0.into(), 1.into(), 2.into(), 8.into()]
+        );
+        assert_eq!(
+            notebook.index(),
+            &NotebookIndex {
+                cell_starts: vec![
+                    CellStart {
+                        start_row: OneIndexed::MIN,
+                        raw_cell_index: OneIndexed::MIN,
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(1),
+                        raw_cell_index: OneIndexed::from_zero_indexed(1),
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(2),
+                        raw_cell_index: OneIndexed::from_zero_indexed(2),
                     },
                 ],
             }

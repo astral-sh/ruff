@@ -122,6 +122,28 @@ mod tests {
     }
 
     #[test]
+    fn w391_after_fix_empties_cell_ipynb() -> Result<()> {
+        let actual =
+            test_resource_path("fixtures").join("pycodestyle/W391_after_empty_cell_fix.ipynb");
+        let expected = test_resource_path("fixtures")
+            .join("pycodestyle/W391_after_empty_cell_fix_expected.ipynb");
+
+        assert_notebook_path(
+            &actual,
+            &expected,
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules([
+                    Rule::UnusedImport,
+                    Rule::TooManyNewlinesAtEndOfFile,
+                ])
+            },
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
     fn w292_4() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pycodestyle/W292_4.py"),
