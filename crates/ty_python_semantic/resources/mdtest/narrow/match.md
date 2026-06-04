@@ -176,6 +176,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
+from enum import IntEnum
 from typing import Any, Literal, TypeAlias, TypeVar
 from typing_extensions import assert_never
 
@@ -339,6 +340,33 @@ def test_match_capture_filters_constrained_typevar_arms(value: MatchPairT) -> No
     match value:
         case [1, item]:
             reveal_type(item)  # revealed: int
+
+class Number(IntEnum):
+    ONE = 1
+
+class RecursiveNumber(IntEnum):
+    _value_: "RecursiveNumber"
+    ONE = 1
+
+def test_match_capture_preserves_int_enum_equal_arm(
+    value: tuple[Literal[1], int],
+) -> str:
+    match value:
+        case [Number.ONE, item]:
+            reveal_type(item)  # revealed: int
+            return item  # error: [invalid-return-type]
+        case _:
+            return ""
+
+def test_match_capture_preserves_recursive_int_enum_arm(
+    value: tuple[Literal[1], int],
+) -> str:
+    match value:
+        case [RecursiveNumber.ONE, item]:
+            reveal_type(item)  # revealed: int
+            return item  # error: [invalid-return-type]
+        case _:
+            return ""
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
@@ -645,6 +673,31 @@ def match_tuple_expression_guard_rebinding(
         case [TupleSubjectA1(), TupleSubjectB1()]:
             reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
             reveal_type(b)  # revealed: TupleSubjectB1
+```
+
+## Sequence patterns with `StrEnum`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import StrEnum
+from typing import Literal
+
+class Word(StrEnum):
+    ONE = "one"
+
+def test_match_capture_preserves_str_enum_equal_arm(
+    value: tuple[Literal["one"], str],
+) -> int:
+    match value:
+        case [Word.ONE, item]:
+            reveal_type(item)  # revealed: str
+            return item  # error: [invalid-return-type]
+        case _:
+            return 0
 ```
 
 ## Value patterns
