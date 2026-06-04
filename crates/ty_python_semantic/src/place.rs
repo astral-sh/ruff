@@ -2,16 +2,12 @@ use itertools::Either;
 use ruff_db::files::File;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHashSet;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::reachability::{
-    ReachabilityConstraintsExtension, evaluate_loop_header_reachability, evaluate_reachability,
-    loop_header_reachability_exceeds_budget,
-};
+use crate::reachability::{ReachabilityConstraintsExtension, evaluate_loop_header_reachability};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
@@ -26,8 +22,8 @@ use ty_python_core::reachability_constraints::ReachabilityConstraints;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, LoopToken, Truthiness, get_loop_header,
-    global_scope, place_table, use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, Truthiness, get_loop_header, global_scope,
+    place_table, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -1205,51 +1201,6 @@ pub(crate) fn loop_header_reachability<'db>(
     loop_header_reachability_impl(db, definition, false)
 }
 
-/// Return whether inferring the concrete types for one loop header would require too much work.
-#[salsa::tracked]
-pub(crate) fn loop_header_type_inference_exceeds_budget<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    loop_token: LoopToken<'db>,
-) -> bool {
-    const MAX_EXACT_LOOP_HEADER_NARROWING_NODES: usize = 4096;
-
-    if loop_header_reachability_exceeds_budget(db, scope, loop_token) {
-        return true;
-    }
-
-    let use_def = use_def_map(db, scope);
-    let constraints = use_def.reachability_constraints();
-    let loop_header = get_loop_header(db, loop_token);
-    let mut remaining = MAX_EXACT_LOOP_HEADER_NARROWING_NODES;
-    let mut visited = FxHashSet::default();
-    let mut pending = Vec::new();
-
-    for binding in loop_header.bindings() {
-        // Narrowing projects each root independently, so count shared nodes again for each
-        // loop-back binding.
-        visited.clear();
-        pending.clear();
-        pending.push(binding.narrowing_constraint());
-
-        while let Some(id) = pending.pop() {
-            if id.is_terminal() || !visited.insert(id) {
-                continue;
-            }
-            let Some(next_remaining) = remaining.checked_sub(1) else {
-                return true;
-            };
-            remaining = next_remaining;
-
-            let node = constraints.get_interior_node(id);
-            pending.push(node.if_true());
-            pending.push(node.if_false());
-        }
-    }
-
-    false
-}
-
 fn loop_header_reachability_cycle_recover<'db>(
     _db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -1265,8 +1216,6 @@ fn loop_header_reachability_impl<'db>(
     definition: Definition<'db>,
     is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
-    const MAX_DIRECT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
-
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
     };
@@ -1282,15 +1231,12 @@ fn loop_header_reachability_impl<'db>(
     for live_binding in loop_header.bindings_for_place(place) {
         let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
-        } else if use_def.reachability_constraints().used_interiors().len()
-            <= MAX_DIRECT_LOOP_HEADER_REACHABILITY_NODES
-        {
-            evaluate_reachability(db, use_def, live_binding.reachability_constraint())
         } else {
             evaluate_loop_header_reachability(
                 db,
                 scope,
                 loop_header_definition.loop_token(),
+                place,
                 live_binding.reachability_constraint(),
             )
         };

@@ -32,9 +32,8 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
     class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
-    loop_header_type_inference_exceeds_budget, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place_by_id, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -113,6 +112,7 @@ use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
@@ -2085,21 +2085,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
-
-        if loop_header_type_inference_exceeds_budget(
-            db,
-            definition.scope(db),
-            loop_header_kind.loop_token(),
-        ) {
-            self.bindings.insert(definition, Type::unknown());
-            return;
-        }
-
-        let loop_header = loop_header_reachability(db, definition);
         let use_def = self
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
+
+        let loop_header = loop_header_reachability(db, definition);
         let place = loop_header_kind.place();
+        let mut reachable_bindings = loop_header.reachable_bindings.iter();
+        if let Some(binding) = reachable_bindings.next()
+            && reachable_bindings.next().is_none()
+            && binding.narrowing_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
+        {
+            self.bindings
+                .insert(definition, binding_type(db, binding.definition));
+            return;
+        }
+
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
 
         for reachable_binding in &loop_header.reachable_bindings {
