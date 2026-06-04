@@ -13,7 +13,7 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 /// ## Why is this bad?
 /// Autouse fixtures are run implicitly, which can make test behavior hard to
 /// reason about in general, but especially when defined in `conftest.py` files.
-/// When defined in a `conftest.py` file, autouse fixtures are automatically run for
+/// Autouse fixtures in `conftest.py` files are automatically run for
 /// all tests in the directory structure, which can introduce hidden side effects,
 /// make test suites slower, and make debugging difficult.
 ///
@@ -45,11 +45,11 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 /// ```
 ///
 /// ## Note
-/// This is a pedantic rule that restricts a valid pytest pattern. If you choose to
+/// This is a pedantic rule that restricts a valid `pytest` pattern. If you choose to
 /// enable it, you may want to restrict it to only apply outside of `conftest.py` files,
 /// as autouse fixtures are most problematic when defined globally.
 ///
-/// You can do this by configuring [`per-file-ignores`](https://docs.astral.sh/ruff/settings/#lint_per-file-ignores):
+/// You can do this by configuring [`lint.per-file-ignores`]:
 /// ```toml
 /// [tool.ruff.lint.per-file-ignores]
 /// "!**/conftest.py" = ["RUF076"]
