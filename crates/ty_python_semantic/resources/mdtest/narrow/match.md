@@ -403,6 +403,27 @@ def test_match_capture_preserves_recursive_int_enum_arm(
         case _:
             return ""
 
+class AlwaysEqualMeta(type):
+    def __eq__(cls, other: object) -> Literal[True]:
+        return True
+
+class EqualA(metaclass=AlwaysEqualMeta):
+    pass
+
+class EqualB(metaclass=AlwaysEqualMeta):
+    pass
+
+class EqualConstants:
+    A = EqualA
+
+def test_match_capture_preserves_custom_equal_class_arm() -> int:
+    value = (EqualB, "actual")
+    match value:
+        case [EqualConstants.A, item]:
+            return item  # error: [invalid-return-type]
+        case _:
+            return 0
+
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
         case x, str():
