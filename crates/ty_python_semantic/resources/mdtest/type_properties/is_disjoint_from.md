@@ -141,6 +141,94 @@ static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
 static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```
 
+## Invariant generic specializations and bases
+
+Only incompatible invariant generic arguments imply disjointness. Covariant generic arguments do
+not: a covariant container can be inhabited by an empty value.
+
+```py
+from collections.abc import Sequence
+from typing import Any, Generic, TypeVar
+from ty_extensions import Intersection, is_disjoint_from, static_assert
+
+T = TypeVar("T")
+U = TypeVar("U")
+T_co = TypeVar("T_co", covariant=True)
+
+class A: ...
+class B: ...
+
+class Invariant(Generic[T]):
+    x: T
+
+class InvariantPair(Generic[T, U]):
+    x: T
+    y: U
+
+class Covariant(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError()
+
+class InvSubA(Invariant[A]):
+    pass
+
+class CoSubB(Covariant[B]):
+    pass
+
+static_assert(is_disjoint_from(Invariant[A], Invariant[B]))
+static_assert(is_disjoint_from(InvSubA, Invariant[B]))
+static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
+static_assert(not is_disjoint_from(Invariant[Any], Invariant[B]))
+static_assert(not is_disjoint_from(Invariant[B], Invariant[Any]))
+# `A | Any` cannot materialize to be equivalent to `B`.
+static_assert(is_disjoint_from(Invariant[A | Any], Invariant[B]))
+static_assert(is_disjoint_from(Invariant[B], Invariant[A | Any]))
+static_assert(is_disjoint_from(Invariant[Intersection[A, Any]], Invariant[B]))
+static_assert(is_disjoint_from(Invariant[B], Invariant[Intersection[A, Any]]))
+static_assert(is_disjoint_from(InvariantPair[A, A], InvariantPair[A, B]))
+static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
+static_assert(not is_disjoint_from(Covariant[A], CoSubB))
+static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
+```
+
+## Type-variable aliases and empty invariant arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Never, TypeVar
+from ty_extensions import is_disjoint_from, static_assert
+
+T = TypeVar("T")
+
+class Invariant(Generic[T]):
+    x: T
+
+type Id[V] = V
+
+def _[U]():
+    static_assert(not is_disjoint_from(Invariant[U], Invariant[int]))
+    static_assert(not is_disjoint_from(Invariant[Id[U]], Invariant[int]))
+
+static_assert(not is_disjoint_from(Invariant[Id[int]], Invariant[int]))
+static_assert(is_disjoint_from(Invariant[Id[int]], Invariant[str]))
+
+class Mixed[T, U]:
+    x: T
+
+# `Mixed` is bivariant in `U`, so the differing second argument cannot make these disjoint.
+static_assert(not is_disjoint_from(Mixed[Never, int], Mixed[Never, str]))
+
+class Left(Invariant[Never]): ...
+class Right(Invariant[Never]): ...
+class Both(Left, Right): ...
+
+static_assert(not is_disjoint_from(Left, Right))
+```
+
 ## "Disjoint base" builtin types
 
 Most other builtins can be subclassed and can even be used in multiple inheritance. However, builtin

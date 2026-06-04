@@ -5135,18 +5135,18 @@ pub(crate) fn report_duplicate_bases(
             class.name(db)
         ),
     );
-    if let Some(first_base) = bases_list[*first_index].source_node() {
-        sub_diagnostic.annotate(Annotation::secondary(context.span(first_base)).message(
-            format_args!("Class `{duplicate_name}` first included in bases list here"),
-        ));
-    }
+    let first_base = bases_list[*first_index].source_node();
+    sub_diagnostic.annotate(
+        Annotation::secondary(context.span(first_base)).message(format_args!(
+            "Class `{duplicate_name}` first included in bases list here"
+        )),
+    );
     for index in later_indices {
-        if let Some(repeated_base) = bases_list[*index].source_node() {
-            sub_diagnostic.annotate(
-                Annotation::primary(context.span(repeated_base))
-                    .message(format_args!("Class `{duplicate_name}` later repeated here")),
-            );
-        }
+        let repeated_base = bases_list[*index].source_node();
+        sub_diagnostic.annotate(
+            Annotation::primary(context.span(repeated_base))
+                .message(format_args!("Class `{duplicate_name}` later repeated here")),
+        );
     }
 
     diagnostic.sub(sub_diagnostic);

@@ -85,10 +85,23 @@ pub(super) struct LiveDeclaration {
 
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
+/// What happens to any preexisting definitions when a new binding of the same place is added.
+/// `AreShadowed` is how normal assignments behave, but we model some features (loop headers,
+/// `nonlocal` writes from nested scopes) as "synthetic" bindings that don't shadow other bindings.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum PreviousDefinitions {
     AreShadowed,
     AreKept,
+}
+
+/// What will happen to a definition if/when a when a new binding of the same place is added later.
+/// `ShadowThisOne` is how normal assignments behave, and it's also how some "synthetic" bindings
+/// behave (loop headers), but there are other synthetic bindings (nested `nonlocal` writes) that
+/// cannot be shadowed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum FutureDefinitions {
+    ShadowThisOne,
+    DontShadowThisOne,
 }
 
 impl PreviousDefinitions {
@@ -231,6 +244,7 @@ impl Bindings {
                     binding: ScopedDefinitionId::UNBOUND,
                     narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
                     reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+                    can_be_shadowed: FutureDefinitions::ShadowThisOne,
                 }]
             )
     }
@@ -255,6 +269,9 @@ pub struct LiveBinding {
     binding: ScopedDefinitionId,
     narrowing_constraint: ScopedNarrowingConstraint,
     reachability_constraint: ScopedReachabilityConstraintId,
+    // TODO: This extra bit is responsible for 1% of our memory footprint in some projects. We
+    // could pack it into one of the fields above.
+    can_be_shadowed: FutureDefinitions,
 }
 
 impl LiveBinding {
@@ -279,6 +296,7 @@ impl Bindings {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
+            can_be_shadowed: FutureDefinitions::ShadowThisOne,
         };
         Self {
             unbound_narrowing_constraint: None,
@@ -294,21 +312,24 @@ impl Bindings {
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
+        can_be_shadowed: FutureDefinitions,
     ) {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
         if is_class_scope && is_place_name && self.live_bindings[0].binding.is_unbound() {
             self.unbound_narrowing_constraint = Some(self.live_bindings[0].narrowing_constraint);
         }
-        // The new binding replaces all previous live bindings in this path, and has no
-        // constraints.
+        // If the new binding is a shadowing type, it replaces previous live bindings in this path
+        // (unless they're marked as not shadowable), and has no constraints.
         if previous_definitions.are_shadowed() {
-            self.live_bindings.clear();
+            self.live_bindings
+                .retain(|b| b.can_be_shadowed == FutureDefinitions::DontShadowThisOne);
         }
         self.live_bindings.push(LiveBinding {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
+            can_be_shadowed,
         });
     }
 
@@ -375,10 +396,12 @@ impl Bindings {
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
 
+                    debug_assert_eq!(a.can_be_shadowed, b.can_be_shadowed);
                     self.live_bindings.push(LiveBinding {
                         binding: a.binding,
                         narrowing_constraint,
                         reachability_constraint,
+                        can_be_shadowed: a.can_be_shadowed,
                     });
                 }
 
@@ -413,6 +436,7 @@ impl PlaceState {
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
+        can_be_shadowed: FutureDefinitions,
     ) {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
         self.bindings.record_binding(
@@ -421,6 +445,7 @@ impl PlaceState {
             is_class_scope,
             is_place_name,
             previous_definitions,
+            can_be_shadowed,
         );
     }
 
@@ -542,9 +567,56 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
 
         assert_bindings(&sym, &[(1, ScopedNarrowingConstraint::ALWAYS_TRUE)]);
+    }
+
+    #[test]
+    fn future_definitions_can_opt_out_of_shadowing() {
+        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            false,
+            true,
+            PreviousDefinitions::AreKept,
+            FutureDefinitions::DontShadowThisOne,
+        );
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(2),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            false,
+            true,
+            PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
+        );
+
+        assert_bindings(
+            &sym,
+            &[
+                (1, ScopedNarrowingConstraint::ALWAYS_TRUE),
+                (2, ScopedNarrowingConstraint::ALWAYS_TRUE),
+            ],
+        );
+
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(3),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            false,
+            true,
+            PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
+        );
+
+        assert_bindings(
+            &sym,
+            &[
+                (1, ScopedNarrowingConstraint::ALWAYS_TRUE),
+                (3, ScopedNarrowingConstraint::ALWAYS_TRUE),
+            ],
+        );
     }
 
     #[test]
@@ -557,6 +629,7 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
         let atom = reachability_constraints.add_atom(ScopedPredicateId::new(0));
         sym.record_narrowing_constraint(&mut reachability_constraints, atom);
@@ -576,6 +649,7 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
         let atom0 = reachability_constraints.add_atom(ScopedPredicateId::new(0));
         sym1a.record_narrowing_constraint(&mut reachability_constraints, atom0);
@@ -587,6 +661,7 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
         sym1b.record_narrowing_constraint(&mut reachability_constraints, atom0);
 
@@ -603,6 +678,7 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
         let atom1 = reachability_constraints.add_atom(ScopedPredicateId::new(1));
         sym2a.record_narrowing_constraint(&mut reachability_constraints, atom1);
@@ -614,6 +690,7 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
         let atom2 = reachability_constraints.add_atom(ScopedPredicateId::new(2));
         sym1b.record_narrowing_constraint(&mut reachability_constraints, atom2);
@@ -635,6 +712,7 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
         let atom3 = reachability_constraints.add_atom(ScopedPredicateId::new(3));
         sym3a.record_narrowing_constraint(&mut reachability_constraints, atom3);

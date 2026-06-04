@@ -1175,6 +1175,68 @@ class Unrelated: ...
 Bad: type[Unrelated] = type("Bad", (Base,), {})
 ```
 
+## Dynamic class reassignment in a loop
+
+A dynamic class can capture the previous value of a loop-carried variable in its namespace. Type
+inference should reach a fixed point instead of repeatedly nesting the dynamic class's member type.
+
+```py
+def make_chain(depth: int) -> type[object]:
+    current: type[object] = type("Leaf", (object,), {})
+    for index in range(depth):
+        current = type(f"Level{index}", (object,), {"child": current})
+    return current
+```
+
+## Dynamic class base reassignment in a loop
+
+A dynamic class that is not the direct right-hand side of an assignment stores its inferred bases in
+its identity. Those bases should not prevent type inference from reaching a fixed point.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+def make_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = identity(type("Level", (current,), {}))  # error: [unsupported-dynamic-base]
+    return current
+```
+
+## Functional dynamic class reassignment in a loop
+
+Functional class literals can capture the previous value of a loop-carried variable when they are
+used in a dynamic class namespace. Their inferred field or member types should not prevent type
+inference from reaching a fixed point.
+
+```py
+from enum import Enum
+from typing import NamedTuple, TypedDict
+
+def make_named_tuple_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": NamedTuple("N", [("value", current)])})
+    return current
+
+def make_typed_dict_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": TypedDict("T", {"value": current})})
+    return current
+
+def make_enum_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": Enum("E", {"VALUE": current})})
+    return current
+```
+
 ## Special base classes
 
 Some special base classes work with dynamic class creation, but special semantics may not be fully

@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -23,18 +22,18 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion, ScopeInference,
-    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    DefinitionInference, DefinitionInferenceExtra, DefinitionTypes, ExpressionInference,
+    ExpressionInferenceExtra, FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion,
+    ScopeInference, ScopeInferenceExtra, infer_deferred_types, infer_definition_types,
+    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
+    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -107,7 +106,7 @@ use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
+    NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -271,7 +270,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The list should only contain one entry per binding at most.
     bindings: VecMap<Definition<'db>, Type<'db>>,
 
-    /// The types and type qualifiers of every declaration in this region.
+    /// The types and type qualifiers of every valid declaration in this region.
     ///
     /// The list should only contain one entry per declaration at most.
     declarations: VecMap<Definition<'db>, TypeAndQualifiers<'db>>,
@@ -1067,6 +1066,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::LoopHeader(loop_header) => {
                 self.infer_loop_header_definition(loop_header, definition);
             }
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                self.infer_nested_bindings_definition(nested_bindings, definition);
+            }
         }
     }
 
@@ -1203,15 +1205,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                     let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
-                    if enclosing_symbol.is_nonlocal() {
-                        // The variable is `nonlocal` in this ancestor scope. Keep going.
-                        continue;
-                    }
                     if enclosing_symbol.is_global() {
                         // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
                         // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that
                         // here and just bail out of this loop.
                         break;
+                    }
+                    if !enclosing_symbol.is_local() {
+                        // The variable is either explicitly `nonlocal` or just a free read in this
+                        // ancestor scope. Keep going.
+                        continue;
                     }
                     // We found the closest definition. Note that (as in `infer_place_load`) this does
                     // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
@@ -1264,40 +1267,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers,
         } = place_and_quals;
 
-        // If the place is unbound and its an attribute or subscript place, fall back to normal
-        // attribute/subscript inference on the root type.
-        let declared_ty =
-            if resolved_place.is_undefined() && !place_table.place(place_id).is_symbol() {
-                if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-                    let value_type =
-                        self.infer_maybe_standalone_expression(value, TypeContext::default());
-                    if let Place::Defined(DefinedPlace {
-                        ty,
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    }) = value_type.member(db, attr).place
-                    {
-                        // TODO: also consider qualifiers on the attribute
-                        Some(ty)
-                    } else {
-                        None
-                    }
-                } else if let AnyNodeRef::ExprSubscript(
-                    subscript @ ast::ExprSubscript {
-                        value, slice, ctx, ..
-                    },
-                ) = node
-                {
-                    let value_ty = self.infer_expression(value, TypeContext::default());
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-            .or_else(|| resolved_place.ignore_possibly_undefined());
+        let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
+            self.fallback_member_declared_type(node)
+        } else {
+            None
+        }
+        .or_else(|| resolved_place.ignore_possibly_undefined());
 
         AddBinding {
             declared_ty,
@@ -1305,6 +1280,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node,
             qualifiers,
             is_local,
+        }
+    }
+
+    /// For a member binding without a live place declaration, obtain its declared type from
+    /// normal attribute or subscript lookup on its receiver.
+    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+        let db = self.db();
+
+        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+            let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
+            if let Place::Defined(DefinedPlace {
+                ty,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) = value_type.member(db, attr).place
+            {
+                // TODO: also consider qualifiers on the attribute
+                Some(ty)
+            } else {
+                None
+            }
+        } else if let AnyNodeRef::ExprSubscript(
+            subscript @ ast::ExprSubscript {
+                value, slice, ctx, ..
+            },
+        ) = node
+        {
+            let value_ty = self.infer_expression(value, TypeContext::default());
+            let slice_ty = self.infer_expression(slice, TypeContext::default());
+            Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
+        } else {
+            None
         }
     }
 
@@ -1680,9 +1687,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Stmt::Raise(raise) => self.infer_raise_statement(raise),
             ast::Stmt::Return(ret) => self.infer_return_statement(ret),
             ast::Stmt::Delete(delete) => self.infer_delete_statement(delete),
-            ast::Stmt::Nonlocal(nonlocal) => self.infer_nonlocal_statement(nonlocal),
             ast::Stmt::Global(global) => self.infer_global_statement(global),
-            ast::Stmt::Break(_)
+            ast::Stmt::Nonlocal(_)
+            | ast::Stmt::Break(_)
             | ast::Stmt::Continue(_)
             | ast::Stmt::Pass(_)
             | ast::Stmt::IpyEscapeCommand(_) => {
@@ -2109,6 +2116,108 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union.add_in_place(narrowed_ty);
         }
 
+        self.bindings.insert(definition, union.build());
+    }
+
+    fn infer_nested_bindings_definition(
+        &mut self,
+        nested_bindings_kind: &NestedBindingsDefinitionKind,
+        definition: Definition<'db>,
+    ) {
+        const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 2048;
+
+        let db = self.db();
+        let scope = definition.scope(db);
+        let scope_id = scope.file_scope_id(db);
+        let symbol_id = definition
+            .place(db)
+            .as_symbol()
+            .expect("nested bindings definition should be a symbol");
+        let symbol = self.index.place_table(scope_id).symbol(symbol_id);
+
+        // At the point where a nested bindings definition is first synthesized, we don't
+        // necessarily know whether the current scope will see global or nonlocal bindings.
+        // Consider this example:
+        //
+        //     def outer():
+        //         def inner1():
+        //             global x
+        //             x = 1
+        //         def inner2():
+        //             nonlocal x
+        //             x = 2
+        //         # Nested bindings of both kinds are potentially visible here, but we can't
+        //         # actually use both kinds in the same scope. If `print(x)` comes next, we should
+        //         # only see 2. But if `global x; print(x)` comes next, we should only see 1.
+        //         ...
+        //
+        // By the time we get here in type inference, though, we can ask the semantic index whether
+        // the symbol resolves to the global scope or not. (For free variables, this currently
+        // requires walking ancestor scopes.) If so, we see any nested `global` bindings that were
+        // recorded. If not, we see any nested `nonlocal` ones.
+        //
+        // Note that if `x` is a free variable in this scope, then this synthetic binding will not
+        // shadow `UNBOUND`, and `infer_place_load` will walk to the defining scope and see all the
+        // nested bindings from there via the symbol's public type. However, we still want to
+        // respect locally visible nested bindings in that case, because there might be narrowing
+        // constraints that apply to the public type but not these nested bindings.
+        let this_scope_sees_global_bindings = self
+            .index
+            .symbol_resolves_to_global_scope(symbol_id, scope_id);
+
+        // If a function body binds `x`, it's interested in nested `nonlocal` bindings of `x` too,
+        // because those resolve to the same variable. But if a *class* body binds `x`, it does
+        // *not* want to consider nested bindings of `x`, because those do *not* resolve to the
+        // same variable.
+        let this_scope_sees_nonlocal_bindings = !(this_scope_sees_global_bindings
+            || (scope.scope(db).kind().is_class() && symbol.is_local()));
+
+        let mut visible_nested_declarations = nested_bindings_kind
+            .nested_declarations
+            .iter()
+            .filter(|declaration| {
+                if declaration.is_global() {
+                    this_scope_sees_global_bindings
+                } else {
+                    this_scope_sees_nonlocal_bindings
+                }
+            })
+            .peekable();
+        if visible_nested_declarations.peek().is_some()
+            && self
+                .index
+                .use_def_map(scope_id)
+                .reachability_constraints()
+                .used_interiors()
+                .len()
+                > MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES
+        {
+            // As with loop header definitions above, use a reachability cutoff to avoid excessive
+            // perf costs in complicated projects like `isort`.
+            self.bindings.insert(definition, Type::unknown());
+            return;
+        }
+
+        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+        for declaration in visible_nested_declarations {
+            assert!(
+                declaration.is_bound,
+                "nested declarations without bindings shouldn't be recorded here",
+            );
+            let nested_place_table = self.index.place_table(declaration.file_scope_id);
+            let nested_symbol_id = nested_place_table
+                .symbol_id(&nested_bindings_kind.name)
+                .unwrap();
+            let use_def = self.index.use_def_map(declaration.file_scope_id);
+            let Some(ty) =
+                place_from_bindings(db, use_def.reachable_bindings(nested_symbol_id.into()))
+                    .place
+                    .raw_type()
+            else {
+                continue;
+            };
+            union.add_in_place(ty);
+        }
         self.bindings.insert(definition, union.build());
     }
 
@@ -3461,6 +3570,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         add.insert(self, target_ty);
     }
 
+    fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
+        if self.in_stub() && value.is_ellipsis_literal_expr() {
+            Some(Type::unknown())
+        } else {
+            None
+        }
+    }
+
     fn infer_assignment_definition_impl(
         &mut self,
         assignment: &AssignmentDefinitionKind<'db>,
@@ -3585,10 +3702,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
                     Type::bool_literal(true)
-                } else if self.in_stub() && value.is_ellipsis_literal_expr() {
-                    Type::unknown()
                 } else {
-                    value_ty
+                    self.stub_placeholder_binding_type(value)
+                        .unwrap_or(value_ty)
                 }
             }
         };
@@ -4048,6 +4164,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.typevar_binding_context = previous_context;
     }
 
+    fn is_valid_receiver_annotation_target(&self, target: &ast::Expr) -> bool {
+        target
+            .as_attribute_expr()
+            .is_some_and(|target| self.is_receiver_attribute_annotation_target(target))
+    }
+
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
         if assignment.target.is_name_expr() {
             self.infer_definition(assignment);
@@ -4129,10 +4251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Disallow annotations on non-name targets unless they are valid receivers (e.g.
             // `self.x: int` or `cls.x: int`).
-            let is_receiver_attribute = target
-                .as_attribute_expr()
-                .is_some_and(|target| self.is_receiver_attribute_annotation_target(target));
-            if !is_receiver_attribute {
+            if !self.is_valid_receiver_annotation_target(target) {
                 let message = match target.as_ref() {
                     ast::Expr::Attribute(_) => {
                         "Type annotations are not allowed on this attribute expression"
@@ -4243,10 +4362,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let annotation = assignment.annotation(self.module());
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
+        if !target.is_name_expr() && !self.is_valid_receiver_annotation_target(target) {
+            // Omit this definition from `self.declarations`; declaration lookup treats an absent
+            // inferred declaration as rejected.
+            if !definition
+                .kind(self.db())
+                .category(self.in_stub(), self.module())
+                .is_binding()
+            {
+                return;
+            }
+
+            let node = target.into();
+            let add = AddBinding {
+                declared_ty: self.fallback_member_declared_type(node),
+                binding: definition,
+                node,
+                qualifiers: TypeQualifiers::empty(),
+                is_local: true,
+            };
+            let target_ty = if let Some(value) = value {
+                // Infer the value as an ordinary assignment without using the rejected annotation
+                // as its declared type.
+                let value_ty = self.infer_maybe_standalone_expression(value, add.type_context());
+                self.stub_placeholder_binding_type(value)
+                    .unwrap_or(value_ty)
+            } else {
+                // Annotation-only definitions are bindings in stubs.
+                add.declared_ty.unwrap_or(Type::unknown())
+            };
+            self.store_expression_type(target, target_ty);
+            add.insert(self, target_ty);
+
+            return;
+        }
+
+        let annotation = assignment.annotation(self.module());
         let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
@@ -4468,6 +4622,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
+            let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
+                // The post-inference pass emits the diagnostic, but this first-pass value is
+                // retained as the alias binding.
+                match inferred_ty {
+                    Type::SpecialForm(SpecialFormType::TypingSelf) => {
+                        self.expressions.insert(value.into(), Type::unknown());
+                        Type::unknown()
+                    }
+                    Type::KnownInstance(KnownInstanceType::LiteralStringAlias(ty))
+                        if ty.inner(self.db()).contains_self(self.db()) =>
+                    {
+                        Type::KnownInstance(KnownInstanceType::LiteralStringAlias(
+                            InternedType::new(self.db(), Type::unknown()),
+                        ))
+                    }
+                    _ => inferred_ty,
+                }
+            } else {
+                inferred_ty
+            };
 
             self.typevar_binding_context = previous_typevar_binding_context;
             self.deferred_state = previous_deferred_state;
@@ -4994,75 +5168,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diag.info(format_args!(
                 "Consider adding a declaration to the global scope, e.g. `{name}: int`"
             ));
-        }
-    }
-
-    fn infer_nonlocal_statement(&mut self, nonlocal: &ast::StmtNonlocal) {
-        let ast::StmtNonlocal {
-            node_index: _,
-            range,
-            names,
-        } = nonlocal;
-        let db = self.db();
-        let scope = self.scope();
-        let file_scope_id = scope.file_scope_id(db);
-
-        'names: for name in names {
-            // Walk up parent scopes looking for a possible enclosing scope that may have a
-            // definition of this name visible to us. Note that we skip the scope containing the
-            // use that we are resolving, since we already looked for the place there up above.
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
-                // Class scopes are not visible to nested scopes, and `nonlocal` cannot refer to
-                // globals, so check only function-like scopes.
-                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
-                if !enclosing_scope.kind().is_function_like() {
-                    continue;
-                }
-                let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(name) else {
-                    // This scope doesn't define this name. Keep going.
-                    continue;
-                };
-                let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
-                // We've found a definition for this name in an enclosing function-like scope.
-                // Either this definition is the valid place this name refers to, or else we'll
-                // emit a syntax error. Either way, we won't walk any more enclosing scopes. Note
-                // that there are differences here compared to `infer_place_load`: A regular load
-                // (e.g. `print(x)`) is allowed to refer to a global variable (e.g. `x = 1` in the
-                // global scope), and similarly it's allowed to refer to a local variable in an
-                // enclosing function that's declared `global` (e.g. `global x`). However, the
-                // `nonlocal` keyword can't refer to global variables (that's a `SyntaxError`), and
-                // it also can't refer to local variables in enclosing functions that are declared
-                // `global` (also a `SyntaxError`).
-                if enclosing_symbol.is_global() {
-                    // A "chain" of `nonlocal` statements is "broken" by a `global` statement. Stop
-                    // looping and report that this `nonlocal` statement is invalid.
-                    break;
-                }
-                if !enclosing_symbol.is_bound()
-                    && !enclosing_symbol.is_declared()
-                    && !enclosing_symbol.is_nonlocal()
-                {
-                    debug_assert!(enclosing_symbol.is_used());
-                    // The name is only referenced here, not defined. Keep going.
-                    continue;
-                }
-                // We found a definition. We've checked that the name isn't `global` in this scope,
-                // but it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to
-                // lead to a valid binding, the outermost one will be an error; we don't need to
-                // walk the whole chain for each one.
-                continue 'names;
-            }
-            // There's no matching binding in an enclosing scope. This `nonlocal` statement is
-            // invalid.
-            if let Some(builder) = self
-                .context
-                .report_diagnostic(DiagnosticId::InvalidSyntax, Severity::Error)
-            {
-                builder
-                    .into_diagnostic(format_args!("no binding for nonlocal `{name}` found"))
-                    .annotate(Annotation::primary(self.context.span(*range)));
-            }
         }
     }
 
@@ -6587,6 +6692,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If the type context is a union, attempt to narrow to a specific element.
         for narrowed_ty in tcx
             .narrow_targets(db)
+            .as_deref()
             .into_iter()
             .flatten()
             .filter(|ty| ty.class_specialization(db).is_some())
@@ -6675,13 +6781,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let path_bounds =
                     identity_instance.assignable_solutions_with_inferable(db, tcx, inferable);
-                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
+                let solutions = path_bounds.solve_with(|typevar, variance, bounds| {
                     let identity = typevar.identity(db);
                     elt_tcx_variance
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::default_solve(db, &constraints, typevar, lower, upper)
+                    PathBounds::default_solve(db, &constraints, typevar, bounds)
                 });
 
                 match solutions {
@@ -6972,7 +7078,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .origin(self.db())
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
-                    let (lower, _upper) = bounds?;
+                    let lower = bounds?.lower?;
 
                     let lower = if tcx.annotation.is_none() {
                         // Constraints learned from later collection uses should follow the same
@@ -8952,12 +9058,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // Walk up parent scopes looking for a possible enclosing scope that may have a
-            // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
-            // Note that we skip the scope containing the use that we are resolving, since we
-            // already looked for the place there up above.
-            let mut nonlocal_union_builder = UnionBuilder::new(db);
-            let mut found_some_definition = false;
+            // Walk enclosing scopes to resolve a free-variable load (`LOAD_DEREF` at runtime).
+            // There are two main ways we try to model these loads:
+            //
+            // 1. "Snapshots" record the bindings/constraints in the enclosing scope at the point
+            //    just before a nested scope begins. For variables that aren't modified after that
+            //    point, that's the only value that the nested scope can see. If a variable is
+            //    reassigned later, lazy snapshots for that variable can be updated or swept.
+            //
+            // 2. Otherwise, we keep walking until we get to the variable's original defining
+            //    scope, and we use its "public type" there, which respects all reachable bindings,
+            //    not just end-of-scope bindings. That includes the synthetic `NestedBindings`
+            //    definitions that we install after each nested scope is closed, so it has
+            //    a complete view of the nested `global` and `nonlocal` writes beneath it.
+            //
+            // This walk only resolves free variables and explicit `nonlocal`s. A symbol that is
+            // local to the current scope never falls back to an enclosing scope, even if it's only
+            // possibly bound at the current use: Python would raise `UnboundLocalError` instead.
+            //
+            // Note that we only get to this walk via `or_fall_back_to` above. In other words, for
+            // definitely-locally-bound variables, we defer to the current scope's bindings instead
+            // of looking at enclosing scopes. Concretely:
+            //
+            // def f():
+            //     x = None
+            //
+            //     def g():
+            //         nonlocal x
+            //         if flag:
+            //             x = 42
+            //
+            //         # `x` is possibly unbound here, so we walk enclosing scopes and see the
+            //         # public type in `f`.
+            //         reveal_type(x)  # revealed: Literal[42, 99] | None
+            //
+            //         x = 99
+            //         # But now `x` is definitely bound, so we don't do the walk.
+            //         reveal_type(x)  # revealed: Literal[99]
+            //
+            // Importantly, this approach isn't generally sound. The public type could include
+            // nested bindings from sibling scopes, which really could run at any time, and in some
+            // cases we're being too deferential to local bindings. Unfortunately the fully sound
+            // treatment would reveal `Literal[42, 99] | None` even immediately after `x = 99`,
+            // which is too frustrating for users in practice.
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // If the current enclosing scope is global, no place lookup is performed here,
                 // instead falling back to the module's explicit global lookup below.
@@ -9054,65 +9197,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let enclosing_place = enclosing_place_table.place(enclosing_place_id);
 
-                // Reads of "free" variables terminate at any enclosing scope that marks the
-                // variable `global`, whether or not that scope actually binds the variable. If we
-                // see a `global` declaration, stop walking scopes and proceed to the global
-                // handling below. (If we're walking from a prior/inner scope where this variable
-                // is `nonlocal`, then this is a semantic syntax error, but we don't enforce that
-                // here. See `infer_nonlocal_statement`.)
+                // Reads of "free" or `nonlocal` variables terminate at any enclosing scope that
+                // marks the variable `global`, whether or not that scope actually binds the
+                // variable. If we see a `global` declaration, stop walking scopes and proceed to
+                // the global handling below. (If we're walking from a prior/inner scope where this
+                // variable is `nonlocal`, then this is a semantic syntax error, but we don't
+                // enforce that here. See `SemanticIndexBuilder::pop_scope`.)
                 if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
                     break;
                 }
 
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
-
-                // If the name is declared or bound in this scope, figure out its type. This might
-                // resolve the name and end the walk. But if the name is declared `nonlocal` in
-                // this scope, we'll keep walking enclosing scopes and union this type with the
-                // other types we find. (It's a semantic syntax error to declare a type for a
-                // `nonlocal` variable, but we don't enforce that here. See the
-                // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
-                if enclosing_place.is_bound() || enclosing_place.is_declared() {
-                    let local_place_and_qualifiers = eagerly_resolved_place.unwrap_or_else(|| {
-                        place(
-                            db,
-                            enclosing_scope_id,
-                            place_expr,
-                            ConsideredDefinitions::AllReachable,
-                        )
-                        .map_type(|ty| {
-                            self.narrow_place_with_applicable_constraints(
-                                place_expr,
-                                ty,
-                                &constraint_keys,
-                            )
-                        })
-                    });
-                    // We could have `Place::Undefined` here, despite the checks above, for example if
-                    // this scope contains a `del` statement but no binding or declaration.
-                    if let Place::Defined(DefinedPlace {
-                        ty: type_,
-                        definedness: boundness,
-                        ..
-                    }) = local_place_and_qualifiers.place
-                    {
-                        nonlocal_union_builder.add_in_place(type_);
-                        // `ConsideredDefinitions::AllReachable` never returns PossiblyUnbound
-                        debug_assert_eq!(boundness, Definedness::AlwaysDefined);
-                        found_some_definition = true;
-                    }
-
-                    if !enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
-                        // We've reached a function-like scope that marks this name bound or
-                        // declared but doesn't mark it `nonlocal`. The name is therefore resolved,
-                        // and we won't consider any scopes outside of this one.
-                        return if found_some_definition {
-                            Place::bound(nonlocal_union_builder.build()).into()
-                        } else {
-                            Place::Undefined.into()
-                        };
-                    }
+                // Keep walking until we reach the defining scope of the variable. The synthetic
+                // nested bindings definitions installed there will see everything below it.
+                if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
+                    continue;
                 }
+                if !(enclosing_place.is_bound() || enclosing_place.is_declared()) {
+                    // Note that this check includes members like `x.y` and `x[0]`, which aren't
+                    // symbols and can't be explicitly `nonlocal`.
+                    continue;
+                }
+
+                // We've reached the defining scope of the variable. Infer its public type.
+                debug_assert!(enclosing_place.is_bound() || enclosing_place.is_declared());
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
+                return eagerly_resolved_place.unwrap_or_else(|| {
+                    place_by_id(
+                        db,
+                        enclosing_scope_id,
+                        enclosing_place_id,
+                        RequiresExplicitReExport::No,
+                        ConsideredDefinitions::AllReachable,
+                    )
+                    .map_type(|ty| {
+                        self.narrow_place_with_applicable_constraints(
+                            place_expr,
+                            ty,
+                            &constraint_keys,
+                        )
+                    })
+                });
             }
 
             PlaceAndQualifiers::default()
@@ -9526,7 +9650,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the attribute but others definitely don't. That's a very different case, and
                     // we want it to be an error. Use `as_union_like` here to handle type aliases
                     // of unions and `NewType`s of float/complex in addition to explicit unions.
-                    if let Some(union) = value_type.as_union_like(db) {
+                    //
+                    // Attribute lookup on a bounded type variable delegates to its upper bound, so
+                    // use that bound here too when determining whether the lookup was on a union.
+                    let union_like_type = if let Type::TypeVar(typevar) = value_type
+                        && let Some(bound) = typevar.typevar(db).upper_bound(db)
+                    {
+                        bound
+                    } else {
+                        value_type
+                    };
+
+                    if let Some(union) = union_like_type.as_union_like(db) {
                         let mut elements_missing_the_attribute = FxIndexSet::default();
                         for element in union.elements(db) {
                             union_elements_missing_attribute(
@@ -9548,9 +9683,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .join(", ");
 
                                 builder.into_diagnostic(format_args!(
-                                    "Attribute `{attr_name}` is not defined on {} in union `{value_type}`",
+                                    "Attribute `{attr_name}` is not defined on {} in union `{union_like_type}`",
                                     missing_types,
-                                    value_type = value_type.display(db),
+                                    union_like_type = union_like_type.display(db),
                                 ));
                             }
                             return type_when_bound;
@@ -10342,8 +10477,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
-            bindings: bindings.into_boxed_slice(),
-            declarations: declarations.into_boxed_slice(),
+            types: DefinitionTypes::from_parts(bindings.into_vec(), declarations.into_vec()),
             extra,
         }
     }
@@ -10779,6 +10913,10 @@ impl<K, V> VecMap<K, V> {
 
     fn into_boxed_slice(self) -> Box<[(K, V)]> {
         self.0.into_boxed_slice()
+    }
+
+    fn into_vec(self) -> Vec<(K, V)> {
+        self.0
     }
 }
 

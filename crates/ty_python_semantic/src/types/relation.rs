@@ -943,20 +943,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
-                return ConstraintSet::constrain_typevar(
+                return ConstraintSet::constrain_typevar_upper_bound(
                     db,
                     self.constraints,
                     bound_typevar,
-                    Type::Never,
                     target,
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
-                return ConstraintSet::constrain_typevar(
+                return ConstraintSet::constrain_typevar_lower_bound(
                     db,
                     self.constraints,
                     bound_typevar,
                     source,
-                    Type::object(),
                 );
             }
         }
@@ -1007,18 +1005,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
             // that depend on multiple elements, such as all members of an enum, are visible.
-            (_, Type::Union(union))
-                if union
-                    .elements(db)
-                    .iter()
-                    .any(|element| matches!(element, Type::TypeAlias(_))) =>
-            {
+            (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(source, target, || {
-                    self.check_type_pair(
-                        db,
-                        source,
-                        UnionType::from_elements(db, union.elements(db).iter().copied()),
-                    )
+                    self.check_type_pair(db, source, union.expand_aliases(db))
                 })
             }
 
@@ -2759,10 +2748,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
+                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
                             db,
                             ClassType::NonGeneric(class_b),
-                            self.constraints,
+                            self,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
@@ -2775,10 +2764,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
+                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
                             db,
                             ClassType::Generic(alias_b),
-                            self.constraints,
+                            self,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),

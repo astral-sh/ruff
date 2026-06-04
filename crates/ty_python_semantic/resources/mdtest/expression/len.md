@@ -11,6 +11,9 @@ reveal_type(len(r"conca\t" "ena\tion"))  # revealed: Literal[14]
 reveal_type(len(b"ytes lite" rb"al"))  # revealed: Literal[11]
 reveal_type(len("𝒰𝕹🄸©🕲𝕕ℇ"))  # revealed: Literal[7]
 
+reveal_type("abc".__len__)  # revealed: () -> Literal[3]
+reveal_type(b"abc".__len__)  # revealed: () -> Literal[3]
+
 # fmt: off
 
 reveal_type(len(  # revealed: Literal[7]

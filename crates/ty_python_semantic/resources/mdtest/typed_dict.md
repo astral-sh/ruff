@@ -2356,6 +2356,193 @@ def takes_dict(value: dict[str, object]) -> None: ...
 def _(movie: Movie) -> None:
     reveal_type(dict(movie))  # revealed: dict[str, object]
     takes_dict(dict(movie))
+
+def mixed(movie_or_int: Movie | int) -> None:
+    # A union with a non-TypedDict member should still use normal overload resolution.
+    dict(movie_or_int)  # error: [no-matching-overload]
+```
+
+The same result is inferred efficiently for a union of `TypedDict`s:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, TypedDict
+
+A = TypedDict("A", {"type": Literal["a"]})
+B = TypedDict("B", {"type": Literal["b"]})
+C = TypedDict("C", {"type": Literal["c"]})
+D = TypedDict("D", {"type": Literal["d"]})
+E = TypedDict("E", {"type": Literal["e"]})
+F = TypedDict("F", {"type": Literal["f"]})
+G = TypedDict("G", {"type": Literal["g"]})
+H = TypedDict("H", {"type": Literal["h"]})
+I = TypedDict("I", {"type": Literal["i"]})
+J = TypedDict("J", {"type": Literal["j"]})
+K = TypedDict("K", {"type": Literal["k"]})
+L = TypedDict("L", {"type": Literal["l"]})
+M = TypedDict("M", {"type": Literal["m"]})
+N = TypedDict("N", {"type": Literal["n"]})
+O = TypedDict("O", {"type": Literal["o"]})
+P = TypedDict("P", {"type": Literal["p"]})
+Q = TypedDict("Q", {"type": Literal["q"]})
+R = TypedDict("R", {"type": Literal["r"]})
+S = TypedDict("S", {"type": Literal["s"]})
+T = TypedDict("T", {"type": Literal["t"]})
+U = TypedDict("U", {"type": Literal["u"]})
+V = TypedDict("V", {"type": Literal["v"]})
+W = TypedDict("W", {"type": Literal["w"]})
+X = TypedDict("X", {"type": Literal["x"]})
+
+Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X
+
+def _(item: Item) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
+
+type FirstGroup = A | B | C | D | E | F | G | H
+type SecondGroup = I | J | K | L | M | N | O | P
+type AliasedItem = FirstGroup | SecondGroup | Q | R | S | T | U | V | W | X
+
+def _(item: AliasedItem) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
+
+# Reusing sub-aliases should not make the common-constraint check exponential.
+type Left0 = A
+type Right0 = B
+type Left1 = Left0 | Right0
+type Right1 = Left0 | Right0
+type Left2 = Left1 | Right1
+type Right2 = Left1 | Right1
+type Left3 = Left2 | Right2
+type Right3 = Left2 | Right2
+type Left4 = Left3 | Right3
+type Right4 = Left3 | Right3
+type Left5 = Left4 | Right4
+type Right5 = Left4 | Right4
+type Left6 = Left5 | Right5
+type Right6 = Left5 | Right5
+type Left7 = Left6 | Right6
+type Right7 = Left6 | Right6
+type Left8 = Left7 | Right7
+type Right8 = Left7 | Right7
+type Left9 = Left8 | Right8
+type Right9 = Left8 | Right8
+type Left10 = Left9 | Right9
+type Right10 = Left9 | Right9
+type Left11 = Left10 | Right10
+type Right11 = Left10 | Right10
+type Left12 = Left11 | Right11
+type Right12 = Left11 | Right11
+type Left13 = Left12 | Right12
+type Right13 = Left12 | Right12
+type Left14 = Left13 | Right13
+type Right14 = Left13 | Right13
+type Left15 = Left14 | Right14
+type Right15 = Left14 | Right14
+type Left16 = Left15 | Right15
+type Right16 = Left15 | Right15
+type Left17 = Left16 | Right16
+type Right17 = Left16 | Right16
+type Left18 = Left17 | Right17
+type Right18 = Left17 | Right17
+type Left19 = Left18 | Right18
+type Right19 = Left18 | Right18
+type Left20 = Left19 | Right19
+type Right20 = Left19 | Right19
+type Left21 = Left20 | Right20
+type Right21 = Left20 | Right20
+type Left22 = Left21 | Right21
+
+def _(item: Left22) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
+
+type RecursiveItem = A | RecursiveItem
+
+def _(item: RecursiveItem) -> None:
+    # The common-constraint check must terminate when an alias refers back to its containing union.
+    reveal_type(dict(item))  # revealed: dict[str, object]
+```
+
+Generic protocol inference must preserve structural constraints that differ from
+`dict[str, object]`:
+
+```py
+from _collections_abc import dict_items
+from collections.abc import Callable
+from typing import Protocol, TypeVar, TypedDict
+
+ItemsT = TypeVar("ItemsT")
+
+class HasItems(Protocol[ItemsT]):
+    def items(self) -> ItemsT: ...
+
+class ItemsA(TypedDict):
+    x: int
+
+class ItemsB(TypedDict):
+    x: int
+
+def accept(value: HasItems[ItemsT], callback: Callable[[ItemsT], None]) -> None: ...
+def takes_dict_items(value: dict_items[str, object]) -> None: ...
+def _(value: ItemsA | ItemsB) -> None:
+    accept(value, takes_dict_items)
+```
+
+Rejected common-constraint probes must not affect fallback protocol inference:
+
+```py
+from typing import Literal, Protocol, TypeVar, TypedDict
+
+ConstrainedValue = TypeVar("ConstrainedValue", int, object, covariant=True)
+
+class GetValue(Protocol[ConstrainedValue]):
+    def __getitem__(self, key: Literal["value"], /) -> ConstrainedValue: ...
+
+class ValueA(TypedDict):
+    value: int
+
+class ValueB(TypedDict):
+    value: int
+
+def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
+    raise NotImplementedError
+
+def takes_str(value: str) -> None: ...
+def _(value: ValueA | ValueB) -> None:
+    reveal_type(get_value(value))  # revealed: object
+    takes_str(get_value(value))  # error: [invalid-argument-type]
+```
+
+Common constraints must preserve correlations in mutable protocols:
+
+```py
+from typing import Any, Protocol, TypeVar, TypedDict
+
+Key = TypeVar("Key")
+Value = TypeVar("Value")
+
+class SetAndGet(Protocol[Key, Value]):
+    def __getitem__(self, key: Key, /) -> Value: ...
+    def __setitem__(self, key: Key, value: Value, /) -> None: ...
+
+class CorrelatedA(TypedDict):
+    a: Any
+    b: str
+
+class CorrelatedB(TypedDict):
+    a: Any
+    b: str
+
+def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
+    value[key] = item
+    return value[key]
+
+def takes_int(value: int) -> None: ...
+def _(value: CorrelatedA | CorrelatedB) -> None:
+    takes_int(set_and_get(value, "a", 1))
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
@@ -3019,6 +3206,10 @@ TotalNone = TypedDict("TotalNone", {"id": int}, total=None)
 def f(total: bool) -> None:
     # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
     TotalDynamic = TypedDict("TotalDynamic", {"id": int}, total=total)
+
+# An expression that evaluates to a bool literal is still not a literal expression:
+# error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+TotalExpression = TypedDict("TotalExpression", {"id": int}, total=1 == 1)
 ```
 
 ## Function syntax with `Required` and `NotRequired`
@@ -3088,6 +3279,10 @@ ClosedNone = TypedDict("ClosedNone", {"id": int}, closed=None)
 def f(closed: bool) -> None:
     # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
     ClosedDynamic = TypedDict("ClosedDynamic", {"id": int}, closed=closed)
+
+# An expression that evaluates to a bool literal is still not a literal expression:
+# error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+ClosedExpression = TypedDict("ClosedExpression", {"id": int}, closed=1 == 1)
 ```
 
 ## Function syntax with `extra_items`
@@ -5089,6 +5284,13 @@ And variadic keywords are also banned:
 ```py
 def f(kwargs: dict):
     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
+```
+
+Literal-valued expressions are not literal arguments:
+
+```py
+class Qux(TypedDict, total=1 == 1): ...  # error: [invalid-argument-type]
+class Quux(TypedDict, closed=1 == 1): ...  # error: [invalid-argument-type]
 ```
 
 ## PEP 728 (`closed` and `extra_items`)
