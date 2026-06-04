@@ -11,10 +11,10 @@ use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
-    CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
-    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, class_pattern_is_irrefutable,
+    CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType,
+    KnownClass, KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature,
+    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type, class_pattern_is_irrefutable,
     definite_match_pattern_type, definite_sequence_pattern_type, exact_sequence_pattern_type,
     infer_expression_types, mapping_pattern_type, sequence_pattern_type_builder,
     singleton_pattern_type, starred_sequence_pattern_type,
@@ -694,6 +694,64 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         return true;
     }
 
+    if [left_ty, right_ty]
+        .into_iter()
+        .any(|ty| (ty.as_enum_literal().is_some() || ty.is_enum(db)) && ty.overrides_equality(db))
+    {
+        return true;
+    }
+
+    // IntEnum and StrEnum members compare equal to their underlying values.
+    let enum_value_type = |ty: Type<'db>| {
+        let (enum_class, value_ty) = if let Some(literal) = ty.as_enum_literal() {
+            let enum_class = literal.enum_class(db);
+            (
+                enum_class,
+                enum_metadata(db, enum_class)?.value_type(db, literal.name(db)),
+            )
+        } else {
+            let instance = ty.as_nominal_instance()?;
+            let enum_class = instance.class_literal(db);
+            (
+                enum_class,
+                enum_metadata(db, enum_class)?.instance_value_type(db),
+            )
+        };
+
+        if !enum_class
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|base| {
+                matches!(
+                    base.class_literal(db).known(db),
+                    Some(
+                        KnownClass::Int
+                            | KnownClass::Str
+                            | KnownClass::IntEnum
+                            | KnownClass::StrEnum
+                    )
+                )
+            })
+        {
+            return None;
+        }
+
+        value_ty
+    };
+
+    if let Some(left_value_ty) = enum_value_type(left_ty) {
+        if left_value_ty == left_ty || left_value_ty.is_enum(db) {
+            return true;
+        }
+        return could_compare_equal(db, left_value_ty, right_ty);
+    }
+    if let Some(right_value_ty) = enum_value_type(right_ty) {
+        if right_value_ty == right_ty || right_value_ty.is_enum(db) {
+            return true;
+        }
+        return could_compare_equal(db, left_ty, right_value_ty);
+    }
+
     if let Some(left_alternatives) = finite_single_valued_union_alternatives(db, left_ty) {
         return left_alternatives
             .into_iter()
@@ -1033,9 +1091,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Value(value) => {
                 let value_ty =
                     infer_same_file_expression_type(self.db, *value, TypeContext::default());
-                self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, true)
-                    .map(|constraint| self.intersect_types(subject_ty, constraint))
-                    .unwrap_or(subject_ty)
+                let Some(constraint) =
+                    self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, true)
+                else {
+                    return subject_ty;
+                };
+                let narrowed_ty = self.intersect_types(subject_ty, constraint);
+
+                if narrowed_ty.is_never() && could_compare_equal(self.db, subject_ty, value_ty) {
+                    subject_ty
+                } else {
+                    narrowed_ty
+                }
             }
             PatternPredicateKind::As(Some(pattern), _) => {
                 self.match_pattern_subject_type(pattern, subject_ty)
