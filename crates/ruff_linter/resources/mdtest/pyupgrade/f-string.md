@@ -50,10 +50,11 @@ help: Convert to f-string
 4 + f"{foo()}"  # snapshot: f-string
 ```
 
-## A dropped leading empty literal leaves no orphan whitespace
+## A leading empty literal is preserved
 
-An empty literal in an implicit string concatenation contributes nothing, so dropping it must not
-leave stray whitespace before the f-string.
+An empty literal in an implicit string concatenation contributes nothing to the f-string, but
+dropping a leading one would orphan whatever precedes the first kept segment, such as a stray space,
+an opening parenthesis, or a comment. A leading empty literal is left in place instead.
 
 ```py
 "" "{}".format(x)  # snapshot: f-string
@@ -68,8 +69,10 @@ error[UP032]: Use f-string instead of `format` call
   |
 help: Convert to f-string
   - "" "{}".format(x)  # snapshot: f-string
-1 + f"{x}"  # snapshot: f-string
+1 + "" f"{x}"  # snapshot: f-string
 2 | "a" "" "{}".format(x)  # snapshot: f-string
+3 | x = ("" "{}").format(value)  # snapshot: f-string
+4 | foo(
 ```
 
 ```py
@@ -87,4 +90,59 @@ help: Convert to f-string
 1 | "" "{}".format(x)  # snapshot: f-string
   - "a" "" "{}".format(x)  # snapshot: f-string
 2 + "a" f"{x}"  # snapshot: f-string
+3 | x = ("" "{}").format(value)  # snapshot: f-string
+4 | foo(
+5 |     ""  # snapshot: f-string
+```
+
+A leading empty literal inside parentheses must keep the opening parenthesis, otherwise the fix would
+introduce a syntax error by leaving the closing one unbalanced.
+
+```py
+x = ("" "{}").format(value)  # snapshot: f-string
+```
+
+```snapshot
+error[UP032]: Use f-string instead of `format` call
+ --> src/mdtest_snippet.py:3:5
+  |
+3 | x = ("" "{}").format(value)  # snapshot: f-string
+  |     ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Convert to f-string
+1 | "" "{}".format(x)  # snapshot: f-string
+2 | "a" "" "{}".format(x)  # snapshot: f-string
+  - x = ("" "{}").format(value)  # snapshot: f-string
+3 + x = ("" f"{value}")  # snapshot: f-string
+4 | foo(
+5 |     ""  # snapshot: f-string
+6 |     # comment
+```
+
+A comment between a leading empty literal and the f-string must not be dropped by a safe fix.
+
+```py
+foo(
+    ""  # snapshot: f-string
+    # comment
+    "{}".format(value)
+)
+```
+
+```snapshot
+error[UP032]: Use f-string instead of `format` call
+ --> src/mdtest_snippet.py:5:5
+  |
+5 | /     ""  # snapshot: f-string
+6 | |     # comment
+7 | |     "{}".format(value)
+  | |______________________^
+  |
+help: Convert to f-string
+4 | foo(
+5 |     ""  # snapshot: f-string
+6 |     # comment
+  -     "{}".format(value)
+7 +     f"{value}"
+8 | )
 ```

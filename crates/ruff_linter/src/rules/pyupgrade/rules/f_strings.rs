@@ -460,31 +460,37 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
+    // Leading empty literals are preserved; dropping them would orphan a space, parenthesis, or
+    // comment before the first kept segment. Middle and trailing ones are still dropped.
+    let first_kept = patches
+        .iter()
+        .position(|(_, conversion)| !matches!(conversion, FStringConversion::EmptyLiteral));
+
     let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
-    let mut emitted_part = false;
-    for (range, conversion) in patches {
+    for (index, (range, conversion)) in patches.into_iter().enumerate() {
         let fstring = match conversion {
-            FStringConversion::Convert(fstring) => Some(fstring),
-            FStringConversion::EmptyLiteral => None,
+            FStringConversion::Convert(fstring) => fstring,
+            FStringConversion::EmptyLiteral => {
+                // Preserve a leading empty literal by leaving `prev_end` before it.
+                if first_kept.is_none_or(|first| index >= first) {
+                    prev_end = range.end();
+                }
+                continue;
+            }
             FStringConversion::NonEmptyLiteral => {
                 // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
-                Some(curly_unescape(checker.locator().slice(range)).to_string())
+                curly_unescape(checker.locator().slice(range)).to_string()
             }
             // We handled this in the previous loop.
             FStringConversion::SideEffects => unreachable!(),
         };
-        if let Some(fstring) = fstring {
-            if emitted_part || prev_end == call.start() {
-                contents.push_str(
-                    checker
-                        .locator()
-                        .slice(TextRange::new(prev_end, range.start())),
-                );
-            }
-            contents.push_str(&fstring);
-            emitted_part = true;
-        }
+        contents.push_str(
+            checker
+                .locator()
+                .slice(TextRange::new(prev_end, range.start())),
+        );
+        contents.push_str(&fstring);
         prev_end = range.end();
     }
     contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
