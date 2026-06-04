@@ -2686,19 +2686,29 @@ fn call_property_getter_with<'db>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tests::TestDb;
+    use crate::db::tests::setup_db;
+    use crate::place::global_symbol;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
 
     #[test]
     fn property_getter_without_self_is_called_once() {
-        let db = TestDb::new();
-        let mut calls = 0;
+        let mut db = setup_db();
+        db.write_dedented("/src/getter.py", "def getter(instance: object) -> int: ...")
+            .unwrap();
+        let file = system_path_to_file(&db, "/src/getter.py").unwrap();
+        let getter = global_symbol(&db, file, "getter").place.expect_type();
+        assert!(matches!(getter, Type::FunctionLiteral(_)));
 
-        let result = call_property_getter_with(&db, Type::unknown(), Type::object(), |_, _| {
+        let mut calls = 0;
+        let return_ty = KnownClass::Int.to_instance(&db);
+        let result = call_property_getter_with(&db, getter, Type::object(), |called_getter, _| {
+            assert_eq!(called_getter, getter);
             calls += 1;
-            Some(Type::unknown())
+            Some(return_ty)
         });
 
-        assert_eq!(result, Some(Type::unknown()));
+        assert_eq!(result, Some(return_ty));
         assert_eq!(calls, 1);
     }
 }

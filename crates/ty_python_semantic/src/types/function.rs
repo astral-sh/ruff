@@ -1014,11 +1014,21 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        let signature = self.signature(db);
+        let updated_signature = signature.apply_self(db, self_type);
+        let implementation_signature = self.last_definition_signature(db);
+        let updated_implementation_signature = implementation_signature.apply_self(db, self_type);
+        if updated_signature == *signature
+            && updated_implementation_signature == *implementation_signature
+        {
+            return self;
+        }
+
         Self::new(
             db,
             self.literal(db),
-            Some(self.signature(db).apply_self(db, self_type)),
-            Some(self.last_definition_signature(db).apply_self(db, self_type)),
+            Some(updated_signature),
+            Some(updated_implementation_signature),
         )
     }
 
