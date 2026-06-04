@@ -424,6 +424,24 @@ def test_match_capture_preserves_custom_equal_class_arm() -> int:
         case _:
             return 0
 
+class NeverEqualMeta(type):
+    def __eq__(cls, other: object) -> Literal[False]:
+        return False
+
+class NeverEqualValue(metaclass=NeverEqualMeta):
+    pass
+
+class NeverEqualConstants:
+    VALUE = NeverEqualValue
+
+def test_match_alias_preserves_nonreflexive_value(flag: bool) -> str:
+    value = NeverEqualValue if flag else "fallback"
+    match value:
+        case NeverEqualConstants.VALUE:
+            return ""
+        case _ as item:
+            return item  # error: [invalid-return-type]
+
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
         case x, str():

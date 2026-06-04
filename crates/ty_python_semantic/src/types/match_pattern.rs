@@ -212,10 +212,9 @@ pub(crate) fn definite_match_pattern_type<'db>(
         PatternPredicateKind::Singleton(singleton) => singleton_pattern_type(db, *singleton),
         PatternPredicateKind::Value(value) => {
             let ty = infer_same_file_expression_type(db, *value, TypeContext::default());
-            // Only return the type if it's single-valued. For non-single-valued types
-            // (like `str`), we can't definitively exclude any specific type from
-            // subsequent patterns because the pattern could match any value of that type.
-            if ty.is_single_valued(db) {
+            // Only return the type if it's single-valued and equality is guaranteed to be
+            // reflexive. Otherwise, we can't definitively exclude it from subsequent patterns.
+            if ty.is_single_valued(db) && !ty.equality_may_not_be_reflexive(db) {
                 ty
             } else {
                 Type::Never

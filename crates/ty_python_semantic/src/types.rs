@@ -1202,6 +1202,14 @@ impl<'db> Type<'db> {
         !(check_dunder("__eq__", true) && check_dunder("__ne__", false))
     }
 
+    /// Return true if equality is not guaranteed to be reflexive for this type.
+    fn equality_may_not_be_reflexive(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::LiteralValue(literal) if !literal.is_enum() => false,
+            _ => self.has_custom_equality(db),
+        }
+    }
+
     /// Return true if this type defines a custom `__eq__` or `__ne__` method.
     fn has_custom_equality(&self, db: &'db dyn Db) -> bool {
         ["__eq__", "__ne__"].into_iter().any(|dunder_name| {
