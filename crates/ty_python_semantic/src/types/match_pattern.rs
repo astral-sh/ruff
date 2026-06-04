@@ -24,7 +24,7 @@ pub(crate) fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
     KnownClass::Mapping.to_instance(db).top_materialization(db)
 }
 
-pub(crate) fn sequence_pattern_type(db: &dyn Db) -> Type<'_> {
+pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
     IntersectionBuilder::new(db)
         .add_positive(KnownClass::Sequence.to_instance(db).top_materialization(db))
         // `str`, `bytes`, and `bytearray` are sequences, but Python sequence
@@ -32,7 +32,6 @@ pub(crate) fn sequence_pattern_type(db: &dyn Db) -> Type<'_> {
         .add_negative(KnownClass::Str.to_instance(db))
         .add_negative(KnownClass::Bytes.to_instance(db))
         .add_negative(KnownClass::Bytearray.to_instance(db))
-        .build()
 }
 
 fn sequence_pattern_getitem_method<'db>(
@@ -99,7 +98,7 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
     element_types: &[Type<'db>],
 ) -> Type<'db> {
     let Ok(length) = i64::try_from(element_types.len()) else {
-        return sequence_pattern_type(db);
+        return sequence_pattern_type_builder(db).build();
     };
 
     // `False == 0` and `True == 1`, so the protocol must accept both literals.
@@ -129,8 +128,7 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
 
     let protocol = Type::protocol_with_methods(db, methods);
 
-    IntersectionBuilder::new(db)
-        .add_positive(sequence_pattern_type(db))
+    sequence_pattern_type_builder(db)
         .add_positive(protocol)
         .build()
 }
@@ -145,11 +143,11 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
     suffix_element_types: &[Type<'db>],
 ) -> Type<'db> {
     if prefix_element_types.is_empty() && suffix_element_types.is_empty() {
-        return sequence_pattern_type(db);
+        return sequence_pattern_type_builder(db).build();
     }
 
     let Ok(suffix_length) = i64::try_from(suffix_element_types.len()) else {
-        return sequence_pattern_type(db);
+        return sequence_pattern_type_builder(db).build();
     };
 
     let indexed_element_types = (0_i64..)
@@ -159,8 +157,7 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
         sequence_pattern_getitem_method(db, indexed_element_types, Some(Type::object()));
     let protocol = Type::protocol_with_methods(db, [("__getitem__", getitem_method)]);
 
-    IntersectionBuilder::new(db)
-        .add_positive(sequence_pattern_type(db))
+    sequence_pattern_type_builder(db)
         .add_positive(protocol)
         .build()
 }
@@ -223,7 +220,7 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
     kind: &SequencePatternPredicateKind<'db>,
 ) -> Type<'db> {
     if kind.is_irrefutable() {
-        return sequence_pattern_type(db);
+        return sequence_pattern_type_builder(db).build();
     }
 
     if kind.is_exact_length() {
