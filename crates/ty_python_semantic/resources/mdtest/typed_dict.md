@@ -5055,7 +5055,7 @@ define a `"foo"` field, it could be _assigned to_ with another `TypedDict` that 
 
 ```py
 from collections.abc import Mapping
-from typing_extensions import Literal, TypeGuard
+from typing_extensions import Literal, TypeGuard, TypeIs
 
 class Foo(TypedDict):
     foo: int
@@ -5130,6 +5130,17 @@ def no_op_membership_and_typeguard(value: Foo):
     has_foo = "foo" in value
     if guard_object(value) and has_foo:
         reveal_type(value)  # revealed: object
+
+def is_mapping(
+    value: Foo | Mapping[Literal["a", "b"], int],
+) -> TypeIs[Mapping[Literal["a", "b"], int]]:
+    return True
+
+def mapping_membership_remains_true(u: Foo | Mapping[Literal["a", "b"], int]):
+    has_x = "x" in u
+    if has_x and is_mapping(u):
+        if "x" not in u:
+            reveal_type(u)  # revealed: Never
 
 def membership_and_typeguard(u: Foo | Mapping[Literal["a", "b"], int]):
     has_c = "c" in u
