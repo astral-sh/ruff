@@ -381,14 +381,90 @@ def higher[A, B](f: Callable[[A], B]) -> Callable[[A], B]:
 def identity[T](x: T) -> T:
     return x
 
-# TODO: revealed: Literal[1]
-# TODO: no error
-# error: [invalid-argument-type]
-reveal_type(higher(identity)(1))  # revealed: A@higher
-# TODO: revealed: Literal["x"]
-# TODO: no error
-# error: [invalid-argument-type]
-reveal_type(higher(identity)("x"))  # revealed: A@higher
+# revealed: [A'return](A'return, /) -> A'return
+reveal_type(higher(identity))
+# revealed: Literal[1]
+reveal_type(higher(identity)(1))
+# revealed: Literal["x"]
+reveal_type(higher(identity)("x"))
+```
+
+Returned callables nested in a higher-order call result use the same innermost-cover rule as
+signature-based returned callables.
+
+```py
+from typing import Callable
+
+def nested_higher[A, B](f: Callable[[A], B]) -> Callable[[], Callable[[A], B]]:
+    raise NotImplementedError
+
+def accepts_higher[A, B](f: Callable[[A], B]) -> Callable[[Callable[[A], B]], int]:
+    raise NotImplementedError
+
+def identity[T](x: T) -> T:
+    return x
+
+# revealed: () -> ([A'return](A'return, /) -> A'return)
+reveal_type(nested_higher(identity))
+# revealed: [A'return](A'return, /) -> A'return
+reveal_type(nested_higher(identity)())
+# revealed: Literal[1]
+reveal_type(nested_higher(identity)()(1))
+
+# revealed: [A'return]((A'return, /) -> A'return, /) -> int
+reveal_type(accepts_higher(identity))
+```
+
+Multiple returned callable occurrences can be used independently after rebinding.
+
+```py
+from typing import Callable
+
+def duplicated[A, B](f: Callable[[A], B]) -> tuple[Callable[[A], B], Callable[[A], B]]:
+    raise NotImplementedError
+
+def identity[T](x: T) -> T:
+    return x
+
+first, second = duplicated(identity)
+
+# revealed: [A'return](A'return, /) -> A'return
+reveal_type(first)
+# revealed: [A'return](A'return, /) -> A'return
+reveal_type(second)
+# revealed: Literal[1]
+reveal_type(first(1))
+# revealed: Literal["x"]
+reveal_type(second("x"))
+```
+
+Type variables from enclosing generic contexts should remain in that context instead of becoming
+returned-callable-local.
+
+```py
+from typing import Callable
+
+def identity[T](x: T) -> T:
+    return x
+
+def outer[T](value: T) -> None:
+    def make[U](f: Callable[[U], object]) -> Callable[[U], T]:
+        raise NotImplementedError
+
+    # TODO (optional): Could this be `(object, /) -> T@outer`? Passing `identity`
+    # generates `U@make ≤ T@identity ∧ T@identity ≤ object`, but the `object`-only
+    # upper bound is currently ignored when solving, so `U@make` falls back to `Unknown`.
+    # The important regression here is that `T@outer` is not rebound as callable-local.
+    # revealed: (Unknown, /) -> T@outer
+    reveal_type(make(identity))
+
+class Box[T]:
+    def method[A, B](self, f: Callable[[A], B]) -> Callable[[A], T]:
+        raise NotImplementedError
+
+    def test(self) -> None:
+        # revealed: [A'return](A'return, /) -> T@Box
+        reveal_type(self.method(identity))
 ```
 
 ## Returned callable typevars remain correlated with the surrounding return type

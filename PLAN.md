@@ -364,14 +364,14 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
 
 ### Phase 5: Wire call-result rebinding into call binding
 
-- [ ] Extend the shared `types/typevar/return_callables.rs` entry point/options to support the new
+- [x] Extend the shared `types/typevar/return_callables.rs` entry point/options to support the new
     call-result use case. The call-result use needs to pass:
 
     - `db`,
     - the already-specialized call result `Type`, and
     - the candidate `InferableTypeVars` / candidate identity set from Phase 4.
 
-- [ ] For the call-result use case:
+- [x] For the call-result use case:
 
     - traverse the already-specialized call result as the returned-value root;
     - pass an eligibility callback using the explicit candidate set
@@ -380,7 +380,7 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
     - do **not** remove anything from any callee signature generic context; this is a post-call result
         rewrite only.
 
-- [ ] In `ArgumentTypeChecker::infer_specialization` in
+- [x] In `ArgumentTypeChecker::infer_specialization` in
     `crates/ty_python_semantic/src/types/call/bind.rs`, capture rescoping candidates immediately
     before `builder.build_with(...)`, then apply the shared helper immediately after:
 
@@ -391,25 +391,30 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
     This should happen inside `infer_specialization`, not later in `Binding::check_types` or
     `finish()`, so `self.return_ty` is final once specialization inference completes.
 
-- [ ] Pass the candidate typevar set assembled during specialization inference.
+- [x] Pass the candidate typevar set assembled during specialization inference.
 
-- [ ] Keep non-generic calls and calls with no candidate typevars on the caller-side fast path with
+- [x] Keep non-generic calls and calls with no candidate typevars on the caller-side fast path with
     no rewrite; avoiding unnecessary traversal is the caller's responsibility.
 
-- [ ] Review special-case return-type overrides in `Bindings::evaluate_known_cases`; if any special
+- [x] Review special-case return-type overrides in `Bindings::evaluate_known_cases`; if any special
     cases synthesize callables from generic callable arguments, decide whether they also need the
     rescoping helper or should be left unchanged.
 
+- [x] Guard against over-rebinding class context variables during call-result rescoping: bound
+    receiver argument types are passed as outside roots, and class-bound typevars are filtered out of
+    the eligibility predicate. Existing ParamSpec mdtests cover a `Container[**P].method` case where
+    `P@Container` must remain scoped to the class.
+
 ### Phase 6: Update and extend feature tests
 
-- [ ] Re-establish the new feature's red baseline if needed by running the mdtests that contain the
+- [x] Re-establish the new feature's red baseline if needed by running the mdtests that contain the
     parent revision's red/green cases and noting the exact sections:
 
     - `Generic callable returned from a higher-order call`
     - `Multiple occurrences of a higher-order generic callable`
     - any related legacy equivalents
 
-- [ ] Update the red mdtests in both PEP-695 and legacy callable mdtest files:
+- [~] Update the red mdtests in both PEP-695 and legacy callable mdtest files:
 
     - remove `TODO` markers where the feature is now implemented,
     - remove now-invalid `invalid-argument-type` expectations when rebinding fully fixes the call,
@@ -419,8 +424,12 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
         rebinding, investigate whether they are due to this feature or an existing
         inference/specialization gap; if out of scope and non-trivial, keep the mdtest passing with
         explicit TODO/xfail comments documenting the known limitation.
+    - Current status: `higher(identity)` is now green in both syntax variants. The existing
+        `partial(partial, drop)` stanza is still left with TODO/xfail comments because typevars from
+        `drop` are not yet present in the explicit rescoping candidate set; see the open freshness
+        interaction item below.
 
-- [ ] Add or update a regression showing that surrounding result correlations are preserved:
+- [x] Add or update a regression showing that surrounding result correlations are preserved:
 
     ```py
     def pair[X, Y](f: Callable[[X], Y]) -> tuple[Y, Callable[[X], Y]]: ...
@@ -429,11 +438,11 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
 
     The existing parent tests already include this; verify it remains unchanged.
 
-- [ ] Consider adding a focused regression for an enclosing generic typevar to ensure it is not
+- [x] Consider adding a focused regression for an enclosing generic typevar to ensure it is not
     accidentally rebound as callable-local, e.g. a generic outer function whose call result is
     `Callable[..., T@outer]`.
 
-- [ ] Add or update focused regressions for nested returned callables, including:
+- [x] Add or update focused regressions for nested returned callables, including:
 
     - `Callable[[], Callable[[T], T]]` binds on the inner callable;
     - `Callable[[Callable[[T], T]], int]` binds on the outer callable because the nested callable is a
@@ -446,11 +455,11 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
     `T` cannot be inferred from a non-callable return value. If diagnostics for that are missing or
     incomplete, that is out of scope.
 
-- [ ] Run the two affected mdtest files and review any snapshot updates.
+- [x] Run the two affected mdtest files and review any snapshot updates.
 
 ### Phase 7: Broader validation and cleanup
 
-- [ ] Run the relevant crate tests if the change touches shared generic/constraint code:
+- [x] Run the relevant crate tests if the change touches shared generic/constraint code:
 
     ```sh
     CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always \
@@ -458,16 +467,16 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
       cargo test -p ty_python_semantic
     ```
 
-- [ ] Run targeted formatting / pre-commit for changed files using the repository's jj-aware hook
+- [x] Run targeted formatting / pre-commit for changed files using the repository's jj-aware hook
     wrapper:
 
     ```sh
     /home/dcreager/bin/jpk run --files <changed-files>
     ```
 
-- [ ] Review `jj diff --git` and `jj diff --stat`.
+- [x] Review `jj diff --git` and `jj diff --stat`.
 
-- [ ] Update this plan's status markers before handing off or finishing.
+- [x] Update this plan's status markers before handing off or finishing.
 
 ## Open questions / risks
 
@@ -544,8 +553,11 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
 - [x] Call-result integration point: apply rebinding inside `ArgumentTypeChecker::infer_specialization`
     immediately after applying the specialization to `self.return_ty`, not later in `finish()` or
     `Binding::check_types`.
-- [ ] Freshness interactions: confirm that freshened generic callable occurrences passed as
-    arguments are represented in the candidate set with matching identities.
+- [!] Freshness interactions: confirm that freshened generic callable occurrences passed as
+    arguments are represented in the candidate set with matching identities. Current call-result
+    rebinding fixes callee-inferable leaks like `higher(identity)`, but the existing
+    `partial(partial, drop)` regression still leaks `Y@drop`, suggesting not all generic callable
+    argument identities that can flow into the result are present in the current candidate set.
 - [x] Identical sibling callables / freshening: for a type like
     `tuple[Callable[[T], T], Callable[[T], T]]`, the desired behavior is that each returned callable
     occurrence can be used independently, e.g. after `c1, c2 = f(identity)`, `c1(1)` and `c2("x")`
@@ -570,5 +582,6 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
     order matters for typevar replacement maps, not callable replacement lookup.
 - [x] Typevar occurrence traversal: match existing behavior by recording the occurrence itself only;
     do not recurse into bounds, constraints, or defaults attached to the typevar.
-- [ ] ParamSpec cases may require additional tests if returned callable signatures involving
-    `Callable[P, R]` regress.
+- [x] ParamSpec cases may require additional tests if returned callable signatures involving
+    `Callable[P, R]` regress. The existing PEP-695 ParamSpec mdtest caught an over-rebinding
+    regression for class-scoped ParamSpecs, and now passes.
