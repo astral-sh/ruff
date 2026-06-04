@@ -14,10 +14,10 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, definite_match_pattern_type,
-    definite_sequence_pattern_type, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type,
+    UnionBuilder, callable_pattern_type, class_pattern_is_irrefutable,
+    definite_match_pattern_type, definite_sequence_pattern_type, exact_sequence_pattern_type,
+    infer_expression_types, mapping_pattern_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -2194,17 +2194,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         kind: ClassPatternKind,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        if !kind.is_irrefutable() && !is_positive {
-            // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive case,
-            // we can still narrow the type of the match subject to `Point`. But in the negative case,
-            // we cannot exclude `Point` as a possibility.
-            return None;
-        }
-
         let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
         let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
+
+        let is_irrefutable = match class_type {
+            Type::ClassLiteral(class) => class_pattern_is_irrefutable(self.db, class, kind),
+            _ => kind.is_irrefutable(),
+        };
+        if !is_positive && !is_irrefutable {
+            // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive
+            // case, we can still narrow the subject to `Point`. In the negative case, we cannot
+            // exclude `Point` as a possibility.
+            return None;
+        }
 
         let narrowed_type = match class_type {
             Type::ClassLiteral(class) => {

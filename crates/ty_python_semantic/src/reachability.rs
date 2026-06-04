@@ -199,9 +199,10 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
-        Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+        Type, TypeContext, UnionType, callable_pattern_type, class_pattern_is_irrefutable,
+        definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -998,33 +999,32 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(class_expr, kind) => {
-            let class_ty =
+            let (class_ty, is_irrefutable) =
                 match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
-                    Type::ClassLiteral(class) => {
-                        Some(Type::instance(db, class.top_materialization(db)))
-                    }
+                    Type::ClassLiteral(class) => (
+                        Type::instance(db, class.top_materialization(db)),
+                        class_pattern_is_irrefutable(db, class, *kind),
+                    ),
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        Some(callable_pattern_type(db))
+                        (callable_pattern_type(db), kind.is_irrefutable())
                     }
-                    _ => None,
+                    _ => return Truthiness::Ambiguous,
                 };
 
-            class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
-                if subject_ty.is_subtype_of(db, class_ty) {
-                    if kind.is_irrefutable() {
-                        Truthiness::AlwaysTrue
-                    } else {
-                        // A class pattern like `case Point(x=0, y=0)` is not irrefutable,
-                        // i.e. it does not match all instances of `Point`. This means that
-                        // we can't tell for sure if this pattern will match or not.
-                        Truthiness::Ambiguous
-                    }
-                } else if subject_ty.is_disjoint_from(db, class_ty) {
-                    Truthiness::AlwaysFalse
+            if subject_ty.is_subtype_of(db, class_ty) {
+                if is_irrefutable {
+                    Truthiness::AlwaysTrue
                 } else {
+                    // A class pattern like `case Point(x=0, y=0)` is not irrefutable,
+                    // i.e. it does not match all instances of `Point`. This means that
+                    // we can't tell for sure if this pattern will match or not.
                     Truthiness::Ambiguous
                 }
-            })
+            } else if subject_ty.is_disjoint_from(db, class_ty) {
+                Truthiness::AlwaysFalse
+            } else {
+                Truthiness::Ambiguous
+            }
         }
         PatternPredicateKind::Mapping(kind) => {
             let mapping_ty = mapping_pattern_type(db);

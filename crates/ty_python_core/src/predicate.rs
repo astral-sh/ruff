@@ -136,6 +136,9 @@ pub enum PredicateNode<'db> {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassPatternKind {
     Irrefutable,
+    /// Exactly one irrefutable positional subpattern, which is only irrefutable for built-in
+    /// classes with match-self behavior.
+    MatchSelf,
     Refutable,
 }
 

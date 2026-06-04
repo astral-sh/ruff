@@ -306,7 +306,7 @@ def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
 
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:
-        case int():
+        case int(value):
             return value
         case (left, right):
             return left + right
@@ -324,6 +324,37 @@ def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> i
             # to `tuple[Never]`, and therefore `Never`.
             # revealed: tuple[int | str] & ~<Protocol with members '__getitem__', '__len__'> & ~<Protocol with members '__getitem__', '__len__'>
             reveal_type(x)
+
+def test_match_builtin_self_patterns_are_exhaustive(
+    value: tuple[
+        bool,
+        bytearray,
+        bytes,
+        dict[object, object],
+        float,
+        frozenset[object],
+        int,
+        list[object],
+        set[object],
+        str,
+        tuple[object, ...],
+    ],
+) -> int:
+    match value:
+        case (
+            bool(_),
+            bytearray(_),
+            bytes(_),
+            dict(_),
+            (int(_) | float(_)),
+            frozenset(_),
+            int(_),
+            list(_),
+            set(_),
+            str(_),
+            tuple(_),
+        ):
+            return 1
 
 def test_match_variable_class_sequence_is_not_exhaustive(
     value: tuple[int],
@@ -368,6 +399,17 @@ def test_match_fixed_class_sequence_is_exhaustive(value: tuple[int]) -> int:
             return 1
 
 class ClassWithoutX: ...
+
+class ClassWithMatchArgs:
+    __match_args__ = ("x",)
+
+def test_match_class_positional_sequence_is_not_exhaustive(
+    value: tuple[ClassWithMatchArgs],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [ClassWithMatchArgs(_)]:
+            return 1
 
 def test_match_class_attribute_sequence_is_not_exhaustive(
     value: tuple[ClassWithoutX],
