@@ -5150,6 +5150,11 @@ def mapping_membership_remains_true(u: Foo | Mapping[Literal["a", "b"], int]):
         if "x" not in u:
             reveal_type(u)  # revealed: Never
 
+def mapping_membership_disjunction(mapping: Mapping[Literal["a"], int]):
+    if "c" in mapping or "d" in mapping:
+        if "c" not in mapping:
+            reveal_type(mapping["d"])  # revealed: object
+
 def membership_and_typeguard(u: Foo | Mapping[Literal["a", "b"], int]):
     has_c = "c" in u
     if guard_object(u) and has_c:
