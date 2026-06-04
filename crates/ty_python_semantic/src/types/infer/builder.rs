@@ -31,7 +31,7 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
-    class_body_implicit_symbol, explicit_global_symbol, loop_header_types,
+    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
@@ -2084,9 +2084,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
-        let ty = loop_header_types(db, definition.scope(db), loop_header_kind.place())
-            .binding_type(definition);
-        self.bindings.insert(definition, ty);
+        let loop_header = loop_header_reachability(db, definition);
+        let use_def = self
+            .index
+            .use_def_map(self.scope().file_scope_id(self.db()));
+        let place = loop_header_kind.place();
+        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+
+        for reachable_binding in &loop_header.reachable_bindings {
+            let binding_ty = binding_type(db, reachable_binding.definition);
+            let narrowed_ty = use_def
+                .narrowing_evaluator(reachable_binding.narrowing_constraint)
+                .narrow(db, binding_ty, place);
+
+            union.add_in_place(narrowed_ty);
+        }
+
+        self.bindings.insert(definition, union.build());
     }
 
     fn infer_nested_bindings_definition(

@@ -657,6 +657,36 @@ while True:
     break
 ```
 
+### Unrelated loop headers have independent fixed points
+
+Sequential and nested loops that bind the same place should not widen each other's types.
+
+```py
+from typing import Literal
+
+def f(a: bool, b: bool):
+    x = 0
+    y = "y"
+    while a:
+        if b:
+            x = b"b"
+        y = x
+        if b:
+            x = 3
+        else:
+            x = "e"
+        x, y = y, x
+        if not b:
+            break
+    while a:
+        while b:
+            x = y
+            break
+        y = x
+
+    expected: Literal[0, 3, b"b", "y", "e"] = x
+```
+
 ### Loop headers remain precise in large scopes
 
 Loop-header reachability and type inference should remain exact regardless of the size of the
