@@ -159,8 +159,7 @@ impl ClassPatternKind {
 
 /// Structural details for sequence patterns that affect narrowing and reachability.
 ///
-/// `patterns` stores one predicate per syntactic element, with a starred element
-/// represented by [`PatternPredicateKind::MatchStar`]. `has_star` records
+/// `patterns` stores one predicate per syntactic element. `has_star` records
 /// whether the pattern accepts additional sequence elements.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct SequencePatternPredicateKind<'db> {
@@ -190,7 +189,7 @@ impl<'db> SequencePatternPredicateKind<'db> {
         let star_index = self
             .patterns
             .iter()
-            .position(|pattern| matches!(pattern, PatternPredicateKind::MatchStar))?;
+            .position(|pattern| matches!(pattern, PatternPredicateKind::Star(_)))?;
         let (prefix, star_and_suffix) = self.patterns.split_at(star_index);
         Some((prefix, &star_and_suffix[1..]))
     }
@@ -206,7 +205,7 @@ pub enum PatternPredicateKind<'db> {
     Mapping(ClassPatternKind),
     Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
-    MatchStar,
+    Star(Option<Name>),
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
