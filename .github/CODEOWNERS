@@ -18,7 +18,7 @@
 /crates/ty* @carljm @AlexWaygood @sharkdp @dcreager @ibraheemdev
 /crates/ruff_db/ @carljm @sharkdp @dcreager
 /crates/ty_project/ @carljm @sharkdp @dcreager @Gankra
-/crates/ty_ide/ @carljm @@AlexWaygood @sharkdp @dcreager @Gankra @BurntSushi
+/crates/ty_ide/ @carljm @AlexWaygood @sharkdp @dcreager @Gankra @BurntSushi
 /crates/ty_server/ @carljm @sharkdp @dcreager @Gankra @BurntSushi
 /crates/ty/ @carljm @sharkdp @dcreager @ibraheemdev
 /crates/ty_wasm/ @carljm @sharkdp @dcreager @Gankra
