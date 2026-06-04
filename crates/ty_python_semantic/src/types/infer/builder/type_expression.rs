@@ -2886,8 +2886,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let class_name = class.name(db);
                     if required_count == 1 {
                         builder.into_diagnostic(format_args!(
-                            "Missing type parameter for generic class `{class_name}` \
-                             (expected 1 type argument)"
+                            "Missing type argument for generic class `{class_name}` \
+                             (expected 1)"
                         ));
                     } else {
                         builder.into_diagnostic(format_args!(
