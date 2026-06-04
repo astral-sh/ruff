@@ -7,7 +7,7 @@ use ty_module_resolver::{
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachability};
+use crate::reachability::{ReachabilityConstraintsExtension, evaluate_loop_header_reachability};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
@@ -1232,7 +1232,7 @@ fn loop_header_reachability_impl<'db>(
         let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
         } else {
-            evaluate_reachability(db, use_def, live_binding.reachability_constraint())
+            evaluate_loop_header_reachability(db, scope, live_binding.reachability_constraint())
         };
         // Skip unreachable bindings.
         if reachability.is_always_false() {

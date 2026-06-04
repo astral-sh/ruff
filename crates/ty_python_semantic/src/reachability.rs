@@ -219,6 +219,8 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
+    use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -574,23 +576,32 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         &self,
         db: &'db dyn Db,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        mut id: ScopedReachabilityConstraintId,
+        id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        type Id = ScopedReachabilityConstraintId;
+        evaluate_constraint(self, id, |predicate| {
+            analyze_single(db, &predicates[predicate])
+        })
+    }
+}
 
-        loop {
-            let node = match id {
-                Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
-                Id::AMBIGUOUS => return Truthiness::Ambiguous,
-                Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => self.get_interior_node(id),
-            };
-            let predicate = &predicates[node.atom()];
-            match analyze_single(db, predicate) {
-                Truthiness::AlwaysTrue => id = node.if_true(),
-                Truthiness::Ambiguous => id = node.if_ambiguous(),
-                Truthiness::AlwaysFalse => id = node.if_false(),
-            }
+fn evaluate_constraint(
+    constraints: &ReachabilityConstraints,
+    mut id: ScopedReachabilityConstraintId,
+    mut analyze: impl FnMut(ScopedPredicateId) -> Truthiness,
+) -> Truthiness {
+    type Id = ScopedReachabilityConstraintId;
+
+    loop {
+        let node = match id {
+            Id::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+            Id::AMBIGUOUS => return Truthiness::Ambiguous,
+            Id::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+            _ => constraints.get_interior_node(id),
+        };
+        match analyze(node.atom()) {
+            Truthiness::AlwaysTrue => id = node.if_true(),
+            Truthiness::Ambiguous => id = node.if_ambiguous(),
+            Truthiness::AlwaysFalse => id = node.if_false(),
         }
     }
 }
@@ -1164,6 +1175,24 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     }
 }
 
+/// Analyze one predicate for exact loop-header reachability.
+///
+/// A scoped predicate is a TDD variable with one stable value. Loop headers often evaluate the
+/// same variable through many reachability roots, so memoizing this query avoids repeating its
+/// type inference while preserving each loop header's independent fixed point.
+#[salsa::tracked(
+    cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn analyze_loop_header_predicate<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    predicate: ScopedPredicateId,
+) -> Truthiness {
+    let use_def = use_def_map(db, scope);
+    analyze_single(db, &use_def.predicates()[predicate])
+}
+
 /// Check whether a diagnostic emitted at `range` is in reachable code, considering both
 /// scope reachability and statement-level reachability within the scope.
 pub(crate) fn is_range_reachable<'db>(
@@ -1210,6 +1239,19 @@ pub(crate) fn evaluate_reachability(
     use_def
         .reachability_constraints()
         .evaluate(db, use_def.predicates(), reachability)
+}
+
+pub(crate) fn evaluate_loop_header_reachability<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    reachability: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    let use_def = use_def_map(db, scope);
+    evaluate_constraint(
+        use_def.reachability_constraints(),
+        reachability,
+        |predicate| analyze_loop_header_predicate(db, scope, predicate),
+    )
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {
