@@ -483,6 +483,29 @@ def generic_method_fallback(value: Intersection[GenericGetConstraint, GenericGet
     reveal_type(value.get(1))  # revealed: object
     takes_int(value.get(1))  # error: [invalid-argument-type]
 
+class CorrelatedReturnA:
+    a: int
+
+class CorrelatedReturnB: ...
+
+class HasCorrelatedGet:
+    def get(self) -> CorrelatedReturnA:
+        return CorrelatedReturnA()
+
+class NoCorrelatedGet: ...
+
+class CorrelatedGetFallback:
+    def get(self) -> CorrelatedReturnB:
+        return CorrelatedReturnB()
+
+CorrelatedGetConstraint = TypeVar("CorrelatedGetConstraint", HasCorrelatedGet, NoCorrelatedGet)
+
+def correlated_partial_method(
+    value: Intersection[CorrelatedGetConstraint, CorrelatedGetFallback],
+):
+    reveal_type(value.get())  # revealed: CorrelatedReturnA | CorrelatedReturnB
+    value.get().a  # error: [unresolved-attribute]
+
 class HasClassGet:
     @classmethod
     def get(cls) -> Self:

@@ -2182,9 +2182,7 @@ class XFallback:
 X = TypeVar("X", HasX, NoX)
 
 def partial_class_attribute(value: Intersection[X, XFallback]):
-    # TODO: This should reveal `int | str` once intersection member lookup can preserve MRO
-    # correlation across TypeVar constraints.
-    reveal_type(value.x)  # revealed: Never
+    reveal_type(value.x)  # revealed: int | str
 
 class BoundBase:
     other: Self

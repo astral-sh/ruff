@@ -3437,6 +3437,57 @@ impl<'db> Type<'db> {
         self.member_lookup_with_policy_and_receiver(db, name, policy, None)
     }
 
+    fn typevar_alternative_member_lookup_with_policy_and_receiver(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
+    ) -> Option<PlaceAndQualifiers<'db>> {
+        match self {
+            Type::TypeVar(typevar) => {
+                typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .map(|bound_or_constraints| match bound_or_constraints {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                            .map_with_boundness_and_qualifiers(db, |constraint| {
+                                constraint.member_lookup_with_policy_and_receiver(
+                                    db,
+                                    name.clone(),
+                                    policy,
+                                    receiver,
+                                )
+                            }),
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            bound.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                        }
+                    })
+            }
+            Type::SubclassOf(subclass_of) => subclass_of
+                .subclass_of()
+                .into_type_var()
+                .and_then(|typevar| typevar.typevar(db).bound_or_constraints(db))
+                .map(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                        .map_with_boundness_and_qualifiers(db, |constraint| {
+                            constraint
+                                .to_meta_type(db)
+                                .member_lookup_with_policy_and_receiver(
+                                    db,
+                                    name.clone(),
+                                    policy,
+                                    receiver,
+                                )
+                        }),
+                    TypeVarBoundOrConstraints::UpperBound(bound) => bound
+                        .to_meta_type(db)
+                        .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+                }),
+            _ => None,
+        }
+    }
+
     /// Perform member lookup while optionally binding descriptors and `Self` to a more precise
     /// receiver than the type whose members are being searched.
     ///
@@ -3465,40 +3516,12 @@ impl<'db> Type<'db> {
         // another intersection element provides an always-defined member that safely covers it.
         // We cannot preserve the correlation between the optional member and that fallback.
         let local_member = if receiver.is_some() {
-            match self {
-                Type::TypeVar(typevar) => {
-                    typevar
-                        .typevar(db)
-                        .bound_or_constraints(db)
-                        .map(|bound_or_constraints| match bound_or_constraints {
-                            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
-                                .map_with_boundness_and_qualifiers(db, |constraint| {
-                                    constraint.member_lookup_with_policy(db, name.clone(), policy)
-                                }),
-                            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                                bound.member_lookup_with_policy(db, name.clone(), policy)
-                            }
-                        })
-                }
-                Type::SubclassOf(subclass_of) => subclass_of
-                    .subclass_of()
-                    .into_type_var()
-                    .and_then(|typevar| typevar.typevar(db).bound_or_constraints(db))
-                    .map(|bound_or_constraints| match bound_or_constraints {
-                        TypeVarBoundOrConstraints::Constraints(constraints) => constraints
-                            .map_with_boundness_and_qualifiers(db, |constraint| {
-                                constraint.to_meta_type(db).member_lookup_with_policy(
-                                    db,
-                                    name.clone(),
-                                    policy,
-                                )
-                            }),
-                        TypeVarBoundOrConstraints::UpperBound(bound) => bound
-                            .to_meta_type(db)
-                            .member_lookup_with_policy(db, name.clone(), policy),
-                    }),
-                _ => None,
-            }
+            self.typevar_alternative_member_lookup_with_policy_and_receiver(
+                db,
+                name.clone(),
+                policy,
+                None,
+            )
         } else {
             None
         };
@@ -3634,7 +3657,7 @@ impl<'db> Type<'db> {
                         })
                         .flatten()
                         .unwrap_or(false);
-                    let result = intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                    let lookup_member = |elem: Type<'db>| {
                         // If multiple elements define the member, either one can shadow the other
                         // at runtime, unless they inherit the same class member. Keep ambiguous
                         // members bound to their local receiver.
@@ -3659,7 +3682,67 @@ impl<'db> Type<'db> {
                             member_policy,
                             Some(receiver),
                         )
-                    });
+                    };
+                    // A TypeVar alternative may or may not provide the member. If another
+                    // intersection element always does, runtime MRO can select either defined
+                    // member, so preserve those alternatives as a union.
+                    let has_partial_alternative =
+                        intersection.positive_elements_or_object(db).any(|element| {
+                            matches!(
+                                element
+                                    .typevar_alternative_member_lookup_with_policy_and_receiver(
+                                        db,
+                                        name_str.into(),
+                                        member_policy,
+                                        None,
+                                    )
+                                    .map(|member| member.place),
+                                Some(Place::Defined(DefinedPlace {
+                                    definedness: Definedness::PossiblyUndefined,
+                                    ..
+                                }))
+                            )
+                        });
+                    let result = if has_partial_alternative && always_defined_member_count > 0 {
+                        let mut builder = UnionBuilder::new(db);
+                        let mut qualifiers = TypeQualifiers::empty();
+                        let mut origin = TypeOrigin::Declared;
+                        for element in intersection.positive_elements_or_object(db) {
+                            let partial_alternative = element
+                                .typevar_alternative_member_lookup_with_policy_and_receiver(
+                                    db,
+                                    name_str.into(),
+                                    member_policy,
+                                    None,
+                                )
+                                .filter(|member| {
+                                    matches!(
+                                        member.place,
+                                        Place::Defined(DefinedPlace {
+                                            definedness: Definedness::PossiblyUndefined,
+                                            ..
+                                        })
+                                    )
+                                });
+                            let member =
+                                partial_alternative.unwrap_or_else(|| lookup_member(element));
+                            qualifiers |= member.qualifiers;
+                            if let Place::Defined(DefinedPlace {
+                                ty,
+                                origin: member_origin,
+                                ..
+                            }) = member.place
+                            {
+                                builder = builder.add(ty);
+                                origin = origin.merge(member_origin);
+                            }
+                        }
+                        Place::Defined(DefinedPlace::new(builder.build()).with_origin(origin))
+                            .with_qualifiers(qualifiers)
+                    } else {
+                        intersection
+                            .map_with_boundness_and_qualifiers(db, |elem| lookup_member(*elem))
+                    };
                     self.fallback_to_getattr_only(db, receiver, &name, result, policy)
                 }
             }
