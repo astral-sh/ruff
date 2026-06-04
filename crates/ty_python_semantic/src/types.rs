@@ -3517,9 +3517,15 @@ impl<'db> Type<'db> {
                                 .try_upcast_to_callable(db)
                                 .zip(fallback_ty.try_upcast_to_callable(db))
                                 .is_some_and(|(member, fallback)| {
-                                    member
-                                        .into_type(db)
-                                        .is_subtype_of(db, fallback.into_type(db))
+                                    let member = member.into_type(db);
+                                    let fallback = fallback.into_type(db);
+                                    member.is_subtype_of(db, fallback)
+                                        // Generic callable compatibility requires assignability,
+                                        // but gradual compatibility cannot safely discard an MRO
+                                        // alternative.
+                                        || (!member.has_dynamic(db)
+                                            && !fallback.has_dynamic(db)
+                                            && member.is_assignable_to(db, fallback))
                                 }))
                 };
                 if let Some(Type::Intersection(receiver)) = receiver

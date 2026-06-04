@@ -464,6 +464,25 @@ def upper_bounded[V: HasGet | NoGet](value: Intersection[V, GetFallback]):
     # error: [invalid-argument-type]
     takes_has_get(value.get())
 
+GenericReturn = TypeVar("GenericReturn")
+
+class HasGenericGet:
+    def get(self, value: GenericReturn) -> GenericReturn:
+        return value
+
+class NoGenericGet: ...
+
+class GenericGetFallback:
+    def get(self, value: object) -> object:
+        return object()
+
+GenericGetConstraint = TypeVar("GenericGetConstraint", HasGenericGet, NoGenericGet)
+
+def takes_int(value: int): ...
+def generic_method_fallback(value: Intersection[GenericGetConstraint, GenericGetFallback]):
+    reveal_type(value.get(1))  # revealed: object
+    takes_int(value.get(1))  # error: [invalid-argument-type]
+
 class HasClassGet:
     @classmethod
     def get(cls) -> Self:
@@ -485,6 +504,26 @@ def _(cls: Intersection[type[W], type[ClassGetFallback]]):
     takes_class_get_fallback(cls.get())
     # error: [invalid-argument-type]
     takes_has_class_get(cls.get())
+
+class HasGenericClassGet:
+    @classmethod
+    def get(cls, value: GenericReturn) -> GenericReturn:
+        return value
+
+class NoGenericClassGet: ...
+
+class GenericClassGetFallback:
+    @classmethod
+    def get(cls, value: object) -> object:
+        return object()
+
+GenericClassGetConstraint = TypeVar("GenericClassGetConstraint", HasGenericClassGet, NoGenericClassGet)
+
+def generic_classmethod_fallback(
+    cls: Intersection[type[GenericClassGetConstraint], type[GenericClassGetFallback]],
+):
+    reveal_type(cls.get(1))  # revealed: object
+    takes_int(cls.get(1))  # error: [invalid-argument-type]
 
 class GenericDefaults:
     def choose[T = Self](self) -> T:
