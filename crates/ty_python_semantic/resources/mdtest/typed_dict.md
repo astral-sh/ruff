@@ -5126,6 +5126,11 @@ def multiple_mapping_membership_tests(mapping: Mapping[Literal["a", "b"], int]):
 def guard_object(value: object) -> TypeGuard[object]:
     return True
 
+def no_op_membership_and_typeguard(value: Foo):
+    has_foo = "foo" in value
+    if guard_object(value) and has_foo:
+        reveal_type(value)  # revealed: object
+
 def membership_and_typeguard(u: Foo | Mapping[Literal["a", "b"], int]):
     has_c = "c" in u
     if guard_object(u) and has_c:
