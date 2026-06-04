@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+  --> import_heading.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import os
+ 4 | | import sys
+ 5 | |
+ 6 | | import requests
+ 7 | | import pandas
+ 8 | |
+ 9 | | from my_first_party import my_first_party_object
+10 | |
+11 | | from . import my_local_folder_object
+   | |____________________________________^
+   |
+help: Organize imports
+1  +
+2  + # Future imports
+3  | from __future__ import annotations
+4  |
+5  + # Standard library imports
+6  | import os
+7  | import sys
+8  |
+9  + # Third party imports
+10 + import pandas
+11 | import requests
+   - import pandas
+12 |
+13 + # First party imports
+14 | from my_first_party import my_first_party_object
+15 |
+16 + # Local folder imports
+17 | from . import my_local_folder_object
