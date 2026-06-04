@@ -1495,7 +1495,7 @@ Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be a
 
 ```py
 from functools import partial
-from typing import Callable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 def f(a: int, b: str) -> bool:
     return True
@@ -1505,6 +1505,18 @@ reveal_type(p.func)  # revealed: def f(a: int, b: str) -> bool
 reveal_type(p.func(2, "hello"))  # revealed: bool
 reveal_type(p.args)  # revealed: tuple[Any, ...]
 reveal_type(p.keywords)  # revealed: dict[str, Any]
+
+@runtime_checkable
+class PartialMarker(Protocol):
+    def __call__(self, value: int) -> bool: ...
+
+def takes_str(value: str): ...
+
+if isinstance(p, PartialMarker):
+    reveal_type(p.args)  # revealed: tuple[Any, ...]
+    reveal_type(p.keywords)  # revealed: dict[str, Any]
+    takes_str(p.args)  # error: [invalid-argument-type]
+    takes_str(p.keywords)  # error: [invalid-argument-type]
 ```
 
 ### `partial.func` keeps the original callable type

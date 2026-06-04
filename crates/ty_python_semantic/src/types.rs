@@ -4133,7 +4133,7 @@ impl<'db> Type<'db> {
                 let nominal_lookup = partial
                     .partial(db)
                     .into_functools_partial_instance(db)
-                    .member_lookup_with_policy_and_receiver(db, name.clone(), policy, receiver);
+                    .member_lookup_with_policy(db, name.clone(), policy);
                 if name_str == "func" {
                     match nominal_lookup.place {
                         Place::Defined(DefinedPlace {
