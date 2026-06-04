@@ -348,6 +348,33 @@ impl<'db> Definitions<'db> {
         Self::new(resolved)
     }
 
+    /// Map stub definitions to corresponding source implementations for implementation lookup.
+    pub(crate) fn map_stubs_for_implementation(
+        self,
+        db: &'db dyn ty_python_semantic::Db,
+    ) -> Option<Definitions<'db>> {
+        let stub_mapper = StubMapper::new(db);
+        let resolved: Vec<_> = self
+            .0
+            .into_iter()
+            .flat_map(|definition| {
+                if definition.focus_range(db).file().is_stub(db) {
+                    stub_mapper
+                        .map_definition_to_source(&definition)
+                        .unwrap_or_default()
+                } else {
+                    vec![definition]
+                }
+            })
+            .collect();
+
+        if resolved.is_empty() {
+            None
+        } else {
+            Some(Self::new(resolved))
+        }
+    }
+
     /// Convert these semantic definitions to editor-facing navigation targets.
     pub(crate) fn into_navigation_targets(
         self,
