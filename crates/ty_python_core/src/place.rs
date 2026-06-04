@@ -824,6 +824,13 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                     places.extend(self.pattern_aliases_kind(pattern));
                 }
             }
+            PatternPredicateKind::Star(name) => {
+                if let Some(name) = name
+                    && let Some(place) = self.places.symbol_id(name.as_str())
+                {
+                    places.insert(place.into());
+                }
+            }
             _ => {}
         }
 

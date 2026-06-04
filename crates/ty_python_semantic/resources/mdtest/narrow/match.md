@@ -270,6 +270,18 @@ def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
         case [int(), *rest]:
             reveal_type(value[0])  # revealed: int
             reveal_type(value[1])  # revealed: int | str
+            reveal_type(rest)  # revealed: list[int | str]
+
+def test_match_star_capture(value: tuple[int, str, bool]) -> None:
+    match value:
+        case [first, *rest]:
+            reveal_type(first)  # revealed: int
+            reveal_type(rest)  # revealed: list[str | bool]
+
+def test_match_star_capture_between_patterns(value: tuple[int, bytes, str]) -> None:
+    match value:
+        case [int(), *rest, str()]:
+            reveal_type(rest)  # revealed: list[bytes]
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:

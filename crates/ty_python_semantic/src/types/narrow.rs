@@ -927,7 +927,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::As(pattern, _) => pattern
                 .as_deref()
                 .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
-            PatternPredicateKind::MatchStar => None,
+            PatternPredicateKind::Star(_) => None,
         }
     }
 
@@ -1000,6 +1000,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 });
                 Self::merge_optional_constraints_and(nested, alias)
             }
+            PatternPredicateKind::Star(name) => name.as_ref().and_then(|name| {
+                let place = self.places().symbol_id(name.as_str())?;
+                Some(NarrowingConstraints::from_iter([(
+                    place.into(),
+                    NarrowingConstraint::replacement(subject_ty),
+                )]))
+            }),
             _ => None,
         }
     }
@@ -1020,7 +1027,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::As(Some(pattern), _) => {
                 self.match_pattern_subject_type(pattern, subject_ty)
             }
-            PatternPredicateKind::As(None, _) | PatternPredicateKind::Unsupported => subject_ty,
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => subject_ty,
             PatternPredicateKind::Or(patterns) => UnionType::from_elements(
                 self.db,
                 patterns
@@ -1039,7 +1046,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let target_len = if let Some(starred_index) = kind
             .patterns
             .iter()
-            .position(|pattern| matches!(pattern, PatternPredicateKind::Unsupported))
+            .position(|pattern| matches!(pattern, PatternPredicateKind::Star(_)))
         {
             TupleLength::Variable(starred_index, kind.patterns.len() - (starred_index + 1))
         } else {
@@ -2276,7 +2283,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .as_deref()
                 .map(|pattern| self.necessary_match_pattern_type(pattern))
                 .unwrap_or_else(Type::object),
-            PatternPredicateKind::Value(_) | PatternPredicateKind::MatchStar => Type::object(),
+            PatternPredicateKind::Value(_) | PatternPredicateKind::Star(_) => Type::object(),
         }
     }
 
