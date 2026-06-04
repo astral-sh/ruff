@@ -176,7 +176,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
-from typing import Literal
+from typing import Any, Literal
 from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
@@ -324,6 +324,48 @@ def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> i
             # to `tuple[Never]`, and therefore `Never`.
             # revealed: tuple[int | str] & ~<Protocol with members '__getitem__', '__len__'> & ~<Protocol with members '__getitem__', '__len__'>
             reveal_type(x)
+
+def test_match_variable_class_sequence_is_not_exhaustive(
+    value: tuple[int],
+    C: type[int] | type[str],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [C()]:
+            return 1
+
+def test_match_variable_class_sequence_fallback(
+    value: tuple[int],
+    C: type[int] | type[str],
+) -> None:
+    match value:
+        case [C()]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: tuple[int]
+
+def test_match_dynamic_class_sequence_is_not_exhaustive(
+    value: tuple[int],
+    C: Any,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [C()]:
+            return 1
+
+def test_match_subclass_class_sequence_is_not_exhaustive(
+    value: tuple[int],
+    C: type[int],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [C()]:
+            return 1
+
+def test_match_fixed_class_sequence_is_exhaustive(value: tuple[int]) -> int:
+    match value:
+        case [int()]:
+            return 1
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
     match value:
