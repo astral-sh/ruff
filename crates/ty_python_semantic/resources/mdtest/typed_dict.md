@@ -5054,7 +5054,8 @@ the key, because "extra items" are allowed by default. For example, even though 
 define a `"foo"` field, it could be _assigned to_ with another `TypedDict` that does:
 
 ```py
-from typing_extensions import Literal
+from collections.abc import Mapping
+from typing_extensions import Literal, TypeGuard
 
 class Foo(TypedDict):
     foo: int
@@ -5087,9 +5088,52 @@ static_assert(is_assignable_to(FooBar, Bar))
 
 def dictionary_union(u: Foo | dict[Literal["a", "b"], int]):
     if "c" in u:
-        # TODO: This should stop erroring if we prove that the `dict` arm cannot contain `"c"`.
-        # error: [invalid-argument-type]
         reveal_type(u["c"])  # revealed: object
+
+def mapping_union(u: Foo | Mapping[Literal["a", "b"], int]):
+    if "c" in u:
+        reveal_type(u["c"])  # revealed: object
+
+def mapping_only(
+    mapping: Mapping[Literal["a", "b"], int],
+    broad_mapping: Mapping[str, int],
+):
+    if "c" in mapping:
+        reveal_type(mapping["c"])  # revealed: object
+    if "c" in broad_mapping:
+        reveal_type(broad_mapping["c"])  # revealed: int
+
+def multiple_membership_tests(u: Foo | Bar):
+    has_foo = "foo" in u
+    has_bar = "bar" in u
+    if has_foo and has_bar:
+        reveal_type(u["foo"])  # revealed: object
+        reveal_type(u["bar"])  # revealed: object
+
+def nested_membership_tests(u: Foo | Bar):
+    if "foo" in u:
+        if "bar" in u:
+            reveal_type(u["foo"])  # revealed: object
+            reveal_type(u["bar"])  # revealed: object
+
+def multiple_mapping_membership_tests(mapping: Mapping[Literal["a", "b"], int]):
+    has_c = "c" in mapping
+    has_d = "d" in mapping
+    if has_c and has_d:
+        reveal_type(mapping["c"])  # revealed: object
+        reveal_type(mapping["d"])  # revealed: object
+
+def guard_object(value: object) -> TypeGuard[object]:
+    return True
+
+def membership_and_typeguard(u: Foo | Mapping[Literal["a", "b"], int]):
+    has_c = "c" in u
+    if guard_object(u) and has_c:
+        reveal_type(u["c"])  # revealed: object
+    if has_c and guard_object(u):
+        reveal_type(u)  # revealed: object
+    if "c" in u and guard_object(u):
+        reveal_type(u)  # revealed: object
 
 def literal_union(u: Foo | Literal["abc"]):
     if "a" in u:
@@ -5101,6 +5145,51 @@ def literal_union_key_access(obj: Foo | Literal["a"]):
         # Membership in a string does not imply that the string supports subscripting with that key.
         # error: [invalid-argument-type]
         reveal_type(obj["a"])  # revealed: object
+```
+
+Present-key constraints retain union-arm correlation when multiple membership tests are combined.
+This example also guards against constructing the Cartesian product of the eight union arms for each
+of the six predicates:
+
+```py
+from typing import TypedDict
+
+class Membership0(TypedDict):
+    item0: int
+
+class Membership1(TypedDict):
+    item1: int
+
+class Membership2(TypedDict):
+    item2: int
+
+class Membership3(TypedDict):
+    item3: int
+
+class Membership4(TypedDict):
+    item4: int
+
+class Membership5(TypedDict):
+    item5: int
+
+class Membership6(TypedDict):
+    item6: int
+
+class Membership7(TypedDict):
+    item7: int
+
+def multiple_union_membership_tests(
+    u: Membership0 | Membership1 | Membership2 | Membership3 | Membership4 | Membership5 | Membership6 | Membership7,
+):
+    has_key0 = "key0" in u
+    has_key1 = "key1" in u
+    has_key2 = "key2" in u
+    has_key3 = "key3" in u
+    has_key4 = "key4" in u
+    has_key5 = "key5" in u
+    if has_key0 and has_key1 and has_key2 and has_key3 and has_key4 and has_key5:
+        reveal_type(u["key0"])  # revealed: object
+        reveal_type(u["key5"])  # revealed: object
 ```
 
 This still accepts guarded key access in the branch, without pretending that an open `TypedDict`
