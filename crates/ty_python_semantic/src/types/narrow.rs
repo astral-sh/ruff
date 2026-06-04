@@ -748,20 +748,29 @@ struct PresentKeyConstraint<'db> {
 }
 
 impl<'db> PresentKeyConstraint<'db> {
-    fn after_replacement(
+    fn apply_after_replacement(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> Option<Type<'db>> {
+        replacement: Type<'db>,
+    ) -> Type<'db> {
         let narrowed = narrow_with_present_key(db, env, self.source, self.key.value(db));
         if narrowed == self.source || narrowed == self.source.resolve_type_alias(db) {
-            return None;
+            return replacement;
+        }
+        if narrowed.is_never() {
+            return Type::Never;
         }
 
         if key_membership_implies_subscript(db, env, self.source) {
-            Some(mapping_present_key_protocol(db, env, self.key.value(db)))
+            IntersectionType::from_two_elements(
+                db,
+                env,
+                replacement,
+                mapping_present_key_protocol(db, env, self.key.value(db)),
+            )
         } else {
-            Some(key_membership_contains_protocol(db, env, self.key.value(db)))
+            narrow_with_present_key(db, env, replacement, self.key.value(db))
         }
     }
 }
@@ -841,9 +850,7 @@ impl<'db> Conjunctions<'db> {
 
         if is_replacement {
             for present_key in self.present_keys {
-                if let Some(constraint) = present_key.after_replacement(db, env) {
-                    current = IntersectionType::from_two_elements(db, env, current, constraint);
-                }
+                current = present_key.apply_after_replacement(db, env, current);
             }
         } else {
             for present_key in self.present_keys {
