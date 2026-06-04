@@ -1082,7 +1082,7 @@ def _(
     # `NotCallable` would fail with call-non-callable
     # We only show the call-top-callable error (it's more specific)
     # error: [call-top-callable]
-    x()
+    reveal_type(x())  # revealed: object
 ```
 
 ### Keyword arguments
@@ -1168,8 +1168,9 @@ When one element returns `Never`, the intersection of return types simplifies to
 from ty_extensions import Intersection
 from typing import Callable, NoReturn
 
-def _(x: Intersection[Callable[[], NoReturn], Callable[[], str]]) -> None:
-    reveal_type(x())  # revealed: Never
+def _(x: Intersection[Callable[[bool], NoReturn], Callable[[int], str]]) -> None:
+    reveal_type(x)  # revealed: ((bool, /) -> Never) & ((int, /) -> str)
+    reveal_type(x(True))  # revealed: Never
 ```
 
 ### Variadic arguments

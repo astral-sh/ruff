@@ -26,10 +26,11 @@ use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErro
 use crate::types::tuple::{Tuple, TupleType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CycleDetector, DynamicType, InternedType,
-    KnownClass, KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
-    StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
+    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
+    UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::SemanticIndex;
@@ -328,7 +329,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         InternedType::new(db, argument_ty),
                     ));
                 }
-                SpecialFormType::Callable => {
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     let callable = self
                         .infer_callable_type(subscript)
                         .as_callable()
@@ -1171,11 +1172,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
-        enum SliceArg<'db> {
-            Arg(Type<'db>),
-            Unsupported,
-        }
-
         let db = self.db();
 
         let ast::ExprSlice {
@@ -1190,29 +1186,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty_upper = self.infer_optional_expression(upper.as_deref(), TypeContext::default());
         let ty_step = self.infer_optional_expression(step.as_deref(), TypeContext::default());
 
-        let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(ty @ Type::LiteralValue(literal)) if literal.is_int() || literal.is_bool() => {
-                SliceArg::Arg(ty)
-            }
-            Some(ty @ Type::NominalInstance(instance))
-                if instance.has_known_class(db, KnownClass::NoneType) =>
-            {
-                SliceArg::Arg(ty)
-            }
-            None => SliceArg::Arg(Type::none(db)),
-            _ => SliceArg::Unsupported,
-        };
-
-        match (
-            type_to_slice_argument(ty_lower),
-            type_to_slice_argument(ty_upper),
-            type_to_slice_argument(ty_step),
-        ) {
-            (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
-                KnownClass::Slice.to_specialized_instance(db, &[lower, upper, step])
-            }
-            _ => KnownClass::Slice.to_instance(db),
-        }
+        KnownClass::Slice.to_specialized_instance(
+            db,
+            &[
+                ty_lower.unwrap_or_else(|| Type::none(db)),
+                ty_upper.unwrap_or_else(|| Type::none(db)),
+                ty_step.unwrap_or_else(|| Type::none(db)),
+            ],
+        )
     }
 
     /// Validate a subscript assignment of the form `object[key] = rhs_value`.
@@ -1230,11 +1211,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = target;
 
+        let db = self.db();
+
         let object_ty = self.infer_expression(object, TypeContext::default());
         self.store_typed_dict_key_expected_type(slice, object_ty);
         let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
 
-        self.validate_subscript_assignment_impl(
+        let is_valid_assignment = self.validate_subscript_assignment_impl(
             target,
             None,
             object_ty,
@@ -1242,7 +1225,84 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             rhs_value,
             infer_rhs_value,
             true,
-        )
+        );
+
+        // Record the constraints for the object of the subscript assignment, if the object is an
+        // unconstrained collection literal.
+        if is_valid_assignment
+            && let Some(collection_def) = self.index.unconstrained_collection_binding(object)
+            && let Some((class_literal, _)) = object_ty.class_specialization(db)
+        {
+            let identity_instance = Type::instance(db, class_literal.identity_specialization(db));
+            let collection_generic_context = class_literal.generic_context(db);
+
+            let ast_arguments = [
+                ArgOrKeyword::Arg(&target.slice),
+                ArgOrKeyword::Arg(rhs_value),
+            ];
+
+            let mut call_arguments = CallArguments::positional([Type::unknown(), Type::unknown()]);
+
+            if let Place::Defined(DefinedPlace {
+                ty: dunder_callable,
+                definedness: boundness,
+                ..
+            }) = identity_instance
+                .member_lookup_with_policy(
+                    db,
+                    "__setitem__".into(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            {
+                let mut identity_bindings = dunder_callable
+                    .bindings(db)
+                    .match_parameters(db, &call_arguments)
+                    // Perform inference against the type variables on the receiver's generic context.
+                    .with_generic_context(db, collection_generic_context);
+
+                let call_result = self.speculate().infer_and_check_argument_types(
+                    ArgumentsIter::synthesized(&ast_arguments),
+                    &mut call_arguments,
+                    &mut |builder, (_, expr, tcx)| {
+                        // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                        // However, `object` would have been inferred to a be a collection with `Divergent`
+                        // element types, meaning the type context for a given argument, by which the inferred
+                        // type is keyed, may not be the same as the type context we get here. It is not immediately
+                        // clear how to retrieve those types, and so we just re-infer the argument expressions
+                        // for simplicity.
+                        builder.infer_maybe_standalone_expression(expr, tcx)
+                    },
+                    &mut identity_bindings,
+                    TypeContext::default(),
+                );
+
+                if call_result.is_ok() && boundness == Definedness::AlwaysDefined {
+                    for call_specialization in identity_bindings
+                        .iter_flat()
+                        .flat_map(CallableBinding::matching_overloads)
+                        .filter_map(|(_, identity_overload)| identity_overload.specialization())
+                    {
+                        // Record the constraints on the receiver's generic context formed by
+                        // the arguments to this dunder call.
+                        let Some(constraints) = self.collection_use_constraint_from_specialization(
+                            identity_instance,
+                            collection_generic_context,
+                            call_specialization,
+                        ) else {
+                            continue;
+                        };
+
+                        self.collection_use_constraints
+                            .entry(collection_def)
+                            .or_default()
+                            .insert(constraints);
+                    }
+                }
+            }
+        }
+
+        is_valid_assignment
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -1354,6 +1414,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 valid
             }
+
+            Type::EnumComplement(complement) => self.validate_subscript_assignment_impl(
+                target,
+                full_object_ty,
+                complement.remaining_literal_union(db),
+                infer_slice_ty,
+                rhs_value_node,
+                infer_rhs_value,
+                emit_diagnostic,
+            ),
 
             Type::TypedDict(typed_dict) => {
                 // As an optimization, prevent calling `__setitem__` on (unions of) large `TypedDict`s, and
@@ -1712,6 +1782,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            Type::EnumComplement(complement) => self.validate_subscript_deletion_impl(
+                target,
+                full_object_ty,
+                complement.remaining_literal_union(db),
+                slice_ty,
+            ),
+
             _ => {
                 match object_ty.try_call_dunder(
                     db,
@@ -1874,9 +1951,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return TypeAndQualifiers::declared(Type::unknown());
         };
 
+        let previous_in_type_alias = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_TYPE_ALIAS, false);
         for metadata_element in &arguments[1..] {
             self.infer_expression(metadata_element, TypeContext::default());
         }
+        self.context
+            .inference_flags
+            .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);
 
         subscript_context.infer(self, first_argument)
     }

@@ -120,6 +120,7 @@ mod tests {
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
     #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
     #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
+    #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF074.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -304,6 +305,17 @@ mod tests {
                 .with_target_version(PythonVersion::PY39),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn incorrect_decorator_order_py312() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF074.py"),
+            &settings::LinterSettings::for_rule(Rule::IncorrectDecoratorOrder)
+                .with_target_version(PythonVersion::PY312),
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 

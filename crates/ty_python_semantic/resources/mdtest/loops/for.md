@@ -92,6 +92,36 @@ for x in OldStyleIterable():
 reveal_type(x)
 ```
 
+## Enum complement as overloaded `__iter__` receiver
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Iterator, Literal, overload
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    @overload
+    def __iter__(self: Literal[Color.GREEN]) -> Iterator[int]: ...
+    @overload
+    def __iter__(self: Literal[Color.BLUE]) -> Iterator[str]: ...
+```
+
+```py
+from overloaded import Color
+
+def _(color: Color):
+    if color is Color.RED:
+        return
+
+    for item in color:
+        reveal_type(item)  # revealed: int | str
+```
+
 ## With heterogeneous tuple
 
 ```py
@@ -116,6 +146,10 @@ def _(flag: bool):
     # snapshot: not-iterable
     for x in NotIterable():
         pass
+
+    # revealed: Unknown
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ```snapshot
@@ -126,21 +160,6 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
   |              ^^^^^^^^^^^^^
   |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
-```
-
-```py
-    # revealed: Unknown
-    # snapshot: possibly-unresolved-reference
-    reveal_type(x)
-```
-
-```snapshot
-info[possibly-unresolved-reference]: Name `x` used when possibly not defined
-  --> src/mdtest_snippet.py:13:17
-   |
-13 |     reveal_type(x)
-   |                 ^
-   |
 ```
 
 ## Invalid iterable
@@ -198,8 +217,8 @@ class Test2:
     def __iter__(self) -> TestIter:
         return TestIter()
 
-def _(flag: bool):
-    for x in Test() if flag else Test2():
+def _(iterable: Test | Test2):
+    for x in iterable:
         reveal_type(x)  # revealed: int
 ```
 
@@ -256,8 +275,8 @@ class Test2:
     def __iter__(self) -> TestIter3 | TestIter4:
         return TestIter3()
 
-def _(flag: bool):
-    for x in Test() if flag else Test2():
+def _(iterable: Test | Test2):
+    for x in iterable:
         reveal_type(x)  # revealed: Result1A | Result1B | Result2A | Result2B | Result3 | Result4
 ```
 
@@ -346,6 +365,8 @@ class C:
 ## Union type as iterable where one union element has no `__iter__` method
 
 ```py
+from typing import Literal
+
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -354,18 +375,18 @@ class Test:
     def __iter__(self) -> TestIter:
         return TestIter()
 
-def _(flag: bool):
+def _(iterable: Test | Literal[42]):
     # snapshot: not-iterable
-    for x in Test() if flag else 42:
+    for x in iterable:
         reveal_type(x)  # revealed: int
 ```
 
 ```snapshot
 error[not-iterable]: Object of type `Test | Literal[42]` may not be iterable
-  --> src/mdtest_snippet.py:11:14
+  --> src/mdtest_snippet.py:13:14
    |
-11 |     for x in Test() if flag else 42:
-   |              ^^^^^^^^^^^^^^^^^^^^^^
+13 |     for x in iterable:
+   |              ^^^^^^^^
    |
 info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
 info: `Literal[42]` does not implement `__iter__`
@@ -386,10 +407,10 @@ class Test2:
     def __iter__(self) -> int:
         return 42
 
-def _(flag: bool):
+def _(iterable: Test | Test2):
     # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
     # snapshot: not-iterable
-    for x in Test() if flag else Test2():
+    for x in iterable:
         reveal_type(x)  # revealed: int
 ```
 
@@ -397,10 +418,16 @@ def _(flag: bool):
 error[not-iterable]: Object of type `Test | Test2` may not be iterable
   --> src/mdtest_snippet.py:16:14
    |
-16 |     for x in Test() if flag else Test2():
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |     for x in iterable:
+   |              ^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
+info: element `Test2` of union `Test | Test2` is not assignable to `Iterable[Unknown]`
+info: └── type `Test2` is not assignable to protocol `Iterable[Unknown]`
+info:     └── protocol member `__iter__` is incompatible
+info:         └── incompatible return types: `int` is not assignable to `Iterator[Unknown]`
+info:             └── type `int` is not assignable to protocol `Iterator[Unknown]`
+info:                 └── protocol member `__next__` is not defined on type `int`
 ```
 
 ## Union type as iterable where one union element has a non-callable `__iter__`
@@ -422,8 +449,7 @@ class NotIter:
     # `__iter__` is present but not callable
     __iter__: int = 32
 
-def _(flag: bool):
-    iterable = Test() if flag else NotIter()
+def _(iterable: Test | NotIter):
     # snapshot: not-iterable
     for x in iterable:
         reveal_type(x)  # revealed: int | Unknown
@@ -431,9 +457,9 @@ def _(flag: bool):
 
 ```snapshot
 error[not-iterable]: Object of type `Test | NotIter` may not be iterable
-  --> src/mdtest_snippet.py:16:14
+  --> src/mdtest_snippet.py:15:14
    |
-16 |     for x in iterable:
+15 |     for x in iterable:
    |              ^^^^^^^^
    |
 info: Its `__iter__` attribute (with type `(bound method Test.__iter__() -> TestIter) | int`) may not be callable
@@ -680,6 +706,9 @@ error[not-iterable]: Object of type `Iterable` is not iterable
    |          ^^^^^^^^^^
    |
 info: Its `__iter__` method has an invalid signature
+info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── unexpected extra parameter `extra_arg`
 info: Expected signature `def __iter__(self): ...`
 ```
 
@@ -754,6 +783,12 @@ error[not-iterable]: Object of type `Iterable1` is not iterable
    |          ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator1` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── unexpected extra parameter `extra_arg`
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1022,6 +1057,9 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method may have an invalid signature
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── unexpected extra parameter `invalid_extra_arg`
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
 ```
@@ -1093,6 +1131,12 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator1` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── unexpected extra parameter `invalid_extra_arg`
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1111,6 +1155,11 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
+info: type `Iterable2` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator2` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator2` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
 ```
 
 ## Possibly invalid `__getitem__` methods

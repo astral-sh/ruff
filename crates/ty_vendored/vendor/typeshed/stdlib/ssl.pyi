@@ -117,20 +117,20 @@ from _ssl import (
 )
 from _typeshed import ReadableBuffer, StrOrBytesPath, WriteableBuffer
 from collections.abc import Callable, Iterable
-from typing import Any, Final, Literal, NamedTuple, TypedDict, overload, type_check_only
-from typing_extensions import Never, Self, TypeAlias, deprecated
+from typing import Any, Final, Literal, NamedTuple, TypeAlias, TypedDict, overload, type_check_only
+from typing_extensions import Never, Self, deprecated
 
 if sys.version_info >= (3, 13):
     from _ssl import HAS_PSK as HAS_PSK
+
+if sys.version_info >= (3, 15):
+    from _ssl import HAS_PSK_TLS13 as HAS_PSK_TLS13
 
 if sys.version_info >= (3, 14):
     from _ssl import HAS_PHA as HAS_PHA
 
 if sys.version_info < (3, 12):
     from _ssl import RAND_pseudo_bytes as RAND_pseudo_bytes
-
-if sys.version_info < (3, 10):
-    from _ssl import RAND_egd as RAND_egd
 
 if sys.platform == "win32":
     from _ssl import enum_certificates as enum_certificates, enum_crls as enum_crls
@@ -222,19 +222,16 @@ class VerifyFlags(enum.IntFlag):
     VERIFY_CRL_CHECK_CHAIN = 0x0C
     VERIFY_X509_STRICT = 0x20
     VERIFY_X509_TRUSTED_FIRST = 0x8000
-    if sys.version_info >= (3, 10):
-        VERIFY_ALLOW_PROXY_CERTS = 0x40
-        VERIFY_X509_PARTIAL_CHAIN = 0x80000
+    VERIFY_ALLOW_PROXY_CERTS = 0x40
+    VERIFY_X509_PARTIAL_CHAIN = 0x80000
 
 VERIFY_DEFAULT: Final = VerifyFlags.VERIFY_DEFAULT
 VERIFY_CRL_CHECK_LEAF: Final = VerifyFlags.VERIFY_CRL_CHECK_LEAF
 VERIFY_CRL_CHECK_CHAIN: Final = VerifyFlags.VERIFY_CRL_CHECK_CHAIN
 VERIFY_X509_STRICT: Final = VerifyFlags.VERIFY_X509_STRICT
 VERIFY_X509_TRUSTED_FIRST: Final = VerifyFlags.VERIFY_X509_TRUSTED_FIRST
-
-if sys.version_info >= (3, 10):
-    VERIFY_ALLOW_PROXY_CERTS: Final = VerifyFlags.VERIFY_ALLOW_PROXY_CERTS
-    VERIFY_X509_PARTIAL_CHAIN: Final = VerifyFlags.VERIFY_X509_PARTIAL_CHAIN
+VERIFY_ALLOW_PROXY_CERTS: Final = VerifyFlags.VERIFY_ALLOW_PROXY_CERTS
+VERIFY_X509_PARTIAL_CHAIN: Final = VerifyFlags.VERIFY_X509_PARTIAL_CHAIN
 
 class _SSLMethod(enum.IntEnum):
     """An enumeration."""
@@ -432,13 +429,15 @@ class SSLSocket(socket.socket):
     ) -> tuple[int, socket._RetAddress]: ...
     def send(self, data: ReadableBuffer, flags: int = 0) -> int: ...
     def sendall(self, data: ReadableBuffer, flags: int = 0) -> None: ...
+
     @overload
     def sendto(self, data: ReadableBuffer, flags_or_addr: socket._Address, addr: None = None) -> int: ...
     @overload
     def sendto(self, data: ReadableBuffer, flags_or_addr: int, addr: socket._Address) -> int: ...
+
     def shutdown(self, how: int) -> None: ...
     @deprecated("Deprecated since Python 3.6. Use `SSLSocket.recv` method instead.")
-    def read(self, len: int = 1024, buffer: bytearray | None = None) -> bytes:
+    def read(self, len: int = 1024, buffer: WriteableBuffer | None = None) -> bytes:
         """Read up to LEN bytes and return them.
         Return zero-length string on EOF.
         """
@@ -460,11 +459,11 @@ class SSLSocket(socket.socket):
         Return None if no certificate was provided, {} if a certificate was
         provided, but not validated.
         """
-
     @overload
     def getpeercert(self, binary_form: Literal[True]) -> bytes | None: ...
     @overload
     def getpeercert(self, binary_form: bool) -> _PeerCertRetType: ...
+
     def cipher(self) -> tuple[str, str, int] | None:
         """Return the currently selected cipher as a 3-tuple ``(name,
         ssl_version, secret_bits)``.
@@ -479,6 +478,10 @@ class SSLSocket(socket.socket):
         """Return the current compression algorithm in use, or ``None`` if
         compression was not negotiated or not supported by one of the peers.
         """
+    if sys.version_info >= (3, 15):
+        def group(self) -> str | None: ...
+        def client_sigalg(self) -> str | None: ...
+        def server_sigalg(self) -> str | None: ...
 
     def get_channel_binding(self, cb_type: str = "tls-unique") -> bytes | None:
         """Get channel binding data for current connection.  Raise ValueError
@@ -491,19 +494,13 @@ class SSLSocket(socket.socket):
         if a next protocol was not negotiated or if ALPN is not supported by one
         of the peers.
         """
-    if sys.version_info >= (3, 10):
-        @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
-        def selected_npn_protocol(self) -> str | None:
-            """Return the currently selected NPN protocol as a string, or ``None``
-            if a next protocol was not negotiated or if NPN is not supported by one
-            of the peers.
-            """
-    else:
-        def selected_npn_protocol(self) -> str | None:
-            """Return the currently selected NPN protocol as a string, or ``None``
-            if a next protocol was not negotiated or if NPN is not supported by one
-            of the peers.
-            """
+
+    @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
+    def selected_npn_protocol(self) -> str | None:
+        """Return the currently selected NPN protocol as a string, or ``None``
+        if a next protocol was not negotiated or if NPN is not supported by one
+        of the peers.
+        """
 
     def accept(self) -> tuple[SSLSocket, socket._RetAddress]:
         """Accepts a new connection from a remote client, and returns
@@ -591,29 +588,15 @@ def PEM_cert_to_DER_cert(pem_cert_string: str) -> bytes:
     DER-encoded version of it as a byte sequence
     """
 
-if sys.version_info >= (3, 10):
-    def get_server_certificate(
-        addr: tuple[str, int],
-        ssl_version: int = _SSLMethod.PROTOCOL_TLS_CLIENT,
-        ca_certs: str | None = None,
-        timeout: float = ...,
-    ) -> str:
-        """Retrieve the certificate from the server at the specified address,
-        and return it as a PEM-encoded string.
-        If 'ca_certs' is specified, validate the server cert against it.
-        If 'ssl_version' is specified, use it in the connection attempt.
-        If 'timeout' is specified, use it in the connection attempt.
-        """
-
-else:
-    def get_server_certificate(
-        addr: tuple[str, int], ssl_version: int = _SSLMethod.PROTOCOL_TLS_CLIENT, ca_certs: str | None = None
-    ) -> str:
-        """Retrieve the certificate from the server at the specified address,
-        and return it as a PEM-encoded string.
-        If 'ca_certs' is specified, validate the server cert against it.
-        If 'ssl_version' is specified, use it in the connection attempt.
-        """
+def get_server_certificate(
+    addr: tuple[str, int], ssl_version: int = _SSLMethod.PROTOCOL_TLS_CLIENT, ca_certs: str | None = None, timeout: float = ...
+) -> str:
+    """Retrieve the certificate from the server at the specified address,
+    and return it as a PEM-encoded string.
+    If 'ca_certs' is specified, validate the server cert against it.
+    If 'ssl_version' is specified, use it in the connection attempt.
+    If 'timeout' is specified, use it in the connection attempt.
+    """
 
 class TLSVersion(enum.IntEnum):
     """An enumeration."""
@@ -646,18 +629,14 @@ class SSLContext(_SSLContext):
     sslsocket_class: type[SSLSocket]
     keylog_filename: str
     post_handshake_auth: bool
-    if sys.version_info >= (3, 10):
-        security_level: int
-        """The current security level."""
+    security_level: int
+    """The current security level."""
 
-    if sys.version_info >= (3, 10):
-        @overload
-        def __new__(cls, protocol: int, *args: Any, **kwargs: Any) -> Self: ...
-        @overload
-        @deprecated("Deprecated since Python 3.10. Use a specific version of the SSL protocol.")
-        def __new__(cls, protocol: None = None, *args: Any, **kwargs: Any) -> Self: ...
-    else:
-        def __new__(cls, protocol: int = ..., *args: Any, **kwargs: Any) -> Self: ...
+    @overload
+    def __new__(cls, protocol: int, *args: Any, **kwargs: Any) -> Self: ...
+    @overload
+    @deprecated("Deprecated since Python 3.10. Use a specific version of the SSL protocol.")
+    def __new__(cls, protocol: None = None, *args: Any, **kwargs: Any) -> Self: ...
 
     def load_default_certs(self, purpose: Purpose = Purpose.SERVER_AUTH) -> None: ...
     def load_verify_locations(
@@ -666,6 +645,7 @@ class SSLContext(_SSLContext):
         capath: StrOrBytesPath | None = None,
         cadata: str | ReadableBuffer | None = None,
     ) -> None: ...
+
     @overload
     def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
         """Returns a list of dicts with information of loaded CA certs.
@@ -676,21 +656,24 @@ class SSLContext(_SSLContext):
         NOTE: Certificates in a capath directory aren't loaded unless they have
         been used at least once.
         """
-
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...
     @overload
     def get_ca_certs(self, binary_form: bool = False) -> Any: ...
+
     def get_ciphers(self) -> list[_Cipher]: ...
+    if sys.version_info >= (3, 15):
+        def set_ciphersuites(self, ciphersuites: str, /) -> None: ...
+        def get_groups(self, /, *, include_aliases: bool = False) -> list[str]: ...
+        def set_groups(self, grouplist: str, /) -> None: ...
+        def set_client_sigalgs(self, sigalgs: str, /) -> None: ...
+        def set_server_sigalgs(self, sigalgs: str, /) -> None: ...
+
     def set_default_verify_paths(self) -> None: ...
     def set_ciphers(self, cipherlist: str, /) -> None: ...
     def set_alpn_protocols(self, alpn_protocols: Iterable[str]) -> None: ...
-    if sys.version_info >= (3, 10):
-        @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
-        def set_npn_protocols(self, npn_protocols: Iterable[str]) -> None: ...
-    else:
-        def set_npn_protocols(self, npn_protocols: Iterable[str]) -> None: ...
-
+    @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
+    def set_npn_protocols(self, npn_protocols: Iterable[str]) -> None: ...
     def set_servername_callback(self, server_name_callback: _SrvnmeCbType | None) -> None: ...
     def load_dh_params(self, path: str, /) -> None: ...
     def set_ecdh_curve(self, name: str, /) -> None: ...
@@ -726,47 +709,25 @@ def create_default_context(
           compatibility and security.
     """
 
-if sys.version_info >= (3, 10):
-    def _create_unverified_context(
-        protocol: int | None = None,
-        *,
-        cert_reqs: int = VerifyMode.CERT_NONE,
-        check_hostname: bool = False,
-        purpose: Purpose = Purpose.SERVER_AUTH,
-        certfile: StrOrBytesPath | None = None,
-        keyfile: StrOrBytesPath | None = None,
-        cafile: StrOrBytesPath | None = None,
-        capath: StrOrBytesPath | None = None,
-        cadata: str | ReadableBuffer | None = None,
-    ) -> SSLContext:
-        """Create a SSLContext object for Python stdlib modules
+def _create_unverified_context(
+    protocol: int | None = None,
+    *,
+    cert_reqs: int = VerifyMode.CERT_NONE,
+    check_hostname: bool = False,
+    purpose: Purpose = Purpose.SERVER_AUTH,
+    certfile: StrOrBytesPath | None = None,
+    keyfile: StrOrBytesPath | None = None,
+    cafile: StrOrBytesPath | None = None,
+    capath: StrOrBytesPath | None = None,
+    cadata: str | ReadableBuffer | None = None,
+) -> SSLContext:
+    """Create a SSLContext object for Python stdlib modules
 
-        All Python stdlib modules shall use this function to create SSLContext
-        objects in order to keep common settings in one place. The configuration
-        is less restrict than create_default_context()'s to increase backward
-        compatibility.
-        """
-
-else:
-    def _create_unverified_context(
-        protocol: int = ...,
-        *,
-        cert_reqs: int = VerifyMode.CERT_NONE,
-        check_hostname: bool = False,
-        purpose: Purpose = Purpose.SERVER_AUTH,
-        certfile: StrOrBytesPath | None = None,
-        keyfile: StrOrBytesPath | None = None,
-        cafile: StrOrBytesPath | None = None,
-        capath: StrOrBytesPath | None = None,
-        cadata: str | ReadableBuffer | None = None,
-    ) -> SSLContext:
-        """Create a SSLContext object for Python stdlib modules
-
-        All Python stdlib modules shall use this function to create SSLContext
-        objects in order to keep common settings in one place. The configuration
-        is less restrict than create_default_context()'s to increase backward
-        compatibility.
-        """
+    All Python stdlib modules shall use this function to create SSLContext
+    objects in order to keep common settings in one place. The configuration
+    is less restrict than create_default_context()'s to increase backward
+    compatibility.
+    """
 
 _create_default_https_context = create_default_context
 
@@ -806,7 +767,7 @@ class SSLObject:
         """Was the client session reused during handshake"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
-    def read(self, len: int = 1024, buffer: bytearray | None = None) -> bytes:
+    def read(self, len: int = 1024, buffer: WriteableBuffer | None = None) -> bytes:
         """Read up to 'len' bytes from the SSL object and return them.
 
         If 'buffer' is provided, read into this buffer and return the number of
@@ -828,29 +789,23 @@ class SSLObject:
         Return None if no certificate was provided, {} if a certificate was
         provided, but not validated.
         """
-
     @overload
     def getpeercert(self, binary_form: Literal[True]) -> bytes | None: ...
     @overload
     def getpeercert(self, binary_form: bool) -> _PeerCertRetType: ...
+
     def selected_alpn_protocol(self) -> str | None:
         """Return the currently selected ALPN protocol as a string, or ``None``
         if a next protocol was not negotiated or if ALPN is not supported by one
         of the peers.
         """
-    if sys.version_info >= (3, 10):
-        @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
-        def selected_npn_protocol(self) -> str | None:
-            """Return the currently selected NPN protocol as a string, or ``None``
-            if a next protocol was not negotiated or if NPN is not supported by one
-            of the peers.
-            """
-    else:
-        def selected_npn_protocol(self) -> str | None:
-            """Return the currently selected NPN protocol as a string, or ``None``
-            if a next protocol was not negotiated or if NPN is not supported by one
-            of the peers.
-            """
+
+    @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
+    def selected_npn_protocol(self) -> str | None:
+        """Return the currently selected NPN protocol as a string, or ``None``
+        if a next protocol was not negotiated or if NPN is not supported by one
+        of the peers.
+        """
 
     def cipher(self) -> tuple[str, str, int] | None:
         """Return the currently selected cipher as a 3-tuple ``(name,
@@ -866,6 +821,10 @@ class SSLObject:
         """Return the current compression algorithm in use, or ``None`` if
         compression was not negotiated or not supported by one of the peers.
         """
+    if sys.version_info >= (3, 15):
+        def group(self) -> str | None: ...
+        def client_sigalg(self) -> str | None: ...
+        def server_sigalg(self) -> str | None: ...
 
     def pending(self) -> int:
         """Return the number of bytes that can be read immediately."""
@@ -926,6 +885,9 @@ SSL_ERROR_WANT_X509_LOOKUP: Final = SSLErrorNumber.SSL_ERROR_WANT_X509_LOOKUP  #
 SSL_ERROR_ZERO_RETURN: Final = SSLErrorNumber.SSL_ERROR_ZERO_RETURN  # undocumented
 
 def get_protocol_name(protocol_code: int) -> str: ...
+
+if sys.version_info >= (3, 15):
+    def get_sigalgs() -> list[str]: ...
 
 PEM_FOOTER: Final[str]
 PEM_HEADER: Final[str]

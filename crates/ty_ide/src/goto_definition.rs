@@ -251,6 +251,43 @@ def other_function(): ...
         ");
     }
 
+    #[test]
+    fn goto_definition_stub_map_reexported_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from a import bar
+bar<CURSOR>()
+",
+            )
+            .source("a/__init__.pyi", "def bar() -> None: ...\n")
+            .source("a/__init__.py", "from .impl import bar as bar\n")
+            .source(
+                "a/impl.py",
+                r#"
+def bar() -> None:
+    pass
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:3:1
+          |
+        3 | bar()
+          | ^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> a/impl.py:2:5
+          |
+        2 | def bar() -> None:
+          |     ---
+          |
+        ");
+    }
+
     /// goto-definition on a function definition in a .pyi should go to the .py
     #[test]
     fn goto_definition_stub_map_function_def() {
@@ -1525,14 +1562,14 @@ a: float<CURSOR> = 3.14
           |    ^^^^^ Clicking here
           |
         info: Found 2 definitions
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:344:7
             |
-        348 | class int:
+        344 | class int:
             |       ---
             |
-           ::: stdlib/builtins.pyi:661:7
+           ::: stdlib/builtins.pyi:658:7
             |
-        661 | class float:
+        658 | class float:
             |       -----
             |
         ");
@@ -1557,19 +1594,19 @@ a: complex<CURSOR> = 3.14
           |    ^^^^^^^ Clicking here
           |
         info: Found 3 definitions
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:344:7
             |
-        348 | class int:
+        344 | class int:
             |       ---
             |
-           ::: stdlib/builtins.pyi:661:7
+           ::: stdlib/builtins.pyi:658:7
             |
-        661 | class float:
+        658 | class float:
             |       -----
             |
-           ::: stdlib/builtins.pyi:822:7
+           ::: stdlib/builtins.pyi:820:7
             |
-        822 | class complex:
+        820 | class complex:
             |       -------
             |
         ");
@@ -1804,9 +1841,9 @@ x = DynClass<CURSOR>()
           |     ^^^^^^^^ Clicking here
           |
         info: Found 1 definition
-           --> stdlib/builtins.pyi:137:9
+           --> stdlib/builtins.pyi:131:9
             |
-        137 |     def __new__(cls) -> Self: ...
+        131 |     def __new__(cls) -> Self: ...
             |         -------
             |
         ");
@@ -2040,9 +2077,9 @@ p = Point<CURSOR>(1, 2)
           |     ^^^^^^^^^^^^^^ Clicking here
           |
         info: Found 1 definition
-           --> stdlib/builtins.pyi:262:9
+           --> stdlib/builtins.pyi:256:9
             |
-        262 |     def __dictoffset__(self) -> int: ...
+        256 |     def __dictoffset__(self) -> int: ...
             |         --------------
             |
         ");
@@ -2128,9 +2165,9 @@ p = Point<CURSOR>(1, 2)
           |      ^^^^^^^^^^^^^^ Clicking here
           |
         info: Found 1 definition
-           --> stdlib/builtins.pyi:262:9
+           --> stdlib/builtins.pyi:256:9
             |
-        262 |     def __dictoffset__(self) -> int: ...
+        256 |     def __dictoffset__(self) -> int: ...
             |         --------------
             |
         ");

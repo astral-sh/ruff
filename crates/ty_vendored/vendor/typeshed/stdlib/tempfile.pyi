@@ -100,7 +100,6 @@ if sys.version_info >= (3, 12):
         the creating process is terminated abruptly with a SIGKILL signal.
         Windows can delete the file even in this case.
         """
-
     @overload
     def NamedTemporaryFile(
         mode: OpenBinaryMode = "w+b",
@@ -129,7 +128,6 @@ if sys.version_info >= (3, 12):
         errors: str | None = None,
         delete_on_close: bool = True,
     ) -> _TemporaryFileWrapper[Any]: ...
-
 else:
     @overload
     def NamedTemporaryFile(
@@ -163,7 +161,6 @@ else:
         the creating process is terminated abruptly with a SIGKILL signal.
         Windows can delete the file even in this case.
         """
-
     @overload
     def NamedTemporaryFile(
         mode: OpenBinaryMode = "w+b",
@@ -220,7 +217,6 @@ else:
         Returns an object with a file-like interface.  The file has no
         name, and will cease to exist when it is closed.
         """
-
     @overload
     def TemporaryFile(
         mode: OpenBinaryMode,
@@ -341,18 +337,21 @@ class _TemporaryFileWrapper(IO[AnyStr]):
     def tell(self) -> int: ...
     def truncate(self, size: int | None = ...) -> int: ...
     def writable(self) -> bool: ...
+
     @overload
     def write(self: _TemporaryFileWrapper[str], s: str, /) -> int: ...
     @overload
     def write(self: _TemporaryFileWrapper[bytes], s: ReadableBuffer, /) -> int: ...
     @overload
     def write(self, s: AnyStr, /) -> int: ...
+
     @overload
     def writelines(self: _TemporaryFileWrapper[str], lines: Iterable[str]) -> None: ...
     @overload
     def writelines(self: _TemporaryFileWrapper[bytes], lines: Iterable[ReadableBuffer]) -> None: ...
     @overload
     def writelines(self, lines: Iterable[AnyStr]) -> None: ...
+
     @property
     def closed(self) -> bool: ...
 
@@ -374,6 +373,7 @@ class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
     def encoding(self) -> str: ...  # undocumented
     @property
     def newlines(self) -> str | tuple[str, ...] | None: ...  # undocumented
+
     # bytes needs to go first, as default mode is to open as bytes
     @overload
     def __init__(
@@ -445,6 +445,7 @@ class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
         dir: str | None = None,
         errors: str | None = None,
     ) -> None: ...
+
     @property
     def errors(self) -> str | None: ...
     def rollover(self) -> None: ...
@@ -481,12 +482,14 @@ class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
     def write(self: SpooledTemporaryFile[bytes], s: ReadableBuffer) -> int: ...
     @overload
     def write(self, s: AnyStr) -> int: ...
+
     @overload  # type: ignore[override]
     def writelines(self: SpooledTemporaryFile[str], iterable: Iterable[str]) -> None: ...
     @overload
     def writelines(self: SpooledTemporaryFile[bytes], iterable: Iterable[ReadableBuffer]) -> None: ...
     @overload
     def writelines(self, iterable: Iterable[AnyStr]) -> None: ...
+
     def __iter__(self) -> Iterator[AnyStr]: ...  # type: ignore[override]
     # These exist at runtime only on 3.11+.
     def readable(self) -> bool: ...
@@ -543,7 +546,7 @@ class TemporaryDirectory(Generic[AnyStr]):
             *,
             delete: bool = True,
         ) -> None: ...
-    elif sys.version_info >= (3, 10):
+    else:
         @overload
         def __init__(
             self: TemporaryDirectory[str],
@@ -559,18 +562,6 @@ class TemporaryDirectory(Generic[AnyStr]):
             prefix: bytes | None = None,
             dir: BytesPath | None = None,
             ignore_cleanup_errors: bool = False,
-        ) -> None: ...
-    else:
-        @overload
-        def __init__(
-            self: TemporaryDirectory[str], suffix: str | None = None, prefix: str | None = None, dir: StrPath | None = None
-        ) -> None: ...
-        @overload
-        def __init__(
-            self: TemporaryDirectory[bytes],
-            suffix: bytes | None = None,
-            prefix: bytes | None = None,
-            dir: BytesPath | None = None,
         ) -> None: ...
 
     def cleanup(self) -> None: ...
@@ -614,7 +605,6 @@ def mkstemp(
 
     Caller is responsible for deleting the file when done with it.
     """
-
 @overload
 def mkstemp(
     suffix: bytes | None = None, prefix: bytes | None = None, dir: BytesPath | None = None, text: bool = False
@@ -634,9 +624,9 @@ def mkdtemp(suffix: str | None = None, prefix: str | None = None, dir: StrPath |
 
     Caller is responsible for deleting the directory when done with it.
     """
-
 @overload
 def mkdtemp(suffix: bytes | None = None, prefix: bytes | None = None, dir: BytesPath | None = None) -> bytes: ...
+
 @deprecated("Deprecated since Python 2.3. Use `mkstemp()` or `NamedTemporaryFile(delete=False)` instead.")
 def mktemp(suffix: str = "", prefix: str = "tmp", dir: StrPath | None = None) -> str:
     """User-callable function to return a unique temporary file name.  The

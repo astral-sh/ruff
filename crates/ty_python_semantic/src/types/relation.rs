@@ -258,7 +258,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -282,6 +283,7 @@ impl<'db> Type<'db> {
             | Type::SubclassOf(_)
             | Type::Union(_)
             | Type::Intersection(_)
+            | Type::EnumComplement(_)
             | Type::Callable(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(_)
@@ -292,6 +294,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_)
             | Type::NewTypeInstance(_) => false,
@@ -799,6 +802,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         result
     }
 
+    fn should_provide_callable_upcast_context(&self, source: Type<'db>) -> bool {
+        if !self.is_context_collection_enabled() {
+            return false;
+        }
+
+        // These displays already expose the signature being compared; wrapping them would
+        // duplicate the lower-level callable mismatch context.
+        !matches!(
+            source,
+            Type::Callable(_)
+                | Type::FunctionLiteral(_)
+                | Type::BoundMethod(_)
+                | Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+        )
+    }
+
     fn with_recursion_guard(
         &self,
         source: Type<'db>,
@@ -924,20 +943,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
-                return ConstraintSet::constrain_typevar(
+                return ConstraintSet::constrain_typevar_upper_bound(
                     db,
                     self.constraints,
                     bound_typevar,
-                    Type::Never,
                     target,
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
-                return ConstraintSet::constrain_typevar(
+                return ConstraintSet::constrain_typevar_lower_bound(
                     db,
                     self.constraints,
                     bound_typevar,
                     source,
-                    Type::object(),
                 );
             }
         }
@@ -984,6 +1001,87 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
+
+            // Annotation unions retain type aliases so recursive aliases can be represented.
+            // Normalize direct alias elements together before checking the union so reductions
+            // that depend on multiple elements, such as all members of an enum, are visible.
+            (_, Type::Union(union)) if union.has_aliases(db) => {
+                self.with_recursion_guard(source, target, || {
+                    self.check_type_pair(db, source, union.expand_aliases(db))
+                })
+            }
+
+            (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
+                .with_recursion_guard(source, target, || {
+                    self.check_type_pair(
+                        db,
+                        source_typeform.type_argument(db),
+                        target_typeform.type_argument(db),
+                    )
+                }),
+
+            (Type::SubclassOf(source_subclass), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    source_subclass.to_instance(db),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::NominalInstance(source_instance), Type::TypeForm(target_typeform))
+                if source_instance.has_known_class(db, KnownClass::Type) =>
+            {
+                self.check_type_pair(db, Type::object(), target_typeform.type_argument(db))
+            }
+
+            (Type::ClassLiteral(source_class), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    Type::instance(db, source_class.default_specialization(db)),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::GenericAlias(source_alias), Type::TypeForm(target_typeform)) => self
+                .check_type_pair(
+                    db,
+                    Type::instance(db, ClassType::Generic(source_alias)),
+                    target_typeform.type_argument(db),
+                ),
+
+            (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
+                if source_instance.is_type_form_value() =>
+            {
+                source_instance.type_form_argument(db).when_some_and(
+                    db,
+                    self.constraints,
+                    |source_argument| {
+                        self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
+                    },
+                )
+            }
+
+            (Type::SpecialForm(source_form), Type::TypeForm(target_typeform)) => source_form
+                .type_form_argument(db)
+                .when_some_and(db, self.constraints, |source_argument| {
+                    self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
+                }),
+
+            (Type::GenericAlias(_), Type::NominalInstance(target_instance))
+                if target_instance.has_known_class(db, KnownClass::GenericAlias) =>
+            {
+                self.always()
+            }
+
+            (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
+                self.check_type_pair(db, complement.remaining_literal_union(db), target)
+            }
+
+            (Type::EnumComplement(complement), _) => {
+                self.check_type_pair(db, complement.to_intersection(db), target)
+            }
+
+            (_, Type::EnumComplement(complement)) => {
+                self.check_type_pair(db, source, complement.to_intersection(db))
+            }
 
             // Field definitions in dataclasses and dataclass-transformers can involve calls to
             // `dataclasses.field` or custom field-specifier functions. The annotated return type
@@ -1278,6 +1376,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (_, Type::Union(union)) => {
+                if let Type::Intersection(intersection) = source
+                    && let Some(alternatives) = intersection.finite_alternative_union(db)
+                {
+                    return self.check_type_pair(db, alternatives, target);
+                }
+
                 let is_new_type_of_union = || {
                     // Normally non-unions cannot directly contain unions in our model due to the fact that we
                     // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
@@ -1407,6 +1511,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }),
 
             (Type::Intersection(intersection), _) => {
+                if matches!(target, Type::LiteralValue(_))
+                    && let Some(alternatives) = intersection.finite_alternative_union(db)
+                {
+                    return self.check_type_pair(db, alternatives, target);
+                }
+
                 // An intersection type is a subtype of another type if at least one of its
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
@@ -1586,11 +1696,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(source, target, || {
-                    source
+                    let Some(callables) = source
                         .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
-                        .when_some_and(db, self.constraints, |callables| {
-                            self.check_callables_vs_callable(db, &callables, target_callable)
-                        })
+                    else {
+                        return self.never();
+                    };
+
+                    let result = self.check_callables_vs_callable(db, &callables, target_callable);
+
+                    if self.should_provide_callable_upcast_context(source)
+                        && result.is_never_satisfied(db)
+                    {
+                        self.provide_context(|| ErrorContext::InferredCallableType {
+                            source,
+                            callable: callables.into_type(db),
+                        });
+                    }
+
+                    result
                 })
             }
 
@@ -1920,6 +2043,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 target,
             ),
 
+            (Type::TypeForm(_), _) => self.check_type_pair(db, Type::object(), target),
+
             // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
             // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
             // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
@@ -2197,6 +2322,38 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
+    /// Fall back to structural disjointness for intersections without an exact finite expansion.
+    ///
+    /// An intersection is disjoint from another type if any positive component is disjoint from
+    /// that type, or if the other type is covered by one of the intersection's negative elements.
+    fn check_intersection_pair_via_elements(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+        intersection: IntersectionType<'db>,
+        other: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.with_recursion_guard(left, right, || {
+            intersection
+                .positive(db)
+                .iter()
+                .when_any(db, self.constraints, |&pos_ty| {
+                    self.check_type_pair(db, pos_ty, other)
+                })
+                // A & B & Not[C] is disjoint from C
+                .or(db, self.constraints, || {
+                    intersection
+                        .negative(db)
+                        .iter()
+                        .when_any(db, self.constraints, |&neg_ty| {
+                            self.as_relation_checker(TypeRelation::Subtyping)
+                                .check_type_pair(db, other, neg_ty)
+                        })
+                })
+        })
+    }
+
     pub(super) fn check_type_pair(
         &self,
         db: &'db dyn Db,
@@ -2229,6 +2386,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.with_recursion_guard(left, right, || {
                     self.check_type_pair(db, left, right_alias_ty)
                 })
+            }
+
+            (Type::EnumComplement(complement), other) => {
+                self.check_type_pair(db, complement.remaining_literal_union(db), other)
+            }
+
+            (other, Type::EnumComplement(complement)) => {
+                self.check_type_pair(db, other, complement.remaining_literal_union(db))
             }
 
             // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.
@@ -2315,44 +2480,44 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // If we have two intersections, we test the positive elements of each one against the other intersection
             // Negative elements need a positive element on the other side in order to be disjoint.
             // This is similar to what would happen if we tried to build a new intersection that combines the two
-            (Type::Intersection(left_intersection), Type::Intersection(right_intersection)) => self
-                .with_recursion_guard(left, right, || {
-                    left_intersection
-                        .positive(db)
-                        .iter()
-                        .when_any(db, self.constraints, |&pos_ty| {
-                            self.check_type_pair(db, pos_ty, right)
-                        })
-                        .or(db, self.constraints, || {
-                            right_intersection.positive(db).iter().when_any(
-                                db,
-                                self.constraints,
-                                |&pos_ty| self.check_type_pair(db, pos_ty, left),
-                            )
-                        })
-                }),
+            (Type::Intersection(left_intersection), Type::Intersection(right_intersection)) => {
+                if let Some(alternatives) = left_intersection.finite_alternative_union(db) {
+                    self.check_type_pair(db, alternatives, right)
+                } else if let Some(alternatives) = right_intersection.finite_alternative_union(db) {
+                    self.check_type_pair(db, left, alternatives)
+                } else {
+                    self.with_recursion_guard(left, right, || {
+                        left_intersection
+                            .positive(db)
+                            .iter()
+                            .when_any(db, self.constraints, |&pos_ty| {
+                                self.check_type_pair(db, pos_ty, right)
+                            })
+                            .or(db, self.constraints, || {
+                                right_intersection.positive(db).iter().when_any(
+                                    db,
+                                    self.constraints,
+                                    |&pos_ty| self.check_type_pair(db, pos_ty, left),
+                                )
+                            })
+                    })
+                }
+            }
 
-            (Type::Intersection(intersection), other)
-            | (other, Type::Intersection(intersection)) => {
-                self.with_recursion_guard(left, right, || {
-                    intersection
-                        .positive(db)
-                        .iter()
-                        .when_any(db, self.constraints, |&pos_ty| {
-                            self.check_type_pair(db, pos_ty, other)
-                        })
-                        // A & B & Not[C] is disjoint from C
-                        .or(db, self.constraints, || {
-                            intersection.negative(db).iter().when_any(
-                                db,
-                                self.constraints,
-                                |&neg_ty| {
-                                    self.as_relation_checker(TypeRelation::Subtyping)
-                                        .check_type_pair(db, other, neg_ty)
-                                },
-                            )
-                        })
-                })
+            (Type::Intersection(intersection), other) => {
+                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                    self.check_type_pair(db, alternatives, other)
+                } else {
+                    self.check_intersection_pair_via_elements(db, left, right, intersection, other)
+                }
+            }
+
+            (other, Type::Intersection(intersection)) => {
+                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                    self.check_type_pair(db, other, alternatives)
+                } else {
+                    self.check_intersection_pair_via_elements(db, left, right, intersection, other)
+                }
             }
 
             (Type::LiteralValue(left), Type::LiteralValue(right))
@@ -2583,10 +2748,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
+                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
                             db,
                             ClassType::NonGeneric(class_b),
-                            self.constraints,
+                            self,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
@@ -2599,10 +2764,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
-                        !class_a.could_exist_in_mro_of(
+                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
                             db,
                             ClassType::Generic(alias_b),
-                            self.constraints,
+                            self,
                         ),
                     ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
@@ -2863,6 +3028,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 self.check_type_pair(db, KnownClass::Super.to_instance(db), other)
             }
+
+            (Type::TypeForm(_), _) | (_, Type::TypeForm(_)) => self.never(),
 
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
 

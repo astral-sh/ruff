@@ -23,8 +23,7 @@ import sys
 import types
 from _typeshed import Incomplete, StrPath, TraceFunction
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any, TypeVar
-from typing_extensions import ParamSpec, TypeAlias
+from typing import Any, ParamSpec, TypeAlias, TypeVar
 
 __all__ = ["Trace", "CoverageResults"]
 

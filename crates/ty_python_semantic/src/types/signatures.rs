@@ -18,7 +18,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -916,17 +916,20 @@ impl<'db> Signature<'db> {
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         let mut parameters = self.parameters.iter().cloned().peekable();
+        let removed_receiver = parameters.peek().is_some_and(Parameter::is_positional);
 
         // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
         // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
-        if parameters.peek().is_some_and(Parameter::is_positional) {
+        if removed_receiver {
             parameters.next();
         }
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
-        if let Some(self_type) = self_type {
+        if let Some(self_type) = self_type
+            && self.needs_self_mapping(db, removed_receiver)
+        {
             let self_mapping =
                 TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
             parameters = parameters.apply_type_mapping_impl(
@@ -947,7 +950,84 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns `true` if this signature's first parameter can accept the bound `self` type.
+    ///
+    /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
+    /// If a signature has no positional first parameter, we conservatively keep it.
+    pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        // A dynamic receiver might be compatible with any explicit receiver annotation.
+        if self_type.is_dynamic() {
+            return true;
+        }
+
+        // Without a first parameter, there is no receiver annotation to check.
+        let Some(first_parameter) = self.parameters.get(0) else {
+            return true;
+        };
+
+        // If there is no positional receiver, this signature cannot be pruned based on `self`.
+        if !first_parameter.is_positional() {
+            return true;
+        }
+
+        // Inferred receiver annotations describe the method owner, rather than constraining which
+        // overload is exposed for a bound receiver. Only explicit receiver annotations can prune.
+        if first_parameter.inferred_annotation {
+            return true;
+        }
+
+        let mut expected_self_ty = first_parameter.annotated_type();
+        let accepts_any_or_exact_self =
+            |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
+
+        // Avoid the more expensive normalization below for receiver annotations that already
+        // accept all values, or already exactly match the bound receiver.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return true;
+        }
+
+        // TODO: Expand type aliases here so `type Alias = Self` in a class body
+        // participates in receiver-specific overload pruning.
+        expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
+
+        // `Self` binding can make the receiver annotation trivially compatible.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return true;
+        }
+
+        // A specialized receiver can make generic receiver annotations concrete enough to compare.
+        if let Some((_, self_specialization)) = self_type.class_specialization(db) {
+            expected_self_ty =
+                expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
+
+            // Specialization can also make the receiver annotation trivially compatible.
+            if accepts_any_or_exact_self(expected_self_ty) {
+                return true;
+            }
+        }
+
+        let constraints = ConstraintSetBuilder::new();
+        self_type
+            .when_assignable_to(
+                db,
+                expected_self_ty,
+                &constraints,
+                self.inferable_typevars(db),
+            )
+            .is_always_satisfied(db)
+    }
+
+    pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
+        self.parameters
+            .get(0)
+            .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+    }
+
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        if !self.needs_self_mapping(db, false) {
+            return self.clone();
+        }
+
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
             db,
             self_type,
@@ -1116,6 +1196,18 @@ impl<'db> Signature<'db> {
         ))
     }
 
+    fn needs_self_mapping(&self, db: &'db dyn Db, receiver_is_removed: bool) -> bool {
+        // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
+        // triggers binding when a method is accessed on a concrete receiver.
+        self.return_ty.contains_self(db)
+            || self
+                .parameters
+                .iter()
+                .enumerate()
+                .skip(usize::from(receiver_is_removed))
+                .any(|(_, parameter)| parameter.annotated_type().contains_self(db))
+    }
+
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
@@ -1221,12 +1313,12 @@ impl<'db> Signature<'db> {
                     )
                 })),
                 CallableTypeKind::ParamSpecValue,
+                CallableFunctionProvenance::None,
             ));
-            let param_spec_matches = ConstraintSet::constrain_typevar(
+            let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                 db,
                 constraints,
                 self_bound_typevar,
-                Type::Never,
                 upper,
             );
             let return_types_match = other
@@ -1463,12 +1555,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_tvar,
-                        Type::Never,
                         upper,
                     );
                     let return_types_match = || {
@@ -1515,13 +1607,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }),
                         ),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_tvar,
                         lower,
-                        Type::object(),
                     );
                     let return_types_match = || {
                         // TODO: Similar to how we do this for unions, we should collect error
@@ -1867,13 +1959,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
                     return result;
@@ -1897,12 +1989,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -2019,14 +2111,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 Type::unknown(),
                             )),
                             CallableTypeKind::ParamSpecValue,
+                            CallableFunctionProvenance::None,
                         ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            target_bound_typevar,
-                            lower,
-                            Type::object(),
-                        );
+                        let param_spec_prefix_matches =
+                            ConstraintSet::constrain_typevar_lower_bound(
+                                db,
+                                self.constraints,
+                                target_bound_typevar,
+                                lower,
+                            );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else if let Some(target_param) = target_params.next() {
                         let upper = Type::Callable(CallableType::new(
@@ -2043,14 +2136,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 Type::unknown(),
                             )),
                             CallableTypeKind::ParamSpecValue,
+                            CallableFunctionProvenance::None,
                         ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            source_bound_typevar,
-                            Type::Never,
-                            upper,
-                        );
+                        let param_spec_prefix_matches =
+                            ConstraintSet::constrain_typevar_upper_bound(
+                                db,
+                                self.constraints,
+                                source_bound_typevar,
+                                upper,
+                            );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else {
                         // When the prefixes match exactly, we just relate the remaining tails.
@@ -2077,13 +2171,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
                     return result;
@@ -2214,13 +2308,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
 
@@ -2238,12 +2332,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -2347,12 +2441,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
@@ -2628,6 +2722,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // `target`, then the non-variadic parameters in `source` must have a default
                         // value.
                         if default_type.is_none() {
+                            let parameter =
+                                ParameterDescription::new(target_index, source_parameter.name());
+                            self.provide_context(|| ErrorContext::ExtraRequiredParameter {
+                                parameter,
+                            });
                             return self.never();
                         }
                     }
@@ -3136,6 +3235,8 @@ impl<'db> Parameters<'db> {
                 _ => {}
             }
         }
+
+        value.shrink_to_fit();
 
         Parameters { value, kind }
     }

@@ -22,8 +22,8 @@ use ty_python_semantic::types::ide_support::{
     typed_dict_key_definition,
 };
 use ty_python_semantic::{
-    HasDefinition, HasOptionalDefinition, HasType, ImportAliasResolution, SemanticModel,
-    TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
+    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
+    definitions_for_imported_symbol, definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -246,7 +246,13 @@ pub(crate) enum GotoTarget<'a> {
 pub(crate) struct Definitions<'db>(Vec<ResolvedDefinition<'db>>);
 
 impl<'db> Definitions<'db> {
-    fn new(resolved: Vec<ResolvedDefinition<'db>>) -> Self {
+    fn new(mut resolved: Vec<ResolvedDefinition<'db>>) -> Self {
+        for index in (1..resolved.len()).rev() {
+            if resolved[..index].contains(&resolved[index]) {
+                resolved.remove(index);
+            }
+        }
+
         Self(resolved)
     }
 
@@ -623,10 +629,17 @@ impl GotoTarget<'_> {
                 call_expression,
             )),
 
-            // For exception variables, they are their own definitions (like parameters)
-            GotoTarget::ExceptVariable(except_handler) => except_handler
-                .optional_definition(model)
-                .map(|definition| vec![ResolvedDefinition::Definition(definition)]),
+            // Exception handler names are bindings but not expressions, so look them up by ident.
+            GotoTarget::ExceptVariable(except_handler) => {
+                except_handler.name.as_ref().map(|name| {
+                    definitions_for_name(
+                        model,
+                        name.as_str(),
+                        AnyNodeRef::Identifier(name),
+                        alias_resolution,
+                    )
+                })
+            }
 
             // Patterns are glorified assignments but we have to look them up by ident
             // because they're not expressions

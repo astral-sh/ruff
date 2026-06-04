@@ -8,8 +8,8 @@ import sys
 import zlib
 from _typeshed import ReadableBuffer, SizedBuffer, StrOrBytesPath, WriteableBuffer
 from io import FileIO, TextIOWrapper
-from typing import Final, Literal, Protocol, overload, type_check_only
-from typing_extensions import TypeAlias, deprecated
+from typing import Final, Literal, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import deprecated
 
 if sys.version_info >= (3, 14):
     from compression._common._streams import BaseStream, DecompressReader
@@ -76,7 +76,6 @@ def open(
     behavior, and line ending(s).
 
     """
-
 @overload
 def open(
     filename: StrOrBytesPath | _WritableFileobj,
@@ -135,6 +134,7 @@ class GzipFile(BaseStream):
     name: str
     compress: zlib._Compress
     fileobj: _ReadableFileobj | _WritableFileobj
+
     @overload
     def __init__(
         self,
@@ -177,7 +177,6 @@ class GzipFile(BaseStream):
         to generate a compressed stream that does not depend on creation time.
 
         """
-
     @overload
     def __init__(
         self,
@@ -214,6 +213,7 @@ class GzipFile(BaseStream):
         fileobj: _ReadableFileobj | _WritableFileobj | None = None,
         mtime: float | None = None,
     ) -> None: ...
+
     if sys.version_info < (3, 12):
         @property
         @deprecated("Deprecated since Python 2.6; removed in Python 3.12. Use `name` attribute instead.")
@@ -256,7 +256,10 @@ class GzipFile(BaseStream):
 class _GzipReader(DecompressReader):
     def __init__(self, fp: _ReadableFileobj) -> None: ...
 
-if sys.version_info >= (3, 14):
+if sys.version_info >= (3, 15):
+    def compress(data: SizedBuffer, compresslevel: int = 6, *, mtime: float = 0) -> bytes: ...
+
+elif sys.version_info >= (3, 14):
     def compress(data: SizedBuffer, compresslevel: int = 9, *, mtime: float = 0) -> bytes:
         """Compress data in one shot and return the compressed string.
 

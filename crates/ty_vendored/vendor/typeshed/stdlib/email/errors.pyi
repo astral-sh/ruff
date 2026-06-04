@@ -1,7 +1,5 @@
 """email package exception classes."""
 
-import sys
-
 class MessageError(Exception):
     """Base class for errors in the email package."""
 
@@ -87,6 +85,5 @@ class ObsoleteHeaderDefect(HeaderDefect):
 class NonASCIILocalPartDefect(HeaderDefect):
     """local_part contains non-ASCII characters"""
 
-if sys.version_info >= (3, 10):
-    class InvalidDateDefect(HeaderDefect):
-        """Header has unparsable or invalid date"""
+class InvalidDateDefect(HeaderDefect):
+    """Header has unparsable or invalid date"""

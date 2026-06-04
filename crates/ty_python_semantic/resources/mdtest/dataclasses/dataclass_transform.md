@@ -1210,10 +1210,6 @@ class ConverterClass:
 class Model(ModelBase):
     field3: ConverterClass = model_field(converter=ConverterClass)
     field4: int = model_field(converter=overloaded_converter)
-    # TODO: This should be accepted once overloaded class callables with richer signatures are
-    # modeled in callable assignability.
-    # error: [invalid-assignment]
-    # error: [invalid-argument-type]
     field5: dict[str, str] = model_field(converter=dict, default=())
 ```
 
@@ -1745,6 +1741,36 @@ Model(x=1)
 reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
 ```
 
+### Decorator return types are still metadata-only in decorator position
+
+When a `@dataclass_transform()`-decorated function is used as a class decorator, we currently use it
+to shape the class like a dataclass but do not yet let an explicit non-class return annotation
+replace the public class binding.
+
+```py
+from typing import Protocol, TypeVar
+from typing_extensions import dataclass_transform
+
+class Wrapped(Protocol):
+    def f(self) -> int: ...
+
+T = TypeVar("T", bound=object)
+
+@dataclass_transform()
+def model(cls: type[T]) -> Wrapped:
+    raise NotImplementedError
+
+@model
+class C:
+    x: int
+
+reveal_type(C)  # revealed: <class 'C'>
+reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+
+# TODO: Decide whether the explicit `Wrapped` return type should replace the public binding here.
+C.f()  # error: [unresolved-attribute]
+```
+
 ## `__dataclass_transform__` compatibility
 
 For backwards compatibility with pre-3.11 Python, ty recognizes any function named
@@ -1975,14 +2001,15 @@ class WithGenericClassConverter:
     a: list[str] = field(converter=list)
     b: tuple[int, int] = field(converter=duplicate)
 
-# TODO: The input types should ideally be `a: Iterable[str]` and `b: int` here
-# revealed: (self: WithGenericClassConverter, a: Iterable[Unknown], b: Unknown) -> None
+# TODO: The input type for `b` should ideally be `int` here
+# revealed: (self: WithGenericClassConverter, a: Iterable[str], b: Unknown) -> None
 reveal_type(WithGenericClassConverter.__init__)
 
 WithGenericClassConverter(("a", "b", "c"), 1)
 
-# TODO: these should ideally be errors
+# error: [invalid-argument-type]
 WithGenericClassConverter((1, 2, 3), 1)
+# TODO: this should ideally be an error
 WithGenericClassConverter(("a", "b", "c"), "foo")
 ```
 

@@ -37,6 +37,7 @@ bitflags::bitflags! {
         const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 16;
         const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
+        const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
     }
 }
 
@@ -172,6 +173,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports "label details" in completion items.
     pub(crate) const fn supports_completion_item_label_details(self) -> bool {
         self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
+    }
+
+    /// Returns `true` if the client supports snippets in completion items.
+    pub(crate) const fn supports_completion_item_snippets(self) -> bool {
+        self.contains(Self::COMPLETION_ITEM_SNIPPET_SUPPORT)
     }
 
     /// Returns `true` if the client prefers Markdown over plain text in completion items.
@@ -362,6 +368,15 @@ impl ResolvedClientCapabilities {
             flags |= Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT;
         }
 
+        if text_document
+            .and_then(|text_document| text_document.completion.as_ref())
+            .and_then(|completion| completion.completion_item.as_ref())
+            .and_then(|completion_item| completion_item.snippet_support)
+            .unwrap_or_default()
+        {
+            flags |= Self::COMPLETION_ITEM_SNIPPET_SUPPORT;
+        }
+
         flags
     }
 }
@@ -470,6 +485,7 @@ pub(crate) fn server_capabilities(
             ..Default::default()
         }),
         type_hierarchy_provider: Some(OneOf::Left(true)),
+        call_hierarchy_provider: Some(lsp_types::CallHierarchyServerCapability::Simple(true)),
         ..Default::default()
     }
 }

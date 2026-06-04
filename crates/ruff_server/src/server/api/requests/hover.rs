@@ -19,11 +19,22 @@ impl super::BackgroundDocumentRequestHandler for Hover {
     fn document_url(params: &types::HoverParams) -> std::borrow::Cow<'_, lsp_types::Url> {
         std::borrow::Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         params: types::HoverParams,
     ) -> Result<Option<types::Hover>> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(url) => {
+                tracing::warn!(
+                    "Returning no hover information because document `{url}` isn't open."
+                );
+                return Ok(None);
+            }
+        };
+
         Ok(hover(&snapshot, &params.text_document_position_params))
     }
 }

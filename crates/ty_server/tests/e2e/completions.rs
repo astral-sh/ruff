@@ -79,6 +79,155 @@ walktr
     Ok(())
 }
 
+#[test]
+fn complete_function_parentheses_disabled_by_default() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def complete_parentheses() -> None: ...
+
+complete_parenth
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default())
+        .enable_completion_snippets(true)
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 16));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "complete_parentheses",
+        "kind": 3,
+        "detail": "def complete_parentheses() -> None",
+        "sortText": "0"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn complete_function_parentheses() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def complete_parentheses() -> None: ...
+
+complete_parenth
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_complete_function_parentheses(true),
+        )
+        .enable_completion_snippets(true)
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 16));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "complete_parentheses",
+        "kind": 3,
+        "detail": "def complete_parentheses() -> None",
+        "sortText": "0",
+        "insertText": "complete_parentheses($0)",
+        "insertTextFormat": 2
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn complete_function_parentheses_without_snippet_support() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def complete_parentheses() -> None: ...
+
+complete_parenth
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_complete_function_parentheses(true),
+        )
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 16));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "complete_parentheses",
+        "kind": 3,
+        "detail": "def complete_parentheses() -> None",
+        "sortText": "0",
+        "insertText": "complete_parentheses()"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn complete_function_parentheses_preserves_qualified_label() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+import typing
+
+is_typedd
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_complete_function_parentheses(true),
+        )
+        .enable_completion_snippets(true)
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 8));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "typing.is_typeddict",
+        "kind": 3,
+        "sortText": "0",
+        "insertText": "typing.is_typeddict($0)",
+        "insertTextFormat": 2
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
 /// Tests that auto-import completions show the fully
 /// qualified form when it will insert it for you. Also,
 /// that an `import` won't be shown when it won't

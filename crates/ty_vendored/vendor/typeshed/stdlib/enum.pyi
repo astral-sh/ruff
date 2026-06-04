@@ -4,8 +4,8 @@ import types
 from _typeshed import SupportsKeysAndGetItem, Unused
 from builtins import property as _builtins_property
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import Any, Final, Generic, Literal, SupportsIndex, TypeVar, overload
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import Any, Final, Generic, Literal, SupportsIndex, TypeAlias, TypeVar, overload
+from typing_extensions import Self, disjoint_base
 
 __all__ = ["EnumMeta", "Enum", "IntEnum", "Flag", "IntFlag", "auto", "unique"]
 
@@ -37,6 +37,8 @@ if sys.version_info >= (3, 11):
 
 if sys.version_info >= (3, 13):
     __all__ += ["EnumDict"]
+if sys.version_info >= (3, 15):
+    __all__ += ["show_flag_values", "bin"]
 
 _EnumMemberT = TypeVar("_EnumMemberT")
 _EnumerationT = TypeVar("_EnumerationT", bound=type[Enum])
@@ -104,6 +106,7 @@ class _EnumDict(dict[str, Any]):
         def update(self, members: SupportsKeysAndGetItem[str, Any], **more_members: Any) -> None: ...
         @overload
         def update(self, members: Iterable[tuple[str, Any]], **more_members: Any) -> None: ...
+
     if sys.version_info >= (3, 13):
         @property
         def member_names(self) -> list[str]: ...
@@ -162,10 +165,8 @@ class EnumMeta(type):
             note: in 3.12 TypeError will no longer be raised, and True will also be
             returned if member is the value of a member in this enum
             """
-    elif sys.version_info >= (3, 10):
-        def __contains__(self: type[Any], obj: object) -> bool: ...
     else:
-        def __contains__(self: type[Any], member: object) -> bool: ...
+        def __contains__(self: type[Any], obj: object) -> bool: ...
 
     def __getitem__(self: type[_EnumMemberT], name: str) -> _EnumMemberT:
         """
@@ -222,6 +223,7 @@ class EnumMeta(type):
 
         `type`, if set, will be mixed in as the first base class.
         """
+
     # Overload 2: Functional API for constructing new enum classes.
     if sys.version_info >= (3, 11):
         @overload

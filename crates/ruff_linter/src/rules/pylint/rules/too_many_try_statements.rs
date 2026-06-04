@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
-use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::StmtTry;
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Violation;
 
@@ -69,7 +69,7 @@ use crate::rules::pylint::helpers::num_statements;
 /// uses a different default setting.
 /// To replicate it exactly, set `lint.pylint.max-statements-in-try` to 1.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.14")]
 pub(crate) struct TooManyStatementsInTryClause {
     statements: usize,
     max_statements: usize,
@@ -89,18 +89,23 @@ impl Violation for TooManyStatementsInTryClause {
 /// W0717
 pub(crate) fn too_many_try_statements(
     checker: &Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
+    try_stmt: &StmtTry,
     max_statements: usize,
 ) {
-    let statements = num_statements(body);
+    // Ignore cases with only `finally` clauses and no `except` handlers. These can't accidentally
+    // catch the wrong exception and are instead being used more like context managers.
+    if try_stmt.handlers.is_empty() {
+        return;
+    }
+
+    let statements = num_statements(&try_stmt.body);
     if statements > max_statements {
         checker.report_diagnostic(
             TooManyStatementsInTryClause {
                 statements,
                 max_statements,
             },
-            stmt.identifier(),
+            TextRange::at(try_stmt.start(), "try".text_len()),
         );
     }
 }

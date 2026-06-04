@@ -3,13 +3,12 @@
 import email.message
 import io
 import sys
-from _typeshed import StrPath, SupportsNoArgReadline, SupportsRead
+from _typeshed import StrPath, SupportsItems, SupportsNoArgReadline, SupportsRead, SupportsWrite, Unused
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from email._policybase import _MessageT
 from types import GenericAlias, TracebackType
-from typing import IO, Any, AnyStr, Generic, Literal, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, Generic, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self
 
 __all__ = [
     "Mailbox",
@@ -36,29 +35,52 @@ _T = TypeVar("_T")
 @type_check_only
 class _SupportsReadAndReadline(SupportsRead[bytes], SupportsNoArgReadline[bytes], Protocol): ...
 
+# As opposed to _MessageT_co in email._policybase, this type is bound to
+# mailbox.Message instead of email.message.Message.
+_MessageT_co = TypeVar("_MessageT_co", bound=Message, default=Message, covariant=True)
+
 _MessageData: TypeAlias = email.message.Message | bytes | str | io.StringIO | _SupportsReadAndReadline
 
 @type_check_only
 class _HasIteritems(Protocol):
     def iteritems(self) -> Iterator[tuple[str, _MessageData]]: ...
 
-@type_check_only
-class _HasItems(Protocol):
-    def items(self) -> Iterator[tuple[str, _MessageData]]: ...
-
 linesep: bytes
 
-class Mailbox(Generic[_MessageT]):
+# Common interface for get_file() return types.
+@type_check_only
+class _GetFileReturn(Protocol):
+    def __iter__(self) -> Iterator[bytes]: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None, /
+    ) -> bool | None: ...
+    def read(self, size: int | None = None, /) -> bytes: ...
+    def read1(self, size: int | None = None, /) -> bytes: ...
+    def readline(self, size: int | None = None, /) -> bytes: ...
+    def readlines(self, sizehint: int | None = None, /) -> list[bytes]: ...
+    def tell(self) -> int: ...
+    def seek(self, offset: int, whence: int = 0, /) -> object: ...
+    def close(self) -> object: ...
+    def readable(self) -> bool: ...
+    def writable(self) -> bool: ...
+    def seekable(self) -> bool: ...
+    def flush(self) -> object: ...
+    @property
+    def closed(self) -> bool: ...
+
+class Mailbox(Generic[_MessageT_co]):
     """A group of messages in a particular place."""
 
     _path: str  # undocumented
-    _factory: Callable[[IO[Any]], _MessageT] | None  # undocumented
-    @overload
-    def __init__(self, path: StrPath, factory: Callable[[IO[Any]], _MessageT], create: bool = True) -> None:
-        """Initialize a Mailbox instance."""
+    _factory: Callable[[_GetFileReturn], _MessageT_co] | None  # undocumented
 
     @overload
+    def __init__(self, path: StrPath, factory: Callable[[_GetFileReturn], _MessageT_co], create: bool = True) -> None:
+        """Initialize a Mailbox instance."""
+    @overload
     def __init__(self, path: StrPath, factory: None = None, create: bool = True) -> None: ...
+
     @abstractmethod
     def add(self, message: _MessageData) -> str:
         """Add message and return assigned key."""
@@ -76,16 +98,16 @@ class Mailbox(Generic[_MessageT]):
         """Replace the keyed message; raise KeyError if it doesn't exist."""
 
     @overload
-    def get(self, key: str, default: None = None) -> _MessageT | None:
+    def get(self, key: str, default: None = None) -> _MessageT_co | None:
         """Return the keyed message, or default if it doesn't exist."""
-
     @overload
-    def get(self, key: str, default: _T) -> _MessageT | _T: ...
-    def __getitem__(self, key: str) -> _MessageT:
+    def get(self, key: str, default: _T) -> _MessageT_co | _T: ...
+
+    def __getitem__(self, key: str) -> _MessageT_co:
         """Return the keyed message; raise KeyError if it doesn't exist."""
 
     @abstractmethod
-    def get_message(self, key: str) -> _MessageT:
+    def get_message(self, key: str) -> _MessageT_co:
         """Return a Message representation or raise a KeyError."""
 
     def get_string(self, key: str) -> str:
@@ -98,9 +120,9 @@ class Mailbox(Generic[_MessageT]):
     @abstractmethod
     def get_bytes(self, key: str) -> bytes:
         """Return a byte string representation or raise a KeyError."""
-    # As '_ProxyFile' doesn't implement the full IO spec, and BytesIO is incompatible with it, get_file return is Any here
+
     @abstractmethod
-    def get_file(self, key: str) -> Any:
+    def get_file(self, key: str) -> _GetFileReturn:
         """Return a file-like representation or raise a KeyError."""
 
     @abstractmethod
@@ -110,17 +132,17 @@ class Mailbox(Generic[_MessageT]):
     def keys(self) -> list[str]:
         """Return a list of keys."""
 
-    def itervalues(self) -> Iterator[_MessageT]:
+    def itervalues(self) -> Iterator[_MessageT_co]:
         """Return an iterator over all messages."""
 
-    def __iter__(self) -> Iterator[_MessageT]: ...
-    def values(self) -> list[_MessageT]:
+    def __iter__(self) -> Iterator[_MessageT_co]: ...
+    def values(self) -> list[_MessageT_co]:
         """Return a list of messages. Memory intensive."""
 
-    def iteritems(self) -> Iterator[tuple[str, _MessageT]]:
+    def iteritems(self) -> Iterator[tuple[str, _MessageT_co]]:
         """Return an iterator over (key, message) tuples."""
 
-    def items(self) -> list[tuple[str, _MessageT]]:
+    def items(self) -> list[tuple[str, _MessageT_co]]:
         """Return a list of (key, message) tuples. Memory intensive."""
 
     @abstractmethod
@@ -135,15 +157,17 @@ class Mailbox(Generic[_MessageT]):
         """Delete all messages."""
 
     @overload
-    def pop(self, key: str, default: None = None) -> _MessageT | None:
+    def pop(self, key: str, default: None = None) -> _MessageT_co | None:
         """Delete the keyed message and return it, or default."""
-
     @overload
-    def pop(self, key: str, default: _T) -> _MessageT | _T: ...
-    def popitem(self) -> tuple[str, _MessageT]:
+    def pop(self, key: str, default: _T) -> _MessageT_co | _T: ...
+
+    def popitem(self) -> tuple[str, _MessageT_co]:
         """Delete an arbitrary (key, message) pair and return it."""
 
-    def update(self, arg: _HasIteritems | _HasItems | Iterable[tuple[str, _MessageData]] | None = None) -> None:
+    def update(
+        self, arg: _HasIteritems | SupportsItems[str, _MessageData] | Iterable[tuple[str, _MessageData]] | None = None
+    ) -> None:
         """Change the messages that correspond to certain keys."""
 
     @abstractmethod
@@ -161,6 +185,9 @@ class Mailbox(Generic[_MessageT]):
     @abstractmethod
     def close(self) -> None:
         """Flush and close the mailbox."""
+    # Undocumented, called by subclasses to parse added messages.
+    def _dump_message(self, message: _MessageData, target: SupportsWrite[bytes], mangle_from_: bool = False) -> None:
+        """Dump message contents to target file."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
@@ -172,16 +199,18 @@ class Maildir(Mailbox[MaildirMessage]):
     """A qmail-style Maildir mailbox."""
 
     colon: str
-    def __init__(self, dirname: StrPath, factory: Callable[[IO[Any]], MaildirMessage] | None = None, create: bool = True) -> None:
+    def __init__(
+        self, dirname: StrPath, factory: Callable[[_GetFileReturn], MaildirMessage] | None = None, create: bool = True
+    ) -> None:
         """Initialize a Maildir instance."""
 
-    def add(self, message: _MessageData) -> str:
+    def add(self, message: _MessageData | MaildirMessage) -> str:
         """Add message and return assigned key."""
 
     def remove(self, key: str) -> None:
         """Remove the keyed message; raise KeyError if it doesn't exist."""
 
-    def __setitem__(self, key: str, message: _MessageData) -> None:
+    def __setitem__(self, key: str, message: _MessageData | MaildirMessage) -> None:
         """Replace the keyed message; raise KeyError if it doesn't exist."""
 
     def get_message(self, key: str) -> MaildirMessage:
@@ -190,7 +219,7 @@ class Maildir(Mailbox[MaildirMessage]):
     def get_bytes(self, key: str) -> bytes:
         """Return a bytes representation or raise a KeyError."""
 
-    def get_file(self, key: str) -> _ProxyFile[bytes]:
+    def get_file(self, key: str) -> _ProxyFile:
         """Return a file-like representation or raise a KeyError."""
     if sys.version_info >= (3, 13):
         def get_info(self, key: str) -> str:
@@ -250,7 +279,7 @@ class Maildir(Mailbox[MaildirMessage]):
     def next(self) -> str | None:
         """Return the next message in a one-time iteration."""
 
-class _singlefileMailbox(Mailbox[_MessageT], metaclass=ABCMeta):
+class _singlefileMailbox(Mailbox[_MessageT_co], metaclass=ABCMeta):
     """A single-file mailbox."""
 
     def add(self, message: _MessageData) -> str:
@@ -283,13 +312,13 @@ class _singlefileMailbox(Mailbox[_MessageT], metaclass=ABCMeta):
     def close(self) -> None:
         """Flush and close the mailbox."""
 
-class _mboxMMDF(_singlefileMailbox[_MessageT]):
+class _mboxMMDF(_singlefileMailbox[_MessageT_co]):
     """An mbox or MMDF mailbox."""
 
-    def get_message(self, key: str) -> _MessageT:
+    def get_message(self, key: str) -> _MessageT_co:
         """Return a Message representation or raise a KeyError."""
 
-    def get_file(self, key: str, from_: bool = False) -> _PartialFile[bytes]:
+    def get_file(self, key: str, from_: bool = False) -> _PartialFile:
         """Return a file-like representation or raise a KeyError."""
 
     def get_bytes(self, key: str, from_: bool = False) -> bytes:
@@ -301,19 +330,23 @@ class _mboxMMDF(_singlefileMailbox[_MessageT]):
 class mbox(_mboxMMDF[mboxMessage]):
     """A classic mbox mailbox."""
 
-    def __init__(self, path: StrPath, factory: Callable[[IO[Any]], mboxMessage] | None = None, create: bool = True) -> None:
+    def __init__(
+        self, path: StrPath, factory: Callable[[_GetFileReturn], mboxMessage] | None = None, create: bool = True
+    ) -> None:
         """Initialize an mbox mailbox."""
 
 class MMDF(_mboxMMDF[MMDFMessage]):
     """An MMDF mailbox."""
 
-    def __init__(self, path: StrPath, factory: Callable[[IO[Any]], MMDFMessage] | None = None, create: bool = True) -> None:
+    def __init__(
+        self, path: StrPath, factory: Callable[[_GetFileReturn], MMDFMessage] | None = None, create: bool = True
+    ) -> None:
         """Initialize an MMDF mailbox."""
 
 class MH(Mailbox[MHMessage]):
     """An MH mailbox."""
 
-    def __init__(self, path: StrPath, factory: Callable[[IO[Any]], MHMessage] | None = None, create: bool = True) -> None:
+    def __init__(self, path: StrPath, factory: Callable[[_GetFileReturn], MHMessage] | None = None, create: bool = True) -> None:
         """Initialize an MH instance."""
 
     def add(self, message: _MessageData) -> str:
@@ -331,7 +364,7 @@ class MH(Mailbox[MHMessage]):
     def get_bytes(self, key: str) -> bytes:
         """Return a bytes representation or raise a KeyError."""
 
-    def get_file(self, key: str) -> _ProxyFile[bytes]:
+    def get_file(self, key: str) -> _ProxyFile:
         """Return a file-like representation or raise a KeyError."""
 
     def iterkeys(self) -> Iterator[str]:
@@ -379,7 +412,9 @@ class MH(Mailbox[MHMessage]):
 class Babyl(_singlefileMailbox[BabylMessage]):
     """An Rmail-style Babyl mailbox."""
 
-    def __init__(self, path: StrPath, factory: Callable[[IO[Any]], BabylMessage] | None = None, create: bool = True) -> None:
+    def __init__(
+        self, path: StrPath, factory: Callable[[_GetFileReturn], BabylMessage] | None = None, create: bool = True
+    ) -> None:
         """Initialize a Babyl mailbox."""
 
     def get_message(self, key: str) -> BabylMessage:
@@ -388,13 +423,13 @@ class Babyl(_singlefileMailbox[BabylMessage]):
     def get_bytes(self, key: str) -> bytes:
         """Return a string representation or raise a KeyError."""
 
-    def get_file(self, key: str) -> IO[bytes]:
+    def get_file(self, key: str) -> io.BytesIO:
         """Return a file-like representation or raise a KeyError."""
 
     def get_labels(self) -> list[str]:
         """Return a list of user-defined labels in the mailbox."""
 
-class Message(email.message.Message):
+class Message(email.message.Message[str, str]):
     """Message with mailbox-format-specific properties."""
 
     def __init__(self, message: _MessageData | None = None) -> None:
@@ -499,25 +534,26 @@ class BabylMessage(Message):
 class MMDFMessage(_mboxMMDFMessage):
     """Message with MMDF-specific properties."""
 
-class _ProxyFile(Generic[AnyStr]):
+# Until Python 3.14, this class was technically - but unnecessarily - generic at runtime.
+class _ProxyFile:
     """A read-only wrapper of a file."""
 
-    def __init__(self, f: IO[AnyStr], pos: int | None = None) -> None:
+    def __init__(self, f: _GetFileReturn, pos: int | None = None) -> None:
         """Initialize a _ProxyFile."""
 
-    def read(self, size: int | None = None) -> AnyStr:
+    def read(self, size: int | None = None) -> bytes:
         """Read bytes."""
 
-    def read1(self, size: int | None = None) -> AnyStr:
+    def read1(self, size: int | None = None) -> bytes:
         """Read bytes."""
 
-    def readline(self, size: int | None = None) -> AnyStr:
+    def readline(self, size: int | None = None) -> bytes:
         """Read a line."""
 
-    def readlines(self, sizehint: int | None = None) -> list[AnyStr]:
+    def readlines(self, sizehint: int | None = None) -> list[bytes]:
         """Read multiple lines."""
 
-    def __iter__(self) -> Iterator[AnyStr]:
+    def __iter__(self) -> Iterator[bytes]:
         """Iterate over lines."""
 
     def tell(self) -> int:
@@ -532,7 +568,7 @@ class _ProxyFile(Generic[AnyStr]):
     def __enter__(self) -> Self:
         """Context management protocol support."""
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
+    def __exit__(self, *exc: Unused) -> None: ...
     def readable(self) -> bool: ...
     def writable(self) -> bool: ...
     def seekable(self) -> bool: ...
@@ -545,10 +581,10 @@ class _ProxyFile(Generic[AnyStr]):
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
 
-class _PartialFile(_ProxyFile[AnyStr]):
+class _PartialFile(_ProxyFile):
     """A read-only wrapper of part of a file."""
 
-    def __init__(self, f: IO[AnyStr], start: int | None = None, stop: int | None = None) -> None:
+    def __init__(self, f: _GetFileReturn, start: int | None = None, stop: int | None = None) -> None:
         """Initialize a _PartialFile."""
 
 class Error(Exception):
