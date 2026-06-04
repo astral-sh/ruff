@@ -440,6 +440,12 @@ def test_match_sequence_or_as_pattern(value: object) -> None:
         case [int() as item, _] | [str() as item, _]:
             reveal_type(item)  # revealed: int | str
 
+def test_match_ordered_or_capture(value: tuple[int] | str) -> int | str:
+    match value:
+        case [item] | item:
+            reveal_type(item)  # revealed: int | str
+            return item
+
 def test_match_sequence_as_pattern_excludes_previous_cases(
     value: tuple[Literal[1], object] | tuple[Literal[2], object],
 ) -> None:
