@@ -7494,12 +7494,13 @@ impl<'db> SelfBinding<'db> {
             else {
                 return false;
             };
-            any_over_type(db, member, false, |ty| {
-                matches!(
-                    ty,
-                    Type::FunctionLiteral(function)
-                        if function.contains_definition(db, definition)
-                )
+            any_over_type(db, member, false, |ty| match ty {
+                Type::FunctionLiteral(function) => function.contains_definition(db, definition),
+                Type::TypeVar(typevar) => {
+                    typevar.typevar(db).is_self(db)
+                        && typevar.binding_context(db).definition() == Some(definition)
+                }
+                _ => false,
             })
         };
         let intersection_inherits_from_owner = |owner_class| {

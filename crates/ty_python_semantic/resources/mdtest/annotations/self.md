@@ -508,7 +508,7 @@ def _(value: Intersection[ForeignDefaultAlias, ForeignDefaultExtra]):
 ## Callable-returning decorators preserve `Self` on intersections
 
 ```py
-from typing import Callable, Self
+from typing import Callable, Self, TypeVar
 from ty_extensions import Intersection
 
 def identity[**P, R](function: Callable[P, R]) -> Callable[P, R]:
@@ -539,6 +539,16 @@ class Value:
 
 class Extra:
     extra: int
+
+class OwnedValue(Value): ...
+
+class AliasedDecoratedValue:
+    copy = Value.copy
+
+DecoratedOwnedOrAliased = TypeVar("DecoratedOwnedOrAliased", OwnedValue, AliasedDecoratedValue)
+
+def decorated_constraint_arm_ownership(value: Intersection[DecoratedOwnedOrAliased, Extra]):
+    value.copy().extra  # error: [unresolved-attribute]
 
 def _(
     value: Intersection[Value, Extra],
