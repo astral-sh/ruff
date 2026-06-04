@@ -1234,9 +1234,7 @@ fn loop_header_reachability_impl<'db>(
         } else {
             evaluate_loop_header_reachability(
                 db,
-                scope,
-                loop_header_definition.loop_token(),
-                place,
+                definition,
                 live_binding.reachability_constraint(),
             )
         };

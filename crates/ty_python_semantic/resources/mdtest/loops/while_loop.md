@@ -687,6 +687,41 @@ def f(a: bool, b: bool):
     expected: Literal[0, 3, b"b", "y", "e"] = x
 ```
 
+### Recursive reachability preserves terminal calls
+
+```py
+import re
+from typing import NoReturn
+
+def process(items: list[str]) -> None:
+    for item in items:
+        def fail(message: str) -> NoReturn:
+            raise AssertionError(message)
+
+        match = re.match(r"(.*)\.([0-9]+)$", item)
+        if match is None:
+            fail(f"Invalid item {item!r}")
+        int(match.group(2))
+```
+
+### Recursive reachability preserves unconstrained collection element types
+
+```py
+class A: ...
+class B: ...
+class C: ...
+
+def collect(items: list[int]) -> None:
+    values = []
+    extra_values_added = False
+    for _ in items:
+        if not extra_values_added:
+            values += [B()]
+            values.append(C())
+            extra_values_added = True
+        values.append(A())
+```
+
 ### Loop headers remain precise in large scopes
 
 Loop-header reachability and type inference should remain exact regardless of the size of the
