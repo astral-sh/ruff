@@ -97,7 +97,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
             | Type::TypeAlias(alias) => {
-                let value_ty = alias.raw_value_type(db);
+                let value_ty = alias.value_type(db);
 
                 alias_docstring = Definitions::from_ty(db, ty)
                     .and_then(|def| def.docstring(db))
@@ -105,11 +105,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                         Definitions::from_ty(db, value_ty).and_then(|def| def.docstring(db))
                     });
 
-                HoverContent::TypeAlias {
-                    alias,
-                    value_ty,
-                    qualifiers,
-                }
+                HoverContent::TypeAlias { alias, qualifiers }
             }
             Type::TypeVar(typevar) => HoverContent::Type {
                 ty,
@@ -292,8 +288,6 @@ pub enum HoverContent<'db> {
     TypeAlias {
         // The type alias being hovered
         alias: TypeAliasType<'db>,
-        // The value type this TypeAlias is aliasing
-        value_ty: Type<'db>,
         // The type's qualifiers
         qualifiers: TypeQualifiers,
     },
@@ -379,23 +373,12 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
                     .fmt(f)
             }
-            HoverContent::TypeAlias {
-                alias,
-                value_ty,
-                qualifiers,
-            } => {
-                let alias_type = Type::TypeAlias(*alias);
-                let alias_string = alias_type.display(self.db);
-
+            HoverContent::TypeAlias { alias, qualifiers } => {
                 let qualifier_suffix = create_qualifier_suffix(*qualifiers);
-
-                let (ty_string, syntax) = self.ty_string_and_syntax(value_ty);
+                let declaration = alias.display_declaration(self.db);
 
                 self.kind
-                    .fenced_code_block(
-                        format!("type {alias_string} = {ty_string}{qualifier_suffix}"),
-                        syntax,
-                    )
+                    .fenced_code_block(format!("{declaration}{qualifier_suffix}"), "python")
                     .fmt(f)
             }
             HoverContent::TypedDictKey { owner, key, ty } => {
@@ -5762,7 +5745,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        type Wrapper = list[T@Wrapper]
+        type Wrapper[T] = list[T]
         ---------------------------------------------
         Built-in mutable sequence.
 
@@ -5771,7 +5754,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        type Wrapper = list[T@Wrapper]
+        type Wrapper[T] = list[T]
         ```
         ---
         Built-in mutable sequence.<HB>
@@ -5786,6 +5769,31 @@ def function():
           |      ^^^^^^^- Cursor offset
           |      |
           |      source
+          |
+        ");
+
+        let test = hover_test(
+            r#"
+        type Box[T] = T | None
+        x: Box<CURSOR>[int]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        type Box[T] = T | None
+        ---------------------------------------------
+        ```python
+        type Box[T] = T | None
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:4
+          |
+        3 | x: Box[int]
+          |    ^^^-^^^^
+          |    |  |
+          |    |  Cursor offset
+          |    source
           |
         ");
     }

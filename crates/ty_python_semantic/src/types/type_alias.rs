@@ -249,7 +249,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
