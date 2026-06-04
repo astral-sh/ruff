@@ -383,8 +383,8 @@ ConcreteOwner().inspect(Both)
 ## Intersection receivers bind `Self` before inferring arguments
 
 ```py
-from typing import Self, TypeVar, cast
-from ty_extensions import Intersection
+from typing import Protocol, Self, TypeVar, cast
+from ty_extensions import AlwaysTruthy, Intersection
 
 class Value:
     def copy_from(self, other: Self) -> Self:
@@ -396,6 +396,21 @@ def _(value: Intersection[Value, Extra], plain: Value):
     reveal_type(value.copy_from(value))  # revealed: Value & Extra
     # error: [invalid-argument-type]
     reveal_type(value.copy_from(plain))  # revealed: Value & Extra
+
+class MixedRefinementMarker(Protocol):
+    marker: int
+
+MixedRefinement = TypeVar("MixedRefinement", Extra, MixedRefinementMarker)
+
+def mixed_refinement(value: Intersection[Value, MixedRefinement]):
+    # error: [invalid-argument-type]
+    value.copy_from(Value())
+
+MixedTruthinessRefinement = TypeVar("MixedTruthinessRefinement", Extra, AlwaysTruthy)
+
+def mixed_truthiness_refinement(value: Intersection[Value, MixedTruthinessRefinement]):
+    # error: [invalid-argument-type]
+    value.copy_from(Value())
 
 class ConstrainedValue:
     def copy(self) -> Self:

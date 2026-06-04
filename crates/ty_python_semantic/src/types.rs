@@ -7519,11 +7519,11 @@ fn typevar_is_protocol_refinement<'db>(
             TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                 .elements(db)
                 .iter()
-                .any(|constraint| is_protocol_refinement(*constraint)),
+                .all(|constraint| is_protocol_refinement(*constraint)),
             TypeVarBoundOrConstraints::UpperBound(Type::Union(union)) => union
                 .elements(db)
                 .iter()
-                .any(|bound| is_protocol_refinement(*bound)),
+                .all(|bound| is_protocol_refinement(*bound)),
             TypeVarBoundOrConstraints::UpperBound(bound) => is_protocol_refinement(bound),
         })
 }
@@ -7534,7 +7534,7 @@ fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .any(|element| type_is_tuple_refinement(db, *element)),
+            .all(|element| type_is_tuple_refinement(db, *element)),
         Type::TypeVar(typevar) => {
             typevar
                 .typevar(db)
@@ -7543,7 +7543,7 @@ fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                     TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                         .elements(db)
                         .iter()
-                        .any(|constraint| type_is_tuple_refinement(db, *constraint)),
+                        .all(|constraint| type_is_tuple_refinement(db, *constraint)),
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         type_is_tuple_refinement(db, bound)
                     }
@@ -7559,7 +7559,7 @@ fn type_is_truthiness_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .any(|element| type_is_truthiness_refinement(db, *element)),
+            .all(|element| type_is_truthiness_refinement(db, *element)),
         Type::TypeVar(typevar) => {
             typevar
                 .typevar(db)
@@ -7568,7 +7568,7 @@ fn type_is_truthiness_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                     TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                         .elements(db)
                         .iter()
-                        .any(|constraint| type_is_truthiness_refinement(db, *constraint)),
+                        .all(|constraint| type_is_truthiness_refinement(db, *constraint)),
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         type_is_truthiness_refinement(db, bound)
                     }
