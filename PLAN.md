@@ -339,22 +339,22 @@ accidentally capturing enclosing generic typevars. If specialization inference r
 discarding an initial return-context-preferred builder, use only the final builder's candidate set;
 it must match the builder whose specialization is actually applied to the call result.
 
-- [ ] In `crates/ty_python_semantic/src/types/constraints.rs`, make
+- [x] In `crates/ty_python_semantic/src/types/constraints.rs`, make
     `ConstraintSet::deferred_quantification` `pub(crate)` rather than adding an accessor method.
     This lets call-specialization code read which generic-callable typevars were existentially
     introduced while comparing callable signatures; hiding this behind a method is YAGNI for now.
-- [ ] In `SpecializationBuilder` (`types/generics.rs`), define the rescoping candidate set as
+- [x] In `SpecializationBuilder` (`types/generics.rs`), define the rescoping candidate set as
     exactly the call's `inferable` set unioned with the deferred-quantification set of the constraint
     set created during specialization inference. Use `self.inferable_typevars` for the inferable side,
     even though it can include enclosing class typevars for method calls. In practice, deferred
     quantification can likely be read from `self.pending` after argument/callable inference has
     intersected in all relevant constraints.
-- [ ] Expose that candidate set to the call binder, or return it alongside the built
+- [x] Expose that candidate set to the call binder, or return it alongside the built
     specialization. Make sure the exposed set comes from the final specialization attempt, not from
     any abandoned return-context-preferred attempt. Capture it immediately before calling
     `builder.build_with(...)`, so it clearly corresponds to the final pending constraint set used to
     solve the specialization.
-- [ ] Ensure the candidate set uses exact `BoundTypeVarIdentity` values, including freshness
+- [x] Ensure the candidate set uses exact `BoundTypeVarIdentity` values, including freshness
     nonces, so freshened generic callable occurrences remain distinct.
 
 Rationale: for `higher(identity)`, the leaked `A@higher` is a callee inferable typevar. For more
