@@ -6071,27 +6071,34 @@ impl<'db> Binding<'db> {
                 }
             }
 
-            // Default specialize any type variables to a marker type, which will be ignored
-            // during argument inference, allowing the concrete subset of the parameter
-            // type to still affect argument inference.
-            //
-            // TODO: Eventually, we want to "tie together" the typevars of the two calls
-            // so that we can infer their specializations at the same time — or at least, for
-            // the specialization of one to influence the specialization of the other. It's
-            // not yet clear how we're going to do that. (We might have to start inferring
-            // constraint sets for each expression, instead of simple types?)
-            let unspecialized = Type::Dynamic(DynamicType::UnspecializedTypeVar);
-            let specialization = generic_context.specialize_recursive(
-                db,
-                generic_context.variables(db).map(|typevar| {
-                    Some(
-                        return_type_solutions
-                            .get(&typevar.identity(db))
-                            .copied()
-                            .unwrap_or(unspecialized),
-                    )
-                }),
-            );
+            // A retry pass can use the specialization solved from the first argument-inference
+            // pass to provide precise context for collection literals and other bidirectional
+            // expressions.
+            let specialization = if let Some(specialization) = self.specialization {
+                specialization
+            } else {
+                // Default specialize any type variables to a marker type, which will be ignored
+                // during argument inference, allowing the concrete subset of the parameter
+                // type to still affect argument inference.
+                //
+                // TODO: Eventually, we want to "tie together" the typevars of the two calls
+                // so that we can infer their specializations at the same time — or at least, for
+                // the specialization of one to influence the specialization of the other. It's
+                // not yet clear how we're going to do that. (We might have to start inferring
+                // constraint sets for each expression, instead of simple types?)
+                let unspecialized = Type::Dynamic(DynamicType::UnspecializedTypeVar);
+                generic_context.specialize_recursive(
+                    db,
+                    generic_context.variables(db).map(|typevar| {
+                        Some(
+                            return_type_solutions
+                                .get(&typevar.identity(db))
+                                .copied()
+                                .unwrap_or(unspecialized),
+                        )
+                    }),
+                )
+            };
 
             // A `P.args`/`P.kwargs` parameter has a useful context only after another
             // argument, usually a `Callable[P, R]`, specializes `P`.

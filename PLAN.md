@@ -436,8 +436,10 @@ outer `T`, that outer `T` should not be in the candidate set and therefore shoul
         rebinding, investigate whether they are due to this feature or an existing
         inference/specialization gap; if out of scope and non-trivial, keep the mdtest passing with
         explicit TODO/xfail comments documenting the known limitation.
-    - Current status: `higher(identity)` and `partial(partial, drop)` are green in both syntax
-        variants.
+    - Current status: `higher(identity)`, `partial(partial, drop)`, and
+        `same(identity, [1], ["x"])` are green in both syntax variants. The `same(...)` stanza also
+        keeps a non-literal `list[int]` / `list[str]` regression to ensure real invariant-list
+        argument errors are still reported.
 
 - [x] Add or update a regression showing that surrounding result correlations are preserved:
 
@@ -556,12 +558,11 @@ outer `T`, that outer `T` should not be in the candidate set and therefore shoul
     callable detection.
 - [x] Invalid generic calls: apply call-result rebinding whenever `infer_specialization` computes a
     specialized return type and non-empty candidate set, even if later argument checks emit errors.
-- [x] False-positive argument errors after rebinding: valid examples should generally aim for
-    `TODO: no error`, but investigate remaining errors before expanding scope. The existing
-    "Generic callable arguments do not hide real argument errors" stanza is a known caution: solutions
-    can include artifacts such as `T = int | str | A@identity`, causing false positives in the
-    post-specialization argument check. Punt non-trivial existing gaps with explicit TODO/xfail
-    comments.
+- [x] False-positive argument errors after rebinding: the remaining
+    `same(identity, [1], ["x"])` false positives were fixed by retrying context-sensitive argument
+    inference after the initial generic specialization has been solved. The mdtests now expect no
+    errors for contextual list literals, while retaining a non-literal `list[int]` / `list[str]`
+    case that still reports real invariant-list argument errors.
 - [x] Call-result integration point: apply rebinding inside `ArgumentTypeChecker::infer_specialization`
     immediately after applying the specialization to `self.return_ty`, not later in `finish()` or
     `Binding::check_types`.
