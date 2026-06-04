@@ -540,20 +540,37 @@ def _(target: None | Foo):
 ## `as` patterns
 
 ```py
+from typing import Literal
+
 def _(target: int | str):
     y = 1
 
     match target:
         case 1 as x:
             y = 2
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: int | str
         case "foo" as x:
             y = 3
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: (int & ~Literal[1]) | str
         case _:
             y = 4
 
     reveal_type(y)  # revealed: Literal[2, 3, 4]
+
+def value_alias(target: Literal[1, 2]):
+    match target:
+        case 1 as item:
+            reveal_type(item)  # revealed: Literal[1]
+
+def wildcard_alias(target: Literal[1, 2]):
+    match target:
+        case _ as item:
+            reveal_type(item)  # revealed: Literal[1, 2]
+
+def capture_pattern(target: Literal[1, 2]):
+    match target:
+        case item:
+            reveal_type(item)  # revealed: Literal[1, 2]
 ```
 
 ## Guard with object that implements `__bool__` incorrectly

@@ -234,10 +234,6 @@ def match_singletons_error(obj: Literal[1, "a"] | None):
         case None:
             pass
         case _ as obj:
-            # TODO: We should emit an error here, but the message should
-            # show the type `Literal["a"]` instead of `@Todo(…)`. We only
-            # assert on the first part of the message because the `@Todo`
-            # message is not available in release mode builds.
-            # error: [type-assertion-failure] "Type `@Todo"
+            # error: [type-assertion-failure] "Type `Literal["a"]` is not equivalent to `Never`"
             assert_never(obj)
 ```

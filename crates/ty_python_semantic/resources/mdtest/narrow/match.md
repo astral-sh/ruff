@@ -348,6 +348,20 @@ def test_match_sequence_as_pattern_preserves_subject_type(
         case [int() as item, _]:
             reveal_type(item)  # revealed: Literal[1]
 
+def test_match_sequence_value_as_pattern_preserves_subject_type(
+    value: tuple[Literal[1]],
+) -> None:
+    match value:
+        case [1 as item]:
+            reveal_type(item)  # revealed: Literal[1]
+
+def test_match_sequence_wildcard_as_pattern_preserves_subject_type(
+    value: tuple[Literal[1]],
+) -> None:
+    match value:
+        case [_ as item]:
+            reveal_type(item)  # revealed: Literal[1]
+
 def test_match_sequence_or_as_pattern(value: object) -> None:
     match value:
         case [int() as item, _] | [str() as item, _]:
@@ -543,7 +557,7 @@ def match_tuple_expression_multiple_bindings(flag: bool, b: TupleSubjectB) -> No
 def match_tuple_expression_subject_capture(a: TupleSubjectA, b: TupleSubjectB) -> None:
     match a, b:
         case [TupleSubjectA1(), a]:
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(a)  # revealed: TupleSubjectB
 
 def match_tuple_expression_guard_rebinding(
     a: TupleSubjectA,
