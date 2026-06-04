@@ -1112,8 +1112,8 @@
         },
         "missing-direct-dependency": {
           "title": "detects third-party imports without direct dependency declarations",
-          "description": "## What it does\nChecks for third-party imports that are used without a matching direct dependency\ndeclaration.\n\n## Why is this bad?\nImporting a package that is only available transitively can make the project break when\ndependency resolution changes.\n\n## Examples\n```python\nimport requests  # requests is not declared as a direct dependency\n```",
-          "default": "warn",
+          "description": "## What it does\nChecks for third-party imports that are used without a matching direct dependency\ndeclaration.\n\n## Why is this bad?\nImporting a package that is only available transitively can make the project break when\ndependency resolution changes.\n\n## Rule status\nThis rule is disabled by default.\n\n## Examples\n```python\nimport requests  # requests is not declared as a direct dependency\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
