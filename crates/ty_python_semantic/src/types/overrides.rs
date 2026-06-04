@@ -419,7 +419,7 @@ fn check_class_declaration<'db>(
                         let underlying_functions = extract_underlying_functions(
                             db,
                             own_class_member.ignore_possibly_undefined()?,
-                        )?;
+                        );
 
                         if underlying_functions.iter().any(|function| {
                             function.has_known_decorator(db, FunctionDecorators::FINAL)
@@ -1063,11 +1063,7 @@ fn check_explicit_overrides<'db>(
     class: ClassType<'db>,
 ) {
     let db = context.db();
-    let underlying_functions =
-        extract_overriding_functions(db, member.ty, &member.name, subclass_scope);
-    let Some(functions) = underlying_functions else {
-        return;
-    };
+    let functions = extract_overriding_functions(db, member.ty, &member.name, subclass_scope);
     let Some(decorated_function) = functions
         .iter()
         .find(|function| function.has_known_decorator(db, FunctionDecorators::OVERRIDE))
@@ -1182,7 +1178,7 @@ fn overriding_definition_without_decorator<'db>(
     subclass_scope: ScopeId<'db>,
     in_stub: bool,
 ) -> Option<OverloadLiteral<'db>> {
-    for function in extract_overriding_functions(db, ty, member_name, subclass_scope)? {
+    for function in extract_overriding_functions(db, ty, member_name, subclass_scope) {
         let definition = overriding_definition(db, function, in_stub);
         if !definition.has_known_decorator(db, FunctionDecorators::OVERRIDE) {
             return Some(definition);
@@ -1199,7 +1195,7 @@ fn extract_overriding_functions<'db>(
     ty: Type<'db>,
     member_name: &Name,
     subclass_scope: ScopeId<'db>,
-) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
+) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
     match ty {
         Type::PropertyInstance(property) => {
             let subclass_file = subclass_scope.file(db);
@@ -1215,9 +1211,7 @@ fn extract_overriding_functions<'db>(
             .into_iter()
             .flatten()
             {
-                let Some(accessor_functions) = extract_underlying_functions(db, accessor) else {
-                    continue;
-                };
+                let accessor_functions = extract_underlying_functions(db, accessor);
                 functions.extend(accessor_functions.into_iter().filter(|function| {
                     function.name(db) == member_name
                         && function.file(db) == subclass_file
@@ -1225,26 +1219,19 @@ fn extract_overriding_functions<'db>(
                 }));
             }
 
-            if functions.is_empty() {
-                None
-            } else {
-                Some(functions)
-            }
+            functions
         }
         Type::Union(union) => {
             let mut functions = smallvec::smallvec![];
             for member in union.elements(db) {
-                if let Some(mut member_functions) =
-                    extract_overriding_functions(db, *member, member_name, subclass_scope)
-                {
-                    functions.append(&mut member_functions);
-                }
+                functions.extend(extract_overriding_functions(
+                    db,
+                    *member,
+                    member_name,
+                    subclass_scope,
+                ));
             }
-            if functions.is_empty() {
-                None
-            } else {
-                Some(functions)
-            }
+            functions
         }
         _ => extract_underlying_functions(db, ty),
     }
@@ -1268,25 +1255,22 @@ fn overriding_definition<'db>(
 fn extract_underlying_functions<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
+) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
     match ty {
-        Type::FunctionLiteral(function) => Some(smallvec::smallvec_inline![function]),
-        Type::BoundMethod(method) => Some(smallvec::smallvec_inline![method.function(db)]),
-        Type::PropertyInstance(property) => extract_underlying_functions(db, property.getter(db)?),
+        Type::FunctionLiteral(function) => smallvec::smallvec_inline![function],
+        Type::BoundMethod(method) => smallvec::smallvec_inline![method.function(db)],
+        Type::PropertyInstance(property) => property.getter(db).map_or_else(
+            || smallvec::smallvec![],
+            |getter| extract_underlying_functions(db, getter),
+        ),
         Type::Union(union) => {
             let mut functions = smallvec::smallvec![];
             for member in union.elements(db) {
-                if let Some(mut member_functions) = extract_underlying_functions(db, *member) {
-                    functions.append(&mut member_functions);
-                }
+                functions.extend(extract_underlying_functions(db, *member));
             }
-            if functions.is_empty() {
-                None
-            } else {
-                Some(functions)
-            }
+            functions
         }
-        _ => None,
+        _ => smallvec::smallvec![],
     }
 }
 
