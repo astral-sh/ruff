@@ -146,3 +146,87 @@ class MyClass:
     data: dict  # error: [missing-type-argument]
     names: list[str]
 ```
+
+## Generics involving `ParamSpec`
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-type-argument = "error"
+```
+
+```py
+from typing import ParamSpec, Generic, Callable
+
+P = ParamSpec("P")
+
+class Wrapper(Generic[P]):
+    pass
+
+x: Wrapper  # error: [missing-type-argument]
+
+# OK — parameterized
+y: Wrapper[[int, str]]
+```
+
+## Bare `Callable`
+
+`Callable` without type parameters is equivalent to `Callable[..., Any]` and is common
+idiomatic Python. The rule does not fire for bare `Callable`.
+
+```toml
+[rules]
+missing-type-argument = "error"
+```
+
+```py
+from typing import Callable
+import collections.abc
+
+# OK — bare Callable is idiomatic
+def f(cb: Callable) -> None:
+    pass
+
+def g(cb: collections.abc.Callable) -> None:
+    pass
+
+# OK — explicitly parameterized
+def h(cb: Callable[[int], str]) -> None:
+    pass
+```
+
+## Type argument to `cast`
+
+```toml
+[rules]
+missing-type-argument = "error"
+```
+
+```py
+from typing import cast
+
+x = cast(list, [1, 2, 3])  # error: [missing-type-argument]
+
+# OK — parameterized
+y = cast(list[int], object())
+```
+
+## Base classes
+
+Base classes are not type annotations — using a bare generic as a base class is valid
+and does not trigger the rule.
+
+```toml
+[rules]
+missing-type-argument = "error"
+```
+
+```py
+class MyList(list):
+    pass
+
+class MyDict(dict):
+    pass
+```
