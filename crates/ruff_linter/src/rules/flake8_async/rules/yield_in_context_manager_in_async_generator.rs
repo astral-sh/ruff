@@ -20,7 +20,7 @@ use crate::checkers::ast::Checker;
 ///
 /// If the function is intended to yield only once and act as a context
 /// manager, use `@asynccontextmanager`. If it's a true async generator
-/// that yields multiple values, consumers should use `aclosing()` to
+/// that yields multiple values, consumers should use `contextlib.aclosing` to
 /// ensure timely cleanup, or the generator should be refactored to avoid
 /// holding context managers open across yields.
 ///
@@ -52,18 +52,18 @@ use crate::checkers::ast::Checker;
 ///
 /// For async generators that yield multiple values, `@asynccontextmanager`
 /// is not appropriate. Instead, refactor to avoid holding context managers
-/// open across yields, or ensure consumers use `aclosing()` for timely
+/// open across yields, or ensure consumers use `contextlib.aclosing` for timely
 /// cleanup.
 ///
 /// ## Known problems
-/// Using [`aclosing()`] around all call sites of an async generator is a
+/// Using `contextlib.aclosing` around all call sites of an async generator is a
 /// valid way to guarantee timely cleanup, but this rule cannot verify that
-/// all callers use `aclosing()`. As a result, it may flag generators that
+/// all callers use `aclosing`. As a result, it may flag generators that
 /// are always consumed safely.
 ///
 /// ## References
 /// - [PEP 533 – Deterministic cleanup for iterators](https://peps.python.org/pep-0533/)
-/// - [`aclosing()`](https://docs.python.org/3/library/contextlib.html#contextlib.aclosing)
+/// - [`contextlib.aclosing`](https://docs.python.org/3/library/contextlib.html#contextlib.aclosing)
 /// - [trio.as_safe_channel](https://trio.readthedocs.io/en/latest/reference-core.html#trio.as_safe_channel)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
