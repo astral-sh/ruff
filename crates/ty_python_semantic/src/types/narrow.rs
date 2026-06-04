@@ -1128,11 +1128,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Vec<Type<'db>> {
         let target_len = Self::sequence_pattern_target_len(kind);
         let mut unpacker = TupleUnpacker::new(self.db, target_len);
-        let subject_elements = self.sequence_pattern_subject_elements(subject_ty);
+        let subject_arms = self.sequence_pattern_subject_arms(subject_ty);
         let sequence_ty = self.necessary_sequence_pattern_type(kind);
 
         let mut matched = false;
-        for subject_ty in subject_elements.iter().copied() {
+        for (_, subject_ty) in subject_arms.iter().copied() {
             if let Some((_, tuple)) =
                 self.matching_sequence_pattern_arm(kind, subject_ty, target_len, sequence_ty)
             {
@@ -1156,14 +1156,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let target_len = Self::sequence_pattern_target_len(kind);
         let sequence_ty = self.necessary_sequence_pattern_type(kind);
-        let subject_elements = self.sequence_pattern_subject_elements(subject_ty);
+        let subject_arms = self.sequence_pattern_subject_arms(subject_ty);
 
         UnionType::from_elements(
             self.db,
-            subject_elements.iter().copied().filter_map(|subject_ty| {
-                self.matching_sequence_pattern_arm(kind, subject_ty, target_len, sequence_ty)
-                    .map(|(subject_ty, _)| subject_ty)
-            }),
+            subject_arms.iter().copied().filter_map(
+                |(original_subject_ty, filtering_subject_ty)| {
+                    self.matching_sequence_pattern_arm(
+                        kind,
+                        filtering_subject_ty,
+                        target_len,
+                        sequence_ty,
+                    )
+                    .map(|(narrowed_subject_ty, _)| {
+                        if original_subject_ty.has_typevar(self.db) {
+                            original_subject_ty
+                        } else {
+                            narrowed_subject_ty
+                        }
+                    })
+                },
+            ),
         )
     }
 
@@ -1199,16 +1212,38 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .then_some((narrowed_subject_ty, tuple))
     }
 
-    fn sequence_pattern_subject_elements(&self, subject_ty: Type<'db>) -> SmallVec<[Type<'db>; 2]> {
-        let subject_ty = subject_ty
-            .resolve_type_alias(self.db)
-            .flatten_typevars(self.db)
-            .resolve_type_alias(self.db);
+    /// Return each original subject arm paired with the flattened arm used to test the pattern.
+    fn sequence_pattern_subject_arms(
+        &self,
+        subject_ty: Type<'db>,
+    ) -> SmallVec<[(Type<'db>, Type<'db>); 2]> {
+        let subject_ty = subject_ty.resolve_type_alias(self.db);
+        let mut arms = SmallVec::new();
+        let mut add_arm = |original_subject_ty: Type<'db>| {
+            let filtering_subject_ty = original_subject_ty
+                .flatten_typevars(self.db)
+                .resolve_type_alias(self.db);
+            match filtering_subject_ty {
+                Type::Union(union) => arms.extend(
+                    union
+                        .elements(self.db)
+                        .iter()
+                        .map(|element| (original_subject_ty, *element)),
+                ),
+                _ => arms.push((original_subject_ty, filtering_subject_ty)),
+            }
+        };
 
         match subject_ty {
-            Type::Union(union) => SmallVec::from_slice(union.elements(self.db)),
-            _ => smallvec![subject_ty],
+            Type::Union(union) => union
+                .elements(self.db)
+                .iter()
+                .copied()
+                .for_each(&mut add_arm),
+            _ => add_arm(subject_ty),
         }
+
+        arms
     }
 
     fn sequence_pattern_target_len(kind: &SequencePatternPredicateKind<'db>) -> TupleLength {
