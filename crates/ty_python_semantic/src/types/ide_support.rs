@@ -11,6 +11,7 @@ use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
     KnownUnion, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
+    binding_type,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -393,7 +394,7 @@ pub fn implementation_definitions_for_method<'db>(
 
     let class_definition =
         semantic_index(db, containing_scope.file(db)).expect_single_definition(class_node);
-    let class_ty = crate::types::binding_type(db, class_definition);
+    let class_ty = binding_type(db, class_definition);
     let Some(root) = extract_class_literal(db, class_ty) else {
         return Vec::new();
     };
@@ -508,6 +509,13 @@ fn implementation_definitions_for_class_family<'db>(
     method_name: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = mro_method_definitions(db, root, method_name);
+
+    // Prevents scanning every known subclass for unrelated methods when an actual MRO definition
+    // isn't found.
+    if definitions.is_empty() {
+        return definitions;
+    }
+
     for subtype in transitive_subtypes(db, root) {
         for definition in own_method_definitions(db, subtype, method_name).unwrap_or_default() {
             if !definitions.contains(&definition) {
@@ -586,10 +594,36 @@ fn own_method_definitions<'db>(
     Some(
         definitions
             .into_iter()
-            .filter(|definition| matches!(definition.kind(db), DefinitionKind::Function(_)))
-            .map(ResolvedDefinition::Definition)
+            .filter_map(|definition| method_implementation_definition(db, definition))
             .collect(),
     )
+}
+
+/// Normalize a method definition to the implementation target that should be navigated to.
+fn method_implementation_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<ResolvedDefinition<'db>> {
+    // Only `def` statements are method implementation targets. Same-named non-function bindings
+    // or declarations stop MRO lookup here, but should not themselves become implementation
+    // targets.
+    if !matches!(definition.kind(db), DefinitionKind::Function(_)) {
+        return None;
+    }
+
+    // Use the inferred function type to collapse overload declarations to their concrete
+    // implementation. If inference cannot produce a function literal, keep the original `def` as a
+    // conservative fallback.
+    let Some(function) = binding_type(db, definition).as_function_literal() else {
+        return Some(ResolvedDefinition::Definition(definition));
+    };
+
+    // Overload groups without an implementation definition have no target to navigate to.
+    let (_, Some(_)) = function.overloads_and_implementation(db) else {
+        return None;
+    };
+
+    Some(ResolvedDefinition::Definition(function.last_definition(db)))
 }
 
 /// Normalizes a receiver type into the class roots used for implementation lookup.
@@ -2336,7 +2370,7 @@ fn direct_subtypes<'db>(
                 continue;
             }
 
-            let ty = crate::types::binding_type(db, def);
+            let ty = binding_type(db, def);
             let Some(class_ty) = extract_class_literal(db, ty) else {
                 continue;
             };
