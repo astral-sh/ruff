@@ -176,7 +176,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import Any, Literal, TypeAlias, TypeVar
 from typing_extensions import assert_never
 
@@ -410,6 +410,20 @@ def test_match_capture_int_enum_correlation_todo(
         case [Number.ONE, item]:
             # TODO: Narrow this to `int` by comparing known `IntEnum` member values.
             reveal_type(item)  # revealed: int | str
+
+class CustomNeEnum(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> Literal[True]:
+        return True
+
+def test_match_capture_enum_custom_ne_todo() -> None:
+    value = (CustomNeEnum.B, "actual")
+    match value:
+        case [CustomNeEnum.A, item]:
+            # TODO: Preserve enum-member identity when equality is overridden.
+            reveal_type(item)  # revealed: Literal["actual"]
 
 class AlwaysEqualMeta(type):
     def __eq__(cls, other: object) -> Literal[True]:
