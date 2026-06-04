@@ -14,9 +14,10 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
+    UnionBuilder, callable_pattern_type, definite_match_pattern_type,
+    definite_sequence_pattern_type, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -1044,13 +1045,25 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             PatternPredicateKind::Or(patterns) => {
                 let mut patterns = patterns.iter();
-                let first = self.evaluate_match_pattern_aliases(patterns.next()?, subject_ty);
-                patterns.fold(first, |constraints, pattern| {
-                    Self::merge_optional_constraints_or(
+                let first_pattern = patterns.next()?;
+                let mut constraints =
+                    self.evaluate_match_pattern_aliases(first_pattern, subject_ty);
+                let mut remaining_subject_ty = subject_ty;
+                let mut previous_pattern = first_pattern;
+
+                for pattern in patterns {
+                    remaining_subject_ty = IntersectionBuilder::new(self.db)
+                        .add_positive(remaining_subject_ty)
+                        .add_negative(definite_match_pattern_type(self.db, previous_pattern))
+                        .build();
+                    constraints = Self::merge_optional_constraints_or(
                         constraints,
-                        self.evaluate_match_pattern_aliases(pattern, subject_ty),
-                    )
-                })
+                        self.evaluate_match_pattern_aliases(pattern, remaining_subject_ty),
+                    );
+                    previous_pattern = pattern;
+                }
+
+                constraints
             }
             PatternPredicateKind::As(pattern, name) => {
                 let nested = pattern
