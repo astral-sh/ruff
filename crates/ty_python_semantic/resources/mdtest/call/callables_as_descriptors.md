@@ -132,7 +132,8 @@ C1().method_decorated(1)
 This also works with an argumentless `Callable` annotation:
 
 ```py
-def memoize2(f: Callable) -> Callable:
+# error: [missing-type-argument]
+def memoize2(f: Callable) -> Callable:  # error: [missing-type-argument]
     raise NotImplementedError
 
 class C2:

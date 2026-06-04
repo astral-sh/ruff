@@ -110,10 +110,14 @@ x: collections.abc.Sequence  # error: [missing-type-argument]
 y: collections.abc.Sequence[int]
 ```
 
-## Disabled by default
+## Disabled by default (enabled in tests)
+
+```toml
+[rules]
+missing-type-argument = "ignore"
+```
 
 ```py
-# Without explicit configuration, the rule is ignored
 x: list
 y: dict
 ```

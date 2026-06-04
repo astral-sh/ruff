@@ -11,7 +11,8 @@ in fact override anything, a type checker should report a diagnostic on that met
 ```pyi
 from typing_extensions import override, Callable, TypeVar
 
-def lossy_decorator(fn: Callable) -> Callable: ...
+# error: [missing-type-argument]
+def lossy_decorator(fn: Callable) -> Callable: ...  # error: [missing-type-argument]
 
 class A:
     @override

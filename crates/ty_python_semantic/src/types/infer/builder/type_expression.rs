@@ -2887,11 +2887,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if required_count == 1 {
                         builder.into_diagnostic(format_args!(
                             "Missing type argument for generic class `{class_name}` \
-                             (expected 1)"
+                             (expected 1 type argument)"
                         ));
                     } else {
                         builder.into_diagnostic(format_args!(
-                            "Missing type parameters for generic class `{class_name}` \
+                            "Missing type arguments for generic class `{class_name}` \
                              (expected {required_count} type arguments)"
                         ));
                     }
@@ -2904,7 +2904,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.context.report_lint(&MISSING_TYPE_ARGUMENT, annotation)
                 {
                     builder.into_diagnostic(format_args!(
-                        "Missing type parameters for generic type `Callable` \
+                        "Missing type arguments for generic type `Callable` \
                          (expected 2 type arguments)"
                     ));
                 }

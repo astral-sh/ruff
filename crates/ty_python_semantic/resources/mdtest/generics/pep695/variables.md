@@ -1087,9 +1087,10 @@ reveal_type(F[list[Any]]().x)  # revealed: list[Any]
 However, they are lazily evaluated and can cyclically refer to their own type:
 
 ```py
-class G[T: list[G]]:
+class G[T: list[G]]:  # error: [missing-type-argument]
     x: T
 
+# error: [missing-type-argument]
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
 

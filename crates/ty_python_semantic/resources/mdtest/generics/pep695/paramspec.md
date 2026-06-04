@@ -918,10 +918,10 @@ def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return func
 
 @callable_identity
-def f(env: dict) -> None:
+def f(env: dict[str, int]) -> None:
     pass
 
-# revealed: (env: dict[Unknown, Unknown]) -> None
+# revealed: (env: dict[str, int]) -> None
 reveal_type(f)
 ```
 

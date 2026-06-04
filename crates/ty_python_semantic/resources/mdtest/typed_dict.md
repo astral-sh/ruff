@@ -4729,7 +4729,7 @@ def _(x: Intersection[StrTagTD, Any]):
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
 
 ```py
-def _(u: Foo | Bar | dict):
+def _(u: Foo | Bar | dict):  # error: [missing-type-argument]
     if u["tag"] == "foo":
         # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
         # false negative in `is_disjoint_impl`.
@@ -4970,7 +4970,7 @@ def test_or_pattern_with_non_literal(u: Foo | Bar):
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
 
 ```py
-def match_with_dict(u: Foo | Bar | dict):
+def match_with_dict(u: Foo | Bar | dict):  # error: [missing-type-argument]
     match u["tag"]:
         case "foo":
             # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
@@ -5282,7 +5282,7 @@ class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
 And variadic keywords are also banned:
 
 ```py
-def f(kwargs: dict):
+def f(kwargs: dict):  # error: [missing-type-argument]
     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
 ```
 

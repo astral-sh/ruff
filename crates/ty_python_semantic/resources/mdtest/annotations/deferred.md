@@ -104,7 +104,7 @@ class Foo:
         type U = Foo
         # error: [unresolved-reference]
         type V = Bar
-        type W = Baz
+        type W = Baz  # error: [missing-type-argument]
 
     def h[T: Bar]():
         # error: [unresolved-reference]
@@ -172,7 +172,7 @@ class Foo:
         type U = Foo
         # error: [unresolved-reference]
         type V = Bar
-        type W = Baz
+        type W = Baz  # error: [missing-type-argument]
 
     def h[T: Bar]():
         # error: [unresolved-reference]

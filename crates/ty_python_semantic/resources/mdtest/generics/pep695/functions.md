@@ -745,16 +745,16 @@ def decorated[T](t: T) -> None:
 ```py
 from typing import Callable
 
-def my_decorator[T: Callable](f: T) -> None:
+def my_decorator[T: Callable](f: T) -> None:  # error: [missing-type-argument]
     # error: [unresolved-attribute]
     f.whatever
     # error: [unresolved-attribute]
     f.whatever = 1
 
-class Box[T: Callable]:
+class Box[T: Callable]:  # error: [missing-type-argument]
     cls: type[T]
 
-def specialized(box: Box[Callable]) -> None:
+def specialized(box: Box[Callable]) -> None:  # error: [missing-type-argument]
     # error: [unresolved-attribute]
     box.cls.whatever
 ```

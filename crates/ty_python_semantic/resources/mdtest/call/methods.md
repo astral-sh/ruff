@@ -968,7 +968,7 @@ properties are understood correctly for these functions and methods.
 
 ```py
 import types
-from typing import Callable
+from typing import Any, Callable
 from ty_extensions import static_assert, RegularCallableTypeOf, is_assignable_to, TypeOf
 
 def f(obj: type) -> None: ...
@@ -981,56 +981,56 @@ class MyClass:
     @my_property.setter
     def my_property(self, value: int | str) -> None: ...
 
-static_assert(is_assignable_to(types.FunctionType, Callable))
+static_assert(is_assignable_to(types.FunctionType, Callable[..., Any]))
 
 # revealed: <wrapper-descriptor '__get__' of 'function' objects>
 reveal_type(types.FunctionType.__get__)
-static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable[..., Any]))
 
 # revealed: def f(obj: type) -> None
 reveal_type(f)
-static_assert(is_assignable_to(TypeOf[f], Callable))
+static_assert(is_assignable_to(TypeOf[f], Callable[..., Any]))
 
 # revealed: <method-wrapper '__get__' of function 'f'>
 reveal_type(f.__get__)
-static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
+static_assert(is_assignable_to(TypeOf[f.__get__], Callable[..., Any]))
 
 # revealed: def __call__(self, *args: Any, **kwargs: Any) -> Any
 reveal_type(types.FunctionType.__call__)
-static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable))
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable[..., Any]))
 
 # revealed: <method-wrapper '__call__' of function 'f'>
 reveal_type(f.__call__)
-static_assert(is_assignable_to(TypeOf[f.__call__], Callable))
+static_assert(is_assignable_to(TypeOf[f.__call__], Callable[..., Any]))
 
 # revealed: <wrapper-descriptor '__get__' of 'property' objects>
 reveal_type(property.__get__)
-static_assert(is_assignable_to(TypeOf[property.__get__], Callable))
+static_assert(is_assignable_to(TypeOf[property.__get__], Callable[..., Any]))
 
 # revealed: property
 reveal_type(MyClass.my_property)
-static_assert(is_assignable_to(TypeOf[property], Callable))
-static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable))
+static_assert(is_assignable_to(TypeOf[property], Callable[..., Any]))
+static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable[..., Any]))
 
 # revealed: <method-wrapper '__get__' of property 'my_property'>
 reveal_type(MyClass.my_property.__get__)
-static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable))
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable[..., Any]))
 
 # revealed: <wrapper-descriptor '__set__' of 'property' objects>
 reveal_type(property.__set__)
-static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
+static_assert(is_assignable_to(TypeOf[property.__set__], Callable[..., Any]))
 
 # revealed: <method-wrapper '__set__' of property 'my_property'>
 reveal_type(MyClass.my_property.__set__)
-static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable[..., Any]))
 
 # revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(str.startswith)
-static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
+static_assert(is_assignable_to(TypeOf[str.startswith], Callable[..., Any]))
 
 # revealed: <method-wrapper 'startswith' of string 'foo'>
 reveal_type("foo".startswith)
-static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
+static_assert(is_assignable_to(TypeOf["foo".startswith], Callable[..., Any]))
 
 def _(
     a: RegularCallableTypeOf[types.FunctionType.__get__],

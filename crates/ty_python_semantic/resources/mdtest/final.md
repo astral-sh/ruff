@@ -37,7 +37,8 @@ class H(
 ```pyi
 from typing_extensions import final, Callable, TypeVar
 
-def lossy_decorator(fn: Callable) -> Callable: ...
+# error: [missing-type-argument]
+def lossy_decorator(fn: Callable) -> Callable: ...  # error: [missing-type-argument]
 
 class Parent:
     @final

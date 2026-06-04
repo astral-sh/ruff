@@ -499,7 +499,7 @@ from ty_extensions import Unknown, is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
 
-def f(x: tuple, y: tuple[Unknown, ...]):
+def f(x: tuple, y: tuple[Unknown, ...]):  # error: [missing-type-argument]
     reveal_type(x)  # revealed: tuple[Unknown, ...]
     assert_type(x, tuple[Any, ...])
     assert_type(x, tuple[Unknown, ...])

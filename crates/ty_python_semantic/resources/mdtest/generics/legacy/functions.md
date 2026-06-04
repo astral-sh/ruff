@@ -678,7 +678,7 @@ def decorated(t: T) -> None:
 ```py
 from typing import Callable, Generic, TypeVar
 
-F = TypeVar("F", bound=Callable)
+F = TypeVar("F", bound=Callable)  # error: [missing-type-argument]
 
 def my_decorator(f: F) -> None:
     # error: [unresolved-attribute]
@@ -689,7 +689,7 @@ def my_decorator(f: F) -> None:
 class Box(Generic[F]):
     cls: type[F]
 
-def specialized(box: Box[Callable]) -> None:
+def specialized(box: Box[Callable]) -> None:  # error: [missing-type-argument]
     # error: [unresolved-attribute]
     box.cls.whatever
 ```

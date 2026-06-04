@@ -995,7 +995,7 @@ reveal_type(Sub)  # revealed: <class 'Sub'>
 U = TypeVar("U")
 
 class Base2(Generic[T, U]): ...
-class Sub2(Base2["Sub2", U]): ...
+class Sub2(Base2["Sub2", U]): ...  # error: [missing-type-argument]
 ```
 
 #### Without string forward references

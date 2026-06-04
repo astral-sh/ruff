@@ -1406,13 +1406,13 @@ f(**Foo(a=1, b=2))
 
 ```py
 def f(**kwargs: int) -> None: ...
-def _(kwargs1: dict[str, int], kwargs2: dict[str, int], kwargs3: dict[str, str], kwargs4: dict[int, list]) -> None:
+def _(kwargs1: dict[str, int], kwargs2: dict[str, int], kwargs3: dict[str, str], kwargs4: dict[int, list[int]]) -> None:
     f(**kwargs1, **kwargs2)
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
     f(**kwargs1, **kwargs3)
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
     # error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
-    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `list[Unknown]`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `list[int]`"
     f(**kwargs3, **kwargs4)
 ```
 

@@ -3405,7 +3405,7 @@ python-version = "3.14"
 ```py
 from typing import Callable
 
-def f(x: Callable):
+def f(x: Callable):  # error: [missing-type-argument]
     x.__name__  # snapshot: unresolved-attribute
 ```
 
@@ -3421,7 +3421,7 @@ help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/ty
 ```
 
 ```py
-def g(x: Callable):
+def g(x: Callable):  # error: [missing-type-argument]
     x.__annotate__  # snapshot: unresolved-attribute
 ```
 
