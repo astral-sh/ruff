@@ -58,6 +58,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
+use thin_vec::{ThinVec, thin_vec};
 
 mod containment;
 
@@ -780,16 +781,27 @@ impl<'db> NarrowingOperation<'db> {
     }
 }
 
+/// One conjunction in the DNF representation.
+///
+/// Key membership checks are stored as facts instead of converted into types immediately. For
+/// `value: A | B`, converting each check in `"a" in value and "b" in value` can split both checks
+/// into `A` and `B`; combining them would then create every pairing of those branches. Keeping the
+/// checks here applies them only when the final type is evaluated. It also lets a key fact constrain
+/// a later `TypeGuard` replacement instead of restoring the original type.
 #[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct ConstraintConjunction<'db> {
     type_constraints: SmallVec<[NarrowingOperation<'db>; 2]>,
-    present_keys: SmallVec<[PresentKeyConstraint<'db>; 1]>,
-    absent_keys: SmallVec<[AbsentKeyConstraint<'db>; 1]>,
+    key_constraints: ThinVec<KeyConstraint<'db>>,
 }
 
-/// A deferred key-presence operation. Keeping union arms inside `source` avoids expanding one DNF
-/// disjunct per arm when multiple membership tests are combined.
-#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+#[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
+enum KeyConstraint<'db> {
+    Present(PresentKeyConstraint<'db>),
+    Absent(AbsentKeyConstraint<'db>),
+}
+
+/// A deferred fact that `key` is present in `source`.
+#[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct PresentKeyConstraint<'db> {
     source: Type<'db>,
     key: StringLiteralType<'db>,
@@ -807,16 +819,15 @@ impl<'db> PresentKeyConstraint<'db> {
     ///     value["x"]  # The key fact applies to `Bar`, not the original type.
     /// ```
     fn apply_after_replacement(
-        self,
+        &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         replacement: Type<'db>,
     ) -> Type<'db> {
-        let narrowed = narrow_with_present_key(db, env, self.source, self.key.value(db));
         if key_is_always_present(db, env, self.source, self.key) {
             return replacement;
         }
-        if narrowed.is_never() {
+        if narrow_with_present_key(db, env, self.source, self.key.value(db)).is_never() {
             return Type::Never;
         }
 
@@ -831,6 +842,20 @@ impl<'db> PresentKeyConstraint<'db> {
             narrow_with_present_key(db, env, replacement, self.key.value(db))
         }
     }
+
+    fn apply(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        is_replacement: bool,
+    ) -> Type<'db> {
+        if is_replacement {
+            self.apply_after_replacement(db, env, ty)
+        } else {
+            narrow_with_present_key(db, env, ty, self.key.value(db))
+        }
+    }
 }
 
 /// A deferred key-absence operation. Keeping the filtered source out of the conjunction prevents
@@ -841,20 +866,16 @@ impl<'db> PresentKeyConstraint<'db> {
 /// if guard_to_bar(value) and lacks_x:
 ///     reveal_type(value)  # Bar, filtered by the key-absence fact
 /// ```
-#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+#[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct AbsentKeyConstraint<'db> {
     source: Type<'db>,
     key: StringLiteralType<'db>,
 }
 
 impl<'db> AbsentKeyConstraint<'db> {
-    /// Apply this fact to a replacement type without replacing it with the filtered source.
-    ///
-    /// An impossible fact still makes the conjunction `Never`; otherwise, the replacement is
-    /// filtered independently. This preserves `TypeGuard` semantics for aliased conditions such as
-    /// `guard(value) and key_not_in_value`.
+    /// Apply this fact to `replacement`, using `source` only to detect an impossible condition.
     fn apply_after_replacement(
-        self,
+        &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         replacement: Type<'db>,
@@ -863,6 +884,20 @@ impl<'db> AbsentKeyConstraint<'db> {
             Type::Never
         } else {
             narrow_with_absent_key(db, env, replacement, self.key)
+        }
+    }
+
+    fn apply(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        is_replacement: bool,
+    ) -> Type<'db> {
+        if is_replacement {
+            self.apply_after_replacement(db, env, ty)
+        } else {
+            narrow_with_absent_key(db, env, ty, self.key)
         }
     }
 }
@@ -875,24 +910,24 @@ impl<'db> ConstraintConjunction<'db> {
     fn from_operation(operation: NarrowingOperation<'db>) -> Self {
         Self {
             type_constraints: smallvec![operation],
-            present_keys: smallvec![],
-            absent_keys: smallvec![],
+            key_constraints: thin_vec![],
         }
     }
 
     fn present_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
         Self {
             type_constraints: smallvec![],
-            present_keys: smallvec![PresentKeyConstraint { source, key }],
-            absent_keys: smallvec![],
+            key_constraints: thin_vec![KeyConstraint::Present(PresentKeyConstraint {
+                source,
+                key,
+            })],
         }
     }
 
     fn absent_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
         Self {
             type_constraints: smallvec![],
-            present_keys: smallvec![],
-            absent_keys: smallvec![AbsentKeyConstraint { source, key }],
+            key_constraints: thin_vec![KeyConstraint::Absent(AbsentKeyConstraint { source, key })],
         }
     }
 
@@ -915,15 +950,13 @@ impl<'db> ConstraintConjunction<'db> {
             }
         }
 
-        for present_key in other.present_keys {
-            if !self.present_keys.contains(&present_key) {
-                self.present_keys.push(present_key);
-            }
-        }
-
-        for absent_key in other.absent_keys {
-            if !self.absent_keys.contains(&absent_key) {
-                self.absent_keys.push(absent_key);
+        if self.key_constraints.is_empty() {
+            self.key_constraints = other.key_constraints;
+        } else {
+            for key_constraint in other.key_constraints {
+                if !self.key_constraints.contains(&key_constraint) {
+                    self.key_constraints.push(key_constraint);
+                }
             }
         }
 
@@ -941,10 +974,7 @@ impl<'db> ConstraintConjunction<'db> {
         env: &ProgramEnvironment<'db>,
         is_replacement: bool,
     ) -> Type<'db> {
-        if self.present_keys.is_empty()
-            && self.absent_keys.is_empty()
-            && self.type_constraints.len() == 1
-        {
+        if self.key_constraints.is_empty() && self.type_constraints.len() == 1 {
             return self.type_constraints[0].ty();
         }
 
@@ -961,19 +991,18 @@ impl<'db> ConstraintConjunction<'db> {
                 }
             });
 
-        if is_replacement {
-            for present_key in self.present_keys {
-                current = present_key.apply_after_replacement(db, env, current);
+        if self.key_constraints.is_empty() {
+            return current;
+        }
+
+        for key_constraint in &self.key_constraints {
+            if let KeyConstraint::Present(present_key) = key_constraint {
+                current = present_key.apply(db, env, current, is_replacement);
             }
-            for absent_key in self.absent_keys {
-                current = absent_key.apply_after_replacement(db, env, current);
-            }
-        } else {
-            for present_key in self.present_keys {
-                current = narrow_with_present_key(db, env, current, present_key.key.value(db));
-            }
-            for absent_key in self.absent_keys {
-                current = narrow_with_absent_key(db, env, current, absent_key.key);
+        }
+        for key_constraint in &self.key_constraints {
+            if let KeyConstraint::Absent(absent_key) = key_constraint {
+                current = absent_key.apply(db, env, current, is_replacement);
             }
         }
 
@@ -1329,10 +1358,10 @@ impl<'db> NarrowingConstraint<'db> {
             replacement_disjuncts.as_slice(),
         ) {
             ([], []) => Self(NarrowingConstraintKind::Empty),
-            ([conjunctions], []) if conjunctions.present_keys.is_empty() && conjunctions.absent_keys.is_empty() && let [operation] = conjunctions.type_constraints.as_slice() => {
+            ([conjunctions], []) if conjunctions.key_constraints.is_empty() && let [operation] = conjunctions.type_constraints.as_slice() => {
                 Self(NarrowingConstraintKind::Intersection(*operation))
             }
-            ([], [conjunctions]) if conjunctions.present_keys.is_empty() && conjunctions.absent_keys.is_empty() && let [operation] = conjunctions.type_constraints.as_slice() => {
+            ([], [conjunctions]) if conjunctions.key_constraints.is_empty() && let [operation] = conjunctions.type_constraints.as_slice() => {
                 Self(NarrowingConstraintKind::Replacement(*operation))
             }
             _ => Self(NarrowingConstraintKind::Combined(Box::new(
@@ -4448,9 +4477,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
         }
 
-        // Narrow types when a key membership test proves that a key is present, and narrow unions
-        // and intersections of `TypedDict` when a key membership test proves that a required key is
-        // absent:
+        // Record literal key-membership facts for `TypedDict` and `Mapping` values:
         //
         // class Foo(TypedDict):
         //     foo: int
@@ -4477,14 +4504,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         constraints.insert(place, constraint.clone());
                     }
 
-                    let value_place = PlaceExpr::try_from_expr(rhs_expr)
-                        .and_then(|place_expr| self.places().place_id(&place_expr));
-                    if value_place != comparator_place
-                        && let Some(place) = value_place
-                    {
-                        constraints.insert(place, constraint);
-                    }
-                };
+            let comparator_place = PlaceExpr::try_from_expr(&comparators[0])
+                .and_then(|place_expr| self.places().place_id(&place_expr));
+            if let Some(place) = comparator_place {
+                constraints.insert(place, constraint.clone());
+            }
 
             if is_positive == (*op == ast::CmpOp::In) {
                 apply_constraint(
@@ -5660,13 +5684,7 @@ fn key_membership_implies_subscript<'db>(
 ///
 /// `TypedDict` arms gain a required read-only field, `Mapping` arms gain matching
 /// `__contains__` and `__getitem__` methods, and other arms only gain the successful membership
-/// fact. The distinction prevents code like this from implying invalid subscript access:
-///
-/// ```python
-/// def f(value: Literal["abc"]):
-///     if "a" in value:
-///         value["a"]  # Still invalid: string membership does not imply key subscripting.
-/// ```
+/// fact.
 fn narrow_with_present_key<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5729,7 +5747,6 @@ fn narrow_with_absent_key<'db>(
     let resolved = ty.resolve_type_alias(db);
     match resolved {
         Type::Union(union) => {
-            // Remove all members of the union that prove the key is present.
             let filtered = union.filter(db, |ty| !key_is_always_present(db, env, *ty, key));
             if filtered == resolved { ty } else { filtered }
         }
