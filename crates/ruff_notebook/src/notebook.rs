@@ -12,7 +12,7 @@ use std::sync::OnceLock;
 use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
-use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
+use ruff_source_file::{OneIndexed, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::cell::CellOffsets;
@@ -302,33 +302,24 @@ impl Notebook {
     ///
     /// ## Notes
     ///
-    /// Empty cells don't have any newlines, but there's a single visible line
-    /// in the UI. That single line needs to be accounted for.
+    /// Each cell range includes its synthetic newline separator. Counting the
+    /// lines in the concatenated source accounts for empty cells and for cells
+    /// that already end in a newline.
     ///
-    /// In case of [`SourceValue::StringArray`], newlines are part of the strings.
-    /// So, to get the actual count of lines, we need to check for any trailing
-    /// newline for the last line.
-    ///
-    /// For example, consider the following cell:
-    /// ```python
-    /// [
-    ///    "import os\n",
-    ///    "import sys\n",
-    /// ]
+    /// For example, the source array:
+    /// ```text
+    /// ["import os\n", "import sys\n"]
     /// ```
-    ///
-    /// Here, the array suggests that there are two lines, but the actual number
-    /// of lines visible in the UI is three. The same goes for [`SourceValue::String`]
-    /// where we need to check for the trailing newline.
-    ///
-    /// The index building is expensive as it needs to go through the content of
-    /// every valid code cell.
+    /// is joined with the synthetic separator to form `"import os\nimport sys\n\n"`,
+    /// which occupies three rows. Array entries aren't necessarily lines, though:
+    /// `["p", "a", "s", "s"]` is joined with the separator to form `"pass\n"` and
+    /// occupies one row.
     fn build_index(&self) -> NotebookIndex {
         let mut cell_starts = Vec::with_capacity(self.valid_code_cells.len());
 
         let mut current_row = OneIndexed::MIN;
 
-        for &cell_index in &self.valid_code_cells {
+        for (&cell_index, range) in self.valid_code_cells.iter().zip(self.cell_offsets.ranges()) {
             let raw_cell_index = cell_index as usize;
             // Record the starting row of this cell
             cell_starts.push(CellStart {
@@ -336,24 +327,7 @@ impl Notebook {
                 raw_cell_index: OneIndexed::from_zero_indexed(raw_cell_index),
             });
 
-            let line_count = match &self.raw.cells[raw_cell_index].source() {
-                SourceValue::String(string) => {
-                    if string.is_empty() {
-                        1
-                    } else {
-                        NewlineWithTrailingNewline::from(string).count()
-                    }
-                }
-                SourceValue::StringArray(string_array) => {
-                    if string_array.is_empty() {
-                        1
-                    } else {
-                        let trailing_newline =
-                            usize::from(string_array.last().is_some_and(|s| s.ends_with('\n')));
-                        string_array.len() + trailing_newline
-                    }
-                }
-            };
+            let line_count = UniversalNewlineIterator::from(&self.source_code[range]).count();
 
             current_row = current_row.saturating_add(line_count);
         }
@@ -604,6 +578,52 @@ print("after empty cells")
                 198.into()
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn index_fragmented_source_array() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_source_code(
+            r##"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["p", "a", "s", "s", " ", " ", " "]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": ["# snapshot\n", "x = 1"]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 4
+}"##,
+        )?;
+
+        assert_eq!(notebook.source_code(), "pass   \n# snapshot\nx = 1\n");
+        assert_eq!(
+            notebook.index(),
+            &NotebookIndex {
+                cell_starts: vec![
+                    CellStart {
+                        start_row: OneIndexed::MIN,
+                        raw_cell_index: OneIndexed::MIN,
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(1),
+                        raw_cell_index: OneIndexed::from_zero_indexed(1),
+                    },
+                ],
+            }
+        );
+
         Ok(())
     }
 
