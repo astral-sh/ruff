@@ -51,7 +51,7 @@ pub fn goto_implementation(
     }
 
     let implementation_targets = Definitions::new(implementations)
-        .map_stubs(model.db())
+        .map_stubs_for_implementation(model.db())?
         .into_navigation_targets(model.db());
 
     Some(RangedValue {
@@ -105,6 +105,54 @@ mod tests {
         9 |     def speak(self): ...
           |         -----
           |
+        ");
+    }
+
+    #[test]
+    fn implementation_abstract_root_method_is_included() {
+        let test = cursor_test(
+            r#"
+            from abc import ABC, abstractmethod
+
+            class Animal(ABC):
+                @abstractmethod
+                def speak(self) -> str: ...
+
+            class Dog(Animal):
+                def speak(self) -> str:
+                    return "woof"
+
+            class Cat(Animal):
+                def speak(self) -> str:
+                    return "meow"
+
+            def f(animal: Animal):
+                animal.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+          --> main.py:17:12
+           |
+        17 |     animal.speak()
+           |            ^^^^^ Clicking here
+           |
+        info: Found 3 implementations
+          --> main.py:6:9
+           |
+         6 |     def speak(self) -> str: ...
+           |         -----
+         7 |
+         8 | class Dog(Animal):
+         9 |     def speak(self) -> str:
+           |         -----
+           |
+          ::: main.py:13:9
+           |
+        13 |     def speak(self) -> str:
+           |         -----
+           |
         ");
     }
 
@@ -442,6 +490,87 @@ class MyClass:
           |         ------
           |
         ");
+    }
+
+    #[test]
+    fn implementation_stub_map_overloaded_class_method() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+x = MyClass(0)
+x.act<CURSOR>ion(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+    def action(self, value):
+        return value
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+class MyClass:
+    def __init__(self, val: bool): ...
+    @overload
+    def action(self, value: int) -> int: ...
+    @overload
+    def action(self, value: str) -> str: ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:4:3
+          |
+        4 | x.action(1)
+          |   ^^^^^^ Clicking here
+          |
+        info: Found 1 implementation
+         --> mymodule.py:5:9
+          |
+        5 |     def action(self, value):
+          |         ------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_stub_only_overloaded_class_method() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+x = MyClass(0)
+x.act<CURSOR>ion(1)
+",
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+class MyClass:
+    def __init__(self, val: bool): ...
+    @overload
+    def action(self, value: int) -> int: ...
+    @overload
+    def action(self, value: str) -> str: ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @"No goto target found");
     }
 
     #[test]
