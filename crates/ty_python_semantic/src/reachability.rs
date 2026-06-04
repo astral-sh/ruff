@@ -238,7 +238,7 @@ use ty_python_core::{
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-fn type_narrowed_by_previous_patterns<'db>(
+pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,

@@ -176,6 +176,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
+from typing import Literal
 from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
@@ -201,24 +202,24 @@ def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[in
 def test_match_exact_sequence_excludes_str(x: str | tuple[int, int]) -> None:
     match x:
         case (a, b):
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: str
 
 def test_match_exact_sequence_excludes_bytes(x: bytes | tuple[int, int]) -> None:
     match x:
         case (a, b):
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: bytes
 
 def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int]) -> None:
     match x:
         case (a, b):
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(a)  # revealed: int
+            reveal_type(b)  # revealed: int
         case _:
             reveal_type(x)  # revealed: bytearray
 
@@ -334,6 +335,32 @@ def unwrap_number_or_label(value: object) -> int | str | None:
             reveal_type(value[0])  # revealed: int | str
             return value[0]
     return None
+
+def test_match_sequence_as_pattern(value: object) -> None:
+    match value:
+        case [int() as item, _]:
+            reveal_type(item)  # revealed: int
+
+def test_match_sequence_as_pattern_preserves_subject_type(
+    value: tuple[Literal[1], object],
+) -> None:
+    match value:
+        case [int() as item, _]:
+            reveal_type(item)  # revealed: Literal[1]
+
+def test_match_sequence_or_as_pattern(value: object) -> None:
+    match value:
+        case [int() as item, _] | [str() as item, _]:
+            reveal_type(item)  # revealed: int | str
+
+def test_match_sequence_as_pattern_excludes_previous_cases(
+    value: tuple[Literal[1], object] | tuple[Literal[2], object],
+) -> None:
+    match value:
+        case [1, _]:
+            pass
+        case [int() as item, _]:
+            reveal_type(item)  # revealed: Literal[2]
 
 def test_match_value_sequence(value: object) -> None:
     match value:
