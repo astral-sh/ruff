@@ -354,7 +354,7 @@ pub struct ConstraintSet<'db, 'c> {
 
     /// Type variables that should be existentially quantified before solution extraction or final
     /// semantic observation.
-    deferred_quantification: InferableTypeVars<'db>,
+    pub(crate) deferred_quantification: InferableTypeVars<'db>,
 
     /// A reference to the builder that holds the storage for this constraint set's BDD
     builder: &'c ConstraintSetBuilder<'db>,

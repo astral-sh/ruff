@@ -5045,6 +5045,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 maybe_promote(typevar, bounds)
             };
 
+        // Capture this immediately before `build_with` so it reflects the final pending
+        // constraint set used to solve this call's specialization.
+        let _returned_callable_rescoping_candidates =
+            builder.returned_callable_rescoping_candidates();
         let specialization = builder.build_with(generic_context, choose_solution);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
