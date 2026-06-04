@@ -252,14 +252,17 @@ error[call-non-callable]: `NotImplemented` is not callable
 ## `map` with generic callbacks
 
 ```py
-from typing import cast
 from ty_extensions import Unknown
 import re
 
-s = cast(Unknown | str, "")
-"".join(map(re.escape, s))
+def _(s: Unknown | str):
+    escaped = map(re.escape, s)
+    reveal_type(escaped)  # revealed: map[str]
+    "".join(escaped)
 
-xs = cast(Unknown | list[str], ["a"])
-tokens: list[Unknown | str] = []
-tokens.extend(map(re.escape, xs))
+def _(xs: Unknown | list[str]):
+    escaped = map(re.escape, xs)
+    reveal_type(escaped)  # revealed: map[str]
+    tokens: list[Unknown | str] = []
+    tokens.extend(escaped)
 ```
