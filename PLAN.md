@@ -104,11 +104,14 @@ filter from `remove_callable_only_typevars`.
 - Eligibility must be driven by an explicit candidate set, not by a purely structural search for
     all typevars that appear only inside returned callables. This avoids accidentally capturing
     enclosing generic typevars.
-- The candidate set should be efficient to compute exactly as:
+- The candidate set should be efficient to compute as:
     - the call's `inferable` typevar set, unioned with
     - the deferred-quantification set on the constraint set produced during specialization
-        inference. That deferred set should include generic callable typevars encountered while
-        inferring against callable arguments, whose typevars might appear in the final solution.
+        inference, unioned with
+    - generic-context typevars mentioned by types assigned during specialization inference. This
+        covers generic callable arguments that flow into a result through an intermediate typevar,
+        such as `drop` in `partial(partial, drop)`, rather than directly through a callable
+        relation.
         This should use the actual `self.inferable_typevars` for the call, even though that can include
         typevars from enclosing class contexts for method calls; add/keep tests to guard against
         over-rebinding class/enclosing correlations.
@@ -344,23 +347,27 @@ it must match the builder whose specialization is actually applied to the call r
     This lets call-specialization code read which generic-callable typevars were existentially
     introduced while comparing callable signatures; hiding this behind a method is YAGNI for now.
 - [x] In `SpecializationBuilder` (`types/generics.rs`), define the rescoping candidate set as
-    exactly the call's `inferable` set unioned with the deferred-quantification set of the constraint
-    set created during specialization inference. Use `self.inferable_typevars` for the inferable side,
-    even though it can include enclosing class typevars for method calls. In practice, deferred
-    quantification can likely be read from `self.pending` after argument/callable inference has
-    intersected in all relevant constraints.
+    the call's `inferable` set unioned with the deferred-quantification set of the constraint set
+    created during specialization inference and with generic-context typevars mentioned by assigned
+    specialization types. Use `self.inferable_typevars` for the inferable side, even though it can
+    include enclosing class typevars for method calls. In practice, deferred quantification can
+    likely be read from `self.pending` after argument/callable inference has intersected in all
+    relevant constraints.
 - [x] Expose that candidate set to the call binder, or return it alongside the built
     specialization. Make sure the exposed set comes from the final specialization attempt, not from
     any abandoned return-context-preferred attempt. Capture it immediately before calling
     `builder.build_with(...)`, so it clearly corresponds to the final pending constraint set used to
     solve the specialization.
 - [x] Ensure the candidate set uses exact `BoundTypeVarIdentity` values, including freshness
-    nonces, so freshened generic callable occurrences remain distinct.
+    nonces, so freshened generic callable occurrences remain distinct. Generic contexts mentioned by
+    assigned types are collected after any call-site freshening, so the candidates match the identities
+    that can appear in the specialized return type.
 
 Rationale: for `higher(identity)`, the leaked `A@higher` is a callee inferable typevar. For more
-complex cases like `partial(partial, drop)`, leaked typevars can come from the generic callable
-arguments and should be discovered via deferred quantification. For a callable parameter typed with
-an outer `T`, that outer `T` should not be in the candidate set and therefore should not be rebound.
+complex cases like `partial(partial, drop)`, leaked typevars can come from generic callable arguments;
+those are discovered either via deferred quantification from callable relations or by collecting
+freshened generic contexts from assigned specialization types. For a callable parameter typed with an
+outer `T`, that outer `T` should not be in the candidate set and therefore should not be rebound.
 
 ### Phase 5: Wire call-result rebinding into call binding
 
@@ -375,7 +382,7 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
 
     - traverse the already-specialized call result as the returned-value root;
     - pass an eligibility callback using the explicit candidate set
-        (`inferable ∪ deferred_quantification`);
+        (`inferable ∪ deferred_quantification ∪ generic contexts from assigned types`);
     - do **not** filter by source definition;
     - do **not** remove anything from any callee signature generic context; this is a post-call result
         rewrite only.
@@ -392,6 +399,11 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
     `finish()`, so `self.return_ty` is final once specialization inference completes.
 
 - [x] Pass the candidate typevar set assembled during specialization inference.
+
+- [x] Use the candidate set as additional inferable typevars for post-specialization argument
+    assignability checks. This prevents a valid call like `partial(partial, drop)` from producing a
+    false positive against a specialization that still contains generic callable argument typevars
+    before returned-callable rescoping.
 
 - [x] Keep non-generic calls and calls with no candidate typevars on the caller-side fast path with
     no rewrite; avoiding unnecessary traversal is the caller's responsibility.
@@ -414,7 +426,7 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
     - `Multiple occurrences of a higher-order generic callable`
     - any related legacy equivalents
 
-- [~] Update the red mdtests in both PEP-695 and legacy callable mdtest files:
+- [x] Update the red mdtests in both PEP-695 and legacy callable mdtest files:
 
     - remove `TODO` markers where the feature is now implemented,
     - remove now-invalid `invalid-argument-type` expectations when rebinding fully fixes the call,
@@ -424,10 +436,8 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
         rebinding, investigate whether they are due to this feature or an existing
         inference/specialization gap; if out of scope and non-trivial, keep the mdtest passing with
         explicit TODO/xfail comments documenting the known limitation.
-    - Current status: `higher(identity)` is now green in both syntax variants. The existing
-        `partial(partial, drop)` stanza is still left with TODO/xfail comments because typevars from
-        `drop` are not yet present in the explicit rescoping candidate set; see the open freshness
-        interaction item below.
+    - Current status: `higher(identity)` and `partial(partial, drop)` are green in both syntax
+        variants.
 
 - [x] Add or update a regression showing that surrounding result correlations are preserved:
 
@@ -480,9 +490,10 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
 
 ## Open questions / risks
 
-- [x] Exact candidate-set plumbing: agreed design is `inferable ∪ deferred_quantification` from
-    the final specialization constraint set. Make `ConstraintSet::deferred_quantification`
-    `pub(crate)` and read it directly instead of adding an accessor method.
+- [x] Candidate-set plumbing: use `inferable ∪ deferred_quantification` from the final
+    specialization constraint set, plus generic-context typevars mentioned by assigned specialization
+    types. Make `ConstraintSet::deferred_quantification` `pub(crate)` and read it directly instead of
+    adding an accessor method.
 - [x] Nested callable ownership: bind each candidate on the innermost returned callable that covers
     all eligible occurrences, and apply this same rule to both signature-based and call-result
     rebinding. This means `Callable[[], Callable[[T], T]]` becomes
@@ -506,9 +517,10 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
     union of any abandoned first attempt and the final attempt.
 - [x] Candidate capture timing: capture the final candidate set immediately before
     `builder.build_with(...)`, so it matches the final pending constraint set used to solve.
-- [x] Candidate set exactness: use `self.inferable_typevars ∪ pending.deferred_quantification`, not
-    just variables directly in the signature generic context. Guard against over-rebinding enclosing
-    class/function correlations with tests.
+- [x] Candidate set exactness: use
+    `self.inferable_typevars ∪ pending.deferred_quantification ∪ assigned generic-context typevars`,
+    not just variables directly in the signature generic context. Guard against over-rebinding
+    enclosing class/function correlations with tests.
 - [x] Manual callable traversal: the shared helper should not rely on `walk_callable_type` /
     `walk_signature`, because it must distinguish returned-value positions from parameter types and
     should not count signature generic-context metadata as ordinary occurrences. Function types should
@@ -553,11 +565,9 @@ an outer `T`, that outer `T` should not be in the candidate set and therefore sh
 - [x] Call-result integration point: apply rebinding inside `ArgumentTypeChecker::infer_specialization`
     immediately after applying the specialization to `self.return_ty`, not later in `finish()` or
     `Binding::check_types`.
-- [!] Freshness interactions: confirm that freshened generic callable occurrences passed as
-    arguments are represented in the candidate set with matching identities. Current call-result
-    rebinding fixes callee-inferable leaks like `higher(identity)`, but the existing
-    `partial(partial, drop)` regression still leaks `Y@drop`, suggesting not all generic callable
-    argument identities that can flow into the result are present in the current candidate set.
+- [x] Freshness interactions: freshened generic callable occurrences passed as arguments are
+    represented in the candidate set with matching identities. `partial(partial, drop)` now rebinds
+    `X@drop` and `Y@drop` onto returned callables, and both nested calls infer literal return types.
 - [x] Identical sibling callables / freshening: for a type like
     `tuple[Callable[[T], T], Callable[[T], T]]`, the desired behavior is that each returned callable
     occurrence can be used independently, e.g. after `c1, c2 = f(identity)`, `c1(1)` and `c2("x")`

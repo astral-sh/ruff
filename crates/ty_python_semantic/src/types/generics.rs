@@ -17,7 +17,9 @@ use crate::types::infer::original_class_type;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
+use crate::types::signatures::{
+    CallableSignature, Parameters, Signature, SignatureRelationVisitor,
+};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, rebind_return_callables,
@@ -27,11 +29,11 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableTypes, ClassLiteral,
-    FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
-    inferred_declaration,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
+    ClassLiteral, FindLegacyTypeVarsVisitor, FunctionType, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -64,6 +66,63 @@ pub(crate) fn enclosing_binding_contexts<'a, 'db>(
             NodeWithScopeKind::TypeAlias(node) => Some(index.expect_single_definition(node).into()),
             _ => None,
         })
+}
+
+impl<'db> Type<'db> {
+    pub(crate) fn mentioned_generic_contexts(
+        self,
+        db: &'db dyn Db,
+    ) -> FxOrderSet<GenericContext<'db>> {
+        struct GenericContextCollector<'db> {
+            generic_contexts: RefCell<FxOrderSet<GenericContext<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> GenericContextCollector<'db> {
+            fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+                if let Some(generic_context) = signature.generic_context {
+                    self.generic_contexts.borrow_mut().insert(generic_context);
+                }
+                for parameter in signature.parameters() {
+                    self.visit_type(db, parameter.annotated_type());
+                    if let Some(default_ty) = parameter.default_type() {
+                        self.visit_type(db, default_ty);
+                    }
+                }
+                self.visit_type(db, signature.return_ty);
+            }
+        }
+
+        impl<'db> TypeVisitor<'db> for GenericContextCollector<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+                for signature in &callable.signatures(db).overloads {
+                    self.visit_signature(db, signature);
+                }
+            }
+
+            fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+                for signature in &function.signature(db).overloads {
+                    self.visit_signature(db, signature);
+                }
+                self.visit_signature(db, function.last_definition_signature(db));
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let collector = GenericContextCollector {
+            generic_contexts: RefCell::default(),
+            recursion_guard: TypeCollector::default(),
+        };
+        collector.visit_type(db, self);
+        collector.generic_contexts.into_inner()
+    }
 }
 
 /// Binds an unbound typevar.
@@ -1721,6 +1780,10 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'db>,
     pending: ConstraintSet<'db, 'c>,
+    /// Generic-context typevars mentioned by types assigned during specialization inference.
+    /// These can flow into the specialized return type even when they were not introduced by a
+    /// direct callable relation, as in `partial(partial, drop)`.
+    assigned_type_rescoping_candidates: InferableTypeVars<'db>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
@@ -1736,6 +1799,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             constraints,
             inferable,
             pending: ConstraintSet::from_bool(constraints, true),
+            assigned_type_rescoping_candidates: InferableTypeVars::None,
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
         }
@@ -1744,6 +1808,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn returned_callable_rescoping_candidates(&self) -> InferableTypeVars<'db> {
         self.inferable
             .merge(self.db, self.pending.deferred_quantification)
+            .merge(self.db, self.assigned_type_rescoping_candidates)
     }
 
     /// Build a specialization, using a caller-provided hook to select the solution for each
@@ -2037,11 +2102,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .collect()
     }
 
+    fn add_rescoping_candidates_from_assigned_type(&mut self, ty: Type<'db>) {
+        let candidates = ty.mentioned_generic_contexts(self.db).into_iter().fold(
+            InferableTypeVars::None,
+            |candidates, generic_context| {
+                candidates.merge(self.db, generic_context.inferable_typevars(self.db))
+            },
+        );
+        self.assigned_type_rescoping_candidates = self
+            .assigned_type_rescoping_candidates
+            .merge(self.db, candidates);
+    }
+
     fn insert_hash_map_type_mapping(
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) {
+        self.add_rescoping_candidates_from_assigned_type(ty);
+
         let identity = bound_typevar.identity(self.db);
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
