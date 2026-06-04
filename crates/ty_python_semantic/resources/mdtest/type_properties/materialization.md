@@ -418,8 +418,8 @@ def _(
 ):
     # Top[list[Any] & list[int]] = Top[list[Any]] & list[int] = list[int]
     reveal_type(top)  # revealed: list[int]
-    # Bottom[list[Any] & list[int]] = Bottom[list[Any]] & list[int] = Bottom[list[Any]]
-    reveal_type(bottom)  # revealed: Bottom[list[Any]]
+    # list[Any] & list[int] simplifies to list[int] before materialization.
+    reveal_type(bottom)  # revealed: list[int]
 ```
 
 ## Negation (via `Not`)

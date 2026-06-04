@@ -483,8 +483,8 @@ for x in Test():
 
 ## Intersection type via isinstance narrowing
 
-When we have an intersection type via `isinstance` narrowing, we should be able to infer the
-iterable element type precisely:
+When we have an intersection type via `isinstance` narrowing, invariant generic classes use an
+explicit `Any` specialization:
 
 ```py
 from typing import Sequence
@@ -495,15 +495,14 @@ def _(x: Sequence[int], y: object):
         reveal_type(item)  # revealed: int
 
     if isinstance(y, list):
-        reveal_type(y)  # revealed: Top[list[Unknown]]
+        reveal_type(y)  # revealed: list[Any]
         for item in y:
-            reveal_type(item)  # revealed: object
+            reveal_type(item)  # revealed: Any
 
     if isinstance(x, list):
-        reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
+        reveal_type(x)  # revealed: Sequence[int] & list[Any]
         for item in x:
-            # int & object simplifies to int
-            reveal_type(item)  # revealed: int
+            reveal_type(item)  # revealed: int & Any
 ```
 
 ## Intersection where some elements are not iterable

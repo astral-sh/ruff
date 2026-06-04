@@ -10,7 +10,8 @@ use crate::types::typed_dict::{
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, SpecialFormType, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder,
+    infer_expression_types,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -257,7 +258,22 @@ impl ClassInfoConstraintFunction {
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
+                let class_type = class.as_static().map_or_else(
+                    || class.top_materialization(db),
+                    |class| {
+                        if !class.generic_context(db).is_some_and(|generic_context| {
+                            generic_context
+                                .variables(db)
+                                .all(|typevar| typevar.variance(db) == TypeVarVariance::Invariant)
+                        }) {
+                            return class.top_materialization(db);
+                        }
+                        class.apply_specialization(db, |generic_context| {
+                            generic_context.repeat_specialization(db, Type::any())
+                        })
+                    },
+                );
+                Type::instance(db, class_type)
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
