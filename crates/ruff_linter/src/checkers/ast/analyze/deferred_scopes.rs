@@ -22,6 +22,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::InvalidFirstArgumentNameForMethod,
         Rule::MutableClassDefault,
         Rule::MutableDataclassDefault,
+        Rule::NestedGlobalOrNonlocal,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
@@ -243,6 +244,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if scope.kind.is_function() {
+            if checker.is_rule_enabled(Rule::NestedGlobalOrNonlocal) {
+                ruff::rules::nested_global_or_nonlocal(checker, scope);
+            }
+
             if checker.is_rule_enabled(Rule::NoSelfUse) {
                 pylint::rules::no_self_use(checker, scope_id, scope);
             }
