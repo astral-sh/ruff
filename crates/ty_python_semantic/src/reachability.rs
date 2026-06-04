@@ -199,9 +199,9 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, Type, TypeContext,
-        UnionType, definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        UnionType, definite_match_pattern_type, definite_sequence_pattern_constraint_type,
+        enum_metadata, infer_narrowing_constraints, infer_same_file_expression_type,
+        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -267,9 +267,18 @@ fn type_narrowed_by_pattern<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let pattern_ty = match predicate.kind(db) {
+        PatternPredicateKind::Sequence(kind)
+            if subject_ty.is_subtype_of(db, sequence_pattern_type_builder(db).build()) =>
+        {
+            definite_sequence_pattern_constraint_type(db, kind)
+        }
+        kind => definite_match_pattern_type(db, kind),
+    };
+
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
+        .add_negative(pattern_ty)
         .build()
 }
 

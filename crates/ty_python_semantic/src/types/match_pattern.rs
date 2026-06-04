@@ -95,8 +95,17 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
     db: &'db dyn Db,
     element_types: impl ExactSizeIterator<Item = Type<'db>>,
 ) -> Type<'db> {
+    sequence_pattern_type_builder(db)
+        .add_positive(exact_sequence_pattern_protocol(db, element_types))
+        .build()
+}
+
+fn exact_sequence_pattern_protocol<'db>(
+    db: &'db dyn Db,
+    element_types: impl ExactSizeIterator<Item = Type<'db>>,
+) -> Type<'db> {
     let Ok(length) = i64::try_from(element_types.len()) else {
-        return sequence_pattern_type_builder(db).build();
+        return Type::object();
     };
 
     // `False == 0` and `True == 1`, so the protocol must accept both literals.
@@ -118,14 +127,10 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
         )
     });
 
-    let protocol = Type::protocol_with_methods(
+    Type::protocol_with_methods(
         db,
         std::iter::once(("__len__", len_method)).chain(getitem_method),
-    );
-
-    sequence_pattern_type_builder(db)
-        .add_positive(protocol)
-        .build()
+    )
 }
 
 /// Build the structural type used for a sequence pattern containing `*rest`.
@@ -209,13 +214,12 @@ pub(crate) fn definite_match_pattern_type<'db>(
     }
 }
 
-/// Return the values that are guaranteed to match a sequence pattern.
-pub(crate) fn definite_sequence_pattern_type<'db>(
+pub(crate) fn definite_sequence_pattern_constraint_type<'db>(
     db: &'db dyn Db,
     kind: &SequencePatternPredicateKind<'db>,
 ) -> Type<'db> {
     if kind.is_irrefutable() {
-        return sequence_pattern_type_builder(db).build();
+        return Type::object();
     }
 
     if kind.is_exact_length() {
@@ -228,9 +232,19 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
         if element_types.iter().any(Type::is_never) {
             Type::Never
         } else {
-            exact_sequence_pattern_type(db, element_types.into_iter())
+            exact_sequence_pattern_protocol(db, element_types.into_iter())
         }
     } else {
         Type::Never
     }
+}
+
+/// Return the values that are guaranteed to match a sequence pattern.
+pub(crate) fn definite_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+) -> Type<'db> {
+    sequence_pattern_type_builder(db)
+        .add_positive(definite_sequence_pattern_constraint_type(db, kind))
+        .build()
 }

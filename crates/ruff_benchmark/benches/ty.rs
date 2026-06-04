@@ -1193,6 +1193,54 @@ fn benchmark_literal_fallthrough(criterion: &mut Criterion, name: &str, code: &s
     });
 }
 
+/// Benchmarks sequence-pattern fallthrough for a tuple-expression subject.
+///
+/// This is based on a pattern in Kornia where a tuple expression is matched against many
+/// fixed-length sequence patterns:
+///
+/// ```python
+/// match (desired_type, channels):
+///     case (0, 1):
+///         pass
+///     case (0, 3):
+///         pass
+///     ...
+/// ```
+fn benchmark_sequence_match_tuple_subject(criterion: &mut Criterion) {
+    const NUM_MATCH_BRANCHES: usize = 40;
+
+    setup_rayon();
+
+    let mut code = r#"
+        def check_sequence_match_tuple_subject(kind: int, channels: int) -> None:
+            match (kind, channels):
+"#
+    .to_string();
+
+    for index in 0..NUM_MATCH_BRANCHES {
+        writeln!(
+            &mut code,
+            "                case ({}, {}):\n                    pass",
+            index / 4,
+            index % 4,
+        )
+        .ok();
+    }
+    code.push_str("                case _:\n                    pass\n");
+
+    criterion.bench_function("ty_micro[sequence_match_tuple_subject]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3120>.
 ///
 /// Sequential (`TypeIs`) narrowing on a large `Literal` union, combined with
@@ -1523,6 +1571,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_sequence_match_tuple_subject,
     benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
