@@ -1901,7 +1901,7 @@ def _(a_and_b: Intersection[A, B]):
 ```py
 from typing import Callable, ParamSpec, Protocol, TypeVar, runtime_checkable
 from typing_extensions import Self, TypeIs
-from ty_extensions import Intersection
+from ty_extensions import AlwaysTruthy, Intersection
 
 class VariableTruth:
     other: Self
@@ -2006,6 +2006,13 @@ ProtocolBoundMarker = TypeVar("ProtocolBoundMarker", bound=TypeIsMarker)
 def protocol_bounded(value: Intersection[Value, ProtocolBoundMarker]):
     reveal_type(value.other)  # revealed: Value
     value.other.marker  # error: [unresolved-attribute]
+
+TruthinessBound = TypeVar("TruthinessBound", bound=AlwaysTruthy)
+
+def takes_truthy(value: AlwaysTruthy): ...
+def truthiness_bounded(value: Intersection[Value, TruthinessBound]):
+    reveal_type(value.copy())  # revealed: Value
+    takes_truthy(value.copy())  # error: [invalid-argument-type]
 
 def is_marker(value: object) -> TypeIs[TypeIsMarker]:
     return hasattr(value, "marker")

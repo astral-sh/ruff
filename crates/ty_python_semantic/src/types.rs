@@ -1094,7 +1094,7 @@ impl<'db> Type<'db> {
         for positive in intersection.positive(db) {
             // `NamedTupleLike` is deliberately combined with a tuple type to describe
             // `typing.NamedTuple`; unlike a user protocol, it is not a flow refinement.
-            let is_value_refinement = matches!(positive, Type::AlwaysTruthy | Type::AlwaysFalsy)
+            let is_value_refinement = type_is_truthiness_refinement(db, *positive)
                 || (type_is_tuple_refinement(db, *positive) && !has_named_tuple_like_constraint)
                 || matches!(
                     positive,
@@ -7389,6 +7389,31 @@ fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                         .any(|constraint| type_is_tuple_refinement(db, *constraint)),
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         type_is_tuple_refinement(db, bound)
+                    }
+                })
+        }
+        _ => false,
+    }
+}
+
+fn type_is_truthiness_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::AlwaysTruthy | Type::AlwaysFalsy => true,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| type_is_truthiness_refinement(db, *element)),
+        Type::TypeVar(typevar) => {
+            typevar
+                .typevar(db)
+                .bound_or_constraints(db)
+                .is_some_and(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                        .elements(db)
+                        .iter()
+                        .any(|constraint| type_is_truthiness_refinement(db, *constraint)),
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        type_is_truthiness_refinement(db, bound)
                     }
                 })
         }
