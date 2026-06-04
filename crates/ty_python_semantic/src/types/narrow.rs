@@ -6,6 +6,7 @@ use crate::reachability::{
     binding_reachability, narrow_type_by_constraint, type_narrowed_by_previous_patterns,
 };
 use crate::subscript::PyIndex;
+use crate::types::call::CallArguments;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
@@ -42,7 +43,6 @@ use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
-use super::call::CallArguments;
 use super::constraints::{ConstraintSetBuilder, Solutions};
 use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
@@ -4176,47 +4176,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     NarrowingConstraint::present_key(rhs_type, key),
                 );
             } else {
-                let requires_key = |td: TypedDictType<'db>| -> bool {
-                    td.key_membership_truthiness(db, key.value(db))
-                        .is_always_true()
-                };
-
                 let resolved_rhs_type = rhs_type.resolve_type_alias(db);
 
                 let narrowed = match resolved_rhs_type {
-                    Type::TypedDict(td) => {
-                        if requires_key(td) {
-                            Type::Never
-                        } else {
-                            resolved_rhs_type
-                        }
-                    }
-                    Type::Intersection(intersection) => {
-                        if intersection
-                            .positive(db)
-                            .iter()
-                            .copied()
-                            .filter_map(Type::as_typed_dict)
-                            .any(requires_key)
-                        {
-                            Type::Never
-                        } else {
-                            resolved_rhs_type
-                        }
-                    }
                     Type::Union(union) => {
-                        // remove all members of the union that would require the key
-                        union.filter(db, |ty| match ty {
-                            Type::TypedDict(td) => !requires_key(*td),
-                            Type::Intersection(intersection) => !intersection
-                                .positive(db)
-                                .iter()
-                                .copied()
-                                .filter_map(Type::as_typed_dict)
-                                .any(requires_key),
-                            _ => true,
-                        })
+                        // Remove all members of the union that prove the key is present.
+                        union.filter(db, |ty| !key_is_always_present(db, &self.env, *ty, key))
                     }
+                    ty if key_is_always_present(db, &self.env, ty, key) => Type::Never,
                     _ => resolved_rhs_type,
                 };
 
@@ -5248,6 +5215,44 @@ fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> boo
         Type::TypeAlias(alias) => typeddict_declares_key(db, alias.value_type(db), key),
         _ => false,
     }
+}
+
+/// Return whether a negative membership test for `key` contradicts `ty`.
+fn key_is_always_present<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    key: StringLiteralType<'db>,
+) -> bool {
+    let required_typed_dict_key = |typed_dict: TypedDictType<'db>| {
+        typed_dict
+            .key_membership_truthiness(db, key.value(db))
+            .is_always_true()
+    };
+
+    let has_required_typed_dict_key = match ty {
+        Type::TypedDict(typed_dict) => required_typed_dict_key(typed_dict),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .copied()
+            .filter_map(Type::as_typed_dict)
+            .any(required_typed_dict_key),
+        _ => false,
+    };
+
+    has_required_typed_dict_key
+        || ty
+            .try_call_dunder(
+                db,
+                env,
+                "__contains__",
+                CallArguments::positional([Type::string_literal(db, key.value(db))]),
+                TypeContext::default(),
+            )
+            .is_ok_and(|bindings| {
+                bindings.return_type(db, env).bool(db, env) == Truthiness::AlwaysTrue
+            })
 }
 
 /// Return a synthesized `TypedDict` that represents safe subscript access for a present key on a
