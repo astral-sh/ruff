@@ -747,6 +747,25 @@ struct PresentKeyConstraint<'db> {
     key: StringLiteralType<'db>,
 }
 
+impl<'db> PresentKeyConstraint<'db> {
+    fn after_replacement(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let narrowed = narrow_with_present_key(db, env, self.source, self.key.value(db));
+        if narrowed == self.source || narrowed == self.source.resolve_type_alias(db) {
+            return None;
+        }
+
+        if key_membership_implies_subscript(db, env, self.source) {
+            Some(mapping_key_getitem_protocol(db, env, self.key.value(db)))
+        } else {
+            Some(key_membership_contains_protocol(db, env, self.key.value(db)))
+        }
+    }
+}
+
 impl<'db> Conjunctions<'db> {
     fn singleton(ty: Type<'db>) -> Self {
         Self {
@@ -819,21 +838,17 @@ impl<'db> Conjunctions<'db> {
                     filter_generic_narrowing_constraint(db, env, accumulated, ty)
                 }
             });
-        let mut present_keys = self.present_keys.into_iter();
 
-        if is_replacement && let Some(present_key) = present_keys.next() {
-            // A `TypeGuard` replacement discards the previous type, but a later membership test
-            // still needs the source type on which that test was performed.
-            current = IntersectionType::from_two_elements(
-                db,
-                env,
-                current,
-                narrow_with_present_key(db, env, present_key.source, present_key.key.value(db)),
-            );
-        }
-
-        for present_key in present_keys {
-            current = narrow_with_present_key(db, env, current, present_key.key.value(db));
+        if is_replacement {
+            for present_key in self.present_keys {
+                if let Some(constraint) = present_key.after_replacement(db, env) {
+                    current = IntersectionType::from_two_elements(db, env, current, constraint);
+                }
+            }
+        } else {
+            for present_key in self.present_keys {
+                current = narrow_with_present_key(db, env, current, present_key.key.value(db));
+            }
         }
 
         current
@@ -5163,6 +5178,20 @@ fn is_mapping_subtype<'db>(
             .to_instance(db, env)
             .top_materialization(db, env),
     )
+}
+
+fn key_membership_implies_subscript<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| key_membership_implies_subscript(db, env, *element)),
+        resolved => is_or_contains_typeddict(db, resolved) || is_mapping_subtype(db, env, resolved),
+    }
 }
 
 fn narrow_with_present_key<'db>(
