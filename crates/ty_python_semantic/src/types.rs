@@ -1206,26 +1206,24 @@ impl<'db> Type<'db> {
     fn equality_may_not_be_reflexive(self, db: &'db dyn Db) -> bool {
         match self {
             Type::LiteralValue(literal) if !literal.is_enum() => false,
-            _ => self.has_custom_equality(db),
+            _ => self.has_custom_eq(db),
         }
     }
 
-    /// Return true if this type defines a custom `__eq__` or `__ne__` method.
-    fn has_custom_equality(&self, db: &'db dyn Db) -> bool {
-        ["__eq__", "__ne__"].into_iter().any(|dunder_name| {
-            !matches!(
-                self.try_call_dunder_with_policy(
-                    db,
-                    dunder_name,
-                    &mut CallArguments::positional([Type::unknown()]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
-                        | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
-                ),
-                Err(CallDunderError::MethodNotAvailable)
-            )
-        })
+    /// Return true if this type defines a custom `__eq__` method.
+    fn has_custom_eq(&self, db: &'db dyn Db) -> bool {
+        !matches!(
+            self.try_call_dunder_with_policy(
+                db,
+                "__eq__",
+                &mut CallArguments::positional([Type::unknown()]),
+                TypeContext::default(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
+                    | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
+            ),
+            Err(CallDunderError::MethodNotAvailable)
+        )
     }
 
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {

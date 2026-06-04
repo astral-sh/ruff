@@ -403,6 +403,14 @@ def test_match_capture_preserves_recursive_int_enum_arm(
         case _:
             return ""
 
+def test_match_capture_int_enum_correlation_todo(
+    value: tuple[Literal[1], int] | tuple[Literal[2], str],
+) -> None:
+    match value:
+        case [Number.ONE, item]:
+            # TODO: Narrow this to `int` by comparing known `IntEnum` member values.
+            reveal_type(item)  # revealed: int | str
+
 class AlwaysEqualMeta(type):
     def __eq__(cls, other: object) -> Literal[True]:
         return True
@@ -441,6 +449,34 @@ def test_match_alias_preserves_nonreflexive_value(flag: bool) -> str:
             return ""
         case _ as item:
             return item  # error: [invalid-return-type]
+
+class CustomNeMeta(type):
+    def __ne__(cls, other: object) -> Literal[True]:
+        return True
+
+class CustomNeA(metaclass=CustomNeMeta):
+    pass
+
+class CustomNeB(metaclass=CustomNeMeta):
+    pass
+
+class CustomNeConstants:
+    A = CustomNeA
+
+def test_match_capture_ignores_custom_ne() -> None:
+    value = (CustomNeB, "actual")
+    match value:
+        case [CustomNeConstants.A, item]:
+            reveal_type(item)  # revealed: Never
+
+def test_match_alias_ignores_custom_ne(flag: bool) -> str:
+    value = CustomNeA if flag else "fallback"
+    match value:
+        case CustomNeConstants.A:
+            return ""
+        case _ as item:
+            reveal_type(item)  # revealed: Literal["fallback"]
+            return item
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
