@@ -24,12 +24,6 @@ use crate::checkers::ast::Checker;
 /// ensure timely cleanup, or the generator should be refactored to avoid
 /// holding context managers open across yields.
 ///
-/// ## Known problems
-/// Using [`aclosing()`] around all call sites of an async generator is a
-/// valid way to guarantee timely cleanup, but this rule cannot verify that
-/// all callers use `aclosing()`. As a result, it may flag generators that
-/// are always consumed safely.
-///
 /// The rule also suppresses diagnostics for functions decorated with
 /// `@pytest.fixture` or `@pytest_asyncio.fixture`, as the pytest runner
 /// handles generator cleanup automatically.
@@ -60,6 +54,12 @@ use crate::checkers::ast::Checker;
 /// is not appropriate. Instead, refactor to avoid holding context managers
 /// open across yields, or ensure consumers use `aclosing()` for timely
 /// cleanup.
+///
+/// ## Known problems
+/// Using [`aclosing()`] around all call sites of an async generator is a
+/// valid way to guarantee timely cleanup, but this rule cannot verify that
+/// all callers use `aclosing()`. As a result, it may flag generators that
+/// are always consumed safely.
 ///
 /// ## References
 /// - [PEP 533 – Deterministic cleanup for iterators](https://peps.python.org/pep-0533/)
