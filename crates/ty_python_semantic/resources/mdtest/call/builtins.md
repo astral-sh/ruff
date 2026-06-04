@@ -248,3 +248,21 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           Did you mean `NotImplementedError`?
   |
 ```
+
+## `map` with generic callbacks
+
+```py
+from ty_extensions import Unknown
+import re
+
+def _(s: Unknown | str):
+    escaped = map(re.escape, s)
+    reveal_type(escaped)  # revealed: map[str]
+    "".join(escaped)
+
+def _(xs: Unknown | list[str]):
+    escaped = map(re.escape, xs)
+    reveal_type(escaped)  # revealed: map[str]
+    tokens: list[Unknown | str] = []
+    tokens.extend(escaped)
+```
