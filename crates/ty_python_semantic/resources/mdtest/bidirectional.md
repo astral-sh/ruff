@@ -217,6 +217,9 @@ type TypedDictOrMapping = TD | Mapping[int, float]
 # The `dict[int, float]` fallback should still win when it is wrapped in an alias.
 d7_alias_fallback: TypedDictOrDictAlias = {1: 5.2}
 d8_mapping_fallback: TypedDictOrMapping = {1: 5.2}
+d9_direct_dict_call_fallback: TD | dict[int, float] = dict()
+d10_alias_dict_call_fallback: TypedDictOrDictAlias = dict()
+d11_typed_dict_call: TypedDictOrDictAlias = dict(x=1)
 
 # A `Mapping` fallback should only suppress `TypedDict` diagnostics when it accepts the literal.
 # error: [missing-typed-dict-key]

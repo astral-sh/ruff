@@ -340,6 +340,48 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 /// An expression cache shared across builders during multi-inference.
 type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
 
+struct TypedDictUnionElements<'db> {
+    typed_dicts: Vec<TypedDictType<'db>>,
+    has_dict_compatible_fallback: bool,
+}
+
+impl<'db> TypedDictUnionElements<'db> {
+    fn from_union<'ast, F>(
+        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        union: UnionType<'db>,
+        mut fallback_accepts_expression: F,
+    ) -> Self
+    where
+        F: FnMut(&mut TypeInferenceBuilder<'db, 'ast>, Type<'db>) -> bool,
+    {
+        let mut typed_dicts = Vec::new();
+        let mut has_dict_compatible_fallback = false;
+
+        for element in union.elements(builder.db()) {
+            let element = element.resolve_type_alias(builder.db());
+
+            if let Some(typed_dict) = element.as_typed_dict() {
+                typed_dicts.push(typed_dict);
+            } else if !has_dict_compatible_fallback {
+                has_dict_compatible_fallback = fallback_accepts_expression(builder, element);
+            }
+        }
+
+        Self {
+            typed_dicts,
+            has_dict_compatible_fallback,
+        }
+    }
+
+    fn single_typed_dict_without_fallback(&self) -> Option<TypedDictType<'db>> {
+        let [typed_dict] = self.typed_dicts.as_slice() else {
+            return None;
+        };
+
+        (!self.has_dict_compatible_fallback).then_some(*typed_dict)
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
     ///
@@ -6561,34 +6603,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return ty;
                 }
             } else if let Type::Union(union) = annotation {
-                let union_elements = union.elements(self.db());
-                let mut typed_dicts = Vec::new();
-                let mut has_dict_compatible_fallback = false;
-
-                for element in union_elements {
-                    let element = element.resolve_type_alias(self.db());
-
-                    if let Some(typed_dict) = element.as_typed_dict() {
-                        typed_dicts.push(typed_dict);
-                    } else if !has_dict_compatible_fallback {
+                let union_elements =
+                    TypedDictUnionElements::from_union(self, union, |builder, element| {
                         // Suppress `TypedDict` diagnostics only if this literal is assignable to
                         // the non-`TypedDict` arm of the union.
-                        let mut speculative_builder = self.speculate();
-                        has_dict_compatible_fallback = speculative_builder
+                        let mut speculative_builder = builder.speculate();
+                        speculative_builder
                             .infer_dict_expression(dict, TypeContext::new(Some(element)))
-                            .is_assignable_to(self.db(), element);
-                    }
-                }
+                            .is_assignable_to(speculative_builder.db(), element)
+                    });
 
-                if let [typed_dict] = typed_dicts.as_slice()
-                    && !has_dict_compatible_fallback
-                {
+                if let Some(typed_dict) = union_elements.single_typed_dict_without_fallback() {
                     if let Some(ty) =
-                        self.infer_typed_dict_expression(dict, *typed_dict, &mut item_types)
+                        self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
                     {
                         return ty;
                     }
-                } else if !typed_dicts.is_empty() {
+                } else if !union_elements.typed_dicts.is_empty() {
                     // Infer all expressions with diagnostics enabled before starting
                     // multi-inference. This preserves the general expression types even if we later
                     // fall back to a non-`TypedDict` arm of the union.
@@ -6604,7 +6635,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let mut narrowed_tys = Vec::new();
                     let mut item_types = FxHashMap::default();
-                    for typed_dict in typed_dicts {
+                    for typed_dict in union_elements.typed_dicts {
                         // Disable diagnostics as we attempt to narrow to specific `TypedDict`
                         // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
                         // should not emit `TypedDict` diagnostics if a non-`TypedDict` arm accepts
