@@ -3522,8 +3522,7 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(instance)
-                if matches!(name.as_str(), "major" | "minor")
-                    && instance.has_known_class(db, KnownClass::VersionInfo) =>
+                if matches!(name.as_str(), "major" | "minor") && instance.is_sys_version_info() =>
             {
                 let python_version = Program::get(db).python_version(db);
                 let segment = if name == "major" {
