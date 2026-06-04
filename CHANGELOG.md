@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.15.16
+
+Released on 2026-06-04.
+
+### Preview features
+
+- \[`flake8-async`\] Implement `yield-in-context-manager-in-async-generator` (`ASYNC119`) ([#24644](https://github.com/astral-sh/ruff/pull/24644))
+- \[`pylint`\] Narrow diagnostic range and exclude cases without exception handlers (`PLW0717`) ([#25440](https://github.com/astral-sh/ruff/pull/25440))
+- \[`ruff`\] Treat `yield` before `break` from a terminal loop as terminal (`RUF075`) ([#25447](https://github.com/astral-sh/ruff/pull/25447))
+
+### Bug fixes
+
+- \[`eradicate`\] Avoid flagging `ruff:ignore` comments as code (`ERA001`) ([#25537](https://github.com/astral-sh/ruff/pull/25537))
+- \[`eradicate`\] Fix `ERA001`/`RUF100` conflict when `noqa` is on commented-out code ([#25414](https://github.com/astral-sh/ruff/pull/25414))
+- \[`pyflakes`\] Avoid removing the `format` call when it would change behavior (`F523`) ([#25320](https://github.com/astral-sh/ruff/pull/25320))
+- \[`pylint`\] Avoid syntax errors in invalid character replacements in f-strings before Python 3.12 (`PLE2510`, `PLE2512`, `PLE2513`, `PLE2514`, `PLE2515`) ([#25544](https://github.com/astral-sh/ruff/pull/25544))
+- \[`pyupgrade`\] Avoid converting `format` calls with more kinds of side effects (`UP032`) ([#25484](https://github.com/astral-sh/ruff/pull/25484))
+
+### Rule changes
+
+- \[`flake8-pytest-style`\] Avoid fixes for ambiguous `argnames` and `argvalues` combinations (`PT006`) ([#24776](https://github.com/astral-sh/ruff/pull/24776))
+
+### Performance
+
+- Drop excess capacity from statement suites during parsing ([#25368](https://github.com/astral-sh/ruff/pull/25368))
+
+### Documentation
+
+- \[`pydocstyle`\] Improve discoverability of rules enabled for each convention ([#24973](https://github.com/astral-sh/ruff/pull/24973))
+- \[`ruff`\] Restore example code for Python versions before 3.15 (`RUF017`) ([#25439](https://github.com/astral-sh/ruff/pull/25439))
+- Fix typo `bin/active` → `bin/activate` in tutorial ([#25473](https://github.com/astral-sh/ruff/pull/25473))
+
+### Other changes
+
+- Shrink additional parser AST collections ([#25465](https://github.com/astral-sh/ruff/pull/25465))
+
+### Contributors
+
+- [@Redslayer112](https://github.com/Redslayer112)
+- [@koriyoshi2041](https://github.com/koriyoshi2041)
+- [@George-Ogden](https://github.com/George-Ogden)
+- [@TejasAmle](https://github.com/TejasAmle)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@ntBre](https://github.com/ntBre)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@loganrosen](https://github.com/loganrosen)
+- [@RafaelJohn9](https://github.com/RafaelJohn9)
+- [@adityasingh2400](https://github.com/adityasingh2400)
+
 ## 0.15.15
 
 Released on 2026-05-28.

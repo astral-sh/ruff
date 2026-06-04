@@ -66,7 +66,7 @@ use crate::checkers::ast::Checker;
 /// - [`contextlib.aclosing`](https://docs.python.org/3/library/contextlib.html#contextlib.aclosing)
 /// - [trio.as_safe_channel](https://trio.readthedocs.io/en/latest/reference-core.html#trio.as_safe_channel)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.16")]
 pub(crate) struct YieldInContextManagerInAsyncGenerator;
 
 impl Violation for YieldInContextManagerInAsyncGenerator {
