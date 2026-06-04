@@ -96,6 +96,10 @@ pub(crate) mod tests {
         pub(crate) fn set_analysis_settings(&mut self, settings: AnalysisSettings) {
             self.analysis_settings = Arc::new(settings);
         }
+
+        pub(crate) fn set_rule_selection(&mut self, rule_selection: RuleSelection) {
+            self.rule_selection = Arc::new(rule_selection);
+        }
     }
 
     impl DbWithTestSystem for TestDb {

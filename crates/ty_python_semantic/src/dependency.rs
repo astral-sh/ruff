@@ -28,6 +28,9 @@ declare_lint! {
     /// Importing a package that is only available transitively can make the project break when
     /// dependency resolution changes.
     ///
+    /// ## Rule status
+    /// This rule is disabled by default.
+    ///
     /// ## Examples
     /// ```python
     /// import requests  # requests is not declared as a direct dependency
@@ -35,7 +38,7 @@ declare_lint! {
     pub(crate) static MISSING_DIRECT_DEPENDENCY = {
         summary: "detects third-party imports without direct dependency declarations",
         status: LintStatus::preview("0.0.0"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 
@@ -689,9 +692,10 @@ mod tests {
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
     use super::*;
-    use crate::AnalysisSettings;
     use crate::db::tests::TestDb;
+    use crate::lint::RuleSelection;
     use crate::types::check_types;
+    use crate::{AnalysisSettings, default_lint_registry};
 
     fn setup_db(
         source: &str,
@@ -715,6 +719,13 @@ mod tests {
         module_owners: Vec<ModuleOwner>,
     ) -> anyhow::Result<(TestDb, File)> {
         let mut db = TestDb::new();
+        let mut rule_selection = RuleSelection::from_registry(default_lint_registry());
+        rule_selection.enable(
+            LintId::of(&MISSING_DIRECT_DEPENDENCY),
+            Severity::Warning,
+            LintSource::File,
+        );
+        db.set_rule_selection(rule_selection);
 
         let src_root = SystemPathBuf::from("/src");
         let site_packages = SystemPathBuf::from("/site-packages");
