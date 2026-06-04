@@ -5055,7 +5055,7 @@ define a `"foo"` field, it could be _assigned to_ with another `TypedDict` that 
 
 ```py
 from collections.abc import Mapping
-from typing_extensions import Literal, TypeGuard, TypeIs
+from typing_extensions import Literal, NotRequired, TypeGuard, TypeIs
 
 class Foo(TypedDict):
     foo: int
@@ -5138,6 +5138,14 @@ def membership_applies_to_typeguard_replacement(value: Foo | Literal["abc"]):
     has_z = "z" in value
     if guard_bar(value) and has_z:
         reveal_type(value["z"])  # revealed: object
+
+class OptionalKey(TypedDict):
+    x: NotRequired[int]
+
+def optional_membership_applies_to_typeguard_replacement(value: OptionalKey):
+    has_x = "x" in value
+    if guard_bar(value) and has_x:
+        reveal_type(value["x"])  # revealed: object
 
 def is_mapping(
     value: Foo | Mapping[Literal["a", "b"], int],
