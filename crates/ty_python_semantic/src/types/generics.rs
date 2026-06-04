@@ -546,8 +546,9 @@ impl<'db> GenericContext<'db> {
             }
             ast::TypeParam::TypeVarTuple(node) => {
                 let definition = index.expect_single_definition(node);
+                let declared = inferred_declaration(db, definition).declared()?;
                 let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declaration_type(db, definition).inner_type()
+                    declared.inner_type()
                 else {
                     return None;
                 };
