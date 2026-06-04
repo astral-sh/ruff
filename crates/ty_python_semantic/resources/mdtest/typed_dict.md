@@ -5163,6 +5163,32 @@ def mapping_membership_disjunction(mapping: Mapping[Literal["a"], int]):
         if "c" not in mapping:
             reveal_type(mapping["d"])  # revealed: object
 
+class AlwaysContains(Mapping[str, int]):
+    def __contains__(self, key: object, /) -> Literal[True]:
+        return True
+
+class SometimesContains(Mapping[str, int]): ...
+
+class Target:
+    target: int
+
+def guard_target(value: object) -> TypeGuard[Target]:
+    return True
+
+def absent_membership_preserves_typeguard(value: AlwaysContains | SometimesContains):
+    lacks_x = "x" not in value
+    if guard_target(value) and lacks_x:
+        reveal_type(value)  # revealed: Target
+        reveal_type(value.target)  # revealed: int
+
+def guard_always_or_target(value: object) -> TypeGuard[AlwaysContains | Target]:
+    return True
+
+def absent_membership_applies_to_typeguard(value: SometimesContains):
+    lacks_x = "x" not in value
+    if guard_always_or_target(value) and lacks_x:
+        reveal_type(value)  # revealed: Target
+
 def membership_and_typeguard(u: Foo | Mapping[Literal["a", "b"], int]):
     has_c = "c" in u
     if guard_object(u) and has_c:
