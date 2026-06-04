@@ -47,7 +47,7 @@ pub(crate) fn class_pattern_is_irrefutable(
 ) -> bool {
     match kind {
         ClassPatternKind::Irrefutable => true,
-        ClassPatternKind::MatchSelf => {
+        ClassPatternKind::SinglePositionalIrrefutable => {
             Type::ClassLiteral(class)
                 .member(db, "__match_args__")
                 .place

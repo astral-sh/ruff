@@ -136,9 +136,8 @@ pub enum PredicateNode<'db> {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassPatternKind {
     Irrefutable,
-    /// Exactly one irrefutable positional subpattern, which is only irrefutable for built-in
-    /// classes with match-self behavior.
-    MatchSelf,
+    /// Exactly one irrefutable positional subpattern and no keyword subpatterns.
+    SinglePositionalIrrefutable,
     Refutable,
 }
 
@@ -149,34 +148,29 @@ impl ClassPatternKind {
 }
 
 /// Structural details for sequence patterns that affect narrowing and reachability.
-///
-/// `patterns` stores one predicate per syntactic element. `has_star` records
-/// whether the pattern accepts additional sequence elements.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct SequencePatternPredicateKind<'db> {
     pub patterns: Box<[PatternPredicateKind<'db>]>,
-    pub has_star: bool,
 }
 
 impl<'db> SequencePatternPredicateKind<'db> {
     /// Return `true` for `case [*rest]`, the only sequence pattern with no
     /// length or element constraints.
     pub fn is_irrefutable(&self) -> bool {
-        self.patterns.len() == 1 && self.has_star
+        matches!(self.patterns.as_ref(), [PatternPredicateKind::Star(_)])
     }
 
-    pub const fn is_exact_length(&self) -> bool {
-        !self.has_star
+    pub fn is_exact_length(&self) -> bool {
+        !self
+            .patterns
+            .iter()
+            .any(|pattern| matches!(pattern, PatternPredicateKind::Star(_)))
     }
 
     /// Return the patterns before and after the starred element.
     pub fn split_around_star(
         &self,
     ) -> Option<(&[PatternPredicateKind<'db>], &[PatternPredicateKind<'db>])> {
-        if !self.has_star {
-            return None;
-        }
-
         let star_index = self
             .patterns
             .iter()

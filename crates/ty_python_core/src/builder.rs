@@ -1947,7 +1947,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         pattern.arguments.keywords.as_slice(),
                     ) {
                         ([], []) => ClassPatternKind::Irrefutable,
-                        ([pattern], []) if pattern.is_irrefutable() => ClassPatternKind::MatchSelf,
+                        ([pattern], []) if pattern.is_irrefutable() => {
+                            ClassPatternKind::SinglePositionalIrrefutable
+                        }
                         _ => ClassPatternKind::Refutable,
                     },
                 )
@@ -1962,18 +1964,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
-                let mut has_star = false;
-                let patterns = pattern
-                    .patterns
-                    .iter()
-                    .map(|pattern| {
-                        if matches!(pattern, ast::Pattern::MatchStar(_)) {
-                            has_star = true;
-                        }
-                        self.predicate_kind(pattern)
-                    })
-                    .collect();
-                PatternPredicateKind::Sequence(SequencePatternPredicateKind { patterns, has_star })
+                PatternPredicateKind::Sequence(SequencePatternPredicateKind {
+                    patterns: pattern
+                        .patterns
+                        .iter()
+                        .map(|pattern| self.predicate_kind(pattern))
+                        .collect(),
+                })
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
