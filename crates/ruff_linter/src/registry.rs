@@ -434,10 +434,13 @@ pub mod clap_completion {
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-            Some(Box::new(Rule::iter().map(|rule| {
+            Some(Box::new(Rule::iter().flat_map(|rule| {
                 let name = rule.noqa_code().to_string();
                 let help = rule.name().as_str();
-                PossibleValue::new(name).help(help)
+                [
+                    PossibleValue::new(&name).help(help),
+                    PossibleValue::new(help).help(name),
+                ]
             })))
         }
     }
