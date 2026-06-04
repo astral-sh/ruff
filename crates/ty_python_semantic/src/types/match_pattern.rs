@@ -41,7 +41,7 @@ fn sequence_pattern_getitem_method<'db>(
 ) -> CallableType<'db> {
     let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
 
-    let mut overloads: Vec<_> = indexed_element_types
+    let overloads = indexed_element_types
         .into_iter()
         .map(|(index, element_type)| {
             Signature::new(
@@ -55,11 +55,9 @@ fn sequence_pattern_getitem_method<'db>(
                 ),
                 element_type,
             )
-        })
-        .collect();
-
-    if let Some(fallback_return_type) = fallback_return_type {
-        overloads.push(Signature::new(
+        });
+    let fallback_overload = fallback_return_type.map(|fallback_return_type| {
+        Signature::new(
             Parameters::new(
                 db,
                 [
@@ -69,12 +67,12 @@ fn sequence_pattern_getitem_method<'db>(
                 ],
             ),
             fallback_return_type,
-        ));
-    }
+        )
+    });
 
     CallableType::new(
         db,
-        CallableSignature::from_overloads(overloads),
+        CallableSignature::from_overloads(overloads.chain(fallback_overload)),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
     )
@@ -113,20 +111,21 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
     let len_signature = Signature::new(Parameters::new(db, [self_parameter()]), length_type);
     let len_method = CallableType::function_like(db, len_signature);
 
-    let mut methods = vec![("__len__", len_method)];
-
-    if !element_types.is_empty() {
-        methods.push((
+    let getitem_method = (!element_types.is_empty()).then(|| {
+        (
             "__getitem__",
             sequence_pattern_getitem_method(
                 db,
                 (0..length).zip(element_types.iter().copied()),
                 None,
             ),
-        ));
-    }
+        )
+    });
 
-    let protocol = Type::protocol_with_methods(db, methods);
+    let protocol = Type::protocol_with_methods(
+        db,
+        std::iter::once(("__len__", len_method)).chain(getitem_method),
+    );
 
     sequence_pattern_type_builder(db)
         .add_positive(protocol)
