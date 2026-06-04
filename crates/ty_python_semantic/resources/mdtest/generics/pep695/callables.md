@@ -499,10 +499,14 @@ def identity[A](x: A) -> A:
 def same[T](c: Callable[[T], T], x: list[T], y: list[T]) -> T:
     raise NotImplementedError
 
-# TODO: no errors
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(same(identity, [1], ["x"]))  # revealed: int | str
+
+ints: list[int] = [1]
+strings: list[str] = ["x"]
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(same(identity, ints, strings))  # revealed: int | str
 ```
 
 ## Multiple occurrences of a higher-order generic callable

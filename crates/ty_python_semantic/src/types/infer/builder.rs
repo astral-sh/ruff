@@ -5710,20 +5710,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // TODO: We could also attempt an inference without type context, but this
         // leads to similar performance issues.
         self.infer_all_argument_types(
-            ast_arguments,
+            ast_arguments.clone(),
             argument_types,
             infer_argument_ty,
             bindings,
             call_expression_tcx,
         );
 
-        bindings.check_types_impl(
+        let mut checked_bindings = bindings.clone();
+        let result = checked_bindings.check_types_impl(
             db,
             &constraints,
             argument_types,
             call_expression_tcx,
             &self.dataclass_field_specifiers,
-        )
+        );
+        if result.is_ok() {
+            *bindings = checked_bindings;
+            return result;
+        }
+
+        if has_generic_context
+            && checked_bindings
+                .iter_flat()
+                .flat_map(CallableBinding::overloads)
+                .any(|overload| overload.specialization().is_some())
+        {
+            // The first inference pass may need the unspecialized argument types to solve a
+            // generic call. Once those solutions are available, re-infer context-sensitive
+            // arguments, such as collection literals, with the solved parameter types before
+            // deciding whether the call is invalid.
+            let mut retry_argument_types = argument_types.clone();
+            let mut speculative_builder = self.speculate();
+            speculative_builder.infer_all_argument_types(
+                ast_arguments,
+                &mut retry_argument_types,
+                infer_argument_ty,
+                &checked_bindings,
+                call_expression_tcx,
+            );
+
+            let mut retry_bindings = bindings.clone();
+            let retry_result = retry_bindings.check_types_impl(
+                db,
+                &constraints,
+                &retry_argument_types,
+                call_expression_tcx,
+                &self.dataclass_field_specifiers,
+            );
+            if retry_result.is_ok() {
+                self.extend(speculative_builder);
+                *argument_types = retry_argument_types;
+                *bindings = retry_bindings;
+                return retry_result;
+            }
+        }
+
+        *bindings = checked_bindings;
+        result
     }
 
     /// Infer the argument types for all bindings.
