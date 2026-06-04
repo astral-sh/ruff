@@ -176,7 +176,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias, TypeVar
 from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
@@ -282,6 +282,63 @@ def test_match_star_capture_between_patterns(value: tuple[int, bytes, str]) -> N
     match value:
         case [int(), *rest, str()]:
             reveal_type(rest)  # revealed: list[bytes]
+
+def test_match_star_capture_filters_union_arms(
+    value: tuple[Literal[1], int, int] | tuple[Literal[2], str, str],
+) -> list[int]:
+    match value:
+        case [1, *rest]:
+            reveal_type(rest)  # revealed: list[int]
+            return rest
+        case _:
+            return []
+
+def test_match_star_capture_preserves_compatible_union_arms(
+    value: tuple[Literal[1], int, int] | tuple[Literal[2], str, str],
+) -> None:
+    match value:
+        case [_, *rest]:
+            reveal_type(rest)  # revealed: list[int] | list[str]
+
+def test_match_capture_filters_union_arms(
+    value: tuple[Literal[1], int] | tuple[Literal[2], str],
+) -> int:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: int
+            return item
+        case _:
+            return 0
+
+def test_match_capture_preserves_compatible_union_arms(
+    value: tuple[Literal[1], int] | tuple[Literal[2], str],
+) -> None:
+    match value:
+        case [_, item]:
+            reveal_type(item)  # revealed: int | str
+
+MatchPair: TypeAlias = tuple[Literal[1], int] | tuple[Literal[2], str]
+MatchStarPair: TypeAlias = tuple[Literal[1], int, int] | tuple[Literal[2], str, str]
+MatchPairT = TypeVar(
+    "MatchPairT",
+    tuple[Literal[1], int],
+    tuple[Literal[2], str],
+)
+
+def test_match_capture_filters_aliased_union_arms(value: MatchPair) -> None:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: int
+
+def test_match_star_capture_filters_aliased_union_arms(value: MatchStarPair) -> None:
+    match value:
+        case [1, *rest]:
+            reveal_type(rest)  # revealed: list[int]
+
+def test_match_capture_filters_constrained_typevar_arms(value: MatchPairT) -> None:
+    match value:
+        case [1, item]:
+            reveal_type(item)  # revealed: int
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
