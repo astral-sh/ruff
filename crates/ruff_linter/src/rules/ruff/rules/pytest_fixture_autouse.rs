@@ -46,7 +46,7 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 ///
 /// ## Note
 /// This is a pedantic rule that restricts a valid `pytest` pattern. If you choose to
-/// enable it, you may want to restrict it to only apply outside of `conftest.py` files,
+/// enable it, you may want to ignore it outside of `conftest.py` files,
 /// as autouse fixtures are most problematic when defined globally.
 ///
 /// You can do this by configuring [`lint.per-file-ignores`]:
