@@ -623,7 +623,7 @@ fn check_class_declaration<'db>(
     if let Some(target) = missing_override_target
         && first_reachable_definition.kind(db).is_function_def()
     {
-        check_missing_overrides(context, member, target);
+        check_missing_overrides(context, member, class_scope, target);
     }
 
     if !subclass_overrides_superclass_declaration
@@ -632,7 +632,7 @@ fn check_class_declaration<'db>(
         // will always be a definition in the file currently being checked
         && first_reachable_definition.kind(db).is_function_def()
     {
-        check_explicit_overrides(context, member, class);
+        check_explicit_overrides(context, member, class_scope, class);
     }
 
     if let Some((superclass, superclass_method)) = overridden_final_method {
@@ -1059,10 +1059,12 @@ impl OverrideRulesConfig {
 fn check_explicit_overrides<'db>(
     context: &InferContext<'db, '_>,
     member: &Member<'db>,
+    subclass_scope: ScopeId<'db>,
     class: ClassType<'db>,
 ) {
     let db = context.db();
-    let underlying_functions = extract_underlying_functions(db, member.ty);
+    let underlying_functions =
+        extract_overriding_functions(db, member.ty, &member.name, subclass_scope);
     let Some(functions) = underlying_functions else {
         return;
     };
@@ -1127,13 +1129,18 @@ impl<'db> MissingOverrideTarget<'db> {
 fn check_missing_overrides<'db>(
     context: &InferContext<'db, '_>,
     member: &Member<'db>,
+    subclass_scope: ScopeId<'db>,
     target: MissingOverrideTarget<'db>,
 ) {
     let db = context.db();
 
-    let Some(undecorated_override) =
-        overriding_definition_without_decorator(db, member.ty, context.in_stub())
-    else {
+    let Some(undecorated_override) = overriding_definition_without_decorator(
+        db,
+        member.ty,
+        &member.name,
+        subclass_scope,
+        context.in_stub(),
+    ) else {
         return;
     };
 
@@ -1171,9 +1178,11 @@ fn check_missing_overrides<'db>(
 fn overriding_definition_without_decorator<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
+    member_name: &Name,
+    subclass_scope: ScopeId<'db>,
     in_stub: bool,
 ) -> Option<OverloadLiteral<'db>> {
-    for function in extract_underlying_functions(db, ty)? {
+    for function in extract_overriding_functions(db, ty, member_name, subclass_scope)? {
         let definition = overriding_definition(db, function, in_stub);
         if !definition.has_known_decorator(db, FunctionDecorators::OVERRIDE) {
             return Some(definition);
@@ -1181,6 +1190,64 @@ fn overriding_definition_without_decorator<'db>(
     }
 
     None
+}
+
+/// Extract functions that belong to the subclass member currently being checked.
+/// These functions are the appropriate anchor points for override diagnostics.
+fn extract_overriding_functions<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    member_name: &Name,
+    subclass_scope: ScopeId<'db>,
+) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
+    match ty {
+        Type::PropertyInstance(property) => {
+            let subclass_file = subclass_scope.file(db);
+            let mut functions = smallvec::smallvec![];
+
+            // A setter or deleter can reuse a getter from a different class or file. Diagnostics
+            // should only consider accessors defined by the subclass member under analysis.
+            for accessor in [
+                property.getter(db),
+                property.setter(db),
+                property.deleter(db),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                let Some(accessor_functions) = extract_underlying_functions(db, accessor) else {
+                    continue;
+                };
+                functions.extend(accessor_functions.into_iter().filter(|function| {
+                    function.name(db) == member_name
+                        && function.file(db) == subclass_file
+                        && function.definition(db).scope(db) == subclass_scope
+                }));
+            }
+
+            if functions.is_empty() {
+                None
+            } else {
+                Some(functions)
+            }
+        }
+        Type::Union(union) => {
+            let mut functions = smallvec::smallvec![];
+            for member in union.elements(db) {
+                if let Some(mut member_functions) =
+                    extract_overriding_functions(db, *member, member_name, subclass_scope)
+                {
+                    functions.append(&mut member_functions);
+                }
+            }
+            if functions.is_empty() {
+                None
+            } else {
+                Some(functions)
+            }
+        }
+        _ => extract_underlying_functions(db, ty),
+    }
 }
 
 fn overriding_definition<'db>(
@@ -1196,6 +1263,8 @@ fn overriding_definition<'db>(
     }
 }
 
+/// Extract callable functions represented by a type.
+/// These may be defined in files other than the one being checked.
 fn extract_underlying_functions<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
