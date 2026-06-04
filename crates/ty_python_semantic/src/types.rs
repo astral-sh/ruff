@@ -1064,6 +1064,112 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Return the part of a receiver type that describes its runtime class for `Self` binding.
+    ///
+    /// Negative constraints and flow refinements describe the current value, but do not necessarily
+    /// apply to another instance returned as `Self`. When known, `self_typevar` identifies the
+    /// protocol that owns `Self`, so other structural constraints can be treated as refinements.
+    pub(crate) fn self_binding_type_for(
+        self,
+        db: &'db dyn Db,
+        self_typevar: Option<BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        let Type::Intersection(intersection) = self else {
+            return self;
+        };
+
+        let owner = self_typevar
+            .and_then(|self_typevar| self_typevar_owner_class_literal(db, self_typevar));
+        let has_nominal_class_constraint = intersection.positive(db).iter().any(|positive| {
+            !matches!(positive, Type::ProtocolInstance(_)) && positive.nominal_class(db).is_some()
+        });
+        let has_named_tuple_like_constraint =
+            intersection
+                .positive(db)
+                .iter()
+                .any(|positive| match positive {
+                    Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::FromClass(class),
+                        ..
+                    }) => class.is_known(db, KnownClass::NamedTupleLike),
+                    _ => false,
+                });
+        let named_tuple_shape =
+            has_named_tuple_like_constraint.then(|| Type::homogeneous_tuple(db, Type::object()));
+        let mut builder = IntersectionBuilder::new(db);
+        if let Some(named_tuple_shape) = named_tuple_shape
+            && intersection.positive(db).iter().any(|positive| {
+                type_is_tuple_refinement(db, *positive) && *positive != named_tuple_shape
+            })
+        {
+            builder = builder.add_positive(named_tuple_shape);
+        }
+        for positive in intersection.positive(db) {
+            // `NamedTupleLike` is deliberately combined with a tuple type to describe
+            // `typing.NamedTuple`; unlike a user protocol, it is not a flow refinement.
+            let is_value_refinement = type_is_truthiness_refinement(db, *positive)
+                || (type_is_tuple_refinement(db, *positive)
+                    && named_tuple_shape != Some(*positive))
+                || matches!(
+                    positive,
+                    Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::Synthesized(_),
+                        ..
+                    })
+                )
+                || matches!(
+                    positive,
+                    Type::TypeVar(typevar)
+                        if has_nominal_class_constraint
+                            && typevar_is_protocol_refinement(db, *typevar, owner)
+                )
+                || matches!(
+                    positive,
+                    Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::FromClass(class),
+                        ..
+                    }) if ((owner.is_none() && has_nominal_class_constraint)
+                        || owner.is_some_and(|owner| {
+                            !class_mro_literals(db, class.class_literal(db)).contains(&owner)
+                        }))
+                        && !class.is_known(db, KnownClass::NamedTupleLike)
+                );
+            if !is_value_refinement {
+                builder = builder.add_positive(*positive);
+            }
+        }
+        builder.build()
+    }
+
+    pub(crate) fn needs_self_binding(self, db: &'db dyn Db) -> bool {
+        self.as_function_literal().is_some_and(|function| {
+            function
+                .signature(db)
+                .overloads
+                .iter()
+                .any(|signature| signature.needs_self_mapping(db, true))
+        })
+    }
+
+    /// Apply `Self` substitutions without binding or replacing the receiver parameter.
+    pub(crate) fn apply_self_binding(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        match self {
+            Type::FunctionLiteral(function) => {
+                let self_type = function.signature(db).self_binding_type(db, self_type);
+                self.apply_type_mapping(
+                    db,
+                    &TypeMapping::BindSelf(SelfBinding::new(db, self_type, None)),
+                    TypeContext::default(),
+                )
+            }
+            Type::Callable(callable) if callable.is_function_like(db) => {
+                let self_type = callable.signatures(db).self_binding_type(db, self_type);
+                Type::Callable(callable.apply_self(db, self_type))
+            }
+            _ => self,
+        }
+    }
+
     /// Returns `true` if `self` is [`Type::Callable`].
     pub(crate) const fn is_callable_type(&self) -> bool {
         matches!(self, Type::Callable(..))
@@ -4057,10 +4163,29 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
-                    .into()
+                let function = bound_method.function(db);
+                let signatures = function.signature(db);
+                let self_instance = bound_method.self_instance(db);
+                let needs_self_binding = Type::FunctionLiteral(function).needs_self_binding(db);
+                let intersection_self = needs_self_binding
+                    && !function.is_classmethod(db)
+                    && matches!(self_instance, Type::Intersection(_));
+                CallableBinding::from_overloads(
+                    self,
+                    signatures.overloads.iter().map(|signature| {
+                        if intersection_self && signature.needs_self_mapping(db, true) {
+                            signature.apply_self(db, signature.self_binding_type(db, self_instance))
+                        } else {
+                            signature.clone()
+                        }
+                    }),
+                )
+                .with_bound_type(if intersection_self || !needs_self_binding {
+                    self_instance
+                } else {
+                    signatures.self_binding_type(db, self_instance)
+                })
+                .into()
             }
 
             Type::KnownBoundMethod(method) => {
@@ -7069,6 +7194,90 @@ fn class_mro_literals<'db>(
         .collect()
 }
 
+fn typevar_is_protocol_refinement<'db>(
+    db: &'db dyn Db,
+    typevar: BoundTypeVarInstance<'db>,
+    owner: Option<ClassLiteral<'db>>,
+) -> bool {
+    let is_protocol_refinement = |ty: Type<'db>| match ty.resolve_type_alias(db) {
+        Type::ProtocolInstance(ProtocolInstanceType {
+            inner: Protocol::FromClass(class),
+            ..
+        }) => {
+            !class.is_known(db, KnownClass::NamedTupleLike)
+                && owner.is_none_or(|owner| {
+                    !class_mro_literals(db, class.class_literal(db)).contains(&owner)
+                })
+        }
+        _ => false,
+    };
+
+    typevar
+        .typevar(db)
+        .bound_or_constraints(db)
+        .is_some_and(|bound_or_constraints| match bound_or_constraints {
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                .elements(db)
+                .iter()
+                .all(|constraint| is_protocol_refinement(*constraint)),
+            TypeVarBoundOrConstraints::UpperBound(Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .all(|bound| is_protocol_refinement(*bound)),
+            TypeVarBoundOrConstraints::UpperBound(bound) => is_protocol_refinement(bound),
+        })
+}
+
+fn type_is_tuple_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some(),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| type_is_tuple_refinement(db, *element)),
+        Type::TypeVar(typevar) => {
+            typevar
+                .typevar(db)
+                .bound_or_constraints(db)
+                .is_some_and(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| type_is_tuple_refinement(db, *constraint)),
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        type_is_tuple_refinement(db, bound)
+                    }
+                })
+        }
+        _ => false,
+    }
+}
+
+fn type_is_truthiness_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::AlwaysTruthy | Type::AlwaysFalsy => true,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| type_is_truthiness_refinement(db, *element)),
+        Type::TypeVar(typevar) => {
+            typevar
+                .typevar(db)
+                .bound_or_constraints(db)
+                .is_some_and(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| type_is_truthiness_refinement(db, *constraint)),
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        type_is_truthiness_refinement(db, bound)
+                    }
+                })
+        }
+        _ => false,
+    }
+}
+
 /// Information needed to bind `Self` typevars to a concrete type.
 ///
 /// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
@@ -7083,6 +7292,14 @@ pub struct SelfBinding<'db> {
 impl<'db> SelfBinding<'db> {
     pub(crate) fn self_type(&self) -> Type<'db> {
         self.ty
+    }
+
+    fn self_type_for(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Type<'db> {
+        self.ty.self_binding_type_for(db, Some(bound_typevar))
     }
 
     pub(crate) fn binding_context(&self) -> Option<BindingContext<'db>> {
@@ -7101,6 +7318,7 @@ impl<'db> SelfBinding<'db> {
                 self_typevar_owner_class_literal(db, typevar)
             }
             _ => self_type
+                .self_binding_type_for(db, None)
                 .nominal_class(db)
                 .map(|class| class.class_literal(db)),
         };
@@ -7118,19 +7336,53 @@ impl<'db> SelfBinding<'db> {
             return false;
         }
 
+        let owner_class = self_typevar_owner_class_literal(db, bound_typevar);
+        let intersection_inherits_from_owner = |owner_class| {
+            let Type::Intersection(intersection) = self.ty else {
+                return false;
+            };
+            intersection.positive(db).iter().any(|positive| {
+                positive.nominal_class(db).is_some_and(|class| {
+                    class_mro_literals(db, class.class_literal(db)).contains(&owner_class)
+                })
+            })
+        };
+
         // Fast path for the common method-signature case where the bound `Self`
-        // carries the same binding context as this mapping.
+        // carries the same binding context as this mapping. For intersection receivers, also
+        // verify that an element inherits from the method owner; attributes can alias methods
+        // from unrelated classes.
         if self.binding_context == Some(bound_typevar.binding_context(db)) {
-            return true;
+            return owner_class.is_none_or(|owner_class| {
+                !matches!(self.ty, Type::Intersection(_))
+                    || intersection_inherits_from_owner(owner_class)
+            });
         }
 
         // Check that the Self typevar's owner class is in the MRO of the self type's class.
-        // If we can't determine either class, conservatively don't bind.
-        self.class_literal.is_some_and(|class_literal| {
+        if self.class_literal.is_some_and(|class_literal| {
             let class_mro = class_mro_literals(db, class_literal);
-            self_typevar_owner_class_literal(db, bound_typevar)
-                .is_none_or(|owner_class| class_mro.contains(&owner_class))
-        })
+            owner_class.is_none_or(|owner_class| class_mro.contains(&owner_class))
+        }) {
+            return true;
+        }
+
+        // Context-free attribute binding must not replace a method-owned `Self`.
+        if self.binding_context.is_none()
+            && bound_typevar
+                .binding_context(db)
+                .definition()
+                .is_some_and(|definition| definition.kind(db).is_function_def())
+        {
+            return false;
+        }
+
+        // An intersection has no single nominal class, but a positive element can still inherit
+        // from the class or protocol that owns this `Self`.
+        let Some(owner_class) = owner_class else {
+            return false;
+        };
+        intersection_inherits_from_owner(owner_class)
     }
 }
 

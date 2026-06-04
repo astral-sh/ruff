@@ -331,6 +331,73 @@ def f[U: Bar](x: Foo[U]):
     reveal_type(x.foo())  # revealed: U@f
 ```
 
+Intersection receivers must also preserve unrelated occurrences of `Self`:
+
+```py
+from typing import Self
+from ty_extensions import Intersection
+
+class Box[T]:
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+class Owner:
+    def inspect(self: Self, value: Intersection[Box[Self], "Owner"]) -> None:
+        reveal_type(value.value)  # revealed: Self@inspect
+        value.value.value  # error: [unresolved-attribute]
+
+class ConcreteOwner(Owner): ...
+class Both(Box[ConcreteOwner], Owner): ...
+
+ConcreteOwner().inspect(Both(ConcreteOwner()))
+
+class MethodOwner:
+    def copy(self) -> Self:
+        return self
+
+class MethodAlias:
+    copy = MethodOwner.copy
+
+class MethodExtra:
+    extra: int
+
+def _(value: Intersection[MethodAlias, MethodExtra]):
+    value.copy().extra  # error: [unresolved-attribute]
+```
+
+## Intersection receivers bind `Self` before inferring arguments
+
+```py
+from typing import Protocol, Self, TypeVar
+from ty_extensions import AlwaysTruthy, Intersection
+
+class Value:
+    def copy_from(self, other: Self) -> Self:
+        raise NotImplementedError
+
+class Extra: ...
+
+def _(value: Intersection[Value, Extra], plain: Value):
+    reveal_type(value.copy_from(value))  # revealed: Value & Extra
+    # error: [invalid-argument-type]
+    reveal_type(value.copy_from(plain))  # revealed: Value & Extra
+
+class MixedRefinementMarker(Protocol):
+    marker: int
+
+MixedRefinement = TypeVar("MixedRefinement", Extra, MixedRefinementMarker)
+
+def mixed_refinement(value: Intersection[Value, MixedRefinement]):
+    # error: [invalid-argument-type]
+    value.copy_from(Value())
+
+MixedTruthinessRefinement = TypeVar("MixedTruthinessRefinement", Extra, AlwaysTruthy)
+
+def mixed_truthiness_refinement(value: Intersection[Value, MixedTruthinessRefinement]):
+    # error: [invalid-argument-type]
+    value.copy_from(Value())
+```
+
 ## typing_extensions
 
 ```toml

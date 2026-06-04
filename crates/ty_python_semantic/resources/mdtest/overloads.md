@@ -163,6 +163,31 @@ reveal_type(Base().narrowed)  # revealed: bound method Base.narrowed(x: int) -> 
 reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
 
+Flow narrowing of a bound receiver still participates in overload selection when another overload
+uses `Self`:
+
+```py
+from typing import Protocol, overload, runtime_checkable
+from typing_extensions import Self
+
+@runtime_checkable
+class Marker(Protocol):
+    marker: int
+
+class Value:
+    @overload
+    def select(self: Marker, value: int) -> str: ...
+    @overload
+    def select(self, value: str) -> Self: ...
+    def select(self, value: int | str) -> str | Self:
+        return self if isinstance(value, str) else ""
+
+def _(value: Value):
+    if isinstance(value, Marker):
+        reveal_type(value.select(1))  # revealed: str
+        reveal_type(value.select(""))  # revealed: Value
+```
+
 ## Specialized generic receivers
 
 An explicit receiver annotation can also select overloads based on a generic class specialization.

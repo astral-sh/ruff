@@ -1882,6 +1882,183 @@ def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.method())  # revealed: A & B
 ```
 
+### `Self` binding excludes flow-only refinements
+
+```py
+from typing import Protocol, TypeVar, runtime_checkable
+from typing_extensions import Self, TypeIs
+from ty_extensions import AlwaysTruthy, Intersection
+
+class VariableTruth:
+    other: Self
+
+    def __bool__(self) -> bool:
+        return False
+
+    def copy(self) -> Self:
+        return self
+
+    @property
+    def property(self) -> Self:
+        return self
+
+def _(value: VariableTruth):
+    if value:
+        reveal_type(value.copy())  # revealed: VariableTruth
+        reveal_type(value.other)  # revealed: VariableTruth
+        reveal_type(value.property)  # revealed: VariableTruth
+
+@runtime_checkable
+class InstanceMarker(Protocol):
+    marker: int
+
+class Value:
+    other: Self
+
+    def copy(self) -> Self:
+        return self
+
+    @property
+    def property(self) -> Self:
+        return self
+
+def _(value: Value):
+    if isinstance(value, InstanceMarker):
+        reveal_type(value.copy())  # revealed: Value
+        reveal_type(value.other)  # revealed: Value
+        reveal_type(value.property)  # revealed: Value
+
+@runtime_checkable
+class VariableTruthProtocol(Protocol):
+    def __bool__(self) -> bool: ...
+    def copy(self) -> Self: ...
+
+def _(value: VariableTruthProtocol):
+    if value:
+        reveal_type(value.copy())  # revealed: VariableTruthProtocol
+
+class BaseProtocol(Protocol):
+    def copy(self) -> Self: ...
+
+class ChildProtocol(BaseProtocol, Protocol):
+    def __bool__(self) -> bool: ...
+
+def clone(value: ChildProtocol) -> ChildProtocol:
+    if value:
+        return value.copy()
+    return value
+
+class MyTuple(tuple[int, ...]):
+    def fresh(self) -> Self:
+        return type(self)((1, 2, 3))
+
+def takes_pair(value: tuple[int, int]): ...
+def takes_object_pair(value: tuple[object, object]): ...
+def _(value: tuple[int, int]):
+    if isinstance(value, MyTuple):
+        reveal_type(value.fresh())  # revealed: MyTuple
+        takes_pair(value.fresh())  # error: [invalid-argument-type]
+
+T = TypeVar("T", tuple[int, int], tuple[str, str])
+
+def _(value: Intersection[MyTuple, T]):
+    reveal_type(value.fresh())  # revealed: MyTuple
+    takes_object_pair(value.fresh())  # error: [invalid-argument-type]
+
+MixedTupleBound = TypeVar("MixedTupleBound", bound=tuple[int, int] | list[str])
+
+def _(value: Intersection[MyTuple, MixedTupleBound]):
+    reveal_type(value.fresh())  # revealed: MyTuple & MixedTupleBound@_
+    takes_pair(value.fresh())
+
+class TypeIsMarker(Protocol):
+    marker: int
+
+ProtocolBoundMarker = TypeVar("ProtocolBoundMarker", bound=TypeIsMarker)
+
+def protocol_bounded(value: Intersection[Value, ProtocolBoundMarker]):
+    reveal_type(value.other)  # revealed: Value
+    value.other.marker  # error: [unresolved-attribute]
+
+TruthinessBound = TypeVar("TruthinessBound", bound=AlwaysTruthy)
+
+def takes_truthy(value: AlwaysTruthy): ...
+def truthiness_bounded(value: Intersection[Value, TruthinessBound]):
+    reveal_type(value.copy())  # revealed: Value
+    takes_truthy(value.copy())  # error: [invalid-argument-type]
+
+def is_marker(value: object) -> TypeIs[TypeIsMarker]:
+    return hasattr(value, "marker")
+
+def _(value: Value):
+    if is_marker(value):
+        reveal_type(value.copy())  # revealed: Value
+        value.copy().marker  # error: [unresolved-attribute]
+
+    if hasattr(value, "synthesized_marker"):
+        reveal_type(value.copy())  # revealed: Value
+        value.copy().synthesized_marker  # error: [unresolved-attribute]
+
+class CopyableProtocol(Protocol):
+    other: Self
+
+    def copy(self) -> Self: ...
+    @property
+    def property(self) -> Self: ...
+
+class NominalCopyable: ...
+
+def _(value: Intersection[NominalCopyable, CopyableProtocol]):
+    value.copy().copy()
+
+def _(value: CopyableProtocol):
+    if is_marker(value):
+        reveal_type(value.copy())  # revealed: CopyableProtocol
+        reveal_type(value.other)  # revealed: CopyableProtocol
+        reveal_type(value.property)  # revealed: CopyableProtocol
+        value.copy().marker  # error: [unresolved-attribute]
+        value.other.marker  # error: [unresolved-attribute]
+        value.property.marker  # error: [unresolved-attribute]
+```
+
+### `Self` binding expands aliases around refinements
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self, TypeVar
+from ty_extensions import Intersection
+
+class AliasValue:
+    other: Self
+
+class AliasTuple(tuple[int, ...]):
+    def fresh(self) -> Self:
+        return type(self)((1, 2, 3))
+
+def takes_pair(value: tuple[int, int]): ...
+
+type PairAlias = tuple[int, int]
+AliasTupleBound = TypeVar("AliasTupleBound", bound=PairAlias)
+
+def _(value: Intersection[AliasTuple, AliasTupleBound]):
+    reveal_type(value.fresh())  # revealed: AliasTuple
+    takes_pair(value.fresh())  # error: [invalid-argument-type]
+
+class AliasMarker(Protocol):
+    marker: int
+
+type MarkerAlias = AliasMarker
+AliasProtocolBound = TypeVar("AliasProtocolBound", bound=MarkerAlias)
+
+def _(value: Intersection[AliasValue, AliasProtocolBound]):
+    reveal_type(value.other)  # revealed: AliasValue
+    value.other.marker  # error: [unresolved-attribute]
+```
+
 ### Descriptor binding uses the full intersection type
 
 ```py
@@ -1902,9 +2079,14 @@ class A:
     desc = Descriptor()
 
 class B: ...
+class Mixin: ...
 
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.desc)  # revealed: A & B
+
+def _(a: A):
+    if isinstance(a, Mixin):
+        reveal_type(a.desc)  # revealed: A & Mixin
 ```
 
 ### Negation types
