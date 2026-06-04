@@ -734,8 +734,8 @@ impl<'db> NarrowingOperation<'db> {
 }
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
-struct Conjunctions<'db> {
-    conjuncts: SmallVec<[NarrowingOperation<'db>; 2]>,
+struct ConstraintConjunction<'db> {
+    type_constraints: SmallVec<[NarrowingOperation<'db>; 2]>,
     present_keys: SmallVec<[PresentKeyConstraint<'db>; 1]>,
     absent_keys: SmallVec<[AbsentKeyConstraint<'db>; 1]>,
 }
@@ -749,6 +749,16 @@ struct PresentKeyConstraint<'db> {
 }
 
 impl<'db> PresentKeyConstraint<'db> {
+    /// Apply this fact without restoring type information discarded by a replacement narrowing.
+    ///
+    /// `source` determines what the original membership test proved, but any resulting key
+    /// constraint is applied to `replacement`:
+    ///
+    /// ```python
+    /// has_x = "x" in value
+    /// if guard_to_bar(value) and has_x:
+    ///     value["x"]  # The key fact applies to `Bar`, not the original type.
+    /// ```
     fn apply_after_replacement(
         self,
         db: &'db dyn Db,
@@ -778,6 +788,12 @@ impl<'db> PresentKeyConstraint<'db> {
 
 /// A deferred key-absence operation. Keeping the filtered source out of the conjunction prevents
 /// it from replacing a preceding `TypeGuard` result.
+///
+/// ```python
+/// lacks_x = "x" not in value
+/// if guard_to_bar(value) and lacks_x:
+///     reveal_type(value)  # Bar, filtered by the key-absence fact
+/// ```
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
 struct AbsentKeyConstraint<'db> {
     source: Type<'db>,
@@ -785,6 +801,11 @@ struct AbsentKeyConstraint<'db> {
 }
 
 impl<'db> AbsentKeyConstraint<'db> {
+    /// Apply this fact to a replacement type without replacing it with the filtered source.
+    ///
+    /// An impossible fact still makes the conjunction `Never`; otherwise, the replacement is
+    /// filtered independently. This preserves `TypeGuard` semantics for aliased conditions such as
+    /// `guard(value) and key_not_in_value`.
     fn apply_after_replacement(
         self,
         db: &'db dyn Db,
@@ -799,10 +820,10 @@ impl<'db> AbsentKeyConstraint<'db> {
     }
 }
 
-impl<'db> Conjunctions<'db> {
+impl<'db> ConstraintConjunction<'db> {
     fn singleton(ty: Type<'db>) -> Self {
         Self {
-            conjuncts: smallvec![NarrowingOperation::Intersection(ty)],
+            type_constraints: smallvec![NarrowingOperation::Intersection(ty)],
             present_keys: smallvec![],
             absent_keys: smallvec![],
         }
@@ -810,7 +831,7 @@ impl<'db> Conjunctions<'db> {
 
     fn generic_filtering(ty: Type<'db>) -> Self {
         Self {
-            conjuncts: smallvec![NarrowingOperation::GenericFiltering(ty)],
+            type_constraints: smallvec![NarrowingOperation::GenericFiltering(ty)],
             present_keys: smallvec![],
             absent_keys: smallvec![],
         }
@@ -818,7 +839,7 @@ impl<'db> Conjunctions<'db> {
 
     fn present_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
         Self {
-            conjuncts: smallvec![],
+            type_constraints: smallvec![],
             present_keys: smallvec![PresentKeyConstraint { source, key }],
             absent_keys: smallvec![],
         }
@@ -826,7 +847,7 @@ impl<'db> Conjunctions<'db> {
 
     fn absent_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
         Self {
-            conjuncts: smallvec![],
+            type_constraints: smallvec![],
             present_keys: smallvec![],
             absent_keys: smallvec![AbsentKeyConstraint { source, key }],
         }
@@ -834,20 +855,20 @@ impl<'db> Conjunctions<'db> {
 
     fn and_with(mut self, other: Self) -> Self {
         if self
-            .conjuncts
+            .type_constraints
             .iter()
             .any(|conjunct| conjunct.ty().is_never())
             || other
-                .conjuncts
+                .type_constraints
                 .iter()
                 .any(|conjunct| conjunct.ty().is_never())
         {
             return Self::singleton(Type::Never);
         }
 
-        for conjunct in other.conjuncts {
-            if !self.conjuncts.contains(&conjunct) {
-                self.conjuncts.push(conjunct);
+        for type_constraint in other.type_constraints {
+            if !self.type_constraints.contains(&type_constraint) {
+                self.type_constraints.push(type_constraint);
             }
         }
 
@@ -866,20 +887,27 @@ impl<'db> Conjunctions<'db> {
         self
     }
 
+    /// Materialize this conjunction, applying deferred key facts after ordinary type constraints.
+    ///
+    /// Present-key facts are applied before absent-key facts so contradictory facts for the same
+    /// key evaluate to `Never`. Replacement disjuncts use the source-aware application methods to
+    /// avoid undoing `TypeGuard` narrowing.
     fn evaluate_constraint_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         is_replacement: bool,
     ) -> Type<'db> {
-        if self.present_keys.is_empty() && self.absent_keys.is_empty() && self.conjuncts.len() == 1
+        if self.present_keys.is_empty()
+            && self.absent_keys.is_empty()
+            && self.type_constraints.len() == 1
         {
-            return self.conjuncts[0].ty();
+            return self.type_constraints[0].ty();
         }
 
         // Collapse shared union arms before distributing the next constraint over them.
         let mut current = self
-            .conjuncts
+            .type_constraints
             .into_iter()
             .fold(Type::object(), |accumulated, conjunct| match conjunct {
                 NarrowingOperation::Intersection(ty) => {
@@ -1200,14 +1228,14 @@ pub(crate) struct NarrowingConstraint<'db> {
     /// Intersection constraint (from `isinstance()` narrowing comparisons, `TypeIs`, and
     /// similar). We keep these as a disjunction of conjunctions to avoid constructing
     /// union/intersection types while merging constraints.
-    intersection_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
+    intersection_disjuncts: SmallVec<[ConstraintConjunction<'db>; 1]>,
 
     /// "Replacement" constraints: instead of intersecting the previous type with a new type,
     /// the previous type is simply replaced wholesale with the new type. A common use case for
     /// these constraints is `typing.TypeGuard`. We can't eagerly union disjunctions because
     /// `TypeGuard` clobbers the previously-known type; within each replacement disjunct, however,
     /// we may eagerly intersect conjunctions with a later intersection narrowing.
-    replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
+    replacement_disjuncts: SmallVec<[ConstraintConjunction<'db>; 1]>,
 }
 
 impl<'db> NarrowingConstraint<'db> {
@@ -1215,7 +1243,7 @@ impl<'db> NarrowingConstraint<'db> {
     /// intersected with this constraint
     pub(crate) fn intersection(constraint: Type<'db>) -> Self {
         Self {
-            intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+            intersection_disjuncts: smallvec_inline![ConstraintConjunction::singleton(constraint)],
             replacement_disjuncts: smallvec![],
         }
     }
@@ -1224,7 +1252,9 @@ impl<'db> NarrowingConstraint<'db> {
     /// the subject when narrowing it to a subclass.
     fn generic_filtering(constraint: Type<'db>) -> Self {
         Self {
-            intersection_disjuncts: smallvec_inline![Conjunctions::generic_filtering(constraint)],
+            intersection_disjuncts: smallvec_inline![ConstraintConjunction::generic_filtering(
+                constraint
+            )],
             replacement_disjuncts: smallvec![],
         }
     }
@@ -1234,20 +1264,24 @@ impl<'db> NarrowingConstraint<'db> {
     fn replacement(constraint: Type<'db>) -> Self {
         Self {
             intersection_disjuncts: smallvec![],
-            replacement_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+            replacement_disjuncts: smallvec_inline![ConstraintConjunction::singleton(constraint)],
         }
     }
 
     fn present_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
         Self {
-            intersection_disjuncts: smallvec_inline![Conjunctions::present_key(source, key)],
+            intersection_disjuncts: smallvec_inline![ConstraintConjunction::present_key(
+                source, key
+            )],
             replacement_disjuncts: smallvec![],
         }
     }
 
     fn absent_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
         Self {
-            intersection_disjuncts: smallvec_inline![Conjunctions::absent_key(source, key)],
+            intersection_disjuncts: smallvec_inline![ConstraintConjunction::absent_key(
+                source, key
+            )],
             replacement_disjuncts: smallvec![],
         }
     }
@@ -1283,7 +1317,8 @@ impl<'db> NarrowingConstraint<'db> {
             }
         }
 
-        let mut additional_replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]> = smallvec![];
+        let mut additional_replacement_disjuncts: SmallVec<[ConstraintConjunction<'db>; 1]> =
+            smallvec![];
         for replacement_disjunct in &self.replacement_disjuncts {
             for other_intersection_disjunct in &other.intersection_disjuncts {
                 let merged = replacement_disjunct
@@ -1322,11 +1357,11 @@ impl<'db> NarrowingConstraint<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
         let mut union = UnionBuilder::new(db, env);
-        for conjunctions in self.replacement_disjuncts {
-            union.add_in_place(conjunctions.evaluate_constraint_type(db, env, true));
+        for conjunction in self.replacement_disjuncts {
+            union.add_in_place(conjunction.evaluate_constraint_type(db, env, true));
         }
-        for conjunctions in self.intersection_disjuncts {
-            union.add_in_place(conjunctions.evaluate_constraint_type(db, env, false));
+        for conjunction in self.intersection_disjuncts {
+            union.add_in_place(conjunction.evaluate_constraint_type(db, env, false));
         }
         union.build()
     }
@@ -5199,6 +5234,11 @@ fn is_mapping_subtype<'db>(
     )
 }
 
+/// Return whether successful membership implies that subscripting with the same key is valid.
+///
+/// `TypedDict` and `Mapping` provide this relationship; an arbitrary `__contains__`
+/// implementation does not. Every arm of a union must provide the relationship before it can be
+/// carried across replacement narrowing.
 fn key_membership_implies_subscript<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5213,6 +5253,17 @@ fn key_membership_implies_subscript<'db>(
     }
 }
 
+/// Refine `ty` with the fact that the literal `key` is present.
+///
+/// `TypedDict` arms gain a required read-only field, `Mapping` arms gain matching
+/// `__contains__` and `__getitem__` methods, and other arms only gain the successful membership
+/// fact. The distinction prevents code like this from implying invalid subscript access:
+///
+/// ```python
+/// def f(value: Literal["abc"]):
+///     if "a" in value:
+///         value["a"]  # Still invalid: string membership does not imply key subscripting.
+/// ```
 fn narrow_with_present_key<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5262,6 +5313,10 @@ fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> boo
     }
 }
 
+/// Refine `ty` with the fact that the literal `key` is absent.
+///
+/// Union arms that prove the key is always present are removed. Other arms are retained unchanged:
+/// failing to prove presence is not proof of absence.
 fn narrow_with_absent_key<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5280,7 +5335,11 @@ fn narrow_with_absent_key<'db>(
     }
 }
 
-/// Return whether a negative membership test for `key` contradicts `ty`.
+/// Return whether `ty` proves that `key` is present, making a negative membership branch
+/// unreachable.
+///
+/// A required `TypedDict` field proves presence directly. Other types prove it when calling
+/// `__contains__` with this literal key has an always-truthy return type.
 fn key_is_always_present<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5353,6 +5412,12 @@ fn required_typeddict_key<'db>(
 ///
 /// This preserves both the proven membership result and safe subscript access, assuming that
 /// `Mapping` implementations honor the contract between the two operations.
+///
+/// ```python
+/// def f(mapping: Mapping[Literal["a"], int]):
+///     if "b" in mapping:
+///         reveal_type(mapping["b"])  # object
+/// ```
 fn mapping_present_key_protocol<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
