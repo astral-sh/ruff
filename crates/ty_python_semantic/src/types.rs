@@ -7511,24 +7511,24 @@ impl<'db> SelfBinding<'db> {
             let Some(definition) = bound_typevar.binding_context(db).definition() else {
                 return false;
             };
-            let Some(name) = definition.name(db) else {
-                return false;
+            let member_uses_bound_definition = |member: Type<'db>| {
+                any_over_type(db, member, false, |ty| match ty {
+                    Type::FunctionLiteral(function) => function.contains_definition(db, definition),
+                    Type::TypeVar(typevar) => {
+                        typevar.typevar(db).is_self(db)
+                            && typevar.binding_context(db).definition() == Some(definition)
+                    }
+                    _ => false,
+                })
             };
-            let Some(member) = constraint
-                .class_member_with_policy(db, name.into(), MemberLookupPolicy::default())
-                .place
-                .ignore_possibly_undefined()
-            else {
-                return false;
-            };
-            any_over_type(db, member, false, |ty| match ty {
-                Type::FunctionLiteral(function) => function.contains_definition(db, definition),
-                Type::TypeVar(typevar) => {
-                    typevar.typevar(db).is_self(db)
-                        && typevar.binding_context(db).definition() == Some(definition)
-                }
-                _ => false,
-            })
+            constraint
+                .nominal_class(db)
+                .into_iter()
+                .flat_map(|class| class.class_literal(db).iter_mro(db))
+                .filter_map(ClassBase::into_class)
+                .filter_map(|class| class.static_class_literal(db).map(|(class, _)| class))
+                .flat_map(|class| list_members::all_end_of_scope_members(db, class.body_scope(db)))
+                .any(|member| member_uses_bound_definition(member.member.ty))
         };
         let intersection_inherits_from_owner = |owner_class| {
             let Type::Intersection(intersection) = self.ty else {

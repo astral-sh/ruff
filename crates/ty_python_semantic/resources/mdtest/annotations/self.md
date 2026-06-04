@@ -423,6 +423,21 @@ OwnedOrAliased = TypeVar("OwnedOrAliased", OwnedConstraint, AliasedConstraint)
 def constraint_arm_ownership(value: Intersection[OwnedOrAliased, Extra]):
     value.copy().extra  # error: [unresolved-attribute]
 
+class RenamedConstraintOwner:
+    def original(self) -> Self:
+        return cast(Self, RenamedConstraintOwner())
+
+class RenamedOwnedConstraint(RenamedConstraintOwner):
+    alias = RenamedConstraintOwner.original
+
+class RenamedAliasedConstraint:
+    alias = RenamedConstraintOwner.original
+
+RenamedOwnedOrAliased = TypeVar("RenamedOwnedOrAliased", RenamedOwnedConstraint, RenamedAliasedConstraint)
+
+def renamed_constraint_arm_ownership(value: Intersection[RenamedOwnedOrAliased, Extra]):
+    value.alias().extra  # error: [unresolved-attribute]
+
 class HasGet:
     def get(self) -> Self:
         return self
