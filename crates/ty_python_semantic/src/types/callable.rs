@@ -583,8 +583,10 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
-            return replacements.get(&self).copied().unwrap_or(self);
+        if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping
+            && let Some(replacement) = replacements.get(&self)
+        {
+            return *replacement;
         }
 
         CallableType::new(

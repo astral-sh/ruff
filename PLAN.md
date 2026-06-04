@@ -198,7 +198,7 @@ self-contained.
 Goal: before doing any new inference-based work, verify the existing signature-based rebinding
 behavior so the refactor can be validated independently.
 
-- [ ] Run the mdtests that already exercise `remove_callable_only_typevars` and related callable
+- [x] Run the mdtests that already exercise `remove_callable_only_typevars` and related callable
     rebinding behavior. The parent revision contains new red/green cases in these same files, so note
     which sections are expected to remain in their current pre-feature state during the refactor.
 
@@ -212,14 +212,14 @@ behavior so the refactor can be validated independently.
       cargo test -p ty_python_semantic --test mdtest -- generics/legacy/callables.md
     ```
 
-- [ ] Identify the existing signature-based rebinding sections, especially:
+- [x] Identify the existing signature-based rebinding sections, especially:
 
     - `Naming a generic Callable: type aliases`
     - `Naming a generic Callable with paramspecs: type aliases`
     - `Naming a generic Callable: function return values`
     - `Naming a generic Callable with paramspecs: function return values`
 
-- [ ] Do not start inference-based call-result rebinding until the signature-only refactor below is
+- [x] Do not start inference-based call-result rebinding until the signature-only refactor below is
     complete and these existing tests still pass.
 
 ### Phase 2: Refactor signature-based rebinding only
@@ -227,28 +227,28 @@ behavior so the refactor can be validated independently.
 Goal: move and generalize the existing implementation while preserving the current public entry
 point and keeping the change scoped to signature-based rebinding.
 
-- [ ] Move the refactored implementation out of `GenericContext` into a typevar-focused submodule,
+- [x] Move the refactored implementation out of `GenericContext` into a typevar-focused submodule,
     likely `crates/ty_python_semantic/src/types/typevar/return_callables.rs`, with
     `types/typevar.rs` declaring `mod return_callables;` and re-exporting the crate-visible API as
     needed.
-- [ ] Leave `GenericContext::remove_callable_only_typevars` behind as a compatibility shim around
+- [x] Leave `GenericContext::remove_callable_only_typevars` behind as a compatibility shim around
     the moved/refactored implementation, so existing callers do not need to change shape.
-- [ ] Prefer a single exported plain (not salsa-tracked) function from the new module whose behavior
+- [x] Prefer a single exported plain (not salsa-tracked) function from the new module whose behavior
     is customized by an `Fn(BoundTypeVarInstance<'db>) -> bool` eligibility filter callback, instead
     of exposing multiple near-duplicate entry points or a rigid enum. In this phase, only wire the
     existing signature-based use.
-- [ ] Reuse as much of the `remove_callable_only_typevars` implementation as practical. The goal is
+- [x] Reuse as much of the `remove_callable_only_typevars` implementation as practical. The goal is
     code reuse, not merely reproducing behavior in a separate implementation. Renaming rebound
     typevars with a `'return` suffix should fall out of sharing the existing rescoping machinery; any
     switch from renaming to pure nonce freshening should be separate follow-on work that changes all
     uses of this logic together.
-- [ ] Replace the existing outermost-only callable tracking with the shared innermost-cover
+- [x] Replace the existing outermost-only callable tracking with the shared innermost-cover
     algorithm, and apply that updated behavior to signature-based rebinding too. Do not preserve the
     old outermost-only behavior just for the shim.
-- [ ] Manually traverse callable signatures instead of relying on `walk_callable_type` /
+- [x] Manually traverse callable signatures instead of relying on `walk_callable_type` /
     `walk_signature`, because those helpers do not distinguish parameter types from returned-value
     positions and also visit signature generic-context metadata as ordinary typevar occurrences.
-- [ ] For the signature-based shim:
+- [x] For the signature-based shim:
     - keep the existing caller-side fast path that returns immediately when `generic_context` is
         `None`; avoiding unnecessary traversal is the caller's responsibility.
     - pass function parameter annotations/defaults as plain `Type` outside roots with no active
@@ -263,7 +263,7 @@ point and keeping the change scoped to signature-based rebinding.
         signature shim can use the returned map for membership checks while removing typevars from the
         function's generic context, avoiding an additional set allocation. A named result struct is
         unnecessary.
-- [ ] Implement the shared traversal with a postorder callable-frame algorithm:
+- [x] Implement the shared traversal with a postorder callable-frame algorithm:
     - Maintain active frames for returned callable occurrences. Each frame stores the `CallableType`,
         a set/map of candidate typevars seen directly in that callable frame, and completed nested
         callable frames.
@@ -307,7 +307,7 @@ point and keeping the change scoped to signature-based rebinding.
         recursion into PEP 695 and manual PEP 695 type aliases in both outside roots and returned-value
         roots so aliases can make typevars ineligible and returned callables hidden behind aliases are
         still discovered.
-- [ ] In finalization, for each callable:
+- [x] In finalization, for each callable:
     - keep only typevars assigned to that callable by the innermost-cover rule and accepted by the
         use-case-specific filter;
     - skip callables that already have a generic context, which should not have frame results in the
@@ -324,12 +324,12 @@ point and keeping the change scoped to signature-based rebinding.
 
 ### Phase 3: Validate the signature-only refactor
 
-- [ ] Rerun the callable mdtests from Phase 1 and verify that existing signature-based rebinding
+- [x] Rerun the callable mdtests from Phase 1 and verify that existing signature-based rebinding
     behavior still passes.
-- [ ] Review any changed snapshots. Snapshot updates are allowed in this phase, but only when they
+- [x] Review any changed snapshots. Snapshot updates are allowed in this phase, but only when they
     are attributable to the intentional innermost-cover generalization for signature-based rebinding,
     not to the new inference-based feature. Investigate any broader churn.
-- [ ] If needed, add focused signature-only regressions for nested returned callables to lock in the
+- [x] If needed, add focused signature-only regressions for nested returned callables to lock in the
     shared innermost-cover rule before wiring call-result rebinding.
 
 ### Phase 4: Add candidate tracking for call-local typevars

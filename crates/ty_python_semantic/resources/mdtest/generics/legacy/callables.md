@@ -171,6 +171,59 @@ reveal_type(generic_context(decorator_factory()))
 reveal_type(decorator_factory()(1))
 ```
 
+Nested returned callables bind typevars on the innermost returned callable that covers all of their
+occurrences:
+
+```py
+from typing import Callable, TypeVar
+
+NestedT = TypeVar("NestedT")
+
+def nested_factory() -> Callable[[], Callable[[NestedT], NestedT]]:
+    raise NotImplementedError
+
+# revealed: () -> ([NestedT'return](NestedT'return, /) -> NestedT'return)
+reveal_type(nested_factory())
+# revealed: [NestedT'return](NestedT'return, /) -> NestedT'return
+reveal_type(nested_factory()())
+# revealed: Literal[1]
+reveal_type(nested_factory()()(1))
+```
+
+Nested returned callables can still have distinct typevars rebound on multiple callable levels:
+
+```py
+from typing import Callable, TypeVar
+
+OuterT = TypeVar("OuterT")
+InnerT = TypeVar("InnerT")
+
+def curried_factory() -> Callable[[OuterT], Callable[[InnerT], InnerT]]:
+    raise NotImplementedError
+
+# revealed: [OuterT'return](OuterT'return, /) -> ([InnerT'return](InnerT'return, /) -> InnerT'return)
+reveal_type(curried_factory())
+# revealed: [InnerT'return](InnerT'return, /) -> InnerT'return
+reveal_type(curried_factory()(1))
+# revealed: Literal["x"]
+reveal_type(curried_factory()(1)("x"))
+```
+
+A callable nested inside a returned callable's parameter type is part of the surrounding callable's
+signature, so the surrounding callable binds the typevar:
+
+```py
+from typing import Callable, TypeVar
+
+IdentityT = TypeVar("IdentityT")
+
+def accepts_identity() -> Callable[[Callable[[IdentityT], IdentityT]], int]:
+    raise NotImplementedError
+
+# revealed: [IdentityT'return]((IdentityT'return, /) -> IdentityT'return, /) -> int
+reveal_type(accepts_identity())
+```
+
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
 `Callable` is not:
 
