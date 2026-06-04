@@ -9,8 +9,9 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, SpecialFormType, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
+    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
+    UnionBuilder, infer_expression_types,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -1590,8 +1591,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
-        // Narrow unions and intersections of `TypedDict` in cases where required keys are
-        // excluded:
+        // Narrow types when a key membership test proves that a key is present, and narrow unions
+        // and intersections of `TypedDict` when a key membership test proves that a required key is
+        // absent:
         //
         // class Foo(TypedDict):
         //     foo: int
@@ -1607,11 +1609,34 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && let rhs_type = inference.expression_type(&comparators[0])
             && is_or_contains_typeddict(self.db, rhs_type)
         {
-            let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
-            if is_negative_check {
+            let key = key.value(self.db);
+            let apply_constraint =
+                |constraints: &mut NarrowingConstraints<'db>,
+                 constraint: NarrowingConstraint<'db>| {
+                    let comparator_place = PlaceExpr::try_from_expr(&comparators[0])
+                        .and_then(|place_expr| self.places().place_id(&place_expr));
+                    if let Some(place) = comparator_place {
+                        constraints.insert(place, constraint.clone());
+                    }
+
+                    let value_place = PlaceExpr::try_from_expr(rhs_expr)
+                        .and_then(|place_expr| self.places().place_id(&place_expr));
+                    if value_place != comparator_place
+                        && let Some(place) = value_place
+                    {
+                        constraints.insert(place, constraint);
+                    }
+                };
+
+            if is_positive == (ops[0] == ast::CmpOp::In) {
+                let narrowed = self.narrow_with_present_key(rhs_type, key);
+                if narrowed != rhs_type.resolve_type_alias(self.db) {
+                    apply_constraint(&mut constraints, NarrowingConstraint::replacement(narrowed));
+                }
+            } else {
                 let requires_key = |td: TypedDictType<'db>| -> bool {
                     td.items(self.db)
-                        .get(key.value(self.db))
+                        .get(key)
                         .is_some_and(TypedDictField::is_required)
                 };
 
@@ -1655,21 +1680,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 };
 
                 if narrowed != resolved_rhs_type {
-                    let constraint = NarrowingConstraint::replacement(narrowed);
-
-                    let comparator_place = PlaceExpr::try_from_expr(&comparators[0])
-                        .and_then(|place_expr| self.places().place_id(&place_expr));
-                    if let Some(place) = comparator_place {
-                        constraints.insert(place, constraint.clone());
-                    }
-
-                    let value_place = PlaceExpr::try_from_expr(rhs_expr)
-                        .and_then(|place_expr| self.places().place_id(&place_expr));
-                    if value_place != comparator_place
-                        && let Some(place) = value_place
-                    {
-                        constraints.insert(place, constraint);
-                    }
+                    apply_constraint(&mut constraints, NarrowingConstraint::replacement(narrowed));
                 }
             }
         }
@@ -2237,6 +2248,30 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         Some((place, NarrowingConstraint::intersection(intersection)))
     }
 
+    // TODO: Restructure this helper to return the key-presence constraint and apply it with
+    // `NarrowingConstraint::intersection` at the call site instead of constructing a replacement
+    // type here.
+    fn narrow_with_present_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
+        let db = self.db;
+        let constrain = |ty, key_presence_constraint| {
+            IntersectionType::from_two_elements(db, ty, key_presence_constraint)
+        };
+
+        match ty.resolve_type_alias(self.db) {
+            Type::Union(union) => union.map(self.db, |element| {
+                self.narrow_with_present_key(*element, key)
+            }),
+            resolved if typeddict_declares_key(self.db, resolved, key) => resolved,
+            // TODO: Extend this to subtypes of `Mapping[str, object]` whose membership and
+            // subscript operations obey the `Mapping` contract.
+            resolved if is_or_contains_typeddict(self.db, resolved) => constrain(
+                ty,
+                Type::TypedDict(required_typeddict_key(self.db, key, Type::object())),
+            ),
+            _ => constrain(ty, key_membership_contains_protocol(self.db, key)),
+        }
+    }
+
     /// Narrow tagged unions of tuples with `Literal` elements.
     ///
     /// Given a subscript expression like `t[0]` where `t` is a union of tuple types, and a
@@ -2395,6 +2430,86 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::TypeForm(_)
         | Type::NewTypeInstance(_) => false,
     }
+}
+
+fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
+    match ty {
+        Type::TypedDict(typed_dict) => typed_dict.items(db).contains_key(key),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| typeddict_declares_key(db, *element, key)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| typeddict_declares_key(db, *element, key)),
+        Type::TypeAlias(alias) => typeddict_declares_key(db, alias.value_type(db), key),
+        _ => false,
+    }
+}
+
+/// Return a synthesized `TypedDict` that represents safe subscript access for a present key on a
+/// `TypedDict`-containing type.
+///
+/// For `TypedDict`s, a positive key-membership test proves more than containment: it also makes
+/// string-literal subscript access with that key valid. In the `if` branch below, the `Bar` arm
+/// keeps its original shape but is intersected with this schema so `u["foo"]` is accepted:
+///
+/// ```python
+/// class Foo(TypedDict):
+///     foo: int
+///
+/// class Bar(TypedDict):
+///     bar: int
+///
+/// def f(u: Foo | Bar):
+///     if "foo" in u:
+///         reveal_type(u["foo"])  # object
+/// ```
+fn required_typeddict_key<'db>(
+    db: &'db dyn Db,
+    key: &str,
+    value_ty: Type<'db>,
+) -> TypedDictType<'db> {
+    let field = TypedDictFieldBuilder::new(value_ty)
+        .required(true)
+        .read_only(true)
+        .build();
+    let schema = TypedDictSchema::from_iter([(Name::from(key), field)]);
+    TypedDictType::from_schema_items(db, schema)
+}
+
+/// Return a synthesized protocol that records a true key-membership test without implying
+/// subscript access.
+///
+/// For non-`TypedDict` types, `"key" in value` only proves that membership is true. It does not
+/// prove that `value["key"]` is valid:
+///
+/// ```python
+/// def f(s: Literal["abc"]):
+///     if "a" in s:
+///         s["a"]  # Runtime `TypeError`
+/// ```
+///
+/// Non-`TypedDict` union arms therefore receive this `__contains__` protocol instead of the
+/// synthesized `TypedDict` used for `TypedDict` arms.
+fn key_membership_contains_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
+    let signature = Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self"))),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(Type::string_literal(db, key)),
+            ],
+        ),
+        Type::bool_literal(true),
+    );
+
+    Type::protocol_with_methods(
+        db,
+        [("__contains__", CallableType::function_like(db, signature))],
+    )
 }
 
 fn is_supported_tag_literal(ty: Type) -> bool {
