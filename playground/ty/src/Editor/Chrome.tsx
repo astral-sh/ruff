@@ -25,11 +25,13 @@ import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
-import Diagnostics, { Diagnostic } from "./Diagnostics";
+import Diagnostics, {
+  type Diagnostic,
+  type DiagnosticLocation,
+} from "./Diagnostics";
 import VendoredFileBanner from "./VendoredFileBanner";
 import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
-import { Uri, type editor } from "monaco-editor";
-import type { Monaco } from "@monaco-editor/react";
+import type { EditorHandle } from "./Editor";
 
 const Editor = lazy(() => import("./Editor"));
 
@@ -80,10 +82,7 @@ export default function Chrome({
     null,
   );
 
-  const editorRef = useRef<{
-    editor: editor.IStandaloneCodeEditor;
-    monaco: Monaco;
-  } | null>(null);
+  const editorRef = useRef<EditorHandle | null>(null);
 
   const handleFileRenamed = (file: FileId, newName: string) => {
     onRenameFile(session, file, newName);
@@ -125,80 +124,30 @@ export default function Chrome({
     [],
   );
 
-  const handleEditorMount = useCallback(
-    (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
-      editorRef.current = { editor, monaco };
-    },
-    [],
-  );
+  const handleEditorMount = useCallback((handle: EditorHandle) => {
+    editorRef.current = handle;
+  }, []);
 
-  const handleGoTo = useCallback(
-    (line: number, column: number, path?: string | null) => {
-      const editorRefValue = editorRef.current;
+  const handleGoTo = useCallback((line: number, column: number) => {
+    const editorRefValue = editorRef.current;
 
-      if (editorRefValue == null) {
-        return;
-      }
+    if (editorRefValue == null) {
+      return;
+    }
 
-      const { editor, monaco } = editorRefValue;
+    const range = {
+      startLineNumber: line,
+      startColumn: column,
+      endLineNumber: line,
+      endColumn: column,
+    };
+    editorRefValue.editor.revealRange(range);
+    editorRefValue.editor.setSelection(range);
+  }, []);
 
-      if (path != null) {
-        const uri = path.startsWith("vendored:")
-          ? Uri.parse(path)
-          : Uri.file(path);
-        let model = monaco.editor.getModel(uri);
-
-        if (uri.scheme === "vendored") {
-          const vendoredPath = uri.authority
-            ? `${uri.authority}${uri.path}`
-            : uri.path;
-          const fileHandle = workspace.getVendoredFile(vendoredPath);
-          onSelectVendoredFile(fileHandle);
-
-          if (model == null) {
-            model = monaco.editor.createModel(
-              workspace.sourceText(fileHandle),
-              "python",
-              uri,
-            );
-          }
-        } else {
-          const file = Object.values(files.metadata).find((file) => {
-            return (
-              file.handle?.path() === path ||
-              file.uri.toString() === uri.toString()
-            );
-          });
-
-          if (file != null) {
-            onClearVendoredFile();
-            onSelectFile(file.id);
-            model = monaco.editor.getModel(file.uri) ?? model;
-          }
-        }
-
-        if (model != null) {
-          editor.setModel(model);
-        }
-      }
-
-      const range = {
-        startLineNumber: line,
-        startColumn: column,
-        endLineNumber: line,
-        endColumn: column,
-      };
-      editor.revealRange(range);
-      editor.setSelection(range);
-    },
-    [
-      files.metadata,
-      onClearVendoredFile,
-      onSelectFile,
-      onSelectVendoredFile,
-      workspace,
-    ],
-  );
+  const handleGoToLocation = useCallback((location: DiagnosticLocation) => {
+    editorRef.current?.goToLocation(location);
+  }, []);
 
   const handleRemoved = useCallback(
     (id: FileId) => {
@@ -219,6 +168,10 @@ export default function Chrome({
     files.currentVendoredFile ?? null,
     files.revision,
   );
+  const currentFilePath =
+    files.selected == null
+      ? null
+      : (files.metadata[files.selected].handle?.path() ?? null);
 
   return (
     <>
@@ -289,7 +242,9 @@ export default function Chrome({
                 <Panel id="diagnostics" minSize={150} className="my-2">
                   <Diagnostics
                     diagnostics={checkResult.diagnostics}
+                    currentFilePath={currentFilePath}
                     onGoTo={handleGoTo}
+                    onGoToLocation={handleGoToLocation}
                     theme={theme}
                   />
                 </Panel>
@@ -395,11 +350,7 @@ function useCheckResult(
       const serializedDiagnostics = diagnostics.map((diagnostic) => ({
         id: diagnostic.id(),
         message: diagnostic.message(),
-        details: diagnostic.details(workspace).map((detail) => ({
-          message: detail.message,
-          path: detail.path ?? null,
-          range: detail.range ?? null,
-        })),
+        subDiagnostics: diagnostic.subDiagnostics(workspace),
         severity: diagnostic.severity(),
         range: diagnostic.toRange(workspace) ?? null,
         textRange: diagnostic.textRange() ?? null,

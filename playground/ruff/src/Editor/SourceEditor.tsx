@@ -17,6 +17,8 @@ import { Theme } from "shared";
 import CodeActionProvider = languages.CodeActionProvider;
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
+const PLAYGROUND_FILE_PATH = "<filename>";
+
 type MonacoEditorState = {
   monaco: Monaco;
   codeActionProvider: RuffCodeActionProvider;
@@ -204,39 +206,52 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
 }
 
 function diagnosticDisplayMessage(diagnostic: Diagnostic): string {
-  const details = diagnostic.details.filter(
-    (detail) => detail.start_location == null,
+  const subDiagnostics = diagnostic.sub_diagnostics.filter(
+    (subDiagnostic) =>
+      subDiagnostic.location == null ||
+      subDiagnostic.location.path !== PLAYGROUND_FILE_PATH,
   );
 
-  if (details.length === 0) {
+  if (subDiagnostics.length === 0) {
     return diagnostic.message;
   }
 
-  return `${diagnostic.message}\n\n${details.map((detail) => detail.message).join("\n")}`;
+  return `${diagnostic.message}\n\n${subDiagnostics.map(formatSubDiagnostic).join("\n")}`;
 }
 
 function diagnosticRelatedInformation(
   diagnostic: Diagnostic,
   resource: editor.ITextModel["uri"],
 ): editor.IRelatedInformation[] {
-  return diagnostic.details.flatMap((detail) => {
-    const start = detail.start_location;
+  return diagnostic.sub_diagnostics.flatMap((subDiagnostic) => {
+    const location = subDiagnostic.location;
 
-    if (start == null) {
+    if (location == null || location.path !== PLAYGROUND_FILE_PATH) {
       return [];
     }
-
-    const end = detail.end_location ?? start;
 
     return [
       {
         resource,
-        message: detail.message,
-        startLineNumber: start.row,
-        startColumn: start.column,
-        endLineNumber: end.row,
-        endColumn: end.column,
+        message: formatSubDiagnostic(subDiagnostic),
+        startLineNumber: location.start_location.row,
+        startColumn: location.start_location.column,
+        endLineNumber: location.end_location.row,
+        endColumn: location.end_location.column,
       },
     ];
   });
+}
+
+function formatSubDiagnostic(
+  subDiagnostic: Diagnostic["sub_diagnostics"][number],
+): string {
+  const message = `${subDiagnostic.severity}: ${subDiagnostic.message}`;
+  const location = subDiagnostic.location;
+
+  if (location == null || location.path === PLAYGROUND_FILE_PATH) {
+    return message;
+  }
+
+  return `${message} (${location.path}:${location.start_location.row}:${location.start_location.column})`;
 }

@@ -1,4 +1,4 @@
-import { Diagnostic } from "ruff_wasm";
+import type { Diagnostic, SubDiagnostic } from "ruff_wasm";
 import classNames from "classnames";
 import { Theme } from "shared";
 import { useMemo } from "react";
@@ -90,11 +90,14 @@ function Items({
                 Col {column}]
               </span>
             </button>
-            {diagnostic.details.length > 0 ? (
+            {diagnostic.sub_diagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
-                {diagnostic.details.map((detail, index) => (
+                {diagnostic.sub_diagnostics.map((subDiagnostic, index) => (
                   <li key={index}>
-                    <Detail detail={detail} onGoTo={onGoTo} />
+                    <SubDiagnosticItem
+                      subDiagnostic={subDiagnostic}
+                      onGoTo={onGoTo}
+                    />
                   </li>
                 ))}
               </ul>
@@ -106,45 +109,46 @@ function Items({
   );
 }
 
-function Detail({
-  detail,
+function SubDiagnosticItem({
+  subDiagnostic,
   onGoTo,
 }: {
-  detail: Diagnostic["details"][number];
+  subDiagnostic: SubDiagnostic;
   onGoTo(line: number, column: number): void;
 }) {
-  const start = detail.start_location;
-  const [prefix, message] = splitSubdiagnosticMessage(detail.message);
+  const location = subDiagnostic.location;
 
-  if (start == null) {
-    return <span>{detail.message}</span>;
+  if (location == null) {
+    return <span>{formatSubDiagnostic(subDiagnostic)}</span>;
   }
+
+  const start = location.start_location;
+  const locationLabel =
+    location.path === "<filename>"
+      ? `[Ln ${start.row}, Col ${start.column}]`
+      : `[${location.path}: Ln ${start.row}, Col ${start.column}]`;
 
   return (
     <>
-      {prefix}
-      <button
-        onClick={() => onGoTo(start.row, start.column)}
-        className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
-      >
-        {message}
-        <span className="text-gray-500">
-          {" "}
-          [Ln {start.row}, Col {start.column}]
+      {subDiagnostic.severity}:{" "}
+      {location.path === "<filename>" ? (
+        <button
+          onClick={() => onGoTo(start.row, start.column)}
+          className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
+        >
+          {subDiagnostic.message}
+          <span className="text-gray-500"> {locationLabel}</span>
+        </button>
+      ) : (
+        <span>
+          {subDiagnostic.message}
+          <span className="text-gray-500"> {locationLabel}</span>
         </span>
-      </button>
+      )}
     </>
   );
 }
 
-function splitSubdiagnosticMessage(message: string): [string, string] {
-  const separator = ": ";
-  const separatorIndex = message.indexOf(separator);
-
-  if (separatorIndex === -1) {
-    return ["", message];
-  }
-
-  const prefixEnd = separatorIndex + separator.length;
-  return [message.slice(0, prefixEnd), message.slice(prefixEnd)];
+function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
+  return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
 }

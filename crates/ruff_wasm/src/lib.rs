@@ -31,7 +31,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
-    details: DiagnosticDetail[];
+    sub_diagnostics: SubDiagnostic[];
     start_location: {
         row: number;
         column: number;
@@ -56,16 +56,22 @@ export interface Diagnostic {
     } | null;
 }
 
-export interface DiagnosticDetail {
+export interface SubDiagnostic {
+    severity: string;
     message: string;
+    location: SubDiagnosticLocation | null;
+}
+
+export interface SubDiagnosticLocation {
+    path: string;
     start_location: {
         row: number;
         column: number;
-    } | null;
+    };
     end_location: {
         row: number;
         column: number;
-    } | null;
+    };
 }
 "#;
 
@@ -73,17 +79,24 @@ export interface DiagnosticDetail {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
-    pub details: Vec<ExpandedDiagnosticDetail>,
+    pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
     pub start_location: Location,
     pub end_location: Location,
     pub fix: Option<ExpandedFix>,
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
-pub struct ExpandedDiagnosticDetail {
+pub struct ExpandedSubDiagnostic {
+    pub severity: String,
     pub message: String,
-    pub start_location: Option<Location>,
-    pub end_location: Option<Location>,
+    pub location: Option<ExpandedSubDiagnosticLocation>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedSubDiagnosticLocation {
+    pub path: String,
+    pub start_location: Location,
+    pub end_location: Location,
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -295,32 +308,30 @@ impl Workspace {
             .into_iter()
             .map(|msg| {
                 let range = msg.range().unwrap_or_default();
-                let details = msg
+                let sub_diagnostics = msg
                     .sub_diagnostics()
                     .iter()
                     .map(|sub_diagnostic| {
-                        let (start_location, end_location) = sub_diagnostic
-                            .primary_span_ref()
-                            .and_then(|span| {
-                                let source_code = span.as_ruff_file()?.to_source_code();
-                                let range = span.range()?;
+                        let location = sub_diagnostic.primary_span_ref().and_then(|span| {
+                            let source_file = span.as_ruff_file()?;
+                            let source_code = source_file.to_source_code();
+                            let range = span.range()?;
 
-                                Some((
-                                    source_code
-                                        .source_location(range.start(), self.position_encoding)
-                                        .into(),
-                                    source_code
-                                        .source_location(range.end(), self.position_encoding)
-                                        .into(),
-                                ))
+                            Some(ExpandedSubDiagnosticLocation {
+                                path: source_file.name().to_string(),
+                                start_location: source_code
+                                    .source_location(range.start(), self.position_encoding)
+                                    .into(),
+                                end_location: source_code
+                                    .source_location(range.end(), self.position_encoding)
+                                    .into(),
                             })
-                            .map(|(start, end)| (Some(start), Some(end)))
-                            .unwrap_or_default();
+                        });
 
-                        ExpandedDiagnosticDetail {
-                            message: sub_diagnostic.to_string(),
-                            start_location,
-                            end_location,
+                        ExpandedSubDiagnostic {
+                            severity: sub_diagnostic.severity().to_string(),
+                            message: sub_diagnostic.concise_message().to_string(),
+                            location,
                         }
                     })
                     .collect();
@@ -328,7 +339,7 @@ impl Workspace {
                 ExpandedMessage {
                     code: msg.secondary_code_or_id().to_string(),
                     message: msg.concise_message().to_string(),
-                    details,
+                    sub_diagnostics,
                     start_location: source_code
                         .source_location(range.start(), self.position_encoding)
                         .into(),

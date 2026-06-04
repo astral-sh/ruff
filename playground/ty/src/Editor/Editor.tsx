@@ -32,6 +32,8 @@ import {
   InlayHintKind,
   LocationLink,
   TextEdit,
+  type Location as TyLocation,
+  type SubDiagnostic,
 } from "ty_wasm";
 import { FileId, PlaygroundFile, ReadonlyFiles } from "../Playground";
 import { Diagnostic } from "./Diagnostics";
@@ -46,11 +48,17 @@ type Props = {
   hints: Hint[];
   theme: Theme;
   workspace: Workspace;
-  onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
+  onMount(handle: EditorHandle): void;
   onOpenFile(file: FileId): void;
   onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
   onBackToUserFile: () => void;
   isViewingVendoredFile: boolean;
+};
+
+export type EditorHandle = {
+  editor: IStandaloneCodeEditor;
+  monaco: Monaco;
+  goToLocation(location: Pick<TyLocation, "path" | "range">): void;
 };
 
 export default function Editor({
@@ -121,7 +129,11 @@ export default function Editor({
       server.updateMarkers(diagnostics, hints);
       serverRef.current = server;
 
-      onMount(editor, instance);
+      onMount({
+        editor,
+        monaco: instance,
+        goToLocation: (location) => server.goToLocation(location),
+      });
     },
 
     [
@@ -471,46 +483,6 @@ class PlaygroundServer
     );
   }
 
-  private getDiagnosticDetailResource(
-    detail: Diagnostic["details"][number],
-  ): Uri | null {
-    const path = detail.path;
-
-    if (path == null) {
-      return null;
-    }
-
-    const uri = path.startsWith("vendored:") ? Uri.parse(path) : Uri.file(path);
-
-    return uri.scheme === "vendored"
-      ? uri
-      : (this.getPlaygroundFileForUri(uri)?.uri ?? uri);
-  }
-
-  private diagnosticRelatedInformation(
-    diagnostic: Diagnostic,
-  ): editor.IRelatedInformation[] {
-    return diagnostic.details.flatMap((detail) => {
-      const range = detail.range;
-      const resource = this.getDiagnosticDetailResource(detail);
-
-      if (range == null || resource == null) {
-        return [];
-      }
-
-      return [
-        {
-          resource,
-          message: detail.message,
-          startLineNumber: range.start.line,
-          startColumn: range.start.column,
-          endLineNumber: range.end.line,
-          endColumn: range.end.column,
-        },
-      ];
-    });
-  }
-
   private getOrCreateVendoredFileHandle(vendoredPath: string): FileHandle {
     const cachedHandle = this.vendoredFileHandles.get(vendoredPath);
     // Check if we already have a handle for this vendored file
@@ -522,6 +494,17 @@ class PlaygroundServer
     const handle = this.props.workspace.getVendoredFile(vendoredPath);
     this.vendoredFileHandles.set(vendoredPath, handle);
     return handle;
+  }
+
+  private createVendoredModel(uri: Uri): editor.ITextModel {
+    const vendoredPath = this.getVendoredPath(uri);
+    const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
+    const content = this.props.workspace.sourceText(fileHandle);
+    return this.monaco.editor.createModel(content, "python", uri);
+  }
+
+  private getOrCreateVendoredModel(uri: Uri): editor.ITextModel {
+    return this.monaco.editor.getModel(uri) ?? this.createVendoredModel(uri);
   }
 
   private getFileHandleForModel(model: editor.ITextModel) {
@@ -806,12 +789,16 @@ class PlaygroundServer
     const files = this.props.files;
 
     let model = this.monaco.editor.getModel(resource);
+    let resolvedResource = resource;
 
     if (model == null && resource.scheme === "vendored") {
-      const vendoredPath = this.getVendoredPath(resource);
-      const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
-      const content = this.props.workspace.sourceText(fileHandle);
-      model = this.monaco.editor.createModel(content, "python", resource);
+      model = this.getOrCreateVendoredModel(resource);
+    } else if (model == null) {
+      const file = this.getPlaygroundFileForUri(resource);
+      if (file != null) {
+        resolvedResource = file.uri;
+        model = this.monaco.editor.getModel(file.uri);
+      }
     }
 
     if (model == null) {
@@ -819,14 +806,14 @@ class PlaygroundServer
     }
 
     // Handle file-specific logic
-    if (resource.scheme === "vendored") {
+    if (resolvedResource.scheme === "vendored") {
       // Get the file handle to track that we're viewing a vendored file
-      const vendoredPath = this.getVendoredPath(resource);
+      const vendoredPath = this.getVendoredPath(resolvedResource);
       const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
       this.props.onVendoredFileChange(fileHandle);
     } else {
       // Handle regular files
-      const file = this.getPlaygroundFileForUri(resource);
+      const file = this.getPlaygroundFileForUri(resolvedResource);
 
       if (file == null) {
         return false;
@@ -946,35 +933,16 @@ class PlaygroundServer
     return { edits };
   }
 
+  goToLocation(location: Pick<TyLocation, "path" | "range">): void {
+    const { resource, ...range } = this.mapLocation(location);
+    this.openCodeEditor(this.editor, resource, range);
+  }
+
   private mapNavigationTarget(link: LocationLink): languages.LocationLink {
-    let uri = link.path.startsWith("vendored:")
-      ? Uri.parse(link.path)
-      : Uri.file(link.path);
-
-    // Pre-create models to ensure peek definition works
-    if (this.monaco.editor.getModel(uri) == null) {
-      if (uri.scheme === "vendored") {
-        // Handle vendored files
-        const vendoredPath = this.getVendoredPath(uri);
-        const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
-        const content = this.props.workspace.sourceText(fileHandle);
-        this.monaco.editor.createModel(content, "python", uri);
-      } else {
-        // Regular file models are owned by Monaco and created by the playground.
-        const file = this.getPlaygroundFileForUri(uri);
-        if (file == null) {
-          return {
-            uri,
-            range: tyRangeToMonacoRange(link.full_range),
-          } as languages.LocationLink;
-        }
-
-        const model = this.monaco.editor.getModel(file.uri);
-        if (model != null) {
-          uri = model.uri;
-        }
-      }
-    }
+    const location = this.mapLocation({
+      path: link.path,
+      range: link.full_range,
+    });
 
     const targetSelection =
       link.selection_range == null
@@ -987,11 +955,67 @@ class PlaygroundServer
         : tyRangeToMonacoRange(link.origin_selection_range);
 
     return {
-      uri: uri,
-      range: tyRangeToMonacoRange(link.full_range),
+      uri: location.resource,
+      range: {
+        startLineNumber: location.startLineNumber,
+        startColumn: location.startColumn,
+        endLineNumber: location.endLineNumber,
+        endColumn: location.endColumn,
+      },
       targetSelectionRange: targetSelection,
       originSelectionRange: originSelection,
     } as languages.LocationLink;
+  }
+
+  private uriForPath(path: string): Uri {
+    return path.startsWith("vendored:") ? Uri.parse(path) : Uri.file(path);
+  }
+
+  private resolveLocationUri(path: string): Uri {
+    const uri = this.uriForPath(path);
+
+    if (this.monaco.editor.getModel(uri) != null) {
+      return uri;
+    }
+
+    if (uri.scheme === "vendored") {
+      return this.getOrCreateVendoredModel(uri).uri;
+    }
+
+    const file = this.getPlaygroundFileForUri(uri);
+    if (file == null) {
+      return uri;
+    }
+
+    return this.monaco.editor.getModel(file.uri)?.uri ?? file.uri;
+  }
+
+  private mapLocation(
+    location: Pick<TyLocation, "path" | "range">,
+  ): { resource: Uri } & IRange {
+    return {
+      resource: this.resolveLocationUri(location.path),
+      ...tyRangeToMonacoRange(location.range),
+    };
+  }
+
+  private diagnosticRelatedInformation(
+    diagnostic: Diagnostic,
+  ): editor.IRelatedInformation[] {
+    return diagnostic.subDiagnostics.flatMap((subDiagnostic) => {
+      const location = subDiagnostic.location;
+
+      if (location == null) {
+        return [];
+      }
+
+      return [
+        {
+          message: formatSubDiagnostic(subDiagnostic),
+          ...this.mapLocation(location),
+        },
+      ];
+    });
   }
 
   private mapNavigationTargets(
@@ -1018,15 +1042,19 @@ function tyRangeToMonacoRange(range: TyRange): IRange {
 }
 
 function diagnosticDisplayMessage(diagnostic: Diagnostic): string {
-  const details = diagnostic.details.filter(
-    (detail) => detail.range == null || detail.path == null,
+  const subDiagnostics = diagnostic.subDiagnostics.filter(
+    (subDiagnostic) => subDiagnostic.location == null,
   );
 
-  if (details.length === 0) {
+  if (subDiagnostics.length === 0) {
     return diagnostic.message;
   }
 
-  return `${diagnostic.message}\n\n${details.map((detail) => detail.message).join("\n")}`;
+  return `${diagnostic.message}\n\n${subDiagnostics.map(formatSubDiagnostic).join("\n")}`;
+}
+
+function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
+  return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
 }
 
 function monacoRangeToTyRange(range: IRange): TyRange {

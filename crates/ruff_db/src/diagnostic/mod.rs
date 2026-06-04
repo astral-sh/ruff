@@ -723,12 +723,6 @@ impl SubDiagnostic {
     }
 }
 
-impl Display for SubDiagnostic {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.severity(), self.concise_message())
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct SubDiagnosticInner {
     severity: SubDiagnosticSeverity,

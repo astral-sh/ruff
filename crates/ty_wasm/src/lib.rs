@@ -899,32 +899,28 @@ impl Diagnostic {
         JsString::from(self.inner.concise_message().to_string())
     }
 
-    #[wasm_bindgen]
-    pub fn details(&self, workspace: &Workspace) -> Vec<DiagnosticDetail> {
+    #[wasm_bindgen(js_name = "subDiagnostics")]
+    pub fn sub_diagnostics(&self, workspace: &Workspace) -> Vec<SubDiagnostic> {
         self.inner
             .sub_diagnostics()
             .iter()
             .map(|sub_diagnostic| {
-                let (path, range) = sub_diagnostic
-                    .primary_span_ref()
-                    .and_then(|span| {
-                        let file_range = FileRange::try_from(span).ok()?;
-                        Some((
-                            file_range.file().path(&workspace.db).to_string(),
-                            Range::from_file_range(
-                                &workspace.db,
-                                file_range,
-                                workspace.position_encoding,
-                            ),
-                        ))
+                let location = sub_diagnostic.primary_span_ref().and_then(|span| {
+                    let file_range = FileRange::try_from(span).ok()?;
+                    Some(Location {
+                        path: file_range.file().path(&workspace.db).to_string(),
+                        range: Range::from_file_range(
+                            &workspace.db,
+                            file_range,
+                            workspace.position_encoding,
+                        ),
                     })
-                    .map(|(path, range)| (Some(path), Some(range)))
-                    .unwrap_or_default();
+                });
 
-                DiagnosticDetail {
-                    message: sub_diagnostic.to_string(),
-                    path,
-                    range,
+                SubDiagnostic {
+                    severity: sub_diagnostic.severity().to_string(),
+                    message: sub_diagnostic.concise_message().to_string(),
+                    location,
                 }
             })
             .collect()
@@ -1000,12 +996,21 @@ impl Diagnostic {
 
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DiagnosticDetail {
+pub struct SubDiagnostic {
+    #[wasm_bindgen(getter_with_clone)]
+    pub severity: String,
     #[wasm_bindgen(getter_with_clone)]
     pub message: String,
     #[wasm_bindgen(getter_with_clone)]
-    pub path: Option<String>,
-    pub range: Option<Range>,
+    pub location: Option<Location>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Location {
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+    pub range: Range,
 }
 
 fn edit_to_text_edit(workspace: &Workspace, file: File, edit: &Edit) -> TextEdit {

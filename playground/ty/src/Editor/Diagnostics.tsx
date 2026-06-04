@@ -1,6 +1,8 @@
 import type {
   Severity,
+  Location as TyLocation,
   Range,
+  SubDiagnostic,
   TextRange,
   Diagnostic as TyDiagnostic,
 } from "ty_wasm";
@@ -10,15 +12,19 @@ import { useMemo } from "react";
 
 interface Props {
   diagnostics: Diagnostic[];
+  currentFilePath: string | null;
   theme: Theme;
 
-  onGoTo(line: number, column: number, path?: string | null): void;
+  onGoTo(line: number, column: number): void;
+  onGoToLocation(location: DiagnosticLocation): void;
 }
 
 export default function Diagnostics({
   diagnostics: unsorted,
+  currentFilePath,
   theme,
   onGoTo,
+  onGoToLocation,
 }: Props) {
   const diagnostics = useMemo(() => {
     const sorted = [...unsorted];
@@ -46,7 +52,12 @@ export default function Diagnostics({
       </div>
 
       <div className="flex min-h-0 grow overflow-hidden p-2">
-        <Items diagnostics={diagnostics} onGoTo={onGoTo} />
+        <Items
+          diagnostics={diagnostics}
+          currentFilePath={currentFilePath}
+          onGoTo={onGoTo}
+          onGoToLocation={onGoToLocation}
+        />
       </div>
     </div>
   );
@@ -54,10 +65,14 @@ export default function Diagnostics({
 
 function Items({
   diagnostics,
+  currentFilePath,
   onGoTo,
+  onGoToLocation,
 }: {
   diagnostics: Array<Diagnostic>;
-  onGoTo(line: number, column: number, path?: string | null): void;
+  currentFilePath: string | null;
+  onGoTo(line: number, column: number): void;
+  onGoToLocation(location: DiagnosticLocation): void;
 }) {
   if (diagnostics.length === 0) {
     return (
@@ -95,11 +110,15 @@ function Items({
                 {id != null && ` (${id})`} [Ln {startLine}, Col {startColumn}]
               </span>
             </button>
-            {diagnostic.details.length > 0 ? (
+            {diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
-                {diagnostic.details.map((detail, index) => (
+                {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
                   <li key={index}>
-                    <Detail detail={detail} onGoTo={onGoTo} />
+                    <SubDiagnosticItem
+                      subDiagnostic={subDiagnostic}
+                      currentFilePath={currentFilePath}
+                      onGoToLocation={onGoToLocation}
+                    />
                   </li>
                 ))}
               </ul>
@@ -114,58 +133,50 @@ function Items({
 export interface Diagnostic {
   id: string;
   message: string;
-  details: DiagnosticDetail[];
+  subDiagnostics: SubDiagnostic[];
   severity: Severity;
   range: Range | null;
   textRange: TextRange | null;
   raw: TyDiagnostic;
 }
 
-interface DiagnosticDetail {
-  message: string;
-  path: string | null;
-  range: Range | null;
-}
+export type DiagnosticLocation = Pick<TyLocation, "path" | "range">;
 
-function Detail({
-  detail,
-  onGoTo,
+function SubDiagnosticItem({
+  subDiagnostic,
+  currentFilePath,
+  onGoToLocation,
 }: {
-  detail: DiagnosticDetail;
-  onGoTo(line: number, column: number, path?: string | null): void;
+  subDiagnostic: SubDiagnostic;
+  currentFilePath: string | null;
+  onGoToLocation(location: DiagnosticLocation): void;
 }) {
-  const start = detail.range?.start;
-  const [prefix, message] = splitSubdiagnosticMessage(detail.message);
+  const location = subDiagnostic.location;
 
-  if (start == null) {
-    return <span>{detail.message}</span>;
+  if (location == null) {
+    return <span>{formatSubDiagnostic(subDiagnostic)}</span>;
   }
+
+  const start = location.range.start;
+  const locationLabel =
+    location.path === currentFilePath
+      ? `[Ln ${start.line}, Col ${start.column}]`
+      : `[${location.path}: Ln ${start.line}, Col ${start.column}]`;
 
   return (
     <>
-      {prefix}
+      {subDiagnostic.severity}:{" "}
       <button
-        onClick={() => onGoTo(start.line, start.column, detail.path)}
+        onClick={() => onGoToLocation(location)}
         className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
       >
-        {message}
-        <span className="text-gray-500">
-          {" "}
-          [Ln {start.line}, Col {start.column}]
-        </span>
+        {subDiagnostic.message}
+        <span className="text-gray-500"> {locationLabel}</span>
       </button>
     </>
   );
 }
 
-function splitSubdiagnosticMessage(message: string): [string, string] {
-  const separator = ": ";
-  const separatorIndex = message.indexOf(separator);
-
-  if (separatorIndex === -1) {
-    return ["", message];
-  }
-
-  const prefixEnd = separatorIndex + separator.length;
-  return [message.slice(0, prefixEnd), message.slice(prefixEnd)];
+function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
+  return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
 }

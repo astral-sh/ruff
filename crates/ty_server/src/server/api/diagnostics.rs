@@ -493,16 +493,22 @@ pub(super) fn to_lsp_diagnostic(
         diagnostic.concise_message().to_string()
     };
 
-    // Append sub-diagnostics that have no location and thus can't be shown as
-    // related information.
+    // Append info sub-diagnostics that have no location (and thus
+    // can't be shown as "related information") to the message.
     let mut first = true;
     for sub_diagnostic in diagnostic.sub_diagnostics() {
-        if sub_diagnostic.primary_span_ref().is_none() {
+        if sub_diagnostic.primary_annotation().is_none() {
             if first {
                 message.push('\n');
                 first = false;
             }
-            write!(message, "\n{sub_diagnostic}").ok();
+            write!(
+                message,
+                "\n{severity}: {hint}",
+                hint = sub_diagnostic.concise_message(),
+                severity = sub_diagnostic.severity()
+            )
+            .ok();
         }
     }
 
@@ -546,7 +552,9 @@ fn sub_diagnostic_to_related_information(
     diagnostic: &SubDiagnostic,
     encoding: PositionEncoding,
 ) -> Option<DiagnosticRelatedInformation> {
-    let span = diagnostic.primary_span_ref()?;
+    let primary_annotation = diagnostic.primary_annotation()?;
+
+    let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
     let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
