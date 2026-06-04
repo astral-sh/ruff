@@ -4662,7 +4662,6 @@ dependencies = [
  "indexmap",
  "insta",
  "itertools 0.15.0",
- "memchr",
  "rayon",
  "regex",
  "ruff_db",
