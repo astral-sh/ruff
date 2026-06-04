@@ -28,10 +28,17 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// because a new scope gets inserted before the `Definition` or a new place is inserted
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    debug,
+    constructor = new_internal,
+    heap_size = ruff_memory_usage::heap_size
+)]
 #[derive(Ord, PartialOrd)]
 pub struct Definition<'db> {
     /// The scope in which the definition occurs.
+    ///
+    /// Storing the interned scope avoids retaining the file and file-local scope separately, at
+    /// the cost of database lookups when either of those values is needed.
     pub scope_id: ScopeId<'db>,
 
     /// The place ID and re-export state of the definition.
@@ -49,14 +56,14 @@ pub struct Definition<'db> {
 impl get_size2::GetSize for Definition<'_> {}
 
 impl<'db> Definition<'db> {
-    pub(crate) fn create(
+    pub(crate) fn new(
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
         place: ScopedPlaceId,
         kind: DefinitionKind<'db>,
         is_reexported: bool,
     ) -> Self {
-        Self::new(
+        Self::new_internal(
             db,
             scope_id,
             DefinitionPlace::new(place, is_reexported),
@@ -161,10 +168,12 @@ impl<'db> Definition<'db> {
     }
 }
 
-#[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, salsa::Update, get_size2::GetSize,
-)]
-#[doc(hidden)]
+/// The identity of the place defined by a [`Definition`] and whether it is re-exported.
+///
+/// Keeping the re-export state in the enum lets it share the place ID's otherwise-unused
+/// representation space. Storing it as a separate field on [`Definition`] would add padding to
+/// every tracked definition.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum DefinitionPlace {
     Symbol {
         id: ScopedSymbolId,

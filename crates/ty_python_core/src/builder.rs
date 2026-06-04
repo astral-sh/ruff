@@ -325,6 +325,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_scope_info().file_scope_id
     }
 
+    fn current_scope_id(&self) -> ScopeId<'db> {
+        self.scope_ids_by_scope[self.current_scope()]
+    }
+
     pub(crate) fn expect_single_definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
@@ -1380,13 +1384,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
-        let definition: Definition<'db> = Definition::create(
-            self.db,
-            self.scope_ids_by_scope[self.current_scope()],
-            place,
-            kind,
-            is_reexported,
-        );
+        let definition: Definition<'db> =
+            Definition::new(self.db, self.current_scope_id(), place, kind, is_reexported);
 
         let num_definitions = if is_loop_header {
             // Loop headers are internal use-def definitions. They are retrieved through the loop
@@ -1626,9 +1625,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
 
             let place: ScopedPlaceId = self.add_symbol(name.clone()).into();
-            let definition = Definition::create(
+            let definition = Definition::new(
                 self.db,
-                self.scope_ids_by_scope[self.current_scope()],
+                self.current_scope_id(),
                 place,
                 DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
                     name,
@@ -2056,7 +2055,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
-            self.scope_ids_by_scope[self.current_scope()],
+            self.current_scope_id(),
             AstNodeRef::new(self.module, expression_node),
             assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
