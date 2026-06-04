@@ -5078,7 +5078,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        for (argument_index, adjusted_argument_index, _, argument_types) in
+        for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
@@ -5092,10 +5092,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
-                let specialization_result = builder.infer(
+                let argument_type = matched_parameter.argument_type.unwrap_or(argument_type);
+                if self.is_correlated_constrained_self_argument(
+                    argument,
+                    argument_type,
                     declared_type,
-                    matched_parameter.argument_type.unwrap_or(argument_type),
-                );
+                ) {
+                    if let Type::TypeVar(typevar) = declared_type
+                        && typevar.is_inferable(self.db, self.inferable_typevars)
+                    {
+                        builder.add_type_mapping(
+                            typevar,
+                            argument_type,
+                            TypeVarVariance::Covariant,
+                        );
+                    }
+                    continue;
+                }
+                let specialization_result = builder.infer(declared_type, argument_type);
 
                 if let Err(error) = specialization_result {
                     specialization_errors.push(BindingError::SpecializationError {
@@ -5131,6 +5145,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         let mut expected_ty = parameter.annotated_type();
+        let correlated_constrained_self =
+            self.is_correlated_constrained_self_argument(argument, argument_type, expected_ty);
         if let Some(specialization) = self.specialization {
             argument_type = argument_type.apply_specialization(self.db, specialization);
             expected_ty = expected_ty.apply_specialization(self.db, specialization);
@@ -5149,7 +5165,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // building them in an earlier separate step.
         //
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
-        if !self.constraint_set_errors[argument_index]
+        if !correlated_constrained_self
+            && !self.constraint_set_errors[argument_index]
             && !parameter.has_starred_annotation()
             && argument_type
                 .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
@@ -5196,6 +5213,43 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         } else {
             self.parameter_tys[parameter_index] = Some(argument_type);
         }
+    }
+
+    fn is_correlated_constrained_self_argument(
+        &self,
+        argument: Argument<'_>,
+        argument_type: Type<'db>,
+        parameter_type: Type<'db>,
+    ) -> bool {
+        if !matches!(argument, Argument::Synthetic) {
+            return false;
+        }
+
+        let Type::TypeVar(argument_typevar) = argument_type else {
+            return false;
+        };
+        let Some(TypeVarBoundOrConstraints::Constraints(constraints)) = argument_typevar
+            .typevar(self.db)
+            .bound_or_constraints(self.db)
+        else {
+            return false;
+        };
+
+        let parameter_type = if let Type::TypeVar(parameter_typevar) = parameter_type
+            && parameter_typevar.typevar(self.db).is_self(self.db)
+            && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = parameter_typevar
+                .typevar(self.db)
+                .bound_or_constraints(self.db)
+        {
+            bound
+        } else {
+            parameter_type
+        };
+
+        constraints
+            .elements(self.db)
+            .iter()
+            .any(|constraint| constraint.is_assignable_to(self.db, parameter_type))
     }
 
     fn is_gradual_variadic_parameter(&self, parameter_index: usize) -> bool {

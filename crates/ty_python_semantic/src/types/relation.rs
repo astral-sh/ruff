@@ -13,6 +13,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::tuple::Tuple;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -1264,6 +1265,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
+            // A gradual `TypeVarTuple` value (`*tuple[Any, ...]` or
+            // `*tuple[Unknown, ...]`) is assignability-consistent with any concrete
+            // `TypeVarTuple` value. This only applies to fixed `TypeVarTuple` values in
+            // already-specialized generic aliases; inferable `TypeVarTuple`s are handled by
+            // the inference paths below.
+            (Type::TypeVar(bound_typevar), other) | (other, Type::TypeVar(bound_typevar))
+                if self.relation.is_assignability()
+                    && !bound_typevar.is_inferable(db, self.inferable)
+                    && bound_typevar.is_typevartuple(db)
+                    && Self::is_gradual_typevartuple_value(db, other) =>
+            {
+                self.always()
+            }
+
             // Any concrete specialization of a `ParamSpec` is a subtype of the top
             // materialization of a `ParamSpec` value.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
@@ -2153,6 +2168,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .signatures(db)
                 .iter()
                 .all(|signature| signature.parameters().kind() == ParametersKind::Top)
+    }
+
+    /// Return `true` if `ty` is a gradual value for a `TypeVarTuple`.
+    fn is_gradual_typevartuple_value(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        matches!(
+            ty.exact_tuple_instance_spec(db).as_deref(),
+            Some(Tuple::Variable(tuple))
+                if tuple.prefix_elements().is_empty()
+                    && tuple.suffix_elements().is_empty()
+                    && tuple.variable().is_dynamic()
+        )
     }
 }
 

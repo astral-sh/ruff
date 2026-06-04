@@ -1021,7 +1021,7 @@ impl<'db> GenericContext<'db> {
             if typevar.is_paramspec(db) {
                 expanded.push(Type::paramspec_value_callable(db, Parameters::unknown()));
             } else if typevar.is_typevartuple(db) {
-                expanded.push(Type::homogeneous_tuple(db, Type::any()));
+                expanded.push(Type::homogeneous_tuple(db, Type::unknown()));
             } else {
                 expanded.push(Type::unknown());
             }
@@ -2390,19 +2390,49 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let actual_parameters = actual_signature.parameters().as_slice();
         if actual_parameters
             .iter()
-            .any(|parameter| !parameter.is_positional())
-            || actual_parameters.len() < variadic_index + suffix_len
+            .any(|parameter| !parameter.is_positional() && !parameter.is_variadic())
         {
             return;
         }
 
-        let middle_end = actual_parameters.len() - suffix_len;
-        let tuple = Type::heterogeneous_tuple(
-            self.db,
-            actual_parameters[variadic_index..middle_end]
-                .iter()
-                .map(Parameter::annotated_type),
-        );
+        let tuple = if let Some(actual_variadic_index) =
+            actual_parameters.iter().position(Parameter::is_variadic)
+        {
+            // An actual variadic parameter can only satisfy the open-ended portion of the formal
+            // callable. It cannot provide a fixed suffix because callers are not required to pass
+            // any arguments to it.
+            if suffix_len > 0
+                || actual_variadic_index < variadic_index
+                || actual_variadic_index + 1 != actual_parameters.len()
+            {
+                return;
+            }
+
+            Type::tuple(TupleType::new(
+                self.db,
+                &TupleSpecBuilder::Variable {
+                    prefix: actual_parameters[variadic_index..actual_variadic_index]
+                        .iter()
+                        .map(Parameter::annotated_type)
+                        .collect(),
+                    variable: actual_parameters[actual_variadic_index].annotated_type(),
+                    suffix: vec![],
+                }
+                .build(),
+            ))
+        } else {
+            if actual_parameters.len() < variadic_index + suffix_len {
+                return;
+            }
+
+            let middle_end = actual_parameters.len() - suffix_len;
+            Type::heterogeneous_tuple(
+                self.db,
+                actual_parameters[variadic_index..middle_end]
+                    .iter()
+                    .map(Parameter::annotated_type),
+            )
+        };
         self.add_type_mapping(typevartuple, tuple, TypeVarVariance::Contravariant);
 
         let _ = self.infer_map_impl(

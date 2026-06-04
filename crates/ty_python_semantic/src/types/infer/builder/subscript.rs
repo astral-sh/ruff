@@ -2307,12 +2307,18 @@ fn legacy_generic_class_context<'db>(
                 return Err(LegacyGenericContextError::DuplicateTypevar(bound.name(db)));
             }
         } else if let Type::NominalInstance(instance) = argument_ty
-            && instance.has_known_class(db, KnownClass::TypeVarTuple)
+            && matches!(
+                instance.known_class(db),
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+            )
         {
             return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
         } else if any_over_type(db, argument_ty, true, |inner_ty| match inner_ty {
             Type::Dynamic(DynamicType::TodoUnpack | DynamicType::TodoStarredExpression) => true,
-            Type::NominalInstance(nominal) => nominal.has_known_class(db, KnownClass::TypeVarTuple),
+            Type::NominalInstance(nominal) => matches!(
+                nominal.known_class(db),
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+            ),
             _ => false,
         }) {
             return Err(LegacyGenericContextError::NotYetSupported);

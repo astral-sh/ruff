@@ -90,8 +90,9 @@ def f(default: Array, explicit: Array[bool]) -> None:
 
 ### Unspecified type arguments
 
-An unsubscripted variadic generic uses an unknown-length tuple of `Any` arguments, allowing typed
-and dynamic uses of the class to interoperate with the legacy unpack spelling.
+An unsubscripted variadic generic behaves as if it used an unknown-length tuple of `Any` arguments.
+ty represents the missing type information as `Unknown`, distinguishing it from explicitly provided
+`Any`.
 
 ```py
 from typing import Any, Generic, TypeVarTuple, Unpack
@@ -113,8 +114,8 @@ def f(
     explicitly_dynamic: Shelf[Unpack[tuple[Any, ...]]],
     fixed: Shelf[int, str],
 ) -> None:
-    reveal_type(dynamic)  # revealed: Shelf[*tuple[Any, ...]]
-    reveal_type(dynamic.contents())  # revealed: tuple[Any, ...]
+    reveal_type(dynamic)  # revealed: Shelf[*tuple[Unknown, ...]]
+    reveal_type(dynamic.contents())  # revealed: tuple[Unknown, ...]
     reveal_type(explicitly_dynamic)  # revealed: Shelf[*tuple[Any, ...]]
     reveal_type(explicitly_dynamic.contents())  # revealed: tuple[Any, ...]
     needs_two_items(dynamic)

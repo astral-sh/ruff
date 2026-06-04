@@ -745,6 +745,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         target: &ast::Expr,
         call_expr: &ast::ExprCall,
         definition: Definition<'db>,
+        known_class: KnownClass,
     ) -> Type<'db> {
         fn error<'db>(
             context: &InferContext<'db, '_>,
@@ -759,7 +760,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let arguments = &call_expr.arguments;
+        let is_typing_extensions = known_class == KnownClass::ExtensionsTypeVarTuple;
+        let assume_all_features = self.in_stub() || is_typing_extensions;
         let python_version = Program::get(db).python_version(db);
+        let have_features_from =
+            |version: PythonVersion| assume_all_features || python_version >= version;
 
         let mut default = None;
         let mut covariant = false;
@@ -806,7 +811,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Some(self.infer_expression(&kwarg.value, TypeContext::default()));
                 }
                 "default" => {
-                    if python_version < PythonVersion::PY313 && !self.in_stub() {
+                    if !have_features_from(PythonVersion::PY313) {
                         error(
                             &self.context,
                             "The `default` parameter of `typing.TypeVarTuple` was added in Python 3.13",
@@ -857,7 +862,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 "infer_variance" => {
-                    if python_version < PythonVersion::PY312 && !self.in_stub() {
+                    if !have_features_from(PythonVersion::PY312) {
                         error(
                             &self.context,
                             "The `infer_variance` parameter of `typing.TypeVarTuple` was added in Python 3.12",

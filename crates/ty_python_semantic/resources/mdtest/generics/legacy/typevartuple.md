@@ -171,10 +171,10 @@ reveal_type(Simple[()]().attr)  # revealed: tuple[()]
 reveal_type(Simple[int, str]().attr)  # revealed: tuple[int, str]
 reveal_type(Simple[*tuple[int, str]]().attr)  # revealed: tuple[int, str]
 
-# error: [invalid-type-form]
-reveal_type(Simple[[int, str]]().attr)  # revealed: tuple[Unknown, ...]
-# error: [invalid-type-form]
-reveal_type(Simple[*[int, str]]().attr)  # revealed: tuple[Unknown, ...]
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+reveal_type(Simple[[int, str]]().attr)  # revealed: tuple[Unknown]
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+reveal_type(Simple[*[int, str]]().attr)  # revealed: tuple[@Todo(StarredExpression)]
 ```
 
 ```py
@@ -192,7 +192,7 @@ reveal_type(Prefix().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...]]
 
 ```py
 class Suffix(Generic[*Ts, T]):
-    attr: tuple[*Ts, T]:
+    attr: tuple[*Ts, T]
 
 reveal_type(Suffix[int]().attr)  # revealed: tuple[int]
 reveal_type(Suffix[int, str]().attr)  # revealed: tuple[int, str]
@@ -205,7 +205,7 @@ reveal_type(Suffix().attr)  # revealed: tuple[*tuple[Unknown, ...], Unknown]
 
 ```py
 class Between(Generic[T, *Ts, U]):
-    attr: tuple[T, *Ts, U]:
+    attr: tuple[T, *Ts, U]
 
 reveal_type(Between[int, str]().attr)  # revealed: tuple[int, str]
 reveal_type(Between[int, bool, str]().attr)  # revealed: tuple[int, bool, str]
@@ -213,7 +213,8 @@ reveal_type(Between[int, bool, bytes, str]().attr)  # revealed: tuple[int, bool,
 reveal_type(Between[int, *tuple[bool], str]().attr)  # revealed: tuple[int, bool, str]
 
 reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
-reveal_type(Between[int]().attr)  # revealed: tuple[int, *tuple[Unknown, ...], Unknown]
+# error: [invalid-type-arguments] "No type argument provided for required type variable `U` of class `Between`"
+reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
 ### Inferred specialization from construction
@@ -235,10 +236,10 @@ class Variadic(Generic[*Ts]):
         self.shape = shape
 
 reveal_type(Positional(()))  # revealed: Positional[()]
-reveal_type(Positional((1, "a")))  # revealed: Positional[Literal[1], Literal["a"]]
+reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
 
 reveal_type(Variadic())  # revealed: Variadic[()]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[Literal[1], Literal["a"]]
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
 
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
@@ -248,8 +249,9 @@ def _(i: int, s: str) -> None:
 ### Unspecified type arguments
 
 When a generic class parameterized by a type variable tuple is used without any type parameters and
-the `TypeVarTuple` has no default value, it behaves as if the type variable tuple was substituted with
-`tuple[Any, ...]` (in ty's case `tuple[Unknown, ...]`).
+the `TypeVarTuple` has no default value, it behaves as if the type variable tuple was substituted
+with `tuple[Any, ...]`. ty represents the missing type information as `tuple[Unknown, ...]`,
+distinguishing it from an explicitly provided `tuple[Any, ...]`.
 
 ```py
 from typing import Generic, TypeVarTuple
@@ -257,7 +259,7 @@ from typing import Generic, TypeVarTuple
 Ts = TypeVarTuple("Ts")
 
 class Unspecified(Generic[*Ts]):
-    attr: tuple[*Ts]:
+    attr: tuple[*Ts]
 
 unspecified = Unspecified()
 reveal_type(unspecified)  # revealed: Unspecified[*tuple[Unknown, ...]]
@@ -280,10 +282,31 @@ from typing import Generic, TypeVarTuple, Unpack
 Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
 
 class WithDefault(Generic[*Ts]):
-    attr: tuple[*Ts]:
+    attr: tuple[*Ts]
 
 reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
 reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
+```
+
+### Backported default type arguments
+
+`typing_extensions.TypeVarTuple` backports the `default` parameter to older Python versions.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+
+class WithBackportedDefault(Generic[*Ts]):
+    attr: tuple[*Ts]
+
+reveal_type(WithBackportedDefault().attr)  # revealed: tuple[int, str]
 ```
 
 ## Type Aliases
@@ -312,20 +335,19 @@ def _(
     a7: Prefix[bool, int, str],
     a8: Suffix[bool],
     a9: Suffix[int, str, bool],
-    a10: Between[int]
+    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
+    a10: Between[int],
 ):
-    reveal_type(a1) # revealed: tuple[int, bool, str]
-    reveal_type(a2) # revealed: tuple[int, bool, str]
-    reveal_type(a3) # revealed: tuple[int, bool, bytes, str]
-    reveal_type(a4) # revealed: tuple[int, str]
-    reveal_type(a5) # revealed: tuple[int, bool, str]
-    reveal_type(a6) # revealed: tuple[int, bool, str]
-    reveal_type(a7) # revealed: tuple[int, bool, str]
-    reveal_type(a8) # revealed: tuple[int, bool, str]
-    reveal_type(a9) # revealed: tuple[int, bool, str]
-
-    # error: [invalid-type-arguments]
-    reveal_type(a10)
+    reveal_type(a1)  # revealed: tuple[()]
+    reveal_type(a2)  # revealed: tuple[int, str]
+    reveal_type(a3)  # revealed: tuple[int, str]
+    reveal_type(a4)  # revealed: tuple[int, bool, str]
+    reveal_type(a5)  # revealed: tuple[int, bool, bytes, str]
+    reveal_type(a6)  # revealed: tuple[bool]
+    reveal_type(a7)  # revealed: tuple[bool, int, str]
+    reveal_type(a8)  # revealed: tuple[bool]
+    reveal_type(a9)  # revealed: tuple[int, str, bool]
+    reveal_type(a10)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
 ### Unpacked tuple type arguments
@@ -372,14 +394,13 @@ Second = tuple[T, *Ts]
 def _(
     f1: First[*tuple[int, ...]],
     f2: First[*tuple[int, ...], str],
-    # error: invalid-type-arguments
     s1: Second[*tuple[int, ...]],
     s2: Second[str, *tuple[int, ...]],
 ):
-    reveal_type(f1)  # First[*tuple[int, ...], int]
-    reveal_type(f2)  # First[*tuple[int, ...], str]
-    reveal_type(s1)  # revealed: Second[Unknown, *tuple[Unknown, ...]]
-    reveal_type(s2)  # revealed: Second[str, *tuple[int, ...]]
+    reveal_type(f1)  # revealed: tuple[*tuple[int, ...], int]
+    reveal_type(f2)  # revealed: tuple[*tuple[int, ...], str]
+    reveal_type(s1)  # revealed: tuple[int, *tuple[int, ...]]
+    reveal_type(s2)  # revealed: tuple[str, *tuple[int, ...]]
 ```
 
 ### Variadic substitutions
