@@ -1119,13 +1119,15 @@ impl<'db> FunctionType<'db> {
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_signature) = if matches!(
             type_mapping,
-            TypeMapping::ApplySpecialization(
-                ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
-            ) | TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: ApplySpecialization::ReturnCallables(_)
-                    | ApplySpecialization::TypeAlias(_),
-                ..
-            }
+            TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::ApplySpecialization(
+                    ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
+                )
+                | TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: ApplySpecialization::ReturnCallables(_)
+                        | ApplySpecialization::TypeAlias(_),
+                    ..
+                }
         ) {
             (
                 self.updated_signature(db).map(|signature| {

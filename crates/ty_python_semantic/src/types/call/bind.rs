@@ -56,7 +56,7 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, rebind_return_callables};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -69,6 +69,7 @@ use crate::types::{
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
+use ty_python_core::definition::DefinitionKind;
 use ty_python_core::semantic_index;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
@@ -5047,11 +5048,42 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Capture this immediately before `build_with` so it reflects the final pending
         // constraint set used to solve this call's specialization.
-        let _returned_callable_rescoping_candidates =
+        let returned_callable_rescoping_candidates =
             builder.returned_callable_rescoping_candidates();
         let specialization = builder.build_with(generic_context, choose_solution);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
+        if !matches!(
+            returned_callable_rescoping_candidates,
+            InferableTypeVars::None
+        ) {
+            // A bound receiver is outside of the call result. If its class typevars also appear in
+            // the result, they represent the receiver specialization and should not become local to
+            // a returned callable.
+            let synthetic_argument_types =
+                self.enumerate_argument_types()
+                    .filter_map(|(_, _, argument, argument_types)| {
+                        if matches!(argument, Argument::Synthetic) {
+                            argument_types.get_default()
+                        } else {
+                            None
+                        }
+                    });
+            let (return_ty, _) = rebind_return_callables(
+                self.db,
+                synthetic_argument_types,
+                self.return_ty,
+                |typevar| {
+                    typevar.is_inferable(self.db, returned_callable_rescoping_candidates)
+                        && !typevar.binding_context(self.db).definition().is_some_and(
+                            |definition| {
+                                matches!(definition.kind(self.db), DefinitionKind::Class(_))
+                            },
+                        )
+                },
+            );
+            self.return_ty = return_ty;
+        }
         self.specialization = Some(specialization);
     }
 
