@@ -6,6 +6,8 @@
 //! There are no formal specifications for any of these formats, so the parsing
 //! logic needs to be tolerant of variations.
 
+mod markdown;
+
 use regex::Regex;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation};
 use ruff_source_file::UniversalNewlines;
@@ -202,10 +204,11 @@ fn render_markdown(docstring: &str) -> String {
     let mut in_literal = false;
     let mut in_any_code = false;
     let mut temp_owned_line;
-    for untrimmed_line in docstring.lines() {
+    for line in docstring.lines() {
         // We can assume leading whitespace has been normalized
-        let mut line = untrimmed_line.trim_start_matches(' ');
-        let line_indent = untrimmed_line.len() - line.len();
+        let trimmed_source_line = line.trim_start_matches(' ');
+        let mut rendered_line = trimmed_source_line;
+        let line_indent = line.len() - trimmed_source_line.len();
 
         // First thing's first, add a newline to start the new line
         if !first_line {
@@ -224,7 +227,7 @@ fn render_markdown(docstring: &str) -> String {
         // If we're in a literal block and we find a non-empty dedented line, end the block
         // TODO: we should remove all the trailing blank lines
         // (Just pop all trailing `\n` from `output`?)
-        if in_literal && line_indent < block_indent && !line.is_empty() {
+        if in_literal && line_indent < block_indent && !rendered_line.is_empty() {
             in_literal = false;
             in_any_code = false;
             block_indent = 0;
@@ -235,7 +238,7 @@ fn render_markdown(docstring: &str) -> String {
         // We previously entered a literal block and we just found our first non-blank line
         // So now we're actually in the literal block
         if let Some(literal) = starting_literal
-            && !line.is_empty()
+            && !rendered_line.is_empty()
         {
             starting_literal = None;
             in_literal = true;
@@ -248,7 +251,7 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         // If we're not in a codeblock and we see something that signals a doctest, start one
-        if !in_any_code && line.starts_with(">>>") {
+        if !in_any_code && rendered_line.starts_with(">>>") {
             block_indent = line_indent;
             in_doctest = true;
             in_any_code = true;
@@ -258,60 +261,47 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         // If we're not in a codeblock and we see a markdown codefence, start one
-        let has_tick_fence = line.starts_with("```");
-        let has_tilde_fence = line.starts_with("~~~");
-        if !in_any_code && (has_tick_fence || has_tilde_fence) {
-            let without_leading_fence = if has_tick_fence {
-                line.trim_start_matches('`')
-            } else {
-                line.trim_start_matches('~')
-            };
-            let fence_len = line.len() - without_leading_fence.len();
-            let fence = &line[..fence_len];
-            // If we don't see this amount of ticks again on the line, assume we're opening a markdown block
-            // (We *don't* want to consider ```hello``` as a codefence, that's inline code!)
-            if !without_leading_fence.contains(fence) {
-                // Unlike other blocks we don't need to emit fences because it's already markdown
-                block_indent = line_indent;
-                in_any_code = true;
-                in_markdown_with_fence = Some(fence.to_owned());
-                // Render the line verbatim without its indent and move on.
-                //
-                // If there's any indent this is really just Bad Syntax but it "makes sense"
-                // to someone writing docs like this:
-                //
-                // Returns:
-                //     Some details...
-                //     ```
-                //     some_example()
-                //     ```
-                //     etc etc...
-                //
-                // We "make this work" by stripping the indent on the fences but preserving the
-                // full indent of the lines between the fences
-                output.push_str(line);
-                continue;
-            }
+        if !in_any_code && let Some(fence) = markdown::MarkdownFence::find(trimmed_source_line) {
+            // Unlike other blocks we don't need to emit fences because it's already markdown
+            block_indent = line_indent;
+            in_any_code = true;
+            in_markdown_with_fence = Some(fence);
+            // Render the line verbatim without its indent and move on.
+            //
+            // If there's any indent this is really just Bad Syntax but it "makes sense"
+            // to someone writing docs like this:
+            //
+            // Returns:
+            //     Some details...
+            //     ```
+            //     some_example()
+            //     ```
+            //     etc etc...
+            //
+            // We "make this work" by stripping the indent on the fences but preserving the
+            // full indent of the lines between the fences
+            output.push_str(rendered_line);
+            continue;
         // If we're in a markdown code fence and this line seems to terminate it, end the block
-        } else if let Some(fence) = &in_markdown_with_fence
-            && line.starts_with(fence)
+        } else if let Some(fence) = in_markdown_with_fence
+            && fence.is_closed_by(rendered_line)
         {
             in_any_code = false;
             block_indent = 0;
             in_markdown_with_fence = None;
             // Render the line without its indent and move on.
-            output.push_str(line);
+            output.push_str(rendered_line);
             continue;
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
-        let parsed_lit = line
+        let parsed_lit = rendered_line
             // first check for a line ending with `::`
             .strip_suffix("::")
             .map(|prefix| (prefix, None))
             // if that fails, look for a line ending with `:: lang`
             .or_else(|| {
-                let (prefix, lang) = line.rsplit_once(' ')?;
+                let (prefix, lang) = rendered_line.rsplit_once(' ')?;
                 let prefix = prefix.trim_end().strip_suffix("::")?;
                 Some((prefix, Some(lang)))
             });
@@ -337,9 +327,9 @@ fn render_markdown(docstring: &str) -> String {
             };
 
             if include_colon {
-                line = line.strip_suffix(":").unwrap();
+                rendered_line = rendered_line.strip_suffix(":").unwrap();
             } else {
-                line = without_directive.trim_end();
+                rendered_line = without_directive.trim_end();
             }
 
             starting_literal = match directive {
@@ -382,7 +372,7 @@ fn render_markdown(docstring: &str) -> String {
                     // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
                     temp_owned_line = format!("**{without_directive}{pretty_directive}{suffix}:**");
 
-                    line = temp_owned_line.as_str();
+                    rendered_line = temp_owned_line.as_str();
                     None
                 }
                 // Things that just mean "it's code"
@@ -432,7 +422,7 @@ fn render_markdown(docstring: &str) -> String {
             let mut first_chunk = true;
             let mut opening_tick_count = 0;
             let mut current_tick_count = 0;
-            for chunk in line.split('`') {
+            for chunk in rendered_line.split('`') {
                 // First chunk is definitionally not in inline-code and so always plaintext
                 if first_chunk {
                     first_chunk = false;
@@ -482,7 +472,7 @@ fn render_markdown(docstring: &str) -> String {
             }
             // NOTE: explicitly not "flushing" the ticks here.
             // We respect however the user closed their inline code.
-        } else if line.is_empty() {
+        } else if rendered_line.is_empty() {
             if in_doctest {
                 // This is the end of a doctest
                 block_indent = 0;
@@ -492,14 +482,14 @@ fn render_markdown(docstring: &str) -> String {
             }
         } else {
             // Print the line verbatim, it's in code
-            output.push_str(line);
+            output.push_str(rendered_line);
         }
     }
     // Flush codeblock
     if in_any_code {
         output.push('\n');
-        if let Some(fence) = &in_markdown_with_fence {
-            output.push_str(fence);
+        if let Some(fence) = in_markdown_with_fence {
+            output.push_str(fence.marker());
         } else {
             output.push_str(FENCE);
         }
