@@ -2859,41 +2859,57 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     fn check_for_missing_type_arguments(&self, ty: Type<'db>, annotation: &ast::Expr) {
-        let Type::ClassLiteral(class) = ty else {
-            return;
-        };
-        let db = self.db();
+        match ty {
+            Type::ClassLiteral(class) => {
+                let db = self.db();
 
-        let Some(generic_context) = class.generic_context(db) else {
-            return;
-        };
+                let Some(generic_context) = class.generic_context(db) else {
+                    return;
+                };
 
-        // Don't warn if all type parameters have defaults (PEP 696).
-        if generic_context
-            .variables(db)
-            .all(|tv| tv.default_type(db).is_some())
-        {
-            return;
-        }
+                // Don't warn if all type parameters have defaults (PEP 696).
+                if generic_context
+                    .variables(db)
+                    .all(|tv| tv.default_type(db).is_some())
+                {
+                    return;
+                }
 
-        let required_count = generic_context
-            .variables(db)
-            .filter(|tv| tv.default_type(db).is_none())
-            .count();
+                let required_count = generic_context
+                    .variables(db)
+                    .filter(|tv| tv.default_type(db).is_none())
+                    .count();
 
-        if let Some(builder) = self.context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
-            let class_name = class.name(db);
-            if required_count == 1 {
-                builder.into_diagnostic(format_args!(
-                    "Missing type parameter for generic class `{class_name}` \
-                     (expected 1 type argument)"
-                ));
-            } else {
-                builder.into_diagnostic(format_args!(
-                    "Missing type parameters for generic class `{class_name}` \
-                     (expected {required_count} type arguments)"
-                ));
+                if let Some(builder) =
+                    self.context.report_lint(&MISSING_TYPE_ARGUMENT, annotation)
+                {
+                    let class_name = class.name(db);
+                    if required_count == 1 {
+                        builder.into_diagnostic(format_args!(
+                            "Missing type parameter for generic class `{class_name}` \
+                             (expected 1 type argument)"
+                        ));
+                    } else {
+                        builder.into_diagnostic(format_args!(
+                            "Missing type parameters for generic class `{class_name}` \
+                             (expected {required_count} type arguments)"
+                        ));
+                    }
+                }
             }
+            Type::SpecialForm(
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable,
+            ) => {
+                if let Some(builder) =
+                    self.context.report_lint(&MISSING_TYPE_ARGUMENT, annotation)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Missing type parameters for generic type `Callable` \
+                         (expected 2 type arguments)"
+                    ));
+                }
+            }
+            _ => {}
         }
     }
 

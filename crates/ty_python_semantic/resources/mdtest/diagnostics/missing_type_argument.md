@@ -173,9 +173,6 @@ y: Wrapper[[int, str]]
 
 ## Bare `Callable`
 
-`Callable` without type parameters is equivalent to `Callable[..., Any]` and is common
-idiomatic Python. The rule does not fire for bare `Callable`.
-
 ```toml
 [rules]
 missing-type-argument = "error"
@@ -185,11 +182,10 @@ missing-type-argument = "error"
 from typing import Callable
 import collections.abc
 
-# OK — bare Callable is idiomatic
-def f(cb: Callable) -> None:
+def f(cb: Callable) -> None:  # error: [missing-type-argument]
     pass
 
-def g(cb: collections.abc.Callable) -> None:
+def g(cb: collections.abc.Callable) -> None:  # error: [missing-type-argument]
     pass
 
 # OK — explicitly parameterized
