@@ -1343,7 +1343,7 @@ class Y(Base):
     pass
 
 def test(x: Intersection[X, Y]) -> None:
-    reveal_type(x.f)  # revealed: (bound method X.f() -> int) & (bound method Y.f() -> int)
+    reveal_type(x.f)  # revealed: bound method X & Y.f() -> int
     reveal_type(x.f())  # revealed: int
 
 # Example subclass that inhabits that intersection:
