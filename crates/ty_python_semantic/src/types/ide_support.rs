@@ -618,12 +618,18 @@ fn method_implementation_definition<'db>(
         return Some(ResolvedDefinition::Definition(definition));
     };
 
-    // Overload groups without an implementation definition have no target to navigate to.
-    let (_, Some(_)) = function.overloads_and_implementation(db) else {
-        return None;
-    };
+    let (_, implementation) = function.overloads_and_implementation(db);
+    if implementation.is_some() {
+        return Some(ResolvedDefinition::Definition(function.last_definition(db)));
+    }
 
-    Some(ResolvedDefinition::Definition(function.last_definition(db)))
+    // Stub overload declarations can still map to a real source implementation later.
+    if definition.file(db).is_stub(db) {
+        return Some(ResolvedDefinition::Definition(definition));
+    }
+
+    // Non-stub overload-only groups have no runtime implementation to navigate to.
+    None
 }
 
 /// Normalizes a receiver type into the class roots used for implementation lookup.
