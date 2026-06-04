@@ -106,6 +106,7 @@ fn dependency_metadata_is_loaded_from_uv_workspace() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
     success: true
     exit_code: 0
@@ -159,6 +160,7 @@ fn dependency_metadata_is_not_loaded_without_uv_lock() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
     success: true
     exit_code: 0
@@ -186,6 +188,7 @@ fn dependency_metadata_uv_failure_does_not_fail_check() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
     success: true
     exit_code: 0
@@ -198,12 +201,17 @@ fn dependency_metadata_uv_failure_does_not_fail_check() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn write_site_packages_file(case: &CliTest, path: &str, contents: &str) -> anyhow::Result<()> {
+    let site_packages = if cfg!(windows) {
+        ".venv/Lib/site-packages"
+    } else {
+        ".venv/lib/python3.13/site-packages"
+    };
+    case.write_file(format!("{site_packages}/{path}"), contents)
+}
+
 fn write_site_package(case: &CliTest, module: &str) -> anyhow::Result<()> {
-    let path = format!(".venv/lib/python3.13/site-packages/{module}/__init__.py");
-    case.write_file(path.as_str(), "")?;
-    let path = format!(".venv/Lib/site-packages/{module}/__init__.py");
-    case.write_file(path.as_str(), "")?;
-    Ok(())
+    write_site_packages_file(case, &format!("{module}/__init__.py"), "")
 }
 
 fn write_dependency_group_metadata(
@@ -249,20 +257,35 @@ fn write_dependency_group_metadata(
 }
 
 #[test]
-fn dependency_metadata_enables_missing_direct_dependency_lint() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        ("test.py", "import requests"),
-        (
-            ".venv/lib/python3.13/site-packages/requests/__init__.py",
-            "",
-        ),
-        (".venv/Lib/site-packages/requests/__init__.py", ""),
-    ])?;
+fn missing_direct_dependency_is_disabled_by_default() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "import requests")?;
+    write_site_package(&case, "requests")?;
+    write_dependency_metadata(&case, "[]")?;
+
+    assert_cmd_snapshot!(case.command()
+        .arg("--python").arg(".venv")
+        .arg("--dependency-metadata").arg("metadata.json"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn dependency_metadata_supports_missing_direct_dependency_lint() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "import requests")?;
+    write_site_package(&case, "requests")?;
 
     write_dependency_metadata(&case, "[]")?;
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
     success: true
     exit_code: 0
@@ -293,8 +316,7 @@ fn dependency_metadata_infers_editable_module_owners() -> anyhow::Result<()> {
     let editable = case.root().join("libs/lib/src");
     let editable = editable.to_str().unwrap();
 
-    case.write_file(".venv/lib/python3.13/site-packages/_lib.pth", editable)?;
-    case.write_file(".venv/Lib/site-packages/_lib.pth", editable)?;
+    write_site_packages_file(&case, "_lib.pth", editable)?;
     case.write_file(
         "metadata.json",
         &format!(
@@ -317,6 +339,7 @@ fn dependency_metadata_infers_editable_module_owners() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
     success: true
     exit_code: 0
@@ -351,6 +374,7 @@ fn dependency_group_dependency_is_reported_in_package_code() -> anyhow::Result<(
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
     success: true
     exit_code: 0
@@ -385,6 +409,7 @@ fn dependency_group_dependency_is_allowed_in_non_package_file() -> anyhow::Resul
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
     success: true
     exit_code: 0
@@ -409,6 +434,7 @@ fn dependency_group_dependency_does_not_allow_transitive_dependency() -> anyhow:
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
     success: true
     exit_code: 0
@@ -443,8 +469,7 @@ fn dependency_group_dependency_is_reported_in_editable_package_code() -> anyhow:
     ])?;
     let editable = case.root().join("src");
     let editable = editable.to_str().unwrap();
-    case.write_file(".venv/lib/python3.13/site-packages/_app.pth", editable)?;
-    case.write_file(".venv/Lib/site-packages/_app.pth", editable)?;
+    write_site_packages_file(&case, "_app.pth", editable)?;
     write_site_package(&case, "inline_snapshot")?;
     write_dependency_group_metadata(
         &case,
@@ -454,6 +479,7 @@ fn dependency_group_dependency_is_reported_in_editable_package_code() -> anyhow:
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json")
         .arg("src/app/__init__.py"), @"
     success: true
@@ -476,14 +502,8 @@ fn dependency_group_dependency_is_reported_in_editable_package_code() -> anyhow:
 
 #[test]
 fn declared_dependency_is_not_reported() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        ("test.py", "import requests"),
-        (
-            ".venv/lib/python3.13/site-packages/requests/__init__.py",
-            "",
-        ),
-        (".venv/Lib/site-packages/requests/__init__.py", ""),
-    ])?;
+    let case = CliTest::with_file("test.py", "import requests")?;
+    write_site_package(&case, "requests")?;
 
     write_dependency_metadata(
         &case,
@@ -492,6 +512,7 @@ fn declared_dependency_is_not_reported() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
+        .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
     success: true
     exit_code: 0
@@ -512,6 +533,7 @@ fn dependency_metadata_applies_with_multiple_overrides() -> anyhow::Result<()> {
             r#"
             [tool.ty.rules]
             division-by-zero = "error"
+            missing-direct-dependency = "warn"
 
             [[tool.ty.overrides]]
             include = ["*.py"]
@@ -527,12 +549,8 @@ fn dependency_metadata_applies_with_multiple_overrides() -> anyhow::Result<()> {
             "#,
         ),
         ("test.py", "import requests"),
-        (
-            ".venv/lib/python3.13/site-packages/requests/__init__.py",
-            "",
-        ),
-        (".venv/Lib/site-packages/requests/__init__.py", ""),
     ])?;
+    write_site_package(&case, "requests")?;
 
     write_dependency_metadata(&case, "[]")?;
 
