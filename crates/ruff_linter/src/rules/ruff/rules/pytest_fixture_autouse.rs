@@ -21,35 +21,36 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 /// or other fixtures that need them by declaring them in the function parameters.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture(autouse=True)
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture()
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 ///
 ///
-/// def test_foo(my_fixture):
-///     ...
+/// def test_foo(my_fixture): ...
 /// ```
 ///
 /// ## Note
+///
 /// This is a pedantic rule that restricts a valid `pytest` pattern. If you choose to
 /// enable it, you may want to ignore it outside of `conftest.py` files,
 /// as autouse fixtures are most problematic when defined globally.
 ///
-/// You can do this by configuring [`lint.per-file-ignores`]:
+/// You can do this by configuring [`lint.per-file-ignores`][lint.per-file-ignores]:
+///
 /// ```toml
 /// [tool.ruff.lint.per-file-ignores]
 /// "!**/conftest.py" = ["RUF076"]
