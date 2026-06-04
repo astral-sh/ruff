@@ -341,6 +341,41 @@ def test_match_capture_filters_constrained_typevar_arms(value: MatchPairT) -> No
         case [1, item]:
             reveal_type(item)  # revealed: int
 
+BoundSequenceT = TypeVar("BoundSequenceT", bound=tuple[object])
+ConstrainedSequenceT = TypeVar(
+    "ConstrainedSequenceT",
+    tuple[int],
+    tuple[str],
+)
+
+def test_match_sequence_alias_preserves_bound_typevar(
+    value: BoundSequenceT,
+) -> BoundSequenceT:
+    match value:
+        case [_] as whole:
+            reveal_type(whole)  # revealed: BoundSequenceT@test_match_sequence_alias_preserves_bound_typevar
+            return whole
+
+def test_match_sequence_alias_preserves_constrained_typevar(
+    value: ConstrainedSequenceT,
+) -> ConstrainedSequenceT:
+    match value:
+        case [_] as whole:
+            # revealed: ConstrainedSequenceT@test_match_sequence_alias_preserves_constrained_typevar
+            reveal_type(whole)
+            return whole
+
+def test_match_sequence_alias_preserves_typevar_union_arm(
+    value: BoundSequenceT | str,
+) -> BoundSequenceT:
+    match value:
+        case [_] as whole:
+            # revealed: BoundSequenceT@test_match_sequence_alias_preserves_typevar_union_arm
+            reveal_type(whole)
+            return whole
+        case _:
+            raise ValueError
+
 class Number(IntEnum):
     ONE = 1
 
