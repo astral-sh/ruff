@@ -317,15 +317,17 @@ fn type_narrowed_by_previous_patterns<'db>(
         return subject_ty;
     };
     let previous = *previous;
+    let narrowed_by_previous_patterns =
+        type_narrowed_by_previous_patterns(db, previous, subject_ty);
 
     if previous.guard(db).is_some() {
-        type_narrowed_by_previous_patterns(db, previous, subject_ty)
+        narrowed_by_previous_patterns
     } else {
-        type_narrowed_by_pattern(db, previous, subject_ty)
+        type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns)
     }
 }
 
-/// Narrow `subject_ty` by a match pattern and all preceding unguarded patterns.
+/// Narrow `subject_ty` by a match pattern.
 ///
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
@@ -341,9 +343,7 @@ fn type_narrowed_by_pattern<'db>(
     subject_ty: Type<'db>,
 ) -> Type<'db> {
     IntersectionBuilder::new(db)
-        .add_positive(type_narrowed_by_previous_patterns(
-            db, predicate, subject_ty,
-        ))
+        .add_positive(subject_ty)
         .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
         .build()
 }
@@ -551,7 +551,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, subject_ty);
+    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, narrowed_subject_ty);
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }
