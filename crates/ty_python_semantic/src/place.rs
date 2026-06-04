@@ -7,7 +7,10 @@ use ty_module_resolver::{
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::reachability::{ReachabilityConstraintsExtension, evaluate_loop_header_reachability};
+use crate::reachability::{
+    ReachabilityConstraintsExtension, evaluate_loop_header_reachability,
+    loop_header_requires_recursive_collection_analysis,
+};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
@@ -1224,6 +1227,7 @@ fn loop_header_reachability_impl<'db>(
     let use_def = use_def_map(db, scope);
     let loop_header = get_loop_header(db, loop_header_definition.loop_token());
     let place = loop_header_definition.place();
+    let recursive_collection = loop_header_requires_recursive_collection_analysis(db, definition);
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
@@ -1234,7 +1238,10 @@ fn loop_header_reachability_impl<'db>(
         } else {
             evaluate_loop_header_reachability(
                 db,
-                definition,
+                scope,
+                loop_header_definition.loop_token(),
+                place,
+                recursive_collection,
                 live_binding.reachability_constraint(),
             )
         };

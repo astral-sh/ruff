@@ -224,7 +224,7 @@ pub(crate) fn inferred_declaration<'db>(
 ///
 /// ## Panics
 /// If the given expression is not a sub-expression of the given [`Definition`].
-fn definition_expression_type<'db>(
+pub(crate) fn definition_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     expression: &ast::Expr,

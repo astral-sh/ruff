@@ -687,6 +687,33 @@ def f(a: bool, b: bool):
     expected: Literal[0, 3, b"b", "y", "e"] = x
 ```
 
+### Collection detection does not widen unrelated loop headers
+
+Checking whether a loop accumulates an unconstrained collection must not add dependencies to the
+loop-header fixed point for unrelated places.
+
+```py
+class Cell: ...
+
+class Table:
+    count: int
+
+    def cell(self, index: int) -> Cell | None:
+        return None
+
+def f(table: Table) -> None:
+    cells = [table.cell(i) for i in range(table.count)]
+    flags = [cell is not None for cell in cells]
+    flags.append(False)
+
+    i = 0
+    while i < table.count:
+        i += flags[i:].index(False) + 1
+        while i < table.count and flags[i] is False:
+            reveal_type(cells[i])  # revealed: Cell | None
+            i += 1
+```
+
 ### Recursive reachability preserves terminal calls
 
 ```py
