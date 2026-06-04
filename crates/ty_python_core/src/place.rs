@@ -791,16 +791,28 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             places.insert(place);
         }
 
-        // Handle Or patterns by recursing into each alternative
-        if let PatternPredicateKind::Or(predicates) = kind {
-            for predicate in predicates {
-                places.extend(self.pattern_kind(predicate, subject, module));
+        match kind {
+            PatternPredicateKind::Or(patterns) => {
+                for pattern in patterns {
+                    places.extend(self.pattern_kind(pattern, subject, module));
+                }
             }
-        }
-
-        // Handle As patterns by recursing into the inner pattern
-        if let PatternPredicateKind::As(Some(inner), _) = kind {
-            places.extend(self.pattern_kind(inner, subject, module));
+            PatternPredicateKind::Sequence(kind) => {
+                for pattern in &kind.patterns {
+                    places.extend(self.pattern_kind(pattern, subject, module));
+                }
+            }
+            PatternPredicateKind::As(pattern, name) => {
+                if let Some(name) = name
+                    && let Some(place) = self.places.symbol_id(name.as_str())
+                {
+                    places.insert(place.into());
+                }
+                if let Some(pattern) = pattern {
+                    places.extend(self.pattern_kind(pattern, subject, module));
+                }
+            }
+            _ => {}
         }
 
         places

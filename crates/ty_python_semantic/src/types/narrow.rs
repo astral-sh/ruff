@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use crate::Db;
-use crate::reachability::ReachabilityConstraintsExtension;
+use crate::reachability::{ReachabilityConstraintsExtension, type_narrowed_by_previous_patterns};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::{TupleLength, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -934,11 +936,123 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         pattern: PatternPredicate<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        self.evaluate_pattern_predicate_kind(
+        let constraints = self.evaluate_pattern_predicate_kind(
             pattern.kind(self.db),
             pattern.subject(self.db),
             is_positive,
-        )
+        );
+        let alias_constraints = is_positive
+            .then(|| {
+                let subject_ty = infer_same_file_expression_type(
+                    self.db,
+                    pattern.subject(self.db),
+                    TypeContext::default(),
+                );
+                let subject_ty = type_narrowed_by_previous_patterns(self.db, pattern, subject_ty);
+                self.evaluate_match_pattern_aliases(pattern.kind(self.db), subject_ty)
+            })
+            .flatten();
+        Self::merge_optional_constraints_and(constraints, alias_constraints)
+    }
+
+    fn evaluate_match_pattern_aliases(
+        &self,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        match pattern {
+            PatternPredicateKind::Sequence(kind) => {
+                let element_types = self.match_sequence_pattern_element_types(kind, subject_ty);
+                kind.patterns.iter().zip(element_types).fold(
+                    None,
+                    |constraints, (pattern, element_ty)| {
+                        Self::merge_optional_constraints_and(
+                            constraints,
+                            self.evaluate_match_pattern_aliases(pattern, element_ty),
+                        )
+                    },
+                )
+            }
+            PatternPredicateKind::Or(patterns) => {
+                let mut patterns = patterns.iter();
+                let first = self.evaluate_match_pattern_aliases(patterns.next()?, subject_ty);
+                patterns.fold(first, |constraints, pattern| {
+                    Self::merge_optional_constraints_or(
+                        constraints,
+                        self.evaluate_match_pattern_aliases(pattern, subject_ty),
+                    )
+                })
+            }
+            PatternPredicateKind::As(pattern, name) => {
+                let nested = pattern
+                    .as_deref()
+                    .and_then(|pattern| self.evaluate_match_pattern_aliases(pattern, subject_ty));
+                let alias = name.as_ref().and_then(|name| {
+                    let place = self.places().symbol_id(name.as_str())?;
+                    let pattern = pattern.as_deref()?;
+                    let necessary_ty = self.necessary_match_pattern_type(pattern);
+                    if necessary_ty == Type::object() {
+                        return None;
+                    }
+                    let ty = self.intersect_types(subject_ty, necessary_ty);
+                    Some(NarrowingConstraints::from_iter([(
+                        place.into(),
+                        NarrowingConstraint::replacement(ty),
+                    )]))
+                });
+                Self::merge_optional_constraints_and(nested, alias)
+            }
+            _ => None,
+        }
+    }
+
+    fn match_sequence_pattern_element_types(
+        &self,
+        kind: &SequencePatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Vec<Type<'db>> {
+        let target_len = if let Some(starred_index) = kind
+            .patterns
+            .iter()
+            .position(|pattern| matches!(pattern, PatternPredicateKind::Unsupported))
+        {
+            TupleLength::Variable(starred_index, kind.patterns.len() - (starred_index + 1))
+        } else {
+            TupleLength::Fixed(kind.patterns.len())
+        };
+        let mut unpacker = TupleUnpacker::new(self.db, target_len);
+        let subject_ty =
+            self.intersect_types(subject_ty, self.necessary_sequence_pattern_type(kind));
+        let subject_elements = match subject_ty {
+            Type::Union(union) => union.elements(self.db),
+            _ => std::slice::from_ref(&subject_ty),
+        };
+
+        let mut matched = false;
+        for subject_ty in subject_elements.iter().copied() {
+            let tuple = subject_ty.try_iterate(self.db).unwrap_or_else(|error| {
+                Cow::Owned(Tuple::homogeneous(error.fallback_element_type(self.db)))
+            });
+            if unpacker.unpack_tuple(tuple.as_ref()).is_ok() {
+                matched = true;
+            }
+        }
+
+        if matched {
+            unpacker.into_types().collect()
+        } else {
+            kind.patterns
+                .iter()
+                .map(|pattern| self.necessary_match_pattern_type(pattern))
+                .collect()
+        }
+    }
+
+    fn intersect_types(&self, left: Type<'db>, right: Type<'db>) -> Type<'db> {
+        IntersectionBuilder::new(self.db)
+            .add_positive(left)
+            .add_positive(right)
+            .build()
     }
 
     fn places(&self) -> &'db PlaceTable {
