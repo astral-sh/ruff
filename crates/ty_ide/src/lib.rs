@@ -343,8 +343,7 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 
 /// Get the cache-relative path where vendored paths should be written to.
 pub fn relative_cached_vendored_root() -> SystemPathBuf {
-    // The vendored files are uniquely identified by the source commit.
-    SystemPathBuf::from(format!("vendored/typeshed/{}", ty_vendored::SOURCE_COMMIT))
+    SystemPathBuf::from(format!("vendored/typeshed/{}", ty_vendored::cache_key()))
 }
 
 /// Get the cached version of a vendored path in the cache, ensuring the file is written to disk.
@@ -413,12 +412,25 @@ mod tests {
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
 
+    use crate::relative_cached_vendored_root;
+
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
     /// Use cases that require multiple files with a `<CURSOR>` marker
     /// in a file other than `main.py` can use `CursorTest::builder()`.
     pub(super) fn cursor_test(source: &str) -> CursorTest {
         CursorTest::builder().source("main.py", source).build()
+    }
+
+    #[test]
+    fn cached_vendored_root_includes_content_hash() {
+        let cache_root = relative_cached_vendored_root();
+
+        assert_eq!(
+            cache_root.as_str(),
+            format!("vendored/typeshed/{}", ty_vendored::cache_key())
+        );
+        assert_eq!(ty_vendored::cache_key().len(), 16);
     }
 
     pub(super) struct CursorTest {
