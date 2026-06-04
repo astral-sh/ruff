@@ -1539,16 +1539,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                 };
 
-            let is_positive_key_membership = is_positive == (ops[0] == ast::CmpOp::In);
-            if is_positive_key_membership {
+            if is_positive == (ops[0] == ast::CmpOp::In) {
                 let narrowed = self.narrow_with_present_key(rhs_type, key);
                 if narrowed != rhs_type.resolve_type_alias(self.db) {
                     apply_constraint(&mut constraints, NarrowingConstraint::replacement(narrowed));
                 }
-            }
-
-            let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
-            if is_negative_check {
+            } else {
                 let requires_key = |td: TypedDictType<'db>| -> bool {
                     td.items(self.db)
                         .get(key)
@@ -2159,13 +2155,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         };
 
         match ty.resolve_type_alias(self.db) {
-            Type::Union(union) => UnionType::from_elements(
-                self.db,
-                union
-                    .elements(self.db)
-                    .iter()
-                    .map(|element| self.narrow_with_present_key(*element, key)),
-            ),
+            Type::Union(union) => union.map(self.db, |element| {
+                self.narrow_with_present_key(*element, key)
+            }),
             resolved if typeddict_declares_key(self.db, resolved, key) => resolved,
             resolved if is_or_contains_typeddict(self.db, resolved) => constrain(
                 ty,
