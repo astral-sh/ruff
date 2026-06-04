@@ -4915,6 +4915,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "test-case",
+ "thin-vec",
  "thiserror 2.0.19",
  "tracing",
  "ty_module_resolver",
