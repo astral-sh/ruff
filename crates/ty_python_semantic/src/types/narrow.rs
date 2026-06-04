@@ -462,7 +462,7 @@ impl<'db> PresentKeyConstraint<'db> {
         }
 
         if key_membership_implies_subscript(db, self.source) {
-            Some(mapping_key_getitem_protocol(db, self.key.value(db)))
+            Some(mapping_present_key_protocol(db, self.key.value(db)))
         } else {
             Some(key_membership_contains_protocol(db, self.key.value(db)))
         }
@@ -2858,7 +2858,7 @@ fn narrow_with_present_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> Ty
             Type::TypedDict(required_typeddict_key(db, key, Type::object())),
         ),
         resolved if is_mapping_subtype(db, resolved) => {
-            constrain(ty, mapping_key_getitem_protocol(db, key))
+            constrain(ty, mapping_present_key_protocol(db, key))
         }
         _ => constrain(ty, key_membership_contains_protocol(db, key)),
     }
@@ -2911,11 +2911,12 @@ fn required_typeddict_key<'db>(
     TypedDictType::from_schema_items(db, schema)
 }
 
-/// Return a synthesized protocol that represents safe subscript access for a present key on a
-/// `Mapping` subtype. This assumes that `Mapping` implementations honor the contract between
-/// membership and subscript access.
-fn mapping_key_getitem_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
-    let signature = Signature::new(
+/// Return a synthesized protocol that records a present key on a `Mapping` subtype.
+///
+/// This preserves both the proven membership result and safe subscript access, assuming that
+/// `Mapping` implementations honor the contract between the two operations.
+fn mapping_present_key_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
+    let getitem_signature = Signature::new(
         Parameters::new(
             db,
             [
@@ -2926,10 +2927,30 @@ fn mapping_key_getitem_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
         ),
         Type::object(),
     );
+    let contains_signature = Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self"))),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(Type::string_literal(db, key)),
+            ],
+        ),
+        Type::bool_literal(true),
+    );
 
     Type::protocol_with_methods(
         db,
-        [("__getitem__", CallableType::function_like(db, signature))],
+        [
+            (
+                "__getitem__",
+                CallableType::function_like(db, getitem_signature),
+            ),
+            (
+                "__contains__",
+                CallableType::function_like(db, contains_signature),
+            ),
+        ],
     )
 }
 
