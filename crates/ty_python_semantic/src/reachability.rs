@@ -198,10 +198,10 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, Type, TypeContext,
-        UnionType, definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
+        TypeContext, UnionType, definite_match_pattern_type, enum_metadata, infer_expression_types,
+        infer_narrowing_constraint, infer_narrowing_constraints, infer_same_file_expression_type,
+        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -210,8 +210,10 @@ use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
+    LoopToken, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
+    expression::Expression,
+    get_loop_header,
     place::ScopedPlaceId,
     place_table,
     predicate::{
@@ -1062,15 +1064,23 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
-fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+fn analyze_single<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
+    analyze_single_with(db, predicate, |expression| {
+        infer_same_file_expression_type(db, expression, TypeContext::default())
+    })
+}
+
+fn analyze_single_with<'db>(
+    db: &'db dyn Db,
+    predicate: &Predicate<'db>,
+    mut infer_expression: impl FnMut(Expression<'db>) -> Type<'db>,
+) -> Truthiness {
     match predicate.node {
-        PredicateNode::Expression(test_expr) => {
-            infer_same_file_expression_type(db, test_expr, TypeContext::default())
-                .bool(db)
-                .negate_if(!predicate.is_positive)
-        }
+        PredicateNode::Expression(test_expr) => infer_expression(test_expr)
+            .bool(db)
+            .negate_if(!predicate.is_positive),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
             callable,
             call_expr,
@@ -1083,7 +1093,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             // selection algorithm).
             // Avoiding this on the happy-path is important because these constraints can be
             // very large in number, since we add them on all statement level function calls.
-            let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
+            let ty = infer_expression(callable);
 
             // Short-circuit for well known types that are known not to return `Never` when called.
             // Without the short-circuit, we've seen that threads keep blocking each other
@@ -1121,8 +1131,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             } else if all_overloads_return_never {
                 Truthiness::AlwaysFalse
             } else {
-                let call_expr_ty =
-                    infer_same_file_expression_type(db, call_expr, TypeContext::default());
+                let call_expr_ty = infer_expression(call_expr);
                 if call_expr_ty.is_equivalent_to(db, Type::Never) {
                     Truthiness::AlwaysFalse
                 } else {
@@ -1175,22 +1184,106 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     }
 }
 
-/// Analyze one predicate for exact loop-header reachability.
-///
-/// A scoped predicate is a TDD variable with one stable value. Loop headers often evaluate the
-/// same variable through many reachability roots, so memoizing this query avoids repeating its
-/// type inference while preserving each loop header's independent fixed point.
-#[salsa::tracked(
-    cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
-    heap_size = get_size2::GetSize::get_heap_size
-)]
-fn analyze_loop_header_predicate<'db>(
+#[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct LoopHeaderPredicateTruthinesses {
+    truthinesses: FxHashMap<ScopedPredicateId, Truthiness>,
+}
+
+impl LoopHeaderPredicateTruthinesses {
+    fn get(&self, predicate: ScopedPredicateId) -> Truthiness {
+        self.truthinesses
+            .get(&predicate)
+            .copied()
+            .unwrap_or(Truthiness::Ambiguous)
+    }
+}
+
+fn analyze_loop_header_predicate<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> Truthiness {
+    analyze_single_with(db, predicate, |expression| {
+        infer_expression_types(db, expression, TypeContext::default())
+            .expression_type(expression.node_ref(db))
+    })
+}
+
+/// Return whether exact reachability for one loop header would require too much work.
+#[salsa::tracked]
+pub(crate) fn loop_header_reachability_exceeds_budget<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    predicate: ScopedPredicateId,
-) -> Truthiness {
+    loop_token: LoopToken<'db>,
+) -> bool {
+    const MAX_EXACT_LOOP_HEADER_BINDINGS: usize = 128;
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
+
     let use_def = use_def_map(db, scope);
-    analyze_single(db, &use_def.predicates()[predicate])
+    let constraints = use_def.reachability_constraints();
+    let loop_header = get_loop_header(db, loop_token);
+    let mut pending: Vec<_> = loop_header
+        .bindings()
+        .map(|binding| binding.reachability_constraint())
+        .collect();
+    if pending.len() > MAX_EXACT_LOOP_HEADER_BINDINGS {
+        return true;
+    }
+
+    // Predicate truthiness is shared across all roots for this loop token, so count each reachable
+    // TDD node once across the entire loop header.
+    let mut visited = FxHashSet::default();
+    while let Some(id) = pending.pop() {
+        if id.is_terminal() || !visited.insert(id) {
+            continue;
+        }
+        if visited.len() > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES {
+            return true;
+        }
+
+        let node = constraints.get_interior_node(id);
+        pending.push(node.if_true());
+        pending.push(node.if_ambiguous());
+        pending.push(node.if_false());
+    }
+
+    false
+}
+
+/// Analyze all predicates used by one loop header for exact reachability.
+///
+/// Loop headers often evaluate the same predicates through many reachability roots. Grouping those
+/// predicates into one query avoids repeating fixed-point work while keeping separate loops
+/// independent.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial = |_, _, _, _| LoopHeaderPredicateTruthinesses::default(),
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn loop_header_predicate_truthinesses<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    loop_token: LoopToken<'db>,
+) -> LoopHeaderPredicateTruthinesses {
+    if loop_header_reachability_exceeds_budget(db, scope, loop_token) {
+        return LoopHeaderPredicateTruthinesses::default();
+    }
+
+    let use_def = use_def_map(db, scope);
+    let constraints = use_def.reachability_constraints();
+    let loop_header = get_loop_header(db, loop_token);
+    let mut truthinesses = FxHashMap::default();
+
+    for binding in loop_header.bindings() {
+        evaluate_constraint(
+            constraints,
+            binding.reachability_constraint(),
+            |predicate| {
+                *truthinesses.entry(predicate).or_insert_with(|| {
+                    analyze_loop_header_predicate(db, &use_def.predicates()[predicate])
+                })
+            },
+        );
+    }
+
+    truthinesses.shrink_to_fit();
+    LoopHeaderPredicateTruthinesses { truthinesses }
 }
 
 /// Check whether a diagnostic emitted at `range` is in reachable code, considering both
@@ -1244,13 +1337,15 @@ pub(crate) fn evaluate_reachability(
 pub(crate) fn evaluate_loop_header_reachability<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
+    loop_token: LoopToken<'db>,
     reachability: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     let use_def = use_def_map(db, scope);
+    let truthinesses = loop_header_predicate_truthinesses(db, scope, loop_token);
     evaluate_constraint(
         use_def.reachability_constraints(),
         reachability,
-        |predicate| analyze_loop_header_predicate(db, scope, predicate),
+        |predicate| truthinesses.get(predicate),
     )
 }
 

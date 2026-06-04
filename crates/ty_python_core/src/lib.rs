@@ -161,6 +161,10 @@ impl LoopHeader {
             .into_iter()
             .flatten()
     }
+
+    pub fn bindings(&self) -> impl Iterator<Item = LiveBinding> + '_ {
+        self.bindings.values().flatten().copied()
+    }
 }
 
 /// A Salsa token for retrieving a `LoopHeader`. See `get_loop_header` below.
