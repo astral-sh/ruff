@@ -755,7 +755,7 @@ impl<'db> PresentKeyConstraint<'db> {
         replacement: Type<'db>,
     ) -> Type<'db> {
         let narrowed = narrow_with_present_key(db, env, self.source, self.key.value(db));
-        if narrowed == self.source || narrowed == self.source.resolve_type_alias(db) {
+        if key_is_always_present(db, env, self.source, self.key) {
             return replacement;
         }
         if narrowed.is_never() {
