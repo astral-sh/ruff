@@ -491,7 +491,7 @@ fn normalize_comment<'a>(
     // Fast path for correctly formatted comments: if the comment starts with a space, or any
     // of the allowed characters, then it's included verbatim (apart for trimming any trailing
     // whitespace).
-    if content.starts_with([' ', '!', ':', '#', '\'']) {
+    if content.starts_with([' ', '!', ':', '#', '\'', '|']) {
         return Ok(Cow::Borrowed(trimmed));
     }
 
