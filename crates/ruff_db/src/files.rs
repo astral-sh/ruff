@@ -144,7 +144,7 @@ impl Files {
                 let file = File::builder(FilePath::Vendored(path.to_path_buf()))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
-                    .durability(Durability::HIGH)
+                    .durability(Durability::NEVER_CHANGE)
                     .new(db);
 
                 entry.insert(file);
