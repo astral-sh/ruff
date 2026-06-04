@@ -1543,12 +1543,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn dataclass_field_default_argument(call: &ast::ExprCall) -> Option<&ast::Expr> {
-        call.arguments.keywords.iter().find_map(|keyword| {
-            keyword.arg.as_ref().and_then(|name| {
-                matches!(name.as_str(), "default" | "default_factory" | "factory")
-                    .then_some(&keyword.value)
+        call.arguments
+            .keywords
+            .iter()
+            .find_map(|keyword| {
+                keyword.arg.as_ref().and_then(|name| {
+                    matches!(name.as_str(), "default" | "default_factory" | "factory")
+                        .then_some(&keyword.value)
+                })
             })
-        })
+            .or_else(|| {
+                call.arguments
+                    .args
+                    .first()
+                    .filter(|argument| !argument.is_starred_expr())
+            })
     }
 
     fn report_invalid_dataclass_field_assignment<T: Ranged>(
@@ -1613,6 +1622,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
+        let default_expr = Self::dataclass_field_default_argument(call);
+        // Some dataclass-transform libraries use `...` as a required-field sentinel.
+        if default_expr.is_some_and(ast::Expr::is_ellipsis_literal_expr) {
+            return;
+        }
+
         let default_target_ty = field
             .converter(self.db())
             .map(|(converter_input_ty, _)| converter_input_ty)
@@ -1622,7 +1637,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        if let Some(default_expr) = Self::dataclass_field_default_argument(call) {
+        if let Some(default_expr) = default_expr {
             if self
                 .context
                 .has_diagnostic_with_primary_range(&INVALID_ARGUMENT_TYPE, default_expr.range())

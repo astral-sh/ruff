@@ -19,7 +19,7 @@ class User:
     id: int
     role: str = strawberry.field(default="user")
 
-reveal_type(User.__init__)  # revealed: (self: User, *, id: int, role: str = ...) -> None
+reveal_type(User.__init__)  # revealed: (self: User, *, id: int, role: str = "user") -> None
 
 user = User(id=1)
 reveal_type(user.id)  # revealed: int
