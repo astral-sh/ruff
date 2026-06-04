@@ -46,11 +46,26 @@ pub(super) fn synthesize_typed_dict_method<'db>(
         "update" => Some(synthesize_typed_dict_update(db, typed_dict, fields())),
         "pop" => Some(synthesize_typed_dict_pop(db, typed_dict, fields())),
         "setdefault" => Some(synthesize_typed_dict_setdefault(db, typed_dict, fields())),
-        "clear" | "popitem" if typed_dict.supports_arbitrary_key_deletion(db) => Some(
-            synthesize_typed_dict_arbitrary_deletion_method(db, typed_dict, method_name),
+        "clear" if typed_dict.supports_arbitrary_key_deletion(db) => Some(
+            synthesize_typed_dict_no_argument_method(db, typed_dict, Type::none(db)),
         ),
-        "items" | "keys" | "values" if typed_dict.explicit_extra_items(db).is_some() => Some(
-            synthesize_typed_dict_view_method(db, typed_dict, method_name),
+        "popitem" if typed_dict.supports_arbitrary_key_deletion(db) => {
+            let return_ty = Type::heterogeneous_tuple(
+                db,
+                [KnownClass::Str.to_instance(db), typed_dict.value_type(db)],
+            );
+            Some(synthesize_typed_dict_no_argument_method(
+                db, typed_dict, return_ty,
+            ))
+        }
+        "items" if typed_dict.explicit_extra_items(db).is_some() => Some(
+            synthesize_typed_dict_view_method(db, typed_dict, "dict_items"),
+        ),
+        "keys" if typed_dict.explicit_extra_items(db).is_some() => Some(
+            synthesize_typed_dict_view_method(db, typed_dict, "dict_keys"),
+        ),
+        "values" if typed_dict.explicit_extra_items(db).is_some() => Some(
+            synthesize_typed_dict_view_method(db, typed_dict, "dict_values"),
         ),
         "__or__" | "__ror__" | "__ior__" => {
             Some(synthesize_typed_dict_merge(db, instance_ty, method_name))
@@ -623,20 +638,11 @@ fn synthesize_typed_dict_setdefault<'db>(
     ))
 }
 
-/// Synthesize `clear` or `popitem` when every possible key can be deleted.
-fn synthesize_typed_dict_arbitrary_deletion_method<'db>(
+fn synthesize_typed_dict_no_argument_method<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
-    name: &str,
+    return_ty: Type<'db>,
 ) -> Type<'db> {
-    let return_ty = match name {
-        "clear" => Type::none(db),
-        "popitem" => Type::heterogeneous_tuple(
-            db,
-            [KnownClass::Str.to_instance(db), typed_dict.value_type(db)],
-        ),
-        _ => return Type::unknown(),
-    };
     Type::function_like_callable(
         db,
         Signature::new(
@@ -654,15 +660,8 @@ fn synthesize_typed_dict_arbitrary_deletion_method<'db>(
 fn synthesize_typed_dict_view_method<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
-    name: &str,
+    view_name: &str,
 ) -> Type<'db> {
-    let instance_ty = Type::TypedDict(typed_dict);
-    let view_name = match name {
-        "items" => "dict_items",
-        "keys" => "dict_keys",
-        "values" => "dict_values",
-        _ => return Type::unknown(),
-    };
     let return_ty = known_module_symbol(db, KnownModule::CollectionsAbcInternal, view_name)
         .place
         .ignore_possibly_undefined()
@@ -678,17 +677,7 @@ fn synthesize_typed_dict_view_method<'db>(
         .and_then(|class| Type::from(class).to_instance(db))
         .unwrap_or_else(Type::unknown);
 
-    Type::function_like_callable(
-        db,
-        Signature::new(
-            Parameters::new(
-                db,
-                [Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty)],
-            ),
-            return_ty,
-        ),
-    )
+    synthesize_typed_dict_no_argument_method(db, typed_dict, return_ty)
 }
 
 /// Synthesize a merge operator (`__or__`, `__ror__`, or `__ior__`) for a `TypedDict`.

@@ -6056,7 +6056,7 @@ def _(
     mutable.update(strings)  # error: [invalid-argument-type]
     mutable_extra_only.update(open_patch)  # error: [invalid-argument-type]
 
-    # The extra-items tail may contain the target's declared `name` key with an incompatible type.
+    # The source's extra items may contain the target's declared `name` key with an incompatible type.
     open_with_name.update(mutable_extra_only)  # error: [invalid-argument-type]
 
     read_only.update(year=1982)  # error: [unknown-argument]
@@ -6140,17 +6140,16 @@ def _(
     # An arbitrary mapping key may collide with the target's declared `label` item.
     OptionalTarget(**int_mapping)  # error: [invalid-argument-type]
 
-    # The extra-items tail may contain the target's optional `label` key with an incompatible type.
+    # The source's extra items may contain the target's optional `label` key with an incompatible type.
     OptionalTarget(**extra_only)  # error: [invalid-argument-type]
     optional: OptionalTarget = {**extra_only}  # error: [invalid-argument-type]
 
-    # A later value for `label` shadows the potentially incompatible value from the extra-items
-    # tail.
+    # A later value for `label` shadows the potentially incompatible extra-item value.
     OptionalTarget(**{**extra_only, "label": "ok"})
     shadowed: OptionalTarget = {**extra_only, "label": "ok"}
     OptionalTarget(extra_only, label="ok")
 
-    # In the reverse order, the extra-items tail may overwrite `label`.
+    # In the reverse order, the source's extra items may overwrite `label`.
     OptionalTarget(**{"label": "ok", **extra_only})  # error: [invalid-argument-type]
 ```
 

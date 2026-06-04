@@ -4736,41 +4736,19 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         openness: TypedDictOpenness<'db>,
     ) {
-        let Some(extra_items) = openness.effective_extra_items() else {
-            return;
+        let (extra_items_ty, has_explicit_extra_items) = match openness {
+            TypedDictOpenness::Open => (Type::object(), false),
+            TypedDictOpenness::Closed => return,
+            TypedDictOpenness::Extra(extra_items) => (extra_items.declared_ty, true),
         };
-        let extra_items_ty = extra_items.declared_ty;
-        let has_explicit_extra_items = openness.explicit_extra_items().is_some();
-        let mut has_keyword_variadic = false;
 
-        for (parameter_index, parameter) in self.parameters.iter().enumerate() {
-            if self.parameter_info[parameter_index].matched && !parameter.is_keyword_variadic() {
-                continue;
-            }
-            if matches!(
-                parameter.kind(),
-                ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. }
-            ) {
-                continue;
-            }
-
-            if parameter.is_keyword_variadic() {
-                has_keyword_variadic = true;
-                self.assign_argument(
-                    argument_index,
-                    Argument::Keywords,
-                    Some(extra_items_ty),
-                    if openness.is_open() {
-                        InvalidArgumentTypeProvenance::OpenTypedDictExtraItems
-                    } else {
-                        InvalidArgumentTypeProvenance::Argument
-                    },
-                    parameter_index,
-                    parameter,
-                    false,
-                    true,
-                );
-            } else if has_explicit_extra_items {
+        if has_explicit_extra_items {
+            for (parameter_index, parameter) in self.parameters.iter().enumerate() {
+                if self.parameter_info[parameter_index].matched
+                    || parameter.keyword_name().is_none()
+                {
+                    continue;
+                }
                 let matched_argument = &mut self.argument_matches[argument_index];
                 matched_argument.parameters.push(MatchedParameter {
                     index: parameter_index,
@@ -4780,7 +4758,22 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             }
         }
 
-        if has_explicit_extra_items && !has_keyword_variadic {
+        if let Some((parameter_index, parameter)) = self.parameters.keyword_variadic() {
+            self.assign_argument(
+                argument_index,
+                Argument::Keywords,
+                Some(extra_items_ty),
+                if openness.is_open() {
+                    InvalidArgumentTypeProvenance::OpenTypedDictExtraItems
+                } else {
+                    InvalidArgumentTypeProvenance::Argument
+                },
+                parameter_index,
+                parameter,
+                false,
+                true,
+            );
+        } else if has_explicit_extra_items {
             self.errors
                 .push(BindingError::UnknownKeywordVariadicArgument {
                     argument_index: self.get_argument_index(argument_index),
