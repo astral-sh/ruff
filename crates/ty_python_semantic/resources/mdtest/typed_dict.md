@@ -5131,6 +5131,14 @@ def no_op_membership_and_typeguard(value: Foo):
     if guard_object(value) and has_foo:
         reveal_type(value)  # revealed: object
 
+def guard_bar(value: object) -> TypeGuard[Bar]:
+    return True
+
+def membership_applies_to_typeguard_replacement(value: Foo | Literal["abc"]):
+    has_z = "z" in value
+    if guard_bar(value) and has_z:
+        reveal_type(value["z"])  # revealed: object
+
 def is_mapping(
     value: Foo | Mapping[Literal["a", "b"], int],
 ) -> TypeIs[Mapping[Literal["a", "b"], int]]:
