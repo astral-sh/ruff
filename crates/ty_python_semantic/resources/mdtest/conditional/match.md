@@ -313,7 +313,7 @@ def _(target: Point):
         case Point(x, y):  # irrefutable sub-patterns
             pass
         case _:
-            assert_never(target)
+            assert_never(target)  # error: [type-assertion-failure]
 
 def _(target: Point | Other):
     match target:

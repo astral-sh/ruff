@@ -306,7 +306,7 @@ def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
 
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:
-        case int(value):
+        case int():
             return value
         case (left, right):
             return left + right
@@ -366,6 +366,25 @@ def test_match_fixed_class_sequence_is_exhaustive(value: tuple[int]) -> int:
     match value:
         case [int()]:
             return 1
+
+class ClassWithoutX: ...
+
+def test_match_class_attribute_sequence_is_not_exhaustive(
+    value: tuple[ClassWithoutX],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [ClassWithoutX(x=_)]:
+            return 1
+
+def test_match_class_attribute_sequence_fallback(
+    value: tuple[ClassWithoutX],
+) -> None:
+    match value:
+        case [ClassWithoutX(x=_)]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: tuple[ClassWithoutX]
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
     match value:

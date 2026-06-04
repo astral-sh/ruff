@@ -1942,16 +1942,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // irrefutability by analyzing the class's attributes and `__match_args__`.
                 PatternPredicateKind::Class(
                     cls,
-                    if pattern
-                        .arguments
-                        .patterns
-                        .iter()
-                        .all(ast::Pattern::is_irrefutable)
-                        && pattern
-                            .arguments
-                            .keywords
-                            .iter()
-                            .all(|kw| kw.pattern.is_irrefutable())
+                    if pattern.arguments.patterns.is_empty()
+                        && pattern.arguments.keywords.is_empty()
                     {
                         ClassPatternKind::Irrefutable
                     } else {
