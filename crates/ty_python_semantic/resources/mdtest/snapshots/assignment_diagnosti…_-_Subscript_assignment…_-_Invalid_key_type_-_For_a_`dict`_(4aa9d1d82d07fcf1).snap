@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -23,7 +23,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 error[invalid-assignment]: Invalid subscript assignment with key of type `Literal[0]` and value of type `Literal[3]` on object of type `dict[str, int]`
  --> src/mdtest_snippet.py:2:1
   |
-1 | config: dict[str, int] = {}
 2 | config[0] = 3  # error: [invalid-assignment]
   | ^^^^^^^-^^^^^
   |        |

@@ -92,8 +92,11 @@ CustomerModel(id=1, name="Test")
 
 ### Decorating a metaclass
 
+If the metaclass of a class `A` is decorated with `@dataclass_transform`, `A` will have
+dataclass-like semantics.
+
 ```py
-from typing_extensions import dataclass_transform
+from typing_extensions import Any, dataclass_transform
 
 @dataclass_transform()
 class ModelMeta(type): ...
@@ -108,6 +111,45 @@ CustomerModel(id=1, name="Test")
 
 # error: [missing-argument]
 CustomerModel()
+```
+
+This is also true if the metaclass is a subclass of a class decorated with `@dataclass_transform`:
+
+```py
+@dataclass_transform()
+class ModelMeta(type): ...
+
+class RegistryMeta(ModelMeta): ...
+class ModelBase(metaclass=RegistryMeta): ...
+
+class Person(ModelBase):
+    name: str
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str) -> None
+
+Person("Alice")
+Person(name="Alice")
+
+# error: [missing-argument]
+Person()
+
+# error: [unknown-argument]
+Person(name="Alice", extra=1)
+```
+
+But when a subclass of `type` is decorated with `@dataclass_transform`, we do not consider its
+subclasses to themselves be dataclasses; this would break the above case. If `RegistryMeta` were
+given dataclass semantics itself, it would no longer be usable as a metaclass, since its `__init__`
+would be overridden with a dataclass-style `__init__` method, instead of the `type.__init__`
+signature.
+
+This is an unclear area in the typing spec, which should be clarified. Pyright does the opposite
+(treats `RegistryMeta` as a dataclass, but does not treat `Person` as a dataclass), but that seems
+less useful in practice, and Pydantic relies on the behavior we implement.
+
+```py
+# revealed: Overload[(self, o: object, /) -> None, (self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None]
+reveal_type(RegistryMeta.__init__)
 ```
 
 ### Decorating a base class
@@ -1033,36 +1075,6 @@ Person("Alice", 30, [], "some notes", email="alice@example.com")
 Person("Bob", email="bob@example.com", notes="other notes")
 ```
 
-#### Inherited metaclass-based transformer
-
-```py
-from typing import Any, dataclass_transform
-
-def field(*, default: Any = ...) -> Any: ...
-
-@dataclass_transform(field_specifiers=(field,))
-class ModelMeta(type): ...
-
-class RegistryMeta(ModelMeta): ...
-class ModelBase(metaclass=RegistryMeta): ...
-
-class Person(ModelBase):
-    name: str
-    age: int = field(default=0)
-
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int = ...) -> None
-
-Person("Alice")
-Person("Alice", 30)
-Person(name="Alice", age=30)
-
-# error: [missing-argument]
-Person(age=30)
-
-# error: [unknown-argument]
-Person(name="Alice", extra=1)
-```
-
 #### Base-class-based transformer
 
 ```py
@@ -1198,10 +1210,6 @@ class ConverterClass:
 class Model(ModelBase):
     field3: ConverterClass = model_field(converter=ConverterClass)
     field4: int = model_field(converter=overloaded_converter)
-    # TODO: This should be accepted once overloaded class callables with richer signatures are
-    # modeled in callable assignability.
-    # error: [invalid-assignment]
-    # error: [invalid-argument-type]
     field5: dict[str, str] = model_field(converter=dict, default=())
 ```
 
@@ -1733,6 +1741,36 @@ Model(x=1)
 reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
 ```
 
+### Decorator return types are still metadata-only in decorator position
+
+When a `@dataclass_transform()`-decorated function is used as a class decorator, we currently use it
+to shape the class like a dataclass but do not yet let an explicit non-class return annotation
+replace the public class binding.
+
+```py
+from typing import Protocol, TypeVar
+from typing_extensions import dataclass_transform
+
+class Wrapped(Protocol):
+    def f(self) -> int: ...
+
+T = TypeVar("T", bound=object)
+
+@dataclass_transform()
+def model(cls: type[T]) -> Wrapped:
+    raise NotImplementedError
+
+@model
+class C:
+    x: int
+
+reveal_type(C)  # revealed: <class 'C'>
+reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+
+# TODO: Decide whether the explicit `Wrapped` return type should replace the public binding here.
+C.f()  # error: [unresolved-attribute]
+```
+
 ## `__dataclass_transform__` compatibility
 
 For backwards compatibility with pre-3.11 Python, ty recognizes any function named
@@ -1963,14 +2001,15 @@ class WithGenericClassConverter:
     a: list[str] = field(converter=list)
     b: tuple[int, int] = field(converter=duplicate)
 
-# TODO: The input types should ideally be `a: Iterable[str]` and `b: int` here
-# revealed: (self: WithGenericClassConverter, a: Iterable[Unknown], b: Unknown) -> None
+# TODO: The input type for `b` should ideally be `int` here
+# revealed: (self: WithGenericClassConverter, a: Iterable[str], b: Unknown) -> None
 reveal_type(WithGenericClassConverter.__init__)
 
 WithGenericClassConverter(("a", "b", "c"), 1)
 
-# TODO: these should ideally be errors
+# error: [invalid-argument-type]
 WithGenericClassConverter((1, 2, 3), 1)
+# TODO: this should ideally be an error
 WithGenericClassConverter(("a", "b", "c"), "foo")
 ```
 

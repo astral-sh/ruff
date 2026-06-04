@@ -85,6 +85,21 @@ C.declared_and_bound = "overwritten on class"
 c_instance.declared_and_bound = 1
 ```
 
+Assignments to ordinary annotated instance attributes should remain valid even when the annotation
+is `Never`/`NoReturn`; they should not be mistaken for non-returning descriptors.
+
+```py
+from typing import NoReturn
+
+class ClassA:
+    x: NoReturn
+    y: list[NoReturn]
+
+    def __init__(self, x: NoReturn, y: list[NoReturn]) -> None:
+        self.x = x
+        self.y = y
+```
+
 #### Variable declared in class body and not bound anywhere
 
 If a variable is declared in the class body but not bound anywhere, we consider it to be accessible
@@ -540,6 +555,8 @@ reveal_type(C().declared_and_bound)  # revealed: str | None
 class C:
     def __init__(self) -> None:
         this = self
+        # error: [invalid-type-form]
+        # error: [unresolved-attribute]
         this.declared_and_bound: str | None = "a"
 
 # This would ideally be `str | None`, but mypy/pyright don't support this either,
@@ -1016,6 +1033,183 @@ class C1(metaclass=Meta1): ...
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
 ```
 
+Assignments in instance methods of a metaclass are also attributes on its class-object instances. In
+particular, a metaclass `__init__` assignment happens after the initial class namespace has been
+converted into a class object, so it shadows an attribute from that namespace:
+
+```py
+class InitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: int = 1
+
+class CCreated(metaclass=InitializingMeta): ...
+
+reveal_type(CCreated.attr)  # revealed: int
+
+class CInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment] "Object of type `Literal["initial class value"]` is not assignable to attribute `attr` of type `int`"
+    attr = "initial class value"
+
+reveal_type(CInitialized.attr)  # revealed: int
+CInitialized.attr = 2
+# error: [invalid-assignment] "Object of type `Literal["invalid"]` is not assignable to attribute `attr` of type `int`"
+CInitialized.attr = "invalid"
+
+class LiteralInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: Literal[1] = 1
+
+class CAugmentedInitialized(metaclass=LiteralInitializingMeta):
+    attr = 1
+    attr += 1  # error: [invalid-assignment]
+
+class CLoopInitialized(metaclass=LiteralInitializingMeta):
+    for attr in ("invalid",):  # error: [invalid-assignment]
+        pass
+
+class CNamedInitialized(metaclass=LiteralInitializingMeta):
+    if attr := "invalid":  # error: [invalid-assignment]
+        pass
+
+class InvalidContextManager:
+    def __enter__(self) -> str:
+        return "invalid"
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        pass
+
+class CWithInitialized(metaclass=LiteralInitializingMeta):
+    with InvalidContextManager() as attr:  # error: [invalid-assignment]
+        pass
+
+class CAnnotatedInitialized(metaclass=InitializingMeta):
+    attr: str = "invalid"  # error: [invalid-assignment]
+
+class CMethodInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment]
+    def attr(self) -> None:
+        pass
+
+class CNestedClassInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment]
+    class attr:
+        pass
+
+class CImportInitialized(metaclass=InitializingMeta):
+    import sys as attr  # error: [invalid-assignment]
+
+# Exception-handler targets are removed from the namespace on leaving the handler.
+class CExceptionBindingCleared(metaclass=InitializingMeta):
+    try:
+        raise RuntimeError
+    except RuntimeError as attr:
+        pass
+
+class BroadInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        value: object = object()
+        cls.attr = value
+
+class CDeclared(metaclass=BroadInitializingMeta):
+    attr: str  # error: [invalid-assignment]
+
+# A class-body declaration is a contract for an attribute populated by metaclass initialization.
+reveal_type(CDeclared.attr)  # revealed: str
+
+class DeclaredBroadInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: object = object()
+
+class CDeclaredAgainstDeclaredMeta(metaclass=DeclaredBroadInitializingMeta):
+    attr: str  # error: [invalid-assignment]
+
+reveal_type(CDeclaredAgainstDeclaredMeta.attr)  # revealed: str
+
+from collections.abc import Callable
+from typing import ClassVar
+
+class DeclaredCallableMeta(type):
+    factory: Callable[[str], str]
+
+def identity(value: str) -> str:
+    return value
+
+class CStoredDescriptor(metaclass=DeclaredCallableMeta):
+    # A metaclass declaration constrains access without replacing this stored descriptor.
+    factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
+
+class CIncompatibleStoredValue(metaclass=DeclaredCallableMeta):
+    factory: ClassVar[int] = 1  # error: [invalid-assignment]
+
+class CIncompatibleInferredValue(metaclass=DeclaredCallableMeta):
+    factory = 1  # error: [invalid-assignment]
+
+class CIncompatibleDeclaredAccess(metaclass=DeclaredCallableMeta):
+    # TODO: This should be an `invalid-assignment` error, analogous to an incompatible
+    # mutable attribute redeclaration on a subclass.
+    factory: ClassVar[int]
+
+class MethodDeclaredCallableMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory: Callable[[str], str]
+
+class CStoredDescriptorAgainstMethodDeclaration(metaclass=MethodDeclaredCallableMeta):
+    factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
+
+class CompatibleInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: int | str = 1
+
+def _(flag: bool):
+    class CConditionallyDeclared(metaclass=CompatibleInitializingMeta):
+        if flag:
+            attr: str = "class value"  # error: [invalid-assignment]
+
+    # On paths without the class-body value, the metaclass-populated value remains available.
+    reveal_type(CConditionallyDeclared.attr)  # revealed: int | str
+
+class ReplacingMethodsMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory = lambda: object()
+        cls.arguments = lambda: ()
+
+class MethodsReplacedAtConstruction(metaclass=ReplacingMethodsMeta):
+    def factory(self, value: int) -> str:
+        return ""
+
+    def arguments(self, value: int) -> str:
+        return ""
+
+class TypedReplacingMethodsMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory: object = object()
+
+class MethodReplacedByTypedMeta(metaclass=TypedReplacingMethodsMeta):
+    def factory(self) -> str:
+        return ""
+
+class PopulatingMetaclass(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.populated_on_meta: int = 1
+
+class PopulatedMeta(type, metaclass=PopulatingMetaclass): ...
+class ConstructedByPopulatedMeta(metaclass=PopulatedMeta): ...
+
+reveal_type(PopulatedMeta.populated_on_meta)  # revealed: int
+reveal_type(ConstructedByPopulatedMeta.populated_on_meta)  # revealed: int
+
+class DerivedInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.inherited_attr: int = 1
+
+class DeclaringBase:
+    inherited_attr: str
+
+class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
+
+reveal_type(InitializedDerived.inherited_attr)  # revealed: int
+```
+
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data
 descriptor. If it is a non-data descriptor or a normal attribute, the class-level attribute is used
 instead (see the [descriptor protocol tests] for data/non-data descriptor attributes):
@@ -1082,19 +1276,25 @@ def _(flag1: bool, flag2: bool):
 
 ## Invalid access to attribute
 
-<!-- snapshot-diagnostics -->
-
 If an undefined variable is used in a method, and an attribute with the same name is defined and
-accessible, then we emit a subdiagnostic suggesting the use of `self.`. (These don't appear inline
-here; see the diagnostic snapshots.)
+accessible, then we emit a subdiagnostic suggesting the use of `self.`.
 
 ```py
 class Foo:
     x: int
 
     def method(self):
-        # error: [unresolved-reference] "Name `x` used when not defined"
-        y = x
+        y = x  # snapshot
+```
+
+```snapshot
+error[unresolved-reference]: Name `x` used when not defined
+ --> src/mdtest_snippet.py:5:13
+  |
+5 |         y = x  # snapshot
+  |             ^
+  |
+info: An attribute `x` is available: consider using `self.x`
 ```
 
 ```py
@@ -1102,8 +1302,17 @@ class Foo:
     x: int = 1
 
     def method(self):
-        # error: [unresolved-reference] "Name `x` used when not defined"
-        y = x
+        y = x  # snapshot
+```
+
+```snapshot
+error[unresolved-reference]: Name `x` used when not defined
+  --> src/mdtest_snippet.py:10:13
+   |
+10 |         y = x  # snapshot
+   |             ^
+   |
+info: An attribute `x` is available: consider using `self.x`
 ```
 
 ```py
@@ -1512,8 +1721,8 @@ def f(x: list[int], y: list[int] | None, z: None):
     z.index
 ```
 
-This is also true of type aliases of unions, and of special-case `NewType`s that have a union as a
-base type:
+This is also true of type aliases of unions, special-case `NewType`s that have a union as a base
+type, and type variables with union upper bounds:
 
 ```toml
 [environment]
@@ -1531,6 +1740,10 @@ def g(x: MaybeList, y: FloatNT):
     x.index
     # error: [unresolved-attribute] "Attribute `hex` is not defined on `int` in union `FloatNT`"
     y.hex
+
+def h[T: list[int] | None](x: T):
+    # error: [unresolved-attribute] "Attribute `append` is not defined on `None` in union `list[int] | None`"
+    x.append
 ```
 
 ## Inherited class attributes
@@ -2575,6 +2788,33 @@ class C:
 reveal_type(C().x)  # revealed: Unknown
 ```
 
+### Non-receiver annotated assignments from nested functions
+
+```py
+class Other:
+    x: str
+
+receiver = Other()
+
+class C:
+    def __init__(self) -> None:
+        def set_shadowed(self: Other, value: str) -> None:
+            # error: [invalid-type-form]
+            self.x: str = value
+
+    @staticmethod
+    def set_static(self: Other) -> None:
+        def nested(value: str) -> None:
+            # error: [invalid-type-form]
+            self.x: str = value
+
+    def set_global(receiver) -> None:
+        def nested(value: str) -> None:
+            global receiver
+            # error: [invalid-type-form]
+            receiver.x: str = value
+```
+
 ### Accessing attributes on `Never`
 
 Arbitrary attributes can be accessed on `Never` without emitting any errors:
@@ -3051,8 +3291,6 @@ reveal_type(F().x)  # revealed: tuple[Divergent, ...]
 
 For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.10"
@@ -3063,17 +3301,44 @@ python-version = "3.10"
 ```py
 import datetime
 
-# error: [unresolved-attribute]
+# snapshot: unresolved-attribute
 reveal_type(datetime.UTC)  # revealed: Unknown
-# error: [unresolved-attribute]
+```
+
+```snapshot
+error[unresolved-attribute]: Module `datetime` has no member `UTC`
+ --> src/main.py:4:13
+  |
+4 | reveal_type(datetime.UTC)  # revealed: Unknown
+  |             ^^^^^^^^^^^^
+  |
+info: The member may be available on other Python versions or platforms
+info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
+```
+
+If an attribute doesn't exist at all, we still give the same error as before:
+
+`wrong.py`:
+
+```py
+import datetime
+
+# snapshot: unresolved-attribute
 reveal_type(datetime.fakenotreal)  # revealed: Unknown
+```
+
+```snapshot
+error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
+ --> src/wrong.py:4:13
+  |
+4 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
+  |             ^^^^^^^^^^^^^^^^^^^^
+  |
 ```
 
 ## Unimported submodule incorrectly accessed as attribute
 
 We give special diagnostics for this common case too:
-
-<!-- snapshot-diagnostics -->
 
 `foo/__init__.py`:
 
@@ -3090,21 +3355,47 @@ We give special diagnostics for this common case too:
 ```py
 ```
 
-`main.py`:
+`foo_importer.py`:
 
 ```py
 import foo
+
+# snapshot: possibly-missing-submodule
+reveal_type(foo.bar)  # revealed: Unknown
+```
+
+```snapshot
+warning[possibly-missing-submodule]: Submodule `bar` might not have been imported
+ --> src/foo_importer.py:4:13
+  |
+4 | reveal_type(foo.bar)  # revealed: Unknown
+  |             ^^^^^^^
+  |
+help: Consider explicitly importing `foo.bar`
+```
+
+`baz_importer.py`:
+
+```py
 import baz
 
-# error: [possibly-missing-submodule]
-reveal_type(foo.bar)  # revealed: Unknown
-# error: [possibly-missing-submodule]
+# snapshot: possibly-missing-submodule
 reveal_type(baz.bar)  # revealed: Unknown
+```
+
+```snapshot
+warning[possibly-missing-submodule]: Submodule `bar` might not have been imported
+ --> src/baz_importer.py:4:13
+  |
+4 | reveal_type(baz.bar)  # revealed: Unknown
+  |             ^^^^^^^
+  |
+help: Consider explicitly importing `baz.bar`
 ```
 
 ## Diagnostic for function attribute accessed on `Callable` type
 
-<!-- snapshot-diagnostics -->
+We show a special help message here that explains that not all callables are functions.
 
 ```toml
 [environment]
@@ -3115,8 +3406,34 @@ python-version = "3.14"
 from typing import Callable
 
 def f(x: Callable):
-    x.__name__  # error: [unresolved-attribute]
-    x.__annotate__  # error: [unresolved-attribute]
+    x.__name__  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__name__`
+ --> src/mdtest_snippet.py:4:5
+  |
+4 |     x.__name__  # snapshot: unresolved-attribute
+  |     ^^^^^^^^^^
+  |
+help: Function objects have a `__name__` attribute, but not all callable objects are functions
+help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
+```
+
+```py
+def g(x: Callable):
+    x.__annotate__  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__annotate__`
+ --> src/mdtest_snippet.py:6:5
+  |
+6 |     x.__annotate__  # snapshot: unresolved-attribute
+  |     ^^^^^^^^^^^^^^
+  |
+help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
+help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```
 
 ## References

@@ -8,20 +8,23 @@ use crate::suppression::{
 };
 use crate::types::check_types;
 pub use db::Db;
-pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
-pub use fixes::suppress_all_diagnostics;
+pub use diagnostic::{
+    add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
+};
+pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, HasDefinition, HasOptionalDefinition, HasType, MemberDefinition, NameKind,
-    SemanticModel,
+    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasOptionalDefinition, HasType,
+    MemberDefinition, NameKind, SemanticModel,
 };
 use std::hash::BuildHasherDefault;
 pub use suppression::{
-    UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all, suppress_single,
+    SuppressFix, UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all,
+    suppress_single,
 };
 use ty_module_resolver::ModuleGlobSet;
 use ty_python_core::definition::docstring_from_body;
@@ -218,3 +221,10 @@ impl IOErrorDiagnostic {
         diag
     }
 }
+
+/// Many type-inference queries union together results from previous iterations to
+/// ensure convergence. However, the first couple iterations are often prone to get
+/// values that will soon converge, but where unioning in the early value causes an
+/// unrecoverable loss of precision. This constant controls how many iterations
+/// are considered likely to produce "tainted" results that should be discarded.
+pub(crate) const TAINTED_CYCLES: u32 = 1;

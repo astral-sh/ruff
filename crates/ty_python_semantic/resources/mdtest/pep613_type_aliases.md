@@ -361,7 +361,7 @@ NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```
 
-## Conditionally imported on Python < 3.10
+## Conditionally imported
 
 ```toml
 [environment]
@@ -370,7 +370,8 @@ python-version = "3.9"
 
 ```py
 try:
-    # error: [unresolved-import]
+    # this fails at runtime, but we don't emit an error for it
+    # because typeshed has removed its <3.10 branches for the stdlib
     from typing import TypeAlias
 except ImportError:
     from typing_extensions import TypeAlias
@@ -472,16 +473,12 @@ BadTypeAlias13: TypeAlias = f"{'int'}"  # error: [invalid-type-form]
 
 # bonus ones from Alex:
 #
-# TODO should be just one error for both of these (we currently validate type-form subscripts
-# twice, once when inferring as a value expression and again when inferring as a
-# type expression in post-inference)
-#
-# error:[invalid-type-form]
 # error:[invalid-type-form]
 BadTypeAlias14: TypeAlias = Literal[3.14]
 # error: [invalid-type-form]
-# error: [invalid-type-form]
 BadTypeAlias15: TypeAlias = Literal[-3.14]
+# error: [unsupported-operator]
+BadTypeAlias16: TypeAlias = list["int" | "str"]
 ```
 
 ## No type qualifiers
@@ -504,11 +501,75 @@ bad7: TypeAlias = ReadOnly[int]  # error: [invalid-type-form]
 bad9: TypeAlias = InitVar[int]  # error: [invalid-type-form]
 bad10: TypeAlias = InitVar  # error: [invalid-type-form]
 
-# TODO: this should cause us to emit an error (`Unpack` is not valid at the
-# top level in this context), but for different reasons to the above cases:
-# `Unpack` is not a type qualifier, and so the error message in our diagnostic
-# shouldn't say that it is.
-differently_bad: TypeAlias = Unpack[tuple[int, ...]]
+differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: `Unpack` is not allowed in type alias values
+  --> src/mdtest_snippet.py:14:30
+   |
+14 | differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+## `Self`
+
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
+
+```py
+from typing_extensions import Annotated, Self, TypeAlias, cast
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Alias: TypeAlias = tuple[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Simplified: TypeAlias = object | Self
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Stringified: TypeAlias = "tuple[Self]"
+
+    Metadata: TypeAlias = Annotated[int, cast(Self, object())]
+```
+
+## Disabled `invalid-type-form` `Self` fallback
+
+Rejected aliases recover as `Unknown` even when the diagnostic is disabled:
+
+```toml
+[rules]
+invalid-type-form = "ignore"
+```
+
+```py
+from typing_extensions import Self, TypeAlias
+
+class C:
+    Inner: TypeAlias = Self
+    Tuple: TypeAlias = tuple[Self]
+    Stringified: TypeAlias = "tuple[Self, int]"
+
+    def takes(self, value: Inner) -> None:
+        reveal_type(value)  # revealed: Unknown
+
+    def takes_tuple(self, value: Tuple) -> None:
+        reveal_type(value)  # revealed: tuple[Unknown]
+
+    def takes_stringified(self, value: Stringified) -> None:
+        reveal_type(value)  # revealed: Unknown
+
+    def invalid_attribute(self) -> Self:
+        self.attribute: TypeAlias = Self
+        return self.attribute  # error: [invalid-return-type]
+
+C().takes(1)
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

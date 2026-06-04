@@ -162,7 +162,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
         let Case { db, .. } = case;
 
         db.apply_changes(
-            vec![ChangeEvent::Changed {
+            &[ChangeEvent::Changed {
                 path: case.file_path.clone(),
                 kind: ChangedKind::FileContent,
             }],
@@ -693,6 +693,195 @@ class E(Enum):
     });
 }
 
+/// Regression benchmark for protocol-to-protocol non-assignability when the target protocol
+/// has one more member than the source protocol.
+///
+/// Without the member-count gate, repeated return-type checks spend time comparing every shared
+/// protocol member before eventually failing on the missing one.
+fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
+    const NUM_MEMBERS: usize = 800;
+    const NUM_FUNCTIONS: usize = 400;
+
+    setup_rayon();
+
+    let mut code = "from typing import Protocol\n\nclass Small(Protocol):\n".to_string();
+    for i in 0..NUM_MEMBERS {
+        writeln!(&mut code, "    member_{i}: int").ok();
+    }
+
+    code.push_str("\nclass Big(Protocol):\n");
+    for i in 0..=NUM_MEMBERS {
+        writeln!(&mut code, "    member_{i}: int").ok();
+    }
+
+    code.push('\n');
+    for i in 0..NUM_FUNCTIONS {
+        writeln!(
+            &mut code,
+            "def check_{i}(value: Small) -> Big:\n    return value\n"
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[many_protocol_members_mismatch]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), NUM_FUNCTIONS);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for large calls to a gradual variadic tail.
+///
+/// Without the gradual-call shortcut, every positional argument type is folded into the same
+/// `*args` parameter type, making the call checker repeatedly grow a large union.
+fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+from typing import Any
+
+def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
+
+accepts_anything(
+    0,
+"
+    .to_string();
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[gradual_vararg_call]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for many precise arguments flowing into one variadic parameter.
+///
+/// The declared type is intentionally non-gradual, so argument checks still run. The important
+/// part is that the call checker should not repeatedly rebuild a growing union for `*args`.
+fn benchmark_vararg_parameter_type_accumulation(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+def accepts_objects(first: int, *args: object) -> None: ...
+
+accepts_objects(
+    0,
+"
+    .to_string();
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[vararg_parameter_type_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for many precise arguments constraining the same type variable.
+///
+/// The parameters are distinct to avoid exercising the `*args` parameter-type accumulator. The
+/// important part is that specialization inference should not repeatedly rebuild a growing union
+/// for `T` as each argument adds another solution.
+fn benchmark_typevar_mapping_large_accumulation(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "def combine[T](\n".to_string();
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, "    p{i}: T,").ok();
+    }
+    code.push_str(") -> T:\n    return p0\n\ncombine(\n");
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[typevar_mapping_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for many small type-variable accumulations.
+///
+/// This guards the common case where each type variable only receives a few constraints. Optimizing
+/// the large-accumulation case should not make these small generic calls slower.
+fn benchmark_typevar_mapping_small_accumulations(criterion: &mut Criterion) {
+    const NUM_CALLS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+def combine[T](first: T, second: T, third: T) -> T:
+    return first
+
+"
+    .to_string();
+
+    for i in 0..NUM_CALLS {
+        writeln!(
+            &mut code,
+            r#"combine(("field_{i}", {i}), ("other_{i}", "{i}"), ("flag_{i}", True))"#
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[typevar_mapping_small_accumulations]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -740,7 +929,7 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
 
     code.push_str("def process(decl: AllDecls) -> None:\n    match decl:\n");
     for i in 0..NUM_MATCH_BRANCHES {
-        writeln!(&mut code, "        case C{i}():\n            pass",).ok();
+        writeln!(&mut code, "        case C{i}():\n            pass").ok();
     }
     code.push_str("        case _:\n            pass\n\n");
 
@@ -811,6 +1000,199 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
     });
 }
 
+const NUM_LITERAL_FALLTHROUGH_ARMS: usize = 40;
+
+fn is_literal_fallthrough_arm(index: usize) -> bool {
+    index.is_multiple_of(8) || index == NUM_LITERAL_FALLTHROUGH_ARMS - 4
+}
+
+fn literal_fallthrough_value(index: usize) -> String {
+    let prefix = if is_literal_fallthrough_arm(index) {
+        'f'
+    } else {
+        'v'
+    };
+    format!("{prefix}{index:02}")
+}
+
+fn literal_fallthrough_prelude(guarded_any: bool) -> String {
+    let imports = if guarded_any {
+        "from typing import Any, Literal, TypeGuard\n\n"
+    } else {
+        "from typing import Literal\n\n"
+    };
+    let mut code = imports.to_string();
+
+    code.push_str("Value = Literal[\n");
+    for index in 0..NUM_LITERAL_FALLTHROUGH_ARMS {
+        writeln!(&mut code, r#"    "{}","#, literal_fallthrough_value(index)).ok();
+    }
+    code.push_str("]\n\n");
+
+    if guarded_any {
+        code.push_str("def keep_value(value: object) -> TypeGuard[Value]:\n    return True\n\n");
+    }
+
+    code
+}
+
+fn literal_match_fallthrough_code(guarded_any: bool) -> String {
+    let parameter_ty = if guarded_any { "Value | Any" } else { "Value" };
+    let mut code = literal_fallthrough_prelude(guarded_any);
+    writeln!(
+        &mut code,
+        "def check_literal_match(value: {parameter_ty}) -> None:\n    match value:"
+    )
+    .ok();
+
+    for index in 0..NUM_LITERAL_FALLTHROUGH_ARMS {
+        let guard = if guarded_any && index == 0 {
+            " if keep_value(value)"
+        } else {
+            ""
+        };
+        writeln!(
+            &mut code,
+            r#"        case "{}"{guard}:"#,
+            literal_fallthrough_value(index),
+        )
+        .ok();
+        code.push_str(if is_literal_fallthrough_arm(index) {
+            "            pass\n"
+        } else {
+            "            return\n"
+        });
+    }
+
+    code.push_str("\n    repr(value)\n");
+    code
+}
+
+fn literal_equality_fallthrough_code() -> String {
+    let mut code = literal_fallthrough_prelude(true);
+    code.push_str("def check_literal_equality(value: Value | Any) -> None:\n");
+
+    for index in 0..NUM_LITERAL_FALLTHROUGH_ARMS {
+        let keyword = if index == 0 { "if" } else { "elif" };
+        write!(
+            &mut code,
+            r#"    {keyword} value == "{}""#,
+            literal_fallthrough_value(index)
+        )
+        .ok();
+        if index == 0 {
+            code.push_str(" and keep_value(value)");
+        }
+        code.push_str(":\n");
+        code.push_str(if is_literal_fallthrough_arm(index) {
+            "        pass\n"
+        } else {
+            "        return\n"
+        });
+    }
+
+    code.push_str("\n    repr(value)\n");
+    code
+}
+
+/// Benchmarks `match` fallthrough over a finite `Literal` subject.
+///
+/// This generates a large version of this Python shape:
+/// ```python
+/// def check(value: Value) -> None:
+///     match value:
+///         case "f00":
+///             pass
+///         case "v01":
+///             return
+///         case "f08":
+///             pass
+///
+///     repr(value)
+/// ```
+///
+/// Some cases return and some continue after the `match`. This measures how long it takes to infer
+/// the type of `value` after many literal match cases when the subject has a finite literal type.
+fn benchmark_literal_match_fallthrough(criterion: &mut Criterion) {
+    benchmark_literal_fallthrough(
+        criterion,
+        "ty_micro[literal_match_fallthrough]",
+        &literal_match_fallthrough_code(false),
+    );
+}
+
+/// Benchmarks guarded `match` fallthrough over a gradual literal subject.
+///
+/// This generates a large version of this Python shape:
+/// ```python
+/// def keep_value(value: object) -> TypeGuard[Value]:
+///     return True
+///
+/// def check(value: Value | Any) -> None:
+///     match value:
+///         case "f00" if keep_value(value):
+///             pass
+///         case "v01":
+///             return
+///         case "f08":
+///             pass
+///
+///     repr(value)
+/// ```
+///
+/// This is the same match shape, but the subject can also be `Any` and the first continuing case
+/// uses a `TypeGuard`. It measures how that guard affects the type of `value` after many match
+/// cases.
+fn benchmark_literal_match_fallthrough_guarded_any(criterion: &mut Criterion) {
+    benchmark_literal_fallthrough(
+        criterion,
+        "ty_micro[literal_match_fallthrough_guarded_any]",
+        &literal_match_fallthrough_code(true),
+    );
+}
+
+/// Benchmarks guarded fallthrough through many equality checks.
+///
+/// This generates a large version of this Python shape:
+/// ```python
+/// def check(value: Value | Any) -> None:
+///     if value == "f00" and keep_value(value):
+///         pass
+///     elif value == "v01":
+///         return
+///     elif value == "f08":
+///         pass
+///
+///     repr(value)
+/// ```
+///
+/// This is the guarded gradual case written with `if`/`elif` equality checks instead of `match`.
+/// Some branches return and some continue after the conditional, so the benchmark measures the
+/// type of `value` after many comparisons.
+fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion) {
+    benchmark_literal_fallthrough(
+        criterion,
+        "ty_micro[literal_equality_fallthrough_guarded_any]",
+        &literal_equality_fallthrough_code(),
+    );
+}
+
+fn benchmark_literal_fallthrough(criterion: &mut Criterion, name: &str, code: &str) {
+    setup_rayon();
+
+    criterion.bench_function(name, |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3120>.
 ///
 /// Sequential (`TypeIs`) narrowing on a large `Literal` union, combined with
@@ -856,6 +1238,53 @@ fn benchmark_pandas_tdd(criterion: &mut Criterion) {
                     "#,
                 )
             },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
+    const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
+
+    setup_rayon();
+
+    // Minimized from the pydantic and hydra-zen ecosystem regressions seen during the
+    // SpecializationBuilder pending-constraint-set migration. Pydantic has several empty dict
+    // literals with a type context equivalent to `dict[Hashable, core_schema.CoreSchema]`
+    // (including `schema.setdefault("metadata", {})` and tagged-union choice tables).
+    // `CoreSchema` is a large union of TypedDict schema types; this local `CoreSchema` alias is
+    // derived from pydantic-core's real `CoreSchema`, but reduced to enough variants to show the
+    // regression quickly. Solving the empty-dict specialization creates one lower-bound constraint
+    // per union element for `_VT@dict`. Combined with `_KT@dict = Hashable`,
+    // PathAssignments/SequentMap traversal derives cross-typevar facts like
+    // `TypedDictSchema <= _VT@dict <= Hashable`. This benchmark tracks the cost until constraint
+    // projection / path-bounds solving can avoid that work.
+    let mut code = "from collections.abc import Hashable\nfrom typing import Literal, NotRequired, TypedDict\n\n"
+        .to_string();
+    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Schema{i}(TypedDict):\n    type: Literal['schema-{i}']\n    ref: NotRequired[str]\n    value_{i}: NotRequired[int]\n"
+        )
+        .ok();
+    }
+    code.push_str("type CoreSchema = ");
+    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Schema{i}").ok();
+    }
+    code.push_str("\n\nchoices: dict[Hashable, CoreSchema] = {}\n");
+
+    criterion.bench_function("ty_micro[pydantic_core_schema_dict]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
             |case| {
                 let Case { db, .. } = case;
                 let result = db.check();
@@ -1027,11 +1456,20 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
+    benchmark_many_protocol_members_mismatch,
+    benchmark_gradual_vararg_call,
+    benchmark_vararg_parameter_type_accumulation,
+    benchmark_typevar_mapping_large_accumulation,
+    benchmark_typevar_mapping_small_accumulations,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
+    benchmark_literal_match_fallthrough,
+    benchmark_literal_match_fallthrough_guarded_any,
+    benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
+    benchmark_pydantic_core_schema_dict,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

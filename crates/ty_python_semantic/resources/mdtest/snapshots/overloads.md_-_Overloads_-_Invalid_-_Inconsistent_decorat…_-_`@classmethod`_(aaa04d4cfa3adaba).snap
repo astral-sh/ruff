@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -15,7 +15,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 ```
  1 | from __future__ import annotations
  2 | 
- 3 | from typing import overload
+ 3 | from typing import Callable, overload
  4 | 
  5 | class CheckClassMethod:
  6 |     def __init__(self, x: int) -> None:
@@ -69,24 +69,42 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 54 |         if isinstance(x, int):
 55 |             return cls(x)
 56 |         return None
+57 | 
+58 | class Base:
+59 |     @overload
+60 |     @classmethod
+61 |     def from_value(cls: type[Base], x: int) -> int: ...
+62 |     @overload
+63 |     @classmethod
+64 |     def from_value(cls: type[Child], x: str) -> str: ...
+65 |     @classmethod
+66 |     def from_value(cls, x: int | str) -> int | str:
+67 |         return x
+68 | 
+69 | class Child(Base): ...
+70 | 
+71 | reveal_type(Base.from_value)  # revealed: bound method <class 'Base'>.from_value(x: int) -> int
+72 | reveal_type(Child.from_value)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+73 | 
+74 | good: Callable[[int], int] = Base.from_value
+75 | # error: [invalid-assignment]
+76 | bad: Callable[[str], str] = Base.from_value
 ```
 
 # Diagnostics
 
 ```
 error[invalid-overload]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
-  --> src/mdtest_snippet.py:13:9
+  --> src/mdtest_snippet.py:12:5
    |
-11 |     def try_from1(cls, x: int) -> CheckClassMethod: ...
 12 |     @overload
+   |     ---------
 13 |     def try_from1(cls, x: str) -> None: ...
    |         --------- Missing here
 14 |     @classmethod
 15 |     # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
 16 |     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
    |         ^^^^^^^^^
-17 |         if isinstance(x, int):
-18 |             return cls(x)
    |
 
 ```
@@ -95,20 +113,15 @@ error[invalid-overload]: Overloaded function `try_from1` does not use the `@clas
 error[invalid-overload]: Overloaded function `try_from2` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:28:9
    |
-26 |     @classmethod
-27 |     # error: [invalid-overload]
 28 |     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
    |         ^^^^^^^^^
-29 |         if isinstance(x, int):
-30 |             return cls(x)
    |
-  ::: src/mdtest_snippet.py:22:9
+  ::: src/mdtest_snippet.py:21:5
    |
 21 |     @overload
+   |     ---------
 22 |     def try_from2(cls, x: int) -> CheckClassMethod: ...
    |         --------- Missing here
-23 |     @overload
-24 |     @classmethod
    |
 
 ```
@@ -117,14 +130,10 @@ error[invalid-overload]: Overloaded function `try_from2` does not use the `@clas
 error[invalid-overload]: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:40:9
    |
-38 |     def try_from3(cls, x: str) -> None: ...
-39 |     # error: [invalid-overload]
 40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
    |         ---------
    |         |
    |         Missing here
-41 |         if isinstance(x, int):
-42 |             # error: [call-non-callable]
    |
 
 ```
@@ -133,11 +142,21 @@ error[invalid-overload]: Overloaded function `try_from3` does not use the `@clas
 error[call-non-callable]: Object of type `CheckClassMethod` is not callable
   --> src/mdtest_snippet.py:43:20
    |
-41 |         if isinstance(x, int):
-42 |             # error: [call-non-callable]
 43 |             return cls(x)
    |                    ^^^^^^
-44 |         return None
    |
+
+```
+
+```
+error[invalid-assignment]: Object of type `bound method <class 'Base'>.from_value(x: int) -> int` is not assignable to `(str, /) -> str`
+  --> src/mdtest_snippet.py:76:6
+   |
+76 | bad: Callable[[str], str] = Base.from_value
+   |      --------------------   ^^^^^^^^^^^^^^^ Incompatible value of type `bound method <class 'Base'>.from_value(x: int) -> int`
+   |      |
+   |      Declared type
+   |
+info: incompatible return types: `int` is not assignable to `str`
 
 ```

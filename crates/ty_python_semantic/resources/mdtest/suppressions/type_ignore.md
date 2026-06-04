@@ -166,15 +166,11 @@ a = (3
 
 ```snapshot
 warning[unused-ignore-comment]: Unused `ty: ignore` directive
-  --> src/mdtest_snippet.py:9:9
-   |
- 7 | a = (3
- 8 |   # snapshot
- 9 |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-10 | a = (3
-11 |   # snapshot
-   |
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Remove the unused suppression comment
 6  |   + 2  # type: ignore # fmt: skip
 7  | a = (3
@@ -196,8 +192,6 @@ a = (3
 warning[unused-ignore-comment]: Unused `ty: ignore` directive
   --> src/mdtest_snippet.py:12:21
    |
-10 | a = (3
-11 |   # snapshot
 12 |   + 2)  # fmt: skip # ty:ignore[division-by-zero]
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -312,7 +306,6 @@ a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
 warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
  --> src/mdtest_snippet.py:2:39
   |
-1 | # snapshot
 2 | a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
   |                                       ^^^^^^^^^^^^^^^^^^^
   |
@@ -333,7 +326,6 @@ a = 10 / 2  # type: ignore[ty:division-by-zero]
 warning[unused-type-ignore-comment]: Unused `type: ignore` directive
  --> src/mdtest_snippet.py:2:13
   |
-1 | # snapshot
 2 | a = 10 / 2  # type: ignore[ty:division-by-zero]
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
@@ -354,7 +346,6 @@ a = 10 / 2  # type: ignore[ty:division-by]
 warning[ignore-comment-unknown-rule]: Unknown rule `division-by`. Did you mean `division-by-zero`?
  --> src/mdtest_snippet.py:2:28
   |
-1 | # snapshot
 2 | a = 10 / 2  # type: ignore[ty:division-by]
   |                            ^^^^^^^^^^^^^^
   |

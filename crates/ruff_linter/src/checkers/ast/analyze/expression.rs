@@ -228,12 +228,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 );
             }
         }
-        Expr::Name(ast::ExprName {
-            id,
-            ctx,
-            range,
-            node_index: _,
-        }) => {
+        Expr::Name(
+            expr_name @ ast::ExprName {
+                id,
+                ctx,
+                range,
+                node_index: _,
+            },
+        ) => {
             match ctx {
                 ExprContext::Load => {
                     if checker.is_rule_enabled(Rule::TypingTextStrAlias) {
@@ -268,6 +270,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     }
                     if checker.is_rule_enabled(Rule::Airflow3SuggestedToMoveToProvider) {
                         airflow::rules::suggested_to_move_to_provider_in_3(checker, expr);
+                    }
+                    if checker.is_rule_enabled(Rule::LazyImportImmediatelyResolved) {
+                        flake8_tidy_imports::rules::lazy_import_immediately_resolved(
+                            checker, expr_name,
+                        );
                     }
                     if checker.any_rule_enabled(&[
                         Rule::SuspiciousPickleUsage,
@@ -1322,6 +1329,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::Airflow3DagDynamicValue) {
                 airflow::rules::airflow_3_dag_dynamic_value(checker, call);
             }
+            if checker.is_rule_enabled(Rule::AirflowTaskBranchAsShortCircuit) {
+                airflow::rules::branch_python_operator_as_short_circuit(checker, call);
+            }
             if checker.is_rule_enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);
             }
@@ -1856,7 +1866,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
             }
 
-            if checker.is_rule_enabled(Rule::UnnecessaryComprehension) {
+            if checker.is_rule_enabled(Rule::UnnecessaryComprehension)
+                && let Some(key) = key
+            {
                 flake8_comprehensions::rules::unnecessary_dict_comprehension(
                     checker, expr, key, value, generators,
                 );

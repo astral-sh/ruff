@@ -439,7 +439,7 @@ pub struct Options {
     /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
     /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
     ///
-    /// The value must be greater than `0` and less than or equal to `320`.
+    /// The value must be greater than `0`.
     ///
     /// Note: While the formatter will attempt to format lines such that they remain
     /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
@@ -2963,7 +2963,7 @@ impl IsortOptions {
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
-        let sections: FxHashMap<String, Vec<glob::Pattern>> = sections
+        let sections: FxHashMap<String, Vec<IdentifierPattern>> = sections
             .into_iter()
             .filter_map(|(section, modules)| match section {
                 ImportSection::Known(section) => {
@@ -3313,6 +3313,53 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
+    /// The PEP 257 convention includes all `D` errors apart from:
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D212`](rules/multi-line-summary-first-line.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D214`](rules/overindented-section.md),
+    /// [`D215`](rules/overindented-section-underline.md),
+    /// [`D404`](rules/docstring-starts-with-this.md),
+    /// [`D405`](rules/non-capitalized-section-name.md),
+    /// [`D406`](rules/missing-new-line-after-section-name.md),
+    /// [`D407`](rules/missing-dashed-underline-after-section.md),
+    /// [`D408`](rules/missing-section-underline-after-name.md),
+    /// [`D409`](rules/mismatched-section-underline-length.md),
+    /// [`D410`](rules/no-blank-line-after-section.md),
+    /// [`D411`](rules/no-blank-line-before-section.md),
+    /// [`D413`](rules/missing-blank-line-after-last-section.md),
+    /// [`D415`](rules/missing-terminal-punctuation.md),
+    /// [`D416`](rules/missing-section-name-colon.md),
+    /// [`D417`](rules/undocumented-param.md), and
+    /// [`D420`](rules/incorrect-section-order.md).
+    ///
+    /// The NumPy convention includes all `D` errors apart from:
+    /// [`D107`](rules/undocumented-public-init.md),
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D212`](rules/multi-line-summary-first-line.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D402`](rules/signature-in-docstring.md),
+    /// [`D413`](rules/missing-blank-line-after-last-section.md),
+    /// [`D415`](rules/missing-terminal-punctuation.md),
+    /// [`D416`](rules/missing-section-name-colon.md), and
+    /// [`D417`](rules/undocumented-param.md).
+    ///
+    /// The Google convention includes all `D` errors apart from:
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D204`](rules/incorrect-blank-line-after-class.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D215`](rules/overindented-section-underline.md),
+    /// [`D400`](rules/missing-trailing-period.md),
+    /// [`D401`](rules/non-imperative-mood.md),
+    /// [`D404`](rules/docstring-starts-with-this.md),
+    /// [`D406`](rules/missing-new-line-after-section-name.md),
+    /// [`D407`](rules/missing-dashed-underline-after-section.md),
+    /// [`D408`](rules/missing-section-underline-after-name.md),
+    /// [`D409`](rules/mismatched-section-underline-length.md), and
+    /// [`D413`](rules/missing-blank-line-after-last-section.md).
+    ///
+    /// For more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.
+    ///
     /// To enable an additional rule that's excluded from the convention,
     /// select the desired rule via its fully qualified rule code (e.g.,
     /// `D400` instead of `D4` or `D40`):
@@ -3525,6 +3572,14 @@ pub struct PylintOptions {
     #[option(default = r"50", value_type = "int", example = r"max-statements = 75")]
     pub max_statements: Option<usize>,
 
+    /// Maximum number of statements allowed for a try clause body (see `W0717`).
+    #[option(
+        default = r"5",
+        value_type = "int",
+        example = r"max-statements-in-try = 10"
+    )]
+    pub max_statements_in_try: Option<usize>,
+
     /// Maximum number of public methods allowed for a class (see `PLR0904`).
     #[option(
         default = r"20",
@@ -3565,6 +3620,9 @@ impl PylintOptions {
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
+            max_statements_in_try: self
+                .max_statements_in_try
+                .unwrap_or(defaults.max_statements_in_try),
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),

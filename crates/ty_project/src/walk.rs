@@ -3,9 +3,9 @@ use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
-use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_python_ast::PySourceType;
+use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -119,76 +119,76 @@ enum CheckPathMatch {
     Full,
 }
 
-pub(crate) struct ProjectFilesWalker<'a> {
-    walker: WalkDirectoryBuilder,
-
-    filter: ProjectFilesFilter<'a>,
+pub(crate) struct ProjectFilesWalker {
+    /// If set, the walker only visits paths that lead to one of these paths.
+    ///
+    /// Otherwise, the visitor walks all paths recursively, except paths that are excluded or
+    /// not included by the project.
+    incremental_paths: Option<BTreeSet<SystemPathBuf>>,
 }
 
-impl<'a> ProjectFilesWalker<'a> {
-    pub(crate) fn new(db: &'a dyn Db) -> Self {
-        let project = db.project();
-
-        let filter = ProjectFilesFilter::from_project(db, project);
-
-        Self::from_paths(db, project.included_paths_or_root(db), filter)
-            .expect("included_paths_or_root to never return an empty iterator")
-    }
-
-    /// Creates a walker for indexing the project files incrementally.
-    ///
-    /// The main difference to a full project walk is that `paths` may contain paths
-    /// that aren't part of the included files.
-    pub(crate) fn incremental<P>(db: &'a dyn Db, paths: impl IntoIterator<Item = P>) -> Option<Self>
-    where
-        P: AsRef<SystemPath>,
-    {
-        let project = db.project();
-
-        let filter = ProjectFilesFilter::from_project(db, project);
-
-        Self::from_paths(db, paths, filter)
-    }
-
-    fn from_paths<P>(
-        db: &'a dyn Db,
-        paths: impl IntoIterator<Item = P>,
-        filter: ProjectFilesFilter<'a>,
-    ) -> Option<Self>
-    where
-        P: AsRef<SystemPath>,
-    {
-        let mut paths = paths.into_iter();
-
-        let mut walker = db
-            .system()
-            .walk_directory(paths.next()?.as_ref())
-            .standard_filters(db.project().settings(db).src().respect_ignore_files)
-            .ignore_hidden(false);
-
-        for path in paths {
-            walker = walker.add(path);
+impl ProjectFilesWalker {
+    pub(crate) fn full() -> Self {
+        Self {
+            incremental_paths: None,
         }
+    }
 
-        Some(Self { walker, filter })
+    /// Creates a walker for indexing newly added project files incrementally.
+    pub(crate) fn incremental(paths: impl IntoIterator<Item = SystemPathBuf>) -> Self {
+        Self {
+            incremental_paths: Some(deduplicate_nested_paths(paths).collect()),
+        }
     }
 
     /// Walks the project paths and collects the paths of all files that
     /// are included in the project.
     pub(crate) fn collect_vec(self, db: &dyn Db) -> (Vec<File>, Vec<Diagnostic>) {
+        let project = db.project();
+        let root_paths = project.included_paths_or_root(db);
+
+        let walker = if let Some(incremental_paths) = &self.incremental_paths {
+            if incremental_paths.is_empty() {
+                return (Vec::new(), Vec::new());
+            }
+
+            create_walker(
+                db,
+                root_paths.iter().filter(|root| {
+                    should_visit_incremental_path(root.as_path(), incremental_paths)
+                }),
+            )
+        } else {
+            create_walker(db, root_paths)
+        };
+
+        let Some(walker) = walker else {
+            return (Vec::new(), Vec::new());
+        };
+
+        let filter = ProjectFilesFilter::from_project(db, project);
         let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
 
-        self.walker.run(|| {
-            let db = db.dyn_clone();
-            let filter = &self.filter;
+        walker.run(|| {
+            let db = Db::dyn_clone(db);
+            let filter = &filter;
+            let incremental_paths = &self.incremental_paths;
             let files = &files;
             let diagnostics = &diagnostics;
             let force_exclude = filter.force_exclude();
 
             Box::new(move |entry| {
+                db.unwind_if_revision_cancelled();
+
                 match entry {
                     Ok(entry) => {
+                        if incremental_paths.as_ref().is_some_and(|incremental_paths| {
+                            !should_visit_incremental_path(entry.path(), incremental_paths)
+                        }) {
+                            return WalkState::Skip;
+                        }
+
                         // Skip excluded directories unless they were explicitly passed to the walker
                         // (which is the case passed to `ty check <paths>`).
                         if entry.file_type().is_directory() {
@@ -227,22 +227,13 @@ impl<'a> ProjectFilesWalker<'a> {
                                     GlobFilterCheckMode::TopDown
                                 };
                                 match filter.is_file_included(entry.path(), match_mode) {
-                                    IncludeResult::Included { literal_match } => {
+                                    include_result @ IncludeResult::Included { .. } => {
                                         // Ignore any non python files to avoid creating too many entries in `Files`.
                                         // Unless the file is explicitly passed on the CLI or a literal match in the `include`, we then always assume it's a file ty can analyze
-                                        let source_type = if literal_match == Some(true)
-                                            || entry.depth() == 0
+                                        if entry.depth() > 0
+                                            && !include_result
+                                                .should_index_file(db.system(), entry.path())
                                         {
-                                            Some(PySourceType::Python)
-                                        } else {
-                                            entry
-                                                .path()
-                                                .extension()
-                                                .and_then(PySourceType::try_from_extension)
-                                                .or_else(|| db.system().source_type(entry.path()))
-                                        };
-
-                                        if source_type.is_none() {
                                             return WalkState::Skip;
                                         }
                                     }
@@ -314,6 +305,42 @@ impl<'a> ProjectFilesWalker<'a> {
         let (files, diagnostics) = self.collect_vec(db);
         (files.into_iter().collect(), diagnostics)
     }
+}
+
+fn create_walker<I, T>(db: &dyn Db, paths: I) -> Option<WalkDirectoryBuilder>
+where
+    I: IntoIterator<Item = T>,
+    T: AsRef<SystemPath>,
+{
+    let mut paths = paths.into_iter();
+
+    let mut walker = db
+        .system()
+        .walk_directory(paths.next()?.as_ref())
+        .standard_filters(db.project().settings(db).src().respect_ignore_files)
+        .ignore_hidden(false);
+
+    for path in paths {
+        walker = walker.add(path);
+    }
+
+    Some(walker)
+}
+
+fn should_visit_incremental_path(
+    path: &SystemPath,
+    incremental_paths: &BTreeSet<SystemPathBuf>,
+) -> bool {
+    let incremental_path_is_ancestor = incremental_paths
+        .range(..=path.to_path_buf())
+        .next_back()
+        .is_some_and(|incremental_path| path.starts_with(incremental_path));
+    let incremental_path_is_descendant = incremental_paths
+        .range(path.to_path_buf()..)
+        .next()
+        .is_some_and(|incremental_path| incremental_path.starts_with(path));
+
+    incremental_path_is_ancestor || incremental_path_is_descendant
 }
 
 #[derive(Error, Debug, Clone, get_size2::GetSize)]

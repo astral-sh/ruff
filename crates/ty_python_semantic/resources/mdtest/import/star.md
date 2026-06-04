@@ -188,9 +188,9 @@ def get_object() -> object:
 match get_object():
     case {"something": M}:
         pass
-    case [*N]:
-        pass
     case [O]:
+        pass
+    case [*N]:
         pass
     case I(foo=R):
         pass
@@ -1437,7 +1437,7 @@ are present due to `*` imports.
 import collections.abc
 
 reveal_type(collections.abc.Sequence)  # revealed: <class 'Sequence'>
-reveal_type(collections.abc.Callable)  # revealed: <special-form 'typing.Callable'>
+reveal_type(collections.abc.Callable)  # revealed: <special-form 'collections.abc.Callable'>
 reveal_type(collections.abc.Set)  # revealed: <class 'AbstractSet'>
 ```
 

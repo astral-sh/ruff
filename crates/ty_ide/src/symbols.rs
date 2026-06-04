@@ -333,6 +333,16 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
+    pub fn function_kind(name: &str, defined_in_class: bool) -> Self {
+        if !defined_in_class {
+            SymbolKind::Function
+        } else if name == "__init__" {
+            SymbolKind::Constructor
+        } else {
+            SymbolKind::Method
+        }
+    }
+
     /// Returns the string representation of the symbol kind.
     pub fn to_string(self) -> &'static str {
         match self {
@@ -394,7 +404,7 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
 /// returned doesn't include children.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=symbols_for_file_global_only_cycle_initial,
+    cycle_initial=|_, _, _| FlatSymbols::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
 pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbols {
@@ -407,20 +417,12 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
     if file
         .path(db)
         .as_system_path()
-        .is_none_or(|path| !db.project().is_file_included(db, path))
+        .is_none_or(|path| !db.project().is_file_included(db, path).is_included())
     {
         // Eagerly clear ASTs of third party files.
         parsed.clear();
     }
     visitor.into_flat_symbols()
-}
-
-fn symbols_for_file_global_only_cycle_initial(
-    _db: &dyn Db,
-    _id: salsa::Id,
-    _file: File,
-) -> FlatSymbols {
-    FlatSymbols::default()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -800,9 +802,15 @@ impl<'db> SymbolVisitor<'db> {
             remap.push(Some(new_id));
             new.push(symbol);
         }
+
+        new.shrink_to_fit();
+
         FlatSymbols {
             symbols: new,
-            all_names: self.all_origin.map(|_| self.all_names),
+            all_names: self.all_origin.map(|_| {
+                self.all_names.shrink_to_fit();
+                self.all_names
+            }),
         }
     }
 
@@ -826,8 +834,27 @@ impl<'db> SymbolVisitor<'db> {
         symbol_id
     }
 
+    /// Adds a symbol for a name definition.
+    fn add_name_symbol(&mut self, stmt: &ast::Stmt, name: &ast::ExprName, kind: SymbolKind) {
+        let symbol = SymbolTree {
+            parent: None,
+            name: name.id.to_string(),
+            kind,
+            deprecated: false,
+            name_range: name.range(),
+            full_range: stmt.range(),
+            imported_from: None,
+        };
+        self.add_symbol(symbol);
+    }
+
     /// Adds a symbol introduced via an assignment.
-    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &ast::ExprName) -> SymbolId {
+    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &ast::ExprName) {
+        // Include assignments only when we're in global or class scope.
+        if self.in_function {
+            return;
+        }
+
         let kind = if Self::is_constant_name(name.id.as_str()) {
             SymbolKind::Constant
         } else if self
@@ -838,17 +865,7 @@ impl<'db> SymbolVisitor<'db> {
         } else {
             SymbolKind::Variable
         };
-
-        let symbol = SymbolTree {
-            parent: None,
-            name: name.id.to_string(),
-            kind,
-            deprecated: false,
-            name_range: name.range(),
-            full_range: stmt.range(),
-            imported_from: None,
-        };
-        self.add_symbol(symbol)
+        self.add_name_symbol(stmt, name, kind);
     }
 
     /// Adds a symbol introduced via an import `stmt`.
@@ -1216,18 +1233,12 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(func_def) => {
-                let kind = if self
-                    .iter_symbol_stack()
-                    .any(|s| s.kind == SymbolKind::Class)
-                {
-                    if func_def.name.as_str() == "__init__" {
-                        SymbolKind::Constructor
-                    } else {
-                        SymbolKind::Method
-                    }
-                } else {
-                    SymbolKind::Function
-                };
+                let kind = SymbolKind::function_kind(
+                    &func_def.name,
+                    self.iter_symbol_stack()
+                        .last()
+                        .is_some_and(|tree| tree.kind == SymbolKind::Class),
+                );
 
                 let symbol = SymbolTree {
                     parent: None,
@@ -1286,13 +1297,19 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 // Restore the previous class scope state
                 self.in_class = was_in_class;
             }
-            ast::Stmt::Assign(assign) => {
-                self.add_all_assignment(&assign.targets, Some(&assign.value));
-
+            ast::Stmt::TypeAlias(type_alias) => {
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
                 }
+                let ast::Expr::Name(name) = &*type_alias.name else {
+                    return;
+                };
+                self.add_name_symbol(stmt, name, SymbolKind::Variable);
+            }
+            ast::Stmt::Assign(assign) => {
+                self.add_all_assignment(&assign.targets, Some(&assign.value));
+
                 for target in &assign.targets {
                     let ast::Expr::Name(name) = target else {
                         continue;
@@ -1306,10 +1323,6 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     ann_assign.value.as_deref(),
                 );
 
-                // Include assignments only when we're in global or class scope
-                if self.in_function {
-                    return;
-                }
                 let ast::Expr::Name(name) = &*ann_assign.target else {
                     return;
                 };
@@ -1510,6 +1523,7 @@ mod tests {
 FOO = 1
 foo = 1
 frob: int = 1
+type X = int
 class Foo:
     BAR = 1
 def quux():
@@ -1519,6 +1533,7 @@ def quux():
         FOO :: Constant
         foo :: Variable
         frob :: Variable
+        X :: Variable
         Foo :: Class
         quux :: Function
         ",
@@ -2921,7 +2936,7 @@ class C: ...
                 .iter()
                 .map(|(_, symbol)| {
                     let mut snapshot =
-                        format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind,);
+                        format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind);
                     if let Some(ref imported_from) = symbol.imported_from {
                         snapshot = format!(
                             "{snapshot} :: Re-exported from `{module_name}`",
@@ -2964,8 +2979,7 @@ class C: ...
                 if let Some(top) = top {
                     let top = SystemPath::new(top);
                     if db.system().is_directory(top) {
-                        db.files()
-                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                        db.files().try_add_root(&db, top, FileRootKind::SearchPath);
                     }
                 }
             }

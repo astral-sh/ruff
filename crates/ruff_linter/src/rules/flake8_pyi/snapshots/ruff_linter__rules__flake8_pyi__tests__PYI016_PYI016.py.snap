@@ -1175,5 +1175,46 @@ PYI016 Duplicate union member `None`
 147 | # Should throw duplicate union member but not fix
 148 | isinstance(None, typing.Union[None, None])
     |                                     ^^^^
+149 |
+150 | # Regression test for https://github.com/astral-sh/ruff/issues/19914
     |
 help: Remove duplicate union member `None`
+
+PYI016 [*] Duplicate union member `typing.Literal[f"{x=}"]`
+   --> PYI016.py:154:36
+    |
+152 | field50: typing.Literal[f"{00=}"] | typing.Literal[f"{000=}"]  # OK (f"{00=}" -> "00=0", f"{000=}" -> "000=0")
+153 | field51: typing.Literal[f"{x=}"] | typing.Literal[f"{x}"]  # OK (f"{x=}" -> "x=1", f"{x}" -> "1")
+154 | field52: typing.Literal[f"{x=}"] | typing.Literal[f"{x=}"]  # Error (true duplicate)
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^
+155 | field53: typing.Literal[f"{x:.2f}"] | typing.Literal[f"{x:.3f}"]  # OK (different format specs)
+156 | field54: typing.Literal[f"{x}"] | typing.Literal[f"{x}"]  # Error (true duplicate)
+    |
+help: Remove duplicate union member `typing.Literal[f"{x=}"]`
+151 | # f-string debug (=) specifier: different source text means different output
+152 | field50: typing.Literal[f"{00=}"] | typing.Literal[f"{000=}"]  # OK (f"{00=}" -> "00=0", f"{000=}" -> "000=0")
+153 | field51: typing.Literal[f"{x=}"] | typing.Literal[f"{x}"]  # OK (f"{x=}" -> "x=1", f"{x}" -> "1")
+    - field52: typing.Literal[f"{x=}"] | typing.Literal[f"{x=}"]  # Error (true duplicate)
+154 + field52: typing.Literal[f"{x=}"]  # Error (true duplicate)
+155 | field53: typing.Literal[f"{x:.2f}"] | typing.Literal[f"{x:.3f}"]  # OK (different format specs)
+156 | field54: typing.Literal[f"{x}"] | typing.Literal[f"{x}"]  # Error (true duplicate)
+157 | field55: typing.Literal[f"{x =}"] | typing.Literal[f"{x=}"]  # OK (different debug text due to spaces)
+
+PYI016 [*] Duplicate union member `typing.Literal[f"{x}"]`
+   --> PYI016.py:156:35
+    |
+154 | field52: typing.Literal[f"{x=}"] | typing.Literal[f"{x=}"]  # Error (true duplicate)
+155 | field53: typing.Literal[f"{x:.2f}"] | typing.Literal[f"{x:.3f}"]  # OK (different format specs)
+156 | field54: typing.Literal[f"{x}"] | typing.Literal[f"{x}"]  # Error (true duplicate)
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^
+157 | field55: typing.Literal[f"{x =}"] | typing.Literal[f"{x=}"]  # OK (different debug text due to spaces)
+158 | field56: typing.Literal[f"{0x0=}"] | typing.Literal[f"{0o0=}"]  # OK (different source text: "0x0" vs "0o0")
+    |
+help: Remove duplicate union member `typing.Literal[f"{x}"]`
+153 | field51: typing.Literal[f"{x=}"] | typing.Literal[f"{x}"]  # OK (f"{x=}" -> "x=1", f"{x}" -> "1")
+154 | field52: typing.Literal[f"{x=}"] | typing.Literal[f"{x=}"]  # Error (true duplicate)
+155 | field53: typing.Literal[f"{x:.2f}"] | typing.Literal[f"{x:.3f}"]  # OK (different format specs)
+    - field54: typing.Literal[f"{x}"] | typing.Literal[f"{x}"]  # Error (true duplicate)
+156 + field54: typing.Literal[f"{x}"]  # Error (true duplicate)
+157 | field55: typing.Literal[f"{x =}"] | typing.Literal[f"{x=}"]  # OK (different debug text due to spaces)
+158 | field56: typing.Literal[f"{0x0=}"] | typing.Literal[f"{0o0=}"]  # OK (different source text: "0x0" vs "0o0")

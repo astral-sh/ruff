@@ -12,7 +12,8 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
     use crate::settings::types::PreviewMode;
-    use crate::test::test_path;
+    use crate::source_kind::SourceKind;
+    use crate::test::{test_contents, test_path};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
@@ -213,5 +214,23 @@ mod tests {
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn pyi016_multiline_debug_fstring_mixed_newlines() {
+        let path = Path::new("<filename>.pyi");
+        let diagnostics = test_contents(
+            &SourceKind::Python {
+                code: "from typing import Literal\n\
+value: Literal[f\"\"\"{(\r\n1\r\n)=}\"\"\"] | Literal[f\"\"\"{(\n1\n)=}\"\"\"]\n"
+                    .to_string(),
+                is_stub: true,
+            },
+            path,
+            &settings::LinterSettings::for_rule(Rule::DuplicateUnionMember),
+        )
+        .0;
+
+        assert_eq!(diagnostics.len(), 1);
     }
 }

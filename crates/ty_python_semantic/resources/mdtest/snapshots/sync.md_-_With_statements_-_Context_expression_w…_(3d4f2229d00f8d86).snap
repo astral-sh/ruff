@@ -1,0 +1,45 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: sync.md - With statements - Context expression where one union variant has a non-callable dunder
+mdtest path: crates/ty_python_semantic/resources/mdtest/with/sync.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class GoodManager:
+ 2 |     def __enter__(self) -> str:
+ 3 |         return "foo"
+ 4 | 
+ 5 |     def __exit__(self, exc_type, exc_value, traceback): ...
+ 6 | 
+ 7 | class BadManager:
+ 8 |     def __enter__(self) -> str:
+ 9 |         return "bar"
+10 | 
+11 |     # `__exit__` is present but not callable
+12 |     __exit__: int = 32
+13 | 
+14 | def _(context_expr: GoodManager | BadManager):
+15 |     # error: [invalid-context-manager] "Object of type `GoodManager | BadManager` cannot be used with `with` because it does not correctly implement `__exit__`"
+16 |     with context_expr as f:
+17 |         reveal_type(f)  # revealed: str
+```
+
+# Diagnostics
+
+```
+error[invalid-context-manager]: Object of type `GoodManager | BadManager` cannot be used with `with` because it does not correctly implement `__exit__`
+  --> src/mdtest_snippet.py:16:10
+   |
+16 |     with context_expr as f:
+   |          ^^^^^^^^^^^^
+   |
+
+```

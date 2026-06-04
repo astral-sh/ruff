@@ -5,6 +5,9 @@
 #     "rich",
 #     "watchfiles>=1.1.0",
 # ]
+#
+# [tool.uv]
+# exclude-newer = "7 days"
 # ///
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ DIRS_TO_WATCH: Final = (
     CRATE_ROOT,
     TY_VENDORED,
     CRATE_ROOT.parent / "ty_test/src",
+    CRATE_ROOT.parent / "mdtest/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
 SNAPSHOTS_DIR: Final = MDTEST_DIR / "snapshots"
@@ -77,6 +81,7 @@ class MDTestRunner:
                 os.environ,
                 CLI_COLOR="1",
                 CARGO_PROFILE_DEV_OPT_LEVEL="0" if self.filters else "1",
+                CARGO_PROFILE_DEV_DEBUG="line-tables-only",
             ),
             stderr=subprocess.STDOUT,
             text=True,
@@ -110,12 +115,12 @@ class MDTestRunner:
         return True
 
     def _get_executable_path_from_json(self, json_output: str) -> None:
-        for json_line in json_output.splitlines():
+        for json_line in json_output.splitlines()[::-1]:
             try:
                 data = json.loads(json_line)
             except json.JSONDecodeError:
                 continue
-            if data.get("target", {}).get("name") == "mdtest":
+            if data.get("target", {}).get("name") == "mdtest" and data["executable"]:
                 self.mdtest_executable = Path(data["executable"])
                 break
         else:

@@ -1,0 +1,34 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: diagnostics
+---
+{
+  "items": [
+    {
+      "kind": "full",
+      "uri": "file://<temp_dir>/src/foo.py",
+      "version": null,
+      "resultId": "[RESULT_ID]",
+      "items": [
+        {
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 4
+            },
+            "end": {
+              "line": 3,
+              "character": 23
+            }
+          },
+          "severity": 4,
+          "source": "ty",
+          "message": "Code is always unreachable",
+          "tags": [
+            1
+          ]
+        }
+      ]
+    }
+  ]
+}

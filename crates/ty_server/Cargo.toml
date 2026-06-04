@@ -27,7 +27,6 @@ ty_combine = { workspace = true }
 ty_ide = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_project = { workspace = true }
-ty_python_semantic = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }

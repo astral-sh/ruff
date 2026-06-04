@@ -1,4 +1,5 @@
 use itertools::Either;
+use ruff_python_ast::name::Name;
 
 use crate::{
     Db, DisplaySettings,
@@ -23,14 +24,36 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// mdtests. In theory, that means there's no need for this to be interned; being tracked would be
 /// sufficient. However, we currently think that tracked structs are unsound w.r.t. salsa cycles,
 /// so out of an abundance of caution, we are interning the struct.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedConstraintSet<'db> {
     #[returns(ref)]
     pub(super) constraints: OwnedConstraintSet<'db>,
+
+    pub(super) detailed_display: bool,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for InternedConstraintSet<'_> {}
+
+impl<'db> InternedConstraintSet<'db> {
+    pub(super) fn new(db: &'db dyn Db, constraints: OwnedConstraintSet<'db>) -> Self {
+        Self::new_internal(db, constraints, false)
+    }
+
+    pub(super) fn with_detailed_display(self, db: &'db dyn Db) -> Self {
+        Self::new_internal(db, self.constraints(db), true)
+    }
+}
+
+/// A salsa-interned payload for `functools.partial(...)` instances.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct FunctoolsPartialInstance<'db> {
+    pub wrapped: InternedType<'db>,
+    pub partial: CallableType<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctoolsPartialInstance<'_> {}
 
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`super::NominalInstanceType`].
@@ -102,8 +125,15 @@ pub enum KnownInstanceType<'db> {
     /// subtype of `base` in type expressions. See the `struct NewType` payload for an example.
     NewType(NewType<'db>),
 
+    /// A single sentinel object created with `typing_extensions.Sentinel`.
+    Sentinel(SentinelInstance<'db>),
+
     /// The inferred spec for a functional `NamedTuple` class.
     NamedTupleSpec(NamedTupleSpec<'db>),
+
+    /// A `functools.partial(func, ...)` call result where we could determine
+    /// the remaining callable signature after binding some arguments.
+    FunctoolsPartial(FunctoolsPartialInstance<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -154,10 +184,16 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownInstanceType::NewType(newtype) => {
             visitor.visit_type(db, newtype.concrete_base_type(db));
         }
+        KnownInstanceType::Sentinel(_) => {
+            // Nothing to visit
+        }
         KnownInstanceType::NamedTupleSpec(spec) => {
             for field in spec.fields(db) {
                 visitor.visit_type(db, field.ty);
             }
+        }
+        KnownInstanceType::FunctoolsPartial(partial) => {
+            visitor.visit_callable_type(db, partial.partial(db));
         }
     }
 }
@@ -210,10 +246,9 @@ impl<'db> KnownInstanceType<'db> {
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::Callable),
             Self::NewType(newtype) => newtype
-                .try_map_base_class_type(db, |class_type| {
-                    class_type.recursive_type_normalized_impl(db, div, true)
-                })
+                .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NewType),
+            Self::Sentinel(sentinel) => Some(Self::Sentinel(sentinel)),
             Self::GenericContext(generic) => Some(Self::GenericContext(generic)),
             Self::Specialization(specialization) => specialization
                 .recursive_type_normalized_impl(db, div, true)
@@ -221,6 +256,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(spec) => spec
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NamedTupleSpec),
+            Self::FunctoolsPartial(partial) => partial
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Self::FunctoolsPartial),
         }
     }
 
@@ -247,7 +285,9 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Callable(_) => KnownClass::GenericAlias,
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
+            Self::Sentinel(_) => KnownClass::Sentinel,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
+            Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
         }
     }
 
@@ -260,8 +300,45 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, an alias created using the `type` statement is an instance of
     /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
+    pub(super) fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
         self.class(db).to_instance(db)
+    }
+
+    /// Return the type denoted by this retained runtime type-expression object.
+    ///
+    /// This is the scope-independent subset of `Type::in_type_expression` used when a value
+    /// reaches a `TypeForm` position after it has already been inferred in value context.
+    pub(crate) fn type_form_argument(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
+            Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
+            Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
+                Some(ty.inner(db))
+            }
+            Self::TypeGenericAlias(instance) => Some(instance.inner(db).to_meta_type(db)),
+            Self::Callable(callable) => Some(Type::Callable(callable)),
+            Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
+            Self::Sentinel(sentinel) => {
+                Some(Type::KnownInstance(KnownInstanceType::Sentinel(sentinel)))
+            }
+            _ => None,
+        }
+    }
+
+    /// Return whether this known instance can represent a type expression at runtime.
+    pub(crate) fn is_type_form_value(self) -> bool {
+        matches!(
+            self,
+            Self::TypeAliasType(_)
+                | Self::UnionType(_)
+                | Self::Literal(_)
+                | Self::Annotated(_)
+                | Self::TypeGenericAlias(_)
+                | Self::Callable(_)
+                | Self::LiteralStringAlias(_)
+                | Self::NewType(_)
+                | Self::Sentinel(_)
+        )
     }
 
     /// Return `true` if this symbol is an instance of `class`.
@@ -313,6 +390,11 @@ impl<'db> KnownInstanceType<'db> {
                     callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            KnownInstanceType::FunctoolsPartial(partial) => {
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                    partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
                     db,
@@ -332,11 +414,32 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::Literal(_)
             | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
-            | KnownInstanceType::NewType(_) => {
+            | KnownInstanceType::NewType(_)
+            | KnownInstanceType::Sentinel(_) => {
                 // TODO: For some of these, we may need to apply the type mapping to inner types.
                 Type::KnownInstance(self)
             }
         }
+    }
+}
+
+/// Contains information about a sentinel object created with `typing_extensions.Sentinel`.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct SentinelInstance<'db> {
+    pub name: Name,
+    pub definition: Definition<'db>,
+}
+
+impl get_size2::GetSize for SentinelInstance<'_> {}
+
+impl<'db> SentinelInstance<'db> {
+    pub(crate) fn is_same_sentinel(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_definition = self.definition(db);
+        let other_definition = other.definition(db);
+
+        self_definition.file(db) == other_definition.file(db)
+            && self_definition.file_scope(db) == other_definition.file_scope(db)
+            && self_definition.place(db) == other_definition.place(db)
     }
 }
 
@@ -462,10 +565,24 @@ impl<'db> UnionTypeInstance<'db> {
             }
         }
 
+        let union_type = builder.build();
+
+        // `A | B | B` is the same runtime union value as `A | B`. Reuse the existing union
+        // instance when its semantic union already contains the new operand, rather than storing
+        // an ever-deeper value-expression tree like `((A | B) | B) | B`.
+        for ty in &value_expr_types {
+            if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = ty
+                && let Ok(&existing_union) = union.union_type(db).as_ref()
+                && existing_union == union_type
+            {
+                return *ty;
+            }
+        }
+
         Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
             db,
             Some(value_expr_types),
-            Ok(builder.build()),
+            Ok(union_type),
         )))
     }
 
@@ -554,6 +671,49 @@ impl<'db> UnionTypeInstance<'db> {
         };
 
         Some(Self::new(db, value_expr_types, union_type))
+    }
+}
+
+impl<'db> FunctoolsPartialInstance<'db> {
+    /// Normalizes both the wrapped callable and the exposed reduced callable recursively.
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self::new(
+            db,
+            InternedType::new(
+                db,
+                self.wrapped(db)
+                    .inner(db)
+                    .recursive_type_normalized_impl(db, div, nested)?,
+            ),
+            self.partial(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+        ))
+    }
+
+    /// Applies a type mapping to both the wrapped callable and the exposed reduced callable.
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            InternedType::new(
+                db,
+                self.wrapped(db)
+                    .inner(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
+            self.partial(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        )
     }
 }
 

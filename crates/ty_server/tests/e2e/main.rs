@@ -27,6 +27,7 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod call_hierarchy;
 mod code_actions;
 mod commands;
 mod completions;
@@ -750,7 +751,7 @@ impl TestServer {
                     Some("ty") => match serde_json::to_value(options) {
                         Ok(value) => value,
                         Err(err) => {
-                            panic!("Failed to deserialize workspace configuration options: {err}",)
+                            panic!("Failed to deserialize workspace configuration options: {err}")
                         }
                     },
                     Some(section) => {
@@ -1295,6 +1296,19 @@ impl TestServerBuilder {
         } else {
             None
         };
+        self
+    }
+
+    /// Enable or disable the completion snippet capability.
+    pub(crate) fn enable_completion_snippets(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .completion
+            .get_or_insert_default()
+            .completion_item
+            .get_or_insert_default()
+            .snippet_support = Some(enabled);
         self
     }
 

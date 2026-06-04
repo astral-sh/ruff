@@ -21,21 +21,19 @@ with Manager() as f:
 ## Union context manager
 
 ```py
-def _(flag: bool):
-    class Manager1:
-        def __enter__(self) -> str:
-            return "foo"
+class Manager1:
+    def __enter__(self) -> str:
+        return "foo"
 
-        def __exit__(self, exc_type, exc_value, traceback): ...
+    def __exit__(self, exc_type, exc_value, traceback): ...
 
-    class Manager2:
-        def __enter__(self) -> int:
-            return 42
+class Manager2:
+    def __enter__(self) -> int:
+        return 42
 
-        def __exit__(self, exc_type, exc_value, traceback): ...
+    def __exit__(self, exc_type, exc_value, traceback): ...
 
-    context_expr = Manager1() if flag else Manager2()
-
+def _(context_expr: Manager1 | Manager2):
     with context_expr as f:
         reveal_type(f)  # revealed: str | int
 ```
@@ -142,18 +140,70 @@ with Manager():
 
 ## Context expression with possibly-unbound union variants
 
+<!-- snapshot-diagnostics -->
+
 ```py
-def _(flag: bool):
-    class Manager1:
-        def __enter__(self) -> str:
-            return "foo"
+class Manager1:
+    def __enter__(self) -> str:
+        return "foo"
 
-        def __exit__(self, exc_type, exc_value, traceback): ...
+    def __exit__(self, exc_type, exc_value, traceback): ...
 
-    class NotAContextManager: ...
-    context_expr = Manager1() if flag else NotAContextManager()
+class NotAContextManager: ...
 
+def _(context_expr: Manager1 | NotAContextManager):
     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str
+```
+
+## Context expression with overlapping possibly-unbound union variants
+
+<!-- snapshot-diagnostics -->
+
+```py
+class GoodManager:
+    def __enter__(self) -> str:
+        return "foo"
+
+    def __exit__(self, exc_type, exc_value, traceback): ...
+
+class MissingExitManager:
+    def __enter__(self) -> str:
+        return "bar"
+
+class NotAContextManager: ...
+
+def _(context_expr: GoodManager | MissingExitManager | NotAContextManager):
+    # error: [invalid-context-manager] "Object of type `GoodManager | MissingExitManager | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str
+```
+
+## Context expression where one union variant has a non-callable dunder
+
+<!-- snapshot-diagnostics -->
+
+If every union element implements the context manager protocol but at least one implements it
+incorrectly (e.g. with a non-callable `__exit__` attribute), the diagnostic should reflect that —
+*not* report the dunder as "possibly missing".
+
+```py
+class GoodManager:
+    def __enter__(self) -> str:
+        return "foo"
+
+    def __exit__(self, exc_type, exc_value, traceback): ...
+
+class BadManager:
+    def __enter__(self) -> str:
+        return "bar"
+
+    # `__exit__` is present but not callable
+    __exit__: int = 32
+
+def _(context_expr: GoodManager | BadManager):
+    # error: [invalid-context-manager] "Object of type `GoodManager | BadManager` cannot be used with `with` because it does not correctly implement `__exit__`"
     with context_expr as f:
         reveal_type(f)  # revealed: str
 ```
@@ -192,8 +242,6 @@ with context_expr as f:
 
 ## Accidental use of non-async `with`
 
-<!-- snapshot-diagnostics -->
-
 If a synchronous `with` statement is used on a type with `__aenter__` and `__aexit__`, we show a
 diagnostic hint that the user might have intended to use `async with` instead.
 
@@ -202,9 +250,20 @@ class Manager:
     async def __aenter__(self): ...
     async def __aexit__(self, *args): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
+# snapshot: invalid-context-manager
 with Manager():
     pass
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`
+ --> src/mdtest_snippet.py:6:6
+  |
+6 | with Manager():
+  |      ^^^^^^^^^
+  |
+info: Objects of type `Manager` can be used as async context managers
+info: Consider using `async with` here
 ```
 
 ## Incorrect signatures

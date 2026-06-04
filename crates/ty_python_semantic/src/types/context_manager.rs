@@ -1,5 +1,5 @@
 use crate::{
-    Db,
+    Db, FxOrderSet,
     types::{
         CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
         context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
@@ -127,9 +127,7 @@ impl<'db> ContextManagerError<'db> {
                 exit_error: _,
                 mode: _,
             } => match enter_error {
-                CallDunderError::PossiblyUnbound(call_outcome) => {
-                    Some(call_outcome.return_type(db))
-                }
+                CallDunderError::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => None,
                 CallDunderError::CallError(_, bindings) => Some(bindings.return_type(db)),
                 CallDunderError::MethodNotAvailable => None,
@@ -143,6 +141,16 @@ impl<'db> ContextManagerError<'db> {
         context_expression_type: Type<'db>,
         context_expression_node: ast::AnyNodeRef,
     ) {
+        fn unbound_on<'db>(error: &CallDunderError<'db>) -> FxOrderSet<Type<'db>> {
+            match error {
+                CallDunderError::PossiblyUnbound {
+                    unbound_on: Some(unbound_on),
+                    ..
+                } => unbound_on.iter().copied().collect(),
+                _ => FxOrderSet::default(),
+            }
+        }
+
         let Some(builder) = context.report_lint(&INVALID_CONTEXT_MANAGER, context_expression_node)
         else {
             return;
@@ -162,12 +170,11 @@ impl<'db> ContextManagerError<'db> {
         let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderError::PossiblyUnbound { .. } => {
                     format!("the method `{name}` may be missing")
                 }
                 // TODO: Use more specific error messages for the different error cases.
-                //  E.g. hint toward the union variant that doesn't correctly implement enter,
-                //  distinguish between a not callable `__enter__` attribute and a wrong signature.
+                //  E.g. distinguish between a not callable `__enter__` attribute and a wrong signature.
                 CallDunderError::CallError(_, _) => {
                     format!("it does not correctly implement `{name}`")
                 }
@@ -179,9 +186,10 @@ impl<'db> ContextManagerError<'db> {
                                          error_b: &CallDunderError<'db>,
                                          name_b: &str| {
             match (error_a, error_b) {
-                (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
-                    format!("the methods `{name_a}` and `{name_b}` are possibly missing")
-                }
+                (
+                    CallDunderError::PossiblyUnbound { .. },
+                    CallDunderError::PossiblyUnbound { .. },
+                ) => format!("the methods `{name_a}` and `{name_b}` are possibly missing"),
                 (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
                 }
@@ -225,6 +233,58 @@ impl<'db> ContextManagerError<'db> {
             with_kw,
             formatted_errors,
         ));
+
+        match self {
+            Self::Exit { exit_error, .. } => {
+                let exit_unbound_on = unbound_on(exit_error);
+                for ty in &exit_unbound_on {
+                    diag.info(format_args!(
+                        "`{}` does not implement `{exit_method}`",
+                        ty.display(db)
+                    ));
+                }
+            }
+            Self::Enter(enter_error, _) => {
+                let enter_unbound_on = unbound_on(enter_error);
+                for ty in &enter_unbound_on {
+                    diag.info(format_args!(
+                        "`{}` does not implement `{enter_method}`",
+                        ty.display(db)
+                    ));
+                }
+            }
+            Self::EnterAndExit {
+                enter_error,
+                exit_error,
+                ..
+            } => {
+                let enter_unbound_on = unbound_on(enter_error);
+                let exit_unbound_on = unbound_on(exit_error);
+
+                for ty in &enter_unbound_on {
+                    if exit_unbound_on.contains(ty) {
+                        diag.info(format_args!(
+                            "`{}` does not implement `{enter_method}` or `{exit_method}`",
+                            ty.display(db)
+                        ));
+                    } else {
+                        diag.info(format_args!(
+                            "`{}` does not implement `{enter_method}`",
+                            ty.display(db)
+                        ));
+                    }
+                }
+
+                for ty in &exit_unbound_on {
+                    if !enter_unbound_on.contains(ty) {
+                        diag.info(format_args!(
+                            "`{}` does not implement `{exit_method}`",
+                            ty.display(db)
+                        ));
+                    }
+                }
+            }
+        }
 
         let (alt_mode, alt_enter_method, alt_exit_method, alt_with_kw) = match mode {
             EvaluationMode::Sync => ("async", "__aenter__", "__aexit__", "async with"),

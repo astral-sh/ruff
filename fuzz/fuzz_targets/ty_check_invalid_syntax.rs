@@ -126,6 +126,10 @@ impl SemanticDb for TestDb {
     fn verbose(&self) -> bool {
         false
     }
+
+    fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
+        Box::new(self.clone())
+    }
 }
 
 #[salsa::db]

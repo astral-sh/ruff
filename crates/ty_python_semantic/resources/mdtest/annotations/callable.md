@@ -81,7 +81,7 @@ Using a parameter list:
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int, str]]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -89,7 +89,7 @@ def _(c: Callable[[int, str]]):
 Or, an ellipsis:
 
 ```py
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[...]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -99,7 +99,7 @@ Or something else that's invalid in a type expression generally:
 ```py
 # fmt: off
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
@@ -129,7 +129,7 @@ which argument corresponds to either the parameters or the return type.
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int], str, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -182,7 +182,7 @@ from typing import Callable
 # fmt: off
 
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             [int],
             [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
             [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
@@ -525,6 +525,81 @@ class A(Base):
 
 # revealed: () -> A
 reveal_type(into_regular_callable(A))
+```
+
+## Nested callable relations still reach the leaf mismatch
+
+```py
+from typing import Callable
+
+from ty_extensions import is_assignable_to, static_assert
+
+static_assert(
+    not is_assignable_to(
+        Callable[[], Callable[[], int]],
+        Callable[[], Callable[[], str]],
+    )
+)
+```
+
+## `typing.Callable` and `collections.abc.Callable` parity
+
+`typing.Callable` is a deprecated alias for `collections.abc.Callable`. Internally we model them as
+distinct `SpecialFormType` variants so that we can support usage of the latter in `match`
+statements, while disallowing the former, but otherwise they should be interchangeable in type
+expressions.
+
+### Bare form
+
+```py
+from typing import Any
+import typing
+import collections.abc
+
+def _(c1: typing.Callable, c2: collections.abc.Callable):
+    reveal_type(c1)  # revealed: (...) -> Unknown
+    reveal_type(c2)  # revealed: (...) -> Unknown
+```
+
+### Parameterized form
+
+```py
+import typing
+import collections.abc
+
+def _(c1: typing.Callable[[int], str], c2: collections.abc.Callable[[int], str]):
+    reveal_type(c1)  # revealed: (int, /) -> str
+    reveal_type(c2)  # revealed: (int, /) -> str
+```
+
+### Equivalence
+
+```py
+import typing
+import collections.abc
+from ty_extensions import is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(typing.Callable[[int], str], collections.abc.Callable[[int], str]))
+static_assert(is_equivalent_to(typing.Callable, collections.abc.Callable))
+```
+
+### Inside `type[...]`
+
+`type[Callable[...]]` is not a valid type expression (the argument to `type[...]` must be a class
+object), but both modules' `Callable` should produce the same diagnostic and resolved type.
+
+```py
+import typing
+import collections.abc
+
+def _(
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    c1: type[typing.Callable[[int], str]],
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    c2: type[collections.abc.Callable[[int], str]],
+):
+    reveal_type(c1)  # revealed: type[Unknown]
+    reveal_type(c2)  # revealed: type[Unknown]
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

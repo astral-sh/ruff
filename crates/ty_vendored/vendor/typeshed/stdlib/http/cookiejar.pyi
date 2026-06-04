@@ -25,7 +25,6 @@ http://wwwsearch.sf.net/):
 
 """
 
-import sys
 from _typeshed import StrPath
 from collections.abc import Iterator, Sequence
 from http.client import HTTPResponse
@@ -175,9 +174,6 @@ class MozillaCookieJar(FileCookieJar):
     header by default (Mozilla can cope with that).
 
     """
-
-    if sys.version_info < (3, 10):
-        header: ClassVar[str]  # undocumented
 
 class LWPCookieJar(FileCookieJar):
     """
@@ -344,9 +340,11 @@ class Cookie:
         rfc2109: bool = False,
     ) -> None: ...
     def has_nonstandard_attr(self, name: str) -> bool: ...
+
     @overload
     def get_nonstandard_attr(self, name: str) -> str | None: ...
     @overload
     def get_nonstandard_attr(self, name: str, default: _T) -> str | _T: ...
+
     def set_nonstandard_attr(self, name: str, value: str) -> None: ...
     def is_expired(self, now: int | None = None) -> bool: ...

@@ -28,8 +28,8 @@ from _ctypes import (
 from _typeshed import StrPath, SupportsBool, SupportsLen
 from ctypes._endian import BigEndianStructure as BigEndianStructure, LittleEndianStructure as LittleEndianStructure
 from types import GenericAlias
-from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import Any, ClassVar, Final, Generic, Literal, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, deprecated
 
 if sys.platform == "win32":
     from _ctypes import FormatError as FormatError, get_last_error as get_last_error, set_last_error as set_last_error
@@ -53,11 +53,11 @@ if sys.version_info >= (3, 14):
         Pointer types are cached and reused internally,
         so calling this function repeatedly is cheap.
         """
-
     @overload
     def POINTER(cls: None) -> type[c_void_p]: ...
     @overload
     def POINTER(cls: type[_CT]) -> type[_Pointer[_CT]]: ...
+
     def pointer(obj: _CT) -> _Pointer[_CT]:
         """Create a new pointer instance, pointing to 'obj'.
 
@@ -234,15 +234,12 @@ def create_unicode_buffer(init: int | str, size: int | None = None) -> Array[c_w
     create_unicode_buffer(aString, anInteger) -> character array
     """
 
-if sys.version_info >= (3, 13):
+if sys.version_info < (3, 15):
     @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
     def SetPointerType(pointer: type[_Pointer[Any]], cls: _CTypeBaseType) -> None: ...
-    @deprecated("Soft deprecated since Python 3.13. Use multiplication instead.")
-    def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...
 
-else:
-    def SetPointerType(pointer: type[_Pointer[Any]], cls: _CTypeBaseType) -> None: ...
-    def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...
+@deprecated("Soft deprecated since Python 3.13. Use multiplication instead.")
+def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...
 
 if sys.platform == "win32":
     def DllCanUnloadNow() -> int: ...
@@ -305,86 +302,146 @@ class py_object(_CanCastTo, _SimpleCData[_T]):
 
 class c_bool(_SimpleCData[bool]):
     _type_: ClassVar[Literal["?"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
     def __init__(self, value: SupportsBool | SupportsLen | None = ...) -> None: ...
 
 class c_byte(_SimpleCData[int]):
     _type_: ClassVar[Literal["b"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_ubyte(_SimpleCData[int]):
     _type_: ClassVar[Literal["B"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_short(_SimpleCData[int]):
     _type_: ClassVar[Literal["h"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_ushort(_SimpleCData[int]):
     _type_: ClassVar[Literal["H"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_long(_SimpleCData[int]):
     _type_: ClassVar[Literal["l"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_ulong(_SimpleCData[int]):
     _type_: ClassVar[Literal["L"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_int(_SimpleCData[int]):  # can be an alias for c_long
     _type_: ClassVar[Literal["i", "l"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_uint(_SimpleCData[int]):  # can be an alias for c_ulong
     _type_: ClassVar[Literal["I", "L"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_longlong(_SimpleCData[int]):  # can be an alias for c_long
     _type_: ClassVar[Literal["q", "l"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_ulonglong(_SimpleCData[int]):  # can be an alias for c_ulong
     _type_: ClassVar[Literal["Q", "L"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 c_int8 = c_byte
 c_uint8 = c_ubyte
 
 class c_int16(_SimpleCData[int]):  # can be an alias for c_short or c_int
     _type_: ClassVar[Literal["h", "i"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_uint16(_SimpleCData[int]):  # can be an alias for c_ushort or c_uint
     _type_: ClassVar[Literal["H", "I"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_int32(_SimpleCData[int]):  # can be an alias for c_int or c_long
     _type_: ClassVar[Literal["i", "l"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_uint32(_SimpleCData[int]):  # can be an alias for c_uint or c_ulong
     _type_: ClassVar[Literal["I", "L"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_int64(_SimpleCData[int]):  # can be an alias for c_long or c_longlong
     _type_: ClassVar[Literal["l", "q"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_uint64(_SimpleCData[int]):  # can be an alias for c_ulong or c_ulonglong
     _type_: ClassVar[Literal["L", "Q"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_ssize_t(_SimpleCData[int]):  # alias for c_int, c_long, or c_longlong
     _type_: ClassVar[Literal["i", "l", "q"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_size_t(_SimpleCData[int]):  # alias for c_uint, c_ulong, or c_ulonglong
     _type_: ClassVar[Literal["I", "L", "Q"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_float(_SimpleCData[float]):
     _type_: ClassVar[Literal["f"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_double(_SimpleCData[float]):
     _type_: ClassVar[Literal["d"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
 
 class c_longdouble(_SimpleCData[float]):  # can be an alias for c_double
     _type_: ClassVar[Literal["d", "g"]]
 
 if sys.version_info >= (3, 14) and sys.platform != "win32":
+    # NOTE: currently (3.14.4) the `__ctype_{be,le}__` attributes of these complex types are missing at runtime:
+    # https://github.com/python/cpython/issues/148464
+
     class c_double_complex(_SimpleCData[complex]):
-        _type_: ClassVar[Literal["D"]]
+        if sys.version_info >= (3, 15):
+            _type_: ClassVar[Literal["Zd"]]
+        else:
+            _type_: ClassVar[Literal["D"]]
+        __ctype_be__: ClassVar[type[Self]]
+        __ctype_le__: ClassVar[type[Self]]
 
     class c_float_complex(_SimpleCData[complex]):
-        _type_: ClassVar[Literal["F"]]
+        if sys.version_info >= (3, 15):
+            _type_: ClassVar[Literal["Zf"]]
+        else:
+            _type_: ClassVar[Literal["F"]]
+        __ctype_be__: ClassVar[type[Self]]
+        __ctype_le__: ClassVar[type[Self]]
 
     class c_longdouble_complex(_SimpleCData[complex]):
-        _type_: ClassVar[Literal["G"]]
+        if sys.version_info >= (3, 15):
+            _type_: ClassVar[Literal["Zg"]]
+        else:
+            _type_: ClassVar[Literal["G"]]
 
 class c_char(_SimpleCData[bytes]):
     _type_: ClassVar[Literal["c"]]
+    __ctype_be__: ClassVar[type[Self]]
+    __ctype_le__: ClassVar[type[Self]]
     def __init__(self, value: int | bytes | bytearray = ...) -> None: ...
 
 class c_char_p(_PointerLike, _SimpleCData[bytes | None]):

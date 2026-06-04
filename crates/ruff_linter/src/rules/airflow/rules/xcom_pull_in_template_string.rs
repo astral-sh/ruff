@@ -49,7 +49,7 @@ use crate::{FixAvailability, Violation};
 /// The fix is always unsafe because the variable in scope that matches the
 /// task ID may not be the Airflow task object that produced the `XCom` value.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.11")]
 pub(crate) struct AirflowXcomPullInTemplateString {
     task_id: String,
 }

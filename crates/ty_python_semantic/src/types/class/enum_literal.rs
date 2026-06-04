@@ -23,6 +23,27 @@ pub struct EnumSpec<'db> {
     pub(crate) has_known_members: bool,
 }
 
+impl<'db> EnumSpec<'db> {
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let members = self
+            .members(db)
+            .iter()
+            .map(|(name, ty)| {
+                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                Some((name.clone(), ty))
+            })
+            .collect::<Option<Box<_>>>()?;
+
+        Some(Self::new(db, members, self.has_known_members(db)))
+    }
+}
+
 impl get_size2::GetSize for EnumSpec<'_> {}
 
 /// Anchor for identifying a functional enum class literal.
@@ -43,6 +64,31 @@ pub enum DynamicEnumAnchor<'db> {
     },
 }
 
+impl<'db> DynamicEnumAnchor<'db> {
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Definition { definition, spec } => Some(Self::Definition {
+                definition: *definition,
+                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+            }),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                spec,
+            } => Some(Self::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+            }),
+        }
+    }
+}
+
 /// A class created via the functional enum syntax, e.g. `Enum("Color", "RED GREEN BLUE")`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicEnumLiteral<'db> {
@@ -55,6 +101,32 @@ pub struct DynamicEnumLiteral<'db> {
 }
 
 impl get_size2::GetSize for DynamicEnumLiteral<'_> {}
+
+impl<'db> DynamicEnumLiteral<'db> {
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let mixin_type = match self.mixin_type(db) {
+            Some(mixin) => {
+                let mixin = mixin.recursive_type_normalized_impl(db, div, true);
+                Some(if nested { mixin? } else { mixin.unwrap_or(div) })
+            }
+            None => None,
+        };
+
+        Some(Self::new(
+            db,
+            self.name(db).clone(),
+            self.anchor(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+            self.base_class(db),
+            mixin_type,
+        ))
+    }
+}
 
 #[salsa::tracked]
 impl<'db> DynamicEnumLiteral<'db> {
@@ -125,7 +197,12 @@ impl<'db> DynamicEnumLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=dynamic_enum_try_mro_cycle_initial
+        cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
+            Ok(Mro::from([
+                ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
+                ClassBase::object(db),
+            ]))
+        }
     )]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic_enum(db, self)
@@ -231,16 +308,4 @@ impl<'db> DynamicEnumLiteral<'db> {
     pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
         Member::unbound()
     }
-}
-
-#[expect(clippy::unnecessary_wraps)]
-fn dynamic_enum_try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    self_: DynamicEnumLiteral<'db>,
-) -> Result<Mro<'db>, DynamicMroError<'db>> {
-    Ok(Mro::from([
-        ClassBase::Class(ClassType::NonGeneric(self_.into())),
-        ClassBase::object(db),
-    ]))
 }

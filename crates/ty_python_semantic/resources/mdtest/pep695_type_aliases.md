@@ -82,6 +82,29 @@ def f() -> None:
     reveal_type(x)  # revealed: int | str | bytes
 ```
 
+## `Self`
+
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` in alias type-parameter bounds and defaults.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
+
+```py
+from typing import Annotated, Self, cast
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Alias = tuple[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Simplified = object | Self
+
+    type Metadata = Annotated[int, cast(Self, object())]
+```
+
 ## Aliased type aliases
 
 ```py
@@ -163,8 +186,6 @@ def f(x: Foo[int]):
 
 ## Stringified values
 
-<!-- snapshot-diagnostics -->
-
 Stringifying the right-hand side of a type alias is redundant, but allowed:
 
 ```py
@@ -179,11 +200,24 @@ accesses the `.__value__` attribute. Normal runtime rules still therefore apply 
 stringified alias values:
 
 ```py
-# error: [unsupported-operator]
+# snapshot: unsupported-operator
 type Y = "int" | str
 
 def g(obj: Y):
     reveal_type(obj)  # revealed: int | str
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/mdtest_snippet.py:6:10
+  |
+6 | type Y = "int" | str
+  |          -----^^^---
+  |          |       |
+  |          |       Has type `<class 'str'>`
+  |          Has type `Literal["int"]`
+  |
+info: A type alias scope is lazy but will be executed at runtime if the `__value__` property is accessed
 ```
 
 ## In unions and intersections
@@ -196,6 +230,29 @@ type IntOrStr = int | str
 def f(x: IntOrStr, y: str | bytes):
     z = x or y
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
+```
+
+## Loop-carried augmented unions
+
+PEP 604 unions created by augmented assignment should converge when the previous loop iteration
+already contains the same type alias:
+
+```py
+def f(condition: bool):
+    type Left = int
+    alias = Left
+    reveal_type(alias)  # revealed: TypeAliasType
+
+    while condition:
+        type Right = str
+        alias |= Right
+        reveal_type(alias)  # revealed: <types.UnionType special-form 'int | str'>
+
+    reveal_type(alias)  # revealed: TypeAliasType | <types.UnionType special-form 'int | str'>
+
+    # it would be okay to emit an `invalid-type-form` error here
+    def inner(x: alias):
+        reveal_type(x)  # revealed: int | str
 ```
 
 ## Multiple layers of union aliases
@@ -213,6 +270,51 @@ type Y = W | X
 from ty_extensions import is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(Y, A | B | C | D))
+```
+
+## Unions of enum literal aliases
+
+A union of aliases covering every member of an enum is equivalent to the enum itself, including when
+the aliases occur inside a larger type.
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Choice(Enum):
+    A = "A"
+    B = "B"
+
+type A = Literal[Choice.A]
+type B = Literal[Choice.B]
+type Either = A | B
+type Selector = A | B | tuple[A, B]
+
+def accept_either(value: Either) -> None: ...
+def accept_optional_either(value: Either | None) -> None: ...
+def accept_selector(value: Selector) -> None: ...
+
+class Config:
+    either: Either
+    selector: Selector
+
+def _(choice: Choice, config: Config) -> None:
+    direct: Either = choice
+    accept_either(choice)
+    accept_optional_either(config.either)
+    values: list[Selector] = []
+    accept_selector(config.selector)
+
+class ExtendedChoice(Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+
+type ExtendedA = Literal[ExtendedChoice.A]
+type ExtendedB = Literal[ExtendedChoice.B]
+
+def _(choice: ExtendedChoice) -> None:
+    partial: ExtendedA | ExtendedB = choice  # error: [invalid-assignment]
 ```
 
 ## In binary ops
@@ -365,6 +467,11 @@ def f(x: OptNestedInt) -> None:
     reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
     if x is not None:
         reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
+
+type RecursiveList = list[RecursiveList]
+
+def g(x: RecursiveList):
+    reveal_type(x[0])  # revealed: list[RecursiveList]
 ```
 
 ### Invalid self-referential
@@ -420,8 +527,7 @@ type Foo[T] = list[T] | Bar[T]
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
-    # TODO: should be `int | list[int]`
-    reveal_type(x)  # revealed: int | list[int] | Any
+    reveal_type(x)  # revealed: int | list[int]
 ```
 
 ### With legacy generic
@@ -568,7 +674,7 @@ type A = list[Union["A", str]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str] | str
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With new-style union
@@ -579,7 +685,7 @@ type A = list[A | str]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str] | str
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With Optional
@@ -592,7 +698,7 @@ type A = list[Optional[Union["A", str]]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str | None] | str | None
+        reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
 
 ### Tuple comparison
@@ -646,4 +752,16 @@ type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
 
 reveal_type(CallableIs)  # revealed: TypeAliasType
 reveal_type(CallableGuard)  # revealed: TypeAliasType
+```
+
+### Recursive alias in binary operators doesn't stack overflow
+
+```py
+from typing import reveal_type
+
+type A = int | A
+
+def foo(x: A):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(1 + x)  # revealed: int
 ```

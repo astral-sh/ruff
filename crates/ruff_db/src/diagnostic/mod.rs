@@ -370,9 +370,8 @@ impl Diagnostic {
 
     /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
     /// configured applicability level.
-    pub fn has_applicable_fix(&self, config: &DisplayDiagnosticConfig) -> bool {
-        self.fix()
-            .is_some_and(|fix| fix.applies(config.fix_applicability))
+    pub fn has_applicable_fix(&self, fix_applicability: Applicability) -> bool {
+        self.fix().is_some_and(|fix| fix.applies(fix_applicability))
     }
 
     pub fn documentation_url(&self) -> Option<&str> {
@@ -552,7 +551,7 @@ impl Ord for RenderingSortKey<'_> {
     // We sort diagnostics in a way that keeps them in source order
     // and grouped by file. After that, we fall back to severity
     // (with fatal messages sorting before info messages) and then
-    // finally the diagnostic ID.
+    // finally the diagnostic ID and concise message.
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         if let (Some(span1), Some(span2)) = (
             self.diagnostic.primary_span(),
@@ -579,7 +578,15 @@ impl Ord for RenderingSortKey<'_> {
         if order.is_ne() {
             return order;
         }
-        self.diagnostic.id().cmp(&other.diagnostic.id())
+        let order = self.diagnostic.id().cmp(&other.diagnostic.id());
+        if order.is_ne() {
+            return order;
+        }
+
+        self.diagnostic
+            .concise_message()
+            .to_str()
+            .cmp(&other.diagnostic.concise_message().to_str())
     }
 }
 
@@ -1051,6 +1058,9 @@ pub enum DiagnosticId {
     /// Use of a deprecated setting.
     DeprecatedSetting,
 
+    /// Use of a Python version that ty doesn't support.
+    UnsupportedPythonVersion,
+
     /// The code needs to be formatted.
     Unformatted,
 
@@ -1110,6 +1120,7 @@ impl DiagnosticId {
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
+            DiagnosticId::UnsupportedPythonVersion => "unsupported-python-version",
             DiagnosticId::Unformatted => "unformatted",
             DiagnosticId::InvalidCliOption => "invalid-cli-option",
             DiagnosticId::PreviewFeature => "preview-feature",
@@ -1372,6 +1383,11 @@ pub struct DisplayDiagnosticConfig {
     /// here for now as the most "sensible" place for it to live until
     /// we had more concrete use cases. ---AG
     context: usize,
+    /// The "merge window" for annotations.
+    ///
+    /// If two annotations have fewer than this number of lines between them,
+    /// they will be merged into a single annotation.
+    merge_window: usize,
     /// Whether to use preview formatting for Ruff diagnostics.
     #[allow(
         dead_code,
@@ -1402,6 +1418,7 @@ impl DisplayDiagnosticConfig {
             format: DiagnosticFormat::default(),
             color: false,
             context: 2,
+            merge_window: 2,
             preview: false,
             hide_severity: false,
             show_fix_status: false,
@@ -1425,6 +1442,17 @@ impl DisplayDiagnosticConfig {
     pub fn context(self, lines: usize) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             context: lines,
+            ..self
+        }
+    }
+
+    /// Set the "merge window" for annotations.
+    ///
+    /// If two annotations have fewer than this number of lines between them,
+    /// they will be merged into a single annotation.
+    pub fn merge_window(self, lines: usize) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            merge_window: lines,
             ..self
         }
     }

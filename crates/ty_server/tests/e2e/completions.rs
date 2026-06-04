@@ -79,6 +79,155 @@ walktr
     Ok(())
 }
 
+#[test]
+fn complete_function_parentheses_disabled_by_default() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def complete_parentheses() -> None: ...
+
+complete_parenth
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default())
+        .enable_completion_snippets(true)
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 16));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "complete_parentheses",
+        "kind": 3,
+        "detail": "def complete_parentheses() -> None",
+        "sortText": "0"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn complete_function_parentheses() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def complete_parentheses() -> None: ...
+
+complete_parenth
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_complete_function_parentheses(true),
+        )
+        .enable_completion_snippets(true)
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 16));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "complete_parentheses",
+        "kind": 3,
+        "detail": "def complete_parentheses() -> None",
+        "sortText": "0",
+        "insertText": "complete_parentheses($0)",
+        "insertTextFormat": 2
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn complete_function_parentheses_without_snippet_support() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def complete_parentheses() -> None: ...
+
+complete_parenth
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_complete_function_parentheses(true),
+        )
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 16));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "complete_parentheses",
+        "kind": 3,
+        "detail": "def complete_parentheses() -> None",
+        "sortText": "0",
+        "insertText": "complete_parentheses()"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn complete_function_parentheses_preserves_qualified_label() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+import typing
+
+is_typedd
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_complete_function_parentheses(true),
+        )
+        .enable_completion_snippets(true)
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 8));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "typing.is_typeddict",
+        "kind": 3,
+        "sortText": "0",
+        "insertText": "typing.is_typeddict($0)",
+        "insertTextFormat": 2
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
 /// Tests that auto-import completions show the fully
 /// qualified form when it will insert it for you. Also,
 /// that an `import` won't be shown when it won't
@@ -340,6 +489,103 @@ re.match('', '', fla<CURSOR>
           "value": "Convert a string or number to a floating-point number, if possible.\n"
         },
         "sortText": "3"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+/// Tests the LSP-facing shape for string-literal completions with an already-typed prefix.
+///
+/// The server intentionally returns the full completion in `insertText`. Without an explicit
+/// `textEdit`, LSP clients are allowed to interpret that insert text relative to the current
+/// word; for example, VS Code applies `insertText: "apple"` at `app|` as the suffix `le`.
+#[test]
+fn string_literal_completion_uses_full_lsp_insert_text() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+from typing import Literal
+x: Literal[\"apple\"] = \"app\"
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(1, 26));
+
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "apple",
+        "kind": 12,
+        "detail": "Literal[\"apple\"]",
+        "sortText": "0",
+        "insertText": "apple"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn typed_dict_literal_key_completion_before_colon() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+from typing import TypedDict
+
+class Box(TypedDict):
+    x: float
+    y: float
+    z: float
+
+def take(box: Box): ...
+
+take({\"\"})
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(9, 7));
+
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "x",
+        "kind": 12,
+        "detail": "Literal[\"x\"]",
+        "sortText": "0",
+        "insertText": "x"
+      },
+      {
+        "label": "y",
+        "kind": 12,
+        "detail": "Literal[\"y\"]",
+        "sortText": "1",
+        "insertText": "y"
+      },
+      {
+        "label": "z",
+        "kind": 12,
+        "detail": "Literal[\"z\"]",
+        "sortText": "2",
+        "insertText": "z"
       }
     ]
     "#);

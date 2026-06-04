@@ -22,11 +22,13 @@ use rustc_hash::FxHashSet;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
 
+mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
 
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
+pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
 /// Get the primary definition kind for a name expression within a specific file.
@@ -95,26 +97,17 @@ pub fn definitions_for_name<'db>(
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                let global_bindings =
-                    global_use_def_map.reachable_symbol_bindings(global_symbol_id);
-                let global_declarations =
-                    global_use_def_map.reachable_symbol_declarations(global_symbol_id);
-
-                for binding in global_bindings {
-                    if let Some(def) = binding.binding.definition() {
-                        if def.kind(db).is_user_visible() {
-                            all_definitions.insert(def);
-                        }
-                    }
-                }
-
-                for declaration in global_declarations {
-                    if let Some(def) = declaration.declaration.definition() {
-                        if def.kind(db).is_user_visible() {
-                            all_definitions.insert(def);
-                        }
-                    }
-                }
+                all_definitions.extend(reachable_definitions(
+                    db,
+                    global_use_def_map
+                        .reachable_symbol_bindings(global_symbol_id)
+                        .filter_map(|binding| binding.binding.definition())
+                        .chain(
+                            global_use_def_map
+                                .reachable_symbol_declarations(global_symbol_id)
+                                .filter_map(|declaration| declaration.declaration.definition()),
+                        ),
+                ));
             }
             break;
         }
@@ -128,24 +121,17 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
-
-        for binding in bindings {
-            if let Some(def) = binding.binding.definition() {
-                if def.kind(db).is_user_visible() {
-                    all_definitions.insert(def);
-                }
-            }
-        }
-
-        for declaration in declarations {
-            if let Some(def) = declaration.declaration.definition() {
-                if def.kind(db).is_user_visible() {
-                    all_definitions.insert(def);
-                }
-            }
-        }
+        all_definitions.extend(reachable_definitions(
+            db,
+            use_def_map
+                .reachable_symbol_bindings(symbol_id)
+                .filter_map(|binding| binding.binding.definition())
+                .chain(
+                    use_def_map
+                        .reachable_symbol_declarations(symbol_id)
+                        .filter_map(|declaration| declaration.declaration.definition()),
+                ),
+        ));
 
         // If we found definitions in this scope, we can stop searching
         if !all_definitions.is_empty() {
@@ -275,6 +261,11 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
+        // Prevent lookup on BoundSuper proxy object
+        if matches!(ty, Type::BoundSuper(_)) {
+            continue;
+        }
+
         let meta_type = ty.to_meta_type(db);
 
         // Look up the attribute first on the meta-type, unless it's already a class-like type.
@@ -360,37 +351,20 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         // Look for class-level declarations and bindings
         if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
             let use_def = use_def_map(db, class_scope);
-            let mut ancestor_resolved = Vec::new();
-
-            // Declarations take precedence over bindings, but attribute go-to-definition
-            // should return all co-definitions for the chosen class scope.
-            for decl in use_def.reachable_symbol_declarations(place_id) {
-                if let Some(def) = decl.declaration.definition() {
-                    ancestor_resolved.extend(resolve_definition(
-                        db,
-                        def,
-                        Some(attribute_name),
-                        ImportAliasResolution::ResolveAliases,
-                    ));
-                }
-            }
-
-            // If no declarations found, check bindings
-            if ancestor_resolved.is_empty() {
-                for binding in use_def.reachable_symbol_bindings(place_id) {
-                    if let Some(def) = binding.binding.definition() {
-                        ancestor_resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                    }
-                }
-            }
-
-            if !ancestor_resolved.is_empty() {
-                resolved.extend(ancestor_resolved);
+            let resolved_in_scope = resolve_reachable_definitions(
+                db,
+                attribute_name,
+                use_def
+                    .reachable_symbol_declarations(place_id)
+                    .filter_map(|declaration| declaration.declaration.definition())
+                    .chain(
+                        use_def
+                            .reachable_symbol_bindings(place_id)
+                            .filter_map(|binding| binding.binding.definition()),
+                    ),
+            );
+            if !resolved_in_scope.is_empty() {
+                resolved.extend(resolved_in_scope);
                 break 'scopes;
             }
         }
@@ -405,37 +379,20 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 .member_id_by_instance_attribute_name(attribute_name)
             {
                 let use_def = index.use_def_map(function_scope_id);
-                let mut scope_resolved = Vec::new();
-
-                // Declarations take precedence over bindings, but return all
-                // co-definitions from the chosen method scope.
-                for decl in use_def.reachable_member_declarations(place_id) {
-                    if let Some(def) = decl.declaration.definition() {
-                        scope_resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                    }
-                }
-
-                // If no declarations found, check bindings
-                if scope_resolved.is_empty() {
-                    for binding in use_def.reachable_member_bindings(place_id) {
-                        if let Some(def) = binding.binding.definition() {
-                            scope_resolved.extend(resolve_definition(
-                                db,
-                                def,
-                                Some(attribute_name),
-                                ImportAliasResolution::ResolveAliases,
-                            ));
-                        }
-                    }
-                }
-
-                if !scope_resolved.is_empty() {
-                    resolved.extend(scope_resolved);
+                let resolved_in_scope = resolve_reachable_definitions(
+                    db,
+                    attribute_name,
+                    use_def
+                        .reachable_member_declarations(place_id)
+                        .filter_map(|declaration| declaration.declaration.definition())
+                        .chain(
+                            use_def
+                                .reachable_member_bindings(place_id)
+                                .filter_map(|binding| binding.binding.definition()),
+                        ),
+                );
+                if !resolved_in_scope.is_empty() {
+                    resolved.extend(resolved_in_scope);
                     break 'scopes;
                 }
             }
@@ -443,6 +400,34 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     }
 
     resolved
+}
+
+fn reachable_definitions<'db>(
+    db: &'db dyn Db,
+    definitions: impl IntoIterator<Item = Definition<'db>>,
+) -> FxIndexSet<Definition<'db>> {
+    definitions
+        .into_iter()
+        .filter(|definition| definition.kind(db).is_user_visible())
+        .collect()
+}
+
+fn resolve_reachable_definitions<'db>(
+    db: &'db dyn Db,
+    symbol_name: &str,
+    definitions: impl IntoIterator<Item = Definition<'db>>,
+) -> Vec<ResolvedDefinition<'db>> {
+    reachable_definitions(db, definitions)
+        .into_iter()
+        .flat_map(|definition| {
+            resolve_definition(
+                db,
+                definition,
+                Some(symbol_name),
+                ImportAliasResolution::ResolveAliases,
+            )
+        })
+        .collect()
 }
 
 pub struct TypedDictKeyHover<'db> {
@@ -515,26 +500,11 @@ pub fn definitions_for_keyword_argument<'db>(
 
         // For each signature, find the parameter with the matching name
         for signature in signatures {
-            if let Some((_param_index, _param)) =
+            if let Some((_param_index, param)) =
                 signature.parameters().keyword_by_name(keyword_name_str)
+                && let Some(definition) = param.definition()
             {
-                if let Some(function_definition) = signature.definition() {
-                    let function_file = function_definition.file(db);
-                    let module = parsed_module(db, function_file).load(db);
-                    let def_kind = function_definition.kind(db);
-
-                    if let DefinitionKind::Function(function_ast_ref) = def_kind {
-                        let function_node = function_ast_ref.node(&module);
-
-                        if let Some(parameter_range) =
-                            find_parameter_range(&function_node.parameters, keyword_name_str)
-                        {
-                            resolved_definitions.push(ResolvedDefinition::FileWithRange(
-                                FileRange::new(function_file, parameter_range),
-                            ));
-                        }
-                    }
-                }
+                resolved_definitions.push(ResolvedDefinition::Definition(definition));
             }
         }
     }
@@ -662,20 +632,6 @@ impl<'db> CallSignatureDetails<'db> {
             argument_to_parameter_mapping,
             argument_to_displayed_parameter_mapping,
         }
-    }
-
-    fn get_definition_parameter_range(&self, db: &dyn Db, name: &str) -> Option<FileRange> {
-        let definition = self.signature.definition()?;
-        let file = definition.file(db);
-        let module_ref = parsed_module(db, file).load(db);
-
-        let parameters = match definition.kind(db) {
-            DefinitionKind::Function(node) => &node.node(&module_ref).parameters,
-            // TODO: lambda functions
-            _ => return None,
-        };
-
-        Some(FileRange::new(file, parameters.find(name)?.name().range))
     }
 }
 
@@ -1092,14 +1048,15 @@ pub fn definitions_for_unary_op<'db>(
                 Ok(bindings) => bindings,
                 Err(CallDunderError::MethodNotAvailable) => return None,
                 Err(
-                    CallDunderError::PossiblyUnbound(bindings)
+                    CallDunderError::PossiblyUnbound { bindings, .. }
                     | CallDunderError::CallError(_, bindings),
                 ) => *bindings,
             }
         }
         Err(CallDunderError::MethodNotAvailable) => return None,
         Err(
-            CallDunderError::PossiblyUnbound(bindings) | CallDunderError::CallError(_, bindings),
+            CallDunderError::PossiblyUnbound { bindings, .. }
+            | CallDunderError::CallError(_, bindings),
         ) => *bindings,
     };
 
@@ -1181,7 +1138,7 @@ pub fn find_active_signature_from_details(
 /// using full type checking (not just arity matching) for overload resolution.
 ///
 /// Falls back to arity-based matching if type-based resolution fails.
-fn resolve_call_signature<'db>(
+pub fn resolved_call_signature<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<CallSignatureDetails<'db>> {
@@ -1243,7 +1200,7 @@ pub fn inlay_hint_call_argument_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<InlayHintCallArgumentDetails> {
-    let resolved = resolve_call_signature(model, call_expr)?;
+    let resolved = resolved_call_signature(model, call_expr)?;
 
     let parameters = resolved.signature.parameters();
 
@@ -1272,7 +1229,11 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         };
 
-        let parameter_label_offset = resolved.get_definition_parameter_range(db, param.name()?);
+        let parameter_label_offset = param.definition().map(|definition| {
+            let param_file = definition.file(db);
+            let module = parsed_module(db, param_file).load(db);
+            definition.focus_range(db, &module)
+        });
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
@@ -1284,18 +1245,6 @@ pub fn inlay_hint_call_argument_details<'db>(
     }
 
     Some(InlayHintCallArgumentDetails { argument_names })
-}
-
-/// Find the text range of a specific parameter in function parameters by name.
-/// Only searches for parameters that can be addressed by name in keyword arguments.
-fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> Option<TextRange> {
-    // Check regular positional and keyword-only parameters
-    parameters
-        .args
-        .iter()
-        .chain(&parameters.kwonlyargs)
-        .find(|param| param.parameter.name.as_str() == parameter_name)
-        .map(|param| param.parameter.name.range())
 }
 
 mod resolve_definition {
@@ -1319,13 +1268,15 @@ mod resolve_definition {
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
     use ruff_python_stdlib::sys::is_builtin_module;
+    use ruff_text_size::TextRange;
     use rustc_hash::FxHashSet;
     use tracing::trace;
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
     use crate::Db;
     use crate::module_docstring;
-    use ty_python_core::definition::{Definition, DefinitionKind};
+    use crate::types::binding_type;
+    use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
@@ -1345,6 +1296,31 @@ mod resolve_definition {
     }
 
     impl<'db> ResolvedDefinition<'db> {
+        pub fn focus_range(&self, db: &dyn Db) -> FileRange {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    let parsed = parsed_module(db, definition.file(db)).load(db);
+                    definition.focus_range(db, &parsed)
+                }
+                // For modules, navigate to the start of the file
+                ResolvedDefinition::Module(module) => FileRange::new(*module, TextRange::default()),
+                ResolvedDefinition::FileWithRange(file_range) => *file_range,
+            }
+        }
+
+        pub fn category(&self, db: &dyn Db) -> DefinitionCategory {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    let file = definition.file(db);
+                    let parsed = parsed_module(db, file).load(db);
+                    definition.kind(db).category(file.is_stub(db), &parsed)
+                }
+                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => {
+                    DefinitionCategory::DeclarationAndBinding
+                }
+            }
+        }
+
         pub fn definition(&self) -> Option<Definition<'db>> {
             match self {
                 ResolvedDefinition::Definition(definition) => Some(*definition),
@@ -1368,6 +1344,55 @@ mod resolve_definition {
                 ResolvedDefinition::FileWithRange(_) => None,
             }
         }
+
+        pub fn implementation_docstring(&self, db: &'db dyn Db) -> Option<String> {
+            match self {
+                ResolvedDefinition::Definition(definition) => {
+                    implementation_docstring(db, *definition)
+                }
+                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => None,
+            }
+        }
+    }
+
+    // Overload declarations often omit docstrings, while the runtime
+    // implementation appears as the last sibling binding for the same symbol.
+    // Fall back to that binding's docstring when the resolved overload has none.
+    //
+    // Uses type-aware matching: resolves each end-of-scope binding's type to a
+    // function literal, then checks whether that function's overloads contain the
+    // current definition. This correctly handles version-conditional branches and
+    // avoids picking up unrelated reassignments of the same name.
+    fn implementation_docstring<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<String> {
+        let DefinitionKind::Function(_) = definition.kind(db) else {
+            return None;
+        };
+
+        let name = definition.name(db)?;
+        let scope = definition.scope(db);
+        let symbol_id = place_table(db, scope).symbol_id(&name)?;
+        let use_def = use_def_map(db, scope);
+
+        let current_overload = binding_type(db, definition)
+            .as_function_literal()?
+            .literal(db)
+            .last_definition;
+
+        // Find the last end-of-scope binding whose function type contains this overload.
+        let implementation = use_def
+            .end_of_scope_symbol_bindings(symbol_id)
+            .filter_map(|binding| {
+                let ty = binding_type(db, binding.binding.definition()?).as_function_literal()?;
+                ty.iter_overloads_and_implementation(db)
+                    .any(|overload| overload == current_overload)
+                    .then_some(ty)
+            })
+            .last()?;
+
+        implementation.definition(db).docstring(db)
     }
 
     /// Resolve import definitions to their targets.
@@ -1544,23 +1569,29 @@ mod resolve_definition {
         let definitions_in_module = find_symbol_in_scope(db, global_scope, symbol_name);
 
         // Recursively resolve any import definitions found in the target module
-        if definitions_in_module.is_empty() {
-            // This might be importing a submodule, try that
-            return Vec::from_iter(resolve_from_import_submodule_definitions(
-                db,
-                file,
-                symbol_name,
-                module_name,
-            ));
-        }
-
         let mut resolved_definitions = Vec::new();
         for def in definitions_in_module {
             let resolved =
                 resolve_definition_recursive(db, def, visited, Some(symbol_name), alias_resolution);
             resolved_definitions.extend(resolved);
         }
-        resolved_definitions
+
+        if resolved_definitions.is_empty() {
+            // In `pkg/__init__.py`, `from . import child` resolves `.` to
+            // `pkg/__init__.py`. Looking up `child` there can find an import definition
+            // that recursively resolves back here (possibly through `from . import *`),
+            // so recursive resolution bottoms out before reaching the `pkg.child`
+            // submodule target. Fall back to the same submodule candidate we use when
+            // `child` has no binding in `pkg/__init__.py`.
+            Vec::from_iter(resolve_from_import_submodule_definitions(
+                db,
+                file,
+                symbol_name,
+                module_name,
+            ))
+        } else {
+            resolved_definitions
+        }
     }
 
     // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
@@ -1751,7 +1782,14 @@ mod resolve_definition {
                     definitions.extend(
                         find_symbol_in_scope(db, scope, component)
                             .into_iter()
-                            .map(ResolvedDefinition::Definition),
+                            .flat_map(|definition| {
+                                resolve_definition(
+                                    db,
+                                    definition,
+                                    Some(component),
+                                    ImportAliasResolution::ResolveAliases,
+                                )
+                            }),
                     );
                 } else {
                     // We're in the middle of the path, look for scopes that match the current component
@@ -1837,16 +1875,16 @@ mod resolve_definition {
             | DefinitionKind::DictKeyAssignment(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
-            | DefinitionKind::VariadicPositionalParameter(_)
-            | DefinitionKind::VariadicKeywordParameter(_)
             | DefinitionKind::Parameter(_)
+            | DefinitionKind::LambdaParameter { .. }
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ExceptHandler(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_)
-            | DefinitionKind::LoopHeader(_) => {
+            | DefinitionKind::LoopHeader(_)
+            | DefinitionKind::NestedBindings(_) => {
                 // Not yet implemented
                 return Err(());
             }

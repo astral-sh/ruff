@@ -2,19 +2,29 @@
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
 ASYNC109 Async function definition with a `timeout` parameter
- --> ASYNC109_0.py:8:16
-  |
-8 | async def func(timeout):
-  |                ^^^^^^^
-9 |     ...
-  |
+  --> ASYNC109_0.py:10:16
+   |
+10 | async def func(timeout):
+   |                ^^^^^^^
+11 |     ...
+   |
 help: Use `trio.fail_after` instead
 
 ASYNC109 Async function definition with a `timeout` parameter
-  --> ASYNC109_0.py:12:16
+  --> ASYNC109_0.py:14:16
    |
-12 | async def func(timeout=10):
+14 | async def func(timeout=10):
    |                ^^^^^^^^^^
-13 |     ...
+15 |     ...
+   |
+help: Use `trio.fail_after` instead
+
+ASYNC109 Async function definition with a `timeout` parameter
+  --> ASYNC109_0.py:20:25
+   |
+18 | class Foo(ABC):
+19 |     @abstractmethod
+20 |     async def foo(self, timeout: float): ...
+   |                         ^^^^^^^^^^^^^^
    |
 help: Use `trio.fail_after` instead

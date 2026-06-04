@@ -1,9 +1,12 @@
 use itertools::Either;
 
+use std::convert::Infallible;
+
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
 };
 use crate::types::class::KnownClass;
+use crate::types::enums::EnumComplement;
 use crate::types::{Type, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
@@ -90,6 +93,21 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
+    /// Returns `true` if any direct element of this union is a type alias.
+    pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
+        self.elements(db)
+            .iter()
+            .any(|element| matches!(element, Type::TypeAlias(_)))
+    }
+
+    /// Recursively expands aliases that expose top-level union elements.
+    ///
+    /// Aliases nested inside non-union elements remain part of those elements.
+    pub(crate) fn expand_aliases(self, db: &'db dyn Db) -> Type<'db> {
+        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
+        Self::from_elements(db, self.elements(db).iter().copied())
+    }
+
     pub(crate) fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
@@ -126,33 +144,39 @@ impl<'db> UnionType<'db> {
     pub(crate) fn map(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        self.elements(db)
-            .iter()
-            .map(transform_fn)
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element)
-            })
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+        let Ok(mapped) =
+            self.try_map_impl(db, |element| Ok::<_, Infallible>(transform_fn(element)));
+        mapped
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
     pub(crate) fn map_leave_aliases(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        self.elements(db)
-            .iter()
-            .map(transform_fn)
-            .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
-                UnionBuilder::add,
-            )
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+        let elements = self.elements(db);
+        let mut iter = elements.iter().enumerate();
+        while let Some((i, ty)) = iter.next() {
+            let new_ty = transform_fn(ty);
+            if &new_ty != ty {
+                let mut builder = UnionBuilder::new(db).unpack_aliases(false);
+                for prev in &elements[..i] {
+                    builder = builder.add(*prev);
+                }
+                builder = builder.add(new_ty);
+                for (_, element) in iter {
+                    builder = builder.add(transform_fn(element));
+                }
+                return builder
+                    .recursively_defined(self.recursively_defined(db))
+                    .build();
+            }
+        }
+
+        Type::Union(self)
     }
 
     /// A fallible version of [`UnionType::map`].
@@ -165,14 +189,37 @@ impl<'db> UnionType<'db> {
     pub(crate) fn try_map(
         self,
         db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db);
-        for element in self.elements(db).iter().map(transform_fn) {
-            builder = builder.add(element?);
+        self.try_map_impl(db, |element| transform_fn(element).ok_or(()))
+            .ok()
+    }
+
+    fn try_map_impl<E>(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Result<Type<'db>, E>,
+    ) -> Result<Type<'db>, E> {
+        let elements = self.elements(db);
+        let mut iter = elements.iter().enumerate();
+        while let Some((i, ty)) = iter.next() {
+            let new_ty = transform_fn(ty)?;
+            if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
+                let mut builder = elements[..i]
+                    .iter()
+                    .copied()
+                    .fold(UnionBuilder::new(db), UnionBuilder::add);
+                builder = builder.add(new_ty);
+                for (_, element) in iter {
+                    builder = builder.add(transform_fn(element)?);
+                }
+                return Ok(builder
+                    .recursively_defined(self.recursively_defined(db))
+                    .build());
+            }
         }
-        builder = builder.recursively_defined(self.recursively_defined(db));
-        Some(builder.build())
+
+        Ok(Type::Union(self))
     }
 
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -633,6 +680,32 @@ pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Return the compact enum-complement view of this intersection, if it has one.
+    pub(crate) fn enum_complement(self, db: &'db dyn Db) -> Option<EnumComplement<'db>> {
+        EnumComplement::from_intersection_parts(db, self.positive(db), self.negative(db))
+    }
+
+    /// Return the exact finite alternatives represented by this intersection, if available.
+    pub fn finite_alternatives(self, db: &'db dyn Db) -> Option<Vec<Type<'db>>> {
+        self.enum_complement(db)
+            .map(|complement| complement.remaining_literal_types(db))
+    }
+
+    /// Return the exact finite alternative union represented by this intersection, if available.
+    pub(crate) fn finite_alternative_union(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        Some(self.enum_complement(db)?.remaining_literal_union(db))
+    }
+
+    /// Return the finite alternatives only if they remain concise enough for display.
+    pub(crate) fn finite_alternatives_for_display(
+        self,
+        db: &'db dyn Db,
+        max_literals: usize,
+    ) -> Option<Vec<Type<'db>>> {
+        self.enum_complement(db)?
+            .remaining_literal_types_for_display(db, max_literals)
+    }
+
     /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements.
     ///
     /// For performance reasons, consider using [`IntersectionType::from_two_elements`] if

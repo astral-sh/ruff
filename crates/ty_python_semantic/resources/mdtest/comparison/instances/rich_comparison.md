@@ -345,8 +345,6 @@ def f(x: bool, y: int):
 
 ## Chained comparisons with objects that don't implement `__bool__` correctly
 
-<!-- snapshot-diagnostics -->
-
 Python implicitly calls `bool` on the comparison result of preceding elements (but not for the last
 element) of a chained comparison.
 
@@ -361,12 +359,35 @@ class Comparable:
     def __gt__(self, item) -> NotBoolable:
         return NotBoolable()
 
-# error: [unsupported-bool-conversion]
+# snapshot: unsupported-bool-conversion
 10 < Comparable() < 20
-# error: [unsupported-bool-conversion]
+```
+
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+  --> src/mdtest_snippet.py:12:1
+   |
+12 | 10 < Comparable() < 20
+   | ^^^^^^^^^^^^^^^^^
+   |
+info: `__bool__` on `NotBoolable` must be callable
+```
+
+```py
+# snapshot: unsupported-bool-conversion
 10 < Comparable() < Comparable()
 
 Comparable() < Comparable()  # fine
+```
+
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+  --> src/mdtest_snippet.py:14:1
+   |
+14 | 10 < Comparable() < Comparable()
+   | ^^^^^^^^^^^^^^^^^
+   |
+info: `__bool__` on `NotBoolable` must be callable
 ```
 
 ## Callables as comparison dunders

@@ -1,4 +1,5 @@
 use configuration_file::{ConfigurationFile, ConfigurationFileError};
+use ruff_db::files::FileRootKind;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::name::Name;
@@ -7,8 +8,11 @@ use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
 
+use crate::Db;
 use crate::metadata::options::ProjectOptionsOverrides;
+use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError};
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
+use crate::metadata::settings::Settings;
 use crate::metadata::value::ValueSource;
 pub use options::Options;
 use options::TyTomlError;
@@ -279,14 +283,32 @@ impl ProjectMetadata {
         &self.extra_configuration_paths
     }
 
+    pub(crate) fn try_add_project_root(&self, db: &dyn Db) {
+        // This adds a file root for the project itself. This enables
+        // tracking of when changes are made to the files in a project
+        // at the directory level. At time of writing (2025-07-17),
+        // this is used for caching completions for submodules.
+        db.files()
+            .try_add_root(db, self.root(), FileRootKind::Project);
+    }
+
     pub fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<ProgramSettings, Strategy::Error<anyhow::Error>> {
+    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
+    {
         self.options
             .to_program_settings(self.root(), self.name(), system, vendored, strategy)
+    }
+
+    pub fn to_settings<Strategy: MisconfigurationStrategy>(
+        &self,
+        db: &dyn Db,
+        strategy: &Strategy,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
+        self.options.to_settings(db, self.root(), strategy)
     }
 
     pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {

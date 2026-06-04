@@ -158,6 +158,7 @@ impl<'db> ClassBase<'db> {
             }
 
             Type::PropertyInstance(_)
+            | Type::EnumComplement(_)
             | Type::LiteralValue(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
@@ -174,6 +175,7 @@ impl<'db> ClassBase<'db> {
             | Type::AlwaysTruthy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypeForm(_)
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
@@ -191,10 +193,12 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
+                | KnownInstanceType::Sentinel(_)
                 // A class inheriting from a newtype would make intuitive sense, but newtype
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
-                | KnownInstanceType::NewType(_) => None,
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::FunctoolsPartial(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
@@ -234,7 +238,8 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::RegularCallableTypeOf
                 | SpecialFormType::AlwaysTruthy
-                | SpecialFormType::AlwaysFalsy => None,
+                | SpecialFormType::AlwaysFalsy
+                | SpecialFormType::TypeForm => None,
 
                 SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),
@@ -270,11 +275,13 @@ impl<'db> ClassBase<'db> {
                     Self::try_from_type(db, alias.aliased_class().to_class_literal(db), subclass)
                 }
 
-                SpecialFormType::Callable => Self::try_from_type(
-                    db,
-                    todo_type!("Support for Callable as a base class"),
-                    subclass,
-                ),
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
+                    Self::try_from_type(
+                        db,
+                        todo_type!("Support for Callable as a base class"),
+                        subclass,
+                    )
+                }
             },
         }
     }
@@ -379,7 +386,7 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         additional_specialization: Option<Specialization<'db>>,
-    ) -> impl Iterator<Item = ClassBase<'db>> {
+    ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
             ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
             ClassBase::Dynamic(_)
@@ -456,6 +463,7 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 }
 
 /// An iterator over the MRO of a class base.
+#[derive(Clone)]
 enum ClassBaseMroIterator<'db> {
     Length2(core::array::IntoIter<ClassBase<'db>, 2>),
     Length3(core::array::IntoIter<ClassBase<'db>, 3>),

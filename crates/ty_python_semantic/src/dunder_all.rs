@@ -1,10 +1,9 @@
-use rustc_hash::FxHashSet;
-
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
+use rustc_hash::FxHashSet;
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::Db;
@@ -197,13 +196,14 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// Returns [`None`] if `__all__` is not defined in the current module or if it contains
     /// invalid elements.
-    fn into_names(self) -> Option<FxHashSet<Name>> {
+    fn into_names(mut self) -> Option<FxHashSet<Name>> {
         if self.origin.is_none() {
             None
         } else if self.invalid {
             tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
             None
         } else {
+            self.names.shrink_to_fit();
             Some(self.names)
         }
     }

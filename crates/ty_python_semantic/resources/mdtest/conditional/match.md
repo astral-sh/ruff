@@ -33,6 +33,42 @@ def _(target: int):
     reveal_type(y)
 ```
 
+## With sequence wildcard
+
+```py
+from collections.abc import Sequence
+
+def sequence_star_pattern_is_exhaustive(paths: list[int]) -> None:
+    match paths:
+        case [*_paths]:
+            raise ValueError
+
+    reveal_type(paths)  # revealed: Never
+
+def sequence_star_pattern_is_not_exhaustive_for_text(paths: Sequence[str]) -> None:
+    match paths:
+        case [*_paths]:
+            raise ValueError
+
+    # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but sequence
+    # patterns explicitly do not match them.
+    # TODO: After https://github.com/astral-sh/ty/issues/3314 is fixed, the
+    # `Sequence[str] & bytes` and `Sequence[str] & bytearray` intersections
+    # should simplify to `Never`.
+    reveal_type(paths)  # revealed: str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
+
+def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
+    match paths:
+        case []:
+            raise ValueError
+        case [_first]:
+            raise ValueError
+        case [_first, _second, *_paths]:
+            raise ValueError
+
+    reveal_type(paths)  # revealed: Sequence[str]
+```
+
 ## Basic match
 
 ```py
@@ -290,6 +326,38 @@ def _(answer: Answer):
             y = 2
 
     reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+## Matching on enum value patterns in invalid code
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3481>.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from enum import Enum
+from typing import TypeVar
+
+def f(x: T): ...
+def g(x: T): ...
+
+f()  # error: [missing-argument] "No argument provided for required parameter `x`"
+g()  # error: [missing-argument]
+
+class C(Enum):
+    a = 1
+    b = 2
+
+match m:  # error: [unresolved-reference] "Name `m` used when not defined"
+    case C.a:
+        _()  # error: [unresolved-reference] "Name `_` used when not defined"
+    case _:
+        _()  # error: [unresolved-reference]
+
+T = TypeVar
 ```
 
 ## Or match

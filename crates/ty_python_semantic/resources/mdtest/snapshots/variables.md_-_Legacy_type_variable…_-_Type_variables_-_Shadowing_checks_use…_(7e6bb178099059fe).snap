@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -33,15 +33,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
 
 ```
 warning[mismatched-type-name]: The name passed to `TypeVar` must match the variable it is assigned to
-  --> src/mdtest_snippet.py:8:13
-   |
- 6 | # This recovers as the `Q` binding for source-level name resolution.
- 7 | # error: [mismatched-type-name]
- 8 | Q = TypeVar("T")
-   |             ^^^ Expected "Q", got "T"
- 9 |
-10 | class Outer(Generic[Q]):
-   |
+ --> src/mdtest_snippet.py:8:13
+  |
+8 | Q = TypeVar("T")
+  |             ^^^ Expected "Q", got "T"
+  |
 
 ```
 
@@ -49,8 +45,6 @@ warning[mismatched-type-name]: The name passed to `TypeVar` must match the varia
 error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` already bound by an enclosing scope
   --> src/mdtest_snippet.py:10:7
    |
- 8 | Q = TypeVar("T")
- 9 |
 10 | class Outer(Generic[Q]):
    |       ----------------- Type variable `Q` is bound in this enclosing scope
 11 |     class Ok(Generic[S]): ...
@@ -66,8 +60,6 @@ error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` alread
 error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` already bound by an enclosing scope
   --> src/mdtest_snippet.py:10:7
    |
- 8 | Q = TypeVar("T")
- 9 |
 10 | class Outer(Generic[Q]):
    |       ----------------- Type variable `Q` is bound in this enclosing scope
 11 |     class Ok(Generic[S]): ...

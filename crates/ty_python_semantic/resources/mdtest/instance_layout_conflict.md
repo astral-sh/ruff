@@ -183,7 +183,7 @@ decorator introduced by this PEP provides a generalised way for type checkers to
 classes.
 
 ```py
-from typing_extensions import disjoint_base
+from typing_extensions import Protocol, TypedDict, disjoint_base
 
 # fmt: off
 
@@ -213,12 +213,16 @@ class G: ...
 
 @disjoint_base
 class H: ...
-
+@disjoint_base  # error: [invalid-typed-dict-header] "`@disjoint_base` cannot be used with `TypedDict` class `Movie`"
+class Movie(TypedDict):
+    name: str
+@disjoint_base  # error: [invalid-protocol] "`@disjoint_base` cannot be used with protocol class `SupportsClose`"
+class SupportsClose(Protocol):
+    def close(self) -> None: ...
 class I(  # error: [instance-layout-conflict]
     G,
     H
 ): ...
-
 # fmt: on
 ```
 
@@ -259,6 +263,17 @@ class BB(AA):
 class CC(BB): ...
 class DD(AA): ...
 class FF(CC, DD): ...  # fine
+```
+
+CPython's layout check operates on runtime classes, so type arguments in a generic disjoint base's
+inheritance hierarchy do not affect whether the disjoint bases can coexist:
+
+```py
+import asyncio
+
+class Future(asyncio.Future): ...
+class Task(asyncio.Task): ...
+class SubClass(Task, Future): ...  # fine
 ```
 
 ## False negatives
