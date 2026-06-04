@@ -2171,6 +2171,21 @@ def partial(value: Intersection[V, OtherFallback]):
     # error: [invalid-argument-type]
     takes_other_fallback(value.other)
 
+class HasX:
+    x: int = 1
+
+class NoX: ...
+
+class XFallback:
+    x: str = ""
+
+X = TypeVar("X", HasX, NoX)
+
+def partial_class_attribute(value: Intersection[X, XFallback]):
+    # TODO: This should reveal `int | str` once intersection member lookup can preserve MRO
+    # correlation across TypeVar constraints.
+    reveal_type(value.x)  # revealed: Never
+
 class BoundBase:
     other: Self
     callback: Callable[[Self], None]

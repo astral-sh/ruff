@@ -1041,6 +1041,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn is_bound_method_like(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::BoundMethod(_) => true,
+            Type::Callable(callable) => callable.is_function_like(db),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| element.is_bound_method_like(db)),
+            _ => false,
+        }
+    }
+
     /// Bind `Self` type variables in this type to a concrete self type.
     ///
     /// Uses MRO-based matching: a `Self` typevar is only bound if its owner class
@@ -3450,8 +3462,8 @@ impl<'db> Type<'db> {
         }
 
         // Keep a partially available member bound to the alternative that provides it, unless
-        // another intersection element provides an always-defined fallback. We cannot preserve
-        // the correlation between the optional member and that fallback, so use the fallback.
+        // another intersection element provides an always-defined member that safely covers it.
+        // We cannot preserve the correlation between the optional member and that fallback.
         let local_member = if receiver.is_some() {
             match self {
                 Type::TypeVar(typevar) => {
@@ -3492,10 +3504,24 @@ impl<'db> Type<'db> {
         };
         if let Some(local_member) = local_member {
             if let Place::Defined(DefinedPlace {
+                ty,
                 definedness: Definedness::PossiblyUndefined,
                 ..
             }) = local_member.place
             {
+                let fallback_covers_member = |fallback_ty: Type<'db>| {
+                    ty.is_subtype_of(db, fallback_ty)
+                        || (ty.is_bound_method_like(db)
+                            && fallback_ty.is_bound_method_like(db)
+                            && ty
+                                .try_upcast_to_callable(db)
+                                .zip(fallback_ty.try_upcast_to_callable(db))
+                                .is_some_and(|(member, fallback)| {
+                                    member
+                                        .into_type(db)
+                                        .is_subtype_of(db, fallback.into_type(db))
+                                }))
+                };
                 if let Some(Type::Intersection(receiver)) = receiver
                     && receiver.positive(db).iter().any(|positive| {
                         *positive != self
@@ -3504,9 +3530,10 @@ impl<'db> Type<'db> {
                                     .member_lookup_with_policy(db, name.clone(), policy)
                                     .place,
                                 Place::Defined(DefinedPlace {
+                                    ty: fallback_ty,
                                     definedness: Definedness::AlwaysDefined,
                                     ..
-                                })
+                                }) if fallback_covers_member(fallback_ty)
                             )
                     })
                 {
