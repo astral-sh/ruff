@@ -6,7 +6,7 @@
 //! [Ruff]: https://github.com/astral-sh/ruff
 
 pub use locator::Locator;
-pub use noqa::generate_noqa_edits;
+pub use noqa::{SuppressionKind, generate_noqa_edits};
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
 #[cfg(feature = "clap")]

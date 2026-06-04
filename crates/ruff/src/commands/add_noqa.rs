@@ -16,7 +16,7 @@ use ruff_workspace::resolver::{
 
 use crate::args::ConfigArguments;
 
-/// Add `noqa` directives to a collection of files.
+/// Add suppression directives to a collection of files.
 pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
@@ -95,7 +95,7 @@ pub(crate) fn add_noqa(
             ) {
                 Ok(count) => Some(count),
                 Err(e) => {
-                    error!("Failed to add noqa to {}: {e}", path.display());
+                    error!("Failed to add suppression to {}: {e}", path.display());
                     None
                 }
             }
@@ -103,7 +103,7 @@ pub(crate) fn add_noqa(
         .sum();
 
     let duration = start.elapsed();
-    debug!("Added noqa to files in: {duration:?}");
+    debug!("Added suppressions to files in: {duration:?}");
 
     Ok(modifications)
 }

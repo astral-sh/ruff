@@ -158,6 +158,13 @@ impl CliTest {
         Ok(())
     }
 
+    /// Reads a file from the test directory.
+    pub(crate) fn read_file(&self, path: impl AsRef<Path>) -> Result<String> {
+        let file_path = self.project_dir.join(path);
+        fs::read_to_string(&file_path)
+            .with_context(|| format!("Failed to read file `{}`", file_path.display()))
+    }
+
     pub(crate) fn write_files<'a>(
         &self,
         files: impl IntoIterator<Item = (&'a str, &'a str)>,

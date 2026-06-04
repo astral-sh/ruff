@@ -16,7 +16,7 @@ use crate::{
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    Locator,
+    Locator, SuppressionKind,
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
@@ -44,7 +44,7 @@ pub(crate) struct AssociatedDiagnosticData {
     pub(crate) edits: Vec<lsp_types::TextEdit>,
     /// The identifier displayed for the diagnostic.
     pub(crate) code: String,
-    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -61,7 +61,7 @@ pub(crate) struct DiagnosticFix {
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
-    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -163,6 +163,11 @@ pub(crate) fn check(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
+        if is_human_readable_names_enabled(settings.linter.preview) {
+            SuppressionKind::Ignore
+        } else {
+            SuppressionKind::Noqa
+        },
     );
     let context = LspDiagnosticContext {
         source_kind: &source_kind,
