@@ -784,6 +784,7 @@ impl<'db> NarrowingOperation<'db> {
 struct Conjunctions<'db> {
     conjuncts: SmallVec<[NarrowingOperation<'db>; 2]>,
     present_keys: SmallVec<[PresentKeyConstraint<'db>; 1]>,
+    absent_keys: SmallVec<[AbsentKeyConstraint<'db>; 1]>,
 }
 
 /// A deferred key-presence operation. Keeping union arms inside `source` avoids expanding one DNF
@@ -822,6 +823,29 @@ impl<'db> PresentKeyConstraint<'db> {
     }
 }
 
+/// A deferred key-absence operation. Keeping the filtered source out of the conjunction prevents
+/// it from replacing a preceding `TypeGuard` result.
+#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+struct AbsentKeyConstraint<'db> {
+    source: Type<'db>,
+    key: StringLiteralType<'db>,
+}
+
+impl<'db> AbsentKeyConstraint<'db> {
+    fn apply_after_replacement(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        replacement: Type<'db>,
+    ) -> Type<'db> {
+        if narrow_with_absent_key(db, env, self.source, self.key).is_never() {
+            Type::Never
+        } else {
+            narrow_with_absent_key(db, env, replacement, self.key)
+        }
+    }
+}
+
 impl<'db> Conjunctions<'db> {
     fn singleton(ty: Type<'db>) -> Self {
         Self::from_operation(NarrowingOperation::Intersection(ty))
@@ -831,6 +855,7 @@ impl<'db> Conjunctions<'db> {
         Self {
             conjuncts: smallvec![operation],
             present_keys: smallvec![],
+            absent_keys: smallvec![],
         }
     }
 
@@ -838,6 +863,15 @@ impl<'db> Conjunctions<'db> {
         Self {
             conjuncts: smallvec![],
             present_keys: smallvec![PresentKeyConstraint { source, key }],
+            absent_keys: smallvec![],
+        }
+    }
+
+    fn absent_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
+        Self {
+            conjuncts: smallvec![],
+            present_keys: smallvec![],
+            absent_keys: smallvec![AbsentKeyConstraint { source, key }],
         }
     }
 
@@ -866,6 +900,12 @@ impl<'db> Conjunctions<'db> {
             }
         }
 
+        for absent_key in other.absent_keys {
+            if !self.absent_keys.contains(&absent_key) {
+                self.absent_keys.push(absent_key);
+            }
+        }
+
         self
     }
 
@@ -875,7 +915,8 @@ impl<'db> Conjunctions<'db> {
         env: &ProgramEnvironment<'db>,
         is_replacement: bool,
     ) -> Type<'db> {
-        if self.present_keys.is_empty() && self.conjuncts.len() == 1 {
+        if self.present_keys.is_empty() && self.absent_keys.is_empty() && self.conjuncts.len() == 1
+        {
             return self.conjuncts[0].ty();
         }
 
@@ -896,9 +937,15 @@ impl<'db> Conjunctions<'db> {
             for present_key in self.present_keys {
                 current = present_key.apply_after_replacement(db, env, current);
             }
+            for absent_key in self.absent_keys {
+                current = absent_key.apply_after_replacement(db, env, current);
+            }
         } else {
             for present_key in self.present_keys {
                 current = narrow_with_present_key(db, env, current, present_key.key.value(db));
+            }
+            for absent_key in self.absent_keys {
+                current = narrow_with_absent_key(db, env, current, absent_key.key);
             }
         }
 
@@ -1254,10 +1301,10 @@ impl<'db> NarrowingConstraint<'db> {
             replacement_disjuncts.as_slice(),
         ) {
             ([], []) => Self(NarrowingConstraintKind::Empty),
-            ([conjunctions], []) if conjunctions.present_keys.is_empty() && let [operation] = conjunctions.conjuncts.as_slice() => {
+            ([conjunctions], []) if conjunctions.present_keys.is_empty() && conjunctions.absent_keys.is_empty() && let [operation] = conjunctions.conjuncts.as_slice() => {
                 Self(NarrowingConstraintKind::Intersection(*operation))
             }
-            ([], [conjunctions]) if conjunctions.present_keys.is_empty() && let [operation] = conjunctions.conjuncts.as_slice() => {
+            ([], [conjunctions]) if conjunctions.present_keys.is_empty() && conjunctions.absent_keys.is_empty() && let [operation] = conjunctions.conjuncts.as_slice() => {
                 Self(NarrowingConstraintKind::Replacement(*operation))
             }
             _ => Self(NarrowingConstraintKind::Combined(Box::new(
@@ -1328,6 +1375,10 @@ impl<'db> NarrowingConstraint<'db> {
 
     fn present_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
         Self::from_disjuncts(smallvec_inline![Conjunctions::present_key(source, key)], smallvec![])
+    }
+
+    fn absent_key(source: Type<'db>, key: StringLiteralType<'db>) -> Self {
+        Self::from_disjuncts(smallvec_inline![Conjunctions::absent_key(source, key)], smallvec![])
     }
 
     /// Merge two constraints, taking their intersection but respecting "replacement" semantics (with
@@ -4412,20 +4463,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     NarrowingConstraint::present_key(rhs_type, key),
                 );
             } else {
-                let resolved_rhs_type = rhs_type.resolve_type_alias(db);
-
-                let narrowed = match resolved_rhs_type {
-                    Type::Union(union) => {
-                        // Remove all members of the union that prove the key is present.
-                        union.filter(db, |ty| !key_is_always_present(db, &self.env, *ty, key))
-                    }
-                    ty if key_is_always_present(db, &self.env, ty, key) => Type::Never,
-                    _ => resolved_rhs_type,
-                };
-
-                if narrowed != resolved_rhs_type {
-                    apply_constraint(&mut constraints, NarrowingConstraint::replacement(narrowed));
-                }
+                apply_constraint(
+                    &mut constraints,
+                    NarrowingConstraint::absent_key(rhs_type, key),
+                );
             }
         }
 
@@ -5627,6 +5668,24 @@ fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> boo
             .any(|element| typeddict_declares_key(db, *element, key)),
         Type::TypeAlias(alias) => typeddict_declares_key(db, alias.value_type(db), key),
         _ => false,
+    }
+}
+
+fn narrow_with_absent_key<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    key: StringLiteralType<'db>,
+) -> Type<'db> {
+    let resolved = ty.resolve_type_alias(db);
+    match resolved {
+        Type::Union(union) => {
+            // Remove all members of the union that prove the key is present.
+            let filtered = union.filter(db, |ty| !key_is_always_present(db, env, *ty, key));
+            if filtered == resolved { ty } else { filtered }
+        }
+        ty if key_is_always_present(db, env, ty, key) => Type::Never,
+        _ => ty,
     }
 }
 
