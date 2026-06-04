@@ -956,7 +956,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_match_pattern_aliases(
-        &self,
+        &mut self,
         pattern: &PatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
@@ -989,12 +989,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .and_then(|pattern| self.evaluate_match_pattern_aliases(pattern, subject_ty));
                 let alias = name.as_ref().and_then(|name| {
                     let place = self.places().symbol_id(name.as_str())?;
-                    let pattern = pattern.as_deref()?;
-                    let necessary_ty = self.necessary_match_pattern_type(pattern);
-                    if necessary_ty == Type::object() {
-                        return None;
-                    }
-                    let ty = self.intersect_types(subject_ty, necessary_ty);
+                    let ty = pattern
+                        .as_deref()
+                        .map(|pattern| self.match_pattern_subject_type(pattern, subject_ty))
+                        .unwrap_or(subject_ty);
                     Some(NarrowingConstraints::from_iter([(
                         place.into(),
                         NarrowingConstraint::replacement(ty),
@@ -1003,6 +1001,33 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 Self::merge_optional_constraints_and(nested, alias)
             }
             _ => None,
+        }
+    }
+
+    fn match_pattern_subject_type(
+        &mut self,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        match pattern {
+            PatternPredicateKind::Value(value) => {
+                let value_ty =
+                    infer_same_file_expression_type(self.db, *value, TypeContext::default());
+                self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, true)
+                    .map(|constraint| self.intersect_types(subject_ty, constraint))
+                    .unwrap_or(subject_ty)
+            }
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.match_pattern_subject_type(pattern, subject_ty)
+            }
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::Unsupported => subject_ty,
+            PatternPredicateKind::Or(patterns) => UnionType::from_elements(
+                self.db,
+                patterns
+                    .iter()
+                    .map(|pattern| self.match_pattern_subject_type(pattern, subject_ty)),
+            ),
+            _ => self.intersect_types(subject_ty, self.necessary_match_pattern_type(pattern)),
         }
     }
 

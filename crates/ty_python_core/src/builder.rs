@@ -2049,7 +2049,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // the original type after an exhaustive match. The reachability and pattern
         // predicates are still created normally for proper control flow tracking.
         let predicate_id = if is_catchall {
-            ScopedPredicateId::ALWAYS_TRUE
+            let aliases = PossiblyNarrowedPlacesBuilder::new(self.db, self.current_place_table())
+                .pattern_aliases(pattern_predicate);
+            if aliases.is_empty() {
+                ScopedPredicateId::ALWAYS_TRUE
+            } else {
+                let predicate_id = self.add_predicate(predicate);
+                self.record_narrowing_constraint_id_for_places(predicate_id, &aliases);
+                predicate_id
+            }
         } else {
             self.record_narrowing_constraint(predicate)
         };

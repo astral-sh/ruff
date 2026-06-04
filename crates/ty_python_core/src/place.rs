@@ -604,6 +604,11 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         self.pattern_kind(pattern.kind(self.db), pattern.subject(self.db), module)
     }
 
+    /// Compute the alias bindings that can be narrowed by a pattern predicate.
+    pub(crate) fn pattern_aliases(self, pattern: PatternPredicate<'db>) -> PossiblyNarrowedPlaces {
+        self.pattern_aliases_kind(pattern.kind(self.db))
+    }
+
     fn expression_node(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
         match expr {
             // Simple expressions that directly narrow a place
@@ -791,15 +796,22 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             places.insert(place);
         }
 
+        places.extend(self.pattern_aliases_kind(kind));
+        places
+    }
+
+    fn pattern_aliases_kind(&self, kind: &PatternPredicateKind<'db>) -> PossiblyNarrowedPlaces {
+        let mut places = PossiblyNarrowedPlaces::default();
+
         match kind {
             PatternPredicateKind::Or(patterns) => {
                 for pattern in patterns {
-                    places.extend(self.pattern_kind(pattern, subject, module));
+                    places.extend(self.pattern_aliases_kind(pattern));
                 }
             }
             PatternPredicateKind::Sequence(kind) => {
                 for pattern in &kind.patterns {
-                    places.extend(self.pattern_kind(pattern, subject, module));
+                    places.extend(self.pattern_aliases_kind(pattern));
                 }
             }
             PatternPredicateKind::As(pattern, name) => {
@@ -809,7 +821,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                     places.insert(place.into());
                 }
                 if let Some(pattern) = pattern {
-                    places.extend(self.pattern_kind(pattern, subject, module));
+                    places.extend(self.pattern_aliases_kind(pattern));
                 }
             }
             _ => {}
