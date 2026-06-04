@@ -3,6 +3,7 @@ import type {
   Location as TyLocation,
   Range,
   SubDiagnostic,
+  SubDiagnosticAnnotation,
   TextRange,
   Diagnostic as TyDiagnostic,
 } from "ty_wasm";
@@ -151,10 +152,68 @@ function SubDiagnosticItem({
   currentFilePath: string | null;
   onGoToLocation(location: DiagnosticLocation): void;
 }) {
-  const location = subDiagnostic.location;
+  const annotations = subDiagnostic.annotations;
+  const primaryAnnotationIndex = subDiagnostic.primary_annotation_index;
+  const primaryAnnotation =
+    primaryAnnotationIndex == null
+      ? undefined
+      : annotations[primaryAnnotationIndex];
+  const additionalAnnotations = annotations.filter(
+    (_, index) => index !== primaryAnnotationIndex,
+  );
 
+  return (
+    <>
+      {primaryAnnotation == null ? (
+        <span>{formatSubDiagnostic(subDiagnostic)}</span>
+      ) : (
+        <SubDiagnosticAnnotationItem
+          prefix={`${subDiagnostic.severity}: `}
+          message={formatPrimaryAnnotation(subDiagnostic, primaryAnnotation)}
+          annotation={primaryAnnotation}
+          currentFilePath={currentFilePath}
+          onGoToLocation={onGoToLocation}
+        />
+      )}
+      {additionalAnnotations.length > 0 ? (
+        <ul className="pl-3">
+          {additionalAnnotations.map((annotation, index) => (
+            <li key={index}>
+              <SubDiagnosticAnnotationItem
+                message={annotation.message ?? subDiagnostic.message}
+                annotation={annotation}
+                currentFilePath={currentFilePath}
+                onGoToLocation={onGoToLocation}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
+function SubDiagnosticAnnotationItem({
+  prefix,
+  message,
+  annotation,
+  currentFilePath,
+  onGoToLocation,
+}: {
+  prefix?: string;
+  message: string;
+  annotation: SubDiagnosticAnnotation;
+  currentFilePath: string | null;
+  onGoToLocation(location: DiagnosticLocation): void;
+}) {
+  const location = annotation.location;
   if (location == null) {
-    return <span>{formatSubDiagnostic(subDiagnostic)}</span>;
+    return (
+      <span>
+        {prefix}
+        {message}
+      </span>
+    );
   }
 
   const start = location.range.start;
@@ -165,12 +224,12 @@ function SubDiagnosticItem({
 
   return (
     <>
-      {subDiagnostic.severity}:{" "}
+      {prefix}
       <button
         onClick={() => onGoToLocation(location)}
         className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
       >
-        {subDiagnostic.message}
+        {message}
         <span className="text-gray-500"> {locationLabel}</span>
       </button>
     </>
@@ -179,4 +238,13 @@ function SubDiagnosticItem({
 
 function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
   return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
+}
+
+function formatPrimaryAnnotation(
+  subDiagnostic: SubDiagnostic,
+  annotation: SubDiagnosticAnnotation,
+): string {
+  return annotation.message == null
+    ? subDiagnostic.message
+    : `${subDiagnostic.message}: ${annotation.message}`;
 }

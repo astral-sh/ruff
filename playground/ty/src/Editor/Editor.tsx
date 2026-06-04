@@ -1003,18 +1003,20 @@ class PlaygroundServer
     diagnostic: Diagnostic,
   ): editor.IRelatedInformation[] {
     return diagnostic.subDiagnostics.flatMap((subDiagnostic) => {
-      const location = subDiagnostic.location;
+      return subDiagnostic.annotations.flatMap((annotation) => {
+        const location = annotation.location;
 
-      if (location == null) {
-        return [];
-      }
+        if (location == null) {
+          return [];
+        }
 
-      return [
-        {
-          message: formatSubDiagnostic(subDiagnostic),
-          ...this.mapLocation(location),
-        },
-      ];
+        return [
+          {
+            message: formatSubDiagnosticAnnotation(subDiagnostic, annotation),
+            ...this.mapLocation(location),
+          },
+        ];
+      });
     });
   }
 
@@ -1043,7 +1045,10 @@ function tyRangeToMonacoRange(range: TyRange): IRange {
 
 function diagnosticDisplayMessage(diagnostic: Diagnostic): string {
   const subDiagnostics = diagnostic.subDiagnostics.filter(
-    (subDiagnostic) => subDiagnostic.location == null,
+    (subDiagnostic) =>
+      !subDiagnostic.annotations.some(
+        (annotation) => annotation.primary && annotation.location != null,
+      ),
   );
 
   if (subDiagnostics.length === 0) {
@@ -1055,6 +1060,19 @@ function diagnosticDisplayMessage(diagnostic: Diagnostic): string {
 
 function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
   return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
+}
+
+function formatSubDiagnosticAnnotation(
+  subDiagnostic: SubDiagnostic,
+  annotation: SubDiagnostic["annotations"][number],
+): string {
+  if (annotation.message == null) {
+    return formatSubDiagnostic(subDiagnostic);
+  }
+
+  return annotation.primary
+    ? `${formatSubDiagnostic(subDiagnostic)}: ${annotation.message}`
+    : annotation.message;
 }
 
 function monacoRangeToTyRange(range: IRange): TyRange {

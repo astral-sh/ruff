@@ -905,22 +905,40 @@ impl Diagnostic {
             .sub_diagnostics()
             .iter()
             .map(|sub_diagnostic| {
-                let location = sub_diagnostic.primary_span_ref().and_then(|span| {
-                    let file_range = FileRange::try_from(span).ok()?;
-                    Some(Location {
-                        path: file_range.file().path(&workspace.db).to_string(),
-                        range: Range::from_file_range(
-                            &workspace.db,
-                            file_range,
-                            workspace.position_encoding,
-                        ),
+                let primary_annotation_index = sub_diagnostic
+                    .annotations()
+                    .iter()
+                    .position(ruff_db::diagnostic::Annotation::is_primary)
+                    .and_then(|index| u32::try_from(index).ok());
+                let annotations = sub_diagnostic
+                    .annotations()
+                    .iter()
+                    .map(|annotation| {
+                        let location =
+                            FileRange::try_from(annotation.get_span())
+                                .ok()
+                                .map(|file_range| Location {
+                                    path: file_range.file().path(&workspace.db).to_string(),
+                                    range: Range::from_file_range(
+                                        &workspace.db,
+                                        file_range,
+                                        workspace.position_encoding,
+                                    ),
+                                });
+
+                        SubDiagnosticAnnotation {
+                            primary: annotation.is_primary(),
+                            message: annotation.get_message().map(ToOwned::to_owned),
+                            location,
+                        }
                     })
-                });
+                    .collect();
 
                 SubDiagnostic {
                     severity: sub_diagnostic.severity().to_string(),
-                    message: sub_diagnostic.concise_message().to_string(),
-                    location,
+                    message: sub_diagnostic.primary_message().to_string(),
+                    primary_annotation_index,
+                    annotations,
                 }
             })
             .collect()
@@ -1001,6 +1019,17 @@ pub struct SubDiagnostic {
     pub severity: String,
     #[wasm_bindgen(getter_with_clone)]
     pub message: String,
+    pub primary_annotation_index: Option<u32>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub annotations: Vec<SubDiagnosticAnnotation>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubDiagnosticAnnotation {
+    pub primary: bool,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: Option<String>,
     #[wasm_bindgen(getter_with_clone)]
     pub location: Option<Location>,
 }
