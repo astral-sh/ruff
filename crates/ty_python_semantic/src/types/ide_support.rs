@@ -700,6 +700,36 @@ fn reachable_definitions<'db>(
         .collect()
 }
 
+/// Cheap text prefilter for identifier references before AST/semantic validation.
+///
+/// Heuristically matches an ASCII approximation of `\b{name}\b`.
+pub fn contains_identifier(source: &str, name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+
+    let bytes = source.as_bytes();
+    let needle = name.as_bytes();
+
+    memchr::memmem::find_iter(bytes, needle).any(move |pos| {
+        let after = pos + needle.len();
+
+        // Skip this entry if it is within an identifier. E.g. skip
+        // this entry when searching for `x` and this is a match
+        // within `exclude = 10`.
+        let boundary_before = pos == 0 || !is_ascii_identifier_continue(bytes[pos - 1]);
+        let boundary_after = bytes
+            .get(after)
+            .is_none_or(|byte| !is_ascii_identifier_continue(*byte));
+
+        boundary_before && boundary_after
+    })
+}
+
+fn is_ascii_identifier_continue(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
 fn resolve_reachable_definitions<'db>(
     db: &'db dyn Db,
     symbol_name: &str,
@@ -2353,7 +2383,7 @@ fn direct_subtypes<'db>(
         // when they do not mention the target class's original name.
         if is_non_first_party
             && !target_is_object
-            && !source_text(db, file).contains(target_name.as_str())
+            && !contains_identifier(&source_text(db, file), target_name.as_str())
         {
             continue;
         }
@@ -2560,11 +2590,22 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 
 #[cfg(test)]
 mod tests {
-    use super::{CallArgumentForm, call_argument_forms};
+    use super::{CallArgumentForm, call_argument_forms, contains_identifier};
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+
+    #[test]
+    fn source_candidate_prefilters_use_identifier_boundaries() {
+        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
+            assert!(contains_identifier(source, name));
+        }
+
+        for (source, name) in [("exclude = 10", "x"), ("Database", "Base"), ("", "x")] {
+            assert!(!contains_identifier(source, name));
+        }
+    }
 
     #[test]
     fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {

@@ -41,9 +41,9 @@ pub use ty_site_packages::{
     SitePackagesPaths, SysPrefixPathOrigin,
 };
 pub use types::ide_support::{
-    ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass, definitions_for_attribute,
-    definitions_for_bin_op, definitions_for_imported_symbol, definitions_for_name,
-    definitions_for_unary_op, implementation_definitions_for_attribute,
+    ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass, contains_identifier,
+    definitions_for_attribute, definitions_for_bin_op, definitions_for_imported_symbol,
+    definitions_for_name, definitions_for_unary_op, implementation_definitions_for_attribute,
     implementation_definitions_for_method, map_stub_definition, type_hierarchy_prepare,
     type_hierarchy_subtypes, type_hierarchy_supertypes,
 };

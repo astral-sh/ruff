@@ -24,7 +24,9 @@ use ruff_text_size::Ranged;
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
-use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
+use ty_python_semantic::{
+    ImportAliasResolution, ResolvedDefinition, SemanticModel, contains_identifier,
+};
 
 /// Salsa snapshots coordinate clone and drop through shared state. For cached files that don't
 /// contain the target, that coordination can cost more than the file scan and scales poorly when
@@ -187,36 +189,6 @@ fn references_for_keyword_arguments_in_file(
     AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
 
     references
-}
-
-/// Cheap text prefilter for identifier references before AST/semantic validation.
-///
-/// Heuristically matches an ASCII approximation of `\b{name}\b`.
-pub(crate) fn contains_identifier(source: &str, name: &str) -> bool {
-    if name.is_empty() {
-        return false;
-    }
-
-    let bytes = source.as_bytes();
-    let needle = name.as_bytes();
-
-    memchr::memmem::find_iter(bytes, needle).any(move |pos| {
-        let after = pos + needle.len();
-
-        // Skip this entry if it is within an identifier. E.g. skip
-        // this entry when searching for `x` and this is a match
-        // within `exclude = 10`
-        let boundary_before = pos == 0 || !is_ascii_identifier_continue(bytes[pos - 1]);
-        let boundary_after = bytes
-            .get(after)
-            .is_none_or(|byte| !is_ascii_identifier_continue(*byte));
-
-        boundary_before && boundary_after
-    })
-}
-
-fn is_ascii_identifier_continue(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
 /// Returns whether `node` assigns `value` to the sole target `__slots__`, e.g.
@@ -870,13 +842,6 @@ def f():
         ] {
             let test = cursor_test(source);
             assert!(!cursor_target_is_externally_visible(&test), "{case}");
-        }
-    }
-
-    #[test]
-    fn source_candidate_prefilters_use_identifier_boundaries() {
-        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
-            assert!(contains_identifier(source, name));
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::call_hierarchy::{CalleeLeaf, module_detail};
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
-use crate::references::{contains_identifier, has_any_external_visible_definitions};
+use crate::references::has_any_external_visible_definitions;
 use crate::{CallHierarchyItem, Db, SymbolKind};
 use rayon::prelude::*;
 use ruff_db::files::File;
@@ -16,7 +16,9 @@ use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
 use ty_python_semantic::types::{PropertyAccessorRole, Type};
-use ty_python_semantic::{HasDefinition as _, HasType as _, ImportAliasResolution, SemanticModel};
+use ty_python_semantic::{
+    HasDefinition as _, HasType as _, ImportAliasResolution, SemanticModel, contains_identifier,
+};
 
 /// Salsa snapshots coordinate clone and drop through shared state. For ordinary targets, most
 /// files are rejected by the text prefilter, so process enough files per job to amortize that
