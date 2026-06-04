@@ -319,10 +319,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
         let mut deprecated = None;
+        let mut outermost_deprecation = None;
         let mut dataclass_transformer_params = None;
         let mut final_decorator = None;
 
-        for decorator in decorator_list {
+        for (index, decorator) in decorator_list.iter().enumerate() {
             let decorator_type = decorator_inference
                 .as_ref()
                 .and_then(|decorator_inference| {
@@ -349,6 +350,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
                 Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
                     deprecated = Some(deprecated_inst);
+                    if index == 0 {
+                        outermost_deprecation = Some(deprecated_inst);
+                    }
                 }
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
@@ -452,25 +456,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
         }
 
-        // If decorators preserve the original function type, its function literal already carries
-        // the deprecation. If the inferred type loses that identity, attach it to the binding.
-        let deprecation = if function_decorators.contains(FunctionDecorators::OVERLOAD)
-            || function_type_loses_definition(db, definition, inferred_ty) != Some(true)
-        {
-            None
-        } else {
-            decorator_list.first().and_then(|decorator| {
-                match decorator_inference
-                    .as_ref()?
-                    .expression_type(&decorator.expression)?
-                {
-                    Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) => {
-                        Some(deprecated)
-                    }
-                    _ => None,
-                }
-            })
-        };
+        // An outermost `@deprecated` applies to the final decorator result. If that result is a
+        // supported callable that loses the original function, preserve it on the binding.
+        let deprecation = outermost_deprecation.filter(|_| {
+            !function_decorators.contains(FunctionDecorators::OVERLOAD)
+                && function_type_loses_definition(db, definition, inferred_ty) == Some(true)
+        });
 
         self.add_declaration_with_binding(
             function.into(),
