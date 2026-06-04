@@ -46,12 +46,11 @@ replacement function itself as deprecated.
 
 ```py
 from collections.abc import Callable
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar, cast, overload
 from ty_extensions import TypeOf, is_equivalent_to, static_assert
 from typing_extensions import TypeGuard, deprecated
 
-F = TypeVar("F", bound=Callable[..., Any])
-G = TypeVar("G", bound=Callable[..., Any])
+R = TypeVar("R")
 
 def replacement() -> str:
     return "replacement"
@@ -63,21 +62,8 @@ def other() -> str:
 def deprecated_replacement() -> str:
     return "deprecated replacement"
 
-def replace_with(replacement: F) -> Callable[[Callable[..., Any]], F]:
-    def decorator(_: Callable[..., Any]) -> F:
-        return replacement
-    return decorator
-
-def replace_with_one_of(first: F, second: G) -> Callable[[Callable[..., Any]], F | G]:
-    def decorator(_: Callable[..., Any]) -> F | G:
-        return first
-    return decorator
-
-def replace_with_object(_: Callable[..., Any]) -> object:
-    return object()
-
-def replace_with_callable(_: Callable[..., Any]) -> Callable[[], str]:
-    return replacement
+def replace_with(replacement: R) -> Callable[[Callable[..., Any]], R]:
+    raise NotImplementedError
 
 def is_replacement(value: object) -> TypeGuard[TypeOf[replacement]]:
     return True
@@ -96,17 +82,17 @@ def deprecated_binding() -> None: ...
 @deprecated("only the replaced function is deprecated")
 def replaced_deprecated_function() -> None: ...
 @deprecated("use replacement or other directly")
-@replace_with_one_of(replacement, other)
+@replace_with(cast(TypeOf[replacement] | TypeOf[other], replacement))
 def deprecated_union_binding() -> None: ...
 @deprecated("outer deprecation")
 @replace_with(replacement)
 @deprecated("inner deprecation")
 def deprecated_outer_binding() -> None: ...
 @deprecated("this object is not callable")
-@replace_with_object
+@replace_with(object())
 def deprecated_object_binding() -> None: ...
 @deprecated("callable replacement")
-@replace_with_callable
+@replace_with(cast(Callable[[], str], replacement))
 def deprecated_callable_binding() -> None: ...
 @deprecated("use ReplacementClass directly")
 @replace_with(ReplacementClass)
@@ -215,9 +201,7 @@ def replacement() -> str:
     return "replacement"
 
 def replace_with(replacement: F) -> Callable[[Callable[..., Any]], F]:
-    def decorator(_: Callable[..., Any]) -> F:
-        return replacement
-    return decorator
+    raise NotImplementedError
 
 @deprecated("use replacement directly")
 @replace_with(replacement)
