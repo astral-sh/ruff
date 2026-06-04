@@ -179,6 +179,40 @@ mod tests {
     }
 
     #[test]
+    fn implementation_overridden_method_from_concrete_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                def speak(self): ...
+
+            class Dog(Animal):
+                def speak(self): ...
+
+            class Cat(Animal):
+                def speak(self): ...
+
+            def f(dog: Dog):
+                dog.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+          --> main.py:12:9
+           |
+        12 |     dog.speak()
+           |         ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:6:9
+          |
+        6 |     def speak(self): ...
+          |         -----
+          |
+        ");
+    }
+
+    #[test]
     fn implementation_shadowed_inherited_method_from_concrete_receiver() {
         let test = cursor_test(
             r#"
@@ -194,6 +228,56 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_implementation(), @"No goto target found");
+    }
+
+    #[test]
+    fn implementation_unresolved_root_does_not_scan_subclasses() {
+        let test = cursor_test(
+            r#"
+            class Dog:
+                def speak(self): ...
+
+            def f(value: object):
+                value.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"No goto target found");
+    }
+
+    #[test]
+    fn implementation_overloaded_method_returns_implementation() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            class Animal:
+                @overload
+                def speak(self, volume: int) -> int: ...
+                @overload
+                def speak(self, volume: str) -> str: ...
+                def speak(self, volume: int | str) -> int | str:
+                    return volume
+
+            def f(animal: Animal):
+                animal.spe<CURSOR>ak(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+          --> main.py:13:12
+           |
+        13 |     animal.speak(1)
+           |            ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:9:9
+          |
+        9 |     def speak(self, volume: int | str) -> int | str:
+          |         -----
+          |
+        ");
     }
 
     #[test]
