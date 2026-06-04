@@ -2940,7 +2940,12 @@ impl<'db> Type<'db> {
                     } else {
                         let self_type = instance.unwrap_or_else(|| {
                             // For classmethod-like callables, bind to the owner class.
-                            owner.to_instance(db).unwrap_or(owner)
+                            match owner {
+                                Type::Intersection(intersection) => intersection
+                                    .to_instance_for_class_receiver(db)
+                                    .unwrap_or(owner),
+                                _ => owner.to_instance(db).unwrap_or(owner),
+                            }
                         });
 
                         Some((
@@ -3827,6 +3832,8 @@ impl<'db> Type<'db> {
                 }
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                    let receiver = receiver.unwrap_or(this);
+
                     let enum_class = match this {
                         Type::ClassLiteral(literal) => Some(literal),
                         Type::SubclassOf(subclass_of) => subclass_of
@@ -3850,17 +3857,28 @@ impl<'db> Type<'db> {
                     let class_attr_plain = this.class_object_member(db, name_str, policy);
 
                     let self_instance = this
-                    .to_instance(db)
-                    .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
+                        .to_instance(db)
+                        .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
+                    let self_instance = match receiver {
+                        Type::Intersection(intersection) => intersection
+                            .to_instance_for_class_receiver(db)
+                            .unwrap_or(self_instance),
+                        _ => receiver.to_instance(db).unwrap_or(self_instance),
+                    };
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
-                    let class_attr_fallback =
-                        Type::try_call_dunder_get_on_attribute(db, class_attr_plain, None, this).0;
+                    let class_attr_fallback = Type::try_call_dunder_get_on_attribute(
+                        db,
+                        class_attr_plain,
+                        None,
+                        receiver,
+                    )
+                    .0;
 
                     let result = this.invoke_descriptor_protocol(
                         db,
-                        this,
+                        receiver,
                         name_str,
                         class_attr_fallback,
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
@@ -4070,10 +4088,20 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
+                let function = bound_method.function(db);
+                let self_instance = bound_method.self_instance(db);
+                if function.is_classmethod(db) && matches!(self_instance, Type::Intersection(_)) {
+                    CallableBinding::from_overloads(
+                        self,
+                        bound_method.bound_signatures(db).iter().cloned(),
+                    )
                     .into()
+                } else {
+                    let signatures = function.signature(db);
+                    CallableBinding::from_overloads(self, signatures.overloads.iter().cloned())
+                        .with_bound_type(self_instance)
+                        .into()
+                }
             }
 
             Type::KnownBoundMethod(method) => {

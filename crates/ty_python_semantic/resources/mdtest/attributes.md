@@ -1869,17 +1869,59 @@ For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find 
 found, however, `Self` must be bound using the full `A & B` receiver.
 
 ```py
+from typing import Any
 from typing_extensions import Self
-from ty_extensions import Intersection
+from ty_extensions import Intersection, Unknown
 
 class A:
     def method(self) -> Self:
         return self
 
+    @classmethod
+    def classmethod(cls) -> Self:
+        return cls()
+
 class B: ...
 
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.method())  # revealed: A & B
+
+def _(a_and_b: Intersection[type[A], type[B]]):
+    # revealed: bound method type[A] & type[B].classmethod() -> A & B
+    reveal_type(a_and_b.classmethod)
+    reveal_type(a_and_b.classmethod())  # revealed: A & B
+
+def _(cls: Intersection[type[A], Any]):
+    reveal_type(cls.classmethod())  # revealed: A & Any
+
+def _(cls: Intersection[type[A], type[Any]]):
+    reveal_type(cls.classmethod())  # revealed: A & Any
+
+def _(cls: Intersection[type[A], type[Unknown]]):
+    reveal_type(cls.classmethod())  # revealed: A & Unknown
+```
+
+### Descriptor owner for an intersection
+
+```py
+from typing import TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[T]) -> type[T]:
+        return owner
+
+class A:
+    descriptor = Descriptor()
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    # TODO: This should reveal `type[A] & type[B]` once intersection meta-types are supported:
+    # https://github.com/astral-sh/ruff/pull/24761
+    reveal_type(a_and_b.descriptor)  # revealed: type[A]
 ```
 
 ### Descriptor binding uses the full intersection type
