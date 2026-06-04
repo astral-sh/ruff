@@ -1237,6 +1237,24 @@ impl<'db> Type<'db> {
         !(check_dunder("__eq__", true) && check_dunder("__ne__", false))
     }
 
+    /// Return true if this type defines a custom `__eq__` or `__ne__` method.
+    fn has_custom_equality(&self, db: &'db dyn Db) -> bool {
+        ["__eq__", "__ne__"].into_iter().any(|dunder_name| {
+            !matches!(
+                self.try_call_dunder_with_policy(
+                    db,
+                    dunder_name,
+                    &mut CallArguments::positional([Type::unknown()]),
+                    TypeContext::default(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
+                        | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
+                ),
+                Err(CallDunderError::MethodNotAvailable)
+            )
+        })
+    }
+
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NotImplementedType)
     }
