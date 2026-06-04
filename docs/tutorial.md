@@ -346,7 +346,7 @@ flag to add `# noqa` directives to all existing `UP035` violations:
 
 ```console
 $ uv run ruff check --select UP035 --add-noqa .
-Added 1 noqa directive.
+Added 1 suppression comment.
 ```
 
 Running `git diff` shows the following:
@@ -360,6 +360,9 @@ index 71fca60c8d..e92d839f1b 100644
 -from typing import Iterable
 +from typing import Iterable  # noqa: UP035
 ```
+
+In preview mode, Ruff instead adds `# ruff:ignore[...]` comments with human-readable rule names.
+The `--add-ignore` flag is an alias for `--add-noqa`.
 
 ## Integrations
 

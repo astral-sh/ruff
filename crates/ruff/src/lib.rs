@@ -344,7 +344,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             let s = if modifications == 1 { "" } else { "s" };
             #[expect(clippy::print_stderr)]
             {
-                eprintln!("Added {modifications} noqa directive{s}.");
+                eprintln!("Added {modifications} suppression comment{s}.");
             }
         }
         return Ok(ExitStatus::Success);
