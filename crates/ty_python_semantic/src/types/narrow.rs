@@ -757,10 +757,11 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
     }
 
     if [left_ty, right_ty].into_iter().any(|ty| {
-        ty.has_custom_equality(db)
-            && ((ty.is_single_valued(db) && ty.as_literal_value().is_none())
-                || ty.as_enum_literal().is_some()
-                || ty.is_enum(db))
+        if ty.as_enum_literal().is_some() || ty.is_enum(db) {
+            ty.overrides_equality(db)
+        } else {
+            ty.is_single_valued(db) && ty.as_literal_value().is_none() && ty.has_custom_eq(db)
+        }
     }) {
         return true;
     }
