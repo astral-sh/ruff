@@ -990,6 +990,11 @@ fn rule_f401() {
 }
 
 #[test]
+fn rule_unused_import() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "unused-import"]));
+}
+
+#[test]
 fn rule_f401_output_json() {
     insta::with_settings!({filters => vec![
         (r#"("file": ")[^"]+(",)"#, "$1<FILE>$2"),

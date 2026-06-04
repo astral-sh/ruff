@@ -430,6 +430,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             Clone,
             Hash,
             ::strum_macros::IntoStaticStr,
+            ::strum_macros::EnumString,
         )]
         #[repr(u16)]
         #[strum(serialize_all = "kebab-case")]
