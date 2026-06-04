@@ -1053,6 +1053,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn is_synthesized_descriptor_callable(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Callable(callable) => {
+                callable.is_function_like(db) || callable.is_classmethod_like(db)
+            }
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| element.is_synthesized_descriptor_callable(db)),
+            _ => false,
+        }
+    }
+
     /// Bind `Self` type variables in this type to a concrete self type.
     ///
     /// Uses MRO-based matching: a `Self` typevar is only bound if its owner class
@@ -3751,11 +3764,6 @@ impl<'db> Type<'db> {
                                     member_policy,
                                     None,
                                 )
-                                .map(|member| {
-                                    member.map_type(|ty| {
-                                        ty.apply_parameter_self_to_bound_methods(db, receiver)
-                                    })
-                                })
                                 .filter(|member| {
                                     matches!(
                                         member.place,
@@ -3764,6 +3772,30 @@ impl<'db> Type<'db> {
                                             ..
                                         })
                                     )
+                                })
+                                .map(|member| {
+                                    // Synthesized descriptor callables have already bound `Self`
+                                    // to the local constraint arm. Re-run descriptor binding to
+                                    // substitute the full intersection receiver.
+                                    let receiver_bound_callable = match member.place {
+                                        Place::Defined(DefinedPlace { ty, .. })
+                                            if ty.is_synthesized_descriptor_callable(db) =>
+                                        {
+                                            element
+                                                .typevar_alternative_member_lookup_with_policy_and_receiver(
+                                                    db,
+                                                    name_str.into(),
+                                                    member_policy,
+                                                    Some(receiver),
+                                                )
+                                        }
+                                        _ => None,
+                                    };
+                                    receiver_bound_callable.unwrap_or_else(|| {
+                                        member.map_type(|ty| {
+                                            ty.apply_parameter_self_to_bound_methods(db, receiver)
+                                        })
+                                    })
                                 });
                             let member =
                                 partial_alternative.unwrap_or_else(|| lookup_member(element));

@@ -660,6 +660,38 @@ DecoratedOwnedOrAliased = TypeVar("DecoratedOwnedOrAliased", OwnedValue, Aliased
 def decorated_constraint_arm_ownership(value: Intersection[DecoratedOwnedOrAliased, Extra]):
     value.copy().extra  # error: [unresolved-attribute]
 
+class DecoratedPartialHas:
+    @identity
+    def set(self, other: Self) -> None: ...
+
+class DecoratedPartialNo: ...
+
+class DecoratedPartialFallback:
+    def set(self, other: object) -> None: ...
+
+DecoratedPartial = TypeVar("DecoratedPartial", DecoratedPartialHas, DecoratedPartialNo)
+
+def decorated_partial(value: Intersection[DecoratedPartial, DecoratedPartialFallback]):
+    value.set(DecoratedPartialHas())  # error: [invalid-argument-type]
+
+class DecoratedPartialClassHas:
+    @classmethod
+    @identity
+    def set(cls, other: Self) -> None: ...
+
+class DecoratedPartialClassNo: ...
+
+class DecoratedPartialClassFallback:
+    @classmethod
+    def set(cls, other: object) -> None: ...
+
+DecoratedPartialClass = TypeVar("DecoratedPartialClass", DecoratedPartialClassHas, DecoratedPartialClassNo)
+
+def decorated_partial_class(
+    cls: Intersection[type[DecoratedPartialClass], type[DecoratedPartialClassFallback]],
+):
+    cls.set(DecoratedPartialClassHas())  # error: [invalid-argument-type]
+
 def _(
     value: Intersection[Value, Extra],
     cls: Intersection[type[Value], type[Extra]],
