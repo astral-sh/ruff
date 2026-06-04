@@ -2,15 +2,12 @@
 
 use std::fs;
 use std::process::Command;
-use std::str;
-
 use anyhow::Result;
 
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
-const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
 impl CliTest {
@@ -475,9 +472,9 @@ ignore = ["D203", "D212"]
 }
 
 #[test]
-fn nonexistent_config_file() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn nonexistent_config_file() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "foo.toml", "."]), @"
     success: false
     exit_code: 2
@@ -495,12 +492,13 @@ fn nonexistent_config_file() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn config_override_rejected_if_invalid_toml() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn config_override_rejected_if_invalid_toml() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "foo = bar", "."]), @"
     success: false
     exit_code: 2
@@ -523,6 +521,7 @@ fn config_override_rejected_if_invalid_toml() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
@@ -553,9 +552,9 @@ fn too_many_config_files() -> Result<()> {
 }
 
 #[test]
-fn extend_passed_via_config_argument() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn extend_passed_via_config_argument() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "extend = 'foo.toml'", "."]), @"
     success: false
     exit_code: 2
@@ -568,6 +567,7 @@ fn extend_passed_via_config_argument() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
@@ -757,9 +757,9 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
 }
 
 #[test]
-fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn valid_toml_but_nonexistent_option_provided_via_config_argument() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args([".", "--config", "extend-select=['F481']"]),  // No such code as F481!
         @"
     success: false
@@ -779,12 +779,13 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn each_toml_option_requires_a_new_flag_1() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn each_toml_option_requires_a_new_flag_1() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         // commas can't be used to delimit different config overrides;
         // you need a new --config flag for each override
         .args([".", "--config", "extend-select=['F841'], line-length=90"]),
@@ -810,12 +811,13 @@ fn each_toml_option_requires_a_new_flag_1() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn each_toml_option_requires_a_new_flag_2() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn each_toml_option_requires_a_new_flag_2() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         // spaces *also* can't be used to delimit different config overrides;
         // you need a new --config flag for each override
         .args([".", "--config", "extend-select=['F841'] line-length=90"]),
@@ -841,13 +843,14 @@ fn each_toml_option_requires_a_new_flag_2() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
-fn value_given_to_table_key_is_not_inline_table_1() {
+fn value_given_to_table_key_is_not_inline_table_1() -> Result<()> {
     // https://github.com/astral-sh/ruff/issues/13995
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args([".", "--config", r#"lint.flake8-pytest-style="csv""#]),
         @r#"
     success: false
@@ -878,13 +881,14 @@ fn value_given_to_table_key_is_not_inline_table_1() {
 
     For more information, try '--help'.
     "#);
+    Ok(())
 }
 
 #[test]
-fn value_given_to_table_key_is_not_inline_table_2() {
+fn value_given_to_table_key_is_not_inline_table_2() -> Result<()> {
     // https://github.com/astral-sh/ruff/issues/13995
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args([".", "--config", r#"lint=123"#]),
         @"
     success: false
@@ -929,6 +933,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
 
     For more information, try '--help'.
     ");
+    Ok(())
 }
 
 #[test]
@@ -988,9 +993,9 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
 }
 
 #[test]
-fn deprecated_config_option_overridden_via_cli() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn deprecated_config_option_overridden_via_cli() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "select=['N801']", "-"])
         .pass_stdin("class lowercase: ..."),
         @"
@@ -1004,6 +1009,7 @@ fn deprecated_config_option_overridden_via_cli() {
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
       - 'select' -> 'lint.select'
     ");
+    Ok(())
 }
 
 #[test]
@@ -2871,10 +2877,10 @@ fn flake8_import_convention_nfkc_normalization() -> Result<()> {
 }
 
 #[test]
-fn flake8_import_convention_unused_aliased_import() {
+fn flake8_import_convention_unused_aliased_import() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["import pandas"]"#)
             .args(["--select", "I002,ICN001,F401"])
@@ -2884,13 +2890,14 @@ fn flake8_import_convention_unused_aliased_import() {
             .arg("-")
             .pass_stdin("1")
     );
+    Ok(())
 }
 
 #[test]
-fn flake8_import_convention_unused_aliased_import_no_conflict() {
+fn flake8_import_convention_unused_aliased_import_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["import pandas as pd"]"#)
             .args(["--select", "I002,ICN001,F401"])
@@ -2900,55 +2907,60 @@ fn flake8_import_convention_unused_aliased_import_no_conflict() {
             .arg("-")
             .pass_stdin("1")
     );
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_conflicts_with_pyi025() {
+fn required_import_set_conflicts_with_pyi025() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set"]"#)
             .args(["--select", "I002,PYI025"])
             .arg("-")
             .pass_stdin("1")
     );
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_aliased_as_abstract_set_no_conflict() {
+fn required_import_set_aliased_as_abstract_set_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set as AbstractSet"]"#)
             .args(["--select", "I002,PYI025"])
             .arg("-")
             .pass_stdin("1")
     );
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_without_pyi025_no_conflict() {
+fn required_import_set_without_pyi025_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set"]"#)
             .args(["--select", "I002"])
             .arg("-")
             .pass_stdin("1")
     );
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/19842
 #[test]
-fn pyupgrade_up026_respects_isort_required_import_fix() {
+fn pyupgrade_up026_respects_isort_required_import_fix() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        test.command()
             .arg("--isolated")
             .arg("check")
             .arg("-")
@@ -2969,13 +2981,15 @@ fn pyupgrade_up026_respects_isort_required_import_fix() {
     Found 1 error (1 fixed, 0 remaining).
     "
     );
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/19842
 #[test]
-fn pyupgrade_up026_respects_isort_required_import_from_fix() {
+fn pyupgrade_up026_respects_isort_required_import_from_fix() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        test.command()
             .arg("--isolated")
             .arg("check")
             .arg("-")
@@ -2995,11 +3009,12 @@ fn pyupgrade_up026_respects_isort_required_import_from_fix() {
     All checks passed!
     "
     );
+    Ok(())
 }
 
 // See: https://github.com/astral-sh/ruff/issues/16177
 #[test]
-fn flake8_pyi_redundant_none_literal() {
+fn flake8_pyi_redundant_none_literal() -> Result<()> {
     let snippet = r#"
 from typing import Literal
 
@@ -3012,8 +3027,8 @@ c: Literal[None] | Literal[None,]
 d: Literal[None,] | Literal[None]
 "#;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args(["--select", "PYI061"])
         .args(["--stdin-filename", "test.py"])
         .arg("--preview")
@@ -3042,6 +3057,7 @@ d: Literal[None,] | Literal[None]
     ----- stderr -----
     Would fix 4 errors.
     ");
+    Ok(())
 }
 
 /// Test that private, old-style `TypeVar` generics
@@ -3050,9 +3066,9 @@ d: Literal[None,] | Literal[None]
 /// 3. Emit a warning that the standalone type variable is now unused (PYI018)
 /// 4. Remove the now-unused `Generic` import
 #[test]
-fn pep695_generic_rename() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn pep695_generic_rename() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args(["--select", "F401,PYI018,UP046,UP047,UP049"])
         .args(["--stdin-filename", "test.py"])
         .arg("--unsafe-fixes")
@@ -3090,15 +3106,16 @@ def func(t: _T) -> _T:
     Found 7 errors (7 fixed, 0 remaining).
     "
     );
+    Ok(())
 }
 
 /// Test that we do not rename two different type parameters to the same name
 /// in one execution of Ruff (autofixing this to `class Foo[T, T]: ...` would
 /// introduce invalid syntax)
 #[test]
-fn type_parameter_rename_isolation() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn type_parameter_rename_isolation() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command()
         .args(["--select", "UP049"])
         .args(["--stdin-filename", "test.py"])
         .arg("--unsafe-fixes")
@@ -3125,6 +3142,7 @@ class Foo[_T, __T]:
     Found 2 errors (1 fixed, 1 remaining).
     "
     );
+    Ok(())
 }
 
 /// construct a directory tree with this structure:
@@ -3246,10 +3264,10 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
 
 /// Test that the linter respects per-file-target-version.
 #[test]
-fn per_file_target_version_linter() {
+fn per_file_target_version_linter() -> Result<()> {
+    let test = CliTest::new()?;
     // without per-file-target-version, there should be one UP046 error
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .args(["--target-version", "py312"])
         .args(["--select", "UP046"]) // only triggers on 3.12+
         .args(["--stdin-filename", "test.py"])
@@ -3277,8 +3295,7 @@ class A(Generic[T]):
 
     // with per-file-target-version, there should be no errors because the new generic syntax is
     // unavailable
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .args(["--target-version", "py312"])
         .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
         .args(["--select", "UP046"]) // only triggers on 3.12+
@@ -3302,13 +3319,14 @@ class A(Generic[T]):
     ----- stderr -----
     "
     );
+    Ok(())
 }
 
 #[test]
-fn walrus_before_py38() {
+fn walrus_before_py38() -> Result<()> {
+    let test = CliTest::new()?;
     // ok
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py38")
         .arg("-")
@@ -3324,8 +3342,7 @@ fn walrus_before_py38() {
     );
 
     // not ok on 3.7 with preview
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py37")
         .arg("-")
@@ -3340,13 +3357,14 @@ fn walrus_before_py38() {
     ----- stderr -----
     "
     );
+    Ok(())
 }
 
 #[test]
-fn match_before_py310() {
+fn match_before_py310() -> Result<()> {
+    let test = CliTest::new()?;
     // ok on 3.10
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py310")
         .arg("-")
@@ -3368,8 +3386,7 @@ match 2:
     );
 
     // ok on 3.9 without preview
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py39")
         .arg("-")
@@ -3392,8 +3409,7 @@ match 2:
     );
 
     // syntax error on 3.9 with preview
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    assert_cmd_snapshot!(test.check_command()
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py39")
         .arg("--preview")
@@ -3415,6 +3431,7 @@ match 2:
     ----- stderr -----
     "
     );
+    Ok(())
 }
 
 /// Regression test for <https://github.com/astral-sh/ruff/issues/16417>
@@ -3603,7 +3620,8 @@ fn semantic_syntax_errors() -> Result<()> {
 /// `lint.typing-extensions = false` with Python 3.9 should disable the PYI019 lint because it would
 /// try to import `Self` from `typing_extensions`
 #[test]
-fn combine_typing_extensions_config() {
+fn combine_typing_extensions_config() -> Result<()> {
+    let test = CliTest::new()?;
     let contents = "
 from typing import TypeVar
 T = TypeVar('T')
@@ -3611,8 +3629,7 @@ class Foo:
     def f(self: T) -> T: ...
 ";
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .args(["--config", "lint.typing-extensions = false"])
             .arg("--select=PYI019")
             .arg("--target-version=py39")
@@ -3627,6 +3644,7 @@ class Foo:
     ----- stderr -----
     "
     );
+    Ok(())
 }
 
 #[test_case::test_case("concise")]
@@ -3704,15 +3722,15 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
 }
 
 #[test]
-fn up045_nested_optional_flatten_all() {
+fn up045_nested_optional_flatten_all() -> Result<()> {
+    let test = CliTest::new()?;
     let contents = "\
 from typing import Optional
 nested_optional: Optional[Optional[Optional[str]]] = None
 ";
 
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .args(["--select", "UP045", "--diff", "--target-version", "py312"])
             .arg("-")
             .pass_stdin(contents),
@@ -3730,12 +3748,14 @@ nested_optional: Optional[Optional[Optional[str]]] = None
     Would fix 1 error.
     ",
     );
+    Ok(())
 }
 
 #[test]
-fn show_fixes_in_full_output_with_preview_enabled() {
+fn show_fixes_in_full_output_with_preview_enabled() -> Result<()> {
+    let test = CliTest::new()?;
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        test.command()
             .args(["check", "--no-cache", "--output-format", "full"])
             .args(["--select", "F401"])
             .arg("--preview")
@@ -3760,6 +3780,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     ----- stderr -----
     ",
     );
+    Ok(())
 }
 
 #[test]
