@@ -1445,9 +1445,14 @@ from typing import Literal
 from ty_extensions import Intersection
 
 def takes_literal_pair(value: tuple[Literal[1], Literal[2]]): ...
+def takes_tuple(value: tuple[object, ...]): ...
+def takes_named_tuple(value: typing.NamedTuple): ...
 def narrowed_named_tuple(value: Intersection[typing.NamedTuple, tuple[Literal[1], Literal[2]]]):
-    reveal_type(value._replace(x=3))  # revealed: NamedTupleLike
-    takes_literal_pair(value._replace(x=3))  # error: [invalid-argument-type]
+    result = value._replace(x=3)
+    reveal_type(result)  # revealed: tuple[object, ...] & NamedTupleLike
+    takes_tuple(result)
+    takes_named_tuple(result)
+    takes_literal_pair(result)  # error: [invalid-argument-type]
 ```
 
 NamedTuples are assignable to `NamedTupleLike`. The `NamedTupleLike._replace` method is typed with
