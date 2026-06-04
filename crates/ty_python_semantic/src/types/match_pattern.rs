@@ -8,8 +8,8 @@ use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::signatures::CallableSignature;
 use crate::types::{
-    CallableType, ClassLiteral, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature,
-    SpecialFormType, Type, TypeContext, UnionType, infer_same_file_expression_type,
+    CallableType, ClassBase, ClassLiteral, IntersectionBuilder, KnownClass, Parameter, Parameters,
+    Signature, SpecialFormType, Type, TypeContext, UnionType, infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -47,22 +47,33 @@ pub(crate) fn class_pattern_is_irrefutable(
 ) -> bool {
     match kind {
         ClassPatternKind::Irrefutable => true,
-        ClassPatternKind::MatchSelf => matches!(
-            class.known(db),
-            Some(
-                KnownClass::Bool
-                    | KnownClass::Bytearray
-                    | KnownClass::Bytes
-                    | KnownClass::Dict
-                    | KnownClass::Float
-                    | KnownClass::FrozenSet
-                    | KnownClass::Int
-                    | KnownClass::List
-                    | KnownClass::Set
-                    | KnownClass::Str
-                    | KnownClass::Tuple
-            )
-        ),
+        ClassPatternKind::MatchSelf => {
+            Type::ClassLiteral(class)
+                .member(db, "__match_args__")
+                .place
+                .is_undefined()
+                && class
+                    .iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                    .any(|base| {
+                        matches!(
+                            base.class_literal(db).known(db),
+                            Some(
+                                KnownClass::Bool
+                                    | KnownClass::Bytearray
+                                    | KnownClass::Bytes
+                                    | KnownClass::Dict
+                                    | KnownClass::Float
+                                    | KnownClass::FrozenSet
+                                    | KnownClass::Int
+                                    | KnownClass::List
+                                    | KnownClass::Set
+                                    | KnownClass::Str
+                                    | KnownClass::Tuple
+                            )
+                        )
+                    })
+        }
         ClassPatternKind::Refutable => false,
     }
 }

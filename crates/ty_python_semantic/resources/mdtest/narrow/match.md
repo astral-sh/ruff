@@ -441,6 +441,37 @@ def test_match_builtin_self_patterns_are_exhaustive(
         ):
             return 1
 
+class MyInt(int): ...
+
+def test_match_builtin_self_subclass_is_exhaustive(value: MyInt) -> int:
+    match value:
+        case MyInt(item):
+            return item
+
+class MyIntWithMatchArgs(int):
+    __match_args__ = ("missing",)
+
+def test_match_builtin_subclass_with_match_args_is_not_exhaustive(
+    value: MyIntWithMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case MyIntWithMatchArgs(_):
+            return 1
+
+class MatchArgsMeta(type):
+    __match_args__ = ("missing",)
+
+class MyIntWithMetaclassMatchArgs(int, metaclass=MatchArgsMeta): ...
+
+def test_match_builtin_subclass_with_metaclass_match_args_is_not_exhaustive(
+    value: MyIntWithMetaclassMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case MyIntWithMetaclassMatchArgs(_):
+            return 1
+
 def test_match_variable_class_sequence_is_not_exhaustive(
     value: tuple[int],
     C: type[int] | type[str],
