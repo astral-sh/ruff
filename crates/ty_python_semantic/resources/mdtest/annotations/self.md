@@ -506,6 +506,24 @@ def correlated_partial_method(
     reveal_type(value.get())  # revealed: CorrelatedReturnA | CorrelatedReturnB
     value.get().a  # error: [unresolved-attribute]
 
+class HasPartialSelfSet:
+    def set(self, other: Self) -> None: ...
+
+class NoPartialSelfSet: ...
+
+class PartialSelfSetFallback:
+    def set(self, other: object) -> None: ...
+
+PartialSelfSetConstraint = TypeVar("PartialSelfSetConstraint", HasPartialSelfSet, NoPartialSelfSet)
+
+def partial_self_parameter(
+    value: Intersection[PartialSelfSetConstraint, PartialSelfSetFallback],
+):
+    # TODO: Avoid emitting the same union-call incompatibility on both the call and argument.
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    value.set(HasPartialSelfSet())
+
 class HasClassGet:
     @classmethod
     def get(cls) -> Self:

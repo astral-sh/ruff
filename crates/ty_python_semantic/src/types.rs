@@ -1162,6 +1162,42 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn apply_parameter_self_to_bound_methods(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        match self {
+            Type::BoundMethod(bound_method) => {
+                let function = bound_method.function(db);
+                let has_self_parameter = function.signature(db).overloads.iter().any(|signature| {
+                    let receiver_is_removed = signature
+                        .parameters()
+                        .get(0)
+                        .is_some_and(Parameter::is_positional);
+                    signature
+                        .parameters()
+                        .into_iter()
+                        .skip(usize::from(receiver_is_removed))
+                        .any(|parameter| parameter.annotated_type().contains_self(db))
+                });
+                if !has_self_parameter {
+                    return self;
+                }
+                // Keep the descriptor bound to the constraint arm, but bind `Self` in its
+                // signature to the full intersection receiver.
+                let typing_self_type = bound_method
+                    .map_self_type(db, |_| self_type)
+                    .typing_self_type(db);
+                Type::BoundMethod(BoundMethodType::new(
+                    db,
+                    function.apply_self(db, typing_self_type),
+                    bound_method.self_instance(db),
+                ))
+            }
+            Type::Union(union) => union.map(db, |element| {
+                element.apply_parameter_self_to_bound_methods(db, self_type)
+            }),
+            _ => self,
+        }
+    }
+
     /// Returns `true` if `self` is [`Type::Callable`].
     pub(crate) const fn is_callable_type(&self) -> bool {
         matches!(self, Type::Callable(..))
@@ -3715,6 +3751,11 @@ impl<'db> Type<'db> {
                                     member_policy,
                                     None,
                                 )
+                                .map(|member| {
+                                    member.map_type(|ty| {
+                                        ty.apply_parameter_self_to_bound_methods(db, receiver)
+                                    })
+                                })
                                 .filter(|member| {
                                     matches!(
                                         member.place,
