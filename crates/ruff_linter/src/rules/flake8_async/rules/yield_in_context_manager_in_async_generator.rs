@@ -24,6 +24,16 @@ use crate::checkers::ast::Checker;
 /// ensure timely cleanup, or the generator should be refactored to avoid
 /// holding context managers open across yields.
 ///
+/// ## Known problems
+/// Using [`aclosing()`] around all call sites of an async generator is a
+/// valid way to guarantee timely cleanup, but this rule cannot verify that
+/// all callers use `aclosing()`. As a result, it may flag generators that
+/// are always consumed safely.
+///
+/// The rule also suppresses diagnostics for functions decorated with
+/// `@pytest.fixture` or `@pytest_asyncio.fixture`, as the pytest runner
+/// handles generator cleanup automatically.
+///
 /// ## Example
 ///
 /// The following function yields once inside a context manager, but without
@@ -53,7 +63,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [PEP 533 – Deterministic cleanup for iterators](https://peps.python.org/pep-0533/)
-/// - [contextlib.aclosing](https://docs.python.org/3/library/contextlib.html#contextlib.aclosing)
+/// - [`aclosing()`](https://docs.python.org/3/library/contextlib.html#contextlib.aclosing)
 /// - [trio.as_safe_channel](https://trio.readthedocs.io/en/latest/reference-core.html#trio.as_safe_channel)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
@@ -62,7 +72,11 @@ pub(crate) struct YieldInContextManagerInAsyncGenerator;
 impl Violation for YieldInContextManagerInAsyncGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Yield in context manager in async generator may not trigger cleanup. Use `@asynccontextmanager` if appropriate, or refactor.".to_string()
+        "Yield in context manager in async generator may not trigger cleanup".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `@asynccontextmanager` if appropriate, or refactor".to_string())
     }
 }
 
@@ -94,7 +108,7 @@ pub(crate) fn yield_in_context_manager_in_async_generator(checker: &Checker, exp
 }
 
 /// Returns the enclosing `async` function definition, if any.
-fn enclosing_async_function<'a>(checker: &'a Checker) -> Option<&'a ast::StmtFunctionDef> {
+fn enclosing_async_function<'a>(checker: &Checker<'a>) -> Option<&'a ast::StmtFunctionDef> {
     for scope in checker.semantic().current_scopes() {
         match scope.kind {
             ScopeKind::Function(function_def) if function_def.is_async => {
