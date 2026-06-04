@@ -2148,6 +2148,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         Some((place, NarrowingConstraint::intersection(intersection)))
     }
 
+    // TODO: Restructure this helper to return the key-presence constraint and apply it with
+    // `NarrowingConstraint::intersection` at the call site instead of constructing a replacement
+    // type here.
     fn narrow_with_present_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
         let db = self.db;
         let constrain = |ty, key_presence_constraint| {
@@ -2159,6 +2162,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.narrow_with_present_key(*element, key)
             }),
             resolved if typeddict_declares_key(self.db, resolved, key) => resolved,
+            // TODO: Extend this to subtypes of `Mapping[str, object]` whose membership and
+            // subscript operations obey the `Mapping` contract.
             resolved if is_or_contains_typeddict(self.db, resolved) => constrain(
                 ty,
                 Type::TypedDict(required_typeddict_key(self.db, key, Type::object())),
