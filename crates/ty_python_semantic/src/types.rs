@@ -1115,12 +1115,15 @@ impl<'db> Type<'db> {
                     }) => class.is_known(db, KnownClass::NamedTupleLike),
                     _ => false,
                 });
+        let named_tuple_shape =
+            has_named_tuple_like_constraint.then(|| Type::homogeneous_tuple(db, Type::object()));
         let mut builder = IntersectionBuilder::new(db);
         for positive in intersection.positive(db) {
             // `NamedTupleLike` is deliberately combined with a tuple type to describe
             // `typing.NamedTuple`; unlike a user protocol, it is not a flow refinement.
             let is_value_refinement = type_is_truthiness_refinement(db, *positive)
-                || (type_is_tuple_refinement(db, *positive) && !has_named_tuple_like_constraint)
+                || (type_is_tuple_refinement(db, *positive)
+                    && named_tuple_shape != Some(*positive))
                 || matches!(
                     positive,
                     Type::ProtocolInstance(ProtocolInstanceType {

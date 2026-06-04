@@ -1438,6 +1438,18 @@ def _(y: type[typing.NamedTuple]):
 def _(z: typing.NamedTuple[int]): ...
 ```
 
+Value-level tuple refinements do not apply to another instance returned as `Self`:
+
+```py
+from typing import Literal
+from ty_extensions import Intersection
+
+def takes_literal_pair(value: tuple[Literal[1], Literal[2]]): ...
+def narrowed_named_tuple(value: Intersection[typing.NamedTuple, tuple[Literal[1], Literal[2]]]):
+    reveal_type(value._replace(x=3))  # revealed: NamedTupleLike
+    takes_literal_pair(value._replace(x=3))  # error: [invalid-argument-type]
+```
+
 NamedTuples are assignable to `NamedTupleLike`. The `NamedTupleLike._replace` method is typed with
 `(*args, **kwargs)`, which type checkers treat as equivalent to `...` (per the typing spec), making
 all NamedTuple implementations automatically compatible:
