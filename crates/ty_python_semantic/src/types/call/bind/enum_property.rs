@@ -6,8 +6,8 @@ use crate::types::call::CallArguments;
 use crate::types::{KnownClass, PropertyInstanceType, Type};
 
 impl<'db> Bindings<'db> {
-    /// Updates both the callable return and the constructed instance, which are tracked separately
-    /// for constructor bindings.
+    /// Replaces constructed `enum.property` instances with the property type derived from their
+    /// accessor arguments.
     pub(super) fn evaluate_enum_property_calls(
         &mut self,
         db: &'db dyn Db,
@@ -22,21 +22,6 @@ impl<'db> Bindings<'db> {
                     deleter.filter(|ty| !ty.is_none(db)),
                 ))
             };
-
-        for binding in self.iter_flat_mut() {
-            if !matches!(
-                binding.callable_type,
-                Type::ClassLiteral(class) if class.is_known(db, KnownClass::EnumProperty)
-            ) {
-                continue;
-            }
-
-            for (_, overload) in binding.matching_overloads_mut() {
-                if let [getter, setter, deleter, ..] = overload.parameter_types() {
-                    overload.set_return_type(property_instance(*getter, *setter, *deleter));
-                }
-            }
-        }
 
         for constructor in self.iter_constructor_items_mut() {
             if !constructor
