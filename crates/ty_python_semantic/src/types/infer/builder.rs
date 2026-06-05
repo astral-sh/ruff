@@ -5932,10 +5932,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid promoting explicitly annotated literal values.
         if let Type::LiteralValue(literal) = ty
             && let Some(tcx) = tcx.annotation
-            && let Type::Union(_) | Type::LiteralValue(_) = tcx
+            && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
                 .resolve_type_alias(self.db())
                 .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
-            && ty.is_assignable_to(self.db(), tcx)
+            && ty.is_assignable_to(self.db(), literal_tcx)
         {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
