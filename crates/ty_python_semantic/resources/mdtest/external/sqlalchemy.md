@@ -193,3 +193,31 @@ async def test_async(session: AsyncSession):
         reveal_type(user_id)  # revealed: int
         reveal_type(name)  # revealed: str
 ```
+
+## Already-Mapped annotations are not double-wrapped
+
+When a class already uses `Mapped[T]` annotations (SQLAlchemy 2.x style), the attributes
+should NOT be wrapped again. The existing descriptor protocol handles them correctly.
+
+```py
+from sqlalchemy import Integer, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+class Base(DeclarativeBase):
+    pass
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+
+# Class-level access should work via the descriptor protocol as before
+reveal_type(User.id)  # revealed: InstrumentedAttribute[int]
+reveal_type(User.name)  # revealed: InstrumentedAttribute[str]
+
+# Instance-level access should return the plain types
+user = User(name="test")
+reveal_type(user.id)  # revealed: int
+reveal_type(user.name)  # revealed: str
+```

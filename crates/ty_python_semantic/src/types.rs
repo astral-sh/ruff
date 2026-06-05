@@ -2984,6 +2984,128 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// For SQLAlchemy/SQLModel ORM table classes with plain type annotations (not `Mapped[T]`),
+    /// wrap the attribute type as an instance of `Mapped[T]` so that the descriptor protocol
+    /// correctly infers `InstrumentedAttribute[T]` for class-level attribute access.
+    ///
+    /// Returns the attribute unchanged if:
+    /// - The class is not a detected ORM table class
+    /// - The attribute name is a dunder
+    /// - The attribute is not a defined place
+    /// - `Mapped` cannot be resolved (SQLAlchemy not installed)
+    fn maybe_wrap_orm_attribute_as_mapped(
+        db: &'db dyn Db,
+        class_ty: Type<'db>,
+        attr_name: &str,
+        attribute: PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        if attr_name.starts_with("__") && attr_name.ends_with("__") {
+            return attribute;
+        }
+
+        if attribute.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+            return attribute;
+        }
+
+        let static_literal = match class_ty {
+            Type::ClassLiteral(ClassLiteral::Static(lit)) => lit,
+            Type::GenericAlias(alias) => alias.origin(db),
+            _ => return attribute,
+        };
+
+        if !static_literal.is_sqlalchemy_orm_table_class(db) {
+            return attribute;
+        }
+
+        let Place::Defined(DefinedPlace {
+            ty: attr_ty,
+            origin,
+            definedness,
+            public_type_policy,
+        }) = attribute.place
+        else {
+            return attribute;
+        };
+
+        if Self::type_is_already_mapped(db, attr_ty) {
+            return attribute;
+        }
+
+        let Some(mapped_instance_ty) = Self::wrap_type_in_mapped(db, static_literal, attr_ty)
+        else {
+            return attribute;
+        };
+
+        PlaceAndQualifiers {
+            place: Place::Defined(DefinedPlace {
+                ty: mapped_instance_ty,
+                origin,
+                definedness,
+                public_type_policy,
+            }),
+            qualifiers: attribute.qualifiers,
+        }
+    }
+
+    /// Check if a type is already an instance of SQLAlchemy's `Mapped` class.
+    fn type_is_already_mapped(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let class_type = match ty {
+            Type::NominalInstance(instance) => instance.class(db),
+            _ => return false,
+        };
+        let literal = class_type.class_literal(db);
+        let file = literal.file(db);
+        let Some(module) = ty_module_resolver::file_to_module(db, file) else {
+            return false;
+        };
+        let module_name = module.name(db).as_str();
+        let class_name = literal.name(db).as_str();
+        class_name == "Mapped"
+            && (module_name == "sqlalchemy.orm.base"
+                || module_name == "sqlalchemy.orm.attributes"
+                || module_name.starts_with("sqlalchemy.orm"))
+    }
+
+    /// Construct an instance of `Mapped[T]` for the given attribute type.
+    /// Returns `None` if `Mapped` cannot be resolved.
+    fn wrap_type_in_mapped(
+        db: &'db dyn Db,
+        class_literal: StaticClassLiteral<'db>,
+        attr_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let importing_file = class_literal.file(db);
+
+        let module_names = ["sqlalchemy.orm.attributes", "sqlalchemy.orm.base"];
+        let mut mapped_literal: Option<StaticClassLiteral<'db>> = None;
+
+        for module_str in &module_names {
+            let Some(module_name) = ModuleName::new(module_str) else {
+                continue;
+            };
+            let Some(module) = resolve_module(db, importing_file, &module_name) else {
+                continue;
+            };
+            let Some(file) = module.file(db) else {
+                continue;
+            };
+            let symbol = imported_symbol(db, Some(file), "Mapped", None);
+            if let Place::Defined(DefinedPlace {
+                ty: Type::ClassLiteral(ClassLiteral::Static(lit)),
+                ..
+            }) = symbol.place
+            {
+                mapped_literal = Some(lit);
+                break;
+            }
+        }
+
+        let mapped_literal = mapped_literal?;
+        let generic_context = mapped_literal.generic_context(db)?;
+        let specialization = generic_context.specialize(db, &[attr_ty]);
+        let alias = GenericAlias::new(db, mapped_literal, specialization);
+        Some(Type::instance(db, ClassType::Generic(alias)))
+    }
+
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
     /// and `owner` as arguments. This method exists as a separate step as we need to handle unions
     /// and intersections explicitly.
@@ -3768,6 +3890,9 @@ impl<'db> Type<'db> {
                     .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
                 let class_attr_plain =
                     class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
+
+                let class_attr_plain =
+                    Self::maybe_wrap_orm_attribute_as_mapped(db, self, name_str, class_attr_plain);
 
                 let class_attr_fallback =
                     Self::try_call_dunder_get_on_attribute(db, class_attr_plain, None, self).0;
