@@ -950,11 +950,22 @@ impl AbstractMethodKind {
     }
 }
 
-/// Represents a function type, which might be a non-generic function, or a specialization of a
-/// generic function.
+/// Contains potentially modified signatures for a function literal.
+///
+/// This uncommon payload is boxed so that ordinary function types only retain the literal and one
+/// optional pointer.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct UpdatedFunctionSignatures<'db> {
+    /// Contains a potentially modified signature for this function literal, in case certain
+    /// operations (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::updated_signature`].
     signature: Option<CallableSignature<'db>>,
+
+    /// Contains a potentially modified signature for the implementation of an overloaded function,
+    /// in case certain operations (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::last_definition_signature`].
     implementation_signature: Option<Signature<'db>>,
 }
 
@@ -972,13 +983,12 @@ impl<'db> UpdatedFunctionSignatures<'db> {
     }
 }
 
+/// Represents a function type, which might be a non-generic function, or a specialization of a
+/// generic function.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 
-    /// Contains potentially modified signatures for this function literal, in case certain
-    /// operations like type mappings have been applied to it. Keep this uncommon payload boxed so
-    /// ordinary function types only retain the literal and one optional pointer.
     #[returns(as_ref)]
     updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
 }
