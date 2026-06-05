@@ -449,6 +449,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Look up an instance member defined directly on this class (not inherited).
     ///
     /// Namespace entries are class attributes, not values stored directly on instances.
+    #[expect(clippy::unused_self)]
     pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
         Member::unbound()
     }
