@@ -72,7 +72,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
-    enclosing_generic_contexts,
+    enclosing_binding_contexts,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -564,7 +564,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.scope
     }
 
-    /// Returns call bindings annotated with the call site's enclosing generic contexts.
+    /// Returns call bindings annotated with the call site's enclosing binding contexts.
     ///
     /// Call binding uses this as an optimization hint to avoid freshening generic callable
     /// signatures when the callable's generic context cannot collide with a containing scope.
@@ -572,8 +572,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         callable_type
             .bindings(db)
-            .with_enclosing_generic_contexts(enclosing_generic_contexts(
-                db,
+            .with_enclosing_binding_contexts(enclosing_binding_contexts(
                 self.index,
                 self.scope().file_scope_id(db),
             ))
