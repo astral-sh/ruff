@@ -6913,7 +6913,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
+        let mut builder =
+            SpecializationBuilder::new(self.db(), &constraints, inferable, generic_context);
 
         let mut tuple_size_promotion_constraints = TupleSizePromotionConstraints::default();
 
