@@ -292,7 +292,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
 
 /// Formats the content of the passed comment.
 ///
-/// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, or `!`
+/// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, `!`, or `|`
 /// * Replaces non breaking whitespaces with regular whitespaces except if in front of a `types:` comment
 pub(crate) const fn format_comment(comment: &SourceComment) -> FormatComment<'_> {
     FormatComment { comment }
