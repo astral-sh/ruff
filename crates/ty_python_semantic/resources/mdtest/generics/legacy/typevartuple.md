@@ -174,7 +174,7 @@ reveal_type(Simple[*tuple[int, str]]().attr)  # revealed: tuple[int, str]
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
 reveal_type(Simple[[int, str]]().attr)  # revealed: tuple[Unknown]
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-reveal_type(Simple[*[int, str]]().attr)  # revealed: tuple[@Todo(StarredExpression)]
+reveal_type(Simple[*[int, str]]().attr)  # revealed: tuple[Unknown, ...]
 ```
 
 ```py

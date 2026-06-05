@@ -1170,9 +1170,7 @@ impl<'db> Type<'db> {
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar
             | DynamicType::AmbiguousOverload => false,
-            DynamicType::Todo(_) | DynamicType::TodoStarredExpression | DynamicType::TodoUnpack => {
-                true
-            }
+            DynamicType::Todo(_) => true,
         })
     }
 
@@ -1919,10 +1917,8 @@ impl<'db> Type<'db> {
                 DynamicType::Unknown
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnspecializedTypeVar
-                | DynamicType::TodoUnpack
                 | DynamicType::Todo(_)
                 | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::TodoStarredExpression
                 | DynamicType::AmbiguousOverload => false,
             },
         }
@@ -6599,8 +6595,6 @@ impl<'db> Type<'db> {
             Self::Divergent(_)
             | Self::Dynamic(
                 DynamicType::Todo(_)
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoStarredExpression
                 | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::UnspecializedTypeVar,
             )
@@ -7247,10 +7241,6 @@ pub enum DynamicType<'db> {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
-    /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
-    TodoUnpack,
-    /// A special Todo-variant for `*Ts`, so that we can treat it specially in `Generic[*Ts]`
-    TodoStarredExpression,
 }
 
 impl DynamicType<'_> {
@@ -7259,7 +7249,7 @@ impl DynamicType<'_> {
     }
 
     pub(crate) fn is_todo(&self) -> bool {
-        matches!(self, Self::Todo(_) | Self::TodoUnpack)
+        matches!(self, Self::Todo(_))
     }
 }
 
@@ -7275,8 +7265,6 @@ impl std::fmt::Display for DynamicType<'_> {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
-            DynamicType::TodoUnpack => f.write_str("@Todo(typing.Unpack)"),
-            DynamicType::TodoStarredExpression => f.write_str("@Todo(StarredExpression)"),
         }
     }
 }

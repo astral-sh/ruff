@@ -142,5 +142,6 @@ def invalid(
     non_tuple: Pair[Unpack[int], str],
     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
     multiple: tuple[Unpack[Ts], Unpack[tuple[str, ...]]],
-) -> None: ...
+) -> None:
+    reveal_type(non_tuple)  # revealed: Pair[tuple[Unknown, ...], str]
 ```

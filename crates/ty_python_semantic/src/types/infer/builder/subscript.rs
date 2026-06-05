@@ -2298,7 +2298,6 @@ fn legacy_generic_class_context<'db>(
         {
             return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
         } else if any_over_type(db, argument_ty, true, |inner_ty| match inner_ty {
-            Type::Dynamic(DynamicType::TodoUnpack | DynamicType::TodoStarredExpression) => true,
             Type::NominalInstance(nominal) => matches!(
                 nominal.known_class(db),
                 Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
