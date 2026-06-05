@@ -210,6 +210,17 @@ impl Suppressions {
     }
 
     /// Check if a diagnostic is suppressed by any known range suppressions
+    ///
+    /// A suppression applies for the given diagnostic if it contains the diagnostic's start offset.
+    /// This means the suppression is on the same line as the diagnostic's start, as in:
+    ///
+    /// ```python
+    /// suppressed = [  # ruff:disable[RUF015]
+    ///     *range(10)
+    /// ][0]
+    /// ```
+    ///
+    /// where the diagnostic starts at the `[`.
     pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
         if self.valid.is_empty() {
             return false;
@@ -228,7 +239,7 @@ impl Suppressions {
         for suppression in &self.valid {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
-            if *code == suppression_code && suppression.range.contains_range(range) {
+            if *code == suppression_code && suppression.range.contains(range.start()) {
                 suppression.used.set(true);
                 return true;
             }

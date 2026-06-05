@@ -17,8 +17,6 @@ suppressed = [  # noqa: RUF015
     *range(10)
 ][0]
 
-# TODO this shouldn't error
-# error: [unnecessary-iterable-allocation-for-first-element]
 not_suppressed = [  # ruff:ignore[RUF015]
     *range(10)
 ][0]
