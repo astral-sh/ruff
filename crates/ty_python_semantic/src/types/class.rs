@@ -1162,7 +1162,7 @@ impl<'db> ClassType<'db> {
                     let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
                     !place_from_declarations(db, declarations)
                         .ignore_conflicting_declarations()
-                        .qualifiers
+                        .qualifiers()
                         .contains(TypeQualifiers::CLASS_VAR)
                 })
             });
@@ -1906,7 +1906,7 @@ impl<'db> ClassType<'db> {
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
-            .place;
+            .place();
 
         if let Place::Defined(DefinedPlace {
             ty: Type::BoundMethod(metaclass_dunder_call_function),
@@ -1974,7 +1974,7 @@ impl<'db> ClassType<'db> {
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
-            .place;
+            .place();
 
         let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
 
@@ -2055,7 +2055,7 @@ impl<'db> ClassType<'db> {
                         "__new__".into(),
                         MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
                     )
-                    .place;
+                    .place();
 
                 if let Place::Defined(DefinedPlace {
                     ty: Type::FunctionLiteral(mut new_function),
@@ -2475,18 +2475,15 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
-                    if let member @ PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                ty,
-                                origin,
-                                definedness: boundness,
-                                ..
-                            }),
-                        qualifiers,
+                    let member = class.own_instance_member(db, name).inner;
+                    if let Place::Defined(DefinedPlace {
+                        ty,
+                        origin,
+                        definedness: boundness,
                         ..
-                    } = class.own_instance_member(db, name).inner
+                    }) = member.place()
                     {
+                        let qualifiers = member.qualifiers();
                         if boundness == Definedness::AlwaysDefined {
                             if origin.is_declared() {
                                 // We found a definitely-declared attribute. Discard possibly collected
@@ -2551,36 +2548,27 @@ pub(super) struct CompletedMemberLookup<'db> {
 impl<'db> CompletedMemberLookup<'db> {
     /// Finalize the lookup result by handling dynamic type intersection.
     pub(super) fn finalize(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
-        match (
-            PlaceAndQualifiers::from(self.lookup_result),
-            self.dynamic_type,
-        ) {
-            (symbol_and_qualifiers, None) => symbol_and_qualifiers,
+        let symbol_and_qualifiers = PlaceAndQualifiers::from(self.lookup_result);
+        let Some(dynamic) = self.dynamic_type else {
+            return symbol_and_qualifiers;
+        };
 
-            (
-                PlaceAndQualifiers {
-                    place: Place::Defined(DefinedPlace { ty, .. }),
-                    qualifiers,
-                    ..
-                },
-                Some(dynamic),
-            ) => Place::bound(IntersectionType::from_two_elements(db, ty, dynamic))
-                .with_qualifiers(qualifiers),
-
-            (
-                PlaceAndQualifiers {
-                    place: Place::Undefined,
-                    qualifiers,
-                    ..
-                },
-                Some(dynamic),
-            ) => Place::bound(dynamic).with_qualifiers(qualifiers),
+        let (place, qualifiers, deprecation) = symbol_and_qualifiers.into_parts();
+        match place {
+            Place::Defined(DefinedPlace { ty, .. }) => {
+                Place::bound(IntersectionType::from_two_elements(db, ty, dynamic))
+                    .with_qualifiers(qualifiers)
+                    .with_deprecation_policy(deprecation)
+            }
+            Place::Undefined => Place::bound(dynamic)
+                .with_qualifiers(qualifiers)
+                .with_deprecation_policy(deprecation),
         }
     }
 }
 
 /// Result of instance member lookup from MRO iteration.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum InstanceMemberResult<'db> {
     /// Found the member or exhausted the MRO
     Done(PlaceAndQualifiers<'db>),
@@ -2784,7 +2772,7 @@ impl SlotsKind {
         }) = base
             .own_class_member(db, base.inherited_generic_context(db), None, "__slots__")
             .inner
-            .place
+            .place()
         else {
             return Self::NotSpecified;
         };

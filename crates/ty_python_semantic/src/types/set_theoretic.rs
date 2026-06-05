@@ -302,11 +302,7 @@ impl<'db> UnionType<'db> {
         let mut origin = TypeOrigin::Declared;
         let mut deprecation = DeprecationBuilder::default();
         for ty in self.elements(db) {
-            let PlaceAndQualifiers {
-                place: ty_member,
-                qualifiers: new_qualifiers,
-                deprecation: new_deprecation,
-            } = transform_fn(ty);
+            let (ty_member, new_qualifiers, new_deprecation) = transform_fn(ty).into_parts();
             qualifiers |= new_qualifiers;
             deprecation.add_policy(new_deprecation);
             match ty_member {
@@ -329,26 +325,24 @@ impl<'db> UnionType<'db> {
                 }
             }
         }
-        PlaceAndQualifiers {
-            place: if all_unbound {
-                Place::Undefined
-            } else {
-                Place::Defined(DefinedPlace {
-                    ty: builder
-                        .recursively_defined(self.recursively_defined(db))
-                        .build(),
-                    origin,
-                    definedness: if possibly_unbound {
-                        Definedness::PossiblyUndefined
-                    } else {
-                        Definedness::AlwaysDefined
-                    },
-                    public_type_policy: PublicTypePolicy::Raw,
-                })
-            },
-            qualifiers,
-            deprecation: deprecation.build_policy(),
-        }
+        (if all_unbound {
+            Place::Undefined
+        } else {
+            Place::Defined(DefinedPlace {
+                ty: builder
+                    .recursively_defined(self.recursively_defined(db))
+                    .build(),
+                origin,
+                definedness: if possibly_unbound {
+                    Definedness::PossiblyUndefined
+                } else {
+                    Definedness::AlwaysDefined
+                },
+                public_type_policy: PublicTypePolicy::Raw,
+            })
+        })
+        .with_qualifiers(qualifiers)
+        .with_deprecation_policy(deprecation.build_policy())
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -877,11 +871,7 @@ impl<'db> IntersectionType<'db> {
         let mut origin = TypeOrigin::Declared;
         let mut deprecation = DeprecationBuilder::default();
         for ty in self.positive_elements_or_object(db) {
-            let PlaceAndQualifiers {
-                place: member,
-                qualifiers: new_qualifiers,
-                deprecation: new_deprecation,
-            } = transform_fn(&ty);
+            let (member, new_qualifiers, new_deprecation) = transform_fn(&ty).into_parts();
             qualifiers |= new_qualifiers;
             match member {
                 Place::Undefined => {}
@@ -903,24 +893,22 @@ impl<'db> IntersectionType<'db> {
             }
         }
 
-        PlaceAndQualifiers {
-            place: if all_unbound {
-                Place::Undefined
-            } else {
-                Place::Defined(DefinedPlace {
-                    ty: builder.build(),
-                    origin,
-                    definedness: if any_definitely_bound {
-                        Definedness::AlwaysDefined
-                    } else {
-                        Definedness::PossiblyUndefined
-                    },
-                    public_type_policy: PublicTypePolicy::Raw,
-                })
-            },
-            qualifiers,
-            deprecation: deprecation.build_policy(),
-        }
+        (if all_unbound {
+            Place::Undefined
+        } else {
+            Place::Defined(DefinedPlace {
+                ty: builder.build(),
+                origin,
+                definedness: if any_definitely_bound {
+                    Definedness::AlwaysDefined
+                } else {
+                    Definedness::PossiblyUndefined
+                },
+                public_type_policy: PublicTypePolicy::Raw,
+            })
+        })
+        .with_qualifiers(qualifiers)
+        .with_deprecation_policy(deprecation.build_policy())
     }
 
     /// Return a version of this intersection type where any type variables in the positive elements

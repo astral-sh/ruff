@@ -33,7 +33,7 @@ pub(crate) fn check_final_without_value<'db>(
         let first_declaration = result.first_declaration;
         let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
 
-        if !place_and_quals.qualifiers.contains(TypeQualifiers::FINAL) {
+        if !place_and_quals.qualifiers().contains(TypeQualifiers::FINAL) {
             continue;
         }
 

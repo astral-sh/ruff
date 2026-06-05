@@ -119,7 +119,6 @@ impl<'db> ProtocolClass<'db> {
                         )
                         .into_place_and_conflicting_declarations()
                         .0
-                        .place
                         .is_undefined()
                     });
 
@@ -323,11 +322,7 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_by_name(db, name)
-            .map(|member| PlaceAndQualifiers {
-                place: Place::bound(member.ty()),
-                qualifiers: member.qualifiers(),
-                deprecation: crate::place::DeprecationPolicy::Inherit,
-            })
+            .map(|member| Place::bound(member.ty()).with_qualifiers(member.qualifiers()))
             .unwrap_or_else(|| Type::object().member(db, name))
     }
 
@@ -710,7 +705,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             InstanceFallbackShadowsNonDataDescriptor::No,
                             MemberLookupPolicy::default(),
                         )
-                        .place
+                        .place()
                     else {
                         self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
                             member_name: member.name.into(),
@@ -746,7 +741,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => {
                 let is_defined = matches!(
-                    ty.member(db, member.name).place,
+                    ty.member(db, member.name).place(),
                     Place::Defined(DefinedPlace {
                         definedness: Definedness::AlwaysDefined,
                         ..
@@ -766,7 +761,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ty: attribute_type,
                     definedness: Definedness::AlwaysDefined,
                     ..
-                }) = ty.member(db, member.name).place
+                }) = ty.member(db, member.name).place()
                 else {
                     self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
                         member_name: member.name.into(),
@@ -1033,19 +1028,15 @@ fn cached_protocol_interface<'db>(
             let place_result = place_from_declarations(db, declarations);
             let first_declaration = place_result.first_declaration;
             let place = place_result.ignore_conflicting_declarations();
-            if let Some(new_type) = place.place.ignore_possibly_undefined() {
+            if let Some(new_type) = place.ignore_possibly_undefined() {
+                let qualifiers = place.qualifiers();
                 direct_members
                     .entry(symbol_id)
                     .and_modify(|(ty, quals, _, _)| {
                         *ty = new_type;
-                        *quals = place.qualifiers;
+                        *quals = qualifiers;
                     })
-                    .or_insert((
-                        new_type,
-                        place.qualifiers,
-                        first_declaration,
-                        BoundOnClass::No,
-                    ));
+                    .or_insert((new_type, qualifiers, first_declaration, BoundOnClass::No));
             }
         }
 
@@ -1160,7 +1151,7 @@ pub(super) fn has_all_protocol_members_defined<'db>(
         }
         _ => target_interface.members(db).all(|member| {
             matches!(
-                ty.member(db, member.name()).place,
+                ty.member(db, member.name()).place(),
                 Place::Defined(DefinedPlace {
                     definedness: Definedness::AlwaysDefined,
                     ..

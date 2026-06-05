@@ -1262,11 +1262,7 @@ impl<'db> TypeVarConstraints<'db> {
         let mut origin = TypeOrigin::Declared;
         let mut deprecation = DeprecationBuilder::default();
         for ty in self.elements(db) {
-            let PlaceAndQualifiers {
-                place: ty_member,
-                qualifiers: new_qualifiers,
-                deprecation: new_deprecation,
-            } = transform_fn(ty);
+            let (ty_member, new_qualifiers, new_deprecation) = transform_fn(ty).into_parts();
             qualifiers |= new_qualifiers;
             deprecation.add_policy(new_deprecation);
             match ty_member {
@@ -1289,24 +1285,22 @@ impl<'db> TypeVarConstraints<'db> {
                 }
             }
         }
-        PlaceAndQualifiers {
-            place: if all_unbound {
-                Place::Undefined
-            } else {
-                Place::Defined(DefinedPlace {
-                    ty: builder.build(),
-                    origin,
-                    definedness: if possibly_unbound {
-                        Definedness::PossiblyUndefined
-                    } else {
-                        Definedness::AlwaysDefined
-                    },
-                    public_type_policy: PublicTypePolicy::Raw,
-                })
-            },
-            qualifiers,
-            deprecation: deprecation.build_policy(),
-        }
+        (if all_unbound {
+            Place::Undefined
+        } else {
+            Place::Defined(DefinedPlace {
+                ty: builder.build(),
+                origin,
+                definedness: if possibly_unbound {
+                    Definedness::PossiblyUndefined
+                } else {
+                    Definedness::AlwaysDefined
+                },
+                public_type_policy: PublicTypePolicy::Raw,
+            })
+        })
+        .with_qualifiers(qualifiers)
+        .with_deprecation_policy(deprecation.build_policy())
     }
 
     fn materialize_impl(

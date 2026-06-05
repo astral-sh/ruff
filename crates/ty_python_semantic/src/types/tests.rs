@@ -30,9 +30,9 @@ fn typing_vs_typeshed_no_default() {
         .build()
         .unwrap();
 
-    let typing_no_default = typing_symbol(&db, "NoDefault").place.expect_type();
+    let typing_no_default = typing_symbol(&db, "NoDefault").place().expect_type();
     let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault")
-        .place
+        .place()
         .expect_type();
 
     assert_eq!(typing_no_default.display(&db).to_string(), "NoDefault");
@@ -127,11 +127,11 @@ fn divergent_type() {
             .is_assignable_to(&db, bottom_div)
     );
     assert_eq!(
-        top_div.member(&db, "__str__").place.expect_type(),
-        Type::object().member(&db, "__str__").place.expect_type()
+        top_div.member(&db, "__str__").place().expect_type(),
+        Type::object().member(&db, "__str__").place().expect_type()
     );
     assert_eq!(
-        top_div.member(&db, "__class__").place.expect_type(),
+        top_div.member(&db, "__class__").place().expect_type(),
         Type::object().dunder_class(&db)
     );
     assert!(top_div.try_upcast_to_callable(&db).is_none());
@@ -284,7 +284,7 @@ fn type_alias_variance() {
 
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
-        let ty = global_symbol(db, module, name).place.expect_type();
+        let ty = global_symbol(db, module, name).place().expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
             type_alias,
         ))) = ty
@@ -440,7 +440,7 @@ fn eager_expansion() {
 
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
-        let ty = global_symbol(db, module, name).place.expect_type();
+        let ty = global_symbol(db, module, name).place().expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
             type_alias,
         ))) = ty

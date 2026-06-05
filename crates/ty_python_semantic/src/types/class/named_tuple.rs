@@ -338,7 +338,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
         // If fields are unknown (dynamic) and the attribute wasn't found,
         // return `Any` instead of failing.
-        if !self.has_known_fields(db) && result.place.is_undefined() {
+        if !self.has_known_fields(db) && result.place().is_undefined() {
             return Place::bound(Type::any()).into();
         }
 

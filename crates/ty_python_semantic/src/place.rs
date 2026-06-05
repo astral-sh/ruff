@@ -252,10 +252,9 @@ impl<'db> Place<'db> {
 
     #[must_use]
     pub(crate) fn with_qualifiers(self, qualifiers: TypeQualifiers) -> PlaceAndQualifiers<'db> {
-        PlaceAndQualifiers {
+        PlaceAndQualifiers::WithoutDeprecation {
             place: self,
             qualifiers,
-            deprecation: DeprecationPolicy::Inherit,
         }
     }
 
@@ -332,7 +331,7 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
 }
 
 /// Possible ways in which a place lookup can (possibly or definitely) fail.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum LookupError<'db> {
     Undefined(TypeQualifiers),
     PossiblyUndefined(TypeAndQualifiers<'db>),
@@ -713,11 +712,31 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct PlaceAndQualifiers<'db> {
-    pub(crate) place: Place<'db>,
-    pub(crate) qualifiers: TypeQualifiers,
-    pub(crate) deprecation: DeprecationPolicy<'db>,
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum PlaceAndQualifiers<'db> {
+    /// The common case, stored inline to avoid an allocation.
+    WithoutDeprecation {
+        place: Place<'db>,
+        qualifiers: TypeQualifiers,
+    },
+    /// Non-default deprecation policies are rare, so store their payload out of line.
+    WithDeprecation(Box<DeprecatedPlaceAndQualifiers<'db>>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct DeprecatedPlaceAndQualifiers<'db> {
+    place: Place<'db>,
+    qualifiers: TypeQualifiers,
+    deprecation: DeprecationPolicy<'db>,
+}
+
+impl Default for PlaceAndQualifiers<'_> {
+    fn default() -> Self {
+        Self::WithoutDeprecation {
+            place: Place::Undefined,
+            qualifiers: TypeQualifiers::empty(),
+        }
+    }
 }
 
 impl<'db> PlaceAndQualifiers<'db> {
@@ -726,57 +745,108 @@ impl<'db> PlaceAndQualifiers<'db> {
     }
 
     pub(crate) fn is_undefined(&self) -> bool {
-        self.place.is_undefined()
+        self.place().is_undefined()
     }
 
     pub(crate) fn ignore_possibly_undefined(&self) -> Option<Type<'db>> {
-        self.place.ignore_possibly_undefined()
+        self.place().ignore_possibly_undefined()
+    }
+
+    pub(crate) fn place(&self) -> Place<'db> {
+        match self {
+            Self::WithoutDeprecation { place, .. } => *place,
+            Self::WithDeprecation(deprecated) => deprecated.place,
+        }
+    }
+
+    pub(crate) fn qualifiers(&self) -> TypeQualifiers {
+        match self {
+            Self::WithoutDeprecation { qualifiers, .. } => *qualifiers,
+            Self::WithDeprecation(deprecated) => deprecated.qualifiers,
+        }
+    }
+
+    pub(crate) fn deprecation_policy(&self) -> DeprecationPolicy<'db> {
+        match self {
+            Self::WithoutDeprecation { .. } => DeprecationPolicy::Inherit,
+            Self::WithDeprecation(deprecated) => deprecated.deprecation,
+        }
+    }
+
+    pub(crate) fn into_parts(self) -> (Place<'db>, TypeQualifiers, DeprecationPolicy<'db>) {
+        match self {
+            Self::WithoutDeprecation { place, qualifiers } => {
+                (place, qualifiers, DeprecationPolicy::Inherit)
+            }
+            Self::WithDeprecation(deprecated) => (
+                deprecated.place,
+                deprecated.qualifiers,
+                deprecated.deprecation,
+            ),
+        }
     }
 
     /// Returns `true` if the place has a `ClassVar` type qualifier.
     pub(crate) fn is_class_var(&self) -> bool {
-        self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+        self.qualifiers().contains(TypeQualifiers::CLASS_VAR)
     }
 
     /// Returns `true` if the place has a `InitVar` type qualifier.
     pub(crate) fn is_init_var(&self) -> bool {
-        self.qualifiers.contains(TypeQualifiers::INIT_VAR)
+        self.qualifiers().contains(TypeQualifiers::INIT_VAR)
     }
 
     /// Returns `true` if the place has a `Required` type qualifier.
     pub(crate) fn is_required(&self) -> bool {
-        self.qualifiers.contains(TypeQualifiers::REQUIRED)
+        self.qualifiers().contains(TypeQualifiers::REQUIRED)
     }
 
     /// Returns `true` if the place has a `NotRequired` type qualifier.
     pub(crate) fn is_not_required(&self) -> bool {
-        self.qualifiers.contains(TypeQualifiers::NOT_REQUIRED)
+        self.qualifiers().contains(TypeQualifiers::NOT_REQUIRED)
     }
 
     /// Returns `true` if the place has a `ReadOnly` type qualifier.
     pub(crate) fn is_read_only(&self) -> bool {
-        self.qualifiers.contains(TypeQualifiers::READ_ONLY)
+        self.qualifiers().contains(TypeQualifiers::READ_ONLY)
     }
 
     #[must_use]
-    pub(crate) fn with_deprecation_policy(mut self, deprecation: DeprecationPolicy<'db>) -> Self {
-        self.deprecation = deprecation;
-        self
+    pub(crate) fn with_deprecation_policy(self, deprecation: DeprecationPolicy<'db>) -> Self {
+        match (self, deprecation) {
+            (place @ Self::WithoutDeprecation { .. }, DeprecationPolicy::Inherit) => place,
+            (Self::WithoutDeprecation { place, qualifiers }, deprecation) => {
+                Self::WithDeprecation(Box::new(DeprecatedPlaceAndQualifiers {
+                    place,
+                    qualifiers,
+                    deprecation,
+                }))
+            }
+            (Self::WithDeprecation(deprecated), DeprecationPolicy::Inherit) => {
+                Self::WithoutDeprecation {
+                    place: deprecated.place,
+                    qualifiers: deprecated.qualifiers,
+                }
+            }
+            (Self::WithDeprecation(mut deprecated), deprecation) => {
+                deprecated.deprecation = deprecation;
+                Self::WithDeprecation(deprecated)
+            }
+        }
     }
 
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
-        match self {
-            PlaceAndQualifiers {
-                place, qualifiers, ..
-            } if (qualifiers.contains(TypeQualifiers::FINAL)
-                && place
-                    .ignore_possibly_undefined()
-                    .is_some_and(|ty| ty.is_unknown())) =>
-            {
-                Some(*qualifiers)
-            }
-            _ => None,
+        let place = self.place();
+        let qualifiers = self.qualifiers();
+        if qualifiers.contains(TypeQualifiers::FINAL)
+            && place
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| ty.is_unknown())
+        {
+            Some(qualifiers)
+        } else {
+            None
         }
     }
 
@@ -785,10 +855,15 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         f: impl FnOnce(Type<'db>) -> Type<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        PlaceAndQualifiers {
-            place: self.place.map_type(f),
-            qualifiers: self.qualifiers,
-            deprecation: self.deprecation,
+        match self {
+            Self::WithoutDeprecation { place, qualifiers } => Self::WithoutDeprecation {
+                place: place.map_type(f),
+                qualifiers,
+            },
+            Self::WithDeprecation(mut deprecated) => {
+                deprecated.place = deprecated.place.map_type(f);
+                Self::WithDeprecation(deprecated)
+            }
         }
     }
 
@@ -799,12 +874,8 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// For places whose public type differs from their raw stored type, this applies the
     /// public-type policy lazily during lookup.
     pub(crate) fn into_lookup_result(self, db: &'db dyn Db) -> LookupResult<'db> {
-        match self {
-            PlaceAndQualifiers {
-                place: Place::Defined(place),
-                qualifiers,
-                deprecation,
-            } => {
+        match self.into_parts() {
+            (Place::Defined(place), qualifiers, deprecation) => {
                 let ty = place.public_type_policy.apply_if_needed(db, place.ty);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
                     .with_deprecation_policy(deprecation);
@@ -815,11 +886,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                     }
                 }
             }
-            PlaceAndQualifiers {
-                place: Place::Undefined,
-                qualifiers,
-                deprecation: _,
-            } => Err(LookupError::Undefined(qualifiers)),
+            (Place::Undefined, qualifiers, _) => Err(LookupError::Undefined(qualifiers)),
         }
     }
 
@@ -861,20 +928,24 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
-        previous_place: Self,
+        previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        let (place, qualifiers, deprecation) = self.into_parts();
+        let previous_place = previous.place();
+        let previous_qualifiers = previous.qualifiers();
+        let previous_deprecation = previous.deprecation_policy();
         let qualifiers = if cycle.iteration() <= 1 {
-            self.qualifiers
+            qualifiers
         } else {
-            previous_place.qualifiers.union(self.qualifiers)
+            previous_qualifiers.union(qualifiers)
         };
         let deprecation = if cycle.iteration() <= 1 {
-            self.deprecation
+            deprecation
         } else {
-            merge_deprecation_policy(previous_place.deprecation, self.deprecation)
+            merge_deprecation_policy(previous_deprecation, deprecation)
         };
-        let place = match (previous_place.place, self.place) {
+        let place = match (previous_place, place) {
             // In fixed-point iteration of type inference, the member result must be monotonically
             // widened and not "oscillate". The type component is widened by unioning the previous
             // iteration into the current result; after the first couple iterations, the same
@@ -923,13 +994,15 @@ impl<'db> PlaceAndQualifiers<'db> {
             }
             (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
-        PlaceAndQualifiers {
-            place,
-            qualifiers,
-            deprecation,
-        }
+        place
+            .with_qualifiers(qualifiers)
+            .with_deprecation_policy(deprecation)
     }
 }
+
+// Keep the common case at the same size as it was before adding place-level deprecation.
+#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
+static_assertions::assert_eq_size!(PlaceAndQualifiers<'_>, [u8; 24]);
 
 impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     fn from(place: Place<'db>) -> Self {
@@ -940,7 +1013,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 #[salsa::tracked(
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
-        place.cycle_normalized(db, *previous, cycle)
+        place.cycle_normalized(db, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -980,20 +1053,19 @@ pub(crate) fn place_by_id<'db>(
             .with_deprecation_policy(inferred.deprecation);
     }
 
-    match declared {
+    match declared.into_parts() {
         // Handle bare `ClassVar` annotations by falling back to the union of `Unknown` and the
         // inferred type.
-        PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty: Type::Dynamic(DynamicType::Unknown),
-                    origin,
-                    definedness,
-                    ..
-                }),
+        (
+            Place::Defined(DefinedPlace {
+                ty: Type::Dynamic(DynamicType::Unknown),
+                origin,
+                definedness,
+                ..
+            }),
             qualifiers,
-            deprecation: _,
-        } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
+            _,
+        ) if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
             match inferred.place {
@@ -1020,27 +1092,27 @@ pub(crate) fn place_by_id<'db>(
             }
         }
         // Place is declared, trust the declared type
-        place_and_quals @ PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }),
-            qualifiers: _,
-            deprecation: _,
-        } => place_and_quals,
-        // Place is possibly declared
-        PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty: declared_ty,
-                    origin,
-                    definedness: Definedness::PossiblyUndefined,
-                    ..
-                }),
+        (
+            place @ Place::Defined(DefinedPlace {
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }),
             qualifiers,
-            deprecation: declared_deprecation,
-        } => {
+            deprecation,
+        ) => place
+            .with_qualifiers(qualifiers)
+            .with_deprecation_policy(deprecation),
+        // Place is possibly declared
+        (
+            Place::Defined(DefinedPlace {
+                ty: declared_ty,
+                origin,
+                definedness: Definedness::PossiblyUndefined,
+                ..
+            }),
+            qualifiers,
+            declared_deprecation,
+        ) => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
@@ -1076,18 +1148,15 @@ pub(crate) fn place_by_id<'db>(
                 }),
             };
 
-            PlaceAndQualifiers {
-                place,
-                qualifiers,
-                deprecation: merge_deprecation_policy(declared_deprecation, inferred.deprecation),
-            }
+            place
+                .with_qualifiers(qualifiers)
+                .with_deprecation_policy(merge_deprecation_policy(
+                    declared_deprecation,
+                    inferred.deprecation,
+                ))
         }
         // Place is undeclared, infer the type from bindings
-        PlaceAndQualifiers {
-            place: Place::Undefined,
-            qualifiers: _,
-            deprecation: _,
-        } => {
+        (Place::Undefined, _, _) => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
@@ -1655,11 +1724,9 @@ pub(super) struct PlaceWithDefinition<'db> {
 
 impl<'db> PlaceWithDefinition<'db> {
     pub(super) fn into_place_and_qualifiers(self) -> PlaceAndQualifiers<'db> {
-        PlaceAndQualifiers {
-            place: self.place,
-            qualifiers: TypeQualifiers::empty(),
-            deprecation: self.deprecation,
-        }
+        self.place
+            .with_qualifiers(TypeQualifiers::empty())
+            .with_deprecation_policy(self.deprecation)
     }
 }
 
@@ -1769,7 +1836,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
         }
     }
 
-    fn add(&mut self, element: TypeAndQualifiers<'db>, reachability: Truthiness) {
+    fn add(&mut self, element: &TypeAndQualifiers<'db>, reachability: Truthiness) {
         let element_ty = element.inner_type();
 
         if self.inner.add(element_ty, reachability) {
@@ -1876,10 +1943,10 @@ fn place_from_declarations_impl<'db>(
     if let Some((first, first_reachability)) = types.next() {
         let (declared, conflicting) = if let Some((second, second_reachability)) = types.next() {
             let mut builder = DeclaredTypeBuilder::new(db);
-            builder.add(first, first_reachability);
-            builder.add(second, second_reachability);
+            builder.add(&first, first_reachability);
+            builder.add(&second, second_reachability);
             for (element, reachability) in types {
-                builder.add(element, reachability);
+                builder.add(&element, reachability);
             }
             builder.build()
         } else {
@@ -2142,7 +2209,10 @@ pub(crate) mod implicit_globals {
             .filter_map(move |name| {
                 let place = module_type_implicit_global_symbol(db, name.as_str());
                 // Only include bound symbols
-                place.place.ignore_possibly_undefined().map(|ty| (name, ty))
+                place
+                    .place()
+                    .ignore_possibly_undefined()
+                    .map(|ty| (name, ty))
             })
     }
 
@@ -2233,6 +2303,13 @@ pub(crate) enum ConsideredDefinitions {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
+
+    #[cfg(all(debug_assertions, target_pointer_width = "64"))]
+    #[test]
+    fn lookup_record_layout() {
+        assert_eq!(std::mem::size_of::<TypeAndQualifiers<'_>>(), 40);
+        assert_eq!(std::mem::size_of::<PlaceAndQualifiers<'_>>(), 48);
+    }
 
     #[test]
     fn test_symbol_or_fall_back_to() {
@@ -2342,19 +2419,19 @@ mod tests {
     #[test]
     fn implicit_builtin_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").place);
+        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").place());
     }
 
     #[test]
     fn implicit_typing_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").place);
+        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").place());
     }
 
     #[test]
     fn implicit_typing_extensions_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").place);
+        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").place());
     }
 
     #[test]
@@ -2362,7 +2439,7 @@ mod tests {
         let db = setup_db();
         assert_bound_string_symbol(
             &db,
-            known_module_symbol(&db, KnownModule::Sys, "__name__").place,
+            known_module_symbol(&db, KnownModule::Sys, "__name__").place(),
         );
     }
 }

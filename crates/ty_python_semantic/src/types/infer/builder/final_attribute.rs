@@ -74,7 +74,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             if !place_and_quals_result
                 .ignore_conflicting_declarations()
-                .qualifiers
+                .qualifiers()
                 .contains(TypeQualifiers::FINAL)
             {
                 continue;
@@ -317,14 +317,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             object_ty,
             target,
             attribute,
-            meta_attr.qualifiers,
+            meta_attr.qualifiers(),
         ) && let Some(fallback_attr) = fallback_attr
         {
             self.invalid_assignment_to_final_attribute(
                 object_ty,
                 target,
                 attribute,
-                fallback_attr.qualifiers,
+                fallback_attr.qualifiers(),
             );
         }
     }
@@ -346,14 +346,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             object_ty,
             target,
             attribute,
-            meta_attr.qualifiers,
+            meta_attr.qualifiers(),
             emit_diagnostics,
         ) || fallback_attr.is_some_and(|fallback_attr| {
             self.invalid_deletion_of_final_attribute(
                 object_ty,
                 target,
                 attribute,
-                fallback_attr.qualifiers,
+                fallback_attr.qualifiers(),
                 emit_diagnostics,
             )
         })

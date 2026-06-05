@@ -771,7 +771,7 @@ impl<'db> DataclassParams<'db> {
 
     fn from_flags(db: &'db dyn Db, flags: DataclassFlags) -> Self {
         let dataclasses_field = known_module_symbol(db, KnownModule::Dataclasses, "field")
-            .place
+            .place()
             .ignore_possibly_undefined()
             .unwrap_or_else(Type::unknown);
 
@@ -2616,7 +2616,7 @@ impl<'db> Type<'db> {
     #[salsa::tracked(
         cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
-            member.cycle_normalized(db, *previous, cycle)
+            member.cycle_normalized(db, previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -2679,7 +2679,7 @@ impl<'db> Type<'db> {
                     .to_class_literal(db)
                     .find_name_in_mro_with_policy(db, name.as_str(), policy)
                     .expect("`find_name_in_mro` should return `Some` for a class literal");
-                if !type_result.place.is_undefined() {
+                if !type_result.place().is_undefined() {
                     type_result
                 } else {
                     self.to_meta_type(db)
@@ -2728,16 +2728,12 @@ impl<'db> Type<'db> {
         // values populated by metaclass initialization, analogous to a declared instance
         // attribute initialized in `__init__`. An inherited declaration does not mask a value
         // that the metaclass stores directly on the newly constructed subclass.
-        let own_declaration_definedness = match own_class_attr {
-            Some(PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Declared,
-                        definedness,
-                        ..
-                    }),
+        let own_declaration_definedness = match own_class_attr.map(|attr| attr.place()) {
+            Some(Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Declared,
+                definedness,
                 ..
-            }) => Some(definedness),
+            })) => Some(definedness),
             _ => None,
         };
         if own_declaration_definedness == Some(Definedness::AlwaysDefined) {
@@ -2882,15 +2878,15 @@ impl<'db> Type<'db> {
     /// See also: [`Type::member`]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
-            module.static_member(db, name).place
-        } else if let place @ Place::Defined(_) = self.class_member(db, name.into()).place {
+            module.static_member(db, name).place()
+        } else if let place @ Place::Defined(_) = self.class_member(db, name.into()).place() {
             place
         } else if let Some(place @ Place::Defined(_)) =
-            self.find_name_in_mro(db, name).map(|inner| inner.place)
+            self.find_name_in_mro(db, name).map(|inner| inner.place())
         {
             place
         } else {
-            self.instance_member(db, name).place
+            self.instance_member(db, name).place()
         }
     }
 
@@ -2953,7 +2949,7 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let descr_get = ty.class_member(db, "__get__".into()).place;
+            let descr_get = ty.class_member(db, "__get__".into()).place();
 
             if let Place::Defined(DefinedPlace {
                 ty: descr_get,
@@ -3022,17 +3018,16 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
-        if let PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty,
-                    origin,
-                    definedness,
-                    public_type_policy,
-                }),
-            qualifiers,
-            deprecation,
-        } = attribute
+        let place = attribute.place();
+        let qualifiers = attribute.qualifiers();
+        let deprecation = attribute.deprecation_policy();
+
+        if let Place::Defined(DefinedPlace {
+            ty,
+            origin,
+            definedness,
+            public_type_policy,
+        }) = place
             && let Some(fallback) = ty.materialized_divergent_fallback()
         {
             return Self::try_call_dunder_get_on_attribute(
@@ -3050,7 +3045,7 @@ impl<'db> Type<'db> {
             );
         }
 
-        match attribute {
+        match place {
             // This branch is not strictly needed, but it short-circuits the lookup of various dunder
             // methods and calls that would otherwise be made.
             //
@@ -3059,27 +3054,17 @@ impl<'db> Type<'db> {
             // data descriptors.
             //
             // The same is true for `Never`.
-            PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty: Type::Dynamic(_) | Type::Divergent(_) | Type::Never,
-                        ..
-                    }),
-                qualifiers: _,
+            Place::Defined(DefinedPlace {
+                ty: Type::Dynamic(_) | Type::Divergent(_) | Type::Never,
                 ..
-            } => (attribute, AttributeKind::DataDescriptor),
+            }) => (attribute, AttributeKind::DataDescriptor),
 
-            PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty: Type::Union(union),
-                        origin,
-                        definedness: boundness,
-                        public_type_policy,
-                    }),
-                qualifiers,
-                deprecation,
-            } => (
+            Place::Defined(DefinedPlace {
+                ty: Type::Union(union),
+                origin,
+                definedness: boundness,
+                public_type_policy,
+            }) => (
                 union
                     .map_with_boundness(db, |elem| {
                         Place::Defined(DefinedPlace {
@@ -3104,17 +3089,12 @@ impl<'db> Type<'db> {
                 },
             ),
 
-            attribute @ PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty: Type::Intersection(intersection),
-                        origin,
-                        definedness,
-                        public_type_policy,
-                    }),
-                qualifiers,
-                deprecation,
-            } => (
+            Place::Defined(DefinedPlace {
+                ty: Type::Intersection(intersection),
+                origin,
+                definedness,
+                public_type_policy,
+            }) => (
                 if intersection.positive(db).is_empty() {
                     attribute
                 } else {
@@ -3136,17 +3116,12 @@ impl<'db> Type<'db> {
                 AttributeKind::NormalOrNonDataDescriptor,
             ),
 
-            PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty: attribute_ty,
-                        origin,
-                        definedness: boundness,
-                        public_type_policy,
-                    }),
-                qualifiers: _,
-                deprecation,
-            } => {
+            Place::Defined(DefinedPlace {
+                ty: attribute_ty,
+                origin,
+                definedness: boundness,
+                public_type_policy,
+            }) => {
                 if let Some((return_ty, attribute_kind)) =
                     attribute_ty.try_call_dunder_get(db, instance, owner)
                 {
@@ -3166,7 +3141,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            _ => (attribute, AttributeKind::NormalOrNonDataDescriptor),
+            Place::Undefined => (attribute, AttributeKind::NormalOrNonDataDescriptor),
         }
     }
 
@@ -3203,10 +3178,13 @@ impl<'db> Type<'db> {
                 .iter_positive(db)
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
             _ => {
-                !self.class_member(db, "__set__".into()).place.is_undefined()
+                !self
+                    .class_member(db, "__set__".into())
+                    .place()
+                    .is_undefined()
                     || !self
                         .class_member(db, "__delete__".into())
-                        .place
+                        .place()
                         .is_undefined()
             }
         }
@@ -3234,25 +3212,15 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let (
-            PlaceAndQualifiers {
-                place: meta_attr,
-                qualifiers: meta_attr_qualifiers,
-                deprecation: meta_attr_deprecation,
-            },
-            meta_attr_kind,
-        ) = Self::try_call_dunder_get_on_attribute(
+        let (meta_attr, meta_attr_kind) = Self::try_call_dunder_get_on_attribute(
             db,
             self.class_member_with_policy(db, name.into(), member_policy),
             Some(self),
             self.to_meta_type(db),
         );
+        let (meta_attr, meta_attr_qualifiers, meta_attr_deprecation) = meta_attr.into_parts();
 
-        let PlaceAndQualifiers {
-            place: fallback,
-            qualifiers: fallback_qualifiers,
-            deprecation: fallback_deprecation,
-        } = fallback;
+        let (fallback, fallback_qualifiers, fallback_deprecation) = fallback.into_parts();
 
         match (meta_attr, meta_attr_kind, fallback) {
             // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
@@ -3381,7 +3349,7 @@ impl<'db> Type<'db> {
         #[salsa::tracked(
             cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
-                member.cycle_normalized(db, *previous, cycle)
+                member.cycle_normalized(db, previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -3730,7 +3698,7 @@ impl<'db> Type<'db> {
                         .into_functools_partial_instance(db)
                         .member_lookup_with_policy(db, name.clone(), policy);
                     if name_str == "func" {
-                        match nominal_lookup.place {
+                        match nominal_lookup.place() {
                             Place::Defined(DefinedPlace {
                                 origin,
                                 definedness,
@@ -3877,7 +3845,7 @@ impl<'db> Type<'db> {
                     let owner_attr = bound_super.find_name_in_mro_after_pivot(db, name_str, policy);
 
                     bound_super
-                        .try_call_dunder_get_on_attribute(db, owner_attr)
+                        .try_call_dunder_get_on_attribute(db, &owner_attr)
                         .unwrap_or(owner_attr)
                 }
             }
@@ -3956,7 +3924,7 @@ impl<'db> Type<'db> {
                 Name::new_static("__getitem__"),
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             )
-            .place
+            .place()
         {
             Place::Defined(DefinedPlace {
                 ty: getitem_method,
@@ -3980,7 +3948,7 @@ impl<'db> Type<'db> {
                 Name::new_static("keys"),
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             )
-            .place
+            .place()
         {
             Place::Defined(DefinedPlace {
                 ty: keys_method,
@@ -4284,7 +4252,7 @@ impl<'db> Type<'db> {
                         Name::new_static("__call__"),
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
-                    .place
+                    .place()
                 {
                     Place::Defined(DefinedPlace {
                         ty: dunder_callable,
@@ -4856,7 +4824,7 @@ impl<'db> Type<'db> {
             MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
         );
 
-        let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
+        let (new_bindings, has_any_new) = match new_method.as_ref().map(PlaceAndQualifiers::place) {
             Some(place) => match resolve_dunder_new_callable(db, self_type, place) {
                 Some((new_callable, definedness)) => {
                     let mut bindings =
@@ -4877,7 +4845,7 @@ impl<'db> Type<'db> {
         };
 
         // Only fall back to `object.__init__` when `__new__` is absent.
-        let init_bindings = match (&init_method_no_object.place, has_any_new) {
+        let init_bindings = match (init_method_no_object.place(), has_any_new) {
             (
                 Place::Defined(DefinedPlace {
                     ty: init_method,
@@ -4893,7 +4861,7 @@ impl<'db> Type<'db> {
                         ConstructorCallableKind::Init,
                     )
                     .with_constructed_instance_type(db, constructor_instance_ty);
-                if *definedness == Definedness::PossiblyUndefined {
+                if definedness == Definedness::PossiblyUndefined {
                     bindings.set_implicit_dunder_init_is_possibly_unbound();
                 }
                 Some(bindings)
@@ -4904,7 +4872,7 @@ impl<'db> Type<'db> {
                     "__init__".into(),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 );
-                match init_method_with_object.place {
+                match init_method_with_object.place() {
                     Place::Defined(DefinedPlace {
                         ty: init_method,
                         definedness,
@@ -4962,7 +4930,7 @@ impl<'db> Type<'db> {
         let bindings = if let Place::Defined(DefinedPlace {
             ty: metaclass_call_method,
             ..
-        }) = metaclass_dunder_call.place
+        }) = metaclass_dunder_call.place()
         {
             let mut metaclass_bindings = metaclass_call_method
                 .bindings(db)
@@ -5060,7 +5028,7 @@ impl<'db> Type<'db> {
                 name.into(),
                 policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             )
-            .place
+            .place()
         {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
@@ -5099,7 +5067,7 @@ impl<'db> Type<'db> {
         argument_types: &CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        match self.member(db, name).place {
+        match self.member(db, name).place() {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
@@ -5171,32 +5139,20 @@ impl<'db> Type<'db> {
             .into()
         };
 
-        match result {
-            member @ PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    }),
-                qualifiers: _,
+        match result.place() {
+            Place::Defined(DefinedPlace {
+                definedness: Definedness::AlwaysDefined,
                 ..
-            } => member,
-            member @ PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        definedness: Definedness::PossiblyUndefined,
-                        ..
-                    }),
-                qualifiers: _,
+            }) => result,
+            Place::Defined(DefinedPlace {
+                definedness: Definedness::PossiblyUndefined,
                 ..
-            } => member
+            }) => result
                 .or_fall_back_to(db, custom_getattribute_result)
                 .or_fall_back_to(db, custom_getattr_result),
-            PlaceAndQualifiers {
-                place: Place::Undefined,
-                qualifiers: _,
-                ..
-            } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
+            Place::Undefined => {
+                custom_getattribute_result().or_fall_back_to(db, custom_getattr_result)
+            }
         }
     }
 
@@ -6862,7 +6818,7 @@ impl<'db> UnionType<'db> {
                     name.into(),
                     policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 )
-                .place
+                .place()
             {
                 Place::Defined(DefinedPlace {
                     ty,
@@ -7431,8 +7387,20 @@ impl TypeQualifiers {
 ///
 /// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
 /// qualifier `ClassVar`.
-#[derive(Clone, Debug, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct TypeAndQualifiers<'db> {
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum TypeAndQualifiers<'db> {
+    /// The common case, stored inline to avoid an allocation.
+    WithoutDeprecation {
+        inner: Type<'db>,
+        origin: TypeOrigin,
+        qualifiers: TypeQualifiers,
+    },
+    /// Non-default deprecation policies are rare, so store their payload out of line.
+    WithDeprecation(Box<DeprecatedTypeAndQualifiers<'db>>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct DeprecatedTypeAndQualifiers<'db> {
     inner: Type<'db>,
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
@@ -7441,75 +7409,135 @@ pub(crate) struct TypeAndQualifiers<'db> {
 
 impl<'db> TypeAndQualifiers<'db> {
     pub(crate) fn new(inner: Type<'db>, origin: TypeOrigin, qualifiers: TypeQualifiers) -> Self {
-        Self {
+        Self::WithoutDeprecation {
             inner,
             origin,
             qualifiers,
-            deprecation: DeprecationPolicy::Inherit,
         }
     }
 
     pub(crate) fn declared(inner: Type<'db>) -> Self {
-        Self {
+        Self::WithoutDeprecation {
             inner,
             origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
-            deprecation: DeprecationPolicy::Inherit,
         }
     }
 
     /// Forget about type qualifiers and only return the inner type.
     pub(crate) fn inner_type(&self) -> Type<'db> {
-        self.inner
+        match self {
+            Self::WithoutDeprecation { inner, .. } => *inner,
+            Self::WithDeprecation(deprecated) => deprecated.inner,
+        }
     }
 
     pub(crate) fn origin(&self) -> TypeOrigin {
-        self.origin
+        match self {
+            Self::WithoutDeprecation { origin, .. } => *origin,
+            Self::WithDeprecation(deprecated) => deprecated.origin,
+        }
     }
 
     /// Return `self` with an additional qualifier added to the set of qualifiers.
     pub(crate) fn with_qualifier(mut self, qualifier: TypeQualifiers) -> Self {
-        self.qualifiers |= qualifier;
+        match &mut self {
+            Self::WithoutDeprecation { qualifiers, .. } => *qualifiers |= qualifier,
+            Self::WithDeprecation(deprecated) => deprecated.qualifiers |= qualifier,
+        }
         self
     }
 
     /// Return the set of type qualifiers.
     pub(crate) fn qualifiers(&self) -> TypeQualifiers {
-        self.qualifiers
+        match self {
+            Self::WithoutDeprecation { qualifiers, .. } => *qualifiers,
+            Self::WithDeprecation(deprecated) => deprecated.qualifiers,
+        }
     }
 
     pub(crate) fn deprecation_policy(&self) -> DeprecationPolicy<'db> {
-        self.deprecation
+        match self {
+            Self::WithoutDeprecation { .. } => DeprecationPolicy::Inherit,
+            Self::WithDeprecation(deprecated) => deprecated.deprecation,
+        }
+    }
+
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        Type<'db>,
+        TypeOrigin,
+        TypeQualifiers,
+        DeprecationPolicy<'db>,
+    ) {
+        match self {
+            Self::WithoutDeprecation {
+                inner,
+                origin,
+                qualifiers,
+            } => (inner, origin, qualifiers, DeprecationPolicy::Inherit),
+            Self::WithDeprecation(deprecated) => (
+                deprecated.inner,
+                deprecated.origin,
+                deprecated.qualifiers,
+                deprecated.deprecation,
+            ),
+        }
     }
 
     #[must_use]
-    pub(crate) fn with_deprecation(mut self, deprecation: Option<DeprecatedInstance<'db>>) -> Self {
-        self.deprecation =
-            deprecation.map_or(DeprecationPolicy::Inherit, DeprecationPolicy::Deprecated);
-        self
+    pub(crate) fn with_deprecation(self, deprecation: Option<DeprecatedInstance<'db>>) -> Self {
+        self.with_deprecation_policy(
+            deprecation.map_or(DeprecationPolicy::Inherit, DeprecationPolicy::Deprecated),
+        )
     }
 
     #[must_use]
-    pub(crate) fn with_deprecation_policy(mut self, deprecation: DeprecationPolicy<'db>) -> Self {
-        self.deprecation = deprecation;
-        self
+    pub(crate) fn with_deprecation_policy(self, deprecation: DeprecationPolicy<'db>) -> Self {
+        match (self, deprecation) {
+            (ty @ Self::WithoutDeprecation { .. }, DeprecationPolicy::Inherit) => ty,
+            (
+                Self::WithoutDeprecation {
+                    inner,
+                    origin,
+                    qualifiers,
+                },
+                deprecation,
+            ) => Self::WithDeprecation(Box::new(DeprecatedTypeAndQualifiers {
+                inner,
+                origin,
+                qualifiers,
+                deprecation,
+            })),
+            (Self::WithDeprecation(deprecated), DeprecationPolicy::Inherit) => {
+                Self::WithoutDeprecation {
+                    inner: deprecated.inner,
+                    origin: deprecated.origin,
+                    qualifiers: deprecated.qualifiers,
+                }
+            }
+            (Self::WithDeprecation(mut deprecated), deprecation) => {
+                deprecated.deprecation = deprecation;
+                Self::WithDeprecation(deprecated)
+            }
+        }
     }
 
     #[must_use]
-    pub(crate) fn suppress_type_deprecation(mut self) -> Self {
-        self.deprecation = DeprecationPolicy::Suppress;
+    pub(crate) fn suppress_type_deprecation(self) -> Self {
+        self.with_deprecation_policy(DeprecationPolicy::Suppress)
+    }
+
+    pub(crate) fn map_type(mut self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        self.map_type_mut(f);
         self
     }
 
-    pub(crate) fn map_type(
-        &self,
-        f: impl FnOnce(Type<'db>) -> Type<'db>,
-    ) -> TypeAndQualifiers<'db> {
-        TypeAndQualifiers {
-            inner: f(self.inner),
-            origin: self.origin,
-            qualifiers: self.qualifiers,
-            deprecation: self.deprecation,
+    pub(crate) fn map_type_mut(&mut self, f: impl FnOnce(Type<'db>) -> Type<'db>) {
+        match self {
+            Self::WithoutDeprecation { inner, .. } => *inner = f(*inner),
+            Self::WithDeprecation(deprecated) => deprecated.inner = f(deprecated.inner),
         }
     }
 }
@@ -7743,7 +7771,7 @@ impl<'db> InvalidTypeExpression<'db> {
             let module_name_final_part = module.name(db).last_component();
             let Some(module_member_with_same_name) = ty
                 .member(db, module_name_final_part)
-                .place
+                .place()
                 .ignore_possibly_undefined()
             else {
                 return;
@@ -8016,20 +8044,17 @@ impl<'db> ModuleLiteralType<'db> {
         if let Some(file) = self.module(db).file(db) {
             let getattr_symbol = imported_symbol(db, Some(file), "__getattr__", None);
             // If we found a __getattr__ function, try to call it with the name argument
-            if let Place::Defined(place) = getattr_symbol.place
+            if let Place::Defined(place) = getattr_symbol.place()
                 && let Ok(outcome) = place.ty.try_call(
                     db,
                     &CallArguments::positional([Type::string_literal(db, name)]),
                 )
             {
-                return PlaceAndQualifiers {
-                    place: Place::Defined(DefinedPlace {
-                        ty: outcome.return_type(db),
-                        ..place
-                    }),
-                    qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
-                    deprecation: DeprecationPolicy::Inherit,
-                };
+                return Place::Defined(DefinedPlace {
+                    ty: outcome.return_type(db),
+                    ..place
+                })
+                .with_qualifiers(TypeQualifiers::FROM_MODULE_GETATTR);
             }
         }
 
@@ -8064,7 +8089,7 @@ impl<'db> ModuleLiteralType<'db> {
         let place_and_qualifiers = imported_symbol(db, self.module(db).file(db), name, None);
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
-        if place_and_qualifiers.place.is_undefined() {
+        if place_and_qualifiers.place().is_undefined() {
             return self.try_module_getattr(db, name);
         }
 
@@ -8072,20 +8097,18 @@ impl<'db> ModuleLiteralType<'db> {
         // is `from typing import Callable as Callable`). The resolved type still carries the
         // definition-site variant (`SpecialFormType::TypingCallable`), so we recover the
         // import-path identity here while it's still observable.
-        if let Place::Defined(defined) = place_and_qualifiers.place
+        if let Place::Defined(defined) = place_and_qualifiers.place()
             && let Type::SpecialForm(special) = defined.ty
             && let Some(import_module) = self.module(db).known(db)
         {
             let rewrapped = special.rewrap_for_import_module(name, import_module);
             if rewrapped != special {
-                return PlaceAndQualifiers {
-                    place: Place::Defined(DefinedPlace {
-                        ty: Type::SpecialForm(rewrapped),
-                        ..defined
-                    }),
-                    qualifiers: place_and_qualifiers.qualifiers,
-                    deprecation: place_and_qualifiers.deprecation,
-                };
+                return Place::Defined(DefinedPlace {
+                    ty: Type::SpecialForm(rewrapped),
+                    ..defined
+                })
+                .with_qualifiers(place_and_qualifiers.qualifiers())
+                .with_deprecation_policy(place_and_qualifiers.deprecation_policy());
             }
         }
 
@@ -8368,6 +8391,10 @@ pub(super) fn determine_upper_bound<'db>(
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
 static_assertions::assert_eq_size!(Type, [u8; 16]);
+
+// Keep the common case at the same size as it was before adding place-level deprecation.
+#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
+static_assertions::assert_eq_size!(TypeAndQualifiers<'_>, [u8; 24]);
 
 // Make sure that `LiteralValueTypeInner` stays at 12 bytes.
 // The `LiteralFlags` byte must fit in the discriminant's padding.

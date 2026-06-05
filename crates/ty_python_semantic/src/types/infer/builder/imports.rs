@@ -6,7 +6,7 @@ use ty_module_resolver::{
 
 use crate::{
     Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
-    place::{DefinedPlace, Definedness, DeprecationPolicy, Place, PlaceAndQualifiers, TypeOrigin},
+    place::{DefinedPlace, Definedness, DeprecationPolicy, Place, TypeOrigin},
     types::{
         Type, TypeAndQualifiers,
         diagnostic::{
@@ -249,7 +249,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 );
                             }
                             DeprecationPolicy::Inherit => {
-                                self.check_deprecated(alias, ty.inner);
+                                self.check_deprecated(alias, ty.inner_type());
                             }
                             DeprecationPolicy::Suppress => {}
                         }
@@ -375,16 +375,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // First try loading the requested attribute from the module.
         if !skip_self_referential_member_lookup {
-            if let PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty,
-                        definedness: boundness,
-                        ..
-                    }),
-                qualifiers,
-                deprecation,
-            } = module_ty.member(db, name)
+            let (place, qualifiers, deprecation) = module_ty.member(db, name).into_parts();
+            if let Place::Defined(DefinedPlace {
+                ty,
+                definedness: boundness,
+                ..
+            }) = place
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
@@ -405,12 +401,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         alias.into(),
                         definition,
                         &DeclaredAndInferredType::MightBeDifferent {
-                            declared_ty: TypeAndQualifiers {
-                                inner: ty,
-                                origin: TypeOrigin::Declared,
+                            declared_ty: TypeAndQualifiers::new(
+                                ty,
+                                TypeOrigin::Declared,
                                 qualifiers,
-                                deprecation,
-                            },
+                            )
+                            .with_deprecation_policy(deprecation),
                             inferred_ty: ty,
                         },
                     );
@@ -462,12 +458,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 alias.into(),
                 definition,
                 &DeclaredAndInferredType::MightBeDifferent {
-                    declared_ty: TypeAndQualifiers {
-                        inner: ty,
-                        origin: TypeOrigin::Declared,
-                        qualifiers,
-                        deprecation,
-                    },
+                    declared_ty: TypeAndQualifiers::new(ty, TypeOrigin::Declared, qualifiers)
+                        .with_deprecation_policy(deprecation),
                     inferred_ty: ty,
                 },
             );

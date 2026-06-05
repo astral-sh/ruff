@@ -1132,7 +1132,7 @@ impl<'db> StaticClassLiteral<'db> {
         // undefined so the MRO falls through to parent classes.
         if member
             .inner
-            .place
+            .place()
             .raw_type()
             .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
             && CodeGeneratorKind::from_static_class(db, self, None)
@@ -1144,7 +1144,7 @@ impl<'db> StaticClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        if let Some(ty) = member.inner.place.raw_type() {
+        if let Some(ty) = member.inner.place().raw_type() {
             if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
                 if is_enum_class_by_inheritance(db, self) {
                     return Member::definitely_declared(value_ty);
@@ -1266,7 +1266,7 @@ impl<'db> StaticClassLiteral<'db> {
                     ty: dunder_set,
                     definedness: Definedness::AlwaysDefined,
                     ..
-                }) = dunder_set.place
+                }) = dunder_set.place()
                 {
                     // The descriptor handling below is guarded by this not-dynamic check, because
                     // dynamic types like `Any` are valid (data) descriptors: since they have all
@@ -1813,7 +1813,7 @@ impl<'db> StaticClassLiteral<'db> {
             let symbol = table.symbol(symbol_id);
             let name = symbol.name();
 
-            let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
+            let Some(Type::FunctionLiteral(literal)) = attr.place().ignore_possibly_undefined()
             else {
                 continue;
             };
@@ -1951,7 +1951,7 @@ impl<'db> StaticClassLiteral<'db> {
                 continue;
             }
 
-            if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
+            if let Some(attr_ty) = attr.place().ignore_possibly_undefined() {
                 let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                 let mut default_ty = place_from_bindings(db, bindings)
                     .place
@@ -2197,8 +2197,9 @@ impl<'db> StaticClassLiteral<'db> {
                 let Some(annotation) = inferred_declaration(db, declaration).declared() else {
                     continue;
                 };
-                let annotation = Place::declared(annotation.inner).with_qualifiers(
-                    annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
+                let (annotation_ty, _, annotation_qualifiers, _) = annotation.into_parts();
+                let annotation = Place::declared(annotation_ty).with_qualifiers(
+                    annotation_qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
                 );
 
                 if let Some(all_qualifiers) = annotation.is_bare_final() {
@@ -2448,17 +2449,13 @@ impl<'db> StaticClassLiteral<'db> {
             let declared_and_qualifiers =
                 place_from_declarations(db, declarations).ignore_conflicting_declarations();
 
-            match declared_and_qualifiers {
-                PlaceAndQualifiers {
-                    place:
-                        mut declared @ Place::Defined(DefinedPlace {
-                            ty: declared_ty,
-                            definedness: declaredness,
-                            ..
-                        }),
-                    qualifiers,
+            let (mut declared, qualifiers, deprecation) = declared_and_qualifiers.into_parts();
+            match declared {
+                Place::Defined(DefinedPlace {
+                    ty: declared_ty,
+                    definedness: declaredness,
                     ..
-                } => {
+                }) => {
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
@@ -2502,7 +2499,9 @@ impl<'db> StaticClassLiteral<'db> {
                                 // attribute assignments in methods of the class,
                                 // we trust the declared type.
                                 Member {
-                                    inner: declared.with_qualifiers(qualifiers),
+                                    inner: declared
+                                        .with_qualifiers(qualifiers)
+                                        .with_deprecation_policy(deprecation),
                                 }
                             } else {
                                 Member {
@@ -2516,13 +2515,14 @@ impl<'db> StaticClassLiteral<'db> {
                                         definedness: declaredness,
                                         public_type_policy: PublicTypePolicy::Raw,
                                     })
-                                    .with_qualifiers(qualifiers),
+                                    .with_qualifiers(qualifiers)
+                                    .with_deprecation_policy(deprecation),
                                 }
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty
                                 .class_member(db, "__get__".into())
-                                .place
+                                .place()
                                 .is_undefined()
                         {
                             // For dataclass-like classes, declared fields are assigned
@@ -2535,7 +2535,9 @@ impl<'db> StaticClassLiteral<'db> {
                             // protocol in `member_lookup_with_policy` can resolve
                             // the attribute type through `__get__`.
                             Member {
-                                inner: declared.with_qualifiers(qualifiers),
+                                inner: declared
+                                    .with_qualifiers(qualifiers)
+                                    .with_deprecation_policy(deprecation),
                             }
                         } else {
                             // The symbol is declared and bound in the class body,
@@ -2555,7 +2557,9 @@ impl<'db> StaticClassLiteral<'db> {
 
                         if declaredness == Definedness::AlwaysDefined {
                             Member {
-                                inner: declared.with_qualifiers(qualifiers),
+                                inner: declared
+                                    .with_qualifiers(qualifiers)
+                                    .with_deprecation_policy(deprecation),
                             }
                         } else {
                             if let Some(implicit_ty) = Self::implicit_attribute(
@@ -2565,7 +2569,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 MethodDecorator::None,
                             )
                             .inner
-                            .place
+                            .place()
                             .ignore_possibly_undefined()
                             {
                                 Member {
@@ -2579,22 +2583,21 @@ impl<'db> StaticClassLiteral<'db> {
                                         definedness: declaredness,
                                         public_type_policy: PublicTypePolicy::Raw,
                                     })
-                                    .with_qualifiers(qualifiers),
+                                    .with_qualifiers(qualifiers)
+                                    .with_deprecation_policy(deprecation),
                                 }
                             } else {
                                 Member {
-                                    inner: declared.with_qualifiers(qualifiers),
+                                    inner: declared
+                                        .with_qualifiers(qualifiers)
+                                        .with_deprecation_policy(deprecation),
                                 }
                             }
                         }
                     }
                 }
 
-                PlaceAndQualifiers {
-                    place: Place::Undefined,
-                    qualifiers: _,
-                    ..
-                } => {
+                Place::Undefined => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
@@ -2940,7 +2943,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
             .filter_map(|(name, place_and_qual)| {
                 place_and_qual.ignore_possibly_undefined().map(|ty| {
                     let variance = if place_and_qual
-                        .qualifiers
+                        .qualifiers()
                         // `CLASS_VAR || FINAL` is really `all()`, but
                         // we want to be robust against new qualifiers
                         .intersects(TypeQualifiers::CLASS_VAR | TypeQualifiers::FINAL)
@@ -3052,6 +3055,6 @@ fn implicit_attribute_cycle_recover<'db>(
 ) -> Member<'db> {
     let inner = member
         .inner
-        .cycle_normalized(db, previous_member.inner, cycle);
+        .cycle_normalized(db, &previous_member.inner, cycle);
     Member { inner }
 }

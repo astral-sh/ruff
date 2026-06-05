@@ -7715,7 +7715,7 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
 
     let context_manager =
         known_module_symbol(db, KnownModule::Contextlib, "_AsyncGeneratorContextManager")
-            .place
+            .place()
             .ignore_possibly_undefined()?
             .as_class_literal()?;
 

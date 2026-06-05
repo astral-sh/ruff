@@ -888,10 +888,10 @@ impl<'db> BoundSuperType<'db> {
     pub(super) fn try_call_dunder_get_on_attribute(
         self,
         db: &'db dyn Db,
-        attribute: PlaceAndQualifiers<'db>,
+        attribute: &PlaceAndQualifiers<'db>,
     ) -> Option<PlaceAndQualifiers<'db>> {
         let (instance, owner) = self.owner(db).descriptor_binding(db)?;
-        Some(Type::try_call_dunder_get_on_attribute(db, attribute, instance, owner).0)
+        Some(Type::try_call_dunder_get_on_attribute(db, attribute.clone(), instance, owner).0)
     }
 
     /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the
@@ -925,7 +925,7 @@ impl<'db> BoundSuperType<'db> {
         // typing._Generic in the typeshed, and we are hard-coding its signature. Ideally we would
         // look that up from the typeshed class, but that would require threading through the
         // static class literal through the SpecialForm and KnownInstance types that we create.
-        if result.place.is_undefined()
+        if result.place().is_undefined()
             && name == "__class_getitem__"
             && mro_after_pivot
                 .any(|superclass| matches!(superclass, ClassBase::Generic | ClassBase::Protocol))

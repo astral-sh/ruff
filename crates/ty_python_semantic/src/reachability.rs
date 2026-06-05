@@ -1221,7 +1221,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 symbol.name(),
                 requires_explicit_reexport,
             )
-            .place
+            .place()
             {
                 Place::Defined(DefinedPlace {
                     definedness: Definedness::AlwaysDefined,

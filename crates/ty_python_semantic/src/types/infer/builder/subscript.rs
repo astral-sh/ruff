@@ -171,7 +171,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty,
                     definedness: Definedness::AlwaysDefined,
                     ..
-                }) = place.place
+                }) = place.place()
                 {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
@@ -1253,7 +1253,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "__setitem__".into(),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 )
-                .place
+                .place()
             {
                 let mut identity_bindings = dunder_callable
                     .bindings(db)

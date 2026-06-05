@@ -2547,7 +2547,7 @@ fn nominal_attribute_type<'db>(
     if resolved_ty.is_nominal_instance() {
         resolved_ty
             .member(db, attribute_name)
-            .place
+            .place()
             .ignore_possibly_undefined()
     } else {
         None

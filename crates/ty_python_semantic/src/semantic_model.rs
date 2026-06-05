@@ -491,7 +491,7 @@ impl<'db> SemanticModel<'db> {
                         attr.attr.id.clone(),
                         crate::types::MemberLookupPolicy::default(),
                     )
-                    .qualifiers
+                    .qualifiers()
             }
             _ => TypeQualifiers::empty(),
         }

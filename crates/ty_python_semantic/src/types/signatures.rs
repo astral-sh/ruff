@@ -4316,7 +4316,7 @@ mod tests {
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
         global_symbol(db, module, "f")
-            .place
+            .place()
             .expect_type()
             .expect_function_literal()
     }

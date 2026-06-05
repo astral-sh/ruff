@@ -6016,7 +6016,7 @@ pub(super) fn report_invalid_method_override<'db>(
 
     let class_member = |cls: ClassType<'db>| {
         cls.class_member(db, member, MemberLookupPolicy::default())
-            .place
+            .place()
     };
 
     if let Place::Defined(DefinedPlace {

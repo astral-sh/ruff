@@ -225,10 +225,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 // not a dataclass, since Final already implies the semantics of ClassVar.
                                 let classvar_and_final = match qualifier {
                                     TypeQualifier::Final => type_and_qualifiers
-                                        .qualifiers
+                                        .qualifiers()
                                         .contains(TypeQualifiers::CLASS_VAR),
                                     TypeQualifier::ClassVar => type_and_qualifiers
-                                        .qualifiers
+                                        .qualifiers()
                                         .contains(TypeQualifiers::FINAL),
                                     _ => false,
                                 };
@@ -261,7 +261,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 if matches!(
                                     qualifier,
                                     TypeQualifier::Required | TypeQualifier::NotRequired
-                                ) && type_and_qualifiers.qualifiers.intersects(
+                                ) && type_and_qualifiers.qualifiers().intersects(
                                     TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED,
                                 ) && let Some(builder) =
                                     self.context.report_lint(&INVALID_TYPE_FORM, subscript)

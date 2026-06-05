@@ -1249,7 +1249,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Fall back to implicit module globals for (possibly) unbound names
-        if !place_and_quals.place.is_definitely_bound()
+        if !place_and_quals.place().is_definitely_bound()
             && let PlaceExprRef::Symbol(symbol) = place
         {
             let symbol_id = place_id.expect_symbol();
@@ -1263,11 +1263,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let PlaceAndQualifiers {
-            place: resolved_place,
-            qualifiers,
-            ..
-        } = place_and_quals;
+        let (resolved_place, qualifiers, _) = place_and_quals.into_parts();
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
             self.fallback_member_declared_type(node)
@@ -1296,7 +1292,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty,
                 definedness: Definedness::AlwaysDefined,
                 ..
-            }) = value_type.member(db, attr).place
+            }) = value_type.member(db, attr).place()
             {
                 // TODO: also consider qualifiers on the attribute
                 Some(ty)
@@ -1364,7 +1360,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Place::Undefined.into()
                 }
             })
-            .place
+            .place()
             .ignore_possibly_undefined()
             .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
@@ -1401,10 +1397,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_declaration()
         );
 
-        let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
-            DeclaredAndInferredType::AreTheSame(type_and_qualifiers) => {
-                (type_and_qualifiers, type_and_qualifiers.inner_type())
-            }
+        let (declared_ty, inferred_ty) = match declared_and_inferred_ty {
+            DeclaredAndInferredType::AreTheSame(type_and_qualifiers) => (
+                type_and_qualifiers.clone(),
+                type_and_qualifiers.inner_type(),
+            ),
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
@@ -1416,7 +1413,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(module_type_implicit_declaration) = place
                         .as_symbol()
                         .map(|symbol| module_type_implicit_global_symbol(self.db(), symbol.name()))
-                        .and_then(|place| place.place.ignore_possibly_undefined())
+                        .and_then(|place| place.place().ignore_possibly_undefined())
                     {
                         let declared_type = declared_ty.inner_type();
                         if !declared_type
@@ -1439,17 +1436,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 let declared_type = declared_ty.inner_type();
                 if inferred_ty.is_assignable_to(self.db(), declared_type) {
-                    if !should_preserve_inferred_binding_type(inferred_ty)
+                    if !should_preserve_inferred_binding_type(*inferred_ty)
                         // TODO We currently can't distinguish here between "no declared type" and
                         // "declared types is `Unknown` (e.g. due to a bad annotation, missing
                         // import, etc.)". Ideally we would still prefer `Unknown` declared type,
                         // but use inferred type if there is no declared type.
                         && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
-                        && declared_type.is_assignable_to(self.db(), inferred_ty)
+                        && declared_type.is_assignable_to(self.db(), *inferred_ty)
                     {
-                        (declared_ty, declared_type)
+                        (declared_ty.clone(), declared_type)
                     } else {
-                        (declared_ty, inferred_ty)
+                        (declared_ty.clone(), *inferred_ty)
                     }
                 } else {
                     self.discard_dict_key_assignments_for(definition);
@@ -1458,11 +1455,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         node,
                         definition,
                         declared_type,
-                        inferred_ty,
+                        *inferred_ty,
                     );
 
                     // if the assignment is invalid, fall back to assuming the annotation is correct
-                    (declared_ty, declared_type)
+                    (declared_ty.clone(), declared_type)
                 }
             }
         };
@@ -2698,21 +2695,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if emit_diagnostics {
                         if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
                         {
-                            let is_setattr_synthesized = match object_ty.class_member_with_policy(
-                                db,
-                                "__setattr__".into(),
-                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                            ) {
-                                PlaceAndQualifiers {
-                                    place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
-                                    qualifiers: _,
-                                    ..
-                                } => attr_ty.is_callable_type(),
-                                _ => false,
+                            let is_setattr_synthesized = match object_ty
+                                .class_member_with_policy(
+                                    db,
+                                    "__setattr__".into(),
+                                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                                )
+                                .place()
+                            {
+                                Place::Defined(DefinedPlace { ty: attr_ty, .. }) => {
+                                    attr_ty.is_callable_type()
+                                }
+                                Place::Undefined => false,
                             };
 
                             let member_exists =
-                                !object_ty.member(db, attribute).place.is_undefined();
+                                !object_ty.member(db, attribute).place().is_undefined();
 
                             let msg = if !member_exists {
                                 format!(
@@ -2748,8 +2746,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return true;
                 };
 
-                match meta_attr {
-                    meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
+                match (meta_attr.place(), meta_attr.qualifiers()) {
+                    _ if meta_attr.is_class_var() => {
                         if emit_diagnostics
                             && let Some(builder) =
                                 self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
@@ -2762,14 +2760,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         false
                     }
-                    PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
-                            }),
+                    (
+                        Place::Defined(DefinedPlace {
+                            ty: meta_attr_ty, ..
+                        }),
                         qualifiers,
-                        ..
-                    } => {
+                    ) => {
                         // Resolve `Self` type variables to the concrete instance type.
                         let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
 
@@ -2785,7 +2781,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ty: meta_dunder_set,
                             ..
                         }) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
+                            meta_attr_ty.class_member(db, "__set__".into()).place()
                         {
                             // TODO: We could use the annotated parameter type of `__set__` as
                             // type context here.
@@ -2830,73 +2826,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ensure_assignable_to(self, value_ty, write_ty)
                         };
 
-                        let assignable_to_instance_attribute =
-                            if let Some(fallback_attr) = fallback_attr {
-                                let (assignable, boundness) = if let PlaceAndQualifiers {
-                                    place:
-                                        Place::Defined(DefinedPlace {
-                                            ty: instance_attr_ty,
-                                            definedness: instance_attr_boundness,
-                                            ..
-                                        }),
-                                    qualifiers,
-                                    ..
-                                } = fallback_attr
-                                {
-                                    // Bind `Self` via MRO matching.
-                                    let instance_attr_ty =
-                                        instance_attr_ty.bind_self_typevars(db, object_ty);
-                                    let write_ty = effective_write_type(instance_attr_ty);
-                                    let value_ty = infer_value_ty
-                                        .infer_silent(self, TypeContext::new(Some(write_ty)));
-                                    if emit_diagnostics
-                                        && self.invalid_assignment_to_final_attribute(
-                                            object_ty, target, attribute, qualifiers,
-                                        )
-                                    {
-                                        return false;
-                                    }
-
-                                    (
-                                        ensure_assignable_to(self, value_ty, write_ty),
-                                        instance_attr_boundness,
+                        let assignable_to_instance_attribute = if let Some(fallback_attr) =
+                            fallback_attr
+                        {
+                            let qualifiers = fallback_attr.qualifiers();
+                            let (assignable, boundness) = if let Place::Defined(DefinedPlace {
+                                ty: instance_attr_ty,
+                                definedness: instance_attr_boundness,
+                                ..
+                            }) = fallback_attr.place()
+                            {
+                                // Bind `Self` via MRO matching.
+                                let instance_attr_ty =
+                                    instance_attr_ty.bind_self_typevars(db, object_ty);
+                                let write_ty = effective_write_type(instance_attr_ty);
+                                let value_ty = infer_value_ty
+                                    .infer_silent(self, TypeContext::new(Some(write_ty)));
+                                if emit_diagnostics
+                                    && self.invalid_assignment_to_final_attribute(
+                                        object_ty, target, attribute, qualifiers,
                                     )
-                                } else {
-                                    (true, Definedness::PossiblyUndefined)
-                                };
-
-                                if boundness == Definedness::PossiblyUndefined {
-                                    report_possibly_missing_attribute(
-                                        &self.context,
-                                        target,
-                                        attribute,
-                                        object_ty,
-                                    );
+                                {
+                                    return false;
                                 }
 
-                                assignable
+                                (
+                                    ensure_assignable_to(self, value_ty, write_ty),
+                                    instance_attr_boundness,
+                                )
                             } else {
-                                true
+                                (true, Definedness::PossiblyUndefined)
                             };
+
+                            if boundness == Definedness::PossiblyUndefined {
+                                report_possibly_missing_attribute(
+                                    &self.context,
+                                    target,
+                                    attribute,
+                                    object_ty,
+                                );
+                            }
+
+                            assignable
+                        } else {
+                            true
+                        };
 
                         assignable_to_meta_attr && assignable_to_instance_attribute
                     }
 
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        ..
-                    } => {
-                        if let Some(PlaceAndQualifiers {
-                            place:
-                                Place::Defined(DefinedPlace {
-                                    ty: instance_attr_ty,
-                                    definedness: instance_attr_boundness,
-                                    ..
-                                }),
-                            qualifiers,
-                            ..
-                        }) = fallback_attr
+                    (Place::Undefined, _) => {
+                        if let Some(fallback_attr) = fallback_attr
+                            && let Place::Defined(DefinedPlace {
+                                ty: instance_attr_ty,
+                                definedness: instance_attr_boundness,
+                                ..
+                            }) = fallback_attr.place()
                         {
+                            let qualifiers = fallback_attr.qualifiers();
                             // Bind `Self` via MRO matching.
                             let instance_attr_ty =
                                 instance_attr_ty.bind_self_typevars(db, object_ty);
@@ -2973,15 +2960,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return true;
                 };
 
-                match meta_attr {
-                    PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
-                            }),
+                match (meta_attr.place(), meta_attr.qualifiers()) {
+                    (
+                        Place::Defined(DefinedPlace {
+                            ty: meta_attr_ty, ..
+                        }),
                         qualifiers,
-                        ..
-                    } => {
+                    ) => {
                         if emit_diagnostics
                             && self.invalid_assignment_to_final_attribute(
                                 object_ty, target, attribute, qualifiers,
@@ -3003,7 +2988,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ty: meta_dunder_set,
                             ..
                         }) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
+                            meta_attr_ty.class_member(db, "__set__".into()).place()
                         {
                             // TODO: We could use the annotated parameter type of `__set__` as
                             // type context here.
@@ -3047,15 +3032,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         };
 
                         let assignable_to_class_attr = if let Some(fallback_attr) = fallback_attr {
-                            let (assignable, boundness) = if let PlaceAndQualifiers {
-                                place:
-                                    Place::Defined(DefinedPlace {
-                                        ty: class_attr_ty,
-                                        definedness: class_attr_boundness,
-                                        ..
-                                    }),
+                            let (assignable, boundness) = if let Place::Defined(DefinedPlace {
+                                ty: class_attr_ty,
+                                definedness: class_attr_boundness,
                                 ..
-                            } = fallback_attr
+                            }) = fallback_attr.place()
                             {
                                 let class_attr_ty =
                                     class_attr_ty.bind_self_typevars(db, class_attr_self_ty);
@@ -3085,21 +3066,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         assignable_to_meta_attr && assignable_to_class_attr
                     }
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        ..
-                    } => {
-                        if let Some(PlaceAndQualifiers {
-                            place:
-                                Place::Defined(DefinedPlace {
-                                    ty: class_attr_ty,
-                                    definedness: class_attr_boundness,
-                                    ..
-                                }),
-                            qualifiers,
-                            ..
-                        }) = fallback_attr
+                    (Place::Undefined, _) => {
+                        if let Some(fallback_attr) = fallback_attr
+                            && let Place::Defined(DefinedPlace {
+                                ty: class_attr_ty,
+                                definedness: class_attr_boundness,
+                                ..
+                            }) = fallback_attr.place()
                         {
+                            let qualifiers = fallback_attr.qualifiers();
                             let class_attr_ty =
                                 class_attr_ty.bind_self_typevars(db, class_attr_self_ty);
                             let value_ty =
@@ -3129,7 +3104,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 object_ty.to_instance(self.db()).is_some_and(|instance| {
                                     !instance
                                         .instance_member(self.db(), attribute)
-                                        .place
+                                        .place()
                                         .is_undefined()
                                 });
 
@@ -3174,7 +3149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     module.static_member(db, attribute)
                 };
-                if let Place::Defined(DefinedPlace { ty: attr_ty, .. }) = sym.place {
+                if let Place::Defined(DefinedPlace { ty: attr_ty, .. }) = sym.place() {
                     let value_ty = infer_value_ty(self, TypeContext::new(Some(attr_ty)));
 
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
@@ -3352,17 +3327,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return false;
                 }
 
-                if let Some(PlaceAndQualifiers {
-                    place:
-                        Place::Defined(DefinedPlace {
-                            ty: attr_ty,
-                            definedness: Definedness::AlwaysDefined,
-                            ..
-                        }),
+                if let Some(Place::Defined(DefinedPlace {
+                    ty: attr_ty,
+                    definedness: Definedness::AlwaysDefined,
                     ..
-                }) = self
+                })) = self
                     .assignment_attribute_members(object_ty, attribute)
-                    .map(|(meta_attr, _)| meta_attr)
+                    .map(|(meta_attr, _)| meta_attr.place())
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
                     let delete_dunder_call_result = attr_ty.try_call_dunder(
@@ -3424,7 +3395,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let meta_attr = object_ty.class_member(db, attribute.into());
         let needs_fallback = matches!(
-            meta_attr.place,
+            meta_attr.place(),
             Place::Defined(DefinedPlace {
                 definedness: Definedness::PossiblyUndefined,
                 ..
@@ -4203,11 +4174,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 DeferredExpressionState::from(self.defer_annotations()),
             );
 
-            if !annotated.qualifiers.is_empty() {
+            if !annotated.qualifiers().is_empty() {
                 for qualifier in TypeQualifier::iter() {
                     if !qualifier.is_valid_for_non_name_targets()
                         && annotated
-                            .qualifiers
+                            .qualifiers()
                             .contains(TypeQualifiers::from(qualifier))
                         && let Some(builder) = self
                             .context
@@ -4320,7 +4291,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // looking up qualifiers from the object type (as `validate_final_attribute_assignment`
             // does for augmented assignments).
             if value.is_some()
-                && annotated.qualifiers.contains(TypeQualifiers::FINAL)
+                && annotated.qualifiers().contains(TypeQualifiers::FINAL)
                 && let ast::Expr::Attribute(attr_expr) = target.as_ref()
             {
                 let object_ty = self.expression_type(&attr_expr.value);
@@ -4328,7 +4299,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     object_ty,
                     attr_expr,
                     attr_expr.attr.id(),
-                    annotated.qualifiers,
+                    annotated.qualifiers(),
                 );
             }
 
@@ -4463,10 +4434,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
-        if !declared.qualifiers.is_empty() {
+        if !declared.qualifiers().is_empty() {
             for qualifier in TypeQualifier::iter() {
                 if !declared
-                    .qualifiers
+                    .qualifiers()
                     .contains(TypeQualifiers::from(qualifier))
                 {
                     continue;
@@ -4599,7 +4570,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // otherwise, assigning something other than `False` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
             }
-            declared.inner = Type::bool_literal(true);
+            declared = declared.map_type(|_| Type::bool_literal(true));
         }
 
         // Handle various singletons.
@@ -4607,7 +4578,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(special_form) =
                 SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name_expr.id)
         {
-            declared.inner = Type::SpecialForm(special_form);
+            declared = declared.map_type(|_| Type::SpecialForm(special_form));
         }
 
         // If the target of an assignment is not one of the place expressions we support,
@@ -4706,7 +4677,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !name_expr.id.starts_with("__")
                     && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
                     // Not bare Final (bare Final is allowed on enum members)
-                    && !(declared.qualifiers.contains(TypeQualifiers::FINAL)
+                    && !(declared.qualifiers().contains(TypeQualifiers::FINAL)
                         && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
                     // Value type would be an enum member at runtime (exclude callables,
                     // which are never members)
@@ -4755,8 +4726,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "`TypeAlias` must be assigned a value in annotated assignments",
                     );
                 }
-                declared.inner = Type::unknown();
+                declared = declared.map_type(|_| Type::unknown());
             }
+            let declared_ty = declared.inner_type();
             if self.in_stub() {
                 self.add_declaration_with_binding(
                     target.into(),
@@ -4767,7 +4739,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration(target.into(), definition, declared);
             }
 
-            self.store_expression_type(target, declared.inner_type());
+            self.store_expression_type(target, declared_ty);
         }
     }
 
@@ -5166,7 +5138,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             if !module_type_implicit_global_symbol(self.db(), name)
-                .place
+                .place()
                 .is_undefined()
             {
                 // This name is an implicit global like `__file__` (but not a built-in like `int`).
@@ -5359,7 +5331,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match object
             .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_INSTANCE_FALLBACK)
-            .place
+            .place()
         {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
@@ -8984,9 +8956,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 EnclosingSnapshotResult::FoundBindings(bindings) => {
                     let mut place_and_qualifiers =
                         place_from_bindings(db, bindings).into_place_and_qualifiers();
-                    if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
-                        place_and_qualifiers.place =
-                            Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
+                    if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place() {
+                        let qualifiers = place_and_qualifiers.qualifiers();
+                        let deprecation = place_and_qualifiers.deprecation_policy();
+                        place_and_qualifiers =
+                            Place::Defined(defined.with_definedness(Definedness::AlwaysDefined))
+                                .with_qualifiers(qualifiers)
+                                .with_deprecation_policy(deprecation);
                     }
                     place_and_qualifiers = place_and_qualifiers.map_type(|ty| {
                         self.narrow_place_with_applicable_constraints(
@@ -9084,7 +9060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let (parent_place, _use_id) = self.infer_local_place_load(parent_expr, expr_ref);
-                if let Place::Defined(_) = parent_place.place {
+                if let Place::Defined(_) = parent_place.place() {
                     return Place::Undefined.into();
                 }
             }
@@ -9280,7 +9256,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Some(symbol) = place_expr.as_symbol()
                     {
                         let implicit = class_body_implicit_symbol(db, symbol.name());
-                        if implicit.place.is_definitely_bound() {
+                        if implicit.place().is_definitely_bound() {
                             return implicit.map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
@@ -9305,8 +9281,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
         });
 
-        if let Some(ty) = place.place.ignore_possibly_undefined() {
-            match place.deprecation {
+        if let Some(ty) = place.place().ignore_possibly_undefined() {
+            match place.deprecation_policy() {
                 DeprecationPolicy::Deprecated(deprecated) if !ty.is_never() => {
                     if let Some(name) = match expr_ref {
                         ast::ExprRef::Name(name) => Some(name.id.as_str()),
@@ -9396,11 +9372,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
             Some(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
                 .class_member(self.db(), id.clone())
-                .place
+                .place()
                 .is_undefined(),
             Some(MethodDecorator::None) => !Type::instance(self.db(), class)
                 .member(self.db(), id)
-                .place
+                .place()
                 .is_undefined(),
             Some(MethodDecorator::StaticMethod) | None => false,
         };
@@ -9466,7 +9442,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for element in union.elements(db) {
                     union_elements_missing_attribute(db, *element, attr_name, missing_types);
                 }
-            } else if ty.member(db, attr_name).place.is_undefined() {
+            } else if ty.member(db, attr_name).place().is_undefined() {
                 missing_types.insert(ty);
             }
         }
@@ -9500,7 +9476,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty,
                 definedness: Definedness::AlwaysDefined,
                 ..
-            }) = resolved.place
+            }) = resolved.place()
             {
                 assigned_type = Some(ty);
             }
@@ -9577,7 +9553,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.scope(),
                                 self.typevar_binding_context,
                                 self.inference_flags()
-                            ) && !defined_type.member(db, attr_name).place.is_undefined()
+                            ) && !defined_type.member(db, attr_name).place().is_undefined()
                             {
                                 diag.help(format_args!(
                                     "Objects with type `{ty}` have a{maybe_n} `{attr_name}` \
@@ -9645,7 +9621,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && KnownClass::FunctionType
                             .to_instance(db)
                             .member(db, attr_name)
-                            .place
+                            .place()
                             .is_definitely_bound()
                     {
                         diagnostic.help(format_args!(
@@ -11202,7 +11178,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
             if value_ty
                 .class_member(db, attr.id.clone())
-                .place
+                .place()
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))
             {

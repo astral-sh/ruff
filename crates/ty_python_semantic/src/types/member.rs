@@ -8,7 +8,7 @@ use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize, Default)]
 pub(super) struct Member<'db> {
     /// Type, qualifiers, and boundness information of this member
     pub(super) inner: PlaceAndQualifiers<'db>,
@@ -29,17 +29,17 @@ impl<'db> Member<'db> {
 
     /// Returns the type qualifiers of this member.
     pub(super) fn qualifiers(&self) -> crate::types::TypeQualifiers {
-        self.inner.qualifiers
+        self.inner.qualifiers()
     }
 
     /// Returns `true` if the inner place is undefined (i.e. there is no such member).
     pub(super) fn is_undefined(&self) -> bool {
-        self.inner.place.is_undefined()
+        self.inner.is_undefined()
     }
 
     /// Returns the inner type, unless it is definitely undefined.
     pub(super) fn ignore_possibly_undefined(&self) -> Option<Type<'db>> {
-        self.inner.place.ignore_possibly_undefined()
+        self.inner.ignore_possibly_undefined()
     }
 
     /// Map a type transformation function over the type of this member.
@@ -72,12 +72,8 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 };
             }
 
-            if let PlaceAndQualifiers {
-                place: Place::Defined(DefinedPlace { ty, .. }),
-                qualifiers,
-                ..
-            } = place_and_quals
-            {
+            let qualifiers = place_and_quals.qualifiers();
+            if let Place::Defined(DefinedPlace { ty, .. }) = place_and_quals.place() {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);

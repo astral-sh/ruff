@@ -1852,7 +1852,7 @@ mod tests {
         db.write_dedented("/src/a.py", "type Alias = int").unwrap();
 
         let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
-        let alias_ty = global_symbol(&db, module, "Alias").place.expect_type();
+        let alias_ty = global_symbol(&db, module, "Alias").place().expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
             alias_ty
         else {
@@ -1932,7 +1932,7 @@ mod tests {
         let db = setup_db();
 
         let safe_uuid_class = known_module_symbol(&db, KnownModule::Uuid, "SafeUUID")
-            .place
+            .place()
             .ignore_possibly_undefined()
             .unwrap();
 

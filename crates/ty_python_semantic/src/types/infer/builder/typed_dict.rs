@@ -547,7 +547,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for qualifier in TypeQualifier::iter() {
             if !qualifier.is_valid_in_typeddict_field()
                 && annotation
-                    .qualifiers
+                    .qualifiers()
                     .contains(TypeQualifiers::from(qualifier))
                 && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
             {
@@ -572,7 +572,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for qualifier in TypeQualifier::iter() {
             if qualifier != TypeQualifier::ReadOnly
                 && annotation
-                    .qualifiers
+                    .qualifiers()
                     .contains(TypeQualifiers::from(qualifier))
                 && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
             {

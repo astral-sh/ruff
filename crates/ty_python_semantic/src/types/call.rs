@@ -69,11 +69,11 @@ impl<'db> Type<'db> {
         let right_class = right_ty.to_meta_type(db);
         if left_ty != right_ty && right_ty.is_subtype_of(db, left_ty) {
             let reflected_dunder = op.reflected_dunder();
-            let rhs_reflected = right_class.member(db, reflected_dunder).place;
+            let rhs_reflected = right_class.member(db, reflected_dunder).place();
             // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
             // Bindings together
             if !rhs_reflected.is_undefined()
-                && rhs_reflected != left_class.member(db, reflected_dunder).place
+                && rhs_reflected != left_class.member(db, reflected_dunder).place()
             {
                 return Ok(right_ty
                     .try_call_dunder_with_policy(

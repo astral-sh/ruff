@@ -683,7 +683,7 @@ pub(crate) fn enum_metadata<'db>(
                                 explicit_member_wrapper = true;
                                 Some(
                                     ty.member(db, "value")
-                                        .place
+                                        .place()
                                         .ignore_possibly_undefined()
                                         .unwrap_or(Type::unknown()),
                                 )
@@ -758,7 +758,7 @@ pub(crate) fn enum_metadata<'db>(
                                 "__get__".into(),
                                 MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                             )
-                            .place;
+                            .place();
 
                         match dunder_get {
                             Place::Undefined
@@ -1061,7 +1061,7 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
             Some(
                 ty.member(db, "value")
-                    .place
+                    .place()
                     .ignore_possibly_undefined()
                     .unwrap_or(Type::unknown()),
             )

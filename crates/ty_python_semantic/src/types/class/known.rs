@@ -1042,7 +1042,7 @@ impl KnownClass {
         self,
         db: &dyn Db,
     ) -> Result<StaticClassLiteral<'_>, KnownClassLookupError<'_>> {
-        let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place;
+        let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place();
         match symbol {
             Place::Defined(DefinedPlace {
                 ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),

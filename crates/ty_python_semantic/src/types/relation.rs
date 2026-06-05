@@ -2342,7 +2342,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .when_any(db, self.constraints, |member| {
                 other
                     .member(db, member.name())
-                    .place
+                    .place()
                     .ignore_possibly_undefined()
                     .when_none_or(db, self.constraints, |attribute_type| {
                         self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
@@ -2736,7 +2736,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         .interface(db)
                         .members(db)
                         .when_any(db, self.constraints, |member| {
-                            match other.member(db, member.name()).place {
+                            match other.member(db, member.name()).place() {
                                 Place::Defined(DefinedPlace {
                                     ty: attribute_type, ..
                                 }) => self.protocol_member_has_disjoint_type_from_ty(
@@ -3010,7 +3010,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     Name::new_static("__call__"),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 )
-                .place
+                .place()
                 .ignore_possibly_undefined()
                 .when_none_or(db, self.constraints, |dunder_call| {
                     self.as_relation_checker(TypeRelation::Assignability)

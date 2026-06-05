@@ -857,7 +857,7 @@ impl<'db> ScopeInference<'db> {
 }
 
 /// The result of inferring a declaration recorded by the semantic index.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum InferredDeclaration<'db> {
     /// A valid declaration with an inferred declared type.
     Declared(TypeAndQualifiers<'db>),
@@ -926,11 +926,11 @@ impl<'db> DefinitionTypes<'db> {
         match (&*bindings, &*declarations) {
             ([], []) => Self::Empty,
             ([binding], []) => Self::Binding(Box::new(*binding)),
-            ([], [declaration]) => Self::Declaration(Box::new(*declaration)),
+            ([], [declaration]) => Self::Declaration(Box::new(declaration.clone())),
             ([(binding, binding_ty)], [(declaration, declaration_ty)])
                 if binding == declaration && *binding_ty == declaration_ty.inner_type() =>
             {
-                Self::BindingAndDeclaration(Box::new((*declaration, *declaration_ty)))
+                Self::BindingAndDeclaration(Box::new((*declaration, declaration_ty.clone())))
             }
             _ => Self::Other(Box::new(OtherDefinitionTypes {
                 bindings: bindings.into_boxed_slice(),
@@ -992,7 +992,7 @@ impl<'db> DefinitionTypes<'db> {
             }
             Self::Declaration(mut declaration) => {
                 let (definition, ty) = &mut *declaration;
-                *ty = Self::normalize_declaration(db, previous, cycle, *definition, *ty);
+                *ty = Self::normalize_declaration(db, previous, cycle, *definition, ty.clone());
                 Self::Declaration(declaration)
             }
             Self::BindingAndDeclaration(mut declaration) => {
@@ -1022,14 +1022,17 @@ impl<'db> DefinitionTypes<'db> {
                     *ty = Self::normalize_binding(db, previous, cycle, *definition, *ty);
                 }
                 for (definition, ty) in &mut other.declarations {
-                    *ty = Self::normalize_declaration(db, previous, cycle, *definition, *ty);
+                    *ty = Self::normalize_declaration(db, previous, cycle, *definition, ty.clone());
                 }
 
                 match (&*other.bindings, &*other.declarations) {
                     ([(binding, binding_ty)], [(declaration, declaration_ty)])
                         if binding == declaration && *binding_ty == declaration_ty.inner_type() =>
                     {
-                        Self::BindingAndDeclaration(Box::new((*declaration, *declaration_ty)))
+                        Self::BindingAndDeclaration(Box::new((
+                            *declaration,
+                            declaration_ty.clone(),
+                        )))
                     }
                     _ => Self::Other(other),
                 }
@@ -1053,10 +1056,10 @@ impl<'db> DefinitionTypes<'db> {
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
         match self {
             Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
-                Either::Left(std::iter::once(**declaration))
+                Either::Left(std::iter::once((declaration.0, declaration.1.clone())))
             }
-            Self::Other(other) => Either::Right(other.declarations.iter().copied()),
-            Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
+            Self::Other(other) => Either::Right(other.declarations.iter().cloned()),
+            Self::Empty | Self::Binding(..) => Either::Right([].iter().cloned()),
         }
     }
 }
@@ -1528,12 +1531,11 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
-                *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                declaration_ty.map_type_mut(|decl_ty| {
                     decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
                 });
             } else {
-                *declaration_ty =
-                    declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
+                declaration_ty.map_type_mut(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
             }
         }
 
@@ -1572,7 +1574,7 @@ impl<'db> StatementInferenceInner<'db> {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
-        self.declarations.iter().copied()
+        self.declarations.iter().cloned()
     }
 
     pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {

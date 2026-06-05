@@ -117,7 +117,7 @@ impl<'db> Type<'db> {
                         Name::new_static("__call__"),
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
-                    .place;
+                    .place();
 
                 if let Place::Defined(place) = call_symbol
                     && place.is_definitely_defined()

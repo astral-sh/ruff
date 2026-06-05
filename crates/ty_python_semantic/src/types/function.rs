@@ -2660,7 +2660,7 @@ pub(crate) mod tests {
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)
-                .place
+                .place()
                 .expect_type()
                 .expect_function_literal()
                 .definition(&db);

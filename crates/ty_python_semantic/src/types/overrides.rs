@@ -146,7 +146,7 @@ fn check_class_declaration<'db>(
     let Place::Defined(DefinedPlace {
         ty: type_on_subclass_instance,
         ..
-    }) = subclass_instance_member.place
+    }) = subclass_instance_member.place()
     else {
         return;
     };
@@ -374,7 +374,7 @@ fn check_class_declaration<'db>(
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
-            }) = superclass_instance_member.place
+            }) = superclass_instance_member.place()
             else {
                 // If not defined on any superclass, no point in continuing to walk up the MRO
                 break;
@@ -481,8 +481,8 @@ fn check_class_declaration<'db>(
                     let subclass_kind = *subclass_variable_kind.get_or_insert_with(|| {
                         variable_kind(
                             db,
-                            class.own_class_member(db, None, &member.name).inner,
-                            subclass_instance_member,
+                            &class.own_class_member(db, None, &member.name).inner,
+                            &subclass_instance_member,
                         )
                     });
 
@@ -603,7 +603,7 @@ fn check_class_declaration<'db>(
             if !KnownClass::TypedDictFallback
                 .to_instance(db)
                 .member(db, &member.name)
-                .place
+                .place()
                 .is_undefined()
             {
                 subclass_overrides_superclass_declaration = true;
@@ -612,7 +612,7 @@ fn check_class_declaration<'db>(
             if !KnownClass::NamedTupleFallback
                 .to_instance(db)
                 .member(db, &member.name)
-                .place
+                .place()
                 .is_undefined()
             {
                 subclass_overrides_superclass_declaration = true;
@@ -683,8 +683,8 @@ fn superclass_variable_kind<'db>(
     db: &'db dyn Db,
     superclass_scope: ScopeId<'db>,
     superclass_symbol_id: Option<ScopedSymbolId>,
-    class_member: PlaceAndQualifiers<'db>,
-    instance_member: PlaceAndQualifiers<'db>,
+    class_member: &PlaceAndQualifiers<'db>,
+    instance_member: &PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
     // Method definitions and properties are not instance-variable declarations. Check the symbol
     // definition before class/instance member lookup can erase that distinction. For example,
@@ -698,7 +698,7 @@ fn superclass_variable_kind<'db>(
 
     // Final attributes have their own override rule and diagnostic. Treating them as class
     // variables here would report both diagnostics for the same override.
-    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+    if class_member.qualifiers().contains(TypeQualifiers::FINAL) {
         return None;
     }
 
@@ -757,8 +757,8 @@ fn effective_superclass_variable_kind<'db>(
             db,
             superclass_scope,
             superclass_symbol_id,
-            superclass.own_class_member(db, None, &name).inner,
-            Type::instance(db, superclass).member(db, &name),
+            &superclass.own_class_member(db, None, &name).inner,
+            &Type::instance(db, superclass).member(db, &name),
         );
 
         if superclass_variable_kind == Some(VariableKind::Instance)
@@ -821,8 +821,8 @@ fn is_function_definition<'db>(
 /// Returns the variable kind for an attribute if it should participate in `ClassVar` override checks.
 fn variable_kind<'db>(
     db: &'db dyn Db,
-    class_member: PlaceAndQualifiers<'db>,
-    instance_member: PlaceAndQualifiers<'db>,
+    class_member: &PlaceAndQualifiers<'db>,
+    instance_member: &PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
     if class_member.is_class_var() || instance_member.is_class_var() {
         return Some(VariableKind::Class);
@@ -830,7 +830,7 @@ fn variable_kind<'db>(
 
     // A `Final` attribute behaves like a class variable, but final overrides are diagnosed by
     // `override-of-final-variable` instead of this rule.
-    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+    if class_member.qualifiers().contains(TypeQualifiers::FINAL) {
         return None;
     }
 
@@ -847,7 +847,7 @@ fn variable_kind<'db>(
     //     def f(self) -> int: ...
     // ```
     if matches!(
-        class_member.place,
+        class_member.place(),
         Place::Defined(DefinedPlace {
             ty: Type::FunctionLiteral(_),
             ..
@@ -866,10 +866,10 @@ fn variable_kind<'db>(
         ty: class_member_ty,
         origin: TypeOrigin::Inferred,
         ..
-    }) = class_member.place
+    }) = class_member.place()
         && class_member_ty
             .class_member(db, "__get__".into())
-            .place
+            .place()
             .ignore_possibly_undefined()
             .is_some()
     {

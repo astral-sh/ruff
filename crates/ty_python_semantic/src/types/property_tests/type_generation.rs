@@ -164,14 +164,14 @@ impl Ty {
             Ty::EnumLiteral(name) => Type::enum_literal(EnumLiteralType::new(
                 db,
                 known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
-                    .place
+                    .place()
                     .expect_type()
                     .expect_class_literal(),
                 Name::new(name),
             )),
             Ty::SingleMemberEnumLiteral => {
                 let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
-                    .place
+                    .place()
                     .expect_type();
                 debug_assert!(
                     matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db)))
@@ -179,27 +179,27 @@ impl Ty {
                 ty
             }
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
-                .place
+                .place()
                 .expect_type()
                 .to_instance(db)
                 .unwrap(),
             Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
-                .place
+                .place()
                 .expect_type()
                 .to_instance(db)
                 .unwrap(),
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
-                .place
+                .place()
                 .expect_type(),
             Ty::UnittestMockLiteral => known_module_symbol(db, KnownModule::UnittestMock, "Mock")
-                .place
+                .place()
                 .expect_type(),
             Ty::UnittestMockInstance => Ty::UnittestMockLiteral
                 .into_type(db)
                 .to_instance(db)
                 .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
+            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place().expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
             Ty::Union(tys) => {
                 UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
@@ -228,7 +228,7 @@ impl Ty {
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
                 builtins_symbol(db, s)
-                    .place
+                    .place()
                     .expect_type()
                     .expect_class_literal()
                     .default_specialization(db),
@@ -236,17 +236,17 @@ impl Ty {
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
                 known_module_symbol(db, KnownModule::Abc, s)
-                    .place
+                    .place()
                     .expect_type()
                     .expect_class_literal()
                     .default_specialization(db),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
-            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).place.expect_type(),
+            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).place().expect_type(),
             Ty::BuiltinsBoundMethod { class, method } => {
-                let builtins_class = builtins_symbol(db, class).place.expect_type();
-                let function = builtins_class.member(db, method).place.expect_type();
+                let builtins_class = builtins_symbol(db, class).place().expect_type();
+                let function = builtins_class.member(db, method).place().expect_type();
 
                 create_bound_method(db, function, builtins_class)
             }
@@ -281,7 +281,7 @@ fn divergent(db: &TestDb, id_bits: u64, materialization: Option<MaterializationK
 fn newtype_instance<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
     let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
         .expect("Property-test module must exist");
-    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place else {
+    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place() else {
         panic!(
             "Expected a global symbol for `{name}` in the property test module, but it was not found"
         );

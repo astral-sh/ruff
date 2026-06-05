@@ -43,7 +43,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
             let first_reachable_definition = place_result.first_declaration?;
             let ty = place_result
                 .ignore_conflicting_declarations()
-                .place
+                .place()
                 .ignore_possibly_undefined()?;
             let symbol = table.symbol(symbol_id);
             let member = Member {
@@ -100,7 +100,7 @@ pub(crate) fn all_reachable_members<'db>(
                     .and_then(|first_reachable_definition| {
                         let ty = declaration_place_result
                             .ignore_conflicting_declarations()
-                            .place
+                            .place()
                             .ignore_possibly_undefined()?;
                         let member = Member {
                             name: symbol.name().clone(),
@@ -389,7 +389,7 @@ impl<'db> AllMembers<'db> {
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(DefinedPlace { ty, .. }) =
-                        imported_symbol(db, Some(file), symbol_name, None).place
+                        imported_symbol(db, Some(file), symbol_name, None).place()
                     else {
                         continue;
                     };
@@ -480,7 +480,7 @@ impl<'db> AllMembers<'db> {
             let parent_scope = parent.body_scope(db);
             for memberdef in all_end_of_scope_members(db, parent_scope) {
                 let result = ty.member(db, memberdef.member.name.as_str());
-                let Some(ty) = result.place.ignore_possibly_undefined() else {
+                let Some(ty) = result.place().ignore_possibly_undefined() else {
                     continue;
                 };
                 self.members.insert(Member {
@@ -527,7 +527,7 @@ impl<'db> AllMembers<'db> {
                     continue;
                 };
                 let result = ty.member(db, name);
-                let Some(ty) = result.place.ignore_possibly_undefined() else {
+                let Some(ty) = result.place().ignore_possibly_undefined() else {
                     continue;
                 };
                 self.members.insert(Member {
@@ -544,7 +544,7 @@ impl<'db> AllMembers<'db> {
         // method, but `instance_of_SomeClass.__delattr__` is.
         for memberdef in all_end_of_scope_members(db, class_body_scope) {
             let result = ty.member(db, memberdef.member.name.as_str());
-            let Some(ty) = result.place.ignore_possibly_undefined() else {
+            let Some(ty) = result.place().ignore_possibly_undefined() else {
                 continue;
             };
             self.members.insert(Member {
@@ -592,7 +592,7 @@ impl<'db> AllMembers<'db> {
                     if let Place::Defined(DefinedPlace {
                         ty: synthetic_member,
                         ..
-                    }) = ty.member(db, attr).place
+                    }) = ty.member(db, attr).place()
                     {
                         self.members.insert(Member {
                             name: Name::from(*attr),

@@ -1071,7 +1071,9 @@ fn check_class_namespace_against_metaclass_members<'db>(
             ty: metaclass_member_ty,
             origin,
             ..
-        }) = metaclass_instance.instance_member(db, name.as_str()).place
+        }) = metaclass_instance
+            .instance_member(db, name.as_str())
+            .place()
         else {
             continue;
         };
@@ -1119,7 +1121,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         let Place::Defined(DefinedPlace {
             ty: class_declared_ty,
             ..
-        }) = result.ignore_conflicting_declarations().place
+        }) = result.ignore_conflicting_declarations().place()
         else {
             continue;
         };
@@ -1355,7 +1357,7 @@ fn check_class_final_without_value<'db>(
         let first_declaration = result.first_declaration;
         let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
 
-        if !place_and_quals.qualifiers.contains(TypeQualifiers::FINAL) {
+        if !place_and_quals.qualifiers().contains(TypeQualifiers::FINAL) {
             continue;
         }
 

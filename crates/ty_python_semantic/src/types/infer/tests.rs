@@ -35,7 +35,7 @@ fn get_symbol<'db>(
         assert_eq!(scope.name(db, &module), *expected_scope_name);
     }
 
-    symbol(db, scope, symbol_name, ConsideredDefinitions::EndOfScope).place
+    symbol(db, scope, symbol_name, ConsideredDefinitions::EndOfScope).place()
 }
 
 #[track_caller]
@@ -191,7 +191,7 @@ fn pep695_type_params() {
         assert_eq!(var_ty.display(&db).to_string(), display);
 
         let expected_name_ty = format!(r#"Literal["{var}"]"#);
-        let name_ty = var_ty.member(&db, "__name__").place.expect_type();
+        let name_ty = var_ty.member(&db, "__name__").place().expect_type();
         assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
 
         let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = var_ty else {
@@ -304,7 +304,7 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     ])?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-    let x_ty = global_symbol(&db, a, "x").place.expect_type();
+    let x_ty = global_symbol(&db, a, "x").place().expect_type();
 
     assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -313,7 +313,7 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-    let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
+    let x_ty_2 = global_symbol(&db, a, "x").place().expect_type();
 
     assert_eq!(x_ty_2.display(&db).to_string(), "bool");
 
@@ -330,7 +330,7 @@ fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     ])?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-    let x_ty = global_symbol(&db, a, "x").place.expect_type();
+    let x_ty = global_symbol(&db, a, "x").place().expect_type();
 
     assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -340,7 +340,7 @@ fn dependency_internal_symbol_change() -> anyhow::Result<()> {
 
     db.clear_salsa_events();
 
-    let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
+    let x_ty_2 = global_symbol(&db, a, "x").place().expect_type();
 
     assert_eq!(x_ty_2.display(&db).to_string(), "int");
 
@@ -366,7 +366,7 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
     ])?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-    let x_ty = global_symbol(&db, a, "x").place.expect_type();
+    let x_ty = global_symbol(&db, a, "x").place().expect_type();
 
     assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -376,7 +376,7 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
 
     db.clear_salsa_events();
 
-    let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
+    let x_ty_2 = global_symbol(&db, a, "x").place().expect_type();
 
     assert_eq!(x_ty_2.display(&db).to_string(), "int");
 
@@ -424,7 +424,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+    let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
     assert_eq!(attr_ty.display(&db).to_string(), "int | None");
 
     // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
@@ -439,7 +439,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "str | None");
         db.take_salsa_events()
     };
@@ -463,7 +463,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "str | None");
         db.take_salsa_events()
     };
@@ -515,7 +515,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+    let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
     assert_eq!(attr_ty.display(&db).to_string(), "int | None");
 
     // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
@@ -532,7 +532,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "str | None");
         db.take_salsa_events()
     };
@@ -558,7 +558,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "str | None");
         db.take_salsa_events()
     };
@@ -611,7 +611,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+    let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
     assert_eq!(attr_ty.display(&db).to_string(), "int");
 
     // Change the type of `class_attr` to `str`; this should trigger the type of `x` to be re-inferred
@@ -630,7 +630,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "str");
         db.take_salsa_events()
     };
@@ -658,7 +658,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
 
     let events = {
         db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        let attr_ty = global_symbol(&db, file_main, "x").place().expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "str");
         db.take_salsa_events()
     };
@@ -697,7 +697,7 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     )?;
 
     let bar = system_path_to_file(&db, "src/bar.py")?;
-    let a = global_symbol(&db, bar, "a").place;
+    let a = global_symbol(&db, bar, "a").place();
 
     assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
     let events = db.take_salsa_events();
@@ -725,7 +725,7 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     )?;
     db.clear_salsa_events();
 
-    let a = global_symbol(&db, bar, "a").place;
+    let a = global_symbol(&db, bar, "a").place();
 
     assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
     let events = db.take_salsa_events();

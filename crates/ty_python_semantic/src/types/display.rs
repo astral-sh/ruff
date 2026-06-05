@@ -1211,7 +1211,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .write_str("method-wrapper")?;
                 f.write_str(" '")?;
                 if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
-                    class_ty.member(self.db, member_name).place
+                    class_ty.member(self.db, member_name).place()
                 {
                     f.with_type(member_ty).write_str(member_name)?;
                 } else {

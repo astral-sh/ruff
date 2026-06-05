@@ -225,7 +225,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         db: &'db dyn Db,
         result: PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        if !self.has_known_members(db) && result.place.is_undefined() {
+        if !self.has_known_members(db) && result.place().is_undefined() {
             Place::bound(Type::unknown()).into()
         } else {
             result
@@ -265,7 +265,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         }
         if let Some(mixin_class) = self.mixin_class(db) {
             let result = mixin_class.class_member(db, name, MemberLookupPolicy::default());
-            if !result.place.is_undefined() {
+            if !result.place().is_undefined() {
                 return result;
             }
         }
@@ -290,7 +290,7 @@ impl<'db> DynamicEnumLiteral<'db> {
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         if let Some(mixin_class) = self.mixin_class(db) {
             let result = mixin_class.instance_member(db, name);
-            if !result.place.is_undefined() {
+            if !result.place().is_undefined() {
                 return result;
             }
         }
