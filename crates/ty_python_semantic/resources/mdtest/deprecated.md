@@ -512,6 +512,57 @@ deprecated_binding()  # error: [deprecated] "use replacement directly"
 module.deprecated_binding  # error: [deprecated] "use replacement directly"
 ```
 
+## Imported conditional decorated binding
+
+`module.py`:
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+from typing_extensions import deprecated
+
+R = TypeVar("R")
+
+def replacement() -> str:
+    return "replacement"
+
+def other() -> str:
+    return "other"
+
+def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
+    raise NotImplementedError
+
+if bool(input()):
+    @deprecated("use replacement directly")
+    @replace_with(replacement)
+    def old() -> None: ...
+else:
+    @deprecated("use other directly")
+    @replace_with(other)
+    def old() -> None: ...
+```
+
+`main.py`:
+
+```py
+from ty_extensions import TypeOf
+from typing_extensions import TypeGuard
+
+from module import old, other, replacement
+
+def is_replacement(value: object) -> TypeGuard[TypeOf[replacement]]:
+    return True
+
+def is_other(value: object) -> TypeGuard[TypeOf[other]]:
+    return True
+
+if is_replacement(old):
+    old()  # error: [deprecated] "use replacement directly"
+
+if is_other(old):
+    old()  # error: [deprecated] "use other directly"
+```
+
 ## Syntax
 
 <!-- snapshot-diagnostics -->

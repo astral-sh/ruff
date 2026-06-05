@@ -1849,14 +1849,14 @@ fn place_from_bindings_impl<'db>(
     let ty = if let Some((first, first_reachability)) = types.next() {
         Some(if let Some((second, second_reachability)) = types.next() {
             let mut builder = PublicTypeBuilder::new(db);
-            builder.add(first, first_reachability);
-            builder.add(second, second_reachability);
+            builder.add(first, (), first_reachability);
+            builder.add(second, (), second_reachability);
 
             for (ty, reachability) in types {
-                builder.add(ty, reachability);
+                builder.add(ty, (), reachability);
             }
 
-            builder.build()
+            builder.build().0
         } else {
             first
         })
@@ -1928,32 +1928,35 @@ impl<'db> PlaceWithDefinition<'db> {
 /// `@overload`ed function literal types are discarded if they are definitely followed
 /// by their implementation. This is to ensure that we do not merge all of them into the
 /// union type. The last one will include the other overloads already.
-struct PublicTypeBuilder<'db> {
+struct PublicTypeBuilder<'db, M> {
     db: &'db dyn Db,
-    queue: Option<Type<'db>>,
+    queue: Option<(Type<'db>, M)>,
     builder: UnionBuilder<'db>,
+    accepted: Vec<(Type<'db>, M)>,
 }
 
-impl<'db> PublicTypeBuilder<'db> {
+impl<'db, M> PublicTypeBuilder<'db, M> {
     fn new(db: &'db dyn Db) -> Self {
         PublicTypeBuilder {
             db,
             queue: None,
             builder: UnionBuilder::new(db),
+            accepted: Vec::new(),
         }
     }
 
-    fn add_to_union(&mut self, element: Type<'db>) {
+    fn add_to_union(&mut self, element: Type<'db>, metadata: M) {
         self.builder.add_in_place(element);
+        self.accepted.push((element, metadata));
     }
 
     fn drain_queue(&mut self) {
-        if let Some(queued_element) = self.queue.take() {
-            self.add_to_union(queued_element);
+        if let Some((queued_element, metadata)) = self.queue.take() {
+            self.add_to_union(queued_element, metadata);
         }
     }
 
-    fn add(&mut self, element: Type<'db>, reachability: Truthiness) -> bool {
+    fn add(&mut self, element: Type<'db>, metadata: M, reachability: Truthiness) -> bool {
         match element {
             Type::FunctionLiteral(function) => {
                 let last_definition = function.literal(self.db).last_definition;
@@ -1961,8 +1964,8 @@ impl<'db> PublicTypeBuilder<'db> {
                     // Distinct overloaded function values can be assigned to the same public
                     // symbol in separate branches. Preserve the queued value unless the next
                     // overload belongs to the same place.
-                    if !self.queue.is_some_and(|queued| {
-                        let Type::FunctionLiteral(queued_function) = queued else {
+                    if !self.queue.as_ref().is_some_and(|queued| {
+                        let Type::FunctionLiteral(queued_function) = queued.0 else {
                             return false;
                         };
                         function.has_same_place_as(self.db, queued_function)
@@ -1970,15 +1973,15 @@ impl<'db> PublicTypeBuilder<'db> {
                         self.drain_queue();
                     }
 
-                    self.queue = Some(element);
+                    self.queue = Some((element, metadata));
                     false
                 } else {
                     // An unconditional implementation shadows preceding overload definitions. A
                     // conditional definition, however, can be only one public possibility among
                     // several, so keep any unrelated queued overloaded function in the union.
                     if reachability.is_always_true()
-                        || self.queue.is_some_and(|queued| {
-                            let Type::FunctionLiteral(queued_function) = queued else {
+                        || self.queue.as_ref().is_some_and(|queued| {
+                            let Type::FunctionLiteral(queued_function) = queued.0 else {
                                 return false;
                             };
                             let queued_definition = queued_function.last_definition(self.db);
@@ -1989,30 +1992,29 @@ impl<'db> PublicTypeBuilder<'db> {
                     } else {
                         self.drain_queue();
                     }
-                    self.add_to_union(element);
+                    self.add_to_union(element, metadata);
                     true
                 }
             }
             _ => {
                 self.drain_queue();
-                self.add_to_union(element);
+                self.add_to_union(element, metadata);
                 true
             }
         }
     }
 
-    fn build(mut self) -> Type<'db> {
+    fn build(mut self) -> (Type<'db>, Vec<(Type<'db>, M)>) {
         self.drain_queue();
-        self.builder.build()
+        (self.builder.build(), self.accepted)
     }
 }
 
 /// Accumulates multiple (potentially conflicting) declared types and type qualifiers,
 /// and eventually builds a union from them.
 struct DeclaredTypeBuilder<'db> {
-    inner: PublicTypeBuilder<'db>,
+    inner: PublicTypeBuilder<'db, DeprecationPolicy<'db>>,
     qualifiers: TypeQualifiers,
-    deprecation: DeprecationBuilder<'db>,
     first_type: Option<Type<'db>>,
     conflicting_types: FxOrderSet<Type<'db>>,
 }
@@ -2022,7 +2024,6 @@ impl<'db> DeclaredTypeBuilder<'db> {
         DeclaredTypeBuilder {
             inner: PublicTypeBuilder::new(db),
             qualifiers: TypeQualifiers::empty(),
-            deprecation: DeprecationBuilder::default(),
             first_type: None,
             conflicting_types: FxOrderSet::default(),
         }
@@ -2031,7 +2032,10 @@ impl<'db> DeclaredTypeBuilder<'db> {
     fn add(&mut self, element: &TypeAndQualifiers<'db>, reachability: Truthiness) {
         let element_ty = element.inner_type();
 
-        if self.inner.add(element_ty, reachability) {
+        if self
+            .inner
+            .add(element_ty, element.deprecation_policy(), reachability)
+        {
             if let Some(first_ty) = self.first_type {
                 if !first_ty.is_equivalent_to(self.inner.db, element_ty) {
                     self.conflicting_types.insert(element_ty);
@@ -2042,13 +2046,16 @@ impl<'db> DeclaredTypeBuilder<'db> {
         }
 
         self.qualifiers = self.qualifiers.union(element.qualifiers());
-        self.deprecation.add_policy(element.deprecation_policy());
     }
 
     fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
-        let type_and_quals =
-            TypeAndQualifiers::new(self.inner.build(), TypeOrigin::Declared, self.qualifiers)
-                .with_deprecation_policy(self.deprecation.build_policy());
+        let db = self.inner.db;
+        let (ty, deprecation_alternatives) = self.inner.build();
+        let type_and_quals = TypeAndQualifiers::new(ty, TypeOrigin::Declared, self.qualifiers)
+            .with_deprecation_policy(DeprecationPolicy::from_alternatives(
+                db,
+                deprecation_alternatives,
+            ));
         if self.conflicting_types.is_empty() {
             (type_and_quals, None)
         } else {
