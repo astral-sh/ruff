@@ -220,12 +220,20 @@ fn variadic_receiver_type<'db>(
         .resolve_type_alias(db)
         .exact_tuple_instance_spec(db)?;
     Some(match tuple.as_ref() {
-        Tuple::Variable(tuple)
-            if tuple.prefix_elements().is_empty() && tuple.suffix_elements().is_empty() =>
-        {
-            VariadicReceiverType::Type(*tuple.variable_element())
+        Tuple::Fixed(tuple) => tuple
+            .all_elements()
+            .first()
+            .copied()
+            .map_or(VariadicReceiverType::Invalid, VariadicReceiverType::Type),
+        Tuple::Variable(tuple) => {
+            let receiver_type = tuple.prefix_elements().first().copied().unwrap_or_else(|| {
+                tuple.suffix_elements().first().copied().map_or_else(
+                    || *tuple.variable_element(),
+                    |suffix| UnionType::from_two_elements(db, *tuple.variable_element(), suffix),
+                )
+            });
+            VariadicReceiverType::Type(receiver_type)
         }
-        Tuple::Fixed(_) | Tuple::Variable(_) => VariadicReceiverType::Invalid,
     })
 }
 
