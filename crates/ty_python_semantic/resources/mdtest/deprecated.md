@@ -580,6 +580,17 @@ def nested_alias():
         alias = depr_func  # error: [deprecated] "Use other_func instead"
 
     alias()
+
+# TODO: Attribute and loop-target assignments should also avoid transitive deprecation.
+class AliasHolder:
+    alias: Callable[..., Any]
+
+holder = AliasHolder()
+holder.alias = depr_func  # error: [deprecated] "Use other_func instead"
+holder.alias()  # error: [deprecated] "Use other_func instead"
+
+for loop_target_alias in (depr_func,):  # error: [deprecated] "Use other_func instead"
+    loop_target_alias()  # error: [deprecated] "Use other_func instead"
 ```
 
 ## Dunders
