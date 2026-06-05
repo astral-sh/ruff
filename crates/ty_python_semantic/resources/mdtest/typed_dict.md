@@ -4913,14 +4913,12 @@ class ClosedBar(TypedDict, closed=True):
 
 def _(u: ClosedFoo | ClosedBar, v: Literal["foo"]):
     if "foo" in u:
-        # TODO: should be `ClosedFoo`
-        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & <TypedDict with items 'foo'>)
+        reveal_type(u)  # revealed: ClosedFoo
     else:
         reveal_type(u)  # revealed: ClosedBar
 
     if v in u:
-        # TODO: should be `ClosedFoo`
-        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & <TypedDict with items 'foo'>)
+        reveal_type(u)  # revealed: ClosedFoo
     else:
         reveal_type(u)  # revealed: ClosedBar
 ```
@@ -4940,8 +4938,7 @@ def _(
     if "bar" not in u:
         reveal_type(u)  # revealed: ClosedFoo
     else:
-        # TODO: should be `ClosedBar & Any`
-        reveal_type(u)  # revealed: (ClosedFoo & <TypedDict with items 'bar'>) | (ClosedBar & Any)
+        reveal_type(u)  # revealed: ClosedBar & Any
 
     if "bar" not in v:
         reveal_type(v)  # revealed: Never
@@ -4951,8 +4948,7 @@ def _(
     if w not in u:
         reveal_type(u)  # revealed: ClosedFoo
     else:
-        # TODO: should be `ClosedBar & Any`
-        reveal_type(u)  # revealed: (ClosedFoo & <TypedDict with items 'bar'>) | (ClosedBar & Any)
+        reveal_type(u)  # revealed: ClosedBar & Any
 ```
 
 ## Narrowing tagged unions of `TypedDict`s with `match` statements
