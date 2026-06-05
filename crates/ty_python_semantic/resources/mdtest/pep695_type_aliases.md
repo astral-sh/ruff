@@ -885,3 +885,20 @@ def foo(x: A):
     reveal_type(x + 1)  # revealed: int
     reveal_type(1 + x)  # revealed: int
 ```
+
+### Recursive alias in comparison operators
+
+Comparison and membership operators on a recursive alias resolve against the alias's unfolded
+structure rather than silently treating the recursive type as dynamic. So an operator that is
+genuinely unsupported on that structure is still reported, while inference still terminates.
+
+```py
+type R = int | list[R]
+
+def f(x: R, y: R):
+    reveal_type(x == y)  # revealed: bool
+    reveal_type(x != y)  # revealed: bool
+    # `<` is unsupported because the unfolded union mixes `int` and `list[R]`:
+    # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `R`"
+    reveal_type(x < y)  # revealed: Unknown
+```
