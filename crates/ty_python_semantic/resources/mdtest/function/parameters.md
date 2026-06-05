@@ -74,7 +74,7 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
-from typing import Annotated, Any, LiteralString, Never, ParamSpec, Protocol, Self, TypeVar, Union, overload
+from typing import Annotated, Any, LiteralString, Never, Optional, ParamSpec, Protocol, Self, TypeVar, Union, overload
 
 class Parent: ...
 class Unrelated: ...
@@ -240,6 +240,16 @@ class ValidAliasedProtocolClassReceiver:
 class ValidMixedProtocolClassReceiver(int):
     @classmethod
     def method(cls: type[FirstReceiverProtocol] | type[int]): ...
+
+class InvalidOptionalProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: Optional[type[FirstReceiverProtocol]]): ...
+
+class ValidOptionalProtocolClassReceiver:
+    def first(self) -> None: ...
+    @classmethod
+    def method(cls: Optional[type[FirstReceiverProtocol]]): ...
 
 class InvalidInstanceProtocolClassReceiver:
     def first(self) -> None: ...

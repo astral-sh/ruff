@@ -283,6 +283,16 @@ impl<'db> ProtocolClassUnionChecker<'db> {
                     }
                     return Some(compatibility);
                 }
+                Type::SpecialForm(SpecialFormType::Optional) => {
+                    return Some(
+                        self.member_compatibility(&subscript.slice, resolver)?.union(
+                            ProtocolClassUnionCompatibility {
+                                contains_protocol_class: false,
+                                accepts_receiver: false,
+                            },
+                        ),
+                    );
+                }
                 Type::SpecialForm(SpecialFormType::Annotated) => {
                     let ast::Expr::Tuple(tuple) = &*subscript.slice else {
                         return None;
