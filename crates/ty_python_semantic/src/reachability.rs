@@ -1085,6 +1085,9 @@ fn analyze_single_pattern_predicate_kind<'db>(
 }
 
 fn with_loop_header_predicate_cache<T>(db: &dyn Db, f: impl FnOnce() -> T) -> T {
+    // This cache may only change the evaluation order, not the converged fixed-point result.
+    // Reporting the outer scope as untracked prevents Salsa from reusing it across revisions.
+    db.report_untracked_read();
     db.loop_header_predicate_cache().with_scope(f)
 }
 

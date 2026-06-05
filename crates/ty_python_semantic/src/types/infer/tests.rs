@@ -55,6 +55,92 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
     assert_diagnostic_messages(&diagnostics, expected);
 }
 
+fn diagnostic_signature(diagnostics: &[Diagnostic]) -> Vec<(String, String)> {
+    diagnostics
+        .iter()
+        .map(|diagnostic| {
+            (
+                diagnostic.id().to_string(),
+                diagnostic.primary_message().to_string(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn loop_header_untracked_cache_is_query_order_independent() -> anyhow::Result<()> {
+    const SOURCE: &str = r#"
+from typing import NoReturn
+
+def process(flag: bool, items: list[str]) -> None:
+    x = 1
+    y = ""
+    while flag:
+        if y:
+            x = 1
+        elif x:
+            y = "value"
+        else:
+            del x
+        reveal_type(x)
+        reveal_type(y)
+
+    for item in items:
+        def fail(message: str) -> NoReturn:
+            raise AssertionError(message)
+
+        if not item:
+            fail("empty")
+        int(item)
+"#;
+
+    let mut baseline_db = setup_db();
+    baseline_db.write_dedented("/src/a.py", SOURCE)?;
+    let baseline_file = system_path_to_file(&baseline_db, "/src/a.py").unwrap();
+    let baseline = diagnostic_signature(&check_types(&baseline_db, baseline_file));
+    assert!(!baseline.is_empty());
+
+    let mut warmed_db = setup_db();
+    warmed_db.write_dedented("/src/a.py", SOURCE)?;
+    let warmed_file = system_path_to_file(&warmed_db, "/src/a.py").unwrap();
+
+    // Enter loop inference through a symbol query before checking the entire file.
+    let x_then_y = [
+        get_symbol(&warmed_db, "/src/a.py", &["process"], "x")
+            .expect_type()
+            .display(&warmed_db)
+            .to_string(),
+        get_symbol(&warmed_db, "/src/a.py", &["process"], "y")
+            .expect_type()
+            .display(&warmed_db)
+            .to_string(),
+    ];
+    let warmed = diagnostic_signature(&check_types(&warmed_db, warmed_file));
+    assert_eq!(warmed, baseline);
+
+    let mut reverse_db = setup_db();
+    reverse_db.write_dedented("/src/a.py", SOURCE)?;
+    let reverse_file = system_path_to_file(&reverse_db, "/src/a.py").unwrap();
+    let y_type = get_symbol(&reverse_db, "/src/a.py", &["process"], "y")
+        .expect_type()
+        .display(&reverse_db)
+        .to_string();
+    let x_type = get_symbol(&reverse_db, "/src/a.py", &["process"], "x")
+        .expect_type()
+        .display(&reverse_db)
+        .to_string();
+    let y_then_x = [x_type, y_type];
+    let reverse = diagnostic_signature(&check_types(&reverse_db, reverse_file));
+    assert_eq!(y_then_x, x_then_y);
+    assert_eq!(reverse, baseline);
+
+    salsa::Database::synthetic_write(&mut warmed_db, salsa::Durability::LOW);
+    let next_revision = diagnostic_signature(&check_types(&warmed_db, warmed_file));
+    assert_eq!(next_revision, baseline);
+
+    Ok(())
+}
+
 #[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
