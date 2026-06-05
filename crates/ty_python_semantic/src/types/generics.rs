@@ -2234,14 +2234,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             bounds.lower,
             bounds.upper,
         );
-        self.intersect_pending(constraint);
-    }
-
-    fn intersect_pending(&mut self, constraint: ConstraintSet<'db, 'c>) {
-        if !self.use_hash_map_solver {
-            self.pending
-                .intersect(self.db, self.constraints, constraint);
-        }
+        self.pending
+            .intersect(self.db, self.constraints, constraint);
     }
 
     pub(crate) fn inferred_type_is_assignable_to(
@@ -2502,7 +2496,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .signatures(self.db)
                     .when_constraint_set_assignable_to(self.db, formal_signature, self.constraints);
                 self.add_type_mappings_from_constraint_set(when)?;
-                self.intersect_pending(when);
+                self.pending.intersect(self.db, self.constraints, when);
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
                 // least one of its overloads is. We collect type mappings from all satisfiable
@@ -2538,7 +2532,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let Some(combined) = combined else {
                     return Err(());
                 };
-                self.intersect_pending(combined);
+                self.pending.intersect(self.db, self.constraints, combined);
             }
         }
         Ok(())
@@ -3059,7 +3053,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
                         if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                            self.intersect_pending(when);
+                            self.pending.intersect(self.db, self.constraints, when);
                         }
                         return Ok(());
                     }
@@ -3109,7 +3103,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
                 if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                    self.intersect_pending(when);
+                    self.pending.intersect(self.db, self.constraints, when);
                 }
                 return Ok(());
             }
@@ -3121,7 +3115,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
                 if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                    self.intersect_pending(when);
+                    self.pending.intersect(self.db, self.constraints, when);
                 }
                 return Ok(());
             }
