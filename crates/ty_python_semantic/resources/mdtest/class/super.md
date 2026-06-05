@@ -325,11 +325,11 @@ _TMeta = TypeVar("_TMeta", bound="BaseWithMeta")
 class MetaBase(type):
     meta_base_value: int = 1
 
-    def plain(self: type[_TMeta]) -> type[_TMeta]:
+    def plain(self: type[_TMeta]) -> type[_TMeta]:  # error: [invalid-method-receiver]
         return self
 
 class Meta(MetaBase):
-    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
+    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:  # error: [invalid-method-receiver]
         reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
         reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
         return super().__call__(*args, **kwargs)
@@ -356,7 +356,7 @@ super(Meta, OtherBase)  # error: [invalid-super-argument]
 T = TypeVar("T", bound=int)
 
 class BoundIntMeta(type):
-    def __call__(cls: type[T]) -> T:
+    def __call__(cls: type[T]) -> T:  # error: [invalid-method-receiver]
         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
 ```
 
