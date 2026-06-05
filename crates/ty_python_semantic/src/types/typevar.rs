@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db, TypeQualifiers,
     place::{
-        DefinedPlace, Definedness, DeprecationBuilder, Place, PlaceAndQualifiers, PublicTypePolicy,
+        DefinedPlace, Definedness, DeprecationPolicy, Place, PlaceAndQualifiers, PublicTypePolicy,
         TypeOrigin,
     },
     types::{
@@ -1260,11 +1260,10 @@ impl<'db> TypeVarConstraints<'db> {
         let mut all_unbound = true;
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
-        let mut deprecation = DeprecationBuilder::default();
+        let mut deprecation_alternatives = Vec::new();
         for ty in self.elements(db) {
             let (ty_member, new_qualifiers, new_deprecation) = transform_fn(ty).into_parts();
             qualifiers |= new_qualifiers;
-            deprecation.add_policy(new_deprecation);
             match ty_member {
                 Place::Undefined => {
                     possibly_unbound = true;
@@ -1282,6 +1281,7 @@ impl<'db> TypeVarConstraints<'db> {
 
                     all_unbound = false;
                     builder = builder.add(ty_member);
+                    deprecation_alternatives.push((ty_member, new_deprecation));
                 }
             }
         }
@@ -1300,7 +1300,10 @@ impl<'db> TypeVarConstraints<'db> {
             })
         })
         .with_qualifiers(qualifiers)
-        .with_deprecation_policy(deprecation.build_policy())
+        .with_deprecation_policy(DeprecationPolicy::from_alternatives(
+            db,
+            deprecation_alternatives,
+        ))
     }
 
     fn materialize_impl(

@@ -334,8 +334,17 @@ def use_mixed_union(instance: DecoratedUnionMember | UndecoratedUnionMember) -> 
 
     alias = instance.binding
     if is_replacement_class(alias):
-        # TODO: Expression inference does not retain binding-level deprecation metadata.
-        alias()  # TODO: error: [deprecated] "union replacement"
+        alias()  # error: [deprecated] "union replacement"
+
+H = TypeVar("H", DecoratedUnionMember, UndecoratedUnionMember)
+
+def use_mixed_typevar(instance: H) -> None:
+    if is_replacement_class(instance.binding):
+        instance.binding()  # error: [deprecated] "union replacement"
+
+    alias = instance.binding
+    if is_replacement_class(alias):
+        alias()  # error: [deprecated] "union replacement"
 
 T = TypeVar("T", D, E)
 

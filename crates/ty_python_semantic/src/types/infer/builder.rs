@@ -3574,19 +3574,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
         let deprecation = self.assignment_value_deprecation_policy(assignment);
-        self.suppress_transitive_deprecation(definition, target_ty, deprecation);
+        self.set_assignment_deprecation_policy(definition, target_ty, deprecation);
         add.insert(self, target_ty);
     }
 
-    fn suppress_transitive_deprecation(
+    fn set_assignment_deprecation_policy(
         &mut self,
         definition: Definition<'db>,
         ty: Type<'db>,
         deprecation: DeprecationPolicy<'db>,
     ) {
-        if ty.is_deprecated(self.db()) && deprecation == DeprecationPolicy::Suppress {
-            self.set_binding_deprecation_policy(definition, ty, DeprecationPolicy::Suppress);
-        }
+        let policy = match deprecation {
+            DeprecationPolicy::Alternatives(_) => deprecation,
+            DeprecationPolicy::Suppress if ty.is_deprecated(self.db()) => {
+                DeprecationPolicy::Suppress
+            }
+            _ => return,
+        };
+        self.set_binding_deprecation_policy(definition, ty, policy);
     }
 
     fn expression_deprecation_policy(&self, expression: &'ast ast::Expr) -> DeprecationPolicy<'db> {
@@ -7689,7 +7694,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty = self.infer_expression(value, add.type_context());
         self.store_expression_type(target, ty);
         let deprecation = self.expression_deprecation_policy(value);
-        self.suppress_transitive_deprecation(definition, ty, deprecation);
+        self.set_assignment_deprecation_policy(definition, ty, deprecation);
         add.insert(self, ty)
     }
 
@@ -11204,11 +11209,27 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
 
     fn policy(&self, expression: &'ast ast::Expr) -> DeprecationPolicy<'db> {
         let expression_ty = self.expression_type(expression);
-        if !expression_ty.is_deprecated(self.builder.db()) {
+        let type_is_deprecated = expression_ty.is_deprecated(self.builder.db());
+        if !type_is_deprecated
+            && !matches!(
+                expression,
+                ast::Expr::Attribute(_) if matches!(expression_ty, Type::Union(_))
+            )
+        {
             return DeprecationPolicy::Inherit;
         }
 
         match expression {
+            ast::Expr::Attribute(attribute) if !type_is_deprecated => {
+                let deprecation = self
+                    .expression_type(&attribute.value)
+                    .member(self.builder.db(), &attribute.attr.id)
+                    .deprecation_policy();
+                match deprecation {
+                    DeprecationPolicy::Alternatives(_) => deprecation,
+                    _ => DeprecationPolicy::Inherit,
+                }
+            }
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 if !matches!(expression_ty, Type::Union(_)) {
                     return DeprecationPolicy::Suppress;
