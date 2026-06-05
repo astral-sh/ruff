@@ -93,7 +93,7 @@ fn sequence_pattern_getitem_method<'db>(
 /// and element types.
 pub(crate) fn exact_sequence_pattern_type<'db>(
     db: &'db dyn Db,
-    element_types: &[Type<'db>],
+    element_types: impl ExactSizeIterator<Item = Type<'db>>,
 ) -> Type<'db> {
     let Ok(length) = i64::try_from(element_types.len()) else {
         return sequence_pattern_type_builder(db).build();
@@ -111,14 +111,10 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
     let len_signature = Signature::new(Parameters::new(db, [self_parameter()]), length_type);
     let len_method = CallableType::function_like(db, len_signature);
 
-    let getitem_method = (!element_types.is_empty()).then(|| {
+    let getitem_method = (element_types.len() > 0).then(|| {
         (
             "__getitem__",
-            sequence_pattern_getitem_method(
-                db,
-                (0..length).zip(element_types.iter().copied()),
-                None,
-            ),
+            sequence_pattern_getitem_method(db, (0..length).zip(element_types), None),
         )
     });
 
@@ -138,10 +134,10 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
 /// negative indices. Other integer indices retain the sequence's element type.
 pub(crate) fn starred_sequence_pattern_type<'db>(
     db: &'db dyn Db,
-    prefix_element_types: &[Type<'db>],
-    suffix_element_types: &[Type<'db>],
+    prefix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
+    suffix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
 ) -> Type<'db> {
-    if prefix_element_types.is_empty() && suffix_element_types.is_empty() {
+    if prefix_element_types.len() == 0 && suffix_element_types.len() == 0 {
         return sequence_pattern_type_builder(db).build();
     }
 
@@ -150,8 +146,8 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
     };
 
     let indexed_element_types = (0_i64..)
-        .zip(prefix_element_types.iter().copied())
-        .chain((-suffix_length..0).zip(suffix_element_types.iter().copied()));
+        .zip(prefix_element_types)
+        .chain((-suffix_length..0).zip(suffix_element_types));
     let getitem_method =
         sequence_pattern_getitem_method(db, indexed_element_types, Some(Type::object()));
     let protocol = Type::protocol_with_methods(db, [("__getitem__", getitem_method)]);
@@ -232,7 +228,7 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
         if element_types.iter().any(Type::is_never) {
             Type::Never
         } else {
-            exact_sequence_pattern_type(db, &element_types)
+            exact_sequence_pattern_type(db, element_types.into_iter())
         }
     } else {
         Type::Never

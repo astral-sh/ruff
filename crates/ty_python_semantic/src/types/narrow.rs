@@ -12,8 +12,8 @@ use crate::types::{
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
     UnionBuilder, definite_sequence_pattern_type, exact_sequence_pattern_type,
-    mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
-    infer_expression_types, starred_sequence_pattern_type,
+    infer_expression_types, mapping_pattern_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -2066,27 +2066,24 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         kind: &SequencePatternPredicateKind<'db>,
     ) -> Type<'db> {
         if kind.is_exact_length() {
-            let element_types: Vec<_> = kind
+            let element_types = kind
                 .patterns
                 .iter()
-                .map(|pattern| self.necessary_match_pattern_type(pattern))
-                .collect();
-            exact_sequence_pattern_type(self.db, &element_types)
+                .map(|pattern| self.necessary_match_pattern_type(pattern));
+            exact_sequence_pattern_type(self.db, element_types)
         } else {
             let Some((prefix_patterns, suffix_patterns)) = kind.split_around_star() else {
                 return sequence_pattern_type_builder(self.db).build();
             };
 
-            let prefix_element_types: Vec<_> = prefix_patterns
+            let prefix_element_types = prefix_patterns
                 .iter()
-                .map(|pattern| self.necessary_match_pattern_type(pattern))
-                .collect();
-            let suffix_element_types: Vec<_> = suffix_patterns
+                .map(|pattern| self.necessary_match_pattern_type(pattern));
+            let suffix_element_types = suffix_patterns
                 .iter()
-                .map(|pattern| self.necessary_match_pattern_type(pattern))
-                .collect();
+                .map(|pattern| self.necessary_match_pattern_type(pattern));
 
-            starred_sequence_pattern_type(self.db, &prefix_element_types, &suffix_element_types)
+            starred_sequence_pattern_type(self.db, prefix_element_types, suffix_element_types)
         }
     }
 
