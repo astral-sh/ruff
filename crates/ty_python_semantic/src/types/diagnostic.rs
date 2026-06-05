@@ -1697,7 +1697,7 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_METHOD_RECEIVER = {
         summary: "detects method receiver annotations that are incompatible with the enclosing class",
-        status: LintStatus::stable("0.0.44"),
+        status: LintStatus::stable("0.0.45"),
         default_level: Level::Error,
     }
 }
