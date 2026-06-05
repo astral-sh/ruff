@@ -51,6 +51,18 @@ pub(crate) fn check_function_definition<'db>(
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
 }
 
+/// Reports explicitly annotated method receivers that cannot accept the instance or class object
+/// Python passes when the method is bound.
+///
+/// ```python
+/// class C:
+///     def valid(self: C): ...
+///     def invalid(self: int): ...
+/// ```
+///
+/// This intentionally preserves receiver restrictions used by overloads, mixins, and metaclass
+/// methods, along with typing-spec and typeshed exemptions such as `Never` and
+/// `str`/`LiteralString`.
 fn check_method_receiver<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
@@ -193,6 +205,10 @@ fn check_method_receiver<'db>(
     }
 }
 
+/// Returns whether a metaclass method receiver annotation permits a class-object restriction.
+///
+/// A bound, constraint, or union only needs one class-object-shaped alternative because a
+/// metaclass method may deliberately restrict which class objects it accepts.
 fn is_metaclass_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bool {
     if is_metaclass_receiver_bound(db, receiver_type) {
         return true;
@@ -214,6 +230,7 @@ fn is_metaclass_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bo
     }
 }
 
+/// Returns whether `bound` contains a class literal or `type[...]` alternative.
 fn is_metaclass_receiver_bound(db: &dyn crate::Db, bound: Type<'_>) -> bool {
     match bound {
         Type::ClassLiteral(_) | Type::SubclassOf(_) => true,
@@ -226,6 +243,11 @@ fn is_metaclass_receiver_bound(db: &dyn crate::Db, bound: Type<'_>) -> bool {
     }
 }
 
+/// Returns whether a type variable is owned by a class rather than by the checked method.
+///
+/// Legacy type variables expose their owner through their binding context. PEP 695 type
+/// parameters can instead require inspecting the definition scope, including when an inner class
+/// refers to a type parameter from an enclosing class.
 fn is_class_typevar(db: &dyn crate::Db, typevar: crate::types::BoundTypeVarInstance<'_>) -> bool {
     if typevar
         .binding_context(db)
@@ -247,6 +269,10 @@ fn is_class_typevar(db: &dyn crate::Db, typevar: crate::types::BoundTypeVarInsta
         })
 }
 
+/// Returns whether `receiver_type` is directly represented by a protocol instance or class.
+///
+/// Protocol receiver annotations are allowed for mixin methods whose enclosing class is expected
+/// to acquire the protocol's members through multiple inheritance.
 fn is_protocol_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bool {
     match receiver_type {
         Type::ProtocolInstance(_) => true,
