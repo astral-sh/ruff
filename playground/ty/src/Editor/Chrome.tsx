@@ -237,7 +237,6 @@ export default function Chrome({
                 <VerticalResizeHandle />
                 <Panel id="diagnostics" minSize={150} className="my-2">
                   <Diagnostics
-                    className="container"
                     diagnostics={checkResult.diagnostics}
                     onGoTo={handleGoTo}
                     theme={theme}

@@ -57,10 +57,6 @@
   box-sizing: border-box;
 }
 
-container {
-  container-type: size;
-}
-
 body,
 html,
 #root {
