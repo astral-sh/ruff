@@ -22,7 +22,11 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::definition::Definition;
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    scope::NodeWithScopeKind,
+    semantic_index,
+};
 
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
@@ -117,9 +121,7 @@ fn check_method_receiver<'db>(
     let receiver_is_class_typevar = matches!(
         concrete_receiver_type,
         Type::TypeVar(typevar)
-            if enclosing_class
-                .generic_context(db)
-                .is_some_and(|context| context.contains(db, typevar.identity(db)))
+            if is_class_typevar(db, typevar)
     );
     let concrete_receiver_type = match concrete_receiver_type {
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
@@ -159,6 +161,27 @@ fn check_method_receiver<'db>(
             expected = expected_receiver.display(db),
         ));
     }
+}
+
+fn is_class_typevar(db: &dyn crate::Db, typevar: crate::types::BoundTypeVarInstance<'_>) -> bool {
+    if typevar
+        .binding_context(db)
+        .definition()
+        .is_some_and(|definition| matches!(definition.kind(db), DefinitionKind::Class(_)))
+    {
+        return true;
+    }
+
+    typevar
+        .typevar(db)
+        .definition(db)
+        .is_some_and(|definition| {
+            let index = semantic_index(db, definition.file(db));
+            matches!(
+                index.scope(definition.file_scope(db)).node(),
+                NodeWithScopeKind::ClassTypeParameters(_)
+            )
+        })
 }
 
 fn is_protocol_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bool {
