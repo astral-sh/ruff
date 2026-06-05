@@ -888,7 +888,9 @@ impl<'db> IntersectionType<'db> {
                         any_definitely_bound = true;
                     }
 
-                    deprecation.add_policy(new_deprecation);
+                    if new_deprecation != DeprecationPolicy::Inherit {
+                        deprecation.add_policy(new_deprecation);
+                    }
                     builder = builder.add_positive(ty_member);
                 }
             }

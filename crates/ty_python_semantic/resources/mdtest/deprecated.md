@@ -46,7 +46,7 @@ replacement function itself as deprecated.
 
 ```py
 from collections.abc import Callable
-from typing import Any, TypeVar, cast, overload
+from typing import Any, Protocol, TypeVar, cast, overload, runtime_checkable
 from ty_extensions import TypeOf, is_equivalent_to, static_assert
 from typing_extensions import TypeGuard, deprecated
 
@@ -413,6 +413,28 @@ def use_mixed_typevar(instance: H) -> None:
     alias = instance.binding
     if is_replacement_class(alias):
         alias()  # error: [deprecated] "union replacement"
+
+@runtime_checkable
+class DecoratedProtocol(Protocol):
+    @deprecated("protocol replacement")
+    @replace_with(ReplacementClass)
+    def binding(self) -> None: ...
+
+@runtime_checkable
+class PlainProtocol(Protocol):
+    binding: TypeOf[ReplacementClass] | TypeOf[OtherReplacementClass]
+
+def use_decorated_protocol(value: DecoratedProtocol) -> None:
+    value.binding  # error: [deprecated] "protocol replacement"
+
+def use_intersection(value: object) -> None:
+    if isinstance(value, DecoratedProtocol) and isinstance(value, PlainProtocol):
+        if is_replacement_class(value.binding):  # error: [deprecated] "protocol replacement"
+            value.binding()  # error: [deprecated] "protocol replacement"
+
+        alias = value.binding  # error: [deprecated] "protocol replacement"
+        if is_replacement_class(alias):
+            alias()
 
 T = TypeVar("T", D, E)
 
