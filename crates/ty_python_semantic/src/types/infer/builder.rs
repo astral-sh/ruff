@@ -425,7 +425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.expressions
             .extend(inference.expressions.iter().copied());
-        self.declarations.extend(inference.declarations());
+        self.declarations.extend_unique(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings.extend_unique(inference.bindings());
@@ -466,7 +466,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.expressions
             .extend(inference.expressions.iter().copied());
-        self.declarations.extend(inference.declarations());
+        self.declarations.extend_unique(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings.extend_unique(inference.bindings());
