@@ -11,6 +11,7 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
     PythonVersion,
 };
+use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::typing::as_pep_585_generic;
 use ruff_text_size::{Ranged, TextRange};
@@ -3564,13 +3565,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
-        self.suppress_transitive_deprecation(definition, target_ty);
+        self.suppress_transitive_deprecation(
+            definition,
+            target_ty,
+            assignment.value(self.module()),
+        );
         add.insert(self, target_ty);
     }
 
-    fn suppress_transitive_deprecation(&mut self, definition: Definition<'db>, ty: Type<'db>) {
-        if ty.is_deprecated(self.db()) {
+    fn suppress_transitive_deprecation(
+        &mut self,
+        definition: Definition<'db>,
+        ty: Type<'db>,
+        value: &'ast ast::Expr,
+    ) {
+        if ty.is_deprecated(self.db()) && self.expression_names_deprecated_symbol(value) {
             self.set_binding_deprecation_policy(definition, ty, DeprecationPolicy::Suppress);
+        }
+    }
+
+    fn expression_names_deprecated_symbol(&self, expression: &'ast ast::Expr) -> bool {
+        if let Some(standalone) = self.index.try_expression(expression) {
+            let inference =
+                infer_expression_types(self.db(), standalone, TypeContext::default());
+            DeprecatedReferenceVisitor::contains_in_inference(self.db(), inference, expression)
+        } else {
+            DeprecatedReferenceVisitor::contains_in_builder(self, expression)
         }
     }
 
@@ -4679,7 +4699,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
-            if inferred_ty.is_deprecated(self.db()) {
+            if inferred_ty.is_deprecated(self.db())
+                && self.expression_names_deprecated_symbol(value)
+            {
                 declared = declared.suppress_type_deprecation();
             }
 
@@ -7638,7 +7660,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let ty = self.infer_expression(value, add.type_context());
         self.store_expression_type(target, ty);
-        self.suppress_transitive_deprecation(definition, ty);
+        self.suppress_transitive_deprecation(definition, ty, value);
         add.insert(self, ty)
     }
 
@@ -11109,6 +11131,69 @@ impl<V> IntoIterator for VecSet<V> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+enum DeprecatedReferenceTypeSource<'builder, 'db, 'ast> {
+    Builder(&'builder TypeInferenceBuilder<'db, 'ast>),
+    Inference(&'builder ExpressionInference<'db>),
+}
+
+struct DeprecatedReferenceVisitor<'builder, 'db, 'ast> {
+    db: &'db dyn Db,
+    source: DeprecatedReferenceTypeSource<'builder, 'db, 'ast>,
+    found: bool,
+}
+
+impl<'builder, 'db, 'ast> DeprecatedReferenceVisitor<'builder, 'db, 'ast> {
+    fn contains_in_builder(
+        builder: &'builder TypeInferenceBuilder<'db, 'ast>,
+        expression: &'ast ast::Expr,
+    ) -> bool {
+        let mut visitor = Self {
+            db: builder.db(),
+            source: DeprecatedReferenceTypeSource::Builder(builder),
+            found: false,
+        };
+        visitor.visit_expr(expression);
+        visitor.found
+    }
+
+    fn contains_in_inference(
+        db: &'db dyn Db,
+        inference: &'builder ExpressionInference<'db>,
+        expression: &'ast ast::Expr,
+    ) -> bool {
+        let mut visitor = Self {
+            db,
+            source: DeprecatedReferenceTypeSource::Inference(inference),
+            found: false,
+        };
+        visitor.visit_expr(expression);
+        visitor.found
+    }
+
+    fn expression_type(&self, expression: &ast::Expr) -> Type<'db> {
+        match self.source {
+            DeprecatedReferenceTypeSource::Builder(builder) => {
+                builder.expression_type(expression)
+            }
+            DeprecatedReferenceTypeSource::Inference(inference) => {
+                inference.expression_type(expression)
+            }
+        }
+    }
+}
+
+impl<'ast> Visitor<'ast> for DeprecatedReferenceVisitor<'_, '_, 'ast> {
+    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+        if matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+            && self.expression_type(expression).is_deprecated(self.db)
+        {
+            self.found = true;
+            return;
+        }
+        visitor::walk_expr(self, expression);
     }
 }
 

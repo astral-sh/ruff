@@ -501,6 +501,7 @@ redundant and annoying.
 ```py
 from collections.abc import Callable
 from typing import Any, TypeAlias
+from ty_extensions import TypeOf
 from typing_extensions import deprecated
 
 @deprecated("Use OtherType instead")
@@ -543,6 +544,12 @@ def union_alias(flag: bool):
     optional_alias = depr_func if flag else None  # error: [deprecated] "Use other_func instead"
     if optional_alias is not None:
         optional_alias()
+
+def factory() -> TypeOf[depr_func]:  # ty: ignore[deprecated]
+    return depr_func  # ty: ignore[deprecated]
+
+factory_alias = factory()
+factory_alias()  # error: [deprecated] "Use other_func instead"
 
 def loop_alias():
     alias = depr_func  # error: [deprecated] "Use other_func instead"
