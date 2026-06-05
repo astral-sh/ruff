@@ -70,7 +70,7 @@ function Items({
   const uniqueIds: Map<string, number> = new Map();
 
   return (
-    <ul className="space-y-0.5 grow overflow-y-scroll">
+    <ul className="space-y-0.5 grow overflow-y-auto">
       {diagnostics.map((diagnostic) => {
         const position = diagnostic.range;
         const start = position?.start;
