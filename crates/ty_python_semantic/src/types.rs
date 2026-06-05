@@ -2901,105 +2901,115 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Option<(Type<'db>, AttributeKind)> {
+        #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn try_call_dunder_get_inner<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            instance: Option<Type<'db>>,
+            owner: Type<'db>,
+        ) -> Option<(Type<'db>, AttributeKind)> {
+            if let Some(fallback) = ty.materialized_divergent_fallback() {
+                return fallback.try_call_dunder_get(db, instance, owner);
+            }
+
+            match ty {
+                Type::Callable(callable) if callable.is_staticmethod_like(db) => {
+                    // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
+                    // The underlying function is returned as-is, without binding self.
+                    return Some((ty, AttributeKind::NormalOrNonDataDescriptor));
+                }
+                Type::Callable(callable)
+                    if callable.is_function_like(db) || callable.is_classmethod_like(db) =>
+                {
+                    // For "function-like" or "classmethod-like" callables, model the behavior of
+                    // `FunctionType.__get__` or `classmethod.__get__`.
+                    //
+                    // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
+                    // we should instead return a new method-wrapper type variant for the synthesized `__get__`
+                    // method of these synthesized functions. The method-wrapper would then be returned from
+                    // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
+                    // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
+                    return if instance.is_none() && callable.is_function_like(db) {
+                        Some((ty, AttributeKind::NormalOrNonDataDescriptor))
+                    } else {
+                        let self_type = instance.unwrap_or_else(|| {
+                            // For classmethod-like callables, bind to the owner class.
+                            owner.to_instance(db).unwrap_or(owner)
+                        });
+
+                        Some((
+                            Type::Callable(callable.bind_self(db, Some(self_type))),
+                            AttributeKind::NormalOrNonDataDescriptor,
+                        ))
+                    };
+                }
+                _ => {}
+            }
+
+            let descr_get = ty.class_member(db, "__get__".into()).place;
+
+            if let Place::Defined(DefinedPlace {
+                ty: descr_get,
+                definedness: descr_get_boundness,
+                ..
+            }) = descr_get
+            {
+                let instance_ty = instance.unwrap_or_else(|| Type::none(db));
+                let return_ty = descr_get
+                    .try_call(db, &CallArguments::positional([ty, instance_ty, owner]))
+                    .map(|bindings| {
+                        if descr_get_boundness == Definedness::AlwaysDefined {
+                            bindings.return_type(db)
+                        } else {
+                            UnionType::from_two_elements(db, bindings.return_type(db), ty)
+                        }
+                    })
+                    // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
+                    // we should emit a diagnostic here instead of silently ignoring the error.
+                    .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
+
+                let descriptor_kind = if ty.is_data_descriptor(db) {
+                    AttributeKind::DataDescriptor
+                } else {
+                    AttributeKind::NormalOrNonDataDescriptor
+                };
+
+                Some((return_ty, descriptor_kind))
+            } else {
+                None
+            }
+        }
+
         tracing::trace!(
             "try_call_dunder_get: {}, {}, {}",
             self.display(db),
             instance.unwrap_or_else(|| Type::none(db)).display(db),
             owner.display(db)
         );
-        if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.try_call_dunder_get(db, instance, owner);
-        }
 
-        match self {
-            Type::Callable(callable) if callable.is_staticmethod_like(db) => {
-                // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
-                // The underlying function is returned as-is, without binding self.
-                return Some((self, AttributeKind::NormalOrNonDataDescriptor));
-            }
-            Type::Callable(callable)
-                if callable.is_function_like(db) || callable.is_classmethod_like(db) =>
+        // Function descriptors have fixed binding behavior, so avoid retaining a tracked query
+        // for every function and access context.
+        if let Type::FunctionLiteral(function) = self {
+            let descriptor_result = if function.is_classmethod(db) {
+                Type::BoundMethod(BoundMethodType::new(db, function, owner))
+            } else if let Some(instance) = instance
+                && !function.is_staticmethod(db)
             {
-                // For "function-like" or "classmethod-like" callables, model the behavior of
-                // `FunctionType.__get__` or `classmethod.__get__`.
-                //
-                // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
-                // we should instead return a new method-wrapper type variant for the synthesized `__get__`
-                // method of these synthesized functions. The method-wrapper would then be returned from
-                // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
-                // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-                return if instance.is_none() && callable.is_function_like(db) {
-                    Some((self, AttributeKind::NormalOrNonDataDescriptor))
-                } else {
-                    let self_type = instance.unwrap_or_else(|| {
-                        // For classmethod-like callables, bind to the owner class.
-                        owner.to_instance(db).unwrap_or(owner)
-                    });
-
-                    Some((
-                        Type::Callable(callable.bind_self(db, Some(self_type))),
-                        AttributeKind::NormalOrNonDataDescriptor,
-                    ))
-                };
-            }
-            Type::FunctionLiteral(function)
-                if instance.is_some_and(|ty| ty.is_none(db))
-                    && !function.is_staticmethod(db)
-                    && !function.is_classmethod(db) =>
-            {
-                // When the instance is of type `None` (`NoneType`), we must handle
-                // `FunctionType.__get__` here rather than falling through to the generic
-                // `__get__` path. The stubs for `FunctionType.__get__` use an overload
-                // with `instance: None` to indicate class-level access (returning the
-                // unbound function). This incorrectly matches when the instance is actually
-                // an instance of `None`
-                return Some((
-                    Type::BoundMethod(BoundMethodType::new(db, function, instance.unwrap())),
-                    AttributeKind::NormalOrNonDataDescriptor,
-                ));
-            }
-            _ => {}
-        }
-
-        let descr_get = self.class_member(db, "__get__".into()).place;
-
-        if let Place::Defined(DefinedPlace {
-            ty: descr_get,
-            definedness: descr_get_boundness,
-            ..
-        }) = descr_get
-        {
-            let instance_ty = instance.unwrap_or_else(|| Type::none(db));
-            let return_ty = descr_get
-                .try_call(db, &CallArguments::positional([self, instance_ty, owner]))
-                .map(|bindings| {
-                    if descr_get_boundness == Definedness::AlwaysDefined {
-                        bindings.return_type(db)
-                    } else {
-                        UnionType::from_two_elements(db, bindings.return_type(db), self)
-                    }
-                })
-                // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
-                // we should emit a diagnostic here instead of silently ignoring the error.
-                .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
-
-            let descriptor_kind = if self.is_data_descriptor(db) {
-                AttributeKind::DataDescriptor
+                Type::BoundMethod(BoundMethodType::new(db, function, instance))
             } else {
-                AttributeKind::NormalOrNonDataDescriptor
+                self
             };
 
-            Some((return_ty, descriptor_kind))
-        } else {
-            None
+            return Some((descriptor_result, AttributeKind::NormalOrNonDataDescriptor));
         }
+
+        try_call_dunder_get_inner(db, self, instance, owner)
     }
 
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
