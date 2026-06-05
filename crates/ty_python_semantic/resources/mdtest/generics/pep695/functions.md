@@ -713,6 +713,25 @@ def f(
     reveal_type(close_and_return(g))  # revealed: Unknown
 ```
 
+## Union upper bounds and method calls
+
+When a TypeVar has a union as its upper bound, we can call methods that exist on all elements of the
+union. The return type is the union of the return types from each element.
+
+```py
+class C:
+    def method(self) -> int:
+        return 1
+
+class D:
+    def method(self) -> str:
+        return "foo"
+
+def f[T: C | D](x: T) -> T:
+    reveal_type(x.method())  # revealed: int | str
+    return x
+```
+
 ## Opaque decorators don't affect typevar binding
 
 Inside the body of a generic function, we should be able to see that the typevars bound by that

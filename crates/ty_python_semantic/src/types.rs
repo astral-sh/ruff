@@ -3654,6 +3654,27 @@ impl<'db> Type<'db> {
                 .into()
             }
 
+            // For a TypeVar with a union upper bound, we need to map over the union elements
+            // and do the full member lookup on each element. This ensures that when we access
+            // a method on `T: A | B`, the method binding is done with the correct instance type
+            // for each union element, rather than trying to bind the method with the TypeVar
+            // itself (which would fail because T is not assignable to A or B individually).
+            Type::TypeVar(typevar)
+                if matches!(
+                    typevar.typevar(db).bound_or_constraints(db),
+                    Some(TypeVarBoundOrConstraints::UpperBound(Type::Union(_)))
+                ) =>
+            {
+                let Some(TypeVarBoundOrConstraints::UpperBound(Type::Union(union))) =
+                    typevar.typevar(db).bound_or_constraints(db)
+                else {
+                    unreachable!("We just checked this is a union bound")
+                };
+                union.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.member_lookup_with_policy(db, name_str.into(), policy)
+                })
+            }
+
             Type::NominalInstance(instance)
                 if matches!(name_str, "name" | "_name_" | "value" | "_value_")
                     && enum_metadata(db, instance.class_literal(db)).is_some() =>
