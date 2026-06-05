@@ -3174,8 +3174,8 @@ pub(crate) enum ParametersKind<'db> {
 /// The `value` field should contain the parameters that participate in the callable signature
 /// proper. For example, even if this represents a `Gradual` form, the `value` field should still
 /// contain the `*args: Any` and `**kwargs: Any` parameter. A `**kwargs: Unpack[TypedDict]`
-/// parameter is normalized to the keyword-only parameters exposed to callers plus a possible
-/// trailing `**kwargs` parameter for explicit extra items or an open `TypedDict`.
+/// parameter is normalized to the keyword-only parameters exposed to callers plus a trailing
+/// `**kwargs` parameter for explicit extra items.
 ///
 /// The `kind` field is used to indicate the specific form of the parameter list which can,
 /// optionally, include additional information such as the bound `ParamSpec` type variable.
@@ -3210,8 +3210,8 @@ impl<'db> Parameters<'db> {
     /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
     /// and the presence of other parameter kinds to determine if they represent a gradual form, a
     /// `ParamSpec`, or a `Concatenate` form. `**kwargs: Unpack[TypedDict]` is normalized here by
-    /// synthesizing keyword-only parameters for the unpacked keys and a possible trailing
-    /// `**kwargs` parameter for explicit extra items or an open `TypedDict`.
+    /// synthesizing keyword-only parameters for the unpacked keys and a trailing `**kwargs`
+    /// parameter for explicit extra items.
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
@@ -3244,8 +3244,7 @@ impl<'db> Parameters<'db> {
                     );
                 }
 
-                if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items()
-                {
+                if let Some(extra_items) = unpacked_typed_dict.explicit_extra_items(db) {
                     value.push(
                         Parameter::keyword_variadic(kwargs_name)
                             .with_annotated_type(extra_items.declared_ty),
