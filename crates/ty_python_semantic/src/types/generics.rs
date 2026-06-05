@@ -1911,7 +1911,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Option<ConstraintBounds<'db>>,
         ) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
-        if self.use_hash_map_solver {
+        if self.use_hash_map_solver
+            || generic_context
+                .variables_inner(self.db)
+                .values()
+                .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
+        {
             return self.solve_hash_map_with(generic_context, choose);
         }
 
