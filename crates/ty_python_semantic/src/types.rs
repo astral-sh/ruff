@@ -2901,8 +2901,33 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn try_call_dunder_get(
+        self,
+        db: &'db dyn Db,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+    ) -> Option<(Type<'db>, AttributeKind)> {
+        // Function descriptors have fixed binding behavior, so avoid retaining a tracked query
+        // for every function and access context.
+        if let Type::FunctionLiteral(function) = self {
+            let descriptor_result = if function.is_classmethod(db) {
+                Type::BoundMethod(BoundMethodType::new(db, function, owner))
+            } else if let Some(instance) = instance
+                && !function.is_staticmethod(db)
+            {
+                Type::BoundMethod(BoundMethodType::new(db, function, instance))
+            } else {
+                self
+            };
+
+            return Some((descriptor_result, AttributeKind::NormalOrNonDataDescriptor));
+        }
+
+        self.try_call_dunder_get_inner(db, instance, owner)
+    }
+
+    #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    fn try_call_dunder_get_inner(
         self,
         db: &'db dyn Db,
         instance: Option<Type<'db>>,
@@ -2948,22 +2973,6 @@ impl<'db> Type<'db> {
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
-            }
-            Type::FunctionLiteral(function)
-                if instance.is_some_and(|ty| ty.is_none(db))
-                    && !function.is_staticmethod(db)
-                    && !function.is_classmethod(db) =>
-            {
-                // When the instance is of type `None` (`NoneType`), we must handle
-                // `FunctionType.__get__` here rather than falling through to the generic
-                // `__get__` path. The stubs for `FunctionType.__get__` use an overload
-                // with `instance: None` to indicate class-level access (returning the
-                // unbound function). This incorrectly matches when the instance is actually
-                // an instance of `None`
-                return Some((
-                    Type::BoundMethod(BoundMethodType::new(db, function, instance.unwrap())),
-                    AttributeKind::NormalOrNonDataDescriptor,
-                ));
             }
             _ => {}
         }
