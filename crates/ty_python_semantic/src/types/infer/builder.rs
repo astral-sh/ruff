@@ -8187,9 +8187,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
+            let method_name = attr.id.as_str();
 
             if let Type::TypedDict(typed_dict_ty) = value_type
-                && matches!(attr.id.as_str(), "get" | "pop" | "setdefault")
+                && matches!(method_name, "get" | "pop" | "setdefault")
                 && !arguments.args.is_empty()
 
                 // Validate the key argument for `TypedDict` methods
@@ -8201,10 +8202,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let key = key_literal.to_str();
                 let items = typed_dict_ty.items(self.db());
+                let is_declared = items.contains_key(key);
 
                 if let Some(field) = typed_dict_ty.item(self.db(), key) {
                     // Key exists - check if it's a `pop()` on a required field
-                    if items.contains_key(key) && attr.id.as_str() == "pop" && field.is_required() {
+                    if is_declared && method_name == "pop" && field.is_required() {
                         report_cannot_pop_required_field_on_typed_dict(
                             &self.context,
                             first_arg.into(),
@@ -8214,8 +8216,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Type::unknown();
                     }
 
-                    if !items.contains_key(key)
-                        && attr.id.as_str() == "get"
+                    if !is_declared
+                        && method_name == "get"
                         && arguments.keywords.is_empty()
                         && matches!(arguments.args.len(), 1 | 2)
                     {
@@ -8233,8 +8235,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // Unknown literal keys are concrete extra items, so mutating operations can
                     // use their extra-items type even when arbitrary `str` keys are unsafe.
-                    if !items.contains_key(key) && !field.is_read_only() {
-                        match attr.id.as_str() {
+                    if !is_declared && !field.is_read_only() {
+                        match method_name {
                             "pop"
                                 if arguments.keywords.is_empty()
                                     && matches!(arguments.args.len(), 1 | 2) =>
@@ -8279,7 +8281,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             _ => {}
                         }
                     }
-                } else if attr.id.as_str() != "get" {
+                } else if method_name != "get" {
                     // Key not found, report error with suggestion and return early
                     let key_ty = Type::string_literal(self.db(), key);
                     report_invalid_key_on_typed_dict(

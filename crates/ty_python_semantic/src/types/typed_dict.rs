@@ -755,12 +755,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             } else {
                 // `NotRequired[]` target fields
                 if target_item_field.is_read_only() {
-                    // As above, for `NotRequired[]` + `ReadOnly[]` fields in the target. It's
-                    // tempting to refactor things and unify some of these calls to
-                    // `check_typeddict_pair`, but this branch will get more complicated when we
-                    // add support for `closed` and `extra_items` (which is why the rules in the
-                    // spec are structured like they are), and following the structure of the spec
-                    // makes it easier to check the logic here.
+                    // A missing read-only field is checked against the source's effective extra
+                    // items. Missing mutable fields below require explicit mutable extra items and
+                    // a relation in both directions.
                     if let Some(source_item_field) = source_items.get(target_item_name) {
                         self.check_type_pair(
                             db,

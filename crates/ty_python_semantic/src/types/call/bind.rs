@@ -5420,7 +5420,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     constraints,
                     argument_index,
                     adjusted_argument_index,
-                    argument,
                     // Splatted arguments are inferred without type context.
                     argument_types.get_default().unwrap_or(Type::unknown()),
                     paramspec_component_start,
@@ -5600,29 +5599,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
-        argument: Argument<'a>,
         argument_type: Type<'db>,
         paramspec_component_start: Option<usize>,
     ) {
         if extract_unpacked_typed_dict_from_value_type(self.db, argument_type).is_some() {
-            for matched_parameter in self.argument_matches[argument_index].iter() {
-                let parameter_index = matched_parameter.index;
-                if paramspec_component_start.is_some_and(|start| parameter_index >= start) {
-                    continue;
-                }
-
-                self.check_argument_type(
-                    constraints,
-                    argument_index,
-                    adjusted_argument_index,
-                    argument,
-                    matched_parameter
-                        .argument_type
-                        .unwrap_or_else(Type::unknown),
-                    matched_parameter,
-                );
-            }
-
+            self.check_variadic_argument_type(
+                constraints,
+                argument_index,
+                adjusted_argument_index,
+                Argument::Keywords,
+                paramspec_component_start,
+            );
             return;
         }
 

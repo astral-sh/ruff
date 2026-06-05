@@ -305,8 +305,9 @@ fn synthesize_typed_dict_delitem<'db>(
         .iter()
         .filter(|(_, field)| !field.is_required() && !field.is_read_only())
         .peekable();
+    let supports_arbitrary_key_deletion = typed_dict.supports_arbitrary_key_deletion(db);
 
-    if deletable_fields.peek().is_none() && !typed_dict.supports_arbitrary_key_deletion(db) {
+    if deletable_fields.peek().is_none() && !supports_arbitrary_key_deletion {
         let parameters = [
             Parameter::positional_only(Some(Name::new_static("self")))
                 .with_annotated_type(instance_ty),
@@ -328,7 +329,7 @@ fn synthesize_typed_dict_delitem<'db>(
             ];
             Signature::new(Parameters::new(db, parameters), Type::none(db))
         })
-        .chain(typed_dict.supports_arbitrary_key_deletion(db).then(|| {
+        .chain(supports_arbitrary_key_deletion.then(|| {
             let parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
