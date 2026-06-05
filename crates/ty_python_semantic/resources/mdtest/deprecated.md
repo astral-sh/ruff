@@ -496,6 +496,9 @@ second_alias()
 
 annotated_alias: Callable[..., Any] = depr_func  # error: [deprecated] "Use other_func instead"
 annotated_alias()
+
+(unpacked_alias,) = (depr_func,)  # error: [deprecated] "Use other_func instead"
+unpacked_alias()
 ```
 
 ## Dunders
