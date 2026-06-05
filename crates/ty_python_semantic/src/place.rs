@@ -407,6 +407,59 @@ impl<'db> DeprecationBuilder<'db> {
     }
 }
 
+/// Merges policies from alternative bindings.
+///
+/// A suppressed deprecated binding can be joined with an inherited nondeprecated binding without
+/// re-enabling transitive deprecation. An inherited deprecated binding remains conservative,
+/// because that alternative has not already reported the warning.
+pub(crate) struct BindingDeprecationBuilder<'db> {
+    first: DeprecationPolicy<'db>,
+    has_candidate: bool,
+    all_same: bool,
+    has_suppress: bool,
+    can_suppress: bool,
+}
+
+impl Default for BindingDeprecationBuilder<'_> {
+    fn default() -> Self {
+        Self {
+            first: DeprecationPolicy::Inherit,
+            has_candidate: false,
+            all_same: true,
+            has_suppress: false,
+            can_suppress: true,
+        }
+    }
+}
+
+impl<'db> BindingDeprecationBuilder<'db> {
+    pub(crate) fn add_policy(
+        &mut self,
+        candidate: DeprecationPolicy<'db>,
+        type_is_deprecated: bool,
+    ) {
+        if self.has_candidate {
+            self.all_same &= candidate == self.first;
+        } else {
+            self.first = candidate;
+            self.has_candidate = true;
+        }
+        self.has_suppress |= candidate == DeprecationPolicy::Suppress;
+        self.can_suppress &= candidate == DeprecationPolicy::Suppress
+            || (candidate == DeprecationPolicy::Inherit && !type_is_deprecated);
+    }
+
+    pub(crate) fn build_policy(self) -> DeprecationPolicy<'db> {
+        if self.all_same {
+            self.first
+        } else if self.has_suppress && self.can_suppress {
+            DeprecationPolicy::Suppress
+        } else {
+            DeprecationPolicy::Inherit
+        }
+    }
+}
+
 /// A [`Result`] type in which the `Ok` variant represents a definitely bound place
 /// and the `Err` variant represents a place that is either definitely or possibly unbound.
 ///
@@ -1526,7 +1579,7 @@ fn place_from_bindings_impl<'db>(
     let mut first_definition = None;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
-    let mut deprecation = DeprecationBuilder::default();
+    let mut deprecation = BindingDeprecationBuilder::default();
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1645,7 +1698,7 @@ fn place_from_bindings_impl<'db>(
                 .map_or(DeprecationPolicy::Inherit, |declaration| {
                     declaration.deprecation_policy()
                 });
-            deprecation.add_policy(binding_deprecation);
+            deprecation.add_policy(binding_deprecation, binding_ty.is_deprecated(db));
             Some((
                 narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
                 static_reachability,

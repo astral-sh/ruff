@@ -30,10 +30,10 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, DeprecationBuilder, DeprecationPolicy,
-    LookupError, Place, PlaceAndQualifiers, RequiresExplicitReExport, TypeOrigin,
-    builtins_module_scope, builtins_symbol, class_body_implicit_symbol, explicit_global_symbol,
-    loop_header_reachability, module_type_implicit_global_declaration,
+    BindingDeprecationBuilder, ConsideredDefinitions, DefinedPlace, Definedness,
+    DeprecationPolicy, LookupError, Place, PlaceAndQualifiers, RequiresExplicitReExport,
+    TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
+    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
     module_type_implicit_global_symbol, place_by_id, place_from_bindings, place_from_declarations,
     typing_extensions_symbol,
 };
@@ -2109,7 +2109,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place = loop_header_kind.place();
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
-        let mut deprecation = DeprecationBuilder::default();
+        let mut deprecation = BindingDeprecationBuilder::default();
 
         for reachable_binding in &loop_header.reachable_bindings {
             let inference = infer_definition_types(db, reachable_binding.definition);
@@ -2126,6 +2126,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map_or(DeprecationPolicy::Inherit, |declaration| {
                         declaration.deprecation_policy()
                     }),
+                narrowed_ty.is_deprecated(db),
             );
         }
 
@@ -2214,7 +2215,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
-        let mut deprecation = DeprecationBuilder::default();
+        let mut deprecation = BindingDeprecationBuilder::default();
         for declaration in visible_nested_declarations {
             assert!(
                 declaration.is_bound,
@@ -2232,7 +2233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             };
             union.add_in_place(ty);
-            deprecation.add_policy(nested_place.deprecation_policy());
+            deprecation.add_policy(nested_place.deprecation_policy(), ty.is_deprecated(db));
         }
         let ty = union.build();
         self.bindings.insert(definition, ty);

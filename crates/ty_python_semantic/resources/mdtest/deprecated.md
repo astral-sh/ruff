@@ -545,11 +545,26 @@ def union_alias(flag: bool):
     if optional_alias is not None:
         optional_alias()
 
+def branch_alias(flag: bool):
+    if flag:
+        branch_value = depr_func  # error: [deprecated] "Use other_func instead"
+    else:
+        branch_value = None
+    if branch_value is not None:
+        branch_value()
+
 def factory() -> TypeOf[depr_func]:  # ty: ignore[deprecated]
     return depr_func  # ty: ignore[deprecated]
 
 factory_alias = factory()
 factory_alias()  # error: [deprecated] "Use other_func instead"
+
+def mixed_alias(flag: bool):
+    if flag:
+        mixed_value = depr_func  # error: [deprecated] "Use other_func instead"
+    else:
+        mixed_value = factory()
+    mixed_value()  # error: [deprecated] "Use other_func instead"
 
 def loop_alias():
     alias = depr_func  # error: [deprecated] "Use other_func instead"
