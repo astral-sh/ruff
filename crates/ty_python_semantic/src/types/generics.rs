@@ -1847,7 +1847,6 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     db: &'db dyn Db,
     constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'db>,
-    use_hash_map_solver: bool,
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
@@ -1858,17 +1857,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         db: &'db dyn Db,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
-        generic_context: GenericContext<'db>,
     ) -> Self {
-        let use_hash_map_solver = generic_context
-            .variables_inner(db)
-            .values()
-            .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
         Self {
             db,
             constraints,
             inferable,
-            use_hash_map_solver,
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
@@ -1916,7 +1909,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Option<ConstraintBounds<'db>>,
         ) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
-        if self.use_hash_map_solver {
+        if generic_context
+            .variables_inner(self.db)
+            .values()
+            .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
+        {
             return self.solve_hash_map_with(generic_context, choose);
         }
 
@@ -2261,10 +2258,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         variance: TypeVarVariance,
     ) {
         self.insert_hash_map_type_mapping(bound_typevar, ty);
-
-        if self.use_hash_map_solver {
-            return;
-        }
 
         let bounds = match variance {
             TypeVarVariance::Covariant => ConstraintBounds::new(Some(ty), None),
