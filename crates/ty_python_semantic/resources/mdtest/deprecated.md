@@ -560,6 +560,9 @@ def branch_alias(flag: bool):
 def factory() -> TypeOf[depr_func]:  # ty: ignore[deprecated]
     return depr_func  # ty: ignore[deprecated]
 
+constant_alias = depr_func if True else factory()  # error: [deprecated] "Use other_func instead"
+constant_alias()
+
 factory_alias = factory()
 factory_alias()  # error: [deprecated] "Use other_func instead"
 
