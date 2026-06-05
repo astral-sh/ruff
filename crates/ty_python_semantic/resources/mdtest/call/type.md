@@ -127,6 +127,22 @@ foo = Foo()
 reveal_type(foo.custom_attr)  # revealed: Literal[42]
 ```
 
+Methods from the namespace dictionary use the descriptor protocol and can be overridden normally:
+
+```py
+def dynamic_method(self) -> int:
+    return 1
+
+DynamicBase = type("DynamicBase", (), {"method": dynamic_method})
+reveal_type(DynamicBase().method())  # revealed: int
+
+class Child(DynamicBase):
+    def method(self) -> str:
+        return "child"
+
+reveal_type(Child().method())  # revealed: str
+```
+
 When the namespace dict is not a literal (e.g., passed as a parameter), attribute access returns
 `Unknown` since we can't know what attributes might be defined:
 

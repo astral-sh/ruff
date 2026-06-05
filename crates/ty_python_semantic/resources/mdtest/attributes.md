@@ -1033,6 +1033,31 @@ class C1(metaclass=Meta1): ...
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
 ```
 
+A dynamically-created metaclass can define methods with the same names as methods in the class it
+creates. These methods can have different roles; in particular, the metaclass's `__new__` creates
+the class object and its `__call__` creates instances, while the class's methods create and operate
+on instances of that class:
+
+```py
+class DynamicallyConstructed(
+    metaclass=type(
+        "DynamicMeta",
+        (type,),
+        {
+            "__new__": lambda mcls, name, bases, namespace: type.__new__(mcls, name, bases, namespace),
+            "__call__": lambda cls: type.__call__(cls),
+        },
+    )
+):
+    def __new__(cls):
+        return super().__new__(cls)
+
+    def __call__(self, value: int) -> int:
+        return value
+
+DynamicallyConstructed()(1)
+```
+
 Assignments in instance methods of a metaclass are also attributes on its class-object instances. In
 particular, a metaclass `__init__` assignment happens after the initial class namespace has been
 converted into a class object, so it shadows an attribute from that namespace:
