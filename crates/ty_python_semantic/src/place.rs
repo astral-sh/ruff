@@ -1698,11 +1698,9 @@ fn place_from_bindings_impl<'db>(
                 .map_or(DeprecationPolicy::Inherit, |declaration| {
                     declaration.deprecation_policy()
                 });
-            deprecation.add_policy(binding_deprecation, binding_ty.is_deprecated(db));
-            Some((
-                narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
-                static_reachability,
-            ))
+            let narrowed_ty = narrowing_constraint.narrow(db, binding_ty, binding.place(db));
+            deprecation.add_policy(binding_deprecation, narrowed_ty.is_deprecated(db));
+            Some((narrowed_ty, static_reachability))
         },
     );
 

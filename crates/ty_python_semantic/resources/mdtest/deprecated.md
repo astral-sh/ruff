@@ -502,7 +502,7 @@ redundant and annoying.
 from collections.abc import Callable
 from typing import Any, TypeAlias
 from ty_extensions import TypeOf
-from typing_extensions import deprecated
+from typing_extensions import TypeGuard, deprecated
 
 @deprecated("Use OtherType instead")
 class DeprType: ...
@@ -572,6 +572,17 @@ def mixed_alias(flag: bool):
     else:
         mixed_value = factory()
     mixed_value()  # error: [deprecated] "Use other_func instead"
+
+def is_depr_func(value: object) -> TypeGuard[TypeOf[depr_func]]:  # ty: ignore[deprecated]
+    return True
+
+def narrowed_alias(flag: bool, unknown: object):
+    if flag:
+        narrowed_value = depr_func  # error: [deprecated] "Use other_func instead"
+    else:
+        narrowed_value = unknown
+    if is_depr_func(narrowed_value):
+        narrowed_value()  # error: [deprecated] "Use other_func instead"
 
 def loop_alias():
     alias = depr_func  # error: [deprecated] "Use other_func instead"
