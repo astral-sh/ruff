@@ -9,7 +9,9 @@ use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker};
-use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
+use crate::types::typed_dict::{
+    TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
+};
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -3930,8 +3932,9 @@ fn key_membership_implies_subscript<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool
 
 /// Refine `ty` with the fact that the literal `key` is present.
 ///
-/// `Mapping` arms gain matching `__contains__` and `__getitem__` methods, while other arms only
-/// gain the successful membership fact.
+/// `TypedDict` arms gain a required read-only field, `Mapping` arms gain matching
+/// `__contains__` and `__getitem__` methods, and other arms only gain the successful membership
+/// fact.
 fn narrow_with_present_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> Type<'db> {
     let constrain = |ty, key_presence_constraint| {
         IntersectionType::from_two_elements(db, ty, key_presence_constraint)
@@ -3939,10 +3942,31 @@ fn narrow_with_present_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> Ty
 
     match ty.resolve_type_alias(db) {
         Type::Union(union) => union.map(db, |element| narrow_with_present_key(db, *element, key)),
+        resolved if typeddict_declares_key(db, resolved, key) => ty,
+        resolved if is_or_contains_typeddict(db, resolved) => constrain(
+            ty,
+            Type::TypedDict(required_typeddict_key(db, key, Type::object())),
+        ),
         resolved if is_mapping_subtype(db, resolved) => {
             constrain(ty, mapping_present_key_protocol(db, key))
         }
         _ => constrain(ty, key_membership_contains_protocol(db, key)),
+    }
+}
+
+fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
+    match ty {
+        Type::TypedDict(typed_dict) => typed_dict.items(db).contains_key(key),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| typeddict_declares_key(db, *element, key)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| typeddict_declares_key(db, *element, key)),
+        Type::TypeAlias(alias) => typeddict_declares_key(db, alias.value_type(db), key),
+        _ => false,
     }
 }
 
@@ -3969,26 +3993,67 @@ fn narrow_with_absent_key<'db>(
 /// Return whether `ty` proves that `key` is present, making a negative membership branch
 /// unreachable.
 ///
-/// Calling `__contains__` with this literal key must have an always-truthy return type.
+/// A required `TypedDict` field proves presence directly. Other types prove it when calling
+/// `__contains__` with this literal key has an always-truthy return type.
 fn key_is_always_present<'db>(db: &'db dyn Db, ty: Type<'db>, key: StringLiteralType<'db>) -> bool {
-    let resolved = ty.resolve_type_alias(db);
-    if let Type::Intersection(intersection) = resolved
-        && intersection
+    let required_typed_dict_key = |typed_dict: TypedDictType<'db>| {
+        typed_dict
+            .items(db)
+            .get(key.value(db))
+            .is_some_and(TypedDictField::is_required)
+    };
+
+    let has_required_typed_dict_key = match ty {
+        Type::TypedDict(typed_dict) => required_typed_dict_key(typed_dict),
+        Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| key_is_always_present(db, *element, key))
-    {
-        return true;
-    }
+            .copied()
+            .filter_map(Type::as_typed_dict)
+            .any(required_typed_dict_key),
+        _ => false,
+    };
 
-    resolved
-        .try_call_dunder(
-            db,
-            "__contains__",
-            CallArguments::positional([Type::string_literal(db, key.value(db))]),
-            TypeContext::default(),
-        )
-        .is_ok_and(|bindings| bindings.return_type(db).bool(db) == Truthiness::AlwaysTrue)
+    has_required_typed_dict_key
+        || ty
+            .try_call_dunder(
+                db,
+                "__contains__",
+                CallArguments::positional([Type::string_literal(db, key.value(db))]),
+                TypeContext::default(),
+            )
+            .is_ok_and(|bindings| bindings.return_type(db).bool(db) == Truthiness::AlwaysTrue)
+}
+
+/// Return a synthesized `TypedDict` that represents safe subscript access for a present key on a
+/// `TypedDict`-containing type.
+///
+/// For `TypedDict`s, a positive key-membership test proves more than containment: it also makes
+/// string-literal subscript access with that key valid. In the `if` branch below, the `Bar` arm
+/// keeps its original shape but is intersected with this schema so `u["foo"]` is accepted:
+///
+/// ```python
+/// class Foo(TypedDict):
+///     foo: int
+///
+/// class Bar(TypedDict):
+///     bar: int
+///
+/// def f(u: Foo | Bar):
+///     if "foo" in u:
+///         reveal_type(u["foo"])  # object
+/// ```
+fn required_typeddict_key<'db>(
+    db: &'db dyn Db,
+    key: &str,
+    value_ty: Type<'db>,
+) -> TypedDictType<'db> {
+    let field = TypedDictFieldBuilder::new(value_ty)
+        .required(true)
+        .read_only(true)
+        .build();
+    let schema = TypedDictSchema::from_iter([(Name::from(key), field)]);
+    TypedDictType::from_schema_items(db, schema)
 }
 
 /// Return a synthesized protocol that records a present key on a `Mapping` subtype.
@@ -4043,8 +4108,8 @@ fn mapping_present_key_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
 /// Return a synthesized protocol that records a true key-membership test without implying
 /// subscript access.
 ///
-/// For non-`Mapping` types, `"key" in value` only proves that membership is true. It does not prove
-/// that `value["key"]` is valid:
+/// For non-`TypedDict` types, `"key" in value` only proves that membership is true. It does not
+/// prove that `value["key"]` is valid:
 ///
 /// ```python
 /// def f(s: Literal["abc"]):
@@ -4052,8 +4117,8 @@ fn mapping_present_key_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
 ///         s["a"]  # Runtime `TypeError`
 /// ```
 ///
-/// Non-`Mapping` union arms therefore receive this `__contains__` protocol instead of the
-/// `__contains__` and `__getitem__` protocol used for `Mapping` arms.
+/// Non-`TypedDict` union arms therefore receive this `__contains__` protocol instead of the
+/// synthesized `TypedDict` used for `TypedDict` arms.
 fn key_membership_contains_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
     let signature = Signature::new(
         Parameters::new(

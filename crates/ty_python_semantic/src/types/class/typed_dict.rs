@@ -39,7 +39,6 @@ pub(super) fn synthesize_typed_dict_method<'db>(
     let instance_ty = Type::TypedDict(typed_dict);
     match method_name {
         "__init__" => Some(synthesize_typed_dict_init(db, typed_dict, fields())),
-        "__contains__" => Some(synthesize_typed_dict_contains(db, instance_ty, fields())),
         "__getitem__" => Some(synthesize_typed_dict_getitem(db, typed_dict, fields())),
         "__setitem__" => Some(synthesize_typed_dict_setitem(db, typed_dict, fields())),
         "__delitem__" => Some(synthesize_typed_dict_delitem(db, typed_dict, fields())),
@@ -111,45 +110,6 @@ impl<'db> TypedDictFields<'db> {
             ),
         }
     }
-}
-
-/// Synthesize the `__contains__` method for a `TypedDict`.
-fn synthesize_typed_dict_contains<'db>(
-    db: &'db dyn Db,
-    instance_ty: Type<'db>,
-    fields: TypedDictFields<'db>,
-) -> Type<'db> {
-    let overloads = fields
-        .iter()
-        .filter(|(_, field)| field.is_required())
-        .map(|(field_name, _)| {
-            let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(Type::string_literal(db, field_name)),
-            ];
-            Signature::new(Parameters::new(db, parameters), Type::bool_literal(true))
-        })
-        .chain(std::iter::once(Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(Type::object()),
-                ],
-            ),
-            KnownClass::Bool.to_instance(db),
-        )));
-
-    Type::Callable(CallableType::new(
-        db,
-        CallableSignature::from_overloads(overloads),
-        CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
-    ))
 }
 
 /// Synthesize the `__init__` method for a `TypedDict`.
@@ -1028,7 +988,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             return member.inner;
         }
 
-        // Fall back to TypedDictFallback for methods like items, keys, etc.
+        // Fall back to TypedDictFallback for methods like __contains__, items, keys, etc.
         // This mirrors the behavior of StaticClassLiteral::typed_dict_member.
         typed_dict_class_member(
             db,
