@@ -239,7 +239,10 @@ impl Suppressions {
         for suppression in &self.valid {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
-            if *code == suppression_code && suppression.range.contains(range.start()) {
+
+            // Note that `contains_inclusive` is used here for diagnostics with an empty range, such
+            // as missing-newline-at-end-of-file (W292) that would otherwise be unsuppressible.
+            if *code == suppression_code && suppression.range.contains_inclusive(range.start()) {
                 suppression.used.set(true);
                 return true;
             }

@@ -21,3 +21,17 @@ not_suppressed = [  # ruff:ignore[RUF015]
     *range(10)
 ][0]
 ```
+
+## Empty diagnostic at end of file
+
+Diagnostics with empty ranges should also be suppressible, as with `noqa`.
+
+```toml
+[lint]
+preview = true
+select = ["W292"]
+```
+
+```py
+suppressed = 1  # ruff:ignore[W292]
+```
