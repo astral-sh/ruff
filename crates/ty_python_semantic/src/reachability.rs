@@ -582,9 +582,15 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        evaluate_constraint(self, id, |predicate| {
-            analyze_single_with_loop_header_cache(db, predicates, None, None, predicate)
-        })
+        if db.loop_header_predicate_cache().is_active() {
+            evaluate_constraint(self, id, |predicate| {
+                analyze_single_with_loop_header_cache(db, predicates, None, None, predicate)
+            })
+        } else {
+            evaluate_constraint(self, id, |predicate| {
+                analyze_single(db, &predicates[predicate])
+            })
+        }
     }
 }
 
@@ -843,13 +849,18 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 let predicate = self.predicates[predicate_id];
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    match analyze_single_with_loop_header_cache(
-                        self.db,
-                        self.predicates,
-                        None,
-                        None,
-                        predicate_id,
-                    ) {
+                    let truthiness = if self.db.loop_header_predicate_cache().is_active() {
+                        analyze_single_with_loop_header_cache(
+                            self.db,
+                            self.predicates,
+                            None,
+                            None,
+                            predicate_id,
+                        )
+                    } else {
+                        analyze_single(self.db, &predicate)
+                    };
+                    match truthiness {
                         Truthiness::AlwaysTrue => self.project(node.if_true()),
                         Truthiness::AlwaysFalse => self.project(node.if_false()),
                         Truthiness::Ambiguous => {

@@ -59,6 +59,7 @@ impl LoopHeaderPredicateCachePersistence {
 pub struct LoopHeaderPredicateCache {
     entries: RefCell<Option<FxHashMap<LoopHeaderPredicateCacheKey, LoopHeaderPredicateCacheEntry>>>,
     generation: Cell<u64>,
+    active: Cell<bool>,
 }
 
 impl Clone for LoopHeaderPredicateCache {
@@ -73,17 +74,18 @@ impl UnwindSafe for LoopHeaderPredicateCache {}
 
 impl LoopHeaderPredicateCache {
     pub(crate) fn with_scope<T>(&self, f: impl FnOnce() -> T) -> T {
-        let owner = {
+        let owner = !self.active.replace(true);
+        if owner {
             let mut entries = self.entries.borrow_mut();
-            if entries.is_some() {
-                false
-            } else {
-                *entries = Some(FxHashMap::default());
-                true
-            }
-        };
+            debug_assert!(entries.is_none());
+            *entries = Some(FxHashMap::default());
+        }
         let _guard = LoopHeaderPredicateCacheGuard { cache: self, owner };
         f()
+    }
+
+    pub(crate) fn is_active(&self) -> bool {
+        self.active.get()
     }
 
     pub(crate) fn get_globally_persistent(
@@ -243,6 +245,7 @@ impl Drop for LoopHeaderPredicateCacheGuard<'_> {
     fn drop(&mut self) {
         if self.owner {
             self.cache.entries.borrow_mut().take();
+            self.cache.active.set(false);
         }
     }
 }
