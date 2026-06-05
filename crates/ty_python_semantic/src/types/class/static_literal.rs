@@ -2084,8 +2084,8 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
-        // Keep the file-wide semantic-index dependency behind an equality-comparable tracked
-        // result, and avoid retaining tracked-query entries for names that no method can define.
+        // Collect names in a tracked query so unrelated edits can preserve dependent member
+        // lookups, and avoid retaining query entries for names that no method can define.
         if implicit_attribute_names(db, class_body_scope)
             .binary_search_by(|candidate| candidate.as_str().cmp(name))
             .is_err()
