@@ -2,7 +2,7 @@
 
 ## End-of-line `ruff:ignore` range
 
-This is a regression test for <https://github.com/astral-sh/ruff/issues/25644>, where `ruff:ignore`
+These are regression tests for <https://github.com/astral-sh/ruff/issues/25644>, where `ruff:ignore`
 comments behaved differently from `noqa` and `ty:ignore` comments when placed on the first line of a
 diagnostic range.
 
@@ -22,7 +22,25 @@ not_suppressed = [  # ruff:ignore[RUF015]
 ][0]
 ```
 
-## Empty diagnostic at end of file
+## Standalone `ruff:ignore` range
+
+This case also was previously not suppressed but will be now. The `B903` diagnostic covers the
+entire class definition.
+
+```toml
+[lint]
+preview = true
+select = ["B903"]
+```
+
+```py
+# ruff:ignore[B903]
+class Point:
+    def __init__(self, x: int):
+        self.x = x
+```
+
+## Empty diagnostic range at end of file
 
 Diagnostics with empty ranges should also be suppressible, as with `noqa`.
 
