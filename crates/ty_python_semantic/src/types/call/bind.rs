@@ -5501,10 +5501,10 @@ pub struct MatchedArgument<'db> {
     /// types assigned to each matched parameter. This isn't necessarily the same as the number of
     /// types in the argument type which might not be a fixed-length iterable.
     ///
-    /// Another thing to note is that the way this is populated means that for any other argument
-    /// kind (synthetic, positional, keyword, keyword-variadic), this will be a single-element
-    /// vector containing `None`, since we don't know the type of the argument when this is
-    /// constructed. So, this field is populated only for variadic arguments.
+    /// For non-splatted arguments (synthetic, positional, and keyword), this will be a
+    /// single-element vector containing `None`, since we don't know the type of the argument when
+    /// this is constructed. Splatted positional and keyword arguments can both populate this field
+    /// with the type assigned to each matched parameter.
     ///
     /// For example, given a `*args` whose type is `tuple[A, B, C]` and the following parameters:
     /// - `(x, *args)`: the `types` field will only have two elements (`B`, `C`) since `A` has been
