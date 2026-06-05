@@ -336,6 +336,29 @@ def use_mixed_union(instance: DecoratedUnionMember | UndecoratedUnionMember) -> 
     if is_replacement_class(alias):
         alias()  # error: [deprecated] "union replacement"
 
+    outer = (inner := instance.binding)
+    if is_replacement_class(inner):
+        inner()  # error: [deprecated] "union replacement"
+    if is_replacement_class(outer):
+        outer()  # error: [deprecated] "union replacement"
+
+    (unpacked_outer,) = ((unpacked_inner := instance.binding),)
+    if is_replacement_class(unpacked_inner):
+        unpacked_inner()  # error: [deprecated] "union replacement"
+    if is_replacement_class(unpacked_outer):
+        unpacked_outer()  # error: [deprecated] "union replacement"
+
+    conditional = instance.binding if flag else OtherReplacementClass
+    if is_replacement_class(conditional):
+        conditional()  # error: [deprecated] "union replacement"
+
+    casted = cast(  # error: [redundant-cast]
+        TypeOf[ReplacementClass] | TypeOf[OtherReplacementClass],
+        instance.binding,
+    )
+    if is_replacement_class(casted):
+        casted()  # error: [deprecated] "union replacement"
+
 H = TypeVar("H", DecoratedUnionMember, UndecoratedUnionMember)
 
 def use_mixed_typevar(instance: H) -> None:

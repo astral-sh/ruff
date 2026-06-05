@@ -29,12 +29,11 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    BindingDeprecationBuilder, ConsideredDefinitions, DefinedPlace, Definedness, DeprecationPolicy,
-    LookupError, Place, PlaceAndQualifiers, RequiresExplicitReExport, TypeOrigin,
-    builtins_module_scope, builtins_symbol, class_body_implicit_symbol, explicit_global_symbol,
-    loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place_by_id, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    ConsideredDefinitions, DefinedPlace, Definedness, DeprecationPolicy, LookupError, Place,
+    PlaceAndQualifiers, RequiresExplicitReExport, TypeOrigin, builtins_module_scope,
+    builtins_symbol, class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -11208,6 +11207,49 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
     }
 
     fn policy(&self, expression: &'ast ast::Expr) -> DeprecationPolicy<'db> {
+        match expression {
+            ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
+                return DeprecationPolicy::from_alternatives(
+                    self.builder.db(),
+                    [
+                        (self.expression_type(body), self.policy(body)),
+                        (self.expression_type(orelse), self.policy(orelse)),
+                    ],
+                );
+            }
+            ast::Expr::Named(ast::ExprNamed { value, .. }) => return self.policy(value),
+            ast::Expr::Call(call)
+                if matches!(
+                    self.expression_type(&call.func),
+                    Type::FunctionLiteral(function)
+                        if function.is_known(self.builder.db(), KnownFunction::Cast)
+                ) =>
+            {
+                return call
+                    .arguments
+                    .args
+                    .get(1)
+                    .map_or(DeprecationPolicy::Inherit, |value| self.policy(value));
+            }
+            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                let Some(elements) = sequence_elts(value) else {
+                    return DeprecationPolicy::Inherit;
+                };
+                let Some(index) = self.expression_type(slice).as_int_literal() else {
+                    return DeprecationPolicy::Inherit;
+                };
+                let Ok(len) = i64::try_from(elements.len()) else {
+                    return DeprecationPolicy::Inherit;
+                };
+                let index = if index < 0 { len + index } else { index };
+                return usize::try_from(index)
+                    .ok()
+                    .and_then(|index| elements.get(index))
+                    .map_or(DeprecationPolicy::Inherit, |element| self.policy(element));
+            }
+            _ => {}
+        }
+
         let expression_ty = self.expression_type(expression);
         let type_is_deprecated = expression_ty.is_deprecated(self.builder.db());
         if !type_is_deprecated
@@ -11250,48 +11292,6 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                 } else {
                     DeprecationPolicy::Inherit
                 }
-            }
-            ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
-                let mut deprecation = BindingDeprecationBuilder::default();
-                deprecation.add_policy(
-                    self.policy(body),
-                    self.expression_type(body).is_deprecated(self.builder.db()),
-                );
-                deprecation.add_policy(
-                    self.policy(orelse),
-                    self.expression_type(orelse)
-                        .is_deprecated(self.builder.db()),
-                );
-                deprecation.build_policy()
-            }
-            ast::Expr::Named(ast::ExprNamed { value, .. }) => self.policy(value),
-            ast::Expr::Call(call)
-                if matches!(
-                    self.expression_type(&call.func),
-                    Type::FunctionLiteral(function)
-                        if function.is_known(self.builder.db(), KnownFunction::Cast)
-                ) =>
-            {
-                call.arguments
-                    .args
-                    .get(1)
-                    .map_or(DeprecationPolicy::Inherit, |value| self.policy(value))
-            }
-            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                let Some(elements) = sequence_elts(value) else {
-                    return DeprecationPolicy::Inherit;
-                };
-                let Some(index) = self.expression_type(slice).as_int_literal() else {
-                    return DeprecationPolicy::Inherit;
-                };
-                let Ok(len) = i64::try_from(elements.len()) else {
-                    return DeprecationPolicy::Inherit;
-                };
-                let index = if index < 0 { len + index } else { index };
-                usize::try_from(index)
-                    .ok()
-                    .and_then(|index| elements.get(index))
-                    .map_or(DeprecationPolicy::Inherit, |element| self.policy(element))
             }
             _ => DeprecationPolicy::Inherit,
         }
