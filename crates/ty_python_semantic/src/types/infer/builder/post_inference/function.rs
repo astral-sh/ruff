@@ -1,7 +1,8 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownClass, KnownInstanceType, Signature, Type, TypeVarBoundOrConstraints, TypeVarKind,
+        ClassLiteral, KnownClass, KnownInstanceType, Signature, Type, TypeVarBoundOrConstraints,
+        TypeVarKind,
         context::InferContext,
         diagnostic::{
             INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
@@ -11,7 +12,7 @@ use crate::{
         function::{FunctionDecorators, OverloadLiteral},
         infer::original_class_type,
         infer_definition_types,
-        signatures::ReturnCallableTypeVarScope,
+        signatures::{Parameter, ReturnCallableTypeVarScope},
         typevar::TypeVarInstance,
         visitor::find_over_type,
     },
@@ -70,7 +71,7 @@ fn check_method_receiver<'db>(
         .body_scope(db)
         .class_definition_of_method(db)
         .and_then(|class_definition| original_class_type(db, class_definition))
-        .and_then(|class| class.as_static())
+        .and_then(ClassLiteral::as_static)
     else {
         return;
     };
@@ -85,7 +86,7 @@ fn check_method_receiver<'db>(
     let Some(annotated_receiver_type) = signature
         .parameters()
         .get(0)
-        .map(|parameter| parameter.annotated_type())
+        .map(Parameter::annotated_type)
     else {
         return;
     };
