@@ -100,8 +100,19 @@ fn check_method_receiver<'db>(
     }
 
     let class_object = Type::from(enclosing_class);
+    let typing_self_type = class_object.to_instance(db).unwrap_or_else(Type::unknown);
+    let concrete_receiver_type = receiver_type
+        .bind_self_typevars(db, typing_self_type)
+        .resolve_type_alias(db);
+    let receiver_is_class_typevar = matches!(
+        concrete_receiver_type,
+        Type::TypeVar(typevar)
+            if is_class_typevar(db, typevar)
+    );
+
     // Methods on metaclasses can restrict their receiver to a particular class object.
-    if is_metaclass_receiver_type(db, receiver_type)
+    if !receiver_is_class_typevar
+        && is_metaclass_receiver_type(db, receiver_type)
         && class_object.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
         && !last_definition.is_classmethod(db)
         && method_name != "__new__"
@@ -114,15 +125,6 @@ fn check_method_receiver<'db>(
     } else {
         class_object.to_instance(db).unwrap_or_else(Type::unknown)
     };
-    let typing_self_type = class_object.to_instance(db).unwrap_or_else(Type::unknown);
-    let concrete_receiver_type = receiver_type
-        .bind_self_typevars(db, typing_self_type)
-        .resolve_type_alias(db);
-    let receiver_is_class_typevar = matches!(
-        concrete_receiver_type,
-        Type::TypeVar(typevar)
-            if is_class_typevar(db, typevar)
-    );
     let concrete_receiver_type = match concrete_receiver_type {
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.top_materialization(db),

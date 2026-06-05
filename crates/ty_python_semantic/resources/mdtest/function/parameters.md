@@ -211,6 +211,10 @@ class RestrictedMeta(type):
         namespace: dict[str, Any],
     ): ...
 
+class GenericRestrictedMeta[T: type[int]](type):
+    # error: [invalid-method-receiver]
+    def restricted(cls: T): ...
+
 @final
 class FinalClass(metaclass=RestrictedMeta): ...
 
