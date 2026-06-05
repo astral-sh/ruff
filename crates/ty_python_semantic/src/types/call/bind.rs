@@ -5042,7 +5042,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             FxHashMap::default();
         if let Some(starred_typevartuple_declared_types) = &starred_typevartuple_declared_types {
             for (argument_index, _, _, argument_types) in self.enumerate_argument_types() {
-                for (parameter_index, _) in self.argument_matches[argument_index].iter() {
+                for matched_parameter in self.argument_matches[argument_index].iter() {
+                    let parameter_index = matched_parameter.index;
                     if starred_typevartuple_declared_types[parameter_index].is_some() {
                         starred_typevartuple_arguments
                             .entry(parameter_index)
@@ -5326,8 +5327,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.enumerate_argument_types()
             {
                 if !self.argument_matches[argument_index]
-                    .parameters
-                    .contains(&parameter_index)
+                    .iter()
+                    .any(|matched_parameter| matched_parameter.index == parameter_index)
                 {
                     continue;
                 }
@@ -5364,6 +5365,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_index: diagnostic_argument_index,
                     expected_ty,
                     provided_ty,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
                 });
             }
         }
