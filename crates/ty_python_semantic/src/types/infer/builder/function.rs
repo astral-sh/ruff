@@ -1201,6 +1201,7 @@ fn function_type_loses_definition<'db>(
             .try_fold(false, |replaced, element| {
                 Some(replaced || function_type_loses_definition(db, definition, *element)?)
             }),
+        _ if ty.is_definitely_callable(db) => Some(true),
         _ => None,
     }
 }

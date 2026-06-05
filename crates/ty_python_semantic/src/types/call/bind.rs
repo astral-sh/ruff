@@ -205,6 +205,11 @@ impl<'db> CallableItem<'db> {
         self.callable().is_callable()
     }
 
+    fn is_definitely_callable(&self) -> bool {
+        let callable = self.callable();
+        callable.is_callable() && !callable.dunder_call_is_possibly_unbound
+    }
+
     fn callable_type(&self) -> Type<'db> {
         self.callable().callable_type
     }
@@ -369,6 +374,10 @@ impl<'db> BindingsElement<'db> {
     fn is_callable(&self) -> bool {
         self.items.iter().any(CallableItem::is_callable)
     }
+
+    fn is_definitely_callable(&self) -> bool {
+        self.items.iter().any(CallableItem::is_definitely_callable)
+    }
 }
 
 /// Binding information for a union of callables, where each union element may be an intersection.
@@ -402,6 +411,12 @@ pub(crate) struct Bindings<'db> {
 }
 
 impl<'db> Bindings<'db> {
+    pub(crate) fn is_definitely_callable(&self) -> bool {
+        self.elements
+            .iter()
+            .all(BindingsElement::is_definitely_callable)
+    }
+
     fn as_result(&self, db: &'db dyn Db) -> Result<(), CallErrorKind> {
         let mut all_ok = true;
         let mut any_binding_error = false;

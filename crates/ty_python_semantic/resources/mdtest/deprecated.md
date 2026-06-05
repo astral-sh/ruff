@@ -73,6 +73,12 @@ def is_callable(value: object) -> TypeGuard[Callable[..., Any]]:
 
 class ReplacementClass: ...
 
+class CallableReplacement:
+    def __call__(self) -> str:
+        return "replacement"
+
+callable_replacement = CallableReplacement()
+
 @deprecated("ordinary deprecated function")
 def ordinary_deprecated_function() -> None: ...
 @deprecated("use replacement directly")
@@ -97,6 +103,9 @@ def deprecated_callable_binding() -> None: ...
 @deprecated("use ReplacementClass directly")
 @replace_with(ReplacementClass)
 def deprecated_class_binding() -> None: ...
+@deprecated("use callable_replacement directly")
+@replace_with(callable_replacement)
+def deprecated_callable_instance_binding() -> None: ...
 @deprecated("overload binding")
 @overload
 @replace_with(deprecated_replacement)  # error: [deprecated] "deprecated replacement"
@@ -109,7 +118,9 @@ deprecated_union_binding  # error: [deprecated] "use replacement or other direct
 deprecated_outer_binding()  # error: [deprecated] "outer deprecation"
 deprecated_object_binding
 deprecated_callable_binding()  # error: [deprecated] "callable replacement"
-deprecated_class_binding  # TODO: error: [deprecated] "use ReplacementClass directly"
+deprecated_class_binding  # error: [deprecated] "use ReplacementClass directly"
+deprecated_callable_instance_binding()  # error: [deprecated] "use callable_replacement directly"
+callable_replacement()
 deprecated_overload_binding()  # error: [deprecated] "deprecated replacement"
 
 copy_of_deprecated_binding = deprecated_binding  # error: [deprecated] "use replacement directly"

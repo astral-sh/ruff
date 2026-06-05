@@ -1070,6 +1070,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
+    pub(crate) fn is_definitely_callable(self, db: &'db dyn Db) -> bool {
+        !self.has_dynamic(db)
+            && !self.is_never()
+            && !self.is_divergent()
+            && self.bindings(db).is_definitely_callable()
+    }
+
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
