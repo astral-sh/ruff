@@ -152,6 +152,31 @@ class Mixin:
 class ProtocolClass(Protocol):
     def method(self: int): ...
 
+class ReceiverClassProtocol(Protocol):
+    value: object
+
+class GenericReceiverClassProtocol[T](Protocol):
+    value: T
+
+type GenericReceiverAlias[T] = type[GenericReceiverClassProtocol[T]] | type[str]
+
+class InvalidProtocolClassReceiver:
+    @classmethod
+    # TODO: error: [invalid-method-receiver]
+    # `type[Protocol]` is currently represented using a `Todo` type.
+    def method(cls: type[ReceiverClassProtocol]): ...
+
+class ValidGenericProtocolClassReceiver:
+    value: type[int] = int
+    @classmethod
+    def method(cls: GenericReceiverAlias[type[int]]): ...
+
+class InvalidGenericProtocolClassReceiver:
+    value: int = 1
+    @classmethod
+    # TODO: error: [invalid-method-receiver]
+    def method(cls: GenericReceiverAlias[type[int]]): ...
+
 class StrSubclass(str):
     # error: [invalid-method-receiver]
     def method(self: LiteralString): ...

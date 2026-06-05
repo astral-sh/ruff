@@ -75,13 +75,18 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let Some(receiver_type) = signature
+    let Some(annotated_receiver_type) = signature
         .parameters()
         .get(0)
-        .map(|parameter| parameter.annotated_type().resolve_type_alias(db))
+        .map(|parameter| parameter.annotated_type())
     else {
         return;
     };
+
+    if matches!(annotated_receiver_type, Type::TypeAlias(_)) {
+        return;
+    }
+    let receiver_type = annotated_receiver_type.resolve_type_alias(db);
 
     if receiver_type.is_never()
         || (enclosing_class.known(db) == Some(KnownClass::Str)
