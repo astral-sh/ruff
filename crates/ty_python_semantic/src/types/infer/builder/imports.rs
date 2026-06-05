@@ -240,7 +240,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if definition.kind(db).as_star_import().is_none() {
                     // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.
                     for ty in inferred.declaration_types() {
-                        match ty.deprecation_policy() {
+                        match ty
+                            .deprecation_policy()
+                            .resolve_for_type(db, ty.inner_type())
+                        {
                             DeprecationPolicy::Deprecated(deprecated) => {
                                 self.report_deprecated_function(
                                     alias,
@@ -248,7 +251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     deprecated,
                                 );
                             }
-                            DeprecationPolicy::Inherit => {
+                            DeprecationPolicy::Inherit | DeprecationPolicy::Alternatives(_) => {
                                 self.check_deprecated(alias, ty.inner_type());
                             }
                             DeprecationPolicy::Suppress => {}

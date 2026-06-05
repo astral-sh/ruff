@@ -59,7 +59,7 @@ pub(crate) enum TypeOrigin {
 }
 
 /// Controls how deprecation is reported when a place is loaded.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum DeprecationPolicy<'db> {
     /// Inspect the inferred type for deprecation.
     #[default]
@@ -68,6 +68,91 @@ pub(crate) enum DeprecationPolicy<'db> {
     Suppress,
     /// Report deprecation attached directly to this binding.
     Deprecated(DeprecatedInstance<'db>),
+    /// Preserve policies for typed alternatives across merged bindings.
+    Alternatives(DeprecationAlternatives<'db>),
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct DeprecationAlternatives<'db> {
+    #[returns(ref)]
+    alternatives: Box<[(Type<'db>, DeprecationPolicy<'db>)]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for DeprecationAlternatives<'_> {}
+
+impl<'db> DeprecationPolicy<'db> {
+    pub(crate) fn from_alternatives(
+        db: &'db dyn Db,
+        alternatives: impl IntoIterator<Item = (Type<'db>, Self)>,
+    ) -> Self {
+        let mut flattened = Vec::new();
+        for (ty, policy) in alternatives {
+            match policy {
+                Self::Alternatives(alternatives) => {
+                    flattened.extend_from_slice(alternatives.alternatives(db));
+                }
+                _ => flattened.push((ty, policy)),
+            }
+        }
+
+        let Some((_, first)) = flattened.first().copied() else {
+            return Self::Inherit;
+        };
+        if flattened.iter().all(|(_, policy)| *policy == first) {
+            first
+        } else {
+            Self::Alternatives(DeprecationAlternatives::new(
+                db,
+                flattened.into_boxed_slice(),
+            ))
+        }
+    }
+
+    pub(crate) fn resolve_for_type(self, db: &'db dyn Db, ty: Type<'db>) -> Self {
+        let Self::Alternatives(alternatives) = self else {
+            return self;
+        };
+
+        let mut deprecation = BindingDeprecationBuilder::default();
+        for (alternative_ty, policy) in alternatives.alternatives(db) {
+            if !deprecation_alternative_is_eliminated(db, *alternative_ty, ty) {
+                deprecation.add_policy(policy.resolve_for_type(db, ty), ty.is_deprecated(db));
+            }
+        }
+        deprecation.build_policy()
+    }
+}
+
+fn deprecation_alternative_is_eliminated<'db>(
+    db: &'db dyn Db,
+    original: Type<'db>,
+    narrowed: Type<'db>,
+) -> bool {
+    fn has_same_single_value<'db>(
+        db: &'db dyn Db,
+        original: Type<'db>,
+        narrowed: Type<'db>,
+    ) -> bool {
+        match (original, narrowed) {
+            (Type::Union(union), narrowed) => union
+                .elements(db)
+                .iter()
+                .any(|element| has_same_single_value(db, *element, narrowed)),
+            (original, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .any(|element| has_same_single_value(db, original, *element)),
+            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+                left.literal(db) == right.literal(db)
+            }
+            _ => original == narrowed,
+        }
+    }
+
+    !has_same_single_value(db, original, narrowed)
+        && (original.is_disjoint_from(db, narrowed)
+            || (original.is_single_valued(db) && narrowed.is_single_valued(db)))
 }
 
 impl TypeOrigin {
@@ -1588,7 +1673,7 @@ fn place_from_bindings_impl<'db>(
     let mut first_definition = None;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
-    let mut deprecation = BindingDeprecationBuilder::default();
+    let mut deprecation_alternatives = Vec::new();
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1702,23 +1787,17 @@ fn place_from_bindings_impl<'db>(
             let binding_ty = inference.binding_type(binding);
             let narrowed_ty = narrowing_constraint.narrow(db, binding_ty, binding.place(db));
             first_definition.get_or_insert(binding);
-            let same_single_value = match (binding_ty, narrowed_ty) {
-                (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
-                    left.literal(db) == right.literal(db)
-                }
-                _ => binding_ty == narrowed_ty,
-            };
-            let binding_is_eliminated = !same_single_value
-                && (binding_ty.is_disjoint_from(db, narrowed_ty)
-                    || (binding_ty.is_single_valued(db) && narrowed_ty.is_single_valued(db)));
             let binding_deprecation = inference
                 .inferred_declaration(binding)
                 .declared()
                 .map_or(DeprecationPolicy::Inherit, |declaration| {
                     declaration.deprecation_policy()
-                });
-            if !narrowed_ty.is_never() && !binding_is_eliminated {
-                deprecation.add_policy(binding_deprecation, narrowed_ty.is_deprecated(db));
+                })
+                .resolve_for_type(db, narrowed_ty);
+            if !narrowed_ty.is_never()
+                && !deprecation_alternative_is_eliminated(db, binding_ty, narrowed_ty)
+            {
+                deprecation_alternatives.push((narrowed_ty, binding_deprecation));
             }
             Some((narrowed_ty, static_reachability))
         },
@@ -1777,9 +1856,8 @@ fn place_from_bindings_impl<'db>(
     let deprecation = if place.is_undefined() {
         DeprecationPolicy::Inherit
     } else {
-        deprecation.build_policy()
+        DeprecationPolicy::from_alternatives(db, deprecation_alternatives)
     };
-
     PlaceWithDefinition {
         place,
         first_definition,

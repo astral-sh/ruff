@@ -183,6 +183,18 @@ for _ in range(1):
     @replace_with(replacement)
     def loop_binding() -> None: ...
 
+mixed_loop_binding = other
+for _ in range(1):
+    if is_replacement(mixed_loop_binding):
+        mixed_loop_binding()  # error: [deprecated] "mixed loop binding"
+
+    if flag:
+        @deprecated("mixed loop binding")
+        @replace_with(replacement)
+        def mixed_loop_binding() -> None: ...
+    else:
+        mixed_loop_binding = other
+
 def nested_binding():
     @deprecated("nested binding")
     @replace_with(replacement)
@@ -195,6 +207,21 @@ def nested_binding():
         def old() -> None: ...
 
     old()  # error: [deprecated] "nested binding"
+
+def mixed_nested_binding():
+    old = other
+
+    def rebind():
+        nonlocal old
+        if flag:
+            @deprecated("mixed nested binding")
+            @replace_with(replacement)
+            def old() -> None: ...
+        else:
+            old = other
+
+    if is_replacement(old):
+        old()  # error: [deprecated] "mixed nested binding"
 
 if True:
     @deprecated("reachable binding")

@@ -2108,7 +2108,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place = loop_header_kind.place();
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
-        let mut deprecation = BindingDeprecationBuilder::default();
+        let mut deprecation_alternatives = Vec::new();
 
         for reachable_binding in &loop_header.reachable_bindings {
             let inference = infer_definition_types(db, reachable_binding.definition);
@@ -2118,20 +2118,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .narrow(db, binding_ty, place);
 
             union.add_in_place(narrowed_ty);
-            deprecation.add_policy(
+            deprecation_alternatives.push((
+                narrowed_ty,
                 inference
                     .inferred_declaration(reachable_binding.definition)
                     .declared()
                     .map_or(DeprecationPolicy::Inherit, |declaration| {
                         declaration.deprecation_policy()
                     }),
-                narrowed_ty.is_deprecated(db),
-            );
+            ));
         }
 
         let ty = union.build();
         self.bindings.insert(definition, ty);
-        self.set_binding_deprecation_policy(definition, ty, deprecation.build_policy());
+        self.set_binding_deprecation_policy(
+            definition,
+            ty,
+            DeprecationPolicy::from_alternatives(db, deprecation_alternatives),
+        );
     }
 
     fn infer_nested_bindings_definition(
@@ -2214,7 +2218,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
-        let mut deprecation = BindingDeprecationBuilder::default();
+        let mut deprecation_alternatives = Vec::new();
         for declaration in visible_nested_declarations {
             assert!(
                 declaration.is_bound,
@@ -2232,11 +2236,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             };
             union.add_in_place(ty);
-            deprecation.add_policy(nested_place.deprecation_policy(), ty.is_deprecated(db));
+            deprecation_alternatives.push((ty, nested_place.deprecation_policy()));
         }
         let ty = union.build();
         self.bindings.insert(definition, ty);
-        self.set_binding_deprecation_policy(definition, ty, deprecation.build_policy());
+        self.set_binding_deprecation_policy(
+            definition,
+            ty,
+            DeprecationPolicy::from_alternatives(db, deprecation_alternatives),
+        );
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -9359,7 +9367,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if let Some(ty) = place.place().ignore_possibly_undefined() {
-            match place.deprecation_policy() {
+            match place.deprecation_policy().resolve_for_type(db, ty) {
                 DeprecationPolicy::Deprecated(deprecated) if !ty.is_never() => {
                     if let Some(name) = match expr_ref {
                         ast::ExprRef::Name(name) => Some(name.id.as_str()),
@@ -9371,7 +9379,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.check_deprecated(expr_ref, ty);
                     }
                 }
-                DeprecationPolicy::Inherit => self.check_deprecated(expr_ref, ty),
+                DeprecationPolicy::Inherit | DeprecationPolicy::Alternatives(_) => {
+                    self.check_deprecated(expr_ref, ty);
+                }
                 DeprecationPolicy::Suppress | DeprecationPolicy::Deprecated(_) => {}
             }
         }
@@ -9806,11 +9816,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let deprecation = resolved_type.deprecation_policy();
         let resolved_type = resolved_type.inner_type();
 
-        match deprecation {
+        match deprecation.resolve_for_type(db, resolved_type) {
             DeprecationPolicy::Deprecated(deprecated) => {
                 self.report_deprecated_function(attr, attr.id.as_str(), deprecated);
             }
-            DeprecationPolicy::Inherit => self.check_deprecated(attr, resolved_type),
+            DeprecationPolicy::Inherit | DeprecationPolicy::Alternatives(_) => {
+                self.check_deprecated(attr, resolved_type);
+            }
             DeprecationPolicy::Suppress => {}
         }
 
