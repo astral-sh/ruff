@@ -173,6 +173,22 @@ class InvalidMeta(type):
         bases: tuple[type, ...],
         namespace: dict[str, Any],
     ): ...
+
+class FirstReceiverProtocol(Protocol):
+    def first(self) -> None: ...
+
+class SecondReceiverProtocol(Protocol):
+    def second(self) -> None: ...
+
+class InvalidProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: type[FirstReceiverProtocol] | type[SecondReceiverProtocol]): ...
+
+class ValidProtocolClassReceiver:
+    def first(self) -> None: ...
+    @classmethod
+    def method(cls: type[FirstReceiverProtocol] | type[SecondReceiverProtocol]): ...
 ```
 
 ## TypedDict defaults use annotation context

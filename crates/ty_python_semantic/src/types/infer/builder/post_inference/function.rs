@@ -1,7 +1,8 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownClass, KnownInstanceType, Signature, Type, TypeVarBoundOrConstraints, TypeVarKind,
+        KnownClass, KnownInstanceType, Signature, SpecialFormType, Type, TypeVarBoundOrConstraints,
+        TypeVarKind, UnionType,
         context::InferContext,
         diagnostic::{
             INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
@@ -39,7 +40,7 @@ pub(crate) fn check_function_definition<'db>(
     let last_definition = function_type.literal(db).last_definition;
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
-    check_method_receiver(context, last_definition, &signature);
+    check_method_receiver(context, last_definition, &signature, file_expression_type);
     check_legacy_positional_only_convention(context, last_definition, &signature);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
@@ -49,6 +50,7 @@ fn check_method_receiver<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
+    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
     let method_name = last_definition.name(db);
@@ -119,12 +121,8 @@ fn check_method_receiver<'db>(
         },
         _ => concrete_receiver_type.top_materialization(db),
     };
-
     if is_protocol_receiver_type(db, receiver_type)
         || is_protocol_receiver_type(db, concrete_receiver_type)
-        || expected_receiver.is_assignable_to(db, concrete_receiver_type)
-        || (!matches!(receiver_type, Type::TypeVar(_))
-            && signature.can_bind_self_to(db, expected_receiver))
     {
         return;
     }
@@ -138,6 +136,22 @@ fn check_method_receiver<'db>(
     else {
         return;
     };
+
+    if let Some(accepts_receiver) = protocol_class_union_accepts_receiver(
+        db,
+        annotation,
+        typing_self_type,
+        file_expression_type,
+    ) {
+        if accepts_receiver {
+            return;
+        }
+    } else if expected_receiver.is_assignable_to(db, concrete_receiver_type)
+        || (!matches!(receiver_type, Type::TypeVar(_))
+            && signature.can_bind_self_to(db, expected_receiver))
+    {
+        return;
+    }
 
     if let Some(builder) = context.report_lint(&INVALID_METHOD_RECEIVER, annotation) {
         builder.into_diagnostic(format_args!(
@@ -158,6 +172,61 @@ fn is_protocol_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> boo
             .is_some_and(|class| class.class_literal(db).is_protocol(db)),
         _ => false,
     }
+}
+
+fn protocol_class_union_accepts_receiver<'db>(
+    db: &'db dyn crate::Db,
+    annotation: &ast::Expr,
+    expected_instance: Type<'db>,
+    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+) -> Option<bool> {
+    // `type[Protocol]` currently lowers to a TODO type, so preserve the union's protocol members
+    // from the annotation rather than relying on class-object assignability.
+    let ast::Expr::BinOp(binary) = annotation else {
+        return None;
+    };
+    if binary.op != ast::Operator::BitOr {
+        return None;
+    }
+
+    let receiver_instance =
+        protocol_class_union_instance_type(db, annotation, file_expression_type)?;
+    Some(expected_instance.is_assignable_to(db, receiver_instance))
+}
+
+fn protocol_class_union_instance_type<'db>(
+    db: &'db dyn crate::Db,
+    annotation: &ast::Expr,
+    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+) -> Option<Type<'db>> {
+    if let ast::Expr::BinOp(binary) = annotation
+        && binary.op == ast::Operator::BitOr
+    {
+        return Some(UnionType::from_two_elements(
+            db,
+            protocol_class_union_instance_type(db, &binary.left, file_expression_type)?,
+            protocol_class_union_instance_type(db, &binary.right, file_expression_type)?,
+        ));
+    }
+
+    let ast::Expr::Subscript(subscript) = annotation else {
+        return None;
+    };
+    let is_type_subscript = match file_expression_type(&subscript.value) {
+        Type::ClassLiteral(class) => class.known(db) == Some(KnownClass::Type),
+        Type::SpecialForm(SpecialFormType::Type) => true,
+        _ => false,
+    };
+    if !is_type_subscript {
+        return None;
+    }
+
+    let protocol_instance = match file_expression_type(&subscript.slice).resolve_type_alias(db) {
+        protocol @ Type::ProtocolInstance(_) => protocol,
+        Type::ClassLiteral(class) if class.is_protocol(db) => Type::from(class).to_instance(db)?,
+        _ => return None,
+    };
+    Some(protocol_instance)
 }
 
 /// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.
