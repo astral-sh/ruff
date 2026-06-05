@@ -2084,6 +2084,15 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
+        // Collect names in a tracked query so unrelated edits can preserve dependent member
+        // lookups, and avoid retaining query entries for names that no method can define.
+        if implicit_attribute_names(db, class_body_scope)
+            .binary_search_by(|candidate| candidate.as_str().cmp(name))
+            .is_err()
+        {
+            return Member::unbound();
+        }
+
         Self::implicit_attribute_inner(
             db,
             class_body_scope,
@@ -3009,6 +3018,25 @@ fn explicit_bases_cycle_fn<'db>(
         // unfortunate, but maybe only pathological programs can trigger such a thing.
         current
     }
+}
+
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
+    let index = semantic_index(db, class_body_scope.file(db));
+    let mut names = Vec::new();
+
+    for function_scope_id in attribute_scopes(db, class_body_scope) {
+        names.extend(
+            index
+                .place_table(function_scope_id)
+                .members()
+                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+        );
+    }
+
+    names.sort_unstable();
+    names.dedup();
+    names.into_boxed_slice()
 }
 
 fn implicit_attribute_cycle_recover<'db>(
