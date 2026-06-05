@@ -947,36 +947,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         tuple: &ast::ExprSubscript,
     ) -> Option<TupleType<'db>> {
-        /// In most cases, if a subelement of the tuple is inferred as `Todo`,
-        /// we should only infer `Todo` for that specific subelement.
-        /// Certain specific AST nodes can however change the meaning of the entire tuple,
-        /// however: for example, `tuple[int, ...]` or `tuple[int, *tuple[str, ...]]` are a
-        /// homogeneous tuple and a partly homogeneous tuple (respectively) due to the `...`
-        /// and the starred expression (respectively), Neither is supported by us right now,
-        /// so we should infer `Todo` for the *entire* tuple if we encounter one of those elements.
-        fn element_could_alter_type_of_whole_tuple(
-            element: &ast::Expr,
-            element_ty: Type,
-            builder: &mut TypeInferenceBuilder,
-        ) -> bool {
-            if !element_ty.is_todo() {
-                return false;
-            }
-
-            match element {
-                ast::Expr::Starred(_) => {
-                    element_ty.exact_tuple_instance_spec(builder.db()).is_none()
-                }
-                ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-                    let value_ty = builder.expression_type(value);
-
-                    value_ty == Type::SpecialForm(SpecialFormType::Unpack)
-                }
-                _ => false,
-            }
-        }
-
-        // TODO: TypeVarTuple
         match &*tuple.slice {
             ast::Expr::Tuple(elements) => {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
@@ -1005,10 +975,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let mut element_types = TupleSpecBuilder::with_capacity(elements.len());
 
-                // Whether to infer `Todo` for the whole tuple
-                // (see docstring for `element_could_alter_type_of_whole_tuple`)
-                let mut return_todo = false;
-
                 let mut first_unpacked_variadic_tuple = None;
 
                 for element in elements {
@@ -1034,25 +1000,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                         previously_in_valid_unpack_context,
                     );
-                    return_todo |=
-                        element_could_alter_type_of_whole_tuple(element, element_ty, self);
-
                     // Determine if this element unpacks a tuple: either `*expr` or `Unpack[expr]`
-                    let unpack_inner = if let ast::Expr::Starred(ast::ExprStarred {
-                        value, ..
-                    }) = element
-                    {
-                        Some(&**value)
-                    } else if let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) =
-                        element
-                        && self.expression_type(value) == Type::SpecialForm(SpecialFormType::Unpack)
-                    {
-                        Some(&**slice)
-                    } else {
-                        None
-                    };
+                    let is_unpack = matches!(element, ast::Expr::Starred(_))
+                        || matches!(
+                            element,
+                            ast::Expr::Subscript(ast::ExprSubscript { value, .. })
+                                if self.expression_type(value)
+                                    == Type::SpecialForm(SpecialFormType::Unpack)
+                        );
 
-                    if let Some(unpack_inner) = unpack_inner {
+                    if is_unpack {
                         let mut report_too_many_unpacked_tuples = || {
                             if let Some(first_unpacked_variadic_tuple) =
                                 first_unpacked_variadic_tuple
@@ -1092,10 +1049,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             report_too_many_unpacked_tuples();
                             element_types =
                                 element_types.concat_variadic_typevar(self.db(), typevar);
-                        } else if self.expression_type(unpack_inner)
-                            == Type::Dynamic(DynamicType::TodoTypeVarTuple)
-                        {
-                            report_too_many_unpacked_tuples();
                         } else {
                             // TODO: emit a diagnostic
                         }
@@ -1104,14 +1057,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
 
-                let ty = if return_todo {
-                    Some(TupleType::homogeneous(
-                        self.db(),
-                        Type::Dynamic(DynamicType::TodoTypeVarTuple),
-                    ))
-                } else {
-                    TupleType::new(self.db(), &element_types.build())
-                };
+                let ty = TupleType::new(self.db(), &element_types.build());
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
@@ -1166,15 +1112,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .concat_variadic_typevar(self.db(), typevar)
                             .build(),
                     )
-                } else if element_could_alter_type_of_whole_tuple(
-                    single_element,
-                    single_element_ty,
-                    self,
-                ) {
-                    Some(TupleType::homogeneous(
-                        self.db(),
-                        Type::Dynamic(DynamicType::TodoTypeVarTuple),
-                    ))
                 } else {
                     TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
                 }
