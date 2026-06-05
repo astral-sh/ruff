@@ -421,8 +421,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             last_definition: overload_literal,
         };
 
-        let mut inferred_ty =
-            Type::FunctionLiteral(FunctionType::new(db, function_literal, None, None));
+        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(db, function_literal, None));
         if !decorator_list.is_empty() {
             self.undecorated_type = Some(inferred_ty);
         }
