@@ -460,20 +460,15 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
-    // Leading empty literals are preserved; dropping them would orphan a space, parenthesis, or
-    // comment before the first kept segment. Middle and trailing ones are still dropped.
-    let first_kept = patches
-        .iter()
-        .position(|(_, conversion)| !matches!(conversion, FStringConversion::EmptyLiteral));
-
     let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
-    for (index, (range, conversion)) in patches.into_iter().enumerate() {
+    for (range, conversion) in patches {
         let fstring = match conversion {
             FStringConversion::Convert(fstring) => fstring,
             FStringConversion::EmptyLiteral => {
-                // Preserve a leading empty literal by leaving `prev_end` before it.
-                if first_kept.is_none_or(|first| index >= first) {
+                // Keep a leading empty literal to avoid orphaning a space, parenthesis, or comment
+                // before the first kept segment; drop later ones by advancing `prev_end`.
+                if !contents.is_empty() {
                     prev_end = range.end();
                 }
                 continue;

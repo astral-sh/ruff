@@ -145,4 +145,27 @@ help: Convert to f-string
   -     "{}".format(value)
 7 +     f"{value}"
 8 | )
+9 | y = ("" "").format(value)  # snapshot: f-string
+```
+
+When every segment is an empty literal, the leading one is still preserved, keeping the concatenation
+and its parentheses balanced.
+
+```py
+y = ("" "").format(value)  # snapshot: f-string
+```
+
+```snapshot
+error[UP032]: Use f-string instead of `format` call
+ --> src/mdtest_snippet.py:9:5
+  |
+9 | y = ("" "").format(value)  # snapshot: f-string
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Convert to f-string
+6 |     # comment
+7 |     "{}".format(value)
+8 | )
+  - y = ("" "").format(value)  # snapshot: f-string
+9 + y = ("" "")  # snapshot: f-string
 ```
