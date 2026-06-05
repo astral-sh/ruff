@@ -864,24 +864,19 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        match self.len(db) {
-            0 => self.specialize(db, &[]),
-            len => self.specialize(
-                db,
-                self.variables(db)
-                    .take(len)
-                    .map(|typevar| {
-                        if typevar.is_typevartuple(db) {
-                            Type::homogeneous_tuple(db, Type::unknown())
-                        } else if typevar.is_paramspec(db) {
-                            Type::paramspec_value_callable(db, Parameters::unknown())
-                        } else {
-                            Type::unknown()
-                        }
-                    })
-                    .collect::<Vec<_>>(),
-            ),
-        }
+        let types: SmallVec<[_; 2]> = self
+            .variables(db)
+            .map(|typevar| {
+                if typevar.is_typevartuple(db) {
+                    Type::homogeneous_tuple(db, Type::unknown())
+                } else if typevar.is_paramspec(db) {
+                    Type::paramspec_value_callable(db, Parameters::unknown())
+                } else {
+                    Type::unknown()
+                }
+            })
+            .collect();
+        self.specialize(db, types.as_slice())
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
