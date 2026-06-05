@@ -14,7 +14,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::types::IdentifierPattern;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     use super::settings::Settings;
     use super::types;
@@ -385,11 +385,12 @@ mod tests {
             rule_code.noqa_code(),
             path.to_string_lossy()
         );
-        let diagnostics = test_path(
+        assert_diagnostics_diff!(
+            snapshot,
             Path::new("flake8_pytest_style").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
             &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
+        );
         Ok(())
     }
 }
