@@ -72,9 +72,8 @@ impl Violation for PytestFixtureAutouse {
 
 /// RUF076
 pub(crate) fn pytest_fixture_autouse(checker: &Checker, decorators: &[Decorator]) {
-    let semantic = checker.semantic();
     for decorator in decorators {
-        if !is_pytest_fixture(decorator, semantic) {
+        if !is_pytest_fixture(decorator, checker) {
             continue;
         }
 
