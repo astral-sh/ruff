@@ -181,6 +181,9 @@ class FirstReceiverProtocol(Protocol):
 class SecondReceiverProtocol(Protocol):
     def second(self) -> None: ...
 
+class GenericReceiverProtocol[T](Protocol):
+    def get(self) -> T: ...
+
 class InvalidProtocolClassReceiver:
     @classmethod
     # error: [invalid-method-receiver] "Method receiver type `type[FirstReceiverProtocol] | type[SecondReceiverProtocol]`"
@@ -207,6 +210,7 @@ class InvalidAnnotatedProtocolClassReceiver:
 
 type ProtocolClassReceiverAlias = type[FirstReceiverProtocol] | type[SecondReceiverProtocol]
 type FirstProtocolClass = type[FirstReceiverProtocol]
+type GenericProtocolClassReceiverAlias[T] = type[GenericReceiverProtocol[T]] | type[int]
 
 class InvalidAliasedProtocolClassReceiver:
     @classmethod
@@ -222,6 +226,27 @@ class InvalidProtocolClassMemberAliasReceiver:
     @classmethod
     # error: [invalid-method-receiver]
     def method(cls: FirstProtocolClass | type[int]): ...
+
+class InvalidGenericProtocolClassAliasReceiver:
+    def get(self) -> int:
+        return 1
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: GenericProtocolClassReceiverAlias[str]): ...
+
+class InvalidGenericProtocolClassReceiver:
+    def get(self) -> int:
+        return 1
+    @classmethod
+    # TODO: error: [invalid-method-receiver]
+    # Nested generic arguments are not available through the file expression-type cache.
+    def method(cls: type[GenericReceiverProtocol[str]] | type[int]): ...
+
+class ValidGenericProtocolClassAliasReceiver:
+    def get(self) -> str:
+        return ""
+    @classmethod
+    def method(cls: GenericProtocolClassReceiverAlias[str]): ...
 
 T_ProtocolClassReceiver = TypeVar(
     "T_ProtocolClassReceiver",

@@ -230,14 +230,39 @@ impl ProtocolClassUnionCompatibility {
 #[derive(Clone, Copy)]
 enum ReceiverAnnotationResolver<'db, 'a> {
     File(&'a dyn Fn(&ast::Expr) -> Type<'db>),
-    Definition(Definition<'db>),
+    Definition {
+        definition: Definition<'db>,
+        alias: Option<TypeAliasType<'db>>,
+    },
 }
 
 impl<'db> ReceiverAnnotationResolver<'db, '_> {
     fn expression_type(self, db: &'db dyn crate::Db, expression: &ast::Expr) -> Type<'db> {
+        if let Self::Definition {
+            definition,
+            alias: Some(alias),
+        } = self
+            && let ast::Expr::Name(name) = expression
+            && let Some(specialization) = alias.specialization(db)
+        {
+            let module = parsed_module(db, definition.file(db)).load(db);
+            if let DefinitionKind::TypeAlias(type_alias) = definition.kind(db)
+                && let Some(type_params) = type_alias.node(&module).type_params.as_deref()
+                && let Some(index) = type_params
+                    .iter()
+                    .position(|type_param| type_param.name().id == name.id)
+                && let Some(ty) = specialization.types(db).get(index)
+            {
+                return *ty;
+            }
+        }
+
         match self {
             Self::File(file_expression_type) => file_expression_type(expression),
-            Self::Definition(definition) => definition_expression_type(db, definition, expression),
+            Self::Definition { definition, alias } => {
+                let ty = definition_expression_type(db, definition, expression);
+                alias.map_or(ty, |alias| alias.apply_function_specialization(db, ty))
+            }
         }
     }
 }
@@ -320,7 +345,10 @@ impl<'db> ProtocolClassUnionChecker<'db> {
             let value = &type_alias.node(&module).value;
             return self.member_compatibility(
                 value,
-                ReceiverAnnotationResolver::Definition(definition),
+                ReceiverAnnotationResolver::Definition {
+                    definition,
+                    alias: Some(alias),
+                },
             );
         }
 
@@ -334,7 +362,10 @@ impl<'db> ProtocolClassUnionChecker<'db> {
         {
             let definition = typevar.definition(self.db)?;
             let module = parsed_module(self.db, definition.file(self.db)).load(self.db);
-            let resolver = ReceiverAnnotationResolver::Definition(definition);
+            let resolver = ReceiverAnnotationResolver::Definition {
+                definition,
+                alias: None,
+            };
             return match definition.kind(self.db) {
                 DefinitionKind::TypeVar(typevar) => {
                     let bound = typevar.node(&module).bound.as_ref()?;
@@ -380,16 +411,8 @@ impl<'db> ProtocolClassUnionChecker<'db> {
                 _ => false,
             };
             if is_type_subscript {
-                let protocol_instance = match resolver
-                    .expression_type(self.db, &subscript.slice)
-                    .resolve_type_alias(self.db)
-                {
-                    protocol @ Type::ProtocolInstance(_) => Some(protocol),
-                    Type::ClassLiteral(class) if class.is_protocol(self.db) => {
-                        Type::from(class).to_instance(self.db)
-                    }
-                    _ => None,
-                };
+                let protocol_instance =
+                    self.protocol_instance_from_annotation(&subscript.slice, resolver);
                 if let Some(protocol_instance) = protocol_instance {
                     return Some(ProtocolClassUnionCompatibility {
                         contains_protocol_class: true,
@@ -408,6 +431,58 @@ impl<'db> ProtocolClassUnionChecker<'db> {
                 .expected_receiver
                 .is_assignable_to(self.db, annotation_type.resolve_type_alias(self.db)),
         })
+    }
+
+    fn protocol_instance_from_annotation(
+        &self,
+        annotation: &ast::Expr,
+        resolver: ReceiverAnnotationResolver<'db, '_>,
+    ) -> Option<Type<'db>> {
+        match resolver
+            .expression_type(self.db, annotation)
+            .resolve_type_alias(self.db)
+        {
+            protocol @ Type::ProtocolInstance(_) => return Some(protocol),
+            Type::ClassLiteral(class) if class.is_protocol(self.db) => {
+                return Type::from(class).to_instance(self.db);
+            }
+            Type::GenericAlias(alias) if alias.origin(self.db).is_protocol(self.db) => {
+                return Type::from(alias).to_instance(self.db);
+            }
+            _ => {}
+        }
+
+        let ast::Expr::Subscript(subscript) = annotation else {
+            return None;
+        };
+        let Type::ClassLiteral(protocol_class) = resolver.expression_type(self.db, &subscript.value)
+        else {
+            return None;
+        };
+        if !protocol_class.is_protocol(self.db) {
+            return None;
+        }
+
+        let arguments: Box<dyn Iterator<Item = &ast::Expr>> = match &*subscript.slice {
+            ast::Expr::Tuple(tuple) => Box::new(tuple.iter()),
+            argument => Box::new(std::iter::once(argument)),
+        };
+        let argument_types: Vec<_> = arguments
+            .map(|argument| {
+                let ty = resolver
+                    .expression_type(self.db, argument)
+                    .resolve_type_alias(self.db);
+                ty.to_instance(self.db).unwrap_or(ty)
+            })
+            .collect();
+        let generic_context = protocol_class.generic_context(self.db)?;
+        if argument_types.len() != generic_context.variables(self.db).len() {
+            return None;
+        }
+        let protocol = protocol_class.apply_specialization(self.db, |generic_context| {
+            generic_context.specialize_partial(self.db, argument_types.into_iter().map(Some))
+        });
+        Some(Type::instance(self.db, protocol))
     }
 }
 
