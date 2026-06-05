@@ -11297,7 +11297,7 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                 let place_deprecation = PlaceExpr::try_from_expr(expression)
                     .map(|place_expr| {
                         self.builder
-                            .infer_place_load(
+                            .infer_place_load_without_deprecation_diagnostic(
                                 PlaceExprRef::from(&place_expr),
                                 ast::ExprRef::from(expression),
                             )

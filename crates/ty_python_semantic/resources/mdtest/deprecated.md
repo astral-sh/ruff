@@ -102,6 +102,12 @@ def replaced_deprecated_function() -> None: ...
 @deprecated("use replacement or other directly")
 @replace_with(cast(TypeOf[replacement] | TypeOf[other], replacement))
 def deprecated_union_binding() -> None: ...
+@deprecated("deprecated union arm")
+def deprecated_union_arm() -> str:
+    return "deprecated union arm"
+@deprecated("outer union binding")
+@replace_with(cast(TypeOf[deprecated_union_arm] | TypeOf[other], deprecated_union_arm))  # ty: ignore[deprecated]
+def duplicate_policy_binding() -> None: ...
 @deprecated("outer deprecation")
 @replace_with(replacement)
 @deprecated("inner deprecation")
@@ -127,6 +133,7 @@ deprecated_binding()  # error: [deprecated] "use replacement directly"
 replacement()
 replaced_deprecated_function()
 deprecated_union_binding  # error: [deprecated] "use replacement or other directly"
+duplicate_policy_alias = duplicate_policy_binding  # error: [deprecated] "outer union binding"
 deprecated_outer_binding()  # error: [deprecated] "outer deprecation"
 deprecated_object_binding
 deprecated_callable_binding()  # error: [deprecated] "callable replacement"
