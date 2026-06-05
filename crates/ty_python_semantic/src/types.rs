@@ -3338,6 +3338,25 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
+    pub(crate) fn member_lookup_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        if self.materialized_divergent_fallback().is_none() {
+            if name == "__class__" {
+                return Place::bound(self.dunder_class(db)).into();
+            }
+
+            if matches!(self, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
+                return Place::bound(self).into();
+            }
+        }
+
+        self.member_lookup_with_policy_inner(db, name, policy)
+    }
+
     #[salsa::tracked(
         cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
@@ -3345,7 +3364,7 @@ impl<'db> Type<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn member_lookup_with_policy(
+    fn member_lookup_with_policy_inner(
         self,
         db: &'db dyn Db,
         name: Name,
