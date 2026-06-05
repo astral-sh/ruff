@@ -1836,8 +1836,7 @@ fn place_from_bindings_impl<'db>(
                 .declared()
                 .map_or(DeprecationPolicy::Inherit, |declaration| {
                     declaration.deprecation_policy()
-                })
-                .resolve_for_type(db, narrowed_ty);
+                });
             if !narrowed_ty.is_never()
                 && !deprecation_alternative_is_eliminated(db, binding_ty, narrowed_ty)
             {

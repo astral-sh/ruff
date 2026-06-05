@@ -172,6 +172,10 @@ narrowed_binding_alias = narrowed_binding
 if is_replacement(narrowed_binding_alias):
     narrowed_binding_alias()  # error: [deprecated] "use replacement directly"
 
+second_narrowed_binding_alias = narrowed_binding_alias
+if is_replacement(second_narrowed_binding_alias):
+    second_narrowed_binding_alias()  # error: [deprecated] "use replacement directly"
+
 if flag:
     chained_source = ordinary_deprecated_function  # error: [deprecated] "ordinary deprecated function"
 elif bool(input()):
