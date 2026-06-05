@@ -864,7 +864,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn place_by_id<'db>(
+fn place_by_id_inner<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     place_id: ScopedPlaceId,
@@ -1010,51 +1010,9 @@ pub(crate) fn place_by_id<'db>(
                 }
             }
 
-            // `__slots__` is a symbol with special behavior in Python's runtime. It can be
-            // modified externally, but those changes do not take effect. We therefore issue
-            // a diagnostic if we see it being modified externally. In type inference, we
-            // can assign a "narrow" type to it even if it is not *declared*. This means we do
-            // not have to adjust its public type.
-            //
-            // `TYPE_CHECKING` is a special variable that should only be assigned `False`
-            // at runtime, but is always considered `True` in type checking.
-            // See mdtest/known_constants.md#user-defined-type_checking for details.
-            let is_considered_non_modifiable = place_id.as_symbol().is_some_and(|symbol_id| {
-                matches!(
-                    place_table(db, scope).symbol(symbol_id).name().as_str(),
-                    "__slots__" | "TYPE_CHECKING"
-                )
-            });
-
-            // Module-level globals can be mutated externally, and strict application of the
-            // gradual guarantee would suggest that if not annotated, all such external mutations
-            // should be valid. However, external modifications (or modifications through `global`
-            // statements) that would require a different public type are relatively rare. From a
-            // practical perspective, we get a better user experience by trusting the inferred type
-            // by default, and only requiring annotation for the rare case.
-            let is_module_global = scope.node(db).scope_kind().is_module();
-
-            // If the visibility of the scope is private (like for a function scope), we also keep
-            // the raw type, because the symbol cannot be modified externally.
-            let scope_has_private_visibility = scope.scope(db).visibility().is_private();
-
-            // We generally trust undeclared places in stubs and expose the raw type.
-            let in_stub_file = scope.file(db).is_stub(db);
-
-            if is_considered_non_modifiable
-                || is_module_global
-                || scope_has_private_visibility
-                || in_stub_file
-            {
-                inferred.into()
-            } else {
-                // Public inferred types should expose a promoted view rather than their raw
-                // inferred literal form. The adjustment is applied lazily when converting to
-                // `LookupResult` via `into_lookup_result`.
-                inferred
-                    .with_public_type_policy(PublicTypePolicy::Promote)
-                    .into()
-            }
+            inferred
+                .with_public_type_policy(inferred_public_type_policy(db, scope, place_id))
+                .into()
         }
     }
 
@@ -1072,6 +1030,172 @@ pub(crate) fn place_by_id<'db>(
     // If we import from this module, we will currently report `x` as a definitely-bound place
     // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
     // every path has either a binding or a declaration for it.)
+}
+
+pub(crate) fn place_by_id<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    place_id: ScopedPlaceId,
+    requires_explicit_reexport: RequiresExplicitReExport,
+    considered_definitions: ConsideredDefinitions,
+) -> PlaceAndQualifiers<'db> {
+    let place = place_table(db, scope).place(place_id);
+    if !place.is_bound() && !place.is_declared() {
+        return PlaceAndQualifiers::default();
+    }
+
+    if place.is_declared()
+        && let Some(declared) = single_unconditional_declaration(
+            db,
+            scope,
+            place_id,
+            requires_explicit_reexport,
+            considered_definitions,
+        )
+        && !(declared.inner_type().is_unknown()
+            && declared
+                .qualifiers()
+                .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR))
+    {
+        return Place::Defined(
+            DefinedPlace::new(declared.inner_type()).with_origin(TypeOrigin::Declared),
+        )
+        .with_qualifiers(declared.qualifiers());
+    }
+
+    if place.is_bound()
+        && !place.is_declared()
+        && let Some(definition) = single_unconstrained_binding(
+            db,
+            scope,
+            place_id,
+            requires_explicit_reexport,
+            considered_definitions,
+        )
+    {
+        return Place::bound(binding_type(db, definition))
+            .with_public_type_policy(inferred_public_type_policy(db, scope, place_id))
+            .into();
+    }
+
+    place_by_id_inner(
+        db,
+        scope,
+        place_id,
+        requires_explicit_reexport,
+        considered_definitions,
+    )
+}
+
+fn single_unconditional_declaration<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    place_id: ScopedPlaceId,
+    requires_explicit_reexport: RequiresExplicitReExport,
+    considered_definitions: ConsideredDefinitions,
+) -> Option<TypeAndQualifiers<'db>> {
+    let use_def = use_def_map(db, scope);
+    let mut declarations = match considered_definitions {
+        ConsideredDefinitions::EndOfScope => use_def.end_of_scope_declarations(place_id),
+        ConsideredDefinitions::AllReachable => use_def.reachable_declarations(place_id),
+    };
+    let declaration = declarations.next()?;
+
+    if declarations.next().is_some()
+        || use_def.reachability_constraints().evaluate(
+            db,
+            use_def.predicates(),
+            declaration.reachability_constraint,
+        ) != Truthiness::AlwaysTrue
+    {
+        return None;
+    }
+
+    let DefinitionState::Defined(declaration) = declaration.declaration else {
+        return None;
+    };
+
+    if is_non_exported(db, declaration, requires_explicit_reexport) {
+        return None;
+    }
+
+    inferred_declaration(db, declaration).declared()
+}
+
+fn single_unconstrained_binding<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    place_id: ScopedPlaceId,
+    requires_explicit_reexport: RequiresExplicitReExport,
+    considered_definitions: ConsideredDefinitions,
+) -> Option<Definition<'db>> {
+    let use_def = use_def_map(db, scope);
+    let mut bindings = match considered_definitions {
+        ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
+        ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
+    };
+    let binding = bindings.next()?;
+
+    if bindings.next().is_some()
+        || binding.narrowing_constraint.constraint() != ScopedNarrowingConstraint::ALWAYS_TRUE
+        || binding.reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+    {
+        return None;
+    }
+
+    let DefinitionState::Defined(definition) = binding.binding else {
+        return None;
+    };
+
+    if is_non_exported(db, definition, requires_explicit_reexport)
+        || is_discarded_dict_key_assignment(db, definition)
+        || definition.kind(db).is_loop_header()
+        || matches!(definition.kind(db), DefinitionKind::NestedBindings(_))
+    {
+        return None;
+    }
+
+    Some(definition)
+}
+
+fn inferred_public_type_policy(
+    db: &dyn Db,
+    scope: ScopeId<'_>,
+    place_id: ScopedPlaceId,
+) -> PublicTypePolicy {
+    // `__slots__` can be modified externally, but those changes do not take effect.
+    // `TYPE_CHECKING` should only be assigned `False` at runtime, but is always considered `True`
+    // in type checking. In both cases, we can expose the inferred type directly.
+    let is_considered_non_modifiable = place_id.as_symbol().is_some_and(|symbol_id| {
+        matches!(
+            place_table(db, scope).symbol(symbol_id).name().as_str(),
+            "__slots__" | "TYPE_CHECKING"
+        )
+    });
+
+    // Module-level globals can be mutated externally, and strict application of the gradual
+    // guarantee would suggest that if not annotated, all such external mutations should be valid.
+    // However, external modifications that require a different public type are relatively rare,
+    // so we trust the inferred type by default.
+    let is_module_global = scope.node(db).scope_kind().is_module();
+
+    // Private scopes, such as function scopes, cannot be modified externally.
+    let scope_has_private_visibility = scope.scope(db).visibility().is_private();
+
+    // We generally trust undeclared places in stubs and expose the raw type.
+    let in_stub_file = scope.file(db).is_stub(db);
+
+    if is_considered_non_modifiable
+        || is_module_global
+        || scope_has_private_visibility
+        || in_stub_file
+    {
+        PublicTypePolicy::Raw
+    } else {
+        // Public inferred types should expose a promoted view rather than their raw inferred
+        // literal form. The adjustment is applied lazily when converting to `LookupResult`.
+        PublicTypePolicy::Promote
+    }
 }
 
 enum DeclarationsBoundnessEvaluator<'map, 'db> {
