@@ -13,6 +13,7 @@ use crate::{
         infer::original_class_type,
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
+        tuple::Tuple,
         typevar::TypeVarInstance,
         visitor::{any_over_type, find_over_type},
     },
@@ -105,11 +106,15 @@ fn check_method_receiver<'db>(
     {
         return;
     }
-    let raw_receiver_type = if receiver_parameter.is_variadic() {
-        unpacked_variadic_receiver_type(db, annotation, file_expression_type)
-            .unwrap_or(annotated_receiver_type)
+    let variadic_receiver = if receiver_parameter.is_variadic() {
+        variadic_receiver_type(db, annotation, file_expression_type)
     } else {
-        annotated_receiver_type
+        None
+    };
+    let invalid_variadic_receiver = matches!(variadic_receiver, Some(VariadicReceiverType::Invalid));
+    let raw_receiver_type = match variadic_receiver {
+        Some(VariadicReceiverType::Type(receiver_type)) => receiver_type,
+        Some(VariadicReceiverType::Invalid) | None => annotated_receiver_type,
     };
     let receiver_type = raw_receiver_type.resolve_type_alias(db);
 
@@ -156,10 +161,11 @@ fn check_method_receiver<'db>(
         if accepts_receiver {
             return;
         }
-    } else if expected_receiver.is_assignable_to(db, concrete_receiver_type)
-        || (receiver_parameter.is_positional()
-            && !matches!(receiver_type, Type::TypeVar(_))
-            && signature.can_bind_self_to(db, expected_receiver))
+    } else if !invalid_variadic_receiver
+        && (expected_receiver.is_assignable_to(db, concrete_receiver_type)
+            || (receiver_parameter.is_positional()
+                && !matches!(receiver_type, Type::TypeVar(_))
+                && signature.can_bind_self_to(db, expected_receiver)))
     {
         return;
     }
@@ -177,25 +183,36 @@ fn check_method_receiver<'db>(
     }
 }
 
-fn unpacked_variadic_receiver_type<'db>(
+#[derive(Clone, Copy)]
+enum VariadicReceiverType<'db> {
+    Type(Type<'db>),
+    Invalid,
+}
+
+fn variadic_receiver_type<'db>(
     db: &'db dyn crate::Db,
     annotation: &ast::Expr,
     file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
-) -> Option<Type<'db>> {
-    let ast::Expr::Subscript(subscript) = annotation else {
-        return None;
+) -> Option<VariadicReceiverType<'db>> {
+    let tuple_annotation = match annotation {
+        ast::Expr::Subscript(subscript)
+            if file_expression_type(&subscript.value)
+                == Type::SpecialForm(SpecialFormType::Unpack) =>
+        {
+            &*subscript.slice
+        }
+        ast::Expr::Starred(starred) => &*starred.value,
+        _ => return None,
     };
-    if file_expression_type(&subscript.value)
-        != Type::SpecialForm(SpecialFormType::Unpack)
-    {
-        return None;
-    }
-
-    let tuple = file_expression_type(&subscript.slice).exact_tuple_instance_spec(db)?;
-    if tuple.fixed_elements().next().is_some() {
-        return None;
-    }
-    tuple.variable_element().copied()
+    let tuple = file_expression_type(tuple_annotation).exact_tuple_instance_spec(db)?;
+    Some(match tuple.as_ref() {
+        Tuple::Variable(tuple)
+            if tuple.prefix_elements().is_empty() && tuple.suffix_elements().is_empty() =>
+        {
+            VariadicReceiverType::Type(*tuple.variable_element())
+        }
+        Tuple::Fixed(_) | Tuple::Variable(_) => VariadicReceiverType::Invalid,
+    })
 }
 
 fn is_protocol_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bool {
