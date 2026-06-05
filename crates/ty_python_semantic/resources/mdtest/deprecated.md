@@ -320,6 +320,23 @@ if is_replacement_class(MetaBindingWithFallback.binding):
     # error: [possibly-missing-attribute]
     MetaBindingWithFallback.binding()  # error: [deprecated] "metaclass replacement"
 
+class DecoratedUnionMember:
+    @deprecated("union replacement")
+    @replace_with(ReplacementClass)
+    def binding(self) -> None: ...
+
+class UndecoratedUnionMember:
+    binding = OtherReplacementClass
+
+def use_mixed_union(instance: DecoratedUnionMember | UndecoratedUnionMember) -> None:
+    if is_replacement_class(instance.binding):
+        instance.binding()  # error: [deprecated] "union replacement"
+
+    alias = instance.binding
+    if is_replacement_class(alias):
+        # TODO: Expression inference does not retain binding-level deprecation metadata.
+        alias()  # TODO: error: [deprecated] "union replacement"
+
 T = TypeVar("T", D, E)
 
 def use_union(instance: D | E) -> None:

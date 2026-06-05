@@ -3,8 +3,8 @@ use itertools::Either;
 use std::convert::Infallible;
 
 use crate::place::{
-    DefinedPlace, Definedness, DeprecationBuilder, Place, PlaceAndQualifiers, PublicTypePolicy,
-    TypeOrigin,
+    DefinedPlace, Definedness, DeprecationBuilder, DeprecationPolicy, Place, PlaceAndQualifiers,
+    PublicTypePolicy, TypeOrigin,
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
@@ -300,11 +300,10 @@ impl<'db> UnionType<'db> {
         let mut all_unbound = true;
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
-        let mut deprecation = DeprecationBuilder::default();
+        let mut deprecation_alternatives = Vec::new();
         for ty in self.elements(db) {
             let (ty_member, new_qualifiers, new_deprecation) = transform_fn(ty).into_parts();
             qualifiers |= new_qualifiers;
-            deprecation.add_policy(new_deprecation);
             match ty_member {
                 Place::Undefined => {
                     possibly_unbound = true;
@@ -322,9 +321,11 @@ impl<'db> UnionType<'db> {
 
                     all_unbound = false;
                     builder = builder.add(ty_member);
+                    deprecation_alternatives.push((ty_member, new_deprecation));
                 }
             }
         }
+        let deprecation = DeprecationPolicy::from_alternatives(db, deprecation_alternatives);
         (if all_unbound {
             Place::Undefined
         } else {
@@ -342,7 +343,7 @@ impl<'db> UnionType<'db> {
             })
         })
         .with_qualifiers(qualifiers)
-        .with_deprecation_policy(deprecation.build_policy())
+        .with_deprecation_policy(deprecation)
     }
 
     pub(crate) fn recursive_type_normalized_impl(
