@@ -426,7 +426,6 @@ pub mod clap_completion {
                         clap::error::ContextKind::InvalidValue,
                         clap::error::ContextValue::String(value.to_string()),
                     );
-
                     error
                 })
         }
