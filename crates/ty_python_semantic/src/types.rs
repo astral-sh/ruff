@@ -5775,6 +5775,43 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        if matches!(
+            self,
+            Type::Dynamic(_)
+                | Type::Divergent(_)
+                | Type::Never
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::SpecialForm(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::LiteralValue(_)
+                | Type::BoundSuper(_)
+                | Type::KnownBoundMethod(
+                    KnownBoundMethodType::StrStartswith(_)
+                        | KnownBoundMethodType::ConstraintSetRange
+                        | KnownBoundMethodType::ConstraintSetAlways
+                        | KnownBoundMethodType::ConstraintSetNever
+                        | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                        | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                        | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                        | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
+                )
+        ) {
+            return self;
+        }
+
+        self.apply_specialization_inner(db, specialization)
+    }
+
     #[salsa::tracked(
         cycle_initial=|_, id, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
@@ -5782,7 +5819,7 @@ impl<'db> Type<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn apply_specialization(
+    fn apply_specialization_inner(
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
