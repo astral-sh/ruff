@@ -11222,6 +11222,7 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                             )
                             .0
                             .deprecation_policy()
+                            .resolve_for_type(self.builder.db(), expression_ty)
                     })
                     .unwrap_or(DeprecationPolicy::Inherit);
                 if place_deprecation != DeprecationPolicy::Inherit {

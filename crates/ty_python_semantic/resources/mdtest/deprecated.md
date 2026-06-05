@@ -81,6 +81,15 @@ callable_replacement = CallableReplacement()
 
 @deprecated("ordinary deprecated function")
 def ordinary_deprecated_function() -> None: ...
+
+def deprecated_factory() -> TypeOf[ordinary_deprecated_function]:  # ty: ignore[deprecated]
+    return ordinary_deprecated_function  # ty: ignore[deprecated]
+
+def is_ordinary_deprecated(
+    value: object,
+) -> TypeGuard[TypeOf[ordinary_deprecated_function]]:  # ty: ignore[deprecated]
+    return True
+
 @deprecated("use replacement directly")
 @replace_with(replacement)
 def deprecated_binding() -> None: ...
@@ -147,6 +156,17 @@ else:
 
 if is_replacement(narrowed_binding):
     narrowed_binding()  # error: [deprecated] "use replacement directly"
+
+if flag:
+    chained_source = ordinary_deprecated_function  # error: [deprecated] "ordinary deprecated function"
+elif bool(input()):
+    chained_source = deprecated_factory()
+else:
+    chained_source = replacement
+
+chained_alias = chained_source
+if is_ordinary_deprecated(chained_alias):
+    chained_alias()  # error: [deprecated] "ordinary deprecated function"
 
 if flag:
     @deprecated("use replacement directly")
