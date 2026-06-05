@@ -83,10 +83,8 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let Some(annotated_receiver_type) = signature
-        .parameters()
-        .get(0)
-        .map(Parameter::annotated_type)
+    let Some(annotated_receiver_type) =
+        signature.parameters().get(0).map(Parameter::annotated_type)
     else {
         return;
     };
