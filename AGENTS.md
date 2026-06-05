@@ -8,7 +8,8 @@ When reviewing a branch or pull request, be deliberately nitpicky. Report not
 only bugs and regressions, but also architectural and maintenance risks, weak
 test coverage, unclear code, unnecessary complexity, and meaningful style or
 consistency issues. Order findings by severity, cite files and lines, and
-distinguish blockers from non-blocking improvements.
+distinguish blockers from non-blocking improvements. Number each review point
+for easy reference in subsequent review discussion.
 
 ## Running Tests
 
