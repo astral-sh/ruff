@@ -342,7 +342,10 @@ def match_non_exhaustive(x: A | B | C):
             # this diagnostic is correct: the inferred type of `x` is `B & ~A & ~C`
             assert_never(x)  # error: [type-assertion-failure]
 
-# Note: no invalid-return-type diagnostic; the `match` is exhaustive
+# Class patterns with arguments are not exhaustive because attribute extraction can fail.
+# TODO: This should be exhaustive - will require analyzing `x` as an attribute on `GenericClass` to
+# guarantee it can be extracted at runtime
+# error: [invalid-return-type]
 def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
     match obj:
         case GenericClass(x=42):

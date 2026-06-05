@@ -1908,19 +1908,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Pattern::MatchClass(pattern) => {
                 let cls = self.add_standalone_expression(&pattern.cls);
 
+                // A class pattern is only irrefutable if:
+                // - It has no pattern arguments
+                // - The pattern arguments map to attributes that can be guaranteed
+                // to be extracted at runtime
+                // - It is a match-self pattern (like `int(_)` or `str(x)`) that matches
+                // the whole object rather than extracting an attribute
+                //
+                // For example: `case Point():` is exhaustive among Point instances,
+                // however case `Point(x, y):` and `case Point(x=_, y=_):`` can fail because attribute extraction can fail,
+                // even though x and y themselves are irrefutable capture/wildcard subpatterns.
+                //
+                // TODO: More precise evaluation of whether the class pattern is refutable, based
+                // on statically analyzing attributes and `__match_args__`, as well as handling
+                // builtin classes.
+                let is_irrefutable =
+                    pattern.arguments.patterns.is_empty() && pattern.arguments.keywords.is_empty();
+
                 PatternPredicateKind::Class(
                     cls,
-                    if pattern
-                        .arguments
-                        .patterns
-                        .iter()
-                        .all(ast::Pattern::is_irrefutable)
-                        && pattern
-                            .arguments
-                            .keywords
-                            .iter()
-                            .all(|kw| kw.pattern.is_irrefutable())
-                    {
+                    if is_irrefutable {
                         ClassPatternKind::Irrefutable
                     } else {
                         ClassPatternKind::Refutable
