@@ -533,6 +533,9 @@ explicit_value: ExplicitAlias
 (named_alias := depr_func)  # error: [deprecated] "Use other_func instead"
 named_alias()
 
+(inline_alias := depr_func)()  # error: [deprecated] "Use other_func instead"
+inline_alias()
+
 (unpacked_alias,) = (depr_func,)  # error: [deprecated] "Use other_func instead"
 unpacked_alias()
 

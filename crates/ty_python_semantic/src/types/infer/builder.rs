@@ -426,7 +426,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.expressions
             .extend(inference.expressions.iter().copied());
-        self.declarations.extend(inference.declarations());
+        if !matches!(self.region, InferenceRegion::Expression(..)) {
+            self.declarations.extend(inference.declarations());
+        }
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings.extend(inference.bindings());
