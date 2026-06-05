@@ -249,7 +249,7 @@ error[invalid-method-receiver]: Method receiver type `S@method11` cannot accept 
 ```
 
 ```
-error[invalid-method-receiver]: Method receiver type `type[S@method12]` cannot accept `<class 'Foo'>`
+error[invalid-method-receiver]: Method receiver type `type[S@method12]` cannot accept `<class 'Foo[Unknown]'>`
    --> src/mdtest_snippet.py:112:42
     |
 112 |     def method12[S: type[Foo[int]]](cls: type[S]) -> S:  # error: [invalid-method-receiver]
