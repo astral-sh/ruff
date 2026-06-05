@@ -83,7 +83,6 @@ fn check_method_receiver<'db>(
     };
 
     if receiver_type.is_never()
-        || is_protocol_receiver_type(db, receiver_type)
         || (enclosing_class.known(db) == Some(KnownClass::Str)
             && receiver_type == Type::literal_string())
     {
@@ -118,7 +117,9 @@ fn check_method_receiver<'db>(
         _ => concrete_receiver_type.top_materialization(db),
     };
 
-    if expected_receiver.is_assignable_to(db, concrete_receiver_type)
+    if is_protocol_receiver_type(db, receiver_type)
+        || is_protocol_receiver_type(db, concrete_receiver_type)
+        || expected_receiver.is_assignable_to(db, concrete_receiver_type)
         || (!matches!(receiver_type, Type::TypeVar(_))
             && signature.can_bind_self_to(db, expected_receiver))
     {

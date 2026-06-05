@@ -132,8 +132,13 @@ class FooChild(Foo): ...
 class ReceiverProtocol(Protocol):
     attribute: int
 
+T_ReceiverProtocol = TypeVar("T_ReceiverProtocol", bound=ReceiverProtocol)
+
 class Mixin:
     def method(self: ReceiverProtocol) -> int:
+        return self.attribute
+
+    def generic_method(self: T_ReceiverProtocol) -> int:
         return self.attribute
 
 class ProtocolClass(Protocol):
