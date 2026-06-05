@@ -921,13 +921,13 @@ def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
 def f(env: dict) -> None:
     pass
 
-# revealed: def f(env: dict[Unknown, Unknown]) -> None
+# revealed: (env: dict[Unknown, Unknown]) -> None
 reveal_type(f)
 ```
 
 ### Transparent decorator passthrough
 
-A decorator typed as `Callable[P, R] -> Callable[P, R]` preserves overloaded functions.
+A decorator typed as `Callable[P, R] -> Callable[P, R]` preserves overload signatures.
 
 ```py
 from typing import Callable, overload
@@ -954,7 +954,7 @@ reveal_type(test(1, y="x"))  # revealed: Unknown
 def increment(value: int) -> int:
     return value + 1
 
-reveal_type(increment)  # revealed: def increment(value: int) -> int
+reveal_type(increment)  # revealed: (value: int) -> int
 reveal_type(increment(1))  # revealed: int
 ```
 
@@ -1281,7 +1281,7 @@ c = Container()
 # revealed: ty_extensions.GenericContext[T@generic_method]
 reveal_type(generic_context(c.generic_method))
 
-reveal_type(c.generic_method)  # revealed: bound method Container.generic_method[T](value: T) -> T
+reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
 reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ```

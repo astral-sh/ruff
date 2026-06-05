@@ -5337,8 +5337,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // per-overload ParamSpec/return correlations for `Callable[P, R] -> Callable[P, R]`.
         if decorator_call_succeeded
             && is_transparent_callable_decorator(self.db(), decorator_ty, decorated_ty)
+            && let Some(callable) = decorated_ty
+                .try_upcast_to_callable(self.db())
+                .and_then(CallableTypes::exactly_one)
         {
-            return decorated_ty;
+            return Type::Callable(callable);
         }
 
         // When a method on a class is decorated with a function that returns a
