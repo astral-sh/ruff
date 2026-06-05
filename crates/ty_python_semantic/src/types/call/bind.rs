@@ -4545,6 +4545,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         self.assign_argument(
             argument_index,
             Argument::Keywords,
+            // TODO: Use the `TypedDict`'s extra-items type once PEP 728 is fully supported, and
+            // omit this match for closed `TypedDict`s.
             Some(Type::object()),
             InvalidArgumentTypeProvenance::OpenTypedDictExtraItems,
             parameter_index,
