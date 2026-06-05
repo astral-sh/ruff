@@ -219,8 +219,9 @@ impl<'db> Type<'db> {
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
+                } else if td.openness(db).is_closed() && td.items(db).is_empty() {
+                    Truthiness::AlwaysFalse
                 } else {
-                    // TODO: Empty closed TypedDicts can be inferred as always falsy.
                     Truthiness::Ambiguous
                 }
             }

@@ -333,6 +333,23 @@ impl<'db> TypedDictType<'db> {
         builder.build()
     }
 
+    /// Returns the type of keys that may be present in this `TypedDict`.
+    ///
+    /// A closed `TypedDict` has a finite set of literal keys. Open and extra-items `TypedDict`s may
+    /// contain arbitrary string keys.
+    pub(crate) fn key_type(self, db: &'db dyn Db) -> Type<'db> {
+        if !self.openness(db).is_closed() {
+            return KnownClass::Str.to_instance(db);
+        }
+
+        self.items(db)
+            .keys()
+            .fold(UnionBuilder::new(db), |builder, name| {
+                builder.add(Type::string_literal(db, name))
+            })
+            .build()
+    }
+
     /// Returns the field exposed by a literal key.
     ///
     /// Undeclared keys synthesize a field only for explicit extra items. Hidden items on an

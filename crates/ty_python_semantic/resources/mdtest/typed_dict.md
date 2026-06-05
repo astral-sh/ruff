@@ -5459,31 +5459,24 @@ class Closed(TypedDict, closed=True):
     age: int
 
 def _(closed: Closed) -> None:
-    # TODO: should be `dict_keys[Literal["name", "age"], str | int]`
-    reveal_type(closed.keys())  # revealed: dict_keys[str, object]
+    reveal_type(closed.keys())  # revealed: dict_keys[Literal["age", "name"], int | str]
 
-    # TODO: should be `dict_values[Literal["name", "age"], str | int]`
-    reveal_type(closed.values())  # revealed: dict_values[str, object]
+    reveal_type(closed.values())  # revealed: dict_values[Literal["age", "name"], int | str]
 
-    # TODO: should be `dict_items[Literal["name", "age"], str | int]`
-    reveal_type(closed.items())  # revealed: dict_items[str, object]
+    reveal_type(closed.items())  # revealed: dict_items[Literal["age", "name"], int | str]
 
     # iterating over the keys gives `Literal` types
     for key in closed:
-        # TODO: should be `Literal["name", "age"]`
-        reveal_type(key)  # revealed: str
+        reveal_type(key)  # revealed: Literal["age", "name"]
 
     for key in closed.keys():
-        # TODO: should be `Literal["name", "age"]`
-        reveal_type(key)  # revealed: str
+        reveal_type(key)  # revealed: Literal["age", "name"]
 
     for value in closed.values():
-        # TODO: should be `str | int
-        reveal_type(value)  # revealed: object
+        reveal_type(value)  # revealed: int | str
 
     for item in closed.items():
-        # TODO: should be `tuple[Literal["name"], str] | tuple[Literal["age"], int]`
-        reveal_type(item)  # revealed: tuple[str, object]
+        reveal_type(item)  # revealed: tuple[Literal["age", "name"], int | str]
 ```
 
 ### Iterating keys, values and items of an extra-items TypedDict
@@ -5549,17 +5542,29 @@ static_assert(is_equivalent_to(AliasedExtra, Closed))
 
 ### Empty closed TypedDict truthiness
 
-An empty `closed=True` TypedDict cannot contain any keys, so it is always empty and always falsy,
-but inferring that precisely is still TODO.
+An empty `closed=True` TypedDict cannot contain any keys, so it is always empty and always falsy.
 
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import Never, NotRequired, TypedDict
 
 class Empty(TypedDict, closed=True): ...
+class EmptyByNever(TypedDict, extra_items=Never): ...
 
-def _(empty: Empty) -> None:
-    # TODO: should be `Literal[False]`
-    reveal_type(bool(empty))  # revealed: bool
+class OptionalClosed(TypedDict, closed=True):
+    value: NotRequired[int]
+
+class EmptyOpen(TypedDict): ...
+
+def _(
+    empty: Empty,
+    empty_by_never: EmptyByNever,
+    optional_closed: OptionalClosed,
+    empty_open: EmptyOpen,
+) -> None:
+    reveal_type(bool(empty))  # revealed: Literal[False]
+    reveal_type(bool(empty_by_never))  # revealed: Literal[False]
+    reveal_type(bool(optional_closed))  # revealed: bool
+    reveal_type(bool(empty_open))  # revealed: bool
 ```
 
 ### Closed TypedDict is structurally final but not nominally final
@@ -5612,9 +5617,8 @@ class Closed(TypedDict, closed=True):
     age: int
 
 def _(td: Closed, key: str) -> None:
-    # TODO: the error is correct, but this could validly be `str | int`
     # error: [invalid-key]
-    reveal_type(td[key])  # revealed: Unknown
+    reveal_type(td[key])  # revealed: int | str
 ```
 
 ### Subclass of extra-items TypedDict has the same extra-items type as its base
