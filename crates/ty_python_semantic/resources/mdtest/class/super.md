@@ -254,7 +254,7 @@ class Foo[T]:
         reveal_type(super())
         return self
 
-    def method9[S: (int, str)](self: S, other: S) -> S:
+    def method9[S: (int, str)](self: S, other: S) -> S:  # error: [invalid-method-receiver]
         # error: [invalid-super-argument]
         # revealed: Unknown
         reveal_type(super())
@@ -290,7 +290,7 @@ class Bar:
         # revealed: <super: <class 'Bar'>, Unknown>
         reveal_type(super())
 
-    def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
+    def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):  # error: [invalid-method-receiver]
         # revealed: <super: <class 'Bar'>, Bar>
         reveal_type(super())
 

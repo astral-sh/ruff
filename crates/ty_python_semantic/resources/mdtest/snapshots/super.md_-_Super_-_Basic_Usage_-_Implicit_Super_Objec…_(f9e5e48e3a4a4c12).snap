@@ -103,7 +103,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  88 |         reveal_type(super())
  89 |         return self
  90 | 
- 91 |     def method9[S: (int, str)](self: S, other: S) -> S:
+ 91 |     def method9[S: (int, str)](self: S, other: S) -> S:  # error: [invalid-method-receiver]
  92 |         # error: [invalid-super-argument]
  93 |         # revealed: Unknown
  94 |         reveal_type(super())
@@ -139,7 +139,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 124 |         # revealed: <super: <class 'Bar'>, Unknown>
 125 |         reveal_type(super())
 126 | 
-127 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
+127 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):  # error: [invalid-method-receiver]
 128 |         # revealed: <super: <class 'Bar'>, Bar>
 129 |         reveal_type(super())
 130 | 
@@ -196,6 +196,16 @@ info: `int` is not an instance or subclass of `<class 'Foo'>`
 ```
 
 ```
+error[invalid-method-receiver]: Method receiver type `S@method9` cannot accept `Foo[Unknown]`
+  --> src/mdtest_snippet.py:91:38
+   |
+91 |     def method9[S: (int, str)](self: S, other: S) -> S:  # error: [invalid-method-receiver]
+   |                                      ^
+   |
+
+```
+
+```
 error[invalid-super-argument]: `S@method9` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method9)` call
   --> src/mdtest_snippet.py:94:21
    |
@@ -244,6 +254,16 @@ error[invalid-method-receiver]: Method receiver type `type[S@method12]` cannot a
     |
 112 |     def method12[S: type[Foo[int]]](cls: type[S]) -> S:  # error: [invalid-method-receiver]
     |                                          ^^^^^^^
+    |
+
+```
+
+```
+error[invalid-method-receiver]: Method receiver type `Bar & ((...) -> object)` cannot accept `Bar`
+   --> src/mdtest_snippet.py:127:51
+    |
+127 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):  # error: [invalid-method-receiver]
+    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 
 ```

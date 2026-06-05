@@ -1,7 +1,7 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownClass, KnownInstanceType, Signature, Type, TypeVarKind,
+        KnownClass, KnownInstanceType, Signature, Type, TypeVarBoundOrConstraints, TypeVarKind,
         context::InferContext,
         diagnostic::{
             INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
@@ -100,9 +100,24 @@ fn check_method_receiver<'db>(
     } else {
         class_object.to_instance(db).unwrap_or_else(Type::unknown)
     };
+    let typing_self_type = class_object.to_instance(db).unwrap_or_else(Type::unknown);
+    let concrete_receiver_type = receiver_type
+        .bind_self_typevars(db, typing_self_type)
+        .resolve_type_alias(db);
+    let concrete_receiver_type = match concrete_receiver_type {
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.top_materialization(db),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.as_type(db).top_materialization(db)
+            }
+            None => Type::object(),
+        },
+        _ => concrete_receiver_type.top_materialization(db),
+    };
 
-    if signature.can_bind_self_to(db, expected_receiver)
-        || receiver_type.is_assignable_to(db, expected_receiver)
+    if expected_receiver.is_assignable_to(db, concrete_receiver_type)
+        || (!matches!(receiver_type, Type::TypeVar(_))
+            && signature.can_bind_self_to(db, expected_receiver))
     {
         return;
     }
