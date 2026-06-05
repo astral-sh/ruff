@@ -11271,47 +11271,45 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
         }
 
         let expression_ty = self.expression_type(expression);
-        if matches!(expression, ast::Expr::Name(_))
-            && let Some(place_expr) = PlaceExpr::try_from_expr(expression)
-        {
-            let place_deprecation = self
-                .builder
-                .infer_place_load_without_deprecation_diagnostic(
-                    PlaceExprRef::from(&place_expr),
-                    ast::ExprRef::from(expression),
-                )
-                .0
-                .deprecation_policy();
-            if matches!(place_deprecation, DeprecationPolicy::Alternatives(_)) {
-                return place_deprecation;
+        match expression {
+            ast::Expr::Name(_) => {
+                let place_deprecation = PlaceExpr::try_from_expr(expression)
+                    .map(|place_expr| {
+                        self.builder
+                            .infer_place_load_without_deprecation_diagnostic(
+                                PlaceExprRef::from(&place_expr),
+                                ast::ExprRef::from(expression),
+                            )
+                            .0
+                            .deprecation_policy()
+                    })
+                    .unwrap_or(DeprecationPolicy::Inherit);
+                if matches!(place_deprecation, DeprecationPolicy::Alternatives(_)) {
+                    return place_deprecation;
+                }
+                if place_deprecation == DeprecationPolicy::Suppress
+                    && matches!(expression_ty, Type::Union(_))
+                {
+                    return DeprecationPolicy::Suppress;
+                }
             }
-            if place_deprecation == DeprecationPolicy::Suppress
-                && matches!(expression_ty, Type::Union(_))
-            {
-                return DeprecationPolicy::Suppress;
+            ast::Expr::Attribute(attribute) => {
+                let place_deprecation = self
+                    .expression_type(&attribute.value)
+                    .member(self.builder.db(), &attribute.attr.id)
+                    .deprecation_policy();
+                if matches!(place_deprecation, DeprecationPolicy::Alternatives(_)) {
+                    return place_deprecation;
+                }
             }
+            _ => {}
         }
         let type_is_deprecated = expression_ty.is_deprecated(self.builder.db());
-        if !type_is_deprecated
-            && !matches!(
-                expression,
-                ast::Expr::Attribute(_) if matches!(expression_ty, Type::Union(_))
-            )
-        {
+        if !type_is_deprecated {
             return DeprecationPolicy::Inherit;
         }
 
         match expression {
-            ast::Expr::Attribute(attribute) if !type_is_deprecated => {
-                let deprecation = self
-                    .expression_type(&attribute.value)
-                    .member(self.builder.db(), &attribute.attr.id)
-                    .deprecation_policy();
-                match deprecation {
-                    DeprecationPolicy::Alternatives(_) => deprecation,
-                    _ => DeprecationPolicy::Inherit,
-                }
-            }
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 if !matches!(expression_ty, Type::Union(_)) {
                     return DeprecationPolicy::Suppress;

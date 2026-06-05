@@ -520,6 +520,7 @@ module.deprecated_binding  # error: [deprecated] "use replacement directly"
 ```py
 from collections.abc import Callable
 from typing import Any, TypeVar
+from ty_extensions import TypeOf
 from typing_extensions import deprecated
 
 R = TypeVar("R")
@@ -529,6 +530,13 @@ def replacement() -> str:
 
 def other() -> str:
     return "other"
+
+@deprecated("ordinary deprecated")
+def ordinary() -> str:
+    return "ordinary"
+
+def ordinary_factory() -> TypeOf[ordinary]:  # ty: ignore[deprecated]
+    return ordinary  # ty: ignore[deprecated]
 
 def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
     raise NotImplementedError
@@ -542,6 +550,14 @@ else:
     @deprecated("use other directly")
     @replace_with(other)
     def old() -> None: ...
+
+if bool(input()):
+    @deprecated("deprecated replacement binding")
+    @replace_with(replacement)
+    def mixed() -> None: ...
+
+else:
+    mixed = ordinary_factory()
 ```
 
 `main.py`:
@@ -550,6 +566,7 @@ else:
 from ty_extensions import TypeOf
 from typing_extensions import TypeGuard
 
+import module
 from module import old, other, replacement
 
 def is_replacement(value: object) -> TypeGuard[TypeOf[replacement]]:
@@ -558,11 +575,23 @@ def is_replacement(value: object) -> TypeGuard[TypeOf[replacement]]:
 def is_other(value: object) -> TypeGuard[TypeOf[other]]:
     return True
 
+def is_ordinary(
+    value: object,
+) -> TypeGuard[TypeOf[module.ordinary]]:  # ty: ignore[deprecated]
+    return True
+
 if is_replacement(old):
     old()  # error: [deprecated] "use replacement directly"
 
 if is_other(old):
     old()  # error: [deprecated] "use other directly"
+
+mixed_alias = module.mixed
+if is_replacement(mixed_alias):
+    mixed_alias()  # error: [deprecated] "deprecated replacement binding"
+
+if is_ordinary(mixed_alias):
+    mixed_alias()  # error: [deprecated] "ordinary deprecated"
 ```
 
 ## Syntax
