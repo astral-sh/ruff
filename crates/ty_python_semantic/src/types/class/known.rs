@@ -63,6 +63,7 @@ pub enum KnownClass {
     NotImplementedError,
     // enum
     Enum,
+    EnumProperty,
     EnumType,
     Auto,
     Member,
@@ -231,6 +232,7 @@ impl KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -308,6 +310,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -408,6 +411,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -508,6 +512,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -655,6 +660,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -719,6 +725,7 @@ impl KnownClass {
             | KnownClass::Classmethod
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -850,6 +857,7 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::EnumProperty => "property",
             Self::EnumType => {
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 {
                     "EnumType"
@@ -1181,6 +1189,7 @@ impl KnownClass {
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
             Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1324,6 +1333,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Sentinel
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1429,6 +1439,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Sentinel
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1490,7 +1501,7 @@ impl KnownClass {
             "dict" => &[Self::Dict],
             "list" => &[Self::List],
             "slice" => &[Self::Slice],
-            "property" => &[Self::Property],
+            "property" => &[Self::Property, Self::EnumProperty],
             "BaseException" => &[Self::BaseException],
             "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
             "Exception" => &[Self::Exception],
@@ -1620,6 +1631,7 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1965,9 +1977,10 @@ mod tests {
                         PythonVersion::PY311
                     }
                     KnownClass::GenericAlias => PythonVersion::PY39,
-                    KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
-                        PythonVersion::PY311
-                    }
+                    KnownClass::EnumProperty
+                    | KnownClass::Member
+                    | KnownClass::Nonmember
+                    | KnownClass::StrEnum => PythonVersion::PY311,
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)

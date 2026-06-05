@@ -3626,8 +3626,14 @@ impl<'db> Type<'db> {
                 ),
 
                 Type::LiteralValue(literal)
-                    if literal.as_enum().is_some()
-                        && matches!(name_str, "name" | "_name_" | "value" | "_value_") =>
+                    if matches!(name_str, "name" | "_name_" | "value" | "_value_")
+                        && literal.as_enum().is_some_and(|enum_literal| {
+                            !enums::class_defines_property(
+                                db,
+                                enum_literal.enum_class(db),
+                                name_str,
+                            )
+                        }) =>
                 {
                     let enum_literal = literal.as_enum().unwrap();
                     let enum_class = enum_literal.enum_class(db);
@@ -3665,7 +3671,12 @@ impl<'db> Type<'db> {
 
                 Type::NominalInstance(instance)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
-                        && enum_metadata(db, instance.class_literal(db)).is_some() =>
+                        && enum_metadata(db, instance.class_literal(db)).is_some()
+                        && !enums::class_defines_property(
+                            db,
+                            instance.class_literal(db),
+                            name_str,
+                        ) =>
                 {
                     let class_literal = instance.class_literal(db);
                     let is_enum_subclass = Type::ClassLiteral(class_literal)

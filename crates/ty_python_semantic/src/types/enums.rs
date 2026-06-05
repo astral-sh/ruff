@@ -59,6 +59,39 @@ pub(crate) struct EnumMetadata<'db> {
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
 
+pub(super) fn class_defines_property<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    name: &str,
+) -> bool {
+    let Some(class) = Type::ClassLiteral(class).to_class_type(db) else {
+        return false;
+    };
+
+    for base in class.iter_mro(db) {
+        let ClassBase::Class(base) = base else {
+            continue;
+        };
+        if matches!(
+            base.known(db),
+            Some(
+                KnownClass::Enum
+                    | KnownClass::StrEnum
+                    | KnownClass::IntEnum
+                    | KnownClass::Flag
+                    | KnownClass::IntFlag
+            )
+        ) {
+            return false;
+        }
+        if let Some(member) = base.own_class_member(db, None, name).inner.place.raw_type() {
+            return member.is_property_instance();
+        }
+    }
+
+    false
+}
+
 /// Look up an instance member on the finite enum literals represented by a complement.
 ///
 /// The enum-owned `.name`/`.value` attributes can often be answered directly. Other members
@@ -106,7 +139,8 @@ fn special_member_for_enum_complement<'db>(
     complement: EnumComplement<'db>,
     name: &str,
 ) -> Option<PlaceAndQualifiers<'db>> {
-    if matches!(name, "name" | "_name_" | "value" | "_value_")
+    if !class_defines_property(db, complement.enum_class(db), name)
+        && matches!(name, "name" | "_name_" | "value" | "_value_")
         && complement.rest(db).iter().all(Type::is_dynamic)
         && let Some(member_ty) = complement.member_type(db, name)
     {
