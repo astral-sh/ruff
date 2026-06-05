@@ -1027,6 +1027,7 @@ effect of using `auto()` will be for an arbitrary non-integer mixin, so for anyt
 
 ```python
 from enum import Enum, auto
+from typing import Any
 
 class A(str, Enum):
     X = auto()
@@ -1040,7 +1041,7 @@ class B(bytes, Enum):
 
 reveal_type(B.X.value)  # revealed: Any
 
-class C(tuple, Enum):
+class C(tuple[Any, ...], Enum):
     X = auto()
     Y = auto()
 

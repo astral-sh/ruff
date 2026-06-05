@@ -256,6 +256,7 @@ _: type[A, B]
 from collections.abc import Callable
 
 def f(
+    # error: [missing-type-argument]
     x: type[Callable],  # error: [invalid-type-form]
     y: type[Callable[[int], str]],  # error: [invalid-type-form]
     # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments"

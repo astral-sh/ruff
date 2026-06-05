@@ -16,22 +16,22 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
  1 | import types
  2 | import typing
  3 | 
- 4 | async def f() -> types.AsyncGeneratorType:
+ 4 | async def f() -> types.AsyncGeneratorType[int, None]:
  5 |     yield 42
  6 | 
- 7 | async def g() -> typing.AsyncGenerator:
+ 7 | async def g() -> typing.AsyncGenerator[int]:
  8 |     yield 42
  9 | 
-10 | async def h() -> typing.AsyncIterator:
+10 | async def h() -> typing.AsyncIterator[int]:
 11 |     yield 42
 12 | 
-13 | async def i() -> typing.AsyncIterable:
+13 | async def i() -> typing.AsyncIterable[int]:
 14 |     yield 42
 15 | 
 16 | async def j() -> str:  # error: [invalid-return-type]
 17 |     yield 42
 18 | 
-19 | async def k() -> typing.AsyncGenerator:
+19 | async def k() -> typing.AsyncGenerator[int]:
 20 |     yield 42
 21 |     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```

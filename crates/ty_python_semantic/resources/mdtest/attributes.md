@@ -3091,12 +3091,14 @@ in this case, `Divergent` is propagated, guaranteeing the convergence of type in
 regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
 
 ```py
+from typing import Any
+
 class NestedListsConcat:
     def __init__(self):
         self.x = [0]
         self.y = [0]
 
-    def f(self, y: list):
+    def f(self, y: list[Any]):
         # The overload that fails to resolve is `list.__add__` in both of these cases.
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
@@ -3422,14 +3424,14 @@ python-version = "3.14"
 ```
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
-def f(x: Callable):
+def f(x: Callable[..., Any]):
     x.__name__  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__name__`
+error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__name__`
  --> src/mdtest_snippet.py:4:5
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
@@ -3440,12 +3442,12 @@ help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/ty
 ```
 
 ```py
-def g(x: Callable):
+def g(x: Callable[..., Any]):
     x.__annotate__  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__annotate__`
+error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__annotate__`
  --> src/mdtest_snippet.py:6:5
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute

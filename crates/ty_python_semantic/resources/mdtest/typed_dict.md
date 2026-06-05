@@ -4112,9 +4112,9 @@ class TD(TypedDict):
 Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a subclass:
 
 ```py
-from typing import TypedDict
+from typing import Any, TypedDict
 
-class MyDict(dict):
+class MyDict(dict[Any, Any]):
     pass
 
 class Person(TypedDict):
@@ -4729,11 +4729,11 @@ def _(x: Intersection[StrTagTD, Any]):
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
 
 ```py
-def _(u: Foo | Bar | dict):
+def _(u: Foo | Bar | dict[Any, Any]):
     if u["tag"] == "foo":
         # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
         # false negative in `is_disjoint_impl`.
-        reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+        reveal_type(u)  # revealed: Foo | (dict[Any, Any] & ~<TypedDict with items 'tag'>)
 
 # The negation(s) will simplify out if we add something to the union that doesn't inherit from
 # `dict`. It just needs to support indexing with a string key.
@@ -5010,12 +5010,14 @@ def test_or_pattern_with_non_literal(u: Foo | Bar):
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
 
 ```py
-def match_with_dict(u: Foo | Bar | dict):
+from typing import Any
+
+def match_with_dict(u: Foo | Bar | dict[Any, Any]):
     match u["tag"]:
         case "foo":
             # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
             # false negative in `is_disjoint_impl`.
-            reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+            reveal_type(u)  # revealed: Foo | (dict[Any, Any] & ~<TypedDict with items 'tag'>)
 ```
 
 ## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases
@@ -5322,7 +5324,7 @@ class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
 And variadic keywords are also banned:
 
 ```py
-def f(kwargs: dict):
+def f(kwargs: dict[str, object]):
     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
 ```
 

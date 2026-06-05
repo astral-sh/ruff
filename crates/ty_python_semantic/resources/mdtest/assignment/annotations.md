@@ -1058,9 +1058,9 @@ def _(i: int):
     reveal_type(b)  # revealed: list[int | None]
     reveal_type(c)  # revealed: list[int | None]
 
-    a: list | None = []
-    b: list | None = identity([])
-    c: list | int | None = identity([])
+    a: list | None = []  # error: [missing-type-argument]
+    b: list | None = identity([])  # error: [missing-type-argument]
+    c: list | int | None = identity([])  # error: [missing-type-argument]
     reveal_type(a)  # revealed: list[Unknown]
     reveal_type(b)  # revealed: list[Unknown]
     reveal_type(c)  # revealed: list[Unknown]

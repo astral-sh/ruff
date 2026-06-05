@@ -1467,7 +1467,7 @@ The type described by `NamedTuple` in type expressions is understood as being as
 `tuple[object, ...]` and `tuple[Any, ...]`:
 
 ```py
-static_assert(is_assignable_to(NamedTuple, tuple))
+static_assert(is_assignable_to(NamedTuple, tuple))  # error: [missing-type-argument]
 static_assert(is_assignable_to(NamedTuple, tuple[object, ...]))
 static_assert(is_assignable_to(NamedTuple, tuple[Any, ...]))
 

@@ -732,11 +732,12 @@ However, they are lazily evaluated and can cyclically refer to their own type:
 ```py
 from typing import TypeVar, Generic
 
-T = TypeVar("T", bound=list["G"])
+T = TypeVar("T", bound=list["G"])  # error: [missing-type-argument]
 
 class G(Generic[T]):
     x: T
 
+# error: [missing-type-argument]
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
 
