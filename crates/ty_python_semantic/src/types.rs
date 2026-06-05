@@ -2939,8 +2939,16 @@ impl<'db> Type<'db> {
                         Some((ty, AttributeKind::NormalOrNonDataDescriptor))
                     } else {
                         let self_type = instance.unwrap_or_else(|| {
-                            // For classmethod-like callables, bind to the owner class.
-                            owner.to_instance(db).unwrap_or(owner)
+                            // Preserve a bare generic owner so call arguments can infer its
+                            // specialization after the classmethod-like callable is bound.
+                            if callable.is_classmethod_like(db)
+                                && let Type::ClassLiteral(class) = owner
+                                && class.generic_context(db).is_some()
+                            {
+                                Type::from(class.identity_specialization(db))
+                            } else {
+                                owner.to_instance(db).unwrap_or(owner)
+                            }
                         });
 
                         Some((

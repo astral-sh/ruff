@@ -974,6 +974,20 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        fn is_class_or_static_method(db: &dyn Db, name: &str, ty: Type<'_>) -> bool {
+            match ty {
+                Type::FunctionLiteral(function) => {
+                    function.is_classmethod(db)
+                        || (name != "__new__" && function.is_staticmethod(db))
+                }
+                Type::Callable(callable) => {
+                    callable.is_classmethod_like(db)
+                        || (name != "__new__" && callable.is_staticmethod_like(db))
+                }
+                _ => false,
+            }
+        }
+
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
             match ty {
                 Type::Callable(callable_ty) => Type::Callable(CallableType::new(
@@ -995,9 +1009,9 @@ impl<'db> StaticClassLiteral<'db> {
         // A class or static method on a bare generic class acts like a generic function: its
         // arguments can determine the specialization of the class on which it was accessed.
         if let Some(generic_context) = self.generic_context(db)
-            && member.ignore_possibly_undefined().is_some_and(|ty| {
-                matches!(ty, Type::FunctionLiteral(function) if function.is_classmethod(db) || (name != "__new__" && function.is_staticmethod(db)))
-            })
+            && member
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| is_class_or_static_method(db, name, ty))
         {
             member = self
                 .class_member_inner(
@@ -1010,6 +1024,14 @@ impl<'db> StaticClassLiteral<'db> {
                     Type::FunctionLiteral(function) => Type::FunctionLiteral(
                         function.with_inherited_generic_context(db, generic_context),
                     ),
+                    Type::Callable(callable) => Type::Callable(CallableType::new(
+                        db,
+                        callable
+                            .signatures(db)
+                            .with_inherited_generic_context(db, generic_context),
+                        callable.kind(db),
+                        callable.provenance(db),
+                    )),
                     _ => ty,
                 });
         }

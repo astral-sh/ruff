@@ -335,6 +335,26 @@ C.f1(1)
 C().f1(1)
 C.f2(1)
 C().f2(1)
+
+class Box[T]:
+    @callable_identity
+    @classmethod
+    def make(cls, value: T) -> Box[T]:
+        raise NotImplementedError
+
+    @callable_identity
+    @staticmethod
+    def make_static(value: T) -> Box[T]:
+        raise NotImplementedError
+
+class Child[T](Box[T]): ...
+
+reveal_type(Box.make(1))  # revealed: Box[int]
+reveal_type(Box[int].make(1))  # revealed: Box[int]
+reveal_type(Child.make(1))  # revealed: Box[int]
+reveal_type(Box.make_static(1))  # revealed: Box[int]
+reveal_type(Box[int].make_static(1))  # revealed: Box[int]
+reveal_type(Child.make_static(1))  # revealed: Box[int]
 ```
 
 ## Types are not bound-method descriptors
