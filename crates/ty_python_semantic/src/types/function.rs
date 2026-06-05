@@ -781,6 +781,12 @@ impl<'db> FunctionLiteral<'db> {
             (overloads.into_boxed_slice(), implementation)
         }
 
+        if !self.last_definition.is_overload(db)
+            && self.last_definition.previous_overload(db).is_none()
+        {
+            return (&[], Some(self.last_definition));
+        }
+
         let (overloads, implementation) =
             overloads_and_implementation_inner(db, self.last_definition);
         (overloads.as_ref(), *implementation)
