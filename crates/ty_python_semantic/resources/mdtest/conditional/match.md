@@ -196,9 +196,11 @@ def _(target: FooSub | str):
             y = 4
 
     reveal_type(y)  # revealed: Literal[1, 3, 4]
+```
 
-# Also handle special case for `collections.abc.Callable`
+### `collections.abc.Callable`
 
+```py
 from collections import abc
 
 def _(subj: abc.Callable[..., str]) -> None:
