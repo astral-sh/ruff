@@ -18,7 +18,8 @@ use ty_python_core::Db as _;
 use ty_python_core::program::Program;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, LoopHeaderPredicateCache, check_file_unwrap,
+    default_lint_registry,
 };
 
 #[salsa::db]
@@ -29,6 +30,7 @@ pub(crate) struct Db {
     system: MdtestSystem,
     vendored: VendoredFileSystem,
     settings: Option<Settings>,
+    loop_header_predicate_cache: LoopHeaderPredicateCache,
 }
 
 impl Db {
@@ -43,6 +45,7 @@ impl Db {
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             settings: None,
+            loop_header_predicate_cache: LoopHeaderPredicateCache::default(),
         };
 
         db.settings = Some(Settings::new(&db));
@@ -197,6 +200,10 @@ impl SemanticDb for Db {
 
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
+    }
+
+    fn loop_header_predicate_cache(&self) -> &LoopHeaderPredicateCache {
+        &self.loop_header_predicate_cache
     }
 }
 

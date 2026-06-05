@@ -1,8 +1,99 @@
+use std::cell::RefCell;
+use std::panic::{RefUnwindSafe, UnwindSafe};
+
 use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use ruff_index::IndexSlice;
+use rustc_hash::FxHashMap;
 use ty_python_core::Db as PythonCoreDb;
+use ty_python_core::Truthiness;
+use ty_python_core::predicate::{Predicate, ScopedPredicateId};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct LoopHeaderPredicateCacheKey {
+    predicates: usize,
+    predicate: ScopedPredicateId,
+}
+
+/// Predicate results cached for one dynamic loop-header analysis.
+#[doc(hidden)]
+#[derive(Debug, Default)]
+pub struct LoopHeaderPredicateCache {
+    entries: RefCell<Option<FxHashMap<LoopHeaderPredicateCacheKey, Truthiness>>>,
+}
+
+impl Clone for LoopHeaderPredicateCache {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
+// The cache is cleared by `with_scope`'s guard if predicate analysis unwinds.
+impl RefUnwindSafe for LoopHeaderPredicateCache {}
+impl UnwindSafe for LoopHeaderPredicateCache {}
+
+impl LoopHeaderPredicateCache {
+    pub(crate) fn with_scope<T>(&self, f: impl FnOnce() -> T) -> T {
+        let owner = {
+            let mut entries = self.entries.borrow_mut();
+            if entries.is_some() {
+                false
+            } else {
+                *entries = Some(FxHashMap::default());
+                true
+            }
+        };
+        let _guard = LoopHeaderPredicateCacheGuard { cache: self, owner };
+        f()
+    }
+
+    pub(crate) fn get(
+        &self,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+        predicate: ScopedPredicateId,
+    ) -> Option<Truthiness> {
+        self.entries
+            .borrow()
+            .as_ref()?
+            .get(&LoopHeaderPredicateCacheKey {
+                predicates: predicates.raw.as_ptr() as usize,
+                predicate,
+            })
+            .copied()
+    }
+
+    pub(crate) fn insert(
+        &self,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+        predicate: ScopedPredicateId,
+        truthiness: Truthiness,
+    ) {
+        if let Some(entries) = self.entries.borrow_mut().as_mut() {
+            entries.insert(
+                LoopHeaderPredicateCacheKey {
+                    predicates: predicates.raw.as_ptr() as usize,
+                    predicate,
+                },
+                truthiness,
+            );
+        }
+    }
+}
+
+struct LoopHeaderPredicateCacheGuard<'db> {
+    cache: &'db LoopHeaderPredicateCache,
+    owner: bool,
+}
+
+impl Drop for LoopHeaderPredicateCacheGuard<'_> {
+    fn drop(&mut self) {
+        if self.owner {
+            self.cache.entries.borrow_mut().take();
+        }
+    }
+}
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
@@ -20,6 +111,9 @@ pub trait Db: PythonCoreDb {
     fn verbose(&self) -> bool;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
+
+    #[doc(hidden)]
+    fn loop_header_predicate_cache(&self) -> &LoopHeaderPredicateCache;
 }
 
 #[cfg(test)]
@@ -55,6 +149,7 @@ pub(crate) mod tests {
         events: Events,
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
+        loop_header_predicate_cache: LoopHeaderPredicateCache,
     }
 
     impl TestDb {
@@ -75,6 +170,7 @@ pub(crate) mod tests {
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
+                loop_header_predicate_cache: LoopHeaderPredicateCache::default(),
             }
         }
 
@@ -158,6 +254,10 @@ pub(crate) mod tests {
 
         fn dyn_clone(&self) -> Box<dyn crate::Db> {
             Box::new(self.clone())
+        }
+
+        fn loop_header_predicate_cache(&self) -> &LoopHeaderPredicateCache {
+            &self.loop_header_predicate_cache
         }
     }
 

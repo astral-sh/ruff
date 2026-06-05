@@ -184,6 +184,7 @@ pub struct CorpusDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     analysis_settings: Arc<AnalysisSettings>,
+    loop_header_predicate_cache: ty_python_semantic::LoopHeaderPredicateCache,
 }
 
 impl CorpusDb {
@@ -196,6 +197,7 @@ impl CorpusDb {
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
             analysis_settings: Arc::new(AnalysisSettings::default()),
+            loop_header_predicate_cache: ty_python_semantic::LoopHeaderPredicateCache::default(),
         };
 
         Program::from_settings(
@@ -287,6 +289,10 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
         Box::new(self.clone())
+    }
+
+    fn loop_header_predicate_cache(&self) -> &ty_python_semantic::LoopHeaderPredicateCache {
+        &self.loop_header_predicate_cache
     }
 }
 

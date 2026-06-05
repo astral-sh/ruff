@@ -19,7 +19,7 @@ use ty_python_core::program::{
     FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
 };
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, LoopHeaderPredicateCache};
 
 mod changes;
 mod ignore;
@@ -49,6 +49,7 @@ pub struct ProjectDatabase {
     // IMPORTANT: Never return clones of `system` outside `ProjectDatabase` (only return references)
     // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
+    loop_header_predicate_cache: LoopHeaderPredicateCache,
 
     // IMPORTANT: This field must be the last because we use `trigger_cancellation` (drops all other storage references)
     // to drop all other references to the database, which gives us exclusive access to other `Arc`s stored on this db.
@@ -100,6 +101,7 @@ impl ProjectDatabase {
             }),
             files: Files::default(),
             system: Arc::new(system),
+            loop_header_predicate_cache: LoopHeaderPredicateCache::default(),
         };
 
         // TODO: Use the `program_settings` to compute the key for the database's persistent
@@ -541,6 +543,10 @@ impl SemanticDb for ProjectDatabase {
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
     }
+
+    fn loop_header_predicate_cache(&self) -> &LoopHeaderPredicateCache {
+        &self.loop_header_predicate_cache
+    }
 }
 
 #[salsa::db]
@@ -614,7 +620,7 @@ pub(crate) mod testing {
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
+    use ty_python_semantic::{AnalysisSettings, LoopHeaderPredicateCache, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -630,6 +636,7 @@ pub(crate) mod testing {
         system: TestSystem,
         vendored: VendoredFileSystem,
         project: Option<Project>,
+        loop_header_predicate_cache: LoopHeaderPredicateCache,
     }
 
     impl TestDb {
@@ -648,6 +655,7 @@ pub(crate) mod testing {
                 files: Files::default(),
                 events,
                 project: None,
+                loop_header_predicate_cache: LoopHeaderPredicateCache::default(),
             };
 
             let (settings, settings_diagnostics) = project
@@ -769,6 +777,10 @@ pub(crate) mod testing {
 
         fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
             Box::new(self.clone())
+        }
+
+        fn loop_header_predicate_cache(&self) -> &LoopHeaderPredicateCache {
+            &self.loop_header_predicate_cache
         }
     }
 

@@ -2178,8 +2178,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .len()
                 > MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES
         {
-            // As with loop header definitions above, use a reachability cutoff to avoid excessive
-            // perf costs in complicated projects like `isort`.
+            // Use a reachability cutoff to avoid excessive costs from nested bindings in
+            // complicated projects like `isort`.
             self.bindings.insert(definition, Type::unknown());
             return;
         }

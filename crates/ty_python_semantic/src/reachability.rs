@@ -193,8 +193,6 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
-use std::cell::RefCell;
-
 use crate::{
     Db,
     dunder_all::dunder_all_names,
@@ -583,7 +581,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
         evaluate_constraint(self, id, |predicate| {
-            analyze_single_with_nested_loop_header_cache(db, predicates, predicate)
+            analyze_single_with_loop_header_cache(db, predicates, None, predicate)
         })
     }
 }
@@ -843,9 +841,10 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 let predicate = self.predicates[predicate_id];
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    match analyze_single_with_nested_loop_header_cache(
+                    match analyze_single_with_loop_header_cache(
                         self.db,
                         self.predicates,
+                        None,
                         predicate_id,
                     ) {
                         Truthiness::AlwaysTrue => self.project(node.if_true()),
@@ -1071,49 +1070,8 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
-/// Cache recursive predicate analysis within one loop-header query.
-///
-/// This avoids repeated inference without combining separate loop headers into one Salsa cycle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct LoopHeaderPredicateCacheKey {
-    // Scoped predicate IDs are only unique within their predicate table. The cache is active for
-    // one outer loop-header query, so the table address is a stable identity for that duration.
-    predicates: usize,
-    predicate: ScopedPredicateId,
-}
-
-thread_local! {
-    static LOOP_HEADER_PREDICATE_CACHE:
-        RefCell<Option<FxHashMap<LoopHeaderPredicateCacheKey, Truthiness>>> =
-        const { RefCell::new(None) };
-}
-
-struct LoopHeaderPredicateCacheGuard {
-    owner: bool,
-}
-
-impl Drop for LoopHeaderPredicateCacheGuard {
-    fn drop(&mut self) {
-        if self.owner {
-            LOOP_HEADER_PREDICATE_CACHE.with(|cache| {
-                cache.borrow_mut().take();
-            });
-        }
-    }
-}
-
-fn with_loop_header_predicate_cache<T>(f: impl FnOnce() -> T) -> T {
-    let owner = LOOP_HEADER_PREDICATE_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if cache.is_some() {
-            false
-        } else {
-            *cache = Some(FxHashMap::default());
-            true
-        }
-    });
-    let _guard = LoopHeaderPredicateCacheGuard { owner };
-    f()
+fn with_loop_header_predicate_cache<T>(db: &dyn Db, f: impl FnOnce() -> T) -> T {
+    db.loop_header_predicate_cache().with_scope(f)
 }
 
 fn analyze_single_with_loop_header_cache<'db>(
@@ -1122,15 +1080,8 @@ fn analyze_single_with_loop_header_cache<'db>(
     terminal_predicates: Option<&LoopCarriedTerminalPredicates>,
     predicate: ScopedPredicateId,
 ) -> Truthiness {
-    let key = LoopHeaderPredicateCacheKey {
-        predicates: predicates.raw.as_ptr() as usize,
-        predicate,
-    };
-    let cached = LOOP_HEADER_PREDICATE_CACHE.with(|cache| {
-        let cache = cache.borrow();
-        cache.as_ref()?.get(&key).copied()
-    });
-    if let Some(truthiness) = cached {
+    let cache = db.loop_header_predicate_cache();
+    if let Some(truthiness) = cache.get(predicates, predicate) {
         return truthiness;
     }
 
@@ -1144,31 +1095,10 @@ fn analyze_single_with_loop_header_cache<'db>(
         PredicateNode::IsNonTerminalCall(_) => Truthiness::AlwaysTrue,
         _ => Truthiness::Ambiguous,
     };
-    let active = LOOP_HEADER_PREDICATE_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        let Some(cache) = cache.as_mut() else {
-            return false;
-        };
-        cache.insert(key, cycle_initial);
-        true
-    });
+    cache.insert(predicates, predicate, cycle_initial);
     let result = analyze_single(db, predicate_node);
-    if active {
-        LOOP_HEADER_PREDICATE_CACHE.with(|cache| {
-            if let Some(cache) = cache.borrow_mut().as_mut() {
-                cache.insert(key, result);
-            }
-        });
-    }
+    cache.insert(predicates, predicate, result);
     result
-}
-
-fn analyze_single_with_nested_loop_header_cache<'db>(
-    db: &'db dyn Db,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    predicate: ScopedPredicateId,
-) -> Truthiness {
-    analyze_single_with_loop_header_cache(db, predicates, None, predicate)
 }
 
 fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
@@ -1510,7 +1440,7 @@ fn loop_header_predicate_truthinesses<'db>(
     let terminal_predicates = loop_carried_terminal_predicates(db, scope, loop_token);
     let mut analyses = FxHashMap::default();
 
-    with_loop_header_predicate_cache(|| {
+    with_loop_header_predicate_cache(db, || {
         for binding in loop_header.bindings_for_place(place) {
             evaluate_constraint(
                 constraints,
