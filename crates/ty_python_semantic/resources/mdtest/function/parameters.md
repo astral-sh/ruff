@@ -206,21 +206,38 @@ class InvalidAnnotatedProtocolClassReceiver:
     ): ...
 
 type ProtocolClassReceiverAlias = type[FirstReceiverProtocol] | type[SecondReceiverProtocol]
+type FirstProtocolClass = type[FirstReceiverProtocol]
 
 class InvalidAliasedProtocolClassReceiver:
     @classmethod
     # error: [invalid-method-receiver]
     def method(cls: ProtocolClassReceiverAlias): ...
 
+class InvalidNestedAnnotatedProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: Annotated[type[FirstReceiverProtocol], "metadata"] | type[int]): ...
+
+class InvalidProtocolClassMemberAliasReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: FirstProtocolClass | type[int]): ...
+
 T_ProtocolClassReceiver = TypeVar(
     "T_ProtocolClassReceiver",
     bound=type[FirstReceiverProtocol] | type[SecondReceiverProtocol],
 )
+T_FirstProtocolClass = TypeVar("T_FirstProtocolClass", bound=type[FirstReceiverProtocol])
 
 class InvalidTypeVarProtocolClassReceiver:
     @classmethod
     # error: [invalid-method-receiver]
     def method(cls: T_ProtocolClassReceiver): ...
+
+class InvalidProtocolClassMemberTypeVarReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: T_FirstProtocolClass | type[int]): ...
 
 class InvalidMixedProtocolClassReceiver:
     @classmethod

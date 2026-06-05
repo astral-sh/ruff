@@ -298,11 +298,7 @@ impl<'db> ProtocolClassUnionChecker<'db> {
                         return None;
                     };
                     let inner = tuple.elts.first()?;
-                    return self.union_compatibility(
-                        inner,
-                        resolver.expression_type(self.db, inner),
-                        resolver,
-                    );
+                    return self.member_compatibility(inner, resolver);
                 }
                 _ => {}
             }
@@ -322,9 +318,8 @@ impl<'db> ProtocolClassUnionChecker<'db> {
                 return None;
             };
             let value = &type_alias.node(&module).value;
-            return self.union_compatibility(
+            return self.member_compatibility(
                 value,
-                definition_expression_type(self.db, definition, value),
                 ReceiverAnnotationResolver::Definition(definition),
             );
         }
@@ -343,20 +338,12 @@ impl<'db> ProtocolClassUnionChecker<'db> {
             return match definition.kind(self.db) {
                 DefinitionKind::TypeVar(typevar) => {
                     let bound = typevar.node(&module).bound.as_ref()?;
-                    self.union_compatibility(
-                        bound,
-                        resolver.expression_type(self.db, bound),
-                        resolver,
-                    )
+                    self.member_compatibility(bound, resolver)
                 }
                 DefinitionKind::Assignment(assignment) => {
                     let call = assignment.value(&module).as_call_expr()?;
                     if let Some(bound) = call.arguments.find_keyword("bound") {
-                        self.union_compatibility(
-                            &bound.value,
-                            resolver.expression_type(self.db, &bound.value),
-                            resolver,
-                        )
+                        self.member_compatibility(&bound.value, resolver)
                     } else {
                         let mut constraints = call.arguments.args.iter().skip(1);
                         let mut compatibility =
