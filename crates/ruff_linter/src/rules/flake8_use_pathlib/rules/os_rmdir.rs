@@ -5,7 +5,8 @@ use ruff_python_ast::ExprCall;
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_rmdir_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    check_os_pathlib_single_arg_calls, is_keyword_only_argument_non_default,
+    FileDescriptorHandling, check_os_pathlib_single_arg_calls,
+    is_keyword_only_argument_non_default,
 };
 use crate::{FixAvailability, Violation};
 
@@ -86,5 +87,6 @@ pub(crate) fn os_rmdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         is_fix_os_rmdir_enabled(checker.settings()),
         OsRmdir,
         Applicability::Safe,
+        FileDescriptorHandling::Ignore,
     );
 }

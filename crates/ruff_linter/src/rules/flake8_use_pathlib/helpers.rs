@@ -6,6 +6,12 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, Violation};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FileDescriptorHandling {
+    Ignore,
+    Suppress,
+}
+
 pub(crate) fn is_keyword_only_argument_non_default(arguments: &Arguments, name: &str) -> bool {
     arguments
         .find_keyword(name)
@@ -58,6 +64,7 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     fix_enabled: bool,
     violation: impl Violation,
     applicability: Applicability,
+    file_descriptor_handling: FileDescriptorHandling,
 ) {
     if call.arguments.len() != 1 {
         return;
@@ -66,6 +73,12 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     let Some(arg) = call.arguments.find_argument_value(fn_argument, 0) else {
         return;
     };
+
+    if file_descriptor_handling == FileDescriptorHandling::Suppress
+        && is_file_descriptor(arg, checker.semantic())
+    {
+        return;
+    }
 
     let arg_code = checker.locator().slice(arg.range());
     let range = call.range();

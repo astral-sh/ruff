@@ -4,7 +4,9 @@ use ruff_python_ast::ExprCall;
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_isfile_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
+use crate::rules::flake8_use_pathlib::helpers::{
+    FileDescriptorHandling, check_os_pathlib_single_arg_calls,
+};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -75,5 +77,6 @@ pub(crate) fn os_path_isfile(checker: &Checker, call: &ExprCall, segments: &[&st
         is_fix_os_path_isfile_enabled(checker.settings()),
         OsPathIsfile,
         Applicability::Safe,
+        FileDescriptorHandling::Suppress,
     );
 }

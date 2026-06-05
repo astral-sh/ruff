@@ -4,7 +4,9 @@ use ruff_python_ast::ExprCall;
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_getctime_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
+use crate::rules::flake8_use_pathlib::helpers::{
+    FileDescriptorHandling, check_os_pathlib_single_arg_calls,
+};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -78,5 +80,6 @@ pub(crate) fn os_path_getctime(checker: &Checker, call: &ExprCall, segments: &[&
         is_fix_os_path_getctime_enabled(checker.settings()),
         OsPathGetctime,
         Applicability::Safe,
+        FileDescriptorHandling::Suppress,
     );
 }

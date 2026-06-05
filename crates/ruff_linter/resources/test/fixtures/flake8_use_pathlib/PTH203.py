@@ -33,3 +33,18 @@ getatime(Path("filename").resolve())
 os.path.getatime(pathlib.Path("filename"))
 
 getatime(Path("dir") / "file.txt")
+
+
+fd: int = 1
+os.path.getatime(1)
+os.path.getatime(filename=fd)
+getatime(fd)
+getatime(filename=1)
+
+
+class AttrHolder:
+    fd: int = 1
+
+
+os.path.getatime(AttrHolder.fd)
+getatime(AttrHolder.fd)

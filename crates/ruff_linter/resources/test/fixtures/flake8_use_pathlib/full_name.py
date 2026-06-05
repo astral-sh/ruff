@@ -185,3 +185,24 @@ class _AttrHolder:
 
 os.chmod(_AttrHolder.fd, 0o644)    # Suppressed: resolved as `int`
 os.chmod(_AttrHolder.name, 0o644)  # Diagnostic + fix: resolved as `str`
+
+# `pathlib` does not support file descriptors for these `os.path` APIs.
+fd: int = 9
+os.path.exists(1)
+os.path.exists(path=fd)
+os.path.exists(_AttrHolder.fd)
+os.path.isdir(1)
+os.path.isdir(s=fd)
+os.path.isdir(_AttrHolder.fd)
+os.path.isfile(1)
+os.path.isfile(path=fd)
+os.path.isfile(_AttrHolder.fd)
+os.path.islink(1)
+os.path.islink(path=fd)
+os.path.islink(_AttrHolder.fd)
+os.path.samefile(1, p)
+os.path.samefile(p, 1)
+os.path.samefile(f1=fd, f2=p)
+os.path.samefile(f1=p, f2=fd)
+os.path.samefile(_AttrHolder.fd, p)
+os.path.samefile(p, _AttrHolder.fd)
