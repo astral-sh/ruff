@@ -101,7 +101,7 @@ fn check_method_receiver<'db>(
 
     let class_object = Type::from(enclosing_class);
     // Methods on metaclasses can restrict their receiver to a particular class object.
-    if matches!(receiver_type, Type::ClassLiteral(_) | Type::SubclassOf(_))
+    if is_metaclass_receiver_type(db, receiver_type)
         && class_object.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
         && !last_definition.is_classmethod(db)
         && method_name != "__new__"
@@ -160,6 +160,41 @@ fn check_method_receiver<'db>(
             receiver = receiver_type.display(db),
             expected = expected_receiver.display(db),
         ));
+    }
+}
+
+fn is_metaclass_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bool {
+    match receiver_type {
+        Type::ClassLiteral(_) | Type::SubclassOf(_) => true,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(|element| is_metaclass_receiver_type(db, element)),
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                is_metaclass_receiver_bound(db, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .copied()
+                .all(|constraint| is_metaclass_receiver_bound(db, constraint)),
+            None => false,
+        },
+        _ => false,
+    }
+}
+
+fn is_metaclass_receiver_bound(db: &dyn crate::Db, bound: Type<'_>) -> bool {
+    match bound {
+        Type::ClassLiteral(_) | Type::SubclassOf(_) => true,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(|element| is_metaclass_receiver_bound(db, element)),
+        _ => false,
     }
 }
 
