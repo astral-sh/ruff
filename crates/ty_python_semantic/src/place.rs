@@ -412,24 +412,16 @@ impl<'db> DeprecationBuilder<'db> {
 /// A suppressed deprecated binding can be joined with an inherited nondeprecated binding without
 /// re-enabling transitive deprecation. An inherited deprecated binding remains conservative,
 /// because that alternative has not already reported the warning.
-pub(crate) struct BindingDeprecationBuilder<'db> {
-    first: DeprecationPolicy<'db>,
-    has_candidate: bool,
-    all_same: bool,
-    has_suppress: bool,
-    can_suppress: bool,
-}
-
-impl Default for BindingDeprecationBuilder<'_> {
-    fn default() -> Self {
-        Self {
-            first: DeprecationPolicy::Inherit,
-            has_candidate: false,
-            all_same: true,
-            has_suppress: false,
-            can_suppress: true,
-        }
-    }
+#[derive(Default)]
+pub(crate) enum BindingDeprecationBuilder<'db> {
+    #[default]
+    Empty,
+    Uniform {
+        policy: DeprecationPolicy<'db>,
+        all_suppressible: bool,
+    },
+    MixedSuppressible,
+    MixedInherit,
 }
 
 impl<'db> BindingDeprecationBuilder<'db> {
@@ -438,24 +430,41 @@ impl<'db> BindingDeprecationBuilder<'db> {
         candidate: DeprecationPolicy<'db>,
         type_is_deprecated: bool,
     ) {
-        if self.has_candidate {
-            self.all_same &= candidate == self.first;
-        } else {
-            self.first = candidate;
-            self.has_candidate = true;
-        }
-        self.has_suppress |= candidate == DeprecationPolicy::Suppress;
-        self.can_suppress &= candidate == DeprecationPolicy::Suppress
+        let candidate_is_suppressible = candidate == DeprecationPolicy::Suppress
             || (candidate == DeprecationPolicy::Inherit && !type_is_deprecated);
+        *self = match std::mem::take(self) {
+            Self::Empty => Self::Uniform {
+                policy: candidate,
+                all_suppressible: candidate_is_suppressible,
+            },
+            Self::Uniform {
+                policy,
+                all_suppressible,
+            } if candidate == policy => Self::Uniform {
+                policy,
+                all_suppressible: all_suppressible && candidate_is_suppressible,
+            },
+            Self::Uniform {
+                policy,
+                all_suppressible,
+            } if all_suppressible
+                && candidate_is_suppressible
+                && (policy == DeprecationPolicy::Suppress
+                    || candidate == DeprecationPolicy::Suppress) =>
+            {
+                Self::MixedSuppressible
+            }
+            Self::Uniform { .. } => Self::MixedInherit,
+            Self::MixedSuppressible if candidate_is_suppressible => Self::MixedSuppressible,
+            Self::MixedSuppressible | Self::MixedInherit => Self::MixedInherit,
+        };
     }
 
     pub(crate) fn build_policy(self) -> DeprecationPolicy<'db> {
-        if self.all_same {
-            self.first
-        } else if self.has_suppress && self.can_suppress {
-            DeprecationPolicy::Suppress
-        } else {
-            DeprecationPolicy::Inherit
+        match self {
+            Self::Uniform { policy, .. } => policy,
+            Self::MixedSuppressible => DeprecationPolicy::Suppress,
+            Self::Empty | Self::MixedInherit => DeprecationPolicy::Inherit,
         }
     }
 }
