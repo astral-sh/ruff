@@ -653,11 +653,19 @@ class Invariant[T]:
     def get(self) -> T:
         raise NotImplementedError
 
+class InvariantSubclass[T](Invariant[T]):
+    value: T
+
 def _(x: object):
     if isinstance(x, Invariant):
         reveal_type(x)  # revealed: Invariant[Any]
         reveal_type(x.get())  # revealed: Any
         x.push(42)
+
+def _(x: Invariant[int]):
+    if isinstance(x, InvariantSubclass):
+        reveal_type(x)  # revealed: InvariantSubclass[int]
+        reveal_type(x.value)  # revealed: int
 ```
 
 When reading attributes from an invariant generic, unrelated gradual attribute types are preserved:
