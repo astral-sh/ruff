@@ -1004,13 +1004,17 @@ impl<'db> DefinitionTypes<'db> {
 
     fn normalize_binding(
         db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
+        previous: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        if let Some(previous_ty) = previous.binding_type(owner, definition) {
+        if let Some(previous_ty) = previous
+            .types
+            .binding_type(owner, definition)
+            .or_else(|| previous.fallback_type())
+        {
             ty.cycle_normalized(db, previous_ty, cycle)
         } else {
             ty.recursive_type_normalized(db, cycle)
@@ -1019,14 +1023,16 @@ impl<'db> DefinitionTypes<'db> {
 
     fn normalize_declaration(
         db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
+        previous: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
         definition: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
-        if let Some(previous_ty) = previous.declaration_type(owner, definition) {
+        if let Some(previous_ty) = previous.types.declaration_type(owner, definition) {
             ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
+        } else if let Some(previous_fallback) = previous.fallback_type() {
+            ty.map_type(|inner| inner.cycle_normalized(db, previous_fallback, cycle))
         } else {
             ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
         }
@@ -1035,7 +1041,7 @@ impl<'db> DefinitionTypes<'db> {
     fn cycle_normalized(
         self,
         db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
+        previous: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
     ) -> Self {
@@ -1318,7 +1324,7 @@ impl<'db> DefinitionInference<'db> {
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
-            &previous_inference.types,
+            previous_inference,
             cycle,
             definition,
         );
