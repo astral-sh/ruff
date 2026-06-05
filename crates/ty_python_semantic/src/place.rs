@@ -142,6 +142,17 @@ impl<'db> DeprecationPolicy<'db> {
             self.resolve_for_type(db, ty)
         }
     }
+
+    pub(crate) fn contains_deprecated(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Deprecated(_) => true,
+            Self::Alternatives(alternatives) => alternatives
+                .alternatives(db)
+                .iter()
+                .any(|(_, policy)| policy.contains_deprecated(db)),
+            Self::Inherit | Self::Suppress => false,
+        }
+    }
 }
 
 fn deprecation_types_share_single_value<'db>(

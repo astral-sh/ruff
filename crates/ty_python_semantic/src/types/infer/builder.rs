@@ -11269,6 +11269,23 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
         }
 
         let expression_ty = self.expression_type(expression);
+        if matches!(expression, ast::Expr::Name(_))
+            && let Some(place_expr) = PlaceExpr::try_from_expr(expression)
+        {
+            let place_deprecation = self
+                .builder
+                .infer_place_load_without_deprecation_diagnostic(
+                    PlaceExprRef::from(&place_expr),
+                    ast::ExprRef::from(expression),
+                )
+                .0
+                .deprecation_policy();
+            if matches!(place_deprecation, DeprecationPolicy::Alternatives(_))
+                && place_deprecation.contains_deprecated(self.builder.db())
+            {
+                return place_deprecation;
+            }
+        }
         let type_is_deprecated = expression_ty.is_deprecated(self.builder.db());
         if !type_is_deprecated
             && !matches!(
