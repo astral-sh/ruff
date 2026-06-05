@@ -85,16 +85,32 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let raw_receiver_type = receiver_parameter.annotated_type();
+    let node = last_definition.node(db, context.file(), context.module());
+    let Some(annotation) = node
+        .parameters
+        .iter()
+        .next()
+        .and_then(ast::AnyParameterRef::annotation)
+    else {
+        return;
+    };
+
+    let annotated_receiver_type = receiver_parameter.annotated_type();
     if receiver_parameter.is_variadic()
         && matches!(
-            raw_receiver_type,
+            annotated_receiver_type,
             Type::TypeVar(typevar)
                 if typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Args)
         )
     {
         return;
     }
+    let raw_receiver_type = if receiver_parameter.is_variadic() {
+        unpacked_variadic_receiver_type(db, annotation, file_expression_type)
+            .unwrap_or(annotated_receiver_type)
+    } else {
+        annotated_receiver_type
+    };
     let receiver_type = raw_receiver_type.resolve_type_alias(db);
 
     if receiver_type.is_never()
@@ -130,20 +146,10 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let node = last_definition.node(db, context.file(), context.module());
-    let Some(annotation) = node
-        .parameters
-        .iter()
-        .next()
-        .and_then(ast::AnyParameterRef::annotation)
-    else {
-        return;
-    };
-
     if let Some(accepts_receiver) = protocol_class_union_accepts_receiver(
         db,
         annotation,
-        raw_receiver_type,
+        annotated_receiver_type,
         expected_receiver,
         typing_self_type,
         file_expression_type,
@@ -160,7 +166,7 @@ fn check_method_receiver<'db>(
     }
 
     if let Some(builder) = context.report_lint(&INVALID_METHOD_RECEIVER, annotation) {
-        let receiver = if any_over_type(db, receiver_type, false, |ty| ty.is_todo()) {
+        let receiver = if any_over_type(db, annotated_receiver_type, false, |ty| ty.is_todo()) {
             Generator::new(&Indentation::default(), LineEnding::default()).expr(annotation)
         } else {
             receiver_type.display(db).to_string()
@@ -170,6 +176,27 @@ fn check_method_receiver<'db>(
             expected = expected_receiver.display(db),
         ));
     }
+}
+
+fn unpacked_variadic_receiver_type<'db>(
+    db: &'db dyn crate::Db,
+    annotation: &ast::Expr,
+    file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
+) -> Option<Type<'db>> {
+    let ast::Expr::Subscript(subscript) = annotation else {
+        return None;
+    };
+    if file_expression_type(&subscript.value)
+        != Type::SpecialForm(SpecialFormType::Unpack)
+    {
+        return None;
+    }
+
+    let tuple = file_expression_type(&subscript.slice).exact_tuple_instance_spec(db)?;
+    if tuple.fixed_elements().next().is_some() {
+        return None;
+    }
+    tuple.variable_element().copied()
 }
 
 fn is_protocol_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bool {
