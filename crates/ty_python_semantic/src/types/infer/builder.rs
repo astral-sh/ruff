@@ -3584,7 +3584,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn expression_deprecation_policy(&self, expression: &'ast ast::Expr) -> DeprecationPolicy<'db> {
         if let Some(standalone) = self.index.try_expression(expression) {
             let inference = infer_expression_types(self.db(), standalone, TypeContext::default());
-            ExpressionDeprecationPolicy::from_inference(self.db(), inference).policy(expression)
+            ExpressionDeprecationPolicy::from_inference(self, inference).policy(expression)
         } else {
             ExpressionDeprecationPolicy::from_builder(self).policy(expression)
         }
@@ -3604,7 +3604,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let value = value_expression.node_ref(self.db()).node(self.module());
                 let inference =
                     infer_expression_types(self.db(), value_expression, TypeContext::default());
-                let policy = ExpressionDeprecationPolicy::from_inference(self.db(), inference);
+                let policy = ExpressionDeprecationPolicy::from_inference(self, inference);
                 corresponding_unpack_value(target, value, assignment.target(self.module()))
                     .map_or(DeprecationPolicy::Inherit, |value| policy.policy(value))
             }
@@ -11158,21 +11158,24 @@ enum ExpressionTypeSource<'builder, 'db, 'ast> {
 }
 
 struct ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
-    db: &'db dyn Db,
+    builder: &'builder TypeInferenceBuilder<'db, 'ast>,
     source: ExpressionTypeSource<'builder, 'db, 'ast>,
 }
 
 impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
     fn from_builder(builder: &'builder TypeInferenceBuilder<'db, 'ast>) -> Self {
         Self {
-            db: builder.db(),
+            builder,
             source: ExpressionTypeSource::Builder(builder),
         }
     }
 
-    fn from_inference(db: &'db dyn Db, inference: &'builder ExpressionInference<'db>) -> Self {
+    fn from_inference(
+        builder: &'builder TypeInferenceBuilder<'db, 'ast>,
+        inference: &'builder ExpressionInference<'db>,
+    ) -> Self {
         Self {
-            db,
+            builder,
             source: ExpressionTypeSource::Inference(inference),
         }
     }
@@ -11185,21 +11188,43 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
     }
 
     fn policy(&self, expression: &'ast ast::Expr) -> DeprecationPolicy<'db> {
-        if !self.expression_type(expression).is_deprecated(self.db) {
+        let expression_ty = self.expression_type(expression);
+        if !expression_ty.is_deprecated(self.builder.db()) {
             return DeprecationPolicy::Inherit;
         }
 
         match expression {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => DeprecationPolicy::Suppress,
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                if !matches!(expression_ty, Type::Union(_)) {
+                    return DeprecationPolicy::Suppress;
+                }
+                let place_deprecation = PlaceExpr::try_from_expr(expression)
+                    .map(|place_expr| {
+                        self.builder
+                            .infer_place_load(
+                                PlaceExprRef::from(&place_expr),
+                                ast::ExprRef::from(expression),
+                            )
+                            .0
+                            .deprecation_policy()
+                    })
+                    .unwrap_or(DeprecationPolicy::Inherit);
+                if place_deprecation != DeprecationPolicy::Inherit {
+                    DeprecationPolicy::Suppress
+                } else {
+                    DeprecationPolicy::Inherit
+                }
+            }
             ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
                 let mut deprecation = BindingDeprecationBuilder::default();
                 deprecation.add_policy(
                     self.policy(body),
-                    self.expression_type(body).is_deprecated(self.db),
+                    self.expression_type(body).is_deprecated(self.builder.db()),
                 );
                 deprecation.add_policy(
                     self.policy(orelse),
-                    self.expression_type(orelse).is_deprecated(self.db),
+                    self.expression_type(orelse)
+                        .is_deprecated(self.builder.db()),
                 );
                 deprecation.build_policy()
             }
@@ -11208,7 +11233,7 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                 if matches!(
                     self.expression_type(&call.func),
                     Type::FunctionLiteral(function)
-                        if function.is_known(self.db, KnownFunction::Cast)
+                        if function.is_known(self.builder.db(), KnownFunction::Cast)
                 ) =>
             {
                 call.arguments

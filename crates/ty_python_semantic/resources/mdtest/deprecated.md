@@ -584,6 +584,11 @@ def narrowed_alias(flag: bool, unknown: object):
     if is_depr_func(narrowed_value):
         narrowed_value()  # error: [deprecated] "Use other_func instead"
 
+def narrowed_union_alias(value: TypeOf[depr_func] | None):  # ty: ignore[deprecated]
+    union_value = value
+    if union_value is not None:
+        union_value()  # error: [deprecated] "Use other_func instead"
+
 def loop_alias():
     alias = depr_func  # error: [deprecated] "Use other_func instead"
     for _ in range(1):
