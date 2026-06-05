@@ -127,6 +127,10 @@ class Foo(Parent):
     def overloaded(self, value: int | str) -> int | str:
         return value
 
+class GenericClass[T]:
+    # error: [invalid-method-receiver]
+    def invalid(self: T): ...
+
 class FooChild(Foo): ...
 
 class ReceiverProtocol(Protocol):

@@ -107,6 +107,13 @@ fn check_method_receiver<'db>(
     let concrete_receiver_type = receiver_type
         .bind_self_typevars(db, typing_self_type)
         .resolve_type_alias(db);
+    let receiver_is_class_typevar = matches!(
+        concrete_receiver_type,
+        Type::TypeVar(typevar)
+            if enclosing_class
+                .generic_context(db)
+                .is_some_and(|context| context.contains(db, typevar.identity(db)))
+    );
     let concrete_receiver_type = match concrete_receiver_type {
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.top_materialization(db),
@@ -118,11 +125,12 @@ fn check_method_receiver<'db>(
         _ => concrete_receiver_type.top_materialization(db),
     };
 
-    if is_protocol_receiver_type(db, receiver_type)
-        || is_protocol_receiver_type(db, concrete_receiver_type)
-        || expected_receiver.is_assignable_to(db, concrete_receiver_type)
-        || (!matches!(receiver_type, Type::TypeVar(_))
-            && signature.can_bind_self_to(db, expected_receiver))
+    if !receiver_is_class_typevar
+        && (is_protocol_receiver_type(db, receiver_type)
+            || is_protocol_receiver_type(db, concrete_receiver_type)
+            || expected_receiver.is_assignable_to(db, concrete_receiver_type)
+            || (!matches!(receiver_type, Type::TypeVar(_))
+                && signature.can_bind_self_to(db, expected_receiver)))
     {
         return;
     }
