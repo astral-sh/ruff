@@ -13,10 +13,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 ## mdtest_snippet.pyi
 
 ```
-  1 | from typing_extensions import final, Callable, TypeVar
+  1 | from typing_extensions import Any, Callable, TypeVar, final
   2 | 
-  3 | # error: [missing-type-argument]
-  4 | def lossy_decorator(fn: Callable) -> Callable: ...  # error: [missing-type-argument]
+  3 | # Decorator intentionally erases the wrapped signature.
+  4 | def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
   5 | 
   6 | class Parent:
   7 |     @final
@@ -129,26 +129,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 ```
 
 # Diagnostics
-
-```
-info[missing-type-argument]: Missing type arguments for generic type `Callable` (expected 2 type arguments)
- --> src/mdtest_snippet.pyi:4:25
-  |
-4 | def lossy_decorator(fn: Callable) -> Callable: ...  # error: [missing-type-argument]
-  |                         ^^^^^^^^
-  |
-
-```
-
-```
-info[missing-type-argument]: Missing type arguments for generic type `Callable` (expected 2 type arguments)
- --> src/mdtest_snippet.pyi:4:38
-  |
-4 | def lossy_decorator(fn: Callable) -> Callable: ...  # error: [missing-type-argument]
-  |                                      ^^^^^^^^
-  |
-
-```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.foo`

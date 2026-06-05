@@ -31,7 +31,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 16 | # This one works at runtime, but the metaclass is still `typing._TypedDictMeta`,
 17 | # so there doesn't seem to be any reason why you'd want to do this
 18 | class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
-19 | def f(kwargs: dict):  # error: [missing-type-argument]
+19 | def f(kwargs: dict[str, object]):
 20 |     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
 21 | class Qux(TypedDict, total=1 == 1): ...  # error: [invalid-argument-type]
 22 | class Quux(TypedDict, closed=1 == 1): ...  # error: [invalid-argument-type]
@@ -125,16 +125,6 @@ error[invalid-typed-dict-header]: Custom metaclasses are not supported in `Typed
    |
 18 | class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
    |                      ^^^^^^^^^^^^^^
-   |
-
-```
-
-```
-info[missing-type-argument]: Missing type arguments for generic class `dict` (expected 2 type arguments)
-  --> src/mdtest_snippet.py:19:15
-   |
-19 | def f(kwargs: dict):  # error: [missing-type-argument]
-   |               ^^^^
    |
 
 ```

@@ -16,67 +16,27 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
  1 | import types
  2 | import typing
  3 | 
- 4 | async def f() -> types.AsyncGeneratorType:  # error: [missing-type-argument]
+ 4 | async def f() -> types.AsyncGeneratorType[int, None]:
  5 |     yield 42
  6 | 
- 7 | async def g() -> typing.AsyncGenerator:  # error: [missing-type-argument]
+ 7 | async def g() -> typing.AsyncGenerator[int]:
  8 |     yield 42
  9 | 
-10 | async def h() -> typing.AsyncIterator:  # error: [missing-type-argument]
+10 | async def h() -> typing.AsyncIterator[int]:
 11 |     yield 42
 12 | 
-13 | async def i() -> typing.AsyncIterable:  # error: [missing-type-argument]
+13 | async def i() -> typing.AsyncIterable[int]:
 14 |     yield 42
 15 | 
 16 | async def j() -> str:  # error: [invalid-return-type]
 17 |     yield 42
 18 | 
-19 | async def k() -> typing.AsyncGenerator:  # error: [missing-type-argument]
+19 | async def k() -> typing.AsyncGenerator[int]:
 20 |     yield 42
 21 |     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
 # Diagnostics
-
-```
-info[missing-type-argument]: Missing type argument for generic class `AsyncGeneratorType` (expected 1 type argument)
- --> src/mdtest_snippet.py:4:18
-  |
-4 | async def f() -> types.AsyncGeneratorType:  # error: [missing-type-argument]
-  |                  ^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-
-```
-
-```
-info[missing-type-argument]: Missing type argument for generic class `AsyncGenerator` (expected 1 type argument)
- --> src/mdtest_snippet.py:7:18
-  |
-7 | async def g() -> typing.AsyncGenerator:  # error: [missing-type-argument]
-  |                  ^^^^^^^^^^^^^^^^^^^^^
-  |
-
-```
-
-```
-info[missing-type-argument]: Missing type argument for generic class `AsyncIterator` (expected 1 type argument)
-  --> src/mdtest_snippet.py:10:18
-   |
-10 | async def h() -> typing.AsyncIterator:  # error: [missing-type-argument]
-   |                  ^^^^^^^^^^^^^^^^^^^^
-   |
-
-```
-
-```
-info[missing-type-argument]: Missing type argument for generic class `AsyncIterable` (expected 1 type argument)
-  --> src/mdtest_snippet.py:13:18
-   |
-13 | async def i() -> typing.AsyncIterable:  # error: [missing-type-argument]
-   |                  ^^^^^^^^^^^^^^^^^^^^
-   |
-
-```
 
 ```
 error[invalid-return-type]: Return type does not match returned value
@@ -87,16 +47,6 @@ error[invalid-return-type]: Return type does not match returned value
    |
 info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
 info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator for more details
-
-```
-
-```
-info[missing-type-argument]: Missing type argument for generic class `AsyncGenerator` (expected 1 type argument)
-  --> src/mdtest_snippet.py:19:18
-   |
-19 | async def k() -> typing.AsyncGenerator:  # error: [missing-type-argument]
-   |                  ^^^^^^^^^^^^^^^^^^^^^
-   |
 
 ```
 

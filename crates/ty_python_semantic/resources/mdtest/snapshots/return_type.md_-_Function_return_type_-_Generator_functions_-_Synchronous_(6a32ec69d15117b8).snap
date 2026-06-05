@@ -16,19 +16,19 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
  1 | import types
  2 | import typing
  3 | 
- 4 | def f() -> types.GeneratorType:  # error: [missing-type-argument]
+ 4 | def f() -> types.GeneratorType[int, None, None]:
  5 |     yield 42
  6 | 
- 7 | def g() -> typing.Generator:  # error: [missing-type-argument]
+ 7 | def g() -> typing.Generator[int]:
  8 |     yield 42
  9 | 
-10 | def h() -> typing.Iterator:  # error: [missing-type-argument]
+10 | def h() -> typing.Iterator[int]:
 11 |     yield 42
 12 | 
-13 | def i() -> typing.Iterable:  # error: [missing-type-argument]
+13 | def i() -> typing.Iterable[int]:
 14 |     yield 42
 15 | 
-16 | def i2() -> typing.Generator:  # error: [missing-type-argument]
+16 | def i2() -> typing.Generator[int]:
 17 |     yield from i()
 18 | 
 19 | def j() -> str:  # error: [invalid-return-type]
@@ -52,56 +52,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 ```
 
 # Diagnostics
-
-```
-info[missing-type-argument]: Missing type argument for generic class `GeneratorType` (expected 1 type argument)
- --> src/mdtest_snippet.py:4:12
-  |
-4 | def f() -> types.GeneratorType:  # error: [missing-type-argument]
-  |            ^^^^^^^^^^^^^^^^^^^
-  |
-
-```
-
-```
-info[missing-type-argument]: Missing type argument for generic class `Generator` (expected 1 type argument)
- --> src/mdtest_snippet.py:7:12
-  |
-7 | def g() -> typing.Generator:  # error: [missing-type-argument]
-  |            ^^^^^^^^^^^^^^^^
-  |
-
-```
-
-```
-info[missing-type-argument]: Missing type argument for generic class `Iterator` (expected 1 type argument)
-  --> src/mdtest_snippet.py:10:12
-   |
-10 | def h() -> typing.Iterator:  # error: [missing-type-argument]
-   |            ^^^^^^^^^^^^^^^
-   |
-
-```
-
-```
-info[missing-type-argument]: Missing type argument for generic class `Iterable` (expected 1 type argument)
-  --> src/mdtest_snippet.py:13:12
-   |
-13 | def i() -> typing.Iterable:  # error: [missing-type-argument]
-   |            ^^^^^^^^^^^^^^^
-   |
-
-```
-
-```
-info[missing-type-argument]: Missing type argument for generic class `Generator` (expected 1 type argument)
-  --> src/mdtest_snippet.py:16:13
-   |
-16 | def i2() -> typing.Generator:  # error: [missing-type-argument]
-   |             ^^^^^^^^^^^^^^^^
-   |
-
-```
 
 ```
 error[invalid-return-type]: Return type does not match returned value

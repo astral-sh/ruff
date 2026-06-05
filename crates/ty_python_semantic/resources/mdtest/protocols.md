@@ -3028,14 +3028,14 @@ reveal_type(is_single_valued(WeirdAndWacky))  # revealed: Literal[False]
 `typing.SupportsIndex` and `typing.Sized` are two protocols that are very commonly used in the wild.
 
 ```py
-from typing import SupportsIndex, Sized, Literal
+from typing import Any, SupportsIndex, Sized, Literal
 
 def one(some_int: int, some_literal_int: Literal[1], some_indexable: SupportsIndex):
     a: SupportsIndex = some_int
     b: SupportsIndex = some_literal_int
     c: SupportsIndex = some_indexable
 
-def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):  # error: [missing-type-argument]
+def two(some_list: list[Any], some_tuple: tuple[int, str], some_sized: Sized):
     a: Sized = some_list
     b: Sized = some_tuple
     c: Sized = some_sized
@@ -3352,14 +3352,13 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
-from typing import cast, Protocol
+from typing import Any, cast, Protocol
 
 class Iterator[T](Protocol):
     def __iter__(self) -> Iterator[T]: ...
 
-def f(value: Iterator):  # error: [missing-type-argument]
-    # error: [missing-type-argument]
-    cast(Iterator, value)  # error: [redundant-cast]
+def f(value: Iterator[Any]):
+    cast(Iterator[Any], value)  # error: [redundant-cast]
 ```
 
 ### Recursive generic protocols
@@ -3452,13 +3451,13 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol
+from typing import Any, Protocol
 
 class Foo[T]: ...
 
 class A(Protocol):
     @property
-    def _(self: "A") -> Foo: ...  # error: [missing-type-argument]
+    def _(self: "A") -> Foo[Any]: ...
 
 class B(Protocol):
     @property

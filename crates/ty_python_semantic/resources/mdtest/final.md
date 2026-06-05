@@ -35,10 +35,10 @@ class H(
 <!-- snapshot-diagnostics -->
 
 ```pyi
-from typing_extensions import final, Callable, TypeVar
+from typing_extensions import Any, Callable, TypeVar, final
 
-# error: [missing-type-argument]
-def lossy_decorator(fn: Callable) -> Callable: ...  # error: [missing-type-argument]
+# Decorator intentionally erases the wrapped signature.
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
 
 class Parent:
     @final

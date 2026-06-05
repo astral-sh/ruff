@@ -743,18 +743,18 @@ def decorated[T](t: T) -> None:
 ## Attribute access on `Callable`-bounded TypeVars
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
-def my_decorator[T: Callable](f: T) -> None:  # error: [missing-type-argument]
+def my_decorator[T: Callable[..., Any]](f: T) -> None:
     # error: [unresolved-attribute]
     f.whatever
     # error: [unresolved-attribute]
     f.whatever = 1
 
-class Box[T: Callable]:  # error: [missing-type-argument]
+class Box[T: Callable[..., Any]]:
     cls: type[T]
 
-def specialized(box: Box[Callable]) -> None:  # error: [missing-type-argument]
+def specialized(box: Box[Callable[..., Any]]) -> None:
     # error: [unresolved-attribute]
     box.cls.whatever
 ```

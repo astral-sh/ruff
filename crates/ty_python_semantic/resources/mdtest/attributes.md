@@ -3403,14 +3403,14 @@ python-version = "3.14"
 ```
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
-def f(x: Callable):  # error: [missing-type-argument]
+def f(x: Callable[..., Any]):
     x.__name__  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__name__`
+error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__name__`
  --> src/mdtest_snippet.py:4:5
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
@@ -3421,12 +3421,12 @@ help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/ty
 ```
 
 ```py
-def g(x: Callable):  # error: [missing-type-argument]
+def g(x: Callable[..., Any]):
     x.__annotate__  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__annotate__`
+error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__annotate__`
  --> src/mdtest_snippet.py:6:5
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute

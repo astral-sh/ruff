@@ -9,10 +9,10 @@ in fact override anything, a type checker should report a diagnostic on that met
 <!-- snapshot-diagnostics -->
 
 ```pyi
-from typing_extensions import override, Callable, TypeVar
+from typing_extensions import Any, Callable, TypeVar, override
 
-# error: [missing-type-argument]
-def lossy_decorator(fn: Callable) -> Callable: ...  # error: [missing-type-argument]
+# Decorator intentionally erases the wrapped signature.
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
 
 class A:
     @override

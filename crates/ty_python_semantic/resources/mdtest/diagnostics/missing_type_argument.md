@@ -215,8 +215,8 @@ y = cast(list[int], object())
 
 ## Base classes
 
-Base classes are not type annotations — using a bare generic as a base class is valid
-and does not trigger the rule.
+Bare generic base classes implicitly inherit from a specialization with `Unknown` type arguments, so
+they trigger the rule.
 
 ```toml
 [rules]
@@ -224,9 +224,9 @@ missing-type-argument = "error"
 ```
 
 ```py
-class MyList(list):
+class MyList(list):  # error: [missing-type-argument]
     pass
 
-class MyDict(dict):
+class MyDict(dict):  # error: [missing-type-argument]
     pass
 ```
