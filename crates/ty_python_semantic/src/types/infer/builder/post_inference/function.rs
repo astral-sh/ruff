@@ -198,6 +198,8 @@ fn protocol_class_union_accepts_receiver<'db>(
         db,
         expected_receiver,
         expected_instance,
+        receiver_is_class_object: expected_receiver
+            .is_subtype_of(db, KnownClass::Type.to_instance(db)),
         seen_aliases: FxHashSet::default(),
         seen_typevars: FxHashSet::default(),
     }
@@ -244,6 +246,7 @@ struct ProtocolClassUnionChecker<'db> {
     db: &'db dyn crate::Db,
     expected_receiver: Type<'db>,
     expected_instance: Type<'db>,
+    receiver_is_class_object: bool,
     seen_aliases: FxHashSet<TypeAliasType<'db>>,
     seen_typevars: FxHashSet<TypeVarInstance<'db>>,
 }
@@ -393,9 +396,10 @@ impl<'db> ProtocolClassUnionChecker<'db> {
                 if let Some(protocol_instance) = protocol_instance {
                     return Some(ProtocolClassUnionCompatibility {
                         contains_protocol_class: true,
-                        accepts_receiver: self
-                            .expected_instance
-                            .is_assignable_to(self.db, protocol_instance),
+                        accepts_receiver: self.receiver_is_class_object
+                            && self
+                                .expected_instance
+                                .is_assignable_to(self.db, protocol_instance),
                     });
                 }
             }
