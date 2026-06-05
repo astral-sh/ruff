@@ -298,6 +298,28 @@ class ClassChildWithFallback(ClassBaseWithFallback):
 if is_replacement_class(ClassChildWithFallback.binding):
     ClassChildWithFallback.binding()  # error: [deprecated] "child class replacement"
 
+class ReplacementMeta(type):
+    if flag:
+        @deprecated("metaclass replacement")
+        @replace_with(ReplacementClass)
+        def binding() -> None: ...
+
+class DirectMetaBinding(metaclass=ReplacementMeta): ...
+
+class MetaBindingWithFallback(metaclass=ReplacementMeta):
+    if flag:
+        binding = OtherReplacementClass
+
+# error: [possibly-missing-attribute]
+if is_replacement_class(DirectMetaBinding.binding):  # error: [deprecated] "metaclass replacement"
+    # error: [possibly-missing-attribute]
+    DirectMetaBinding.binding()  # error: [deprecated] "metaclass replacement"
+
+# error: [possibly-missing-attribute]
+if is_replacement_class(MetaBindingWithFallback.binding):
+    # error: [possibly-missing-attribute]
+    MetaBindingWithFallback.binding()  # error: [deprecated] "metaclass replacement"
+
 T = TypeVar("T", D, E)
 
 def use_union(instance: D | E) -> None:

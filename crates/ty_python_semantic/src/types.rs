@@ -47,7 +47,7 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, DeprecationPolicy, Place, PlaceAndQualifiers, TypeOrigin,
-    builtins_module_scope, imported_symbol, known_module_symbol, merge_deprecation_policy,
+    builtins_module_scope, imported_symbol, known_module_symbol,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -3275,9 +3275,12 @@ impl<'db> Type<'db> {
                 public_type_policy: fallback_public_type_policy,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers))
-            .with_deprecation_policy(merge_deprecation_policy(
-                meta_attr_deprecation,
-                fallback_deprecation,
+            .with_deprecation_policy(DeprecationPolicy::from_alternatives(
+                db,
+                [
+                    (meta_attr_ty, meta_attr_deprecation),
+                    (fallback_ty, fallback_deprecation),
+                ],
             )),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -3323,9 +3326,12 @@ impl<'db> Type<'db> {
                 public_type_policy: fallback_public_type_policy,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers))
-            .with_deprecation_policy(merge_deprecation_policy(
-                meta_attr_deprecation,
-                fallback_deprecation,
+            .with_deprecation_policy(DeprecationPolicy::from_alternatives(
+                db,
+                [
+                    (meta_attr_ty, meta_attr_deprecation),
+                    (fallback_ty, fallback_deprecation),
+                ],
             )),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
