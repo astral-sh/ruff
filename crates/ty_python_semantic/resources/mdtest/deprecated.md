@@ -559,6 +559,13 @@ def factory() -> TypeOf[depr_func]:  # ty: ignore[deprecated]
 factory_alias = factory()
 factory_alias()  # error: [deprecated] "Use other_func instead"
 
+selected_factory_alias = (depr_func, factory())[1]  # error: [deprecated] "Use other_func instead"
+selected_factory_alias()  # error: [deprecated] "Use other_func instead"
+
+first_alias, unpacked_factory_alias = depr_func, factory()  # error: [deprecated] "Use other_func instead"
+first_alias()
+unpacked_factory_alias()  # error: [deprecated] "Use other_func instead"
+
 def mixed_alias(flag: bool):
     if flag:
         mixed_value = depr_func  # error: [deprecated] "Use other_func instead"
