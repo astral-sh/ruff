@@ -244,12 +244,12 @@ function SubDiagnosticAnnotationItem({
   return (
     <>
       {prefix}
+      {message}{" "}
       <button
         onClick={() => onGoTo(location)}
-        className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
+        className="cursor-pointer text-gray-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
       >
-        {message}
-        <span className="text-gray-500"> {locationLabel}</span>
+        {locationLabel}
       </button>
     </>
   );
