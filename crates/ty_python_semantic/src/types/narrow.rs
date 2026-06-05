@@ -3498,8 +3498,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             && let Some(key) = inference.expression_type(&**left).as_string_literal()
             && let rhs_expr = comparators[0].expression_value()
             && let rhs_type = inference.expression_type(&comparators[0])
-            && (is_or_contains_typeddict(self.db, rhs_type)
-                || is_or_contains_mapping(self.db, rhs_type))
+            && is_or_contains_mapping(self.db, rhs_type)
         {
             let constraint = if is_positive == (ops[0] == ast::CmpOp::In) {
                 NarrowingConstraint::present_key(rhs_type, key)
@@ -4337,16 +4336,16 @@ fn is_mapping_subtype<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 
 /// Return whether successful membership implies that subscripting with the same key is valid.
 ///
-/// `TypedDict` and `Mapping` provide this relationship; an arbitrary `__contains__`
-/// implementation does not. Every arm of a union must provide the relationship before it can be
-/// carried across replacement narrowing.
+/// `Mapping` provides this relationship; an arbitrary `__contains__` implementation does not.
+/// Every arm of a union must provide the relationship before it can be carried across replacement
+/// narrowing.
 fn key_membership_implies_subscript<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty.resolve_type_alias(db) {
         Type::Union(union) => union
             .elements(db)
             .iter()
             .all(|element| key_membership_implies_subscript(db, *element)),
-        resolved => is_or_contains_typeddict(db, resolved) || is_mapping_subtype(db, resolved),
+        resolved => is_mapping_subtype(db, resolved),
     }
 }
 
