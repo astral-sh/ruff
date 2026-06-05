@@ -3585,7 +3585,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let policy = match deprecation {
             DeprecationPolicy::Alternatives(_) => deprecation,
-            DeprecationPolicy::Suppress if ty.is_deprecated(self.db()) => {
+            DeprecationPolicy::Suppress
+                if ty.is_deprecated(self.db()) || matches!(ty, Type::Union(_)) =>
+            {
                 DeprecationPolicy::Suppress
             }
             _ => return,
@@ -11280,10 +11282,13 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                 )
                 .0
                 .deprecation_policy();
-            if matches!(place_deprecation, DeprecationPolicy::Alternatives(_))
-                && place_deprecation.contains_deprecated(self.builder.db())
-            {
+            if matches!(place_deprecation, DeprecationPolicy::Alternatives(_)) {
                 return place_deprecation;
+            }
+            if place_deprecation == DeprecationPolicy::Suppress
+                && matches!(expression_ty, Type::Union(_))
+            {
+                return DeprecationPolicy::Suppress;
             }
         }
         let type_is_deprecated = expression_ty.is_deprecated(self.builder.db());

@@ -117,7 +117,10 @@ impl<'db> DeprecationPolicy<'db> {
         let mut deprecation = BindingDeprecationBuilder::default();
         for (alternative_ty, policy) in alternatives.alternatives(db) {
             if !deprecation_alternative_is_eliminated(db, *alternative_ty, ty) {
-                deprecation.add_policy(policy.resolve_for_type(db, ty), ty.is_deprecated(db));
+                deprecation.add_policy(
+                    policy.resolve_for_type(db, ty),
+                    alternative_ty.is_deprecated(db),
+                );
             }
         }
         deprecation.build_policy()
@@ -133,24 +136,16 @@ impl<'db> DeprecationPolicy<'db> {
         for (alternative_ty, policy) in alternatives.alternatives(db) {
             if deprecation_types_share_single_value(db, *alternative_ty, ty) {
                 has_matching_alternative = true;
-                deprecation.add_policy(policy.resolve_for_type(db, ty), ty.is_deprecated(db));
+                deprecation.add_policy(
+                    policy.resolve_for_type(db, ty),
+                    alternative_ty.is_deprecated(db),
+                );
             }
         }
         if has_matching_alternative {
             deprecation.build_policy()
         } else {
             self.resolve_for_type(db, ty)
-        }
-    }
-
-    pub(crate) fn contains_deprecated(self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Deprecated(_) => true,
-            Self::Alternatives(alternatives) => alternatives
-                .alternatives(db)
-                .iter()
-                .any(|(_, policy)| policy.contains_deprecated(db)),
-            Self::Inherit | Self::Suppress => false,
         }
     }
 }

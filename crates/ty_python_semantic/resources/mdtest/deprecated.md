@@ -760,6 +760,8 @@ class DeprType: ...
 @deprecated("Use other_func instead")
 def depr_func(): ...
 
+def regular_func(): ...
+
 class C:
     @deprecated("Use other_method instead")
     def depr_method(self): ...
@@ -836,6 +838,12 @@ def mixed_alias(flag: bool):
 
 def is_depr_func(value: object) -> TypeGuard[TypeOf[depr_func]]:  # ty: ignore[deprecated]
     return True
+
+def chained_union_alias(flag: bool):
+    mixed = depr_func if flag else regular_func  # error: [deprecated] "Use other_func instead"
+    second = mixed
+    if is_depr_func(second):
+        second()
 
 def narrowed_alias(flag: bool, unknown: object):
     if flag:
