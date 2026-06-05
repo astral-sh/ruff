@@ -432,14 +432,16 @@ impl<'db> AllMembers<'db> {
                     });
                 }
 
-                self.members
-                    .extend(literal.available_submodule_attributes(db).filter_map(
-                        |submodule_name| {
-                            let ty = literal.resolve_submodule(db, &submodule_name)?;
+                self.members.extend(
+                    literal
+                        .available_submodule_attributes(db)
+                        .iter()
+                        .filter_map(|submodule_name| {
+                            let ty = literal.resolve_submodule(db, submodule_name.as_str())?;
                             let name = submodule_name.clone();
                             Some(Member { name, ty })
-                        },
-                    ));
+                        }),
+                );
             }
         }
     }

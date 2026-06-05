@@ -1,5 +1,4 @@
 use compact_str::ToCompactString;
-use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
@@ -7846,12 +7845,8 @@ impl<'db> ModuleLiteralType<'db> {
     ///
     /// We instead prefer handling most other import effects as definitions in the scope of
     /// the current file (i.e. `ty_python_core::definition::ImportFromDefinitionNodeRef`).
-    fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
-        self.importing_file(db)
-            .into_iter()
-            .flat_map(|file| semantic_index(db, file).imported_modules())
-            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
-            .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
+    fn available_submodule_attributes(self, db: &'db dyn Db) -> &'db [Name] {
+        module_literal_available_submodule_attributes(db, self)
     }
 
     fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
@@ -7907,7 +7902,10 @@ impl<'db> ModuleLiteralType<'db> {
         // the parent module's `__init__.py` file being evaluated. That said, we have
         // chosen to always have the submodule take priority. (This matches pyright's
         // current behavior, but is the opposite of mypy's current behavior.)
-        if self.available_submodule_attributes(db).contains(name)
+        if self
+            .available_submodule_attributes(db)
+            .iter()
+            .any(|submodule_name| submodule_name.as_str() == name)
             && let Some(submodule) = self.resolve_submodule(db, name)
         {
             return Place::bound(submodule).into();
@@ -7942,6 +7940,20 @@ impl<'db> ModuleLiteralType<'db> {
 
         place_and_qualifiers
     }
+}
+
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn module_literal_available_submodule_attributes<'db>(
+    db: &'db dyn Db,
+    module_literal: ModuleLiteralType<'db>,
+) -> Box<[Name]> {
+    module_literal
+        .importing_file(db)
+        .into_iter()
+        .flat_map(|file| semantic_index(db, file).imported_modules())
+        .filter_map(|submodule_name| submodule_name.relative_to(module_literal.module(db).name(db)))
+        .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
+        .collect()
 }
 
 /// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
