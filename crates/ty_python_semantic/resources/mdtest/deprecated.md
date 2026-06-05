@@ -562,6 +562,10 @@ factory_alias()  # error: [deprecated] "Use other_func instead"
 selected_factory_alias = (depr_func, factory())[1]  # error: [deprecated] "Use other_func instead"
 selected_factory_alias()  # error: [deprecated] "Use other_func instead"
 
+starred_factory_alias = (*[factory(), factory()], depr_func)[1]  # error: [deprecated] "Use other_func instead"
+# TODO: Preserve deprecated function-literal identity through starred tuple inference.
+starred_factory_alias()
+
 first_alias, unpacked_factory_alias = depr_func, factory()  # error: [deprecated] "Use other_func instead"
 first_alias()
 unpacked_factory_alias()  # error: [deprecated] "Use other_func instead"
