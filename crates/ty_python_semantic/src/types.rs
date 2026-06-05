@@ -1282,6 +1282,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
             Type::BoundMethod(bound) => bound.function(db).implementation_deprecated(db).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
+            Type::Union(union) => union.elements(db).iter().any(|ty| ty.is_deprecated(db)),
             _ => false,
         }
     }

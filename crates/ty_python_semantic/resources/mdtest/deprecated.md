@@ -511,6 +511,11 @@ named_alias()
 
 (unpacked_alias,) = (depr_func,)  # error: [deprecated] "Use other_func instead"
 unpacked_alias()
+
+def union_alias(flag: bool):
+    optional_alias = depr_func if flag else None  # error: [deprecated] "Use other_func instead"
+    if optional_alias is not None:
+        optional_alias()
 ```
 
 ## Dunders
