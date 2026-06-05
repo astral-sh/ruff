@@ -220,6 +220,11 @@ class GenericRestrictedMeta[T: type[int]](type):
     # error: [invalid-method-receiver]
     def restricted(cls: T): ...
 
+class OuterGenericMeta[T: type[int]]:
+    class Meta(type):
+        # error: [invalid-method-receiver]
+        def restricted(cls: T): ...
+
 @final
 class FinalClass(metaclass=RestrictedMeta): ...
 
