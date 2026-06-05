@@ -2981,6 +2981,24 @@ impl<'db> Type<'db> {
                     // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
                     // we should emit a diagnostic here instead of silently ignoring the error.
                     .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
+                // Assignment-form staticmethods retain their wrapper until descriptor invocation,
+                // so propagate the bare owner's generic context to the unwrapped callable here.
+                let return_ty = if ty.is_instance_of(db, KnownClass::Staticmethod)
+                    && let Type::ClassLiteral(class) = owner
+                    && let Some(generic_context) = class.generic_context(db)
+                    && let Type::Callable(callable) = return_ty
+                {
+                    Type::Callable(CallableType::new(
+                        db,
+                        callable
+                            .signatures(db)
+                            .with_inherited_generic_context(db, generic_context),
+                        callable.kind(db),
+                        callable.provenance(db),
+                    ))
+                } else {
+                    return_ty
+                };
 
                 let descriptor_kind = if ty.is_data_descriptor(db) {
                     AttributeKind::DataDescriptor

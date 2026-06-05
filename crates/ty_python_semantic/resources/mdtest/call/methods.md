@@ -1069,6 +1069,8 @@ Assigning a `staticmethod(...)` object directly in the class body should preserv
 behavior of the wrapped function when accessed on both classes and instances.
 
 ```py
+from typing import Generic, TypeVar
+
 def foo(*args, **kwargs) -> None:
     print("foo", args, kwargs)
 
@@ -1087,6 +1089,18 @@ a.bar(x=10)
 A.bar()
 A.bar(5)
 A.bar(x=10)
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def from_value(value: T) -> "Box[T]":
+        raise NotImplementedError
+
+    make = staticmethod(from_value)
+
+reveal_type(Box.make(1))  # revealed: Box[int]
+reveal_type(Box[str].make("value"))  # revealed: Box[str]
+Box[str].make(1)  # error: [invalid-argument-type]
 ```
 
 ### Accessing the staticmethod as a static member

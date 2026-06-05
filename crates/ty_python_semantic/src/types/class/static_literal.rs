@@ -984,7 +984,7 @@ impl<'db> StaticClassLiteral<'db> {
                     callable.is_classmethod_like(db)
                         || (name != "__new__" && callable.is_staticmethod_like(db))
                 }
-                _ => false,
+                ty => name != "__new__" && ty.is_instance_of(db, KnownClass::Staticmethod),
             }
         }
 
