@@ -736,6 +736,7 @@ class DeprType: ...
 
 @deprecated("Use other_func instead")
 def depr_func(): ...
+def regular_func(): ...
 
 class C:
     @deprecated("Use other_method instead")
@@ -789,6 +790,15 @@ def factory() -> TypeOf[depr_func]:  # ty: ignore[deprecated]
 
 constant_alias = depr_func if True else factory()  # error: [deprecated] "Use other_func instead"
 constant_alias()
+
+left_or_alias = depr_func or regular_func  # error: [deprecated] "Use other_func instead"
+left_or_alias()
+
+right_or_alias = None or depr_func  # error: [deprecated] "Use other_func instead"
+right_or_alias()
+
+right_and_alias = regular_func and depr_func  # error: [deprecated] "Use other_func instead"
+right_and_alias()
 
 factory_alias = factory()
 factory_alias()  # error: [deprecated] "Use other_func instead"
