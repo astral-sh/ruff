@@ -474,7 +474,9 @@ BadTypeAlias13: TypeAlias = f"{'int'}"  # error: [invalid-type-form]
 @deprecated("Use NewType instead")
 class OldType: ...
 
-DeprecatedConditionalAlias: TypeAlias = OldType if bool() else int  # error: [invalid-type-form]  # error: [deprecated] "Use NewType instead"
+DeprecatedConditionalAlias: TypeAlias = (
+    OldType if bool() else int  # error: [invalid-type-form]  # error: [deprecated] "Use NewType instead"
+)
 
 # bonus ones from Alex:
 #

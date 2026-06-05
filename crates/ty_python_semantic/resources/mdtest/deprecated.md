@@ -85,7 +85,6 @@ callable_replacement = CallableReplacement()
 
 @deprecated("ordinary deprecated function")
 def ordinary_deprecated_function() -> None: ...
-
 def deprecated_factory() -> TypeOf[ordinary_deprecated_function]:  # ty: ignore[deprecated]
     return ordinary_deprecated_function  # ty: ignore[deprecated]
 
@@ -155,6 +154,7 @@ if flag:
     @deprecated("use replacement directly")
     @replace_with(replacement)
     def narrowed_binding() -> None: ...
+
 else:
     narrowed_binding = other
 
@@ -216,6 +216,7 @@ for _ in range(1):
         @deprecated("mixed loop binding")
         @replace_with(replacement)
         def mixed_loop_binding() -> None: ...
+
     else:
         mixed_loop_binding = other
 
@@ -241,6 +242,7 @@ def mixed_nested_binding():
             @deprecated("mixed nested binding")
             @replace_with(replacement)
             def old() -> None: ...
+
         else:
             old = other
 
@@ -350,6 +352,7 @@ class MixedDescriptor:
         @deprecated("descriptor replacement")
         @replace_with(replacement_descriptor)
         def binding(self) -> None: ...
+
     else:
         binding = other_descriptor
 
