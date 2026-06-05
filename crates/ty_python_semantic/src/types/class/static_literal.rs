@@ -2084,6 +2084,18 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
+        // Avoid retaining tracked-query entries for names that no method can define.
+        let index = semantic_index(db, class_body_scope.file(db));
+        let has_attribute = attribute_scopes(db, class_body_scope).any(|function_scope_id| {
+            index
+                .place_table(function_scope_id)
+                .member_id_by_instance_attribute_name(name)
+                .is_some()
+        });
+        if !has_attribute {
+            return Member::unbound();
+        }
+
         Self::implicit_attribute_inner(
             db,
             class_body_scope,
