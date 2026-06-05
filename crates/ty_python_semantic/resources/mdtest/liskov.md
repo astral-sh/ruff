@@ -932,10 +932,11 @@ class G3(A3):
     def method(self: object) -> Self: ...  # fine
 
 class H3(A3):
-    # TODO: we should emit `invalid-method-override` here
+    # TODO: we should also emit `invalid-method-override` here
     # (`A3.method()` can be called on any instance of `A3`,
     # but `H3.method()` can only be called on objects that are
     # instances of `str`)
+    # error: [invalid-method-receiver]
     def method(self: str) -> Self: ...
 
 class I3(A3):
@@ -1343,14 +1344,14 @@ info: This violates the Liskov Substitution Principle
 
 ```pyi
 class BadChild1B(Parent):
-    def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
+    def static_method(x: int) -> int: ...  # snapshot: invalid-method-override  # ty: ignore[invalid-method-receiver]
 ```
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `static_method`
   --> src/mdtest_snippet.pyi:29:9
    |
-29 |     def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
+29 |     def static_method(x: int) -> int: ...  # snapshot: invalid-method-override  # ty: ignore[invalid-method-receiver]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
    |
   ::: src/mdtest_snippet.pyi:6:9
@@ -1414,14 +1415,14 @@ info: This violates the Liskov Substitution Principle
 ```pyi
 class BadChild3B(Parent):
     @classmethod
-    def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
+    def static_method(x: int) -> int: ...  # snapshot: invalid-method-override  # ty: ignore[invalid-method-receiver]
 ```
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `static_method`
   --> src/mdtest_snippet.pyi:42:9
    |
-42 |     def static_method(x: int) -> int: ...  # snapshot: invalid-method-override
+42 |     def static_method(x: int) -> int: ...  # snapshot: invalid-method-override  # ty: ignore[invalid-method-receiver]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
    |
   ::: src/mdtest_snippet.pyi:6:9

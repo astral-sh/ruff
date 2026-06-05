@@ -100,6 +100,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
+    registry.register_lint(&INVALID_METHOD_RECEIVER);
     registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_NAMED_TUPLE);
     registry.register_lint(&INVALID_NAMED_TUPLE_OVERRIDE);
@@ -1675,6 +1676,28 @@ declare_lint! {
     pub(crate) static INVALID_PARAMETER_DEFAULT = {
         summary: "detects default values that can't be assigned to the parameter's annotated type",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for method receiver annotations that cannot accept the enclosing instance or class
+    /// object.
+    ///
+    /// ## Why is this bad?
+    /// Python automatically passes the instance or class object to a method's first parameter.
+    /// An incompatible annotation makes the method impossible to call through the enclosing class
+    /// while satisfying its declared type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class Foo:
+    ///     def method(self: int): ...
+    /// ```
+    pub(crate) static INVALID_METHOD_RECEIVER = {
+        summary: "detects method receiver annotations that are incompatible with the enclosing class",
+        status: LintStatus::stable("0.0.44"),
         default_level: Level::Error,
     }
 }

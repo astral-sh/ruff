@@ -942,6 +942,7 @@ class CheckStaticMethod:
     @staticmethod
     def method3(x: str) -> str: ...
     # error: [invalid-overload]
+    # error: [invalid-method-receiver]
     def method3(x: int | str) -> int | str:
         return x
 

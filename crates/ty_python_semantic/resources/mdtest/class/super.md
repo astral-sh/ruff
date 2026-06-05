@@ -248,7 +248,7 @@ class Foo[T]:
         reveal_type(super())
         return self
 
-    def method8[S: int](self: S, other: S) -> S:
+    def method8[S: int](self: S, other: S) -> S:  # error: [invalid-method-receiver]
         # error: [invalid-super-argument]
         # revealed: Unknown
         reveal_type(super())
@@ -260,14 +260,14 @@ class Foo[T]:
         reveal_type(super())
         return self
 
-    def method10[S: Callable[..., str]](self: S, other: S) -> S:
+    def method10[S: Callable[..., str]](self: S, other: S) -> S:  # error: [invalid-method-receiver]
         # error: [invalid-super-argument]
         # revealed: Unknown
         reveal_type(super())
         return self
     # TypeVar bounded by `type[Foo]` rather than `Foo`
-    # TODO: Should error on signature - `self` is annotated as a class type, not an instance type
-    def method11[S: type[Foo[int]]](self: S, other: S) -> S:
+    # The receiver is a class object rather than an instance.
+    def method11[S: type[Foo[int]]](self: S, other: S) -> S:  # error: [invalid-method-receiver]
         # Delegates to the bound to resolve the super type
         reveal_type(super())  # revealed: <super: <class 'Foo'>, <class 'Foo[int]'>>
         return self
@@ -275,7 +275,7 @@ class Foo[T]:
     # TODO: Should error on signature - `cls` would be `type[type[Foo[int]]]`, a metaclass
     # Delegates to `type[Unknown]` since `type[type[Foo[int]]]` can't be constructed
     @classmethod
-    def method12[S: type[Foo[int]]](cls: type[S]) -> S:
+    def method12[S: type[Foo[int]]](cls: type[S]) -> S:  # error: [invalid-method-receiver]
         reveal_type(super())  # revealed: <super: <class 'Foo'>, Unknown>
         raise NotImplementedError
 

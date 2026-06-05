@@ -1058,7 +1058,7 @@ from typing import final
 class Disjoint: ...
 
 class Explicit:
-    # TODO: We could emit a warning if the annotated type of `self` is disjoint from `Explicit`
+    # error: [invalid-method-receiver]
     def bad(self: Disjoint) -> None:
         reveal_type(self)  # revealed: Disjoint
 

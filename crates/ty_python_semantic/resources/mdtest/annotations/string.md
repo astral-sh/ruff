@@ -131,7 +131,7 @@ if TYPE_CHECKING:
     class Bar:
         # no error because this annotation is resolved inside a scope
         # fully defined inside an `if TYPE_CHECKING` block
-        def f(x: "int" | "None"): ...
+        def f(x: "int" | "None"): ...  # error: [invalid-method-receiver]
 ```
 
 ### Python less than 3.14 in a stub file

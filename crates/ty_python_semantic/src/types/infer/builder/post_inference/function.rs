@@ -1,10 +1,14 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownInstanceType, Signature, Type, TypeVarKind,
+        KnownClass, KnownInstanceType, Signature, Type, TypeVarKind,
         context::InferContext,
-        diagnostic::{INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT},
+        diagnostic::{
+            INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
+            INVALID_TYPE_VARIABLE_DEFAULT,
+        },
         function::OverloadLiteral,
+        infer::nearest_enclosing_class,
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
@@ -18,7 +22,7 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::definition::Definition;
+use ty_python_core::{definition::Definition, semantic_index};
 
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
@@ -35,9 +39,103 @@ pub(crate) fn check_function_definition<'db>(
     let last_definition = function_type.literal(db).last_definition;
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
+    check_method_receiver(context, definition, last_definition, &signature);
     check_legacy_positional_only_convention(context, last_definition, &signature);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
+}
+
+fn check_method_receiver<'db>(
+    context: &InferContext<'db, '_>,
+    definition: Definition<'db>,
+    last_definition: OverloadLiteral<'db>,
+    signature: &Signature<'db>,
+) {
+    let db = context.db();
+    let method_name = last_definition.name(db);
+
+    if last_definition.is_overload(db)
+        || method_name == "_generate_next_value_"
+        || (!last_definition.has_implicit_receiver(db) && method_name != "__new__")
+        || !signature.has_explicit_positional_receiver_annotation()
+    {
+        return;
+    }
+
+    let index = semantic_index(db, definition.file(db));
+    let Some(enclosing_class) = nearest_enclosing_class(db, index, definition.scope(db)) else {
+        return;
+    };
+
+    if enclosing_class.is_protocol(db) {
+        return;
+    }
+
+    let Some(receiver_type) = signature
+        .parameters()
+        .get(0)
+        .map(|parameter| parameter.annotated_type().resolve_type_alias(db))
+    else {
+        return;
+    };
+
+    if receiver_type.is_never()
+        || is_protocol_receiver_type(db, receiver_type)
+        || (enclosing_class.known(db) == Some(KnownClass::Str)
+            && receiver_type == Type::literal_string())
+    {
+        return;
+    }
+
+    let class_object = Type::from(enclosing_class);
+    // Methods on metaclasses can restrict their receiver to a particular class object.
+    if matches!(receiver_type, Type::SubclassOf(_))
+        && class_object.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
+    {
+        return;
+    }
+
+    let expected_receiver = if last_definition.is_classmethod(db) || method_name == "__new__" {
+        class_object
+    } else {
+        class_object.to_instance(db).unwrap_or_else(Type::unknown)
+    };
+
+    if signature.can_bind_self_to(db, expected_receiver)
+        || receiver_type.is_assignable_to(db, expected_receiver)
+    {
+        return;
+    }
+
+    let node = last_definition.node(db, context.file(), context.module());
+    let Some(annotation) = node
+        .parameters
+        .iter()
+        .next()
+        .and_then(ast::AnyParameterRef::annotation)
+    else {
+        return;
+    };
+
+    if let Some(builder) = context.report_lint(&INVALID_METHOD_RECEIVER, annotation) {
+        builder.into_diagnostic(format_args!(
+            "Method receiver type `{receiver}` cannot accept `{expected}`",
+            receiver = receiver_type.display(db),
+            expected = expected_receiver.display(db),
+        ));
+    }
+}
+
+fn is_protocol_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bool {
+    match receiver_type {
+        Type::ProtocolInstance(_) => true,
+        Type::ClassLiteral(class) => class.is_protocol(db),
+        Type::SubclassOf(subclass_of) => subclass_of
+            .subclass_of()
+            .into_class(db)
+            .is_some_and(|class| class.class_literal(db).is_protocol(db)),
+        _ => false,
+    }
 }
 
 /// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.

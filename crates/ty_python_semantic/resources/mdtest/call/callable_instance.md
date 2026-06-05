@@ -93,7 +93,7 @@ reveal_type(c("foo"))  # revealed: int
 
 ```py
 class C:
-    # TODO this definition should also be an error; `C` must be assignable to type of `self`
+    # error: [invalid-method-receiver]
     def __call__(self: int) -> int:
         return 1
 

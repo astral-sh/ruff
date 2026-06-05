@@ -97,7 +97,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  82 |         reveal_type(super())
  83 |         return self
  84 | 
- 85 |     def method8[S: int](self: S, other: S) -> S:
+ 85 |     def method8[S: int](self: S, other: S) -> S:  # error: [invalid-method-receiver]
  86 |         # error: [invalid-super-argument]
  87 |         # revealed: Unknown
  88 |         reveal_type(super())
@@ -109,14 +109,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  94 |         reveal_type(super())
  95 |         return self
  96 | 
- 97 |     def method10[S: Callable[..., str]](self: S, other: S) -> S:
+ 97 |     def method10[S: Callable[..., str]](self: S, other: S) -> S:  # error: [invalid-method-receiver]
  98 |         # error: [invalid-super-argument]
  99 |         # revealed: Unknown
 100 |         reveal_type(super())
 101 |         return self
 102 |     # TypeVar bounded by `type[Foo]` rather than `Foo`
-103 |     # TODO: Should error on signature - `self` is annotated as a class type, not an instance type
-104 |     def method11[S: type[Foo[int]]](self: S, other: S) -> S:
+103 |     # The receiver is a class object rather than an instance.
+104 |     def method11[S: type[Foo[int]]](self: S, other: S) -> S:  # error: [invalid-method-receiver]
 105 |         # Delegates to the bound to resolve the super type
 106 |         reveal_type(super())  # revealed: <super: <class 'Foo'>, <class 'Foo[int]'>>
 107 |         return self
@@ -124,7 +124,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 109 |     # TODO: Should error on signature - `cls` would be `type[type[Foo[int]]]`, a metaclass
 110 |     # Delegates to `type[Unknown]` since `type[type[Foo[int]]]` can't be constructed
 111 |     @classmethod
-112 |     def method12[S: type[Foo[int]]](cls: type[S]) -> S:
+112 |     def method12[S: type[Foo[int]]](cls: type[S]) -> S:  # error: [invalid-method-receiver]
 113 |         reveal_type(super())  # revealed: <super: <class 'Foo'>, Unknown>
 114 |         raise NotImplementedError
 115 | 
@@ -174,6 +174,16 @@ help: Consider adding an upper bound to type variable `S`
 ```
 
 ```
+error[invalid-method-receiver]: Method receiver type `S@method8` cannot accept `Foo[Unknown]`
+  --> src/mdtest_snippet.py:85:31
+   |
+85 |     def method8[S: int](self: S, other: S) -> S:  # error: [invalid-method-receiver]
+   |                               ^
+   |
+
+```
+
+```
 error[invalid-super-argument]: `S@method8` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method8)` call
   --> src/mdtest_snippet.py:88:21
    |
@@ -198,6 +208,16 @@ info: `int | str` is not an instance or subclass of `<class 'Foo'>`
 ```
 
 ```
+error[invalid-method-receiver]: Method receiver type `S@method10` cannot accept `Foo[Unknown]`
+  --> src/mdtest_snippet.py:97:47
+   |
+97 |     def method10[S: Callable[..., str]](self: S, other: S) -> S:  # error: [invalid-method-receiver]
+   |                                               ^
+   |
+
+```
+
+```
 error[invalid-super-argument]: `S@method10` is a type variable with an abstract/structural type as its bounds or constraints, in `super(<class 'Foo'>, S@method10)` call
    --> src/mdtest_snippet.py:100:21
     |
@@ -205,5 +225,25 @@ error[invalid-super-argument]: `S@method10` is a type variable with an abstract/
     |                     ^^^^^^^
     |
 info: Type variable `S` has upper bound `(...) -> str`
+
+```
+
+```
+error[invalid-method-receiver]: Method receiver type `S@method11` cannot accept `Foo[Unknown]`
+   --> src/mdtest_snippet.py:104:43
+    |
+104 |     def method11[S: type[Foo[int]]](self: S, other: S) -> S:  # error: [invalid-method-receiver]
+    |                                           ^
+    |
+
+```
+
+```
+error[invalid-method-receiver]: Method receiver type `type[S@method12]` cannot accept `<class 'Foo'>`
+   --> src/mdtest_snippet.py:112:42
+    |
+112 |     def method12[S: type[Foo[int]]](cls: type[S]) -> S:  # error: [invalid-method-receiver]
+    |                                          ^^^^^^^
+    |
 
 ```

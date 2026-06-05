@@ -336,6 +336,7 @@ A metaclass function can be shadowed by a method on the class:
 from typing import Any, Literal
 
 class D(metaclass=Meta):
+    # error: [invalid-method-receiver]
     def f(arg: int) -> Literal["a"]:
         return "a"
 
@@ -350,6 +351,7 @@ def flag() -> bool:
 
 class E(metaclass=Meta):
     if flag():
+        # error: [invalid-method-receiver]
         def f(arg: int) -> Any:
             return "a"
 
@@ -395,6 +397,7 @@ If the `cls` parameter is wrongly annotated, we emit an error at the call site:
 ```py
 class D:
     @classmethod
+    # error: [invalid-method-receiver]
     def f(cls: D):
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass

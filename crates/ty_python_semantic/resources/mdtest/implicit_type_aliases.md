@@ -395,6 +395,7 @@ if TYPE_CHECKING:
     class ItsQuiteCloudyInManchester:
         X = int | str
 
+        # error: [invalid-method-receiver]
         def f(obj: X):
             reveal_type(obj)  # revealed: int | str
 

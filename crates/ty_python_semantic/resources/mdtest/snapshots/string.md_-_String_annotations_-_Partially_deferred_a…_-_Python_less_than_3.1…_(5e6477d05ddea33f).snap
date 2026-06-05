@@ -77,7 +77,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 62 |     class Bar:
 63 |         # no error because this annotation is resolved inside a scope
 64 |         # fully defined inside an `if TYPE_CHECKING` block
-65 |         def f(x: "int" | "None"): ...
+65 |         def f(x: "int" | "None"): ...  # error: [invalid-method-receiver]
 ```
 
 # Diagnostics
@@ -223,5 +223,15 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
+
+```
+
+```
+error[invalid-method-receiver]: Method receiver type `int | None` cannot accept `Bar`
+  --> src/mdtest_snippet.py:65:18
+   |
+65 |         def f(x: "int" | "None"): ...  # error: [invalid-method-receiver]
+   |                  ^^^^^^^^^^^^^^
+   |
 
 ```
