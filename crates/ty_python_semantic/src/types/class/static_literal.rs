@@ -992,6 +992,27 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let mut member = self.class_member_inner(db, None, name, policy);
+        // A class or static method on a bare generic class acts like a generic function: its
+        // arguments can determine the specialization of the class on which it was accessed.
+        if let Some(generic_context) = self.generic_context(db)
+            && member.ignore_possibly_undefined().is_some_and(|ty| {
+                matches!(ty, Type::FunctionLiteral(function) if function.is_classmethod(db) || (name != "__new__" && function.is_staticmethod(db)))
+            })
+        {
+            member = self
+                .class_member_inner(
+                    db,
+                    Some(generic_context.identity_specialization(db)),
+                    name,
+                    policy,
+                )
+                .map_type(|ty| match ty {
+                    Type::FunctionLiteral(function) => Type::FunctionLiteral(
+                        function.with_inherited_generic_context(db, generic_context),
+                    ),
+                    _ => ty,
+                });
+        }
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
@@ -1096,13 +1117,6 @@ impl<'db> StaticClassLiteral<'db> {
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of
             // the class from the arguments that are passed in.
-            //
-            // We might decide to handle other class methods the same way, having them inherit the
-            // class's generic context, and performing type inference on calls to them to determine
-            // the specialization of the class. If we do that, we would update this to also apply
-            // to any method with a `@classmethod` decorator. (`__init__` would remain a special
-            // case, since it's an _instance_ method where we don't yet know the generic class's
-            // specialization.)
             match (inherited_generic_context, ty, specialization, name) {
                 (
                     Some(generic_context),

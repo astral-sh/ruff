@@ -4021,9 +4021,19 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
-                    .into()
+                let binding_self_type = bound_method.binding_self_type(db);
+                if binding_self_type == bound_method.self_instance(db) {
+                    CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                        .with_bound_type(binding_self_type)
+                        .into()
+                } else {
+                    // Replacing `Self` exposes the bare class's type variables directly to argument
+                    // inference while retaining the receiver for validation and inference.
+                    let signature = signature.apply_self(db, bound_method.typing_self_type(db));
+                    CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                        .with_bound_type(binding_self_type)
+                        .into()
+                }
             }
 
             Type::KnownBoundMethod(method) => {

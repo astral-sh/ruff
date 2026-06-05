@@ -416,6 +416,183 @@ reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
 ```
 
+### Generic classmethod inference
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Type parameters from a generic class are inferred when calling a classmethod on the non-specialized
+class:
+
+```py
+from typing import Generic, Self, TypeVar, overload
+
+class Box[T]:
+    @classmethod
+    def from_value(cls, value: T) -> Self:
+        return cls()
+
+    @classmethod
+    def from_value_explicit(cls, value: T) -> "Box[T]":
+        raise NotImplementedError
+
+class DerivedBox[T](Box[T]): ...
+
+def check(value: int) -> None:
+    reveal_type(Box.from_value(value))  # revealed: Box[int]
+    reveal_type(Box.from_value_explicit(value))  # revealed: Box[int]
+    reveal_type(DerivedBox.from_value(value))  # revealed: DerivedBox[int]
+
+reveal_type(Box[str].from_value("value"))  # revealed: Box[str]
+# revealed: bound method <class 'Box[str]'>.from_value(value: str) -> Box[str]
+reveal_type(Box[str].from_value)
+Box[str].from_value(1)  # error: [invalid-argument-type]
+
+class ReceiverBox[T]:
+    @classmethod
+    def pair[S](cls: "type[ReceiverBox[S]]", value: T, other: S) -> tuple[T, S]:
+        return value, other
+
+# The hidden `cls` argument requires `T` and `S` to agree.
+ReceiverBox.pair(1, "value")  # error: [invalid-argument-type]
+
+class ExplicitReceiverBox[T]:
+    @classmethod
+    def create(cls: "type[ExplicitReceiverBox[int]]") -> "ExplicitReceiverBox[T]":
+        raise NotImplementedError
+
+# TODO: Infer class type parameters from an explicit `cls` annotation.
+reveal_type(ExplicitReceiverBox.create())  # revealed: ExplicitReceiverBox[Unknown]
+
+class PartialReceiverBox[T, U]:
+    @classmethod
+    def create(cls: "type[PartialReceiverBox[T, int]]", value: T) -> "PartialReceiverBox[T, U]":
+        raise NotImplementedError
+
+# TODO: Infer `U` from the explicit `cls` annotation while inferring `T` from `value`.
+reveal_type(PartialReceiverBox.create("value"))  # revealed: PartialReceiverBox[str, Unknown]
+
+LegacyT = TypeVar("LegacyT")
+LegacyU = TypeVar("LegacyU")
+
+class LegacyBox(Generic[LegacyT]):
+    @classmethod
+    def from_value(cls, value: LegacyT) -> Self:
+        return cls()
+
+    @classmethod
+    def create_same(cls, value: LegacyT) -> "LegacyBox[LegacyT]":
+        raise NotImplementedError
+
+    @classmethod
+    def create_diff(cls, value: LegacyU) -> "LegacyBox[LegacyU]":
+        raise NotImplementedError
+
+def check_legacy(value: int) -> None:
+    reveal_type(LegacyBox.from_value(value))  # revealed: LegacyBox[int]
+    reveal_type(LegacyBox.create_same(value))  # revealed: LegacyBox[int]
+    reveal_type(LegacyBox.create_diff(value))  # revealed: LegacyBox[int]
+
+ConstrainedT = TypeVar("ConstrainedT", int, str)
+
+class Token(Generic[ConstrainedT]): ...
+
+class ConstrainedBox(Generic[ConstrainedT]):
+    @classmethod
+    def from_token(cls, *, token: Token[ConstrainedT]) -> "ConstrainedBox[ConstrainedT]":
+        raise NotImplementedError
+
+reveal_type(ConstrainedBox.from_token(token=Token[int]()))  # revealed: ConstrainedBox[int]
+reveal_type(ConstrainedBox.from_token(token=Token[str]()))  # revealed: ConstrainedBox[str]
+
+class Factory:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+    @classmethod
+    def copy(cls, value: Self) -> Self:
+        return value
+
+class GenericFactory[T](Factory): ...
+
+reveal_type(GenericFactory.make())  # revealed: GenericFactory[Unknown]
+
+def check_factory(value: GenericFactory[int]) -> None:
+    reveal_type(GenericFactory.copy(value))  # revealed: GenericFactory[int]
+```
+
+The class type parameter can also be inferred through a specialized generic base class. This is a
+regression test for <https://github.com/astral-sh/ty/issues/3675>.
+
+```py
+class Inner[T]:
+    def kind(self) -> T:
+        raise NotImplementedError
+
+class Concrete(Inner[int]): ...
+
+class HasModel[X]:
+    @overload
+    @classmethod
+    def from_model(cls, model: list[X]) -> Self: ...
+    @overload
+    @classmethod
+    def from_model(cls, model: X) -> Self: ...
+    @classmethod
+    def from_model(cls, model: X | list[X]) -> Self:
+        raise NotImplementedError
+
+class Wrapper[T](HasModel[Inner[T]]): ...
+
+def want(wrapper: Wrapper[int]) -> None: ...
+
+obj = Concrete()
+reveal_type(Wrapper.from_model(obj))  # revealed: Wrapper[int]
+reveal_type(Wrapper[int].from_model(obj))  # revealed: Wrapper[int]
+want(Wrapper.from_model(obj))
+```
+
+### Type parameter defaults do not prevent method inference
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Bare generic classes remain generic until a class or static method call is inferred, even when their
+type parameters have defaults. This is an intentional and potentially controversial policy choice:
+applying the default specialization before either call would make the calls below invalid rather
+than inferring `str`. See <https://github.com/astral-sh/ty/issues/541>.
+
+```py
+from typing import Self
+
+class DefaultBox[T = int]:
+    @classmethod
+    def from_value(cls, value: T) -> Self:
+        return cls()
+
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+    @staticmethod
+    def from_static_value(value: T) -> "DefaultBox[T]":
+        raise NotImplementedError
+
+    @staticmethod
+    def create_static() -> "DefaultBox[T]":
+        raise NotImplementedError
+
+reveal_type(DefaultBox.from_value("value"))  # revealed: DefaultBox[str]
+reveal_type(DefaultBox.from_static_value("value"))  # revealed: DefaultBox[str]
+reveal_type(DefaultBox.create())  # revealed: DefaultBox[int]
+reveal_type(DefaultBox.create_static())  # revealed: DefaultBox[int]
+```
+
 ### Accessing the classmethod as a static member
 
 Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We
@@ -828,6 +1005,64 @@ reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
 ```
 
+### Generic staticmethod inference
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Like classmethods, staticmethods on a bare generic class are implicitly generic over the class type
+parameters that occur in their signature:
+
+```py
+from typing import Generic, TypeVar
+
+class StaticBox[T]:
+    @staticmethod
+    def from_value(value: T) -> "StaticBox[T]":
+        raise NotImplementedError
+
+    @staticmethod
+    def create[S](value: S) -> "StaticBox[S]":
+        raise NotImplementedError
+
+class DerivedStaticBox[T](StaticBox[T]): ...
+
+reveal_type(StaticBox.from_value(1))  # revealed: StaticBox[int]
+reveal_type(StaticBox.create(1))  # revealed: StaticBox[int]
+reveal_type(DerivedStaticBox.from_value(1))  # revealed: StaticBox[int]
+reveal_type(StaticBox[str].from_value("value"))  # revealed: StaticBox[str]
+StaticBox[str].from_value(1)  # error: [invalid-argument-type]
+
+class StaticBase[X]:
+    @staticmethod
+    def unwrap(value: X) -> X:
+        return value
+
+class StaticDerived[T](StaticBase[list[T]]): ...
+
+reveal_type(StaticDerived.unwrap([1]))  # revealed: list[int]
+
+class StaticAliasBox[T]:
+    type Values = list[T]
+
+    @staticmethod
+    def first(values: Values) -> T:
+        return values[0]
+
+reveal_type(StaticAliasBox.first([1]))  # revealed: int
+
+LegacyT = TypeVar("LegacyT")
+
+class LegacyStaticBox(Generic[LegacyT]):
+    @staticmethod
+    def from_value(value: LegacyT) -> "LegacyStaticBox[LegacyT]":
+        raise NotImplementedError
+
+reveal_type(LegacyStaticBox.from_value(1))  # revealed: LegacyStaticBox[int]
+```
+
 ### Staticmethod assigned in class body
 
 Assigning a `staticmethod(...)` object directly in the class body should preserve the callable
@@ -945,6 +1180,7 @@ reveal_type(D().ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
 argument:
 
 ```py
+from typing import Generic, TypeVar
 from typing_extensions import Self
 
 reveal_type(object.__new__)  # revealed: def __new__[Self](cls) -> Self
@@ -959,6 +1195,13 @@ class X:
     def make_another(self) -> Self:
         reveal_type(self.__new__)  # revealed: def __new__[Self](cls) -> Self
         return self.__new__(type(self))
+
+T = TypeVar("T")
+
+class GenericNew(Generic[T]): ...
+
+# `__new__` uses constructor inference rather than inheriting the class context as a staticmethod.
+reveal_type(GenericNew.__new__)  # revealed: def __new__[Self](cls) -> Self
 ```
 
 ## Builtin functions and methods
