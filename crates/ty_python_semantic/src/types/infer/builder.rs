@@ -4661,9 +4661,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
             let previous_deferred_state = self.deferred_state;
+            let previous_pep_613_alias_value_range = self.context.pep_613_alias_value_range;
 
             if is_pep_613_type_alias {
                 self.context.inference_flags |= InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS;
+                self.context.pep_613_alias_value_range = Some(value.range());
                 if self.in_stub() {
                     self.deferred_state = DeferredExpressionState::Deferred;
                 }
@@ -4701,6 +4703,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             self.typevar_binding_context = previous_typevar_binding_context;
             self.deferred_state = previous_deferred_state;
+            self.context.pep_613_alias_value_range = previous_pep_613_alias_value_range;
             self.dataclass_field_specifiers.clear();
             self.context
                 .inference_flags

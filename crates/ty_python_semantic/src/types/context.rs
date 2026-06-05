@@ -45,6 +45,8 @@ pub(crate) struct InferContext<'db, 'ast> {
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
+    /// The value expression of a PEP 613 alias during its first inference pass.
+    pub(crate) pep_613_alias_value_range: Option<TextRange>,
     bomb: DebugDropBomb,
 }
 
@@ -57,6 +59,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             file: scope.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             inference_flags: InferenceFlags::empty(),
+            pep_613_alias_value_range: None,
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
             ),
@@ -439,14 +442,17 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
         let lint_id = LintId::of(lint);
 
+        let in_pep_613_alias_first_pass = ctx
+            .inference_flags
+            .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS);
+
         // Suppress diagnostics that are emitted during the second, post-inference pass of
-        // inferring a PEP-613 type alias.
+        // inferring a PEP-613 type alias. A deprecation on the alias value itself is replayed,
+        // but nested deprecations in an invalid type form are not.
         if (lint_id == LintId::of(&INVALID_TYPE_FORM)
             || lint_id == LintId::of(&UNBOUND_TYPE_VARIABLE)
-            || lint_id == LintId::of(&DEPRECATED))
-            && ctx
-                .inference_flags
-                .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
+            || (lint_id == LintId::of(&DEPRECATED) && ctx.pep_613_alias_value_range == Some(range)))
+            && in_pep_613_alias_first_pass
         {
             return None;
         }

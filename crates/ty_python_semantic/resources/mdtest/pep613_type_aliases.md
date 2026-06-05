@@ -449,7 +449,7 @@ python-version = "3.11"
 ```
 
 ```py
-from typing_extensions import Annotated, Literal, TypeAlias
+from typing_extensions import Annotated, Literal, TypeAlias, deprecated
 
 GoodTypeAlias: TypeAlias = Annotated[int, (1, 3.14, lambda x: x)]
 GoodTypeAlias: TypeAlias = tuple[int, *tuple[str, ...]]
@@ -470,6 +470,11 @@ BadTypeAlias10: TypeAlias = True  # error: [invalid-type-form]
 BadTypeAlias11: TypeAlias = 1  # error: [invalid-type-form]
 BadTypeAlias12: TypeAlias = list or set  # error: [invalid-type-form]
 BadTypeAlias13: TypeAlias = f"{'int'}"  # error: [invalid-type-form]
+
+@deprecated("Use NewType instead")
+class OldType: ...
+
+DeprecatedConditionalAlias: TypeAlias = OldType if bool() else int  # error: [invalid-type-form]  # error: [deprecated] "Use NewType instead"
 
 # bonus ones from Alex:
 #
