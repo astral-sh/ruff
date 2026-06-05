@@ -74,7 +74,7 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
-from typing import Any, LiteralString, Never, Protocol, Self, TypeVar, overload
+from typing import Any, LiteralString, Never, Protocol, Self, TypeVar, Unpack, overload
 
 class Parent: ...
 class Unrelated: ...
@@ -190,6 +190,14 @@ def nested():
 class HasNestedFunction:
     def outer(self):
         def __new__(value: int): ...
+
+class VariadicReceiver:
+    # TODO: error: [invalid-method-receiver]
+    def invalid(*args: int): ...
+    # TODO: error: [invalid-method-receiver]
+    def invalid_keywords(**kwargs: object): ...
+    def valid(*args: object): ...
+    def valid_fixed(*args: Unpack[tuple[VariadicReceiver, int]]): ...
 ```
 
 ## TypedDict defaults use annotation context
