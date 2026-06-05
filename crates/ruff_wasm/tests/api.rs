@@ -4,7 +4,10 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff_linter::registry::Rule;
 use ruff_source_file::OneIndexed;
-use ruff_wasm::{ExpandedMessage, ExpandedSubDiagnostic, Location, PositionEncoding, Workspace};
+use ruff_wasm::{
+    ExpandedMessage, ExpandedSubDiagnostic, Location, PositionEncoding, SubDiagnosticSeverity,
+    Workspace,
+};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{
@@ -110,7 +113,7 @@ fn sub_diagnostics() {
     assert_eq!(
         result[0].sub_diagnostics,
         [ExpandedSubDiagnostic {
-            severity: "help".to_string(),
+            severity: SubDiagnosticSeverity::Help,
             message: "Remove unused import: `os`".to_string(),
             location: None,
         }]

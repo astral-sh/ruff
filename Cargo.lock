@@ -3581,6 +3581,7 @@ dependencies = [
  "getrandom 0.4.2",
  "js-sys",
  "log",
+ "ruff_db",
  "ruff_formatter",
  "ruff_linter",
  "ruff_python_ast",

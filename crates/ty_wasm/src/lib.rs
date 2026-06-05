@@ -905,11 +905,6 @@ impl Diagnostic {
             .sub_diagnostics()
             .iter()
             .map(|sub_diagnostic| {
-                let primary_annotation_index = sub_diagnostic
-                    .annotations()
-                    .iter()
-                    .position(ruff_db::diagnostic::Annotation::is_primary)
-                    .and_then(|index| u32::try_from(index).ok());
                 let annotations = sub_diagnostic
                     .annotations()
                     .iter()
@@ -935,9 +930,8 @@ impl Diagnostic {
                     .collect();
 
                 SubDiagnostic {
-                    severity: sub_diagnostic.severity().to_string(),
+                    severity: sub_diagnostic.severity().into(),
                     message: sub_diagnostic.primary_message().to_string(),
-                    primary_annotation_index,
                     annotations,
                 }
             })
@@ -1015,11 +1009,9 @@ impl Diagnostic {
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubDiagnostic {
-    #[wasm_bindgen(getter_with_clone)]
-    pub severity: String,
+    pub severity: SubDiagnosticSeverity,
     #[wasm_bindgen(getter_with_clone)]
     pub message: String,
-    pub primary_annotation_index: Option<u32>,
     #[wasm_bindgen(getter_with_clone)]
     pub annotations: Vec<SubDiagnosticAnnotation>,
 }
@@ -1199,6 +1191,28 @@ impl From<diagnostic::Severity> for Severity {
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,
             diagnostic::Severity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
+    fn from(value: diagnostic::SubDiagnosticSeverity) -> Self {
+        match value {
+            diagnostic::SubDiagnosticSeverity::Help => Self::Help,
+            diagnostic::SubDiagnosticSeverity::Info => Self::Info,
+            diagnostic::SubDiagnosticSeverity::Warning => Self::Warning,
+            diagnostic::SubDiagnosticSeverity::Error => Self::Error,
+            diagnostic::SubDiagnosticSeverity::Fatal => Self::Fatal,
         }
     }
 }

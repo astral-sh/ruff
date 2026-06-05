@@ -17,7 +17,7 @@ import { Theme } from "shared";
 import CodeActionProvider = languages.CodeActionProvider;
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
-const PLAYGROUND_FILE_PATH = "<filename>";
+export const PLAYGROUND_FILE_PATH = "<filename>";
 
 type MonacoEditorState = {
   monaco: Monaco;
@@ -185,7 +185,7 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
     model,
     "owner",
     diagnostics.map((diagnostic) => {
-      const message = diagnosticDisplayMessage(diagnostic);
+      const message = diagnosticMarkerMessage(diagnostic);
 
       return {
         code: diagnostic.code ?? undefined,
@@ -205,28 +205,28 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
   );
 }
 
-function diagnosticDisplayMessage(diagnostic: Diagnostic): string {
-  const subDiagnostics = diagnostic.sub_diagnostics.filter(
-    (subDiagnostic) =>
-      subDiagnostic.location == null ||
-      subDiagnostic.location.path !== PLAYGROUND_FILE_PATH,
+function diagnosticMarkerMessage(diagnostic: Diagnostic): string {
+  // Monaco renders same-file subdiagnostics as related information. Keep
+  // unlocated and other-file subdiagnostics in the marker message instead.
+  const markerMessageSubDiagnostics = diagnostic.subDiagnostics.filter(
+    (subDiagnostic) => subDiagnostic.location?.path !== PLAYGROUND_FILE_PATH,
   );
 
-  if (subDiagnostics.length === 0) {
+  if (markerMessageSubDiagnostics.length === 0) {
     return diagnostic.message;
   }
 
-  return `${diagnostic.message}\n\n${subDiagnostics.map(formatSubDiagnostic).join("\n")}`;
+  return `${diagnostic.message}\n\n${markerMessageSubDiagnostics.map(formatSubDiagnostic).join("\n")}`;
 }
 
 function diagnosticRelatedInformation(
   diagnostic: Diagnostic,
   resource: editor.ITextModel["uri"],
 ): editor.IRelatedInformation[] {
-  return diagnostic.sub_diagnostics.flatMap((subDiagnostic) => {
+  return diagnostic.subDiagnostics.flatMap((subDiagnostic) => {
     const location = subDiagnostic.location;
 
-    if (location == null || location.path !== PLAYGROUND_FILE_PATH) {
+    if (location?.path !== PLAYGROUND_FILE_PATH) {
       return [];
     }
 
@@ -244,7 +244,7 @@ function diagnosticRelatedInformation(
 }
 
 function formatSubDiagnostic(
-  subDiagnostic: Diagnostic["sub_diagnostics"][number],
+  subDiagnostic: Diagnostic["subDiagnostics"][number],
 ): string {
   const message = `${subDiagnostic.severity}: ${subDiagnostic.message}`;
   const location = subDiagnostic.location;

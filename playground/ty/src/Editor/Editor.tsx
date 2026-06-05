@@ -32,11 +32,14 @@ import {
   InlayHintKind,
   LocationLink,
   TextEdit,
-  type Location as TyLocation,
-  type SubDiagnostic,
 } from "ty_wasm";
 import { FileId, PlaygroundFile, ReadonlyFiles } from "../Playground";
-import { Diagnostic } from "./Diagnostics";
+import {
+  Diagnostic,
+  type DiagnosticLocation,
+  formatSubDiagnostic,
+  formatSubDiagnosticAnnotation,
+} from "./Diagnostics";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import CompletionItemKind = languages.CompletionItemKind;
 
@@ -58,7 +61,7 @@ type Props = {
 export type EditorHandle = {
   editor: IStandaloneCodeEditor;
   monaco: Monaco;
-  goToLocation(location: Pick<TyLocation, "path" | "range">): void;
+  goToLocation(location: DiagnosticLocation): void;
 };
 
 export default function Editor({
@@ -475,10 +478,7 @@ class PlaygroundServer
   private getPlaygroundFileForUri(uri: Uri): PlaygroundFile | null {
     return (
       Object.values(this.props.files.metadata).find((file) => {
-        return (
-          file.uri.toString() === uri.toString() ||
-          (uri.scheme === "file" && file.handle?.path() === uri.fsPath)
-        );
+        return file.uri.toString() === uri.toString();
       }) ?? null
     );
   }
@@ -788,32 +788,24 @@ class PlaygroundServer
   ): boolean {
     const files = this.props.files;
 
-    let model = this.monaco.editor.getModel(resource);
-    let resolvedResource = resource;
-
-    if (model == null && resource.scheme === "vendored") {
-      model = this.getOrCreateVendoredModel(resource);
-    } else if (model == null) {
-      const file = this.getPlaygroundFileForUri(resource);
-      if (file != null) {
-        resolvedResource = file.uri;
-        model = this.monaco.editor.getModel(file.uri);
-      }
-    }
+    const model =
+      resource.scheme === "vendored"
+        ? this.getOrCreateVendoredModel(resource)
+        : this.monaco.editor.getModel(resource);
 
     if (model == null) {
       return false;
     }
 
     // Handle file-specific logic
-    if (resolvedResource.scheme === "vendored") {
+    if (resource.scheme === "vendored") {
       // Get the file handle to track that we're viewing a vendored file
-      const vendoredPath = this.getVendoredPath(resolvedResource);
+      const vendoredPath = this.getVendoredPath(resource);
       const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
       this.props.onVendoredFileChange(fileHandle);
     } else {
       // Handle regular files
-      const file = this.getPlaygroundFileForUri(resolvedResource);
+      const file = this.getPlaygroundFileForUri(resource);
 
       if (file == null) {
         return false;
@@ -933,9 +925,12 @@ class PlaygroundServer
     return { edits };
   }
 
-  goToLocation(location: Pick<TyLocation, "path" | "range">): void {
-    const { resource, ...range } = this.mapLocation(location);
-    this.openCodeEditor(this.editor, resource, range);
+  goToLocation(location: DiagnosticLocation): void {
+    this.openCodeEditor(
+      this.editor,
+      this.uriForPath(location.path),
+      tyRangeToMonacoRange(location.range),
+    );
   }
 
   private mapNavigationTarget(link: LocationLink): languages.LocationLink {
@@ -971,30 +966,16 @@ class PlaygroundServer
     return path.startsWith("vendored:") ? Uri.parse(path) : Uri.file(path);
   }
 
-  private resolveLocationUri(path: string): Uri {
-    const uri = this.uriForPath(path);
-
-    if (this.monaco.editor.getModel(uri) != null) {
-      return uri;
-    }
-
-    if (uri.scheme === "vendored") {
-      return this.getOrCreateVendoredModel(uri).uri;
-    }
-
-    const file = this.getPlaygroundFileForUri(uri);
-    if (file == null) {
-      return uri;
-    }
-
-    return this.monaco.editor.getModel(file.uri)?.uri ?? file.uri;
-  }
-
   private mapLocation(
-    location: Pick<TyLocation, "path" | "range">,
+    location: DiagnosticLocation,
   ): { resource: Uri } & IRange {
+    const uri = this.uriForPath(location.path);
+
     return {
-      resource: this.resolveLocationUri(location.path),
+      resource:
+        uri.scheme === "vendored"
+          ? this.getOrCreateVendoredModel(uri).uri
+          : uri,
       ...tyRangeToMonacoRange(location.range),
     };
   }
@@ -1056,23 +1037,6 @@ function diagnosticDisplayMessage(diagnostic: Diagnostic): string {
   }
 
   return `${diagnostic.message}\n\n${subDiagnostics.map(formatSubDiagnostic).join("\n")}`;
-}
-
-function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
-  return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
-}
-
-function formatSubDiagnosticAnnotation(
-  subDiagnostic: SubDiagnostic,
-  annotation: SubDiagnostic["annotations"][number],
-): string {
-  if (annotation.message == null) {
-    return formatSubDiagnostic(subDiagnostic);
-  }
-
-  return annotation.primary
-    ? `${formatSubDiagnostic(subDiagnostic)}: ${annotation.message}`
-    : annotation.message;
 }
 
 function monacoRangeToTyRange(range: IRange): TyRange {

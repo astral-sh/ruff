@@ -128,24 +128,7 @@ export default function Chrome({
     editorRef.current = handle;
   }, []);
 
-  const handleGoTo = useCallback((line: number, column: number) => {
-    const editorRefValue = editorRef.current;
-
-    if (editorRefValue == null) {
-      return;
-    }
-
-    const range = {
-      startLineNumber: line,
-      startColumn: column,
-      endLineNumber: line,
-      endColumn: column,
-    };
-    editorRefValue.editor.revealRange(range);
-    editorRefValue.editor.setSelection(range);
-  }, []);
-
-  const handleGoToLocation = useCallback((location: DiagnosticLocation) => {
+  const handleGoTo = useCallback((location: DiagnosticLocation) => {
     editorRef.current?.goToLocation(location);
   }, []);
 
@@ -244,7 +227,6 @@ export default function Chrome({
                     diagnostics={checkResult.diagnostics}
                     currentFilePath={currentFilePath}
                     onGoTo={handleGoTo}
-                    onGoToLocation={handleGoToLocation}
                     theme={theme}
                   />
                 </Panel>

@@ -1,6 +1,6 @@
+import { SubDiagnosticSeverity } from "ty_wasm";
 import type {
   Severity,
-  Location as TyLocation,
   Range,
   SubDiagnostic,
   SubDiagnosticAnnotation,
@@ -16,8 +16,7 @@ interface Props {
   currentFilePath: string | null;
   theme: Theme;
 
-  onGoTo(line: number, column: number): void;
-  onGoToLocation(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticLocation): void;
 }
 
 export default function Diagnostics({
@@ -25,7 +24,6 @@ export default function Diagnostics({
   currentFilePath,
   theme,
   onGoTo,
-  onGoToLocation,
 }: Props) {
   const diagnostics = useMemo(() => {
     const sorted = [...unsorted];
@@ -57,7 +55,6 @@ export default function Diagnostics({
           diagnostics={diagnostics}
           currentFilePath={currentFilePath}
           onGoTo={onGoTo}
-          onGoToLocation={onGoToLocation}
         />
       </div>
     </div>
@@ -68,12 +65,10 @@ function Items({
   diagnostics,
   currentFilePath,
   onGoTo,
-  onGoToLocation,
 }: {
   diagnostics: Array<Diagnostic>;
   currentFilePath: string | null;
-  onGoTo(line: number, column: number): void;
-  onGoToLocation(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticLocation): void;
 }) {
   if (diagnostics.length === 0) {
     return (
@@ -94,6 +89,10 @@ function Items({
 
         const startLine = start?.line ?? 1;
         const startColumn = start?.column ?? 1;
+        const location =
+          currentFilePath == null || position == null
+            ? null
+            : { path: currentFilePath, range: position };
 
         const mostlyUniqueId = `${startLine}:${startColumn}-${id}`;
 
@@ -102,15 +101,24 @@ function Items({
 
         return (
           <li key={`${mostlyUniqueId}-${disambiguator}`}>
-            <button
-              onClick={() => onGoTo(startLine, startColumn)}
-              className="w-full text-start cursor-pointer select-text"
-            >
-              {diagnostic.message}
-              <span className="text-gray-500">
-                {id != null && ` (${id})`} [Ln {startLine}, Col {startColumn}]
+            {location == null ? (
+              <span className="w-full text-start select-text">
+                {diagnostic.message}
+                <span className="text-gray-500">
+                  {id != null && ` (${id})`} [Ln {startLine}, Col {startColumn}]
+                </span>
               </span>
-            </button>
+            ) : (
+              <button
+                onClick={() => onGoTo(location)}
+                className="w-full text-start cursor-pointer select-text"
+              >
+                {diagnostic.message}
+                <span className="text-gray-500">
+                  {id != null && ` (${id})`} [Ln {startLine}, Col {startColumn}]
+                </span>
+              </button>
+            )}
             {diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
@@ -118,7 +126,7 @@ function Items({
                     <SubDiagnosticItem
                       subDiagnostic={subDiagnostic}
                       currentFilePath={currentFilePath}
-                      onGoToLocation={onGoToLocation}
+                      onGoTo={onGoTo}
                     />
                   </li>
                 ))}
@@ -141,26 +149,30 @@ export interface Diagnostic {
   raw: TyDiagnostic;
 }
 
-export type DiagnosticLocation = Pick<TyLocation, "path" | "range">;
+export type DiagnosticLocation = {
+  path: string;
+  range: Range;
+};
 
 function SubDiagnosticItem({
   subDiagnostic,
   currentFilePath,
-  onGoToLocation,
+  onGoTo,
 }: {
   subDiagnostic: SubDiagnostic;
   currentFilePath: string | null;
-  onGoToLocation(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticLocation): void;
 }) {
-  const annotations = subDiagnostic.annotations;
-  const primaryAnnotationIndex = subDiagnostic.primary_annotation_index;
-  const primaryAnnotation =
-    primaryAnnotationIndex == null
-      ? undefined
-      : annotations[primaryAnnotationIndex];
-  const additionalAnnotations = annotations.filter(
-    (_, index) => index !== primaryAnnotationIndex,
-  );
+  let primaryAnnotation: SubDiagnosticAnnotation | undefined;
+  const additionalAnnotations: SubDiagnosticAnnotation[] = [];
+
+  for (const annotation of subDiagnostic.annotations) {
+    if (annotation.primary && primaryAnnotation == null) {
+      primaryAnnotation = annotation;
+    } else {
+      additionalAnnotations.push(annotation);
+    }
+  }
 
   return (
     <>
@@ -168,11 +180,14 @@ function SubDiagnosticItem({
         <span>{formatSubDiagnostic(subDiagnostic)}</span>
       ) : (
         <SubDiagnosticAnnotationItem
-          prefix={`${subDiagnostic.severity}: `}
-          message={formatPrimaryAnnotation(subDiagnostic, primaryAnnotation)}
+          prefix={`${formatSubDiagnosticSeverity(subDiagnostic.severity)}: `}
+          message={formatSubDiagnosticAnnotation(
+            subDiagnostic,
+            primaryAnnotation,
+          )}
           annotation={primaryAnnotation}
           currentFilePath={currentFilePath}
-          onGoToLocation={onGoToLocation}
+          onGoTo={onGoTo}
         />
       )}
       {additionalAnnotations.length > 0 ? (
@@ -180,10 +195,14 @@ function SubDiagnosticItem({
           {additionalAnnotations.map((annotation, index) => (
             <li key={index}>
               <SubDiagnosticAnnotationItem
-                message={annotation.message ?? subDiagnostic.message}
+                message={formatSubDiagnosticAnnotation(
+                  subDiagnostic,
+                  annotation,
+                  false,
+                )}
                 annotation={annotation}
                 currentFilePath={currentFilePath}
-                onGoToLocation={onGoToLocation}
+                onGoTo={onGoTo}
               />
             </li>
           ))}
@@ -198,13 +217,13 @@ function SubDiagnosticAnnotationItem({
   message,
   annotation,
   currentFilePath,
-  onGoToLocation,
+  onGoTo,
 }: {
   prefix?: string;
   message: string;
   annotation: SubDiagnosticAnnotation;
   currentFilePath: string | null;
-  onGoToLocation(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticLocation): void;
 }) {
   const location = annotation.location;
   if (location == null) {
@@ -226,7 +245,7 @@ function SubDiagnosticAnnotationItem({
     <>
       {prefix}
       <button
-        onClick={() => onGoToLocation(location)}
+        onClick={() => onGoTo(location)}
         className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
       >
         {message}
@@ -236,15 +255,35 @@ function SubDiagnosticAnnotationItem({
   );
 }
 
-function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
-  return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
+export function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
+  return `${formatSubDiagnosticSeverity(subDiagnostic.severity)}: ${subDiagnostic.message}`;
 }
 
-function formatPrimaryAnnotation(
+export function formatSubDiagnosticAnnotation(
   subDiagnostic: SubDiagnostic,
   annotation: SubDiagnosticAnnotation,
+  includeSubDiagnosticMessage = annotation.primary,
 ): string {
-  return annotation.message == null
-    ? subDiagnostic.message
-    : `${subDiagnostic.message}: ${annotation.message}`;
+  if (annotation.message == null) {
+    return subDiagnostic.message;
+  }
+
+  return includeSubDiagnosticMessage
+    ? `${subDiagnostic.message}: ${annotation.message}`
+    : annotation.message;
+}
+
+function formatSubDiagnosticSeverity(severity: SubDiagnosticSeverity): string {
+  switch (severity) {
+    case SubDiagnosticSeverity.Help:
+      return "help";
+    case SubDiagnosticSeverity.Info:
+      return "info";
+    case SubDiagnosticSeverity.Warning:
+      return "warning";
+    case SubDiagnosticSeverity.Error:
+      return "error";
+    case SubDiagnosticSeverity.Fatal:
+      return "fatal";
+  }
 }

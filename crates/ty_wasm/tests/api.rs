@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use ty_wasm::{Position, PositionEncoding, Workspace};
+use ty_wasm::{Position, PositionEncoding, SubDiagnosticSeverity, Workspace};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[wasm_bindgen_test]
@@ -37,30 +37,29 @@ fn check() {
     assert_eq!(
         sub_diagnostics
             .iter()
-            .map(|sub_diagnostic| (
-                sub_diagnostic.severity.as_str(),
-                sub_diagnostic.message.as_str()
-            ))
+            .map(|sub_diagnostic| (sub_diagnostic.severity, sub_diagnostic.message.as_str()))
             .collect::<Vec<_>>(),
         [
             (
-                "info",
+                SubDiagnosticSeverity::Info,
                 "Searched in the following paths during module resolution:"
             ),
-            ("info", "  1. / (first-party code)"),
+            (SubDiagnosticSeverity::Info, "  1. / (first-party code)"),
             (
-                "info",
+                SubDiagnosticSeverity::Info,
                 "  2. vendored://stdlib (stdlib typeshed stubs vendored by ty)"
             ),
             (
-                "info",
+                SubDiagnosticSeverity::Info,
                 "make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment"
             ),
         ]
     );
-    assert!(sub_diagnostics.iter().all(|sub_diagnostic| {
-        sub_diagnostic.primary_annotation_index.is_none() && sub_diagnostic.annotations.is_empty()
-    }));
+    assert!(
+        sub_diagnostics
+            .iter()
+            .all(|sub_diagnostic| sub_diagnostic.annotations.is_empty())
+    );
 }
 
 #[wasm_bindgen_test]
@@ -91,8 +90,7 @@ f(x=\"foo\")\n",
         .find(|sub_diagnostic| sub_diagnostic.message == "Function defined here")
         .expect("Expected a function definition sub-diagnostic");
 
-    assert_eq!(function_detail.severity, "info");
-    assert_eq!(function_detail.primary_annotation_index, Some(0));
+    assert_eq!(function_detail.severity, SubDiagnosticSeverity::Info);
     assert_eq!(function_detail.annotations.len(), 2);
 
     let function_annotation = &function_detail.annotations[0];
@@ -165,7 +163,6 @@ class VeryEggyOmelette(
         .expect("Expected a class definition sub-diagnostic");
 
     assert_eq!(definition_detail.annotations.len(), 3);
-    assert_eq!(definition_detail.primary_annotation_index, Some(1));
     assert_eq!(
         definition_detail
             .annotations
@@ -236,8 +233,7 @@ del movie['name']
         .find(|sub_diagnostic| sub_diagnostic.message == "Field defined here")
         .expect("Expected a field definition sub-diagnostic");
 
-    assert_eq!(field_detail.severity, "info");
-    assert_eq!(field_detail.primary_annotation_index, None);
+    assert_eq!(field_detail.severity, SubDiagnosticSeverity::Info);
     assert_eq!(field_detail.annotations.len(), 3);
     assert!(
         field_detail

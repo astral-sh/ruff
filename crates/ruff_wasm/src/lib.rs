@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
+use ruff_db::diagnostic;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
@@ -31,7 +32,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
-    sub_diagnostics: SubDiagnostic[];
+    subDiagnostics: SubDiagnostic[];
     start_location: {
         row: number;
         column: number;
@@ -57,9 +58,17 @@ export interface Diagnostic {
 }
 
 export interface SubDiagnostic {
-    severity: string;
+    severity: SubDiagnosticSeverity;
     message: string;
     location: SubDiagnosticLocation | null;
+}
+
+export enum SubDiagnosticSeverity {
+    Help = "help",
+    Info = "info",
+    Warning = "warning",
+    Error = "error",
+    Fatal = "fatal",
 }
 
 export interface SubDiagnosticLocation {
@@ -79,6 +88,7 @@ export interface SubDiagnosticLocation {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
+    #[serde(rename = "subDiagnostics")]
     pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
     pub start_location: Location,
     pub end_location: Location,
@@ -87,9 +97,31 @@ pub struct ExpandedMessage {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedSubDiagnostic {
-    pub severity: String,
+    pub severity: SubDiagnosticSeverity,
     pub message: String,
     pub location: Option<ExpandedSubDiagnosticLocation>,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
+    fn from(value: diagnostic::SubDiagnosticSeverity) -> Self {
+        match value {
+            diagnostic::SubDiagnosticSeverity::Help => Self::Help,
+            diagnostic::SubDiagnosticSeverity::Info => Self::Info,
+            diagnostic::SubDiagnosticSeverity::Warning => Self::Warning,
+            diagnostic::SubDiagnosticSeverity::Error => Self::Error,
+            diagnostic::SubDiagnosticSeverity::Fatal => Self::Fatal,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -329,7 +361,7 @@ impl Workspace {
                         });
 
                         ExpandedSubDiagnostic {
-                            severity: sub_diagnostic.severity().to_string(),
+                            severity: sub_diagnostic.severity().into(),
                             message: sub_diagnostic.concise_message().to_string(),
                             location,
                         }
