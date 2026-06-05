@@ -411,26 +411,24 @@ pub mod clap_completion {
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            Rule::from_code(value).or_else(|_| {
-                if let Ok(rule) = value.parse() {
-                    return Ok(rule);
-                }
-
-                let mut error =
-                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
-                if let Some(arg) = arg {
+            Rule::from_code(value)
+                .or_else(|_| value.parse())
+                .map_err(|_| {
+                    let mut error =
+                        clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                    if let Some(arg) = arg {
+                        error.insert(
+                            clap::error::ContextKind::InvalidArg,
+                            clap::error::ContextValue::String(arg.to_string()),
+                        );
+                    }
                     error.insert(
-                        clap::error::ContextKind::InvalidArg,
-                        clap::error::ContextValue::String(arg.to_string()),
+                        clap::error::ContextKind::InvalidValue,
+                        clap::error::ContextValue::String(value.to_string()),
                     );
-                }
-                error.insert(
-                    clap::error::ContextKind::InvalidValue,
-                    clap::error::ContextValue::String(value.to_string()),
-                );
 
-                Err(error)
-            })
+                    error
+                })
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
