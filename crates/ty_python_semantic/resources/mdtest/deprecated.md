@@ -485,11 +485,17 @@ class DeprType: ...
 @deprecated("Use other_func instead")
 def depr_func(): ...
 
+class C:
+    @deprecated("Use other_method instead")
+    def depr_method(self): ...
+
 alias_func = depr_func  # error: [deprecated] "Use other_func instead"
 AliasClass = DeprType  # error: [deprecated] "Use OtherType instead"
+alias_method = C().depr_method  # error: [deprecated] "Use other_method instead"
 
 alias_func()
 AliasClass()
+alias_method()
 
 second_alias = alias_func
 second_alias()
