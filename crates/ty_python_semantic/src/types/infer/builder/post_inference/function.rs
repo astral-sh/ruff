@@ -66,9 +66,39 @@ pub(crate) fn check_function_definition<'db>(
 ///     def invalid(self: int): ...
 /// ```
 ///
-/// This intentionally preserves receiver restrictions used by overloads, mixins, and metaclass
-/// methods, along with typing-spec and typeshed exemptions such as `Never` and
-/// `str`/`LiteralString`.
+/// A receiver annotation can be narrower than the class containing the method without being
+/// invalid:
+///
+/// ```python
+/// from typing import Protocol, overload
+///
+/// class Base:
+///     @overload
+///     def method(self: "Child", value: str) -> str: ...
+///     @overload
+///     def method(self, value: int) -> int: ...
+///     def method(self, value: int | str) -> int | str:
+///         return value
+///
+/// class Child(Base): ...
+///
+/// class HasName(Protocol):
+///     name: str
+///
+/// class NameMixin:
+///     def get_name(self: HasName) -> str:
+///         return self.name
+///
+/// class Model: ...
+///
+/// class ModelMeta(type):
+///     def register(cls: type[Model]) -> None: ...
+/// ```
+///
+/// These annotations respectively restrict an overload to a subclass, describe members that the
+/// eventual host of a mixin must provide, and restrict a metaclass method to class objects below a
+/// particular base. This check also preserves typing-spec and typeshed exemptions such as `Never`
+/// and `str`/`LiteralString`.
 fn check_method_receiver<'db>(
     context: &InferContext<'db, '_>,
     decorated_type: Type<'db>,
