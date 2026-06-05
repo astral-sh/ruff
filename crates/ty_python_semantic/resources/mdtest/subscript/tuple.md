@@ -335,7 +335,13 @@ reveal_type(tuple[int, ...])  # revealed: <class 'tuple[int, ...]'>
 ```py
 from typing import Any
 
-def _(a: type[tuple], b: type[tuple[int]], c: type[tuple[int, ...]], d: type[tuple[Any, ...]]) -> None:  # error: [missing-type-argument]
+def _(
+    # error: [missing-type-argument]
+    a: type[tuple],
+    b: type[tuple[int]],
+    c: type[tuple[int, ...]],
+    d: type[tuple[Any, ...]],
+) -> None:
     reveal_type(a)  # revealed: type[tuple[Unknown, ...]]
     reveal_type(b)  # revealed: type[tuple[int]]
     reveal_type(c)  # revealed: type[tuple[int, ...]]
@@ -357,7 +363,7 @@ class A(tuple[int, str]): ...
 # revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 
-class C(tuple): ...
+class C(tuple): ...  # error: [missing-type-argument]
 
 # revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(C)

@@ -229,9 +229,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
         let base_class = entry.ty();
-        if let Some(node) = source_node {
-            report_missing_type_arguments(context, base_class, node);
-        }
+        report_missing_type_arguments(context, base_class, source_node);
 
         if class_kind == Some(CodeGeneratorKind::NamedTuple)
             && !matches!(

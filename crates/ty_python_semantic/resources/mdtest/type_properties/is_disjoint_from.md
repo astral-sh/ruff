@@ -895,7 +895,10 @@ class GenericClassIntBound[T: int]:
     x: T  # invariant
 
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))  # error: [missing-type-argument]
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))  # error: [missing-type-argument]
+static_assert(
+    # error: [missing-type-argument]
+    not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound])
+)
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
 
