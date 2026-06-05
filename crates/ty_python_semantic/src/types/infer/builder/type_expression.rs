@@ -187,7 +187,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let value_ty = self.infer_expression(value, TypeContext::default());
 
                 if is_dotted_name(value) {
-                    self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
+                    let previously_in_unpack_type_argument =
+                        if value_ty == Type::SpecialForm(SpecialFormType::Unpack) {
+                            None
+                        } else {
+                            Some(
+                                self.context
+                                    .inference_flags
+                                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, false),
+                            )
+                        };
+                    let ty =
+                        self.infer_subscript_type_expression_no_store(subscript, slice, value_ty);
+                    if let Some(previously_in_unpack_type_argument) =
+                        previously_in_unpack_type_argument
+                    {
+                        self.context.inference_flags.set(
+                            InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
+                            previously_in_unpack_type_argument,
+                        );
+                    }
+                    ty
                 } else {
                     if !self.in_string_annotation() {
                         self.infer_expression(slice, TypeContext::default());
@@ -2268,10 +2288,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 if self
                     .inference_flags()
-                    .contains(InferenceFlags::IN_KWARG_ANNOTATION)
-                    && self
-                        .inference_flags()
-                        .contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)
+                    .contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)
                 {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(

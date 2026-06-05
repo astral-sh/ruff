@@ -145,4 +145,10 @@ def invalid(
     multiple: tuple[Unpack[Ts], Unpack[tuple[str, ...]]],
 ) -> None:
     reveal_type(non_tuple)  # revealed: Pair[*tuple[Unknown, ...], str]
+
+# error: [invalid-type-form] "`Unpack` cannot be nested"
+def nested(*args: Unpack[Unpack[tuple[int, ...]]]) -> None: ...
+
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts` is not valid in this context in a parameter annotation"
+def nested_bare_typevartuple(*args: Unpack[tuple[Ts]]) -> None: ...
 ```
