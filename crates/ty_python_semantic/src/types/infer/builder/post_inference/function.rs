@@ -7,6 +7,7 @@ use crate::{
             INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
             INVALID_TYPE_VARIABLE_DEFAULT,
         },
+        enums::is_enum_class_by_inheritance,
         function::{FunctionDecorators, OverloadLiteral},
         infer::original_class_type,
         infer_definition_types,
@@ -59,7 +60,6 @@ fn check_method_receiver<'db>(
 
     if last_definition.is_overload(db)
         || last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK)
-        || method_name == "_generate_next_value_"
         || (!last_definition.has_implicit_receiver(db) && method_name != "__new__")
         || !signature.has_explicit_positional_receiver_annotation()
     {
@@ -75,7 +75,10 @@ fn check_method_receiver<'db>(
         return;
     };
 
-    if enclosing_class.is_protocol(db) {
+    if enclosing_class.is_protocol(db)
+        || (method_name == "_generate_next_value_"
+            && is_enum_class_by_inheritance(db, enclosing_class))
+    {
         return;
     }
 

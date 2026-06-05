@@ -74,6 +74,7 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, LiteralString, Never, Protocol, Self, TypeVar, Unpack, final, overload
 
 class Parent: ...
@@ -187,7 +188,11 @@ class StrSubclass(str):
     def method(self: LiteralString): ...
 
 class EnumLike:
+    # error: [invalid-method-receiver]
     def _generate_next_value_(name: str, start: int, count: int, last_values: list[object]): ...
+
+class ActualEnum(Enum):
+    def _generate_next_value_(name: str, start: int, count: int, last_values: list[Any]) -> Any: ...  # ty: ignore[invalid-method-override]
 
 def nested():
     def not_a_method(value: int): ...
