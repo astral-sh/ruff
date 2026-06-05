@@ -173,6 +173,7 @@ fn check_method_receiver<'db>(
             return;
         }
     } else if !receiver_is_class_typevar
+        && !receiver_parameter.is_keyword_variadic()
         && !invalid_variadic_receiver
         && (expected_receiver.is_assignable_to(db, concrete_receiver_type)
             || (receiver_parameter.is_positional()
