@@ -74,7 +74,21 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
-from typing import Annotated, Any, LiteralString, Never, Optional, ParamSpec, Protocol, Self, TypeAlias, TypeVar, Union, Unpack, overload
+from typing import (
+    Annotated,
+    Any,
+    LiteralString,
+    Never,
+    Optional,
+    ParamSpec,
+    Protocol,
+    Self,
+    TypeAlias,
+    TypeVar,
+    Union,
+    Unpack,
+    overload,
+)
 
 class Parent: ...
 class Unrelated: ...

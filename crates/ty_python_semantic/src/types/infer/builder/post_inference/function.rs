@@ -113,7 +113,8 @@ fn check_method_receiver<'db>(
     } else {
         None
     };
-    let invalid_variadic_receiver = matches!(variadic_receiver, Some(VariadicReceiverType::Invalid));
+    let invalid_variadic_receiver =
+        matches!(variadic_receiver, Some(VariadicReceiverType::Invalid));
     let raw_receiver_type = match variadic_receiver {
         Some(VariadicReceiverType::Type(receiver_type)) => receiver_type,
         Some(VariadicReceiverType::Invalid) | None => annotated_receiver_type,
@@ -358,12 +359,11 @@ impl<'db> ProtocolClassUnionChecker<'db> {
                 }
                 Type::SpecialForm(SpecialFormType::Optional) => {
                     return Some(
-                        self.member_compatibility(&subscript.slice, resolver)?.union(
-                            ProtocolClassUnionCompatibility {
+                        self.member_compatibility(&subscript.slice, resolver)?
+                            .union(ProtocolClassUnionCompatibility {
                                 contains_protocol_class: false,
                                 accepts_receiver: false,
-                            },
-                        ),
+                            }),
                     );
                 }
                 Type::SpecialForm(SpecialFormType::Annotated) => {
@@ -515,13 +515,16 @@ impl<'db> ProtocolClassUnionChecker<'db> {
             let mut elements = union.elements(self.db).iter().copied();
             let mut compatibility = self.semantic_member_compatibility(elements.next()?)?;
             for element in elements {
-                compatibility =
-                    compatibility.union(self.semantic_member_compatibility(element)?);
+                compatibility = compatibility.union(self.semantic_member_compatibility(element)?);
             }
-            return compatibility.contains_protocol_class.then_some(compatibility);
+            return compatibility
+                .contains_protocol_class
+                .then_some(compatibility);
         }
         let compatibility = self.semantic_member_compatibility(annotation_type)?;
-        compatibility.contains_protocol_class.then_some(compatibility)
+        compatibility
+            .contains_protocol_class
+            .then_some(compatibility)
     }
 
     fn semantic_member_compatibility(
@@ -610,7 +613,8 @@ impl<'db> ProtocolClassUnionChecker<'db> {
             _ => {}
         }
 
-        let Type::ClassLiteral(protocol_class) = resolver.expression_type(self.db, &subscript.value)
+        let Type::ClassLiteral(protocol_class) =
+            resolver.expression_type(self.db, &subscript.value)
         else {
             return None;
         };
