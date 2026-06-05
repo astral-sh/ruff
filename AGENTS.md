@@ -2,6 +2,14 @@
 
 This repository contains both Ruff (a Python linter and formatter) and ty (a Python type checker). The crates follow a naming convention: `ruff_*` for Ruff-specific code and `ty_*` for ty-specific code. ty reuses several Ruff crates, including the Python parser (`ruff_python_parser`) and AST definitions (`ruff_python_ast`).
 
+## Code reviews
+
+When reviewing a branch or pull request, be deliberately nitpicky. Report not
+only bugs and regressions, but also architectural and maintenance risks, weak
+test coverage, unclear code, unnecessary complexity, and meaningful style or
+consistency issues. Order findings by severity, cite files and lines, and
+distinguish blockers from non-blocking improvements.
+
 ## Running Tests
 
 Run all tests (setting `CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_DEBUG="line-tables-only"` to enable optimizations while retaining some debug info, and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
