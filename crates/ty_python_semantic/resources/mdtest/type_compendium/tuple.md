@@ -87,18 +87,18 @@ python-version = "3.11"
 ```
 
 ```py
-from typing_extensions import Iterable, Never
+from typing_extensions import Any, Iterable, Never
 
-class UnspecializedTupleSubclass(tuple): ...
+class VariadicAnyTupleSubclass(tuple[Any, ...]): ...
 class EmptyTupleSubclass(tuple[()]): ...
 class SingleElementTupleSubclass(tuple[int]): ...
 class VariadicTupleSubclass(tuple[int, ...]): ...
 class MixedTupleSubclass(tuple[int, *tuple[str, ...]]): ...
 
-reveal_type(UnspecializedTupleSubclass())  # revealed: UnspecializedTupleSubclass
-reveal_type(UnspecializedTupleSubclass(()))  # revealed: UnspecializedTupleSubclass
-reveal_type(UnspecializedTupleSubclass((1, 2, "foo")))  # revealed: UnspecializedTupleSubclass
-reveal_type(UnspecializedTupleSubclass([1, 2, "foo", b"bar"]))  # revealed: UnspecializedTupleSubclass
+reveal_type(VariadicAnyTupleSubclass())  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass(()))  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass((1, 2, "foo")))  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass([1, 2, "foo", b"bar"]))  # revealed: VariadicAnyTupleSubclass
 
 reveal_type(EmptyTupleSubclass())  # revealed: EmptyTupleSubclass
 reveal_type(EmptyTupleSubclass(()))  # revealed: EmptyTupleSubclass

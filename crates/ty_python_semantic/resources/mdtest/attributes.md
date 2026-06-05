@@ -3091,12 +3091,14 @@ in this case, `Divergent` is propagated, guaranteeing the convergence of type in
 regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
 
 ```py
+from typing import Any
+
 class NestedListsConcat:
     def __init__(self):
         self.x = [0]
         self.y = [0]
 
-    def f(self, y: list):
+    def f(self, y: list[Any]):
         # The overload that fails to resolve is `list.__add__` in both of these cases.
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
