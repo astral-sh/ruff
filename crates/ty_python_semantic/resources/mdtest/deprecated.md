@@ -359,6 +359,10 @@ def use_mixed_union(instance: DecoratedUnionMember | UndecoratedUnionMember) -> 
     if is_replacement_class(casted):
         casted()  # error: [deprecated] "union replacement"
 
+    annotated: TypeOf[ReplacementClass] | TypeOf[OtherReplacementClass] = instance.binding
+    if is_replacement_class(annotated):
+        annotated()  # error: [deprecated] "union replacement"
+
 H = TypeVar("H", DecoratedUnionMember, UndecoratedUnionMember)
 
 def use_mixed_typevar(instance: H) -> None:

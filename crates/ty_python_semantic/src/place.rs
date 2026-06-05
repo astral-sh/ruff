@@ -1275,9 +1275,9 @@ pub(crate) fn place_by_id<'db>(
             let boundness_analysis = bindings.boundness_analysis();
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
-            let place = match inferred.place {
+            let (place, deprecation) = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
-                Place::Undefined => {
+                Place::Undefined => (
                     // TODO: We probably don't want to report `AlwaysDefined` here. This requires a bit of
                     // design work though as we might want a different behavior for stubs and for
                     // normal modules.
@@ -1286,32 +1286,39 @@ pub(crate) fn place_by_id<'db>(
                         origin,
                         definedness: Definedness::AlwaysDefined,
                         public_type_policy: PublicTypePolicy::Raw,
-                    })
-                }
+                    }),
+                    merge_deprecation_policy(declared_deprecation, inferred.deprecation),
+                ),
                 // Place is possibly undeclared and (possibly) bound
                 Place::Defined(DefinedPlace {
                     ty: inferred_ty,
                     origin,
                     definedness: boundness,
                     ..
-                }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
-                    origin,
-                    definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
-                        Definedness::AlwaysDefined
-                    } else {
-                        boundness
-                    },
-                    public_type_policy: PublicTypePolicy::Raw,
-                }),
+                }) => (
+                    Place::Defined(DefinedPlace {
+                        ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
+                        origin,
+                        definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
+                            Definedness::AlwaysDefined
+                        } else {
+                            boundness
+                        },
+                        public_type_policy: PublicTypePolicy::Raw,
+                    }),
+                    DeprecationPolicy::from_alternatives(
+                        db,
+                        [
+                            (declared_ty, declared_deprecation),
+                            (inferred_ty, inferred.deprecation),
+                        ],
+                    ),
+                ),
             };
 
             place
                 .with_qualifiers(qualifiers)
-                .with_deprecation_policy(merge_deprecation_policy(
-                    declared_deprecation,
-                    inferred.deprecation,
-                ))
+                .with_deprecation_policy(deprecation)
         }
         // Place is undeclared, infer the type from bindings
         (Place::Undefined, _, _) => {

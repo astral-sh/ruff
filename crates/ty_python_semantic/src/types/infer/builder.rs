@@ -4731,10 +4731,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
-            if inferred_ty.is_deprecated(self.db())
-                && self.expression_deprecation_policy(value) == DeprecationPolicy::Suppress
-            {
-                declared = declared.suppress_type_deprecation();
+            match self.expression_deprecation_policy(value) {
+                deprecation @ DeprecationPolicy::Alternatives(_) => {
+                    declared = declared.with_deprecation_policy(deprecation);
+                }
+                DeprecationPolicy::Suppress if inferred_ty.is_deprecated(self.db()) => {
+                    declared = declared.suppress_type_deprecation();
+                }
+                _ => {}
             }
 
             if is_pep_613_type_alias {
