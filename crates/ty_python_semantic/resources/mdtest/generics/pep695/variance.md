@@ -1021,6 +1021,7 @@ static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 
 class D[T](C[T]):
+    # error: [invalid-method-receiver]
     def g(x: T) -> None:
         pass
 
