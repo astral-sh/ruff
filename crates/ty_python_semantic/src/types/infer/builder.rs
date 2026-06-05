@@ -5932,10 +5932,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid promoting explicitly annotated literal values.
         if let Type::LiteralValue(literal) = ty
             && let Some(tcx) = tcx.annotation
-            && let Type::Union(_) | Type::LiteralValue(_) = tcx
+            && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
                 .resolve_type_alias(self.db())
                 .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
-            && ty.is_assignable_to(self.db(), tcx)
+            && ty.is_assignable_to(self.db(), literal_tcx)
         {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
@@ -6604,6 +6604,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let mut narrowed_tys = Vec::new();
                     let mut item_types = FxHashMap::default();
+                    // Reuse nested expressions that receive the same field context across candidates.
+                    let teardown = self.setup_expression_cache();
                     for typed_dict in typed_dicts {
                         // Disable diagnostics as we attempt to narrow to specific `TypedDict`
                         // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
@@ -6618,6 +6620,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
 
                         item_types.clear();
+                    }
+                    if teardown {
+                        self.teardown_expression_cache();
                     }
 
                     // Successfully narrowed to a subset of typed dicts.

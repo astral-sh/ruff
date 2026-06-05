@@ -46,7 +46,7 @@ use crate::{
         member::{Member, class_member},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
-        tuple::{FixedLengthTuple, Tuple, TupleSpec, TupleType},
+        tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -2084,6 +2084,15 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
+        // Collect names in a tracked query so unrelated edits can preserve dependent member
+        // lookups, and avoid retaining query entries for names that no method can define.
+        if implicit_attribute_names(db, class_body_scope)
+            .binary_search_by(|candidate| candidate.as_str().cmp(name))
+            .is_err()
+        {
+            return Member::unbound();
+        }
+
         Self::implicit_attribute_inner(
             db,
             class_body_scope,
@@ -2735,36 +2744,26 @@ impl<'db> StaticClassLiteral<'db> {
     }
 }
 
-/// A single semantic class-base entry after expanding starred tuple bases and synthetic bases.
+/// A single semantic class-base entry after expanding starred tuple bases.
 #[derive(Clone, Copy)]
-pub(crate) enum ExpandedClassBaseEntry<'a, 'db> {
-    /// A base that comes from a concrete expression in the class header.
-    SourceBacked { node: &'a ast::Expr, ty: Type<'db> },
-    /// A base introduced by semantic expansion with no corresponding source expression.
-    Synthetic(Type<'db>),
+pub(crate) struct ExpandedClassBaseEntry<'a, 'db> {
+    source_node: &'a ast::Expr,
+    ty: Type<'db>,
 }
 
 impl<'a, 'db> ExpandedClassBaseEntry<'a, 'db> {
-    /// Returns the source expression for this base entry, if it has one.
-    pub(crate) const fn source_node(self) -> Option<&'a ast::Expr> {
-        match self {
-            Self::SourceBacked { node, .. } => Some(node),
-            Self::Synthetic(_) => None,
-        }
+    /// Returns the source expression for this base entry.
+    pub(crate) const fn source_node(self) -> &'a ast::Expr {
+        self.source_node
     }
 
     /// Returns the semantic type of this base entry.
     pub(crate) const fn ty(self) -> Type<'db> {
-        match self {
-            Self::SourceBacked { ty, .. } | Self::Synthetic(ty) => ty,
-        }
+        self.ty
     }
 }
 
 /// Expands a class's bases into the semantic entries used by [`StaticClassLiteral::explicit_bases`].
-///
-/// Entries are source-backed when they originate from a concrete base expression in the class
-/// header, and synthetic when semantic expansion adds a base with no corresponding source span.
 pub(crate) fn expanded_class_base_entries<'a, 'db>(
     db: &'db dyn Db,
     known_class: Option<KnownClass>,
@@ -2772,18 +2771,6 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
     class_definition: Definition<'db>,
 ) -> Vec<ExpandedClassBaseEntry<'a, 'db>> {
     match known_class {
-        Some(KnownClass::VersionInfo) => {
-            let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
-                .expect("sys.version_info tuple spec should always be a valid tuple");
-
-            vec![
-                ExpandedClassBaseEntry::SourceBacked {
-                    node: &class_stmt.bases()[0],
-                    ty: definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
-                },
-                ExpandedClassBaseEntry::Synthetic(Type::from(tuple_type.to_class_type(db))),
-            ]
-        }
         // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
         // but this causes more problems than it fixes.
         Some(KnownClass::NotImplementedType) => vec![],
@@ -2805,8 +2792,8 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                             tuple_literal
                                 .iter()
                                 .zip(tuple.owned_elements().into_vec())
-                                .map(|(node, ty)| ExpandedClassBaseEntry::SourceBacked {
-                                    node,
+                                .map(|(source_node, ty)| ExpandedClassBaseEntry {
+                                    source_node,
                                     ty,
                                 }),
                         );
@@ -2814,8 +2801,8 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                     }
 
                     expanded_bases.extend(tuple.owned_elements().into_vec().into_iter().map(
-                        |ty| ExpandedClassBaseEntry::SourceBacked {
-                            node: base_node,
+                        |ty| ExpandedClassBaseEntry {
+                            source_node: base_node,
                             ty,
                         },
                     ));
@@ -2827,8 +2814,8 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                 } else {
                     definition_expression_type(db, class_definition, base_node)
                 };
-                expanded_bases.push(ExpandedClassBaseEntry::SourceBacked {
-                    node: base_node,
+                expanded_bases.push(ExpandedClassBaseEntry {
+                    source_node: base_node,
                     ty,
                 });
             }
@@ -3031,6 +3018,25 @@ fn explicit_bases_cycle_fn<'db>(
         // unfortunate, but maybe only pathological programs can trigger such a thing.
         current
     }
+}
+
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
+    let index = semantic_index(db, class_body_scope.file(db));
+    let mut names = Vec::new();
+
+    for function_scope_id in attribute_scopes(db, class_body_scope) {
+        names.extend(
+            index
+                .place_table(function_scope_id)
+                .members()
+                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+        );
+    }
+
+    names.sort_unstable();
+    names.dedup();
+    names.into_boxed_slice()
 }
 
 fn implicit_attribute_cycle_recover<'db>(

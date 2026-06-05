@@ -340,6 +340,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "110") => rules::flake8_async::rules::AsyncBusyWait,
         (Flake8Async, "115") => rules::flake8_async::rules::AsyncZeroSleep,
         (Flake8Async, "116") => rules::flake8_async::rules::LongSleepNotForever,
+        (Flake8Async, "119") => rules::flake8_async::rules::YieldInContextManagerInAsyncGenerator,
         (Flake8Async, "210") => rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
         (Flake8Async, "212") => rules::flake8_async::rules::BlockingHttpCallHttpxInAsyncFunction,
         (Flake8Async, "220") => rules::flake8_async::rules::CreateSubprocessInAsyncFunction,
@@ -1076,6 +1077,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
+        (Ruff, "076") => rules::ruff::rules::PytestFixtureAutouse,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,

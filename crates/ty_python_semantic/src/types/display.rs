@@ -31,10 +31,10 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BindingContext, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol, ProtocolInstanceType,
+    SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
+    TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -185,6 +185,23 @@ impl<'db> DisplaySettings<'db> {
         Self {
             active_scopes: Rc::new(active_scopes),
             ..self.clone()
+        }
+    }
+
+    #[must_use]
+    fn with_generic_context(
+        &self,
+        db: &'db dyn Db,
+        generic_context: Option<&GenericContext<'db>>,
+    ) -> Self {
+        if let Some(generic_context) = generic_context {
+            self.with_active_scopes(
+                generic_context
+                    .variables(db)
+                    .filter_map(|bound| bound.binding_context(db).definition()),
+            )
+        } else {
+            self.clone()
         }
     }
 
@@ -791,6 +808,20 @@ impl<'db> TypeAliasType<'db> {
             settings,
         }
     }
+
+    /// Returns a source-style display of this type alias's declaration.
+    pub fn display_declaration(self, db: &'db dyn Db) -> impl Display + 'db {
+        let value_ty = self.raw_value_type(db);
+        DisplayTypeAliasDeclaration {
+            db,
+            type_alias: self,
+            value_ty,
+            settings: DisplaySettings::from_possibly_ambiguous_types(
+                db,
+                [Type::TypeAlias(self), value_ty],
+            ),
+        }
+    }
 }
 
 struct TypeAliasDisplay<'db> {
@@ -828,6 +859,43 @@ impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
 }
 
 impl Display for TypeAliasDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
+}
+
+/// A source-style display of a type alias declaration.
+struct DisplayTypeAliasDeclaration<'db> {
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    value_ty: Type<'db>,
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let generic_context = self.type_alias.generic_context(self.db);
+        let settings = self
+            .settings
+            .with_generic_context(self.db, generic_context.as_ref());
+
+        f.write_str("type ")?;
+        self.type_alias
+            .display_with(self.db, settings.clone())
+            .fmt_detailed(f)?;
+        if let Some(generic_context) = generic_context {
+            generic_context
+                .display_with(self.db, settings.clone())
+                .fmt_detailed(f)?;
+        }
+        f.write_str(" = ")?;
+        self.value_ty
+            .display_with(self.db, settings)
+            .fmt_detailed(f)
+    }
+}
+
+impl Display for DisplayTypeAliasDeclaration<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
@@ -2087,17 +2155,9 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             f.write_str(&name)?;
         }
 
-        let settings = if let Some(generic_context) = self.generic_context {
-            self.settings
-                .with_active_scopes(generic_context.variables(self.db).filter_map(|bound| {
-                    match bound.binding_context(self.db) {
-                        BindingContext::Definition(def) => Some(def),
-                        BindingContext::Synthetic => None,
-                    }
-                }))
-        } else {
-            self.settings.clone()
-        };
+        let settings = self
+            .settings
+            .with_generic_context(self.db, self.generic_context);
 
         // Display type parameters if present, but only when the caller hasn't
         // already displayed them.

@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 1
+
+--- Added ---
+PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+  --> PT003.py:75:25
+   |
+73 |     ...
+74 |
+75 | @pytest_asyncio.fixture(scope="function")
+   |                         ^^^^^^^^^^^^^^^^
+76 | async def asyncio_error():
+77 |     ...
+   |
+help: Remove implied `scope` argument
+72 | def error_multiple_args():
+73 |     ...
+74 |
+   - @pytest_asyncio.fixture(scope="function")
+75 + @pytest_asyncio.fixture()
+76 | async def asyncio_error():
+77 |     ...
+note: This is an unsafe fix and may change runtime behavior

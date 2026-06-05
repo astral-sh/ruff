@@ -148,7 +148,7 @@ But perhaps the most commonly used tuple subclass instance is the singleton `sys
 ```py
 import sys
 
-# revealed: Overload[(self, index: Literal[-5, 0], /) -> Literal[3], (self, index: Literal[-4, 1], /) -> Literal[11], (self, index: Literal[-3, -1, 2, 4], /) -> int, (self, index: Literal[-2, 3], /) -> Literal["alpha", "beta", "candidate", "final"], (self, index: SupportsIndex, /) -> int | Literal["alpha", "beta", "candidate", "final"], (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | Literal["alpha", "beta", "candidate", "final"], ...]]
+# revealed: Overload[(self, index: Literal[-5, -4, -3, -1, 0, 1, 2, 4], /) -> int, (self, index: Literal[-2, 3], /) -> Literal["alpha", "beta", "candidate", "final"], (self, index: SupportsIndex, /) -> int | Literal["alpha", "beta", "candidate", "final"], (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | Literal["alpha", "beta", "candidate", "final"], ...]]
 reveal_type(type(sys.version_info).__getitem__)
 ```
 

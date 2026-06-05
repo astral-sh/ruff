@@ -257,6 +257,15 @@ impl Default for OwnedConstraintSet<'_> {
 }
 
 impl<'db> OwnedConstraintSet<'db> {
+    pub(crate) fn always() -> Self {
+        Self {
+            node: ALWAYS_TRUE,
+            constraints: IndexVec::default(),
+            typevars: IndexVec::default(),
+            nodes: IndexVec::default(),
+        }
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -3207,8 +3216,8 @@ impl<'db> PathBounds<'db> {
                     let when_upper =
                         constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
                     let when = builder
-                        .load(db, when_lower)
-                        .and(db, builder, || builder.load(db, when_upper));
+                        .load(db, &when_lower)
+                        .and(db, builder, || builder.load(db, &when_upper));
                     !when.is_never_satisfied(db)
                 });
 

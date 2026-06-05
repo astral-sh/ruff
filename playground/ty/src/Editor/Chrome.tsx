@@ -25,11 +25,13 @@ import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
-import Diagnostics, { Diagnostic } from "./Diagnostics";
+import Diagnostics, {
+  type Diagnostic,
+  type DiagnosticLocation,
+} from "./Diagnostics";
 import VendoredFileBanner from "./VendoredFileBanner";
 import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
-import type { editor } from "monaco-editor";
-import type { Monaco } from "@monaco-editor/react";
+import type { EditorHandle } from "./Editor";
 
 const Editor = lazy(() => import("./Editor"));
 
@@ -80,10 +82,7 @@ export default function Chrome({
     null,
   );
 
-  const editorRef = useRef<{
-    editor: editor.IStandaloneCodeEditor;
-    monaco: Monaco;
-  } | null>(null);
+  const editorRef = useRef<EditorHandle | null>(null);
 
   const handleFileRenamed = (file: FileId, newName: string) => {
     onRenameFile(session, file, newName);
@@ -125,28 +124,12 @@ export default function Chrome({
     [],
   );
 
-  const handleEditorMount = useCallback(
-    (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
-      editorRef.current = { editor, monaco };
-    },
-    [],
-  );
+  const handleEditorMount = useCallback((handle: EditorHandle) => {
+    editorRef.current = handle;
+  }, []);
 
-  const handleGoTo = useCallback((line: number, column: number) => {
-    const editor = editorRef.current?.editor;
-
-    if (editor == null) {
-      return;
-    }
-
-    const range = {
-      startLineNumber: line,
-      startColumn: column,
-      endLineNumber: line,
-      endColumn: column,
-    };
-    editor.revealRange(range);
-    editor.setSelection(range);
+  const handleGoTo = useCallback((location: DiagnosticLocation) => {
+    editorRef.current?.goToLocation(location);
   }, []);
 
   const handleRemoved = useCallback(
@@ -168,6 +151,10 @@ export default function Chrome({
     files.currentVendoredFile ?? null,
     files.revision,
   );
+  const currentFilePath =
+    files.selected == null
+      ? null
+      : (files.metadata[files.selected].handle?.path() ?? null);
 
   return (
     <>
@@ -238,6 +225,7 @@ export default function Chrome({
                 <Panel id="diagnostics" minSize={150} className="my-2">
                   <Diagnostics
                     diagnostics={checkResult.diagnostics}
+                    currentFilePath={currentFilePath}
                     onGoTo={handleGoTo}
                     theme={theme}
                   />
@@ -344,6 +332,7 @@ function useCheckResult(
       const serializedDiagnostics = diagnostics.map((diagnostic) => ({
         id: diagnostic.id(),
         message: diagnostic.message(),
+        subDiagnostics: diagnostic.subDiagnostics(workspace),
         severity: diagnostic.severity(),
         range: diagnostic.toRange(workspace) ?? null,
         textRange: diagnostic.textRange() ?? null,

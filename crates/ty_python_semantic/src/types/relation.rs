@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -414,13 +416,41 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Returns whether constraint-set assignability is known to be unconditionally satisfied
+    /// before constructing the relation checker.
+    fn is_trivially_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        if self.materialized_divergent_fallback().is_none() && self == target {
+            return true;
+        }
+
+        // Type variables must be converted into constraints before applying the remaining
+        // relation shortcuts.
+        if self.is_type_var() || target.is_type_var() {
+            return false;
+        }
+
+        match (self, target) {
+            (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
+            (_, Type::NominalInstance(target)) if target.is_object() => true,
+            (_, Type::Union(union)) => {
+                self.materialized_divergent_fallback().is_none()
+                    && union.elements(db).contains(&self)
+            }
+            (Type::Intersection(intersection), _) => {
+                target.materialized_divergent_fallback().is_none()
+                    && intersection.positive(db).contains(&target)
+            }
+            _ => false,
+        }
+    }
+
     /// Returns an _owned_ (i.e. salsa-cached) constraint set that describes when `self` is
     /// constraint-set assignable to `target`.
     pub(super) fn when_constraint_set_assignable_to_owned(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-    ) -> &'db OwnedConstraintSet<'db> {
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _, _| OwnedConstraintSet::default(),
@@ -443,7 +473,13 @@ impl<'db> Type<'db> {
             })
         }
 
-        when_constraint_set_assignable_to_owned_impl(db, self, target)
+        if self.is_trivially_constraint_set_assignable_to(db, target) {
+            return Cow::Owned(OwnedConstraintSet::always());
+        }
+
+        Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
+            db, self, target,
+        ))
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(
