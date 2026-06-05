@@ -673,6 +673,93 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn dependency_descriptor_method() -> anyhow::Result<()> {
+    fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
+        let file_main = system_path_to_file(db, "/src/main.py").unwrap();
+        let ast = parsed_module(db, file_main).load(db);
+        let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
+
+        semantic_index(db, file_main).expression(x_rhs_node.as_ref())
+    }
+
+    let mut db = setup_db();
+
+    db.write_dedented(
+        "/src/mod.py",
+        r#"
+        class Descriptor:
+            pass
+
+        class C:
+            attr = Descriptor()
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from mod import C
+        x = y = C().attr
+        "#,
+    )?;
+
+    let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
+    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+    assert_eq!(attr_ty.display(&db).to_string(), "Descriptor");
+
+    db.write_dedented(
+        "/src/mod.py",
+        r#"
+        class Descriptor:
+            # comment
+            pass
+
+        class C:
+            attr = Descriptor()
+        "#,
+    )?;
+
+    let events = {
+        db.clear_salsa_events();
+        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        assert_eq!(attr_ty.display(&db).to_string(), "Descriptor");
+        db.take_salsa_events()
+    };
+    assert_function_query_was_not_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(x_rhs_expression(&db)),
+        &events,
+    );
+
+    db.write_dedented(
+        "/src/mod.py",
+        r#"
+        class Descriptor:
+            def __get__(self, instance: object, owner: type) -> int:
+                return 42
+
+        class C:
+            attr = Descriptor()
+        "#,
+    )?;
+
+    let events = {
+        db.clear_salsa_events();
+        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        assert_eq!(attr_ty.display(&db).to_string(), "int");
+        db.take_salsa_events()
+    };
+    assert_function_query_was_run(
+        &db,
+        infer_expression_types_impl,
+        InferExpression::Bare(x_rhs_expression(&db)),
+        &events,
+    );
+
+    Ok(())
+}
+
 /// Inferring the result of a call-expression shouldn't need to re-run after
 /// a trivial change to the function's file (e.g. by adding a docstring to the function).
 #[test]

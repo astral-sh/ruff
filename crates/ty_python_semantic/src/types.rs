@@ -2883,8 +2883,30 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn try_call_dunder_get(
+        self,
+        db: &'db dyn Db,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+    ) -> Option<(Type<'db>, AttributeKind)> {
+        // Avoid retaining a query for every access context when the attribute's class has no
+        // `__get__`. The tracked class-member lookup preserves the dependency on that class.
+        if matches!(self, Type::NominalInstance(_) | Type::ClassLiteral(_)) {
+            let Place::Defined(DefinedPlace {
+                ty, definedness, ..
+            }) = self.class_member(db, "__get__".into()).place
+            else {
+                return None;
+            };
+
+            return self.try_call_dunder_get_resolved(db, instance, owner, ty, definedness);
+        }
+
+        self.try_call_dunder_get_inner(db, instance, owner)
+    }
+
+    #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    fn try_call_dunder_get_inner(
         self,
         db: &'db dyn Db,
         instance: Option<Type<'db>>,
@@ -2950,38 +2972,65 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
-        let descr_get = self.class_member(db, "__get__".into()).place;
-
-        if let Place::Defined(DefinedPlace {
+        let Place::Defined(DefinedPlace {
             ty: descr_get,
             definedness: descr_get_boundness,
             ..
-        }) = descr_get
-        {
-            let instance_ty = instance.unwrap_or_else(|| Type::none(db));
-            let return_ty = descr_get
-                .try_call(db, &CallArguments::positional([self, instance_ty, owner]))
-                .map(|bindings| {
-                    if descr_get_boundness == Definedness::AlwaysDefined {
-                        bindings.return_type(db)
-                    } else {
-                        UnionType::from_two_elements(db, bindings.return_type(db), self)
-                    }
-                })
-                // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
-                // we should emit a diagnostic here instead of silently ignoring the error.
-                .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
+        }) = self.class_member(db, "__get__".into()).place
+        else {
+            return None;
+        };
 
-            let descriptor_kind = if self.is_data_descriptor(db) {
-                AttributeKind::DataDescriptor
-            } else {
-                AttributeKind::NormalOrNonDataDescriptor
-            };
+        Some(self.call_dunder_get(db, instance, owner, descr_get, descr_get_boundness))
+    }
 
-            Some((return_ty, descriptor_kind))
+    #[salsa::tracked(cycle_initial=|_, _, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    fn try_call_dunder_get_resolved(
+        self,
+        db: &'db dyn Db,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+        descr_get: Type<'db>,
+        descr_get_boundness: Definedness,
+    ) -> Option<(Type<'db>, AttributeKind)> {
+        tracing::trace!(
+            "try_call_dunder_get: {}, {}, {}",
+            self.display(db),
+            instance.unwrap_or_else(|| Type::none(db)).display(db),
+            owner.display(db)
+        );
+        Some(self.call_dunder_get(db, instance, owner, descr_get, descr_get_boundness))
+    }
+
+    fn call_dunder_get(
+        self,
+        db: &'db dyn Db,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+        descr_get: Type<'db>,
+        descr_get_boundness: Definedness,
+    ) -> (Type<'db>, AttributeKind) {
+        let instance_ty = instance.unwrap_or_else(|| Type::none(db));
+        let return_ty = descr_get
+            .try_call(db, &CallArguments::positional([self, instance_ty, owner]))
+            .map(|bindings| {
+                if descr_get_boundness == Definedness::AlwaysDefined {
+                    bindings.return_type(db)
+                } else {
+                    UnionType::from_two_elements(db, bindings.return_type(db), self)
+                }
+            })
+            // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
+            // we should emit a diagnostic here instead of silently ignoring the error.
+            .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
+
+        let descriptor_kind = if self.is_data_descriptor(db) {
+            AttributeKind::DataDescriptor
         } else {
-            None
-        }
+            AttributeKind::NormalOrNonDataDescriptor
+        };
+
+        (return_ty, descriptor_kind)
     }
 
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
