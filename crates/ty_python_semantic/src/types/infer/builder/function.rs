@@ -317,7 +317,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
-        let mut deprecated = None;
         let mut dataclass_transformer_params = None;
         let mut final_decorator = None;
 
@@ -346,9 +345,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     _ => {}
                 },
-                Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
-                    deprecated = Some(deprecated_inst);
-                }
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
@@ -413,7 +409,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             known_function,
             body_scope,
             function_decorators,
-            deprecated,
+            None,
             dataclass_transformer_params,
             function.returns.is_some(),
         );
@@ -448,7 +444,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
+            inferred_ty = if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) =
+                decorator_ty
+                && let Type::FunctionLiteral(function) = inferred_ty
+            {
+                Type::FunctionLiteral(function.with_deprecated(db, *deprecated))
+            } else {
+                self.apply_decorator(*decorator_ty, inferred_ty, decorator_node)
+            };
         }
 
         self.add_declaration_with_binding(
