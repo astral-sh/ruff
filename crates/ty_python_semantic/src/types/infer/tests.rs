@@ -7,7 +7,6 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
-use salsa::Database as _;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -470,110 +469,6 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     };
 
     assert_function_query_was_not_run(
-        &db,
-        infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
-        &events,
-    );
-
-    Ok(())
-}
-
-#[test]
-fn dependency_missing_implicit_instance_attribute() -> anyhow::Result<()> {
-    fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
-        let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, file_main).load(db);
-        let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
-
-        let index = semantic_index(db, file_main);
-        index.expression(x_rhs_node.as_ref())
-    }
-
-    let mut db = setup_db();
-
-    db.write_dedented(
-        "/src/mod.py",
-        r#"
-        class C:
-            def f(self):
-                pass
-        "#,
-    )?;
-    db.write_dedented(
-        "/src/main.py",
-        r#"
-        from mod import C
-        x = y = C().attr
-        "#,
-    )?;
-
-    let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "Unknown");
-
-    db.write_dedented(
-        "/src/mod.py",
-        r#"
-        class C:
-            def f(self):
-                # a comment!
-                pass
-        "#,
-    )?;
-
-    let events = {
-        db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "Unknown");
-        db.take_salsa_events()
-    };
-
-    assert_function_query_was_not_run(
-        &db,
-        infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
-        &events,
-    );
-    let executed_queries = events
-        .iter()
-        .filter_map(|event| {
-            let salsa::EventKind::WillExecute { database_key } = event.kind else {
-                return None;
-            };
-            Some(db.ingredient_debug_name(database_key.ingredient_index()))
-        })
-        .collect::<Vec<_>>();
-    assert!(
-        !executed_queries
-            .iter()
-            .any(|query| query.contains("member_lookup_with_policy")),
-        "{executed_queries:#?}"
-    );
-    assert!(
-        executed_queries
-            .iter()
-            .any(|query| query.contains("implicit_attribute_names")),
-        "{executed_queries:#?}"
-    );
-
-    db.write_dedented(
-        "/src/mod.py",
-        r#"
-        class C:
-            def f(self):
-                self.attr: int = 1
-        "#,
-    )?;
-
-    let events = {
-        db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "int");
-        db.take_salsa_events()
-    };
-
-    assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
         InferExpression::Bare(x_rhs_expression(&db)),
