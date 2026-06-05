@@ -11226,6 +11226,31 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
         }
     }
 
+    fn propagated_place_policy(
+        &self,
+        deprecation: DeprecationPolicy<'db>,
+        ty: Type<'db>,
+    ) -> Option<DeprecationPolicy<'db>> {
+        match deprecation {
+            DeprecationPolicy::Alternatives(_) => {
+                match deprecation.resolve_for_type(self.builder.db(), ty) {
+                    DeprecationPolicy::Deprecated(_) | DeprecationPolicy::Suppress => {
+                        Some(DeprecationPolicy::Suppress)
+                    }
+                    DeprecationPolicy::Inherit | DeprecationPolicy::Alternatives(_) => {
+                        Some(deprecation)
+                    }
+                }
+            }
+            DeprecationPolicy::Suppress if matches!(ty, Type::Union(_)) => {
+                Some(DeprecationPolicy::Suppress)
+            }
+            DeprecationPolicy::Inherit
+            | DeprecationPolicy::Suppress
+            | DeprecationPolicy::Deprecated(_) => None,
+        }
+    }
+
     fn policy(&self, expression: &'ast ast::Expr) -> DeprecationPolicy<'db> {
         match expression {
             ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
@@ -11284,13 +11309,10 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                             .deprecation_policy()
                     })
                     .unwrap_or(DeprecationPolicy::Inherit);
-                if matches!(place_deprecation, DeprecationPolicy::Alternatives(_)) {
-                    return place_deprecation;
-                }
-                if place_deprecation == DeprecationPolicy::Suppress
-                    && matches!(expression_ty, Type::Union(_))
+                if let Some(propagated) =
+                    self.propagated_place_policy(place_deprecation, expression_ty)
                 {
-                    return DeprecationPolicy::Suppress;
+                    return propagated;
                 }
             }
             ast::Expr::Attribute(attribute) => {
@@ -11298,8 +11320,10 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                     .expression_type(&attribute.value)
                     .member(self.builder.db(), &attribute.attr.id)
                     .deprecation_policy();
-                if matches!(place_deprecation, DeprecationPolicy::Alternatives(_)) {
-                    return place_deprecation;
+                if let Some(propagated) =
+                    self.propagated_place_policy(place_deprecation, expression_ty)
+                {
+                    return propagated;
                 }
             }
             _ => {}

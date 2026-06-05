@@ -535,8 +535,15 @@ def other() -> str:
 def ordinary() -> str:
     return "ordinary"
 
+@deprecated("shared message")
+def shared_ordinary() -> str:
+    return "shared ordinary"
+
 def ordinary_factory() -> TypeOf[ordinary]:  # ty: ignore[deprecated]
     return ordinary  # ty: ignore[deprecated]
+
+def shared_ordinary_factory() -> TypeOf[shared_ordinary]:  # ty: ignore[deprecated]
+    return shared_ordinary  # ty: ignore[deprecated]
 
 def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
     raise NotImplementedError
@@ -558,6 +565,14 @@ if bool(input()):
 
 else:
     mixed = ordinary_factory()
+
+if bool(input()):
+    @deprecated("shared message")
+    @replace_with(replacement)
+    def shared() -> None: ...
+
+else:
+    shared = shared_ordinary_factory()
 ```
 
 `main.py`:
@@ -592,6 +607,10 @@ if is_replacement(mixed_alias):
 
 if is_ordinary(mixed_alias):
     mixed_alias()  # error: [deprecated] "ordinary deprecated"
+
+module.shared()  # error: [deprecated] "shared message"
+shared_alias = module.shared  # error: [deprecated] "shared message"
+shared_alias()
 ```
 
 ## Syntax

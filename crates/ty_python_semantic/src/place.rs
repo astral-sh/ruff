@@ -119,7 +119,7 @@ impl<'db> DeprecationPolicy<'db> {
             if !deprecation_alternative_is_eliminated(db, *alternative_ty, ty) {
                 deprecation.add_policy(
                     policy.resolve_for_type(db, ty),
-                    alternative_ty.is_deprecated(db),
+                    inherited_deprecation_policy(db, *alternative_ty),
                 );
             }
         }
@@ -138,7 +138,7 @@ impl<'db> DeprecationPolicy<'db> {
                 has_matching_alternative = true;
                 deprecation.add_policy(
                     policy.resolve_for_type(db, ty),
-                    alternative_ty.is_deprecated(db),
+                    inherited_deprecation_policy(db, *alternative_ty),
                 );
             }
         }
@@ -147,6 +147,29 @@ impl<'db> DeprecationPolicy<'db> {
         } else {
             self.resolve_for_type(db, ty)
         }
+    }
+}
+
+fn inherited_deprecation_policy<'db>(db: &'db dyn Db, ty: Type<'db>) -> DeprecationPolicy<'db> {
+    match ty {
+        Type::FunctionLiteral(function) => function
+            .implementation_deprecated(db)
+            .map_or(DeprecationPolicy::Inherit, DeprecationPolicy::Deprecated),
+        Type::BoundMethod(bound) => bound
+            .function(db)
+            .implementation_deprecated(db)
+            .map_or(DeprecationPolicy::Inherit, DeprecationPolicy::Deprecated),
+        Type::ClassLiteral(class) => class
+            .deprecated(db)
+            .map_or(DeprecationPolicy::Inherit, DeprecationPolicy::Deprecated),
+        Type::Union(union) => {
+            let mut deprecation = DeprecationBuilder::default();
+            for element in union.elements(db) {
+                deprecation.add_policy(inherited_deprecation_policy(db, *element));
+            }
+            deprecation.build_policy()
+        }
+        _ => DeprecationPolicy::Inherit,
     }
 }
 
@@ -542,10 +565,17 @@ impl<'db> BindingDeprecationBuilder<'db> {
     pub(crate) fn add_policy(
         &mut self,
         candidate: DeprecationPolicy<'db>,
-        type_is_deprecated: bool,
+        inherited: DeprecationPolicy<'db>,
     ) {
-        let candidate_is_suppressible = candidate == DeprecationPolicy::Suppress
-            || (candidate == DeprecationPolicy::Inherit && !type_is_deprecated);
+        let candidate = if candidate == DeprecationPolicy::Inherit {
+            inherited
+        } else {
+            candidate
+        };
+        let candidate_is_suppressible = matches!(
+            candidate,
+            DeprecationPolicy::Inherit | DeprecationPolicy::Suppress
+        );
         *self = match std::mem::take(self) {
             Self::Empty => Self::Uniform {
                 policy: candidate,
