@@ -74,6 +74,7 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Enum
 from typing import Any, Generic, LiteralString, Never, Protocol, Self, TypeVar, Unpack, final, overload
 
@@ -119,6 +120,13 @@ class Foo(Parent):
     def __new__(cls: Foo): ...
     @staticmethod
     def static(value: int): ...
+    @final
+    # error: [invalid-method-receiver]
+    def invalid_final(self: int): ...
+    @property
+    # error: [invalid-method-receiver]
+    def invalid_property(self: int) -> int:
+        return 1
     # error: [invalid-method-receiver]
     def restricted(self: FooChild): ...
     @overload
@@ -142,6 +150,21 @@ class DefaultGenericClass(Generic[T_Default]):
     def restricted(self: DefaultGenericClass[Foo]): ...
     @classmethod
     def restricted_classmethod(cls: type[DefaultGenericClass[Foo]]): ...
+
+T_Class = TypeVar("T_Class", bound=type[Any])
+T_Value = TypeVar("T_Value")
+
+class classproperty(Generic[T_Class, T_Value]):
+    def __init__(self, getter: Callable[[T_Class], T_Value]) -> None:
+        self.getter = getter
+
+    def __get__(self, instance: object, owner: T_Class) -> T_Value:
+        return self.getter(owner)
+
+class CustomDescriptor:
+    @classproperty
+    def value(cls: type[Self]) -> int:
+        return 1
 
 class OuterGenericClass[T]:
     class Inner:

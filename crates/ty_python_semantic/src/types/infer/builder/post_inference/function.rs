@@ -10,7 +10,7 @@ use crate::{
         },
         enums::is_enum_class_by_inheritance,
         function::{FunctionDecorators, OverloadLiteral},
-        infer::original_class_type,
+        infer::{function_known_decorators, original_class_type},
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
@@ -45,7 +45,7 @@ pub(crate) fn check_function_definition<'db>(
     let last_definition = function_type.literal(db).last_definition;
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
-    check_method_receiver(context, last_definition, &signature);
+    check_method_receiver(context, definition, last_definition, &signature);
     check_legacy_positional_only_convention(context, last_definition, &signature);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
@@ -65,6 +65,7 @@ pub(crate) fn check_function_definition<'db>(
 /// `str`/`LiteralString`.
 fn check_method_receiver<'db>(
     context: &InferContext<'db, '_>,
+    definition: Definition<'db>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
 ) {
@@ -116,6 +117,19 @@ fn check_method_receiver<'db>(
     }
 
     let node = last_definition.node(db, context.file(), context.module());
+    if !node.decorator_list.is_empty() {
+        let decorator_inference = function_known_decorators(db, definition);
+        if node.decorator_list.iter().any(|decorator| {
+            decorator_inference
+                .expression_type(&decorator.expression)
+                .is_none_or(|decorator_type| {
+                    !decorator_preserves_method_binding(db, decorator_type)
+                })
+        }) {
+            return;
+        }
+    }
+
     let Some(annotation) = node
         .parameters
         .iter()
@@ -205,6 +219,23 @@ fn check_method_receiver<'db>(
             expected = expected_receiver.display(db),
         ));
     }
+}
+
+/// Returns whether a decorator is known to preserve the binding behavior of the decorated method.
+///
+/// Arbitrary decorators can replace a function with a custom descriptor, in which case the
+/// function's first parameter is not necessarily the instance or class passed by normal method
+/// binding.
+fn decorator_preserves_method_binding(db: &dyn crate::Db, decorator_type: Type<'_>) -> bool {
+    !FunctionDecorators::from_decorator_type(db, decorator_type).is_empty()
+        || matches!(
+            decorator_type,
+            Type::ClassLiteral(class) if class.known(db) == Some(KnownClass::Property)
+        )
+        || matches!(
+            decorator_type,
+            Type::KnownInstance(KnownInstanceType::Deprecated(_)) | Type::DataclassTransformer(_)
+        )
 }
 
 /// Returns whether a metaclass method receiver annotation permits a class-object restriction.
