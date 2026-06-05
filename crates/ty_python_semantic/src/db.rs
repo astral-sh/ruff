@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
 use crate::AnalysisSettings;
@@ -7,9 +7,10 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use ruff_index::IndexSlice;
 use rustc_hash::FxHashMap;
+use salsa::plumbing::AsId;
 use ty_python_core::Db as PythonCoreDb;
-use ty_python_core::Truthiness;
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
+use ty_python_core::{LoopToken, Truthiness};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct LoopHeaderPredicateCacheKey {
@@ -17,11 +18,47 @@ struct LoopHeaderPredicateCacheKey {
     predicate: ScopedPredicateId,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct LoopHeaderPredicateCacheEntry {
+    truthiness: Truthiness,
+    generation: u64,
+    persistence: LoopHeaderPredicateCachePersistence,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+enum LoopHeaderPredicateCachePersistence {
+    #[default]
+    None,
+    Global,
+    Loop(salsa::Id),
+}
+
+impl LoopHeaderPredicateCachePersistence {
+    fn for_context(loop_token: Option<LoopToken<'_>>, persistent: bool) -> Self {
+        if !persistent {
+            Self::None
+        } else if let Some(loop_token) = loop_token {
+            Self::Loop(loop_token.as_id())
+        } else {
+            Self::Global
+        }
+    }
+
+    fn matches(self, loop_token: Option<LoopToken<'_>>) -> bool {
+        match self {
+            Self::None => false,
+            Self::Global => true,
+            Self::Loop(id) => loop_token.is_some_and(|loop_token| loop_token.as_id() == id),
+        }
+    }
+}
+
 /// Predicate results cached for one dynamic loop-header analysis.
 #[doc(hidden)]
 #[derive(Debug, Default)]
 pub struct LoopHeaderPredicateCache {
-    entries: RefCell<Option<FxHashMap<LoopHeaderPredicateCacheKey, Truthiness>>>,
+    entries: RefCell<Option<FxHashMap<LoopHeaderPredicateCacheKey, LoopHeaderPredicateCacheEntry>>>,
+    generation: Cell<u64>,
 }
 
 impl Clone for LoopHeaderPredicateCache {
@@ -49,37 +86,152 @@ impl LoopHeaderPredicateCache {
         f()
     }
 
-    pub(crate) fn get(
+    pub(crate) fn get_globally_persistent(
         &self,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
         predicate: ScopedPredicateId,
     ) -> Option<Truthiness> {
-        self.entries
-            .borrow()
-            .as_ref()?
-            .get(&LoopHeaderPredicateCacheKey {
-                predicates: predicates.raw.as_ptr() as usize,
-                predicate,
-            })
-            .copied()
+        let entries = self.entries.borrow();
+        let entry = entries.as_ref()?.get(&LoopHeaderPredicateCacheKey {
+            predicates: predicates.raw.as_ptr() as usize,
+            predicate,
+        })?;
+        (entry.persistence == LoopHeaderPredicateCachePersistence::Global)
+            .then_some(entry.truthiness)
+    }
+
+    pub(crate) fn get_or_prepare(
+        &self,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+        loop_token: Option<LoopToken<'_>>,
+        predicate: ScopedPredicateId,
+        cycle_initial: Truthiness,
+        persistent: bool,
+    ) -> Option<Truthiness> {
+        let generation = self.generation.get();
+        let predicate_key = LoopHeaderPredicateCacheKey {
+            predicates: predicates.raw.as_ptr() as usize,
+            predicate,
+        };
+        let mut entries = self.entries.borrow_mut();
+        let entries = entries.as_mut()?;
+        get_or_prepare_cache_entry(
+            entries,
+            predicate_key,
+            loop_token,
+            generation,
+            cycle_initial,
+            persistent,
+        )
     }
 
     pub(crate) fn insert(
         &self,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+        loop_token: Option<LoopToken<'_>>,
         predicate: ScopedPredicateId,
         truthiness: Truthiness,
+        persistent: bool,
     ) {
         if let Some(entries) = self.entries.borrow_mut().as_mut() {
-            entries.insert(
-                LoopHeaderPredicateCacheKey {
-                    predicates: predicates.raw.as_ptr() as usize,
-                    predicate,
-                },
+            let generation = self.generation.get();
+            let predicate_key = LoopHeaderPredicateCacheKey {
+                predicates: predicates.raw.as_ptr() as usize,
+                predicate,
+            };
+            insert_cache_entry(
+                entries,
+                predicate_key,
+                loop_token,
+                generation,
                 truthiness,
+                persistent,
             );
         }
     }
+
+    pub(crate) fn mark_persistent(
+        &self,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+        loop_token: Option<LoopToken<'_>>,
+        predicate: ScopedPredicateId,
+    ) {
+        let mut entries = self.entries.borrow_mut();
+        let Some(entries) = entries.as_mut() else {
+            return;
+        };
+        let predicate_key = LoopHeaderPredicateCacheKey {
+            predicates: predicates.raw.as_ptr() as usize,
+            predicate,
+        };
+        if let Some(entry) = entries.get_mut(&predicate_key) {
+            let persistence = LoopHeaderPredicateCachePersistence::for_context(loop_token, true);
+            if entry.persistence != LoopHeaderPredicateCachePersistence::Global {
+                entry.persistence = persistence;
+            }
+        }
+    }
+
+    pub(crate) fn next_cycle_iteration(&self) {
+        self.generation.set(self.generation.get().wrapping_add(1));
+    }
+}
+
+fn get_or_prepare_cache_entry(
+    entries: &mut FxHashMap<LoopHeaderPredicateCacheKey, LoopHeaderPredicateCacheEntry>,
+    key: LoopHeaderPredicateCacheKey,
+    loop_token: Option<LoopToken<'_>>,
+    generation: u64,
+    cycle_initial: Truthiness,
+    persistent: bool,
+) -> Option<Truthiness> {
+    match entries.entry(key) {
+        std::collections::hash_map::Entry::Occupied(mut entry) => {
+            let entry = entry.get_mut();
+            if entry.persistence.matches(loop_token) || entry.generation == generation {
+                Some(entry.truthiness)
+            } else {
+                entry.generation = generation;
+                entry.persistence = LoopHeaderPredicateCachePersistence::None;
+                None
+            }
+        }
+        std::collections::hash_map::Entry::Vacant(entry) => {
+            entry.insert(LoopHeaderPredicateCacheEntry {
+                truthiness: cycle_initial,
+                generation,
+                persistence: LoopHeaderPredicateCachePersistence::for_context(
+                    loop_token, persistent,
+                ),
+            });
+            None
+        }
+    }
+}
+
+fn insert_cache_entry(
+    entries: &mut FxHashMap<LoopHeaderPredicateCacheKey, LoopHeaderPredicateCacheEntry>,
+    key: LoopHeaderPredicateCacheKey,
+    loop_token: Option<LoopToken<'_>>,
+    generation: u64,
+    truthiness: Truthiness,
+    persistent: bool,
+) {
+    let persistence = LoopHeaderPredicateCachePersistence::for_context(loop_token, persistent);
+    entries
+        .entry(key)
+        .and_modify(|entry| {
+            entry.truthiness = truthiness;
+            entry.generation = generation;
+            if entry.persistence != LoopHeaderPredicateCachePersistence::Global {
+                entry.persistence = persistence;
+            }
+        })
+        .or_insert(LoopHeaderPredicateCacheEntry {
+            truthiness,
+            generation,
+            persistence,
+        });
 }
 
 struct LoopHeaderPredicateCacheGuard<'db> {

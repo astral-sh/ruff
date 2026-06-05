@@ -731,6 +731,34 @@ def process(items: list[str]) -> None:
         int(match.group(2))
 ```
 
+### Recursive reachability preserves awaited non-terminal calls
+
+```py
+async def process(items: list[bool]) -> None:
+    for item in items:
+        async def resolve(value: tuple[str, int]) -> tuple[str, int]:
+            return value
+
+        await resolve(("ok", 80))
+        if item:
+            await resolve(("too", "many", "items"))  # error: [invalid-argument-type]
+```
+
+### Inner-loop predicates track outer loop headers
+
+A predicate that does not depend on the inner loop can still change as an outer loop header widens.
+
+```py
+def process(flag: bool) -> None:
+    value = 0
+    while flag:
+        while flag:
+            if value:
+                expected: str = value  # error: [invalid-assignment]
+            break
+        value = 1
+```
+
 ### Recursive reachability preserves unconstrained collection element types
 
 ```py
