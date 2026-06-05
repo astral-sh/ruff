@@ -3407,8 +3407,8 @@ def func(**kwargs: Unpack[TD2]) -> None:
 
 ### Call-site validation
 
-At the call site, required keys must be provided, known keys must be type-checked, and unknown
-keywords are rejected for ordinary open `TypedDict`s.
+At the call site, required keys must be provided and known keys must be type-checked. Extra keywords
+are accepted as `object` for ordinary open `TypedDict`s.
 
 ```py
 from typing_extensions import NotRequired, Required, TypedDict, Unpack
@@ -3427,8 +3427,6 @@ def func(**kwargs: Unpack[TD2]) -> None:
 func()
 func(v1=1, v3="ok")
 func(v1=1, v2="optional", v3="ok")
-
-# error: [unknown-argument]
 func(v1=1, v3="ok", v4=1)
 
 # error: [invalid-argument-type]
@@ -3469,8 +3467,8 @@ closed_movie(name="Blade Runner", year=1982)
 ### Assignability with explicit keyword-only signatures
 
 A callable using `**kwargs: Unpack[TD2]` should line up with equivalent explicit keyword-only
-signatures in either direction. Hidden items in an ordinary open `TypedDict` do not become
-call-site parameters.
+signatures when assigning to the explicit form. The reverse assignment is rejected because an open
+unpacked `TypedDict` may still receive hidden extra items.
 
 ```py
 from functools import partial
@@ -3497,13 +3495,13 @@ explicit_ok: ExplicitKwargs = func
 typed_dict_ok: TypedDictKwargs = func
 
 def _(explicit: ExplicitKwargs, typed_dict: TypedDictKwargs) -> None:
-    typed_dict_2: TypedDictKwargs = explicit
+    typed_dict_2: TypedDictKwargs = explicit  # error: [invalid-assignment]
     explicit_2: ExplicitKwargs = typed_dict
 
 def func7(*, v1: int, v3: str, v2: str = "") -> None:
     pass
 
-typed_dict_from_explicit: TypedDictKwargs = func7
+typed_dict_from_explicit: TypedDictKwargs = func7  # error: [invalid-assignment]
 
 class EmptyOpenTD(TypedDict):
     pass
@@ -3514,7 +3512,7 @@ class EmptyOpenTypedDictKwargs(Protocol):
 def no_kwargs() -> None:
     pass
 
-empty_open_typed_dict_from_explicit: EmptyOpenTypedDictKwargs = no_kwargs
+empty_open_typed_dict_from_explicit: EmptyOpenTypedDictKwargs = no_kwargs  # error: [invalid-assignment]
 
 class ClosedTD(TypedDict, closed=True):
     v1: Required[int]
@@ -3535,7 +3533,8 @@ class TraditionalKwargsTarget(Protocol):
 def traditional_kwargs_source(**kwargs: int) -> None:
     pass
 
-traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source
+# TODO: This should be accepted because the declared field is assignable to `int`.
+traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source  # error: [invalid-assignment]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -3546,7 +3545,7 @@ def preserve_signature(callback: Callable[P, R]) -> Callable[P, R]:
 preserved_typed_dict_target: TypedDictKwargs = preserve_signature(func)
 
 partial_typed_dict_target: TypedDictKwargs = partial(func)
-partial_explicit_target: TypedDictKwargs = partial(func7)
+partial_explicit_target: TypedDictKwargs = partial(func7)  # error: [invalid-assignment]
 ```
 
 ### Missing required keys remain incompatible
@@ -3576,7 +3575,7 @@ missing_required: MissingRequiredKwarg = func
 ### Optional-only unpacked kwargs still expose named keys
 
 An unpacked all-optional open `TypedDict` exposes its declared keys as optional named keyword
-arguments while rejecting unknown keyword arguments.
+arguments while accepting extra keyword arguments as `object`.
 
 ```py
 from typing import Protocol
@@ -3592,8 +3591,6 @@ class WantsA(Protocol):
     def __call__(self, *, a: int = 1) -> None: ...
 
 wants_a: WantsA = accepts_optional_kwargs
-
-# error: [unknown-argument]
 accepts_optional_kwargs(b="whatever")
 
 # error: [invalid-argument-type]
