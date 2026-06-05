@@ -1,8 +1,8 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownClass, KnownInstanceType, Signature, SpecialFormType, Type, TypeAliasType,
-        TypeVarBoundOrConstraints, TypeVarKind,
+        KnownClass, KnownInstanceType, ParamSpecAttrKind, Signature, SpecialFormType, Type,
+        TypeAliasType, TypeVarBoundOrConstraints, TypeVarKind,
         context::InferContext,
         definition_expression_type,
         diagnostic::{
@@ -56,12 +56,16 @@ fn check_method_receiver<'db>(
 ) {
     let db = context.db();
     let method_name = last_definition.name(db);
+    let Some(receiver_parameter) = signature.parameters().get(0) else {
+        return;
+    };
 
     if last_definition.is_overload(db)
         || last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK)
         || method_name == "_generate_next_value_"
         || (!last_definition.has_implicit_receiver(db) && method_name != "__new__")
-        || !signature.has_explicit_positional_receiver_annotation()
+        || receiver_parameter.inferred_annotation
+        || !(receiver_parameter.is_positional() || receiver_parameter.is_variadic())
     {
         return;
     }
@@ -79,13 +83,16 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let Some(raw_receiver_type) = signature
-        .parameters()
-        .get(0)
-        .map(|parameter| parameter.annotated_type())
-    else {
+    let raw_receiver_type = receiver_parameter.annotated_type();
+    if receiver_parameter.is_variadic()
+        && matches!(
+            raw_receiver_type,
+            Type::TypeVar(typevar)
+                if typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Args)
+        )
+    {
         return;
-    };
+    }
     let receiver_type = raw_receiver_type.resolve_type_alias(db);
 
     if receiver_type.is_never()
@@ -143,7 +150,8 @@ fn check_method_receiver<'db>(
             return;
         }
     } else if expected_receiver.is_assignable_to(db, concrete_receiver_type)
-        || (!matches!(receiver_type, Type::TypeVar(_))
+        || (receiver_parameter.is_positional()
+            && !matches!(receiver_type, Type::TypeVar(_))
             && signature.can_bind_self_to(db, expected_receiver))
     {
         return;

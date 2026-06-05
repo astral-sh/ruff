@@ -74,7 +74,7 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
-from typing import Annotated, Any, LiteralString, Never, Protocol, Self, TypeVar, Union, overload
+from typing import Annotated, Any, LiteralString, Never, ParamSpec, Protocol, Self, TypeVar, Union, overload
 
 class Parent: ...
 class Unrelated: ...
@@ -246,6 +246,14 @@ class InvalidQuotedProtocolClassReceiver:
     # TODO: error: [invalid-method-receiver]
     # Resolving names in the separately parsed string-annotation AST is not yet supported here.
     def method(cls: "type[FirstReceiverProtocol] | type[SecondReceiverProtocol]"): ...
+
+P = ParamSpec("P")
+
+class VariadicReceiver:
+    # error: [invalid-method-receiver]
+    def invalid(*args: int): ...
+    def valid(*args: object): ...
+    def paramspec(*args: P.args, **kwargs: P.kwargs): ...
 ```
 
 ## TypedDict defaults use annotation context
