@@ -1698,17 +1698,28 @@ fn place_from_bindings_impl<'db>(
                 only_non_shadowing_bindings = false;
             }
 
-            first_definition.get_or_insert(binding);
             let inference = infer_definition_types(db, binding);
             let binding_ty = inference.binding_type(binding);
+            let narrowed_ty = narrowing_constraint.narrow(db, binding_ty, binding.place(db));
+            first_definition.get_or_insert(binding);
+            let same_single_value = match (binding_ty, narrowed_ty) {
+                (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+                    left.literal(db) == right.literal(db)
+                }
+                _ => binding_ty == narrowed_ty,
+            };
+            let binding_is_eliminated = !same_single_value
+                && (binding_ty.is_disjoint_from(db, narrowed_ty)
+                    || (binding_ty.is_single_valued(db) && narrowed_ty.is_single_valued(db)));
             let binding_deprecation = inference
                 .inferred_declaration(binding)
                 .declared()
                 .map_or(DeprecationPolicy::Inherit, |declaration| {
                     declaration.deprecation_policy()
                 });
-            let narrowed_ty = narrowing_constraint.narrow(db, binding_ty, binding.place(db));
-            deprecation.add_policy(binding_deprecation, narrowed_ty.is_deprecated(db));
+            if !narrowed_ty.is_never() && !binding_is_eliminated {
+                deprecation.add_policy(binding_deprecation, narrowed_ty.is_deprecated(db));
+            }
             Some((narrowed_ty, static_reachability))
         },
     );

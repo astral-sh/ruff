@@ -141,6 +141,16 @@ flag = bool(input())
 if flag:
     @deprecated("use replacement directly")
     @replace_with(replacement)
+    def narrowed_binding() -> None: ...
+else:
+    narrowed_binding = other
+
+if is_replacement(narrowed_binding):
+    narrowed_binding()  # error: [deprecated] "use replacement directly"
+
+if flag:
+    @deprecated("use replacement directly")
+    @replace_with(replacement)
     def conditionally_defined() -> None: ...
 
 else:
