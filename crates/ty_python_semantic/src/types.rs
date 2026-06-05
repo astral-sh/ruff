@@ -1098,7 +1098,15 @@ impl<'db> Type<'db> {
             // However, overload is an exception; as iterations progress, overload matching may become ambiguous, and a reversal of precision can occur.
             // This kind of precision degradation can be determined by whether the type contains `DynamicType::AmbiguousOverload`.
             if self_degraded_by_overload {
-                UnionType::from_elements_cycle_recovery(db, [previous, self])
+                // A bare cycle initial value would be removed from the union during recursive
+                // normalization, so keep it until a structured recursive type is available.
+                if previous.is_divergent()
+                    && matches!(self, Type::Dynamic(DynamicType::AmbiguousOverload))
+                {
+                    previous
+                } else {
+                    UnionType::from_elements_cycle_recovery(db, [previous, self])
+                }
             } else {
                 self
             }

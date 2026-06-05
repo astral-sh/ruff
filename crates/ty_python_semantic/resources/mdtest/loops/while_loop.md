@@ -437,6 +437,16 @@ while random():
     reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
+### Ambiguous overloads converge during loop fixpoint iteration
+
+Regression test for [#3677](https://github.com/astral-sh/ty/issues/3677). The ambiguous overload
+result from `list.__add__` must not discard the recursive type marker used for cycle recovery.
+
+```py
+while True:
+    x = [None] + [x]  # error: [possibly-unresolved-reference]
+```
+
 ### Tuple assignments are inferred correctly
 
 ```py

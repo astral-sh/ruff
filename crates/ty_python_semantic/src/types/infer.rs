@@ -951,12 +951,16 @@ impl<'db> DefinitionTypes<'db> {
 
     fn normalize_binding(
         db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
+        previous: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        if let Some(previous_ty) = previous.binding_type(definition) {
+        if let Some(previous_ty) = previous
+            .types
+            .binding_type(definition)
+            .or_else(|| previous.fallback_type())
+        {
             ty.cycle_normalized(db, previous_ty, cycle)
         } else {
             ty.recursive_type_normalized(db, cycle)
@@ -965,13 +969,15 @@ impl<'db> DefinitionTypes<'db> {
 
     fn normalize_declaration(
         db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
+        previous: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
-        if let Some(previous_ty) = previous.declaration_type(definition) {
+        if let Some(previous_ty) = previous.types.declaration_type(definition) {
             ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
+        } else if let Some(previous_fallback) = previous.fallback_type() {
+            ty.map_type(|inner| inner.cycle_normalized(db, previous_fallback, cycle))
         } else {
             ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
         }
@@ -980,7 +986,7 @@ impl<'db> DefinitionTypes<'db> {
     fn cycle_normalized(
         self,
         db: &'db dyn Db,
-        previous: &DefinitionTypes<'db>,
+        previous: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
         match self {
@@ -1156,7 +1162,7 @@ impl<'db> DefinitionInference<'db> {
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
         self.types =
-            std::mem::take(&mut self.types).cycle_normalized(db, &previous_inference.types, cycle);
+            std::mem::take(&mut self.types).cycle_normalized(db, previous_inference, cycle);
 
         self
     }
