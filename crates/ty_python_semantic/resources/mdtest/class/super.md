@@ -272,7 +272,7 @@ class Foo[T]:
         reveal_type(super())  # revealed: <super: <class 'Foo'>, <class 'Foo[int]'>>
         return self
     # TypeVar bounded by `type[Foo]`, used in `type[T]` position
-    # TODO: Should error on signature - `cls` would be `type[type[Foo[int]]]`, a metaclass
+    # `cls` would be `type[type[Foo[int]]]`, a metaclass.
     # Delegates to `type[Unknown]` since `type[type[Foo[int]]]` can't be constructed
     @classmethod
     def method12[S: type[Foo[int]]](cls: type[S]) -> S:  # error: [invalid-method-receiver]

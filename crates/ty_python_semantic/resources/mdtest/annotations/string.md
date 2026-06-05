@@ -129,8 +129,8 @@ if TYPE_CHECKING:
     def foo(x: "int" | "None"): ...
 
     class Bar:
-        # no error because this annotation is resolved inside a scope
-        # fully defined inside an `if TYPE_CHECKING` block
+        # The annotation resolves because the class is defined inside the
+        # `if TYPE_CHECKING` block.
         def f(x: "int" | "None"): ...  # error: [invalid-method-receiver]
 ```
 

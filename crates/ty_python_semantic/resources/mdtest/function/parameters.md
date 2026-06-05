@@ -75,7 +75,7 @@ python-version = "3.13"
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, LiteralString, Never, ParamSpec, Protocol, Self, TypeVar, Unpack, final, overload
+from typing import Any, LiteralString, Never, Protocol, Self, TypeVar, Unpack, final, overload
 
 class Parent: ...
 class Unrelated: ...

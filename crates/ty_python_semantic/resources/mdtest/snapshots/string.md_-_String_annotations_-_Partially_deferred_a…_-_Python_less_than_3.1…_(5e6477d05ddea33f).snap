@@ -75,8 +75,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 60 |     def foo(x: "int" | "None"): ...
 61 | 
 62 |     class Bar:
-63 |         # no error because this annotation is resolved inside a scope
-64 |         # fully defined inside an `if TYPE_CHECKING` block
+63 |         # The annotation resolves because the class is defined inside the
+64 |         # `if TYPE_CHECKING` block.
 65 |         def f(x: "int" | "None"): ...  # error: [invalid-method-receiver]
 ```
 

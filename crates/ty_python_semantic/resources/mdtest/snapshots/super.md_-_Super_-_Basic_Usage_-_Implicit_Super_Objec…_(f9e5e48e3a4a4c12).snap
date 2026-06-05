@@ -121,7 +121,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 106 |         reveal_type(super())  # revealed: <super: <class 'Foo'>, <class 'Foo[int]'>>
 107 |         return self
 108 |     # TypeVar bounded by `type[Foo]`, used in `type[T]` position
-109 |     # TODO: Should error on signature - `cls` would be `type[type[Foo[int]]]`, a metaclass
+109 |     # `cls` would be `type[type[Foo[int]]]`, a metaclass.
 110 |     # Delegates to `type[Unknown]` since `type[type[Foo[int]]]` can't be constructed
 111 |     @classmethod
 112 |     def method12[S: type[Foo[int]]](cls: type[S]) -> S:  # error: [invalid-method-receiver]

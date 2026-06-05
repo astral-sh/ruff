@@ -392,7 +392,7 @@ C.f()  # error: [missing-argument]
 C.f(1, 2)  # error: [too-many-positional-arguments]
 ```
 
-If the `cls` parameter is wrongly annotated, we emit an error at the call site:
+If the `cls` parameter is wrongly annotated, we emit errors at the definition and call site:
 
 ```py
 class D:

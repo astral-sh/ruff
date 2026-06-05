@@ -61,14 +61,15 @@ fn check_method_receiver<'db>(
     let Some(receiver_parameter) = signature.parameters().get(0) else {
         return;
     };
+    let has_explicit_receiver_annotation = !receiver_parameter.inferred_annotation
+        && (receiver_parameter.is_positional()
+            || receiver_parameter.is_variadic()
+            || receiver_parameter.is_keyword_variadic());
 
     if last_definition.is_overload(db)
         || last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK)
         || (!last_definition.has_implicit_receiver(db) && method_name != "__new__")
-        || receiver_parameter.inferred_annotation
-        || !(receiver_parameter.is_positional()
-            || receiver_parameter.is_variadic()
-            || receiver_parameter.is_keyword_variadic())
+        || !has_explicit_receiver_annotation
     {
         return;
     }
@@ -113,10 +114,12 @@ fn check_method_receiver<'db>(
     };
 
     let class_object = Type::from(enclosing_class);
-    let expected_receiver = if last_definition.is_classmethod(db) || method_name == "__new__" {
+    let instance_type = class_object.to_instance(db).unwrap_or_else(Type::unknown);
+    let is_class_receiver = last_definition.is_classmethod(db) || method_name == "__new__";
+    let expected_receiver = if is_class_receiver {
         class_object
     } else {
-        class_object.to_instance(db).unwrap_or_else(Type::unknown)
+        instance_type
     };
 
     if receiver_parameter.is_keyword_variadic() {
@@ -141,9 +144,8 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let typing_self_type = class_object.to_instance(db).unwrap_or_else(Type::unknown);
     let concrete_receiver_type = receiver_type
-        .bind_self_typevars(db, typing_self_type)
+        .bind_self_typevars(db, instance_type)
         .resolve_type_alias(db);
     let receiver_is_class_typevar = matches!(
         concrete_receiver_type,
@@ -155,8 +157,7 @@ fn check_method_receiver<'db>(
     if !receiver_is_class_typevar
         && is_metaclass_receiver_type(db, receiver_type)
         && class_object.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
-        && !last_definition.is_classmethod(db)
-        && method_name != "__new__"
+        && !is_class_receiver
     {
         return;
     }
@@ -193,25 +194,23 @@ fn check_method_receiver<'db>(
 }
 
 fn is_metaclass_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bool {
-    match receiver_type {
-        Type::ClassLiteral(_) | Type::SubclassOf(_) => true,
-        Type::Union(union) => union
+    if is_metaclass_receiver_bound(db, receiver_type) {
+        return true;
+    }
+
+    let Type::TypeVar(typevar) = receiver_type else {
+        return false;
+    };
+    match typevar.typevar(db).bound_or_constraints(db) {
+        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+            is_metaclass_receiver_bound(db, bound)
+        }
+        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
             .elements(db)
             .iter()
             .copied()
-            .any(|element| is_metaclass_receiver_type(db, element)),
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                is_metaclass_receiver_bound(db, bound)
-            }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                .elements(db)
-                .iter()
-                .copied()
-                .any(|constraint| is_metaclass_receiver_bound(db, constraint)),
-            None => false,
-        },
-        _ => false,
+            .any(|constraint| is_metaclass_receiver_bound(db, constraint)),
+        None => false,
     }
 }
 
