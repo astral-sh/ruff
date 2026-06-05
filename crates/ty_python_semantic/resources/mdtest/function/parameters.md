@@ -194,6 +194,26 @@ class ValidProtocolClassReceiver:
     @classmethod
     def method(cls: type[FirstReceiverProtocol] | type[SecondReceiverProtocol]): ...
 
+class InvalidNestedProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def pep604(cls: type[FirstReceiverProtocol | SecondReceiverProtocol]): ...
+    @classmethod
+    # error: [invalid-method-receiver]
+    def typing_union(cls: type[Union[FirstReceiverProtocol, SecondReceiverProtocol]]): ...
+    @classmethod
+    # error: [invalid-method-receiver]
+    def annotated(cls: type[Annotated[FirstReceiverProtocol, "metadata"]]): ...
+
+class ValidNestedProtocolClassReceiver:
+    def first(self) -> None: ...
+    @classmethod
+    def pep604(cls: type[FirstReceiverProtocol | SecondReceiverProtocol]): ...
+    @classmethod
+    def typing_union(cls: type[Union[FirstReceiverProtocol, SecondReceiverProtocol]]): ...
+    @classmethod
+    def annotated(cls: type[Annotated[FirstReceiverProtocol, "metadata"]]): ...
+
 class InvalidTypingUnionProtocolClassReceiver:
     @classmethod
     # error: [invalid-method-receiver]

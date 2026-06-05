@@ -2,7 +2,7 @@ use crate::{
     diagnostic::format_enumeration,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, Signature, SpecialFormType, Type,
-        TypeAliasType, TypeVarBoundOrConstraints, TypeVarKind,
+        TypeAliasType, TypeVarBoundOrConstraints, TypeVarKind, UnionType,
         context::InferContext,
         definition_expression_type,
         diagnostic::{
@@ -149,7 +149,6 @@ fn check_method_receiver<'db>(
     if let Some(accepts_receiver) = protocol_class_union_accepts_receiver(
         db,
         annotation,
-        annotated_receiver_type,
         expected_receiver,
         typing_self_type,
         file_expression_type,
@@ -214,7 +213,6 @@ fn is_protocol_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> boo
 fn protocol_class_union_accepts_receiver<'db>(
     db: &'db dyn crate::Db,
     annotation: &ast::Expr,
-    annotation_type: Type<'db>,
     expected_receiver: Type<'db>,
     expected_instance: Type<'db>,
     file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
@@ -230,9 +228,8 @@ fn protocol_class_union_accepts_receiver<'db>(
         seen_aliases: FxHashSet::default(),
         seen_typevars: FxHashSet::default(),
     }
-    .union_compatibility(
+    .member_compatibility(
         annotation,
-        annotation_type,
         ReceiverAnnotationResolver::File(file_expression_type),
     )
     .filter(|compatibility| compatibility.contains_protocol_class)
@@ -549,23 +546,51 @@ impl<'db> ProtocolClassUnionChecker<'db> {
         annotation: &ast::Expr,
         resolver: ReceiverAnnotationResolver<'db, '_>,
     ) -> Option<Type<'db>> {
-        match resolver
-            .expression_type(self.db, annotation)
-            .resolve_type_alias(self.db)
+        if let Some(protocol) =
+            self.protocol_instance_from_type(resolver.expression_type(self.db, annotation))
         {
-            protocol @ Type::ProtocolInstance(_) => return Some(protocol),
-            Type::ClassLiteral(class) if class.is_protocol(self.db) => {
-                return Type::from(class).to_instance(self.db);
-            }
-            Type::GenericAlias(alias) if alias.origin(self.db).is_protocol(self.db) => {
-                return Type::from(alias).to_instance(self.db);
-            }
-            _ => {}
+            return Some(protocol);
+        }
+
+        if let ast::Expr::BinOp(binary) = annotation
+            && binary.op == ast::Operator::BitOr
+        {
+            return Some(UnionType::from_two_elements(
+                self.db,
+                self.protocol_instance_from_annotation(&binary.left, resolver)?,
+                self.protocol_instance_from_annotation(&binary.right, resolver)?,
+            ));
         }
 
         let ast::Expr::Subscript(subscript) = annotation else {
             return None;
         };
+        match resolver.expression_type(self.db, &subscript.value) {
+            Type::SpecialForm(SpecialFormType::Union) => {
+                let mut elements: Box<dyn Iterator<Item = &ast::Expr>> = match &*subscript.slice {
+                    ast::Expr::Tuple(tuple) => Box::new(tuple.iter()),
+                    element => Box::new(std::iter::once(element)),
+                };
+                let mut protocol =
+                    self.protocol_instance_from_annotation(elements.next()?, resolver)?;
+                for element in elements {
+                    protocol = UnionType::from_two_elements(
+                        self.db,
+                        protocol,
+                        self.protocol_instance_from_annotation(element, resolver)?,
+                    );
+                }
+                return Some(protocol);
+            }
+            Type::SpecialForm(SpecialFormType::Annotated) => {
+                let ast::Expr::Tuple(tuple) = &*subscript.slice else {
+                    return None;
+                };
+                return self.protocol_instance_from_annotation(tuple.elts.first()?, resolver);
+            }
+            _ => {}
+        }
+
         let Type::ClassLiteral(protocol_class) = resolver.expression_type(self.db, &subscript.value)
         else {
             return None;
@@ -594,6 +619,26 @@ impl<'db> ProtocolClassUnionChecker<'db> {
             generic_context.specialize_partial(self.db, argument_types.into_iter().map(Some))
         });
         Some(Type::instance(self.db, protocol))
+    }
+
+    fn protocol_instance_from_type(&self, annotation_type: Type<'db>) -> Option<Type<'db>> {
+        match annotation_type.resolve_type_alias(self.db) {
+            protocol @ Type::ProtocolInstance(_) => Some(protocol),
+            Type::ClassLiteral(class) if class.is_protocol(self.db) => {
+                Type::from(class).to_instance(self.db)
+            }
+            Type::GenericAlias(alias) if alias.origin(self.db).is_protocol(self.db) => {
+                Type::from(alias).to_instance(self.db)
+            }
+            Type::Union(union) => UnionType::try_from_elements(
+                self.db,
+                union
+                    .elements(self.db)
+                    .iter()
+                    .map(|element| self.protocol_instance_from_type(*element)),
+            ),
+            _ => None,
+        }
     }
 }
 
