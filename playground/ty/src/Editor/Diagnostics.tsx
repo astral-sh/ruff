@@ -32,7 +32,7 @@ export default function Diagnostics({
   return (
     <div
       className={classNames(
-        "flex grow flex-col overflow-hidden",
+        "flex h-full min-h-0 flex-col overflow-hidden",
         theme === "dark" ? "text-white" : null,
       )}
     >
@@ -45,7 +45,7 @@ export default function Diagnostics({
         File diagnostics ({diagnostics.length})
       </div>
 
-      <div className="flex grow p-2 overflow-hidden">
+      <div className="flex min-h-0 grow overflow-hidden p-2">
         <Items diagnostics={diagnostics} onGoTo={onGoTo} />
       </div>
     </div>
@@ -70,7 +70,7 @@ function Items({
   const uniqueIds: Map<string, number> = new Map();
 
   return (
-    <ul className="space-y-0.5 grow overflow-y-scroll">
+    <ul className="space-y-0.5 grow overflow-y-auto">
       {diagnostics.map((diagnostic) => {
         const position = diagnostic.range;
         const start = position?.start;
