@@ -105,6 +105,7 @@ def deprecated_union_binding() -> None: ...
 @deprecated("deprecated union arm")
 def deprecated_union_arm() -> str:
     return "deprecated union arm"
+
 @deprecated("outer union binding")
 @replace_with(cast(TypeOf[deprecated_union_arm] | TypeOf[other], deprecated_union_arm))  # ty: ignore[deprecated]
 def duplicate_policy_binding() -> None: ...
@@ -536,6 +537,7 @@ if bool(input()):
     @deprecated("use replacement directly")
     @replace_with(replacement)
     def old() -> None: ...
+
 else:
     @deprecated("use other directly")
     @replace_with(other)
@@ -814,7 +816,6 @@ class DeprType: ...
 
 @deprecated("Use other_func instead")
 def depr_func(): ...
-
 def regular_func(): ...
 
 class C:
