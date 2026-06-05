@@ -549,6 +549,11 @@ class Array[*Ts1, *Ts2]: ...
 ```py
 def invalid[*Ts](x: Ts) -> None: ...  # error: [invalid-type-form]
 def invalid_args[*Ts](*args: Ts) -> None: ...  # error: [invalid-type-form]
+
+class InvalidTupleElement[*Ts]:
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts` is not valid in this context in a type expression"
+    values: tuple[Ts]
+
 def valid[*Ts](x: tuple[*Ts]) -> tuple[*Ts]:
     return x
 ```
