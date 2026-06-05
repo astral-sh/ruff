@@ -157,6 +157,22 @@ def nested():
 class HasNestedFunction:
     def outer(self):
         def __new__(value: int): ...
+
+class RestrictedMeta(type):
+    def restricted(cls: type[int]): ...
+
+class RestrictedInt(int, metaclass=RestrictedMeta): ...
+
+class InvalidMeta(type):
+    @classmethod
+    # error: [invalid-method-receiver]
+    def invalid_classmethod(cls: type[int]): ...
+    def __new__(
+        cls: type[int],  # error: [invalid-method-receiver]
+        name: str,
+        bases: tuple[type, ...],
+        namespace: dict[str, Any],
+    ): ...
 ```
 
 ## TypedDict defaults use annotation context
