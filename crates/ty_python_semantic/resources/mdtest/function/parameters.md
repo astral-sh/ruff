@@ -74,7 +74,7 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
-from typing import Any, LiteralString, Never, Protocol, Self, TypeVar, overload
+from typing import Annotated, Any, LiteralString, Never, Protocol, Self, TypeVar, Union, overload
 
 class Parent: ...
 class Unrelated: ...
@@ -190,6 +190,62 @@ class ValidProtocolClassReceiver:
     def first(self) -> None: ...
     @classmethod
     def method(cls: type[FirstReceiverProtocol] | type[SecondReceiverProtocol]): ...
+
+class InvalidTypingUnionProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: Union[type[FirstReceiverProtocol], type[SecondReceiverProtocol]]): ...
+
+class InvalidAnnotatedProtocolClassReceiver:
+    @classmethod
+    def method(
+        cls: Annotated[  # error: [invalid-method-receiver]
+            type[FirstReceiverProtocol] | type[SecondReceiverProtocol],
+            "metadata",
+        ],
+    ): ...
+
+type ProtocolClassReceiverAlias = type[FirstReceiverProtocol] | type[SecondReceiverProtocol]
+
+class InvalidAliasedProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: ProtocolClassReceiverAlias): ...
+
+T_ProtocolClassReceiver = TypeVar(
+    "T_ProtocolClassReceiver",
+    bound=type[FirstReceiverProtocol] | type[SecondReceiverProtocol],
+)
+
+class InvalidTypeVarProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: T_ProtocolClassReceiver): ...
+
+class InvalidMixedProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: type[FirstReceiverProtocol] | type[int]): ...
+
+class ValidTypingUnionProtocolClassReceiver:
+    def second(self) -> None: ...
+    @classmethod
+    def method(cls: Union[type[FirstReceiverProtocol], type[SecondReceiverProtocol]]): ...
+
+class ValidAliasedProtocolClassReceiver:
+    def first(self) -> None: ...
+    @classmethod
+    def method(cls: ProtocolClassReceiverAlias): ...
+
+class ValidMixedProtocolClassReceiver(int):
+    @classmethod
+    def method(cls: type[FirstReceiverProtocol] | type[int]): ...
+
+class InvalidQuotedProtocolClassReceiver:
+    @classmethod
+    # TODO: error: [invalid-method-receiver]
+    # Resolving names in the separately parsed string-annotation AST is not yet supported here.
+    def method(cls: "type[FirstReceiverProtocol] | type[SecondReceiverProtocol]"): ...
 ```
 
 ## TypedDict defaults use annotation context

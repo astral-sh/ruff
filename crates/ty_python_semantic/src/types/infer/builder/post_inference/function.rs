@@ -1,9 +1,10 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownClass, KnownInstanceType, Signature, SpecialFormType, Type, TypeVarBoundOrConstraints,
-        TypeVarKind, UnionType,
+        KnownClass, KnownInstanceType, Signature, SpecialFormType, Type, TypeAliasType,
+        TypeVarBoundOrConstraints, TypeVarKind,
         context::InferContext,
+        definition_expression_type,
         diagnostic::{
             INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
             INVALID_TYPE_VARIABLE_DEFAULT,
@@ -23,7 +24,8 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::definition::Definition;
+use rustc_hash::FxHashSet;
+use ty_python_core::definition::{Definition, DefinitionKind};
 
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
@@ -77,13 +79,14 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let Some(receiver_type) = signature
+    let Some(raw_receiver_type) = signature
         .parameters()
         .get(0)
-        .map(|parameter| parameter.annotated_type().resolve_type_alias(db))
+        .map(|parameter| parameter.annotated_type())
     else {
         return;
     };
+    let receiver_type = raw_receiver_type.resolve_type_alias(db);
 
     if receiver_type.is_never()
         || (enclosing_class.known(db) == Some(KnownClass::Str)
@@ -131,6 +134,8 @@ fn check_method_receiver<'db>(
     if let Some(accepts_receiver) = protocol_class_union_accepts_receiver(
         db,
         annotation,
+        raw_receiver_type,
+        expected_receiver,
         typing_self_type,
         file_expression_type,
     ) {
@@ -168,56 +173,227 @@ fn is_protocol_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> boo
 fn protocol_class_union_accepts_receiver<'db>(
     db: &'db dyn crate::Db,
     annotation: &ast::Expr,
+    annotation_type: Type<'db>,
+    expected_receiver: Type<'db>,
     expected_instance: Type<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &dyn Fn(&ast::Expr) -> Type<'db>,
 ) -> Option<bool> {
     // `type[Protocol]` currently lowers to a TODO type, so preserve the union's protocol members
     // from the annotation rather than relying on class-object assignability.
-    let ast::Expr::BinOp(binary) = annotation else {
-        return None;
-    };
-    if binary.op != ast::Operator::BitOr {
-        return None;
+    ProtocolClassUnionChecker {
+        db,
+        expected_receiver,
+        expected_instance,
+        seen_aliases: FxHashSet::default(),
+        seen_typevars: FxHashSet::default(),
     }
-
-    let receiver_instance =
-        protocol_class_union_instance_type(db, annotation, file_expression_type)?;
-    Some(expected_instance.is_assignable_to(db, receiver_instance))
+    .union_compatibility(
+        annotation,
+        annotation_type,
+        ReceiverAnnotationResolver::File(file_expression_type),
+    )
+    .filter(|compatibility| compatibility.contains_protocol_class)
+    .map(|compatibility| compatibility.accepts_receiver)
 }
 
-fn protocol_class_union_instance_type<'db>(
+#[derive(Clone, Copy)]
+struct ProtocolClassUnionCompatibility {
+    contains_protocol_class: bool,
+    accepts_receiver: bool,
+}
+
+impl ProtocolClassUnionCompatibility {
+    fn union(self, other: Self) -> Self {
+        Self {
+            contains_protocol_class: self.contains_protocol_class || other.contains_protocol_class,
+            accepts_receiver: self.accepts_receiver || other.accepts_receiver,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ReceiverAnnotationResolver<'db, 'a> {
+    File(&'a dyn Fn(&ast::Expr) -> Type<'db>),
+    Definition(Definition<'db>),
+}
+
+impl<'db> ReceiverAnnotationResolver<'db, '_> {
+    fn expression_type(self, db: &'db dyn crate::Db, expression: &ast::Expr) -> Type<'db> {
+        match self {
+            Self::File(file_expression_type) => file_expression_type(expression),
+            Self::Definition(definition) => definition_expression_type(db, definition, expression),
+        }
+    }
+}
+
+struct ProtocolClassUnionChecker<'db> {
     db: &'db dyn crate::Db,
-    annotation: &ast::Expr,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-) -> Option<Type<'db>> {
-    if let ast::Expr::BinOp(binary) = annotation
-        && binary.op == ast::Operator::BitOr
-    {
-        return Some(UnionType::from_two_elements(
-            db,
-            protocol_class_union_instance_type(db, &binary.left, file_expression_type)?,
-            protocol_class_union_instance_type(db, &binary.right, file_expression_type)?,
-        ));
+    expected_receiver: Type<'db>,
+    expected_instance: Type<'db>,
+    seen_aliases: FxHashSet<TypeAliasType<'db>>,
+    seen_typevars: FxHashSet<TypeVarInstance<'db>>,
+}
+
+impl<'db> ProtocolClassUnionChecker<'db> {
+    fn union_compatibility(
+        &mut self,
+        annotation: &ast::Expr,
+        annotation_type: Type<'db>,
+        resolver: ReceiverAnnotationResolver<'db, '_>,
+    ) -> Option<ProtocolClassUnionCompatibility> {
+        if let ast::Expr::BinOp(binary) = annotation
+            && binary.op == ast::Operator::BitOr
+        {
+            return Some(
+                self.member_compatibility(&binary.left, resolver)?
+                    .union(self.member_compatibility(&binary.right, resolver)?),
+            );
+        }
+
+        if let ast::Expr::Subscript(subscript) = annotation {
+            match resolver.expression_type(self.db, &subscript.value) {
+                Type::SpecialForm(SpecialFormType::Union) => {
+                    let mut elements: Box<dyn Iterator<Item = &ast::Expr>> = match &*subscript.slice
+                    {
+                        ast::Expr::Tuple(tuple) => Box::new(tuple.iter()),
+                        element => Box::new(std::iter::once(element)),
+                    };
+                    let mut compatibility =
+                        self.member_compatibility(elements.next()?, resolver)?;
+                    for element in elements {
+                        compatibility =
+                            compatibility.union(self.member_compatibility(element, resolver)?);
+                    }
+                    return Some(compatibility);
+                }
+                Type::SpecialForm(SpecialFormType::Annotated) => {
+                    let ast::Expr::Tuple(tuple) = &*subscript.slice else {
+                        return None;
+                    };
+                    let inner = tuple.elts.first()?;
+                    return self.union_compatibility(
+                        inner,
+                        resolver.expression_type(self.db, inner),
+                        resolver,
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        let alias = match annotation_type {
+            Type::TypeAlias(alias)
+            | Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => Some(alias),
+            _ => None,
+        };
+        if let Some(alias) = alias
+            && self.seen_aliases.insert(alias)
+        {
+            let definition = alias.definition(self.db);
+            let module = parsed_module(self.db, definition.file(self.db)).load(self.db);
+            let DefinitionKind::TypeAlias(type_alias) = definition.kind(self.db) else {
+                return None;
+            };
+            let value = &type_alias.node(&module).value;
+            return self.union_compatibility(
+                value,
+                definition_expression_type(self.db, definition, value),
+                ReceiverAnnotationResolver::Definition(definition),
+            );
+        }
+
+        let typevar = match annotation_type {
+            Type::TypeVar(bound_typevar) => Some(bound_typevar.typevar(self.db)),
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(typevar),
+            _ => None,
+        };
+        if let Some(typevar) = typevar
+            && self.seen_typevars.insert(typevar)
+        {
+            let definition = typevar.definition(self.db)?;
+            let module = parsed_module(self.db, definition.file(self.db)).load(self.db);
+            let resolver = ReceiverAnnotationResolver::Definition(definition);
+            return match definition.kind(self.db) {
+                DefinitionKind::TypeVar(typevar) => {
+                    let bound = typevar.node(&module).bound.as_ref()?;
+                    self.union_compatibility(
+                        bound,
+                        resolver.expression_type(self.db, bound),
+                        resolver,
+                    )
+                }
+                DefinitionKind::Assignment(assignment) => {
+                    let call = assignment.value(&module).as_call_expr()?;
+                    if let Some(bound) = call.arguments.find_keyword("bound") {
+                        self.union_compatibility(
+                            &bound.value,
+                            resolver.expression_type(self.db, &bound.value),
+                            resolver,
+                        )
+                    } else {
+                        let mut constraints = call.arguments.args.iter().skip(1);
+                        let mut compatibility =
+                            self.member_compatibility(constraints.next()?, resolver)?;
+                        for constraint in constraints {
+                            compatibility = compatibility
+                                .union(self.member_compatibility(constraint, resolver)?);
+                        }
+                        Some(compatibility)
+                    }
+                }
+                _ => None,
+            };
+        }
+
+        None
     }
 
-    let ast::Expr::Subscript(subscript) = annotation else {
-        return None;
-    };
-    let is_type_subscript = match file_expression_type(&subscript.value) {
-        Type::ClassLiteral(class) => class.known(db) == Some(KnownClass::Type),
-        Type::SpecialForm(SpecialFormType::Type) => true,
-        _ => false,
-    };
-    if !is_type_subscript {
-        return None;
-    }
+    fn member_compatibility(
+        &mut self,
+        annotation: &ast::Expr,
+        resolver: ReceiverAnnotationResolver<'db, '_>,
+    ) -> Option<ProtocolClassUnionCompatibility> {
+        let annotation_type = resolver.expression_type(self.db, annotation);
+        if let Some(compatibility) = self.union_compatibility(annotation, annotation_type, resolver)
+        {
+            return Some(compatibility);
+        }
 
-    let protocol_instance = match file_expression_type(&subscript.slice).resolve_type_alias(db) {
-        protocol @ Type::ProtocolInstance(_) => protocol,
-        Type::ClassLiteral(class) if class.is_protocol(db) => Type::from(class).to_instance(db)?,
-        _ => return None,
-    };
-    Some(protocol_instance)
+        if let ast::Expr::Subscript(subscript) = annotation {
+            let is_type_subscript = match resolver.expression_type(self.db, &subscript.value) {
+                Type::ClassLiteral(class) => class.known(self.db) == Some(KnownClass::Type),
+                Type::SpecialForm(SpecialFormType::Type) => true,
+                _ => false,
+            };
+            if is_type_subscript {
+                let protocol_instance = match resolver
+                    .expression_type(self.db, &subscript.slice)
+                    .resolve_type_alias(self.db)
+                {
+                    protocol @ Type::ProtocolInstance(_) => Some(protocol),
+                    Type::ClassLiteral(class) if class.is_protocol(self.db) => {
+                        Type::from(class).to_instance(self.db)
+                    }
+                    _ => None,
+                };
+                if let Some(protocol_instance) = protocol_instance {
+                    return Some(ProtocolClassUnionCompatibility {
+                        contains_protocol_class: true,
+                        accepts_receiver: self
+                            .expected_instance
+                            .is_assignable_to(self.db, protocol_instance),
+                    });
+                }
+            }
+        }
+
+        Some(ProtocolClassUnionCompatibility {
+            contains_protocol_class: false,
+            accepts_receiver: self
+                .expected_receiver
+                .is_assignable_to(self.db, annotation_type.resolve_type_alias(self.db)),
+        })
+    }
 }
 
 /// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.
