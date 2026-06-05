@@ -3093,6 +3093,7 @@ class NestedListsConcat:
         self.y = [0]
 
     def f(self, y: list):
+        # The overload that fails to resolve is `list.__add__` in both of these cases.
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
