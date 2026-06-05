@@ -85,6 +85,9 @@ T = TypeVar("T")
 T_Parent = TypeVar("T_Parent", bound=Parent)
 T_Unrelated = TypeVar("T_Unrelated", bound=Unrelated)
 
+def preserve_callable[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
 class Foo(Parent):
     # error: [invalid-method-receiver]
     def invalid(self: int): ...
@@ -123,6 +126,9 @@ class Foo(Parent):
     @final
     # error: [invalid-method-receiver]
     def invalid_final(self: int): ...
+    @preserve_callable
+    # error: [invalid-method-receiver]
+    def invalid_preserved_callable(self: int): ...
     @property
     # error: [invalid-method-receiver]
     def invalid_property(self: int) -> int:

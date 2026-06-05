@@ -3,6 +3,7 @@ use crate::{
     types::{
         ClassLiteral, KnownClass, KnownInstanceType, ParamSpecAttrKind, Signature, Type,
         TypeVarBoundOrConstraints, TypeVarKind,
+        callable::CallableTypeKind,
         context::InferContext,
         diagnostic::{
             INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
@@ -10,7 +11,7 @@ use crate::{
         },
         enums::is_enum_class_by_inheritance,
         function::{FunctionDecorators, OverloadLiteral},
-        infer::{function_known_decorators, original_class_type},
+        infer::original_class_type,
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
@@ -37,15 +38,20 @@ pub(crate) fn check_function_definition<'db>(
 ) {
     let db = context.db();
 
-    let Some(function_type) = infer_definition_types(db, definition).function_type(definition)
-    else {
+    let inference = infer_definition_types(db, definition);
+    let Some(function_type) = inference.function_type(definition) else {
         return;
     };
 
     let last_definition = function_type.literal(db).last_definition;
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
-    check_method_receiver(context, definition, last_definition, &signature);
+    check_method_receiver(
+        context,
+        inference.binding_type(definition),
+        last_definition,
+        &signature,
+    );
     check_legacy_positional_only_convention(context, last_definition, &signature);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
@@ -65,7 +71,7 @@ pub(crate) fn check_function_definition<'db>(
 /// `str`/`LiteralString`.
 fn check_method_receiver<'db>(
     context: &InferContext<'db, '_>,
-    definition: Definition<'db>,
+    decorated_type: Type<'db>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
 ) {
@@ -117,17 +123,8 @@ fn check_method_receiver<'db>(
     }
 
     let node = last_definition.node(db, context.file(), context.module());
-    if !node.decorator_list.is_empty() {
-        let decorator_inference = function_known_decorators(db, definition);
-        if node.decorator_list.iter().any(|decorator| {
-            decorator_inference
-                .expression_type(&decorator.expression)
-                .is_none_or(|decorator_type| {
-                    !decorator_preserves_method_binding(db, decorator_type)
-                })
-        }) {
-            return;
-        }
+    if !decorated_type_has_method_binding(db, decorated_type) {
+        return;
     }
 
     let Some(annotation) = node
@@ -221,21 +218,28 @@ fn check_method_receiver<'db>(
     }
 }
 
-/// Returns whether a decorator is known to preserve the binding behavior of the decorated method.
+/// Returns whether the decorated binding preserves ordinary method receiver behavior.
 ///
-/// Arbitrary decorators can replace a function with a custom descriptor, in which case the
-/// function's first parameter is not necessarily the instance or class passed by normal method
-/// binding.
-fn decorator_preserves_method_binding(db: &dyn crate::Db, decorator_type: Type<'_>) -> bool {
-    !FunctionDecorators::from_decorator_type(db, decorator_type).is_empty()
-        || matches!(
-            decorator_type,
-            Type::ClassLiteral(class) if class.known(db) == Some(KnownClass::Property)
-        )
-        || matches!(
-            decorator_type,
-            Type::KnownInstance(KnownInstanceType::Deprecated(_)) | Type::DataclassTransformer(_)
-        )
+/// Callable decorators retain their descriptor behavior in [`CallableTypeKind`]. Other decorators
+/// can replace the function with an arbitrary descriptor whose first parameter is not the instance
+/// or class passed by normal method binding.
+fn decorated_type_has_method_binding(db: &dyn crate::Db, decorated_type: Type<'_>) -> bool {
+    match decorated_type {
+        Type::FunctionLiteral(_) | Type::PropertyInstance(_) => true,
+        Type::Callable(callable) => matches!(
+            callable.kind(db),
+            CallableTypeKind::FunctionLike
+                | CallableTypeKind::StaticMethodLike
+                | CallableTypeKind::ClassMethodLike
+        ),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(|element| decorated_type_has_method_binding(db, element)),
+        Type::TypeAlias(alias) => decorated_type_has_method_binding(db, alias.value_type(db)),
+        _ => false,
+    }
 }
 
 /// Returns whether a metaclass method receiver annotation permits a class-object restriction.
