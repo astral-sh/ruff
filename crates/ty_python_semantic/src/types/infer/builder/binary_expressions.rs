@@ -534,8 +534,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
+                    | DynamicType::TodoStarredExpression,
                 ),
                 _,
                 _,
@@ -545,8 +544,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
+                    | DynamicType::TodoStarredExpression,
                 ),
                 _,
             ) => Some(todo),

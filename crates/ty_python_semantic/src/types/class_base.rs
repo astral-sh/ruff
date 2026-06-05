@@ -65,10 +65,7 @@ impl<'db> ClassBase<'db> {
             ) => "Unknown",
             ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoStarredExpression
-                | DynamicType::TodoTypeVarTuple,
+                DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
             ) => "@Todo",
             ClassBase::Divergent(_) => "Divergent",
             ClassBase::Protocol => "Protocol",

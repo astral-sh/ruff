@@ -649,14 +649,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !self
                         .inference_flags()
                         .contains(InferenceFlags::IN_KWARG_ANNOTATION)
-                    && !matches!(
-                        value_ty,
-                        Type::GenericAlias(alias)
-                            if alias
-                                .specialization(db)
-                                .types(db)
-                                .contains(&Type::Dynamic(DynamicType::TodoTypeVarTuple))
-                    )
                     && typevartuple_index.is_none()
                     && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expr)
                 {
@@ -1035,15 +1027,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
-            if let Type::GenericAlias(alias) = value_ty
-                && alias
-                    .specialization(db)
-                    .types(db)
-                    .contains(&Type::Dynamic(DynamicType::TodoTypeVarTuple))
-            {
-                // Avoid false-positive errors when specializing a class
-                // that's generic over a legacy TypeVarTuple
-            } else if typevars_len == 0 {
+            if typevars_len == 0 {
                 // Type parameter list cannot be empty, so if we reach here, `value_ty` is not a generic type.
                 if let Some(builder) = self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
